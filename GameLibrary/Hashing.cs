@@ -12,23 +12,26 @@ namespace GameLibrary
         {
             var saltAndPepper = Encoding.UTF8.GetBytes(salt).AppendAll(_pepper);
             var hashedBytes = SHA512.HashData(Encoding.UTF8.GetBytes(input).AppendAll(saltAndPepper));
-            var input1 = new byte[hashedBytes.Length + saltAndPepper.Length];
-            var input2 = new byte[hashedBytes.Length + saltAndPepper.Length];
 
-            ReplaceFront(input1, saltAndPepper);
-            ReplaceEnd(input2, saltAndPepper);
-
-            for (int i = 1; i < iterations; i++)
+            if (iterations > 1)
             {
-                if (i % 2 == 0)
+                var input1 = new byte[hashedBytes.Length + saltAndPepper.Length];
+                var input2 = new byte[hashedBytes.Length + saltAndPepper.Length];
+                ReplaceFront(input1, saltAndPepper);
+                ReplaceEnd(input2, saltAndPepper);
+
+                for (int i = 1; i < iterations; i++)
                 {
-                    ReplaceEnd(input1, hashedBytes);
-                    hashedBytes = SHA512.HashData(input1);
-                }
-                else
-                {
-                    ReplaceFront(input2, hashedBytes);
-                    hashedBytes = SHA512.HashData(input2);
+                    if (i % 2 == 0)
+                    {
+                        ReplaceEnd(input1, hashedBytes);
+                        hashedBytes = SHA512.HashData(input1);
+                    }
+                    else
+                    {
+                        ReplaceFront(input2, hashedBytes);
+                        hashedBytes = SHA512.HashData(input2);
+                    }
                 }
             }
 

@@ -10,14 +10,16 @@ namespace GameServer
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            //connectionString and hashPepper are set from user secrets
             var connectionString = builder.Configuration["ConnectionString"] ?? throw new Exception("Could not retrieve connection string.");
             var hashPepper = builder.Configuration["HashPepper"];
             if (hashPepper is not null)
             {
                 Hashing.SetPepper(hashPepper);
             }
-            var logger = new ApiLogger();
 
+            var logger = new ApiLogger();
             logger.Log("Initializing CacheManager.");
             long startTime = Stopwatch.GetTimestamp();
             var cacheManager = new CacheManager(connectionString);
@@ -34,7 +36,7 @@ namespace GameServer
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultChallengeScheme = "Default";
-                options.AddScheme<SessionAuthHandler>("Default", "Default Scheme");
+                options.AddScheme<SessionAuthHandler>("Default", nameof(SessionAuthHandler));
             });
 
             var app = builder.Build();
@@ -54,10 +56,6 @@ namespace GameServer
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-
-            app.MapControllerRoute(
-                name: "default",
-                pattern: "{controller=Home}/{action=Game}");
 
             app.Run();
         }
