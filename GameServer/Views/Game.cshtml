@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>My Game :)</title>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <!--For when I make an icon: <link rel="icon" href="./favicon.ico" type="image/x-icon">-->
+  </head>
+  <body>
+    <div id="tooltip">
+        <h2 id="tooltipTitle">Title</h2>
+        <div id="tooltipContent">
+
+        </div>
+    </div>
+    <div id="popupContainer">
+        <div id="popupOverlay"></div>
+        <div class="popup textSelectable" id="loggingOptionsPopup">
+            <table id="loggingOptionsList">
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div class="popup textSelectable" id="loginPopup">
+            <label for="Username">Username:</label>
+            <input name="Username" id="Username" type="text" />
+            <label for="Password">Password:</label>
+            <input name="Password" id="Password" type="password" />
+            <button onclick="LoginManager.attemptLogin()" >Login</button>
+            <span id="loginFailedReason"></span>
+        </div>
+    </div>
+    <main>
+        <div class="navMenu">
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Fight')">Fight</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Inventory')">Inventory</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Attributes')">Attributes</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Stats')">Stats</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Help')">Help</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Options')">Options</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('cardGame')">Card Game</button>
+            <button class="menuButton" onclick="GameManager.resetSaveData()">Reset Save Data</button>
+            <button class="menuButton" onclick="ScreenManager.changeScreen('Quit')">Quit</button>
+        </div>
+        <div class="screenContainer">
+            <div class="screen" id="Fight">
+                <div class="zoneNav">
+                    <button class="zoneNavButton" id="zoneButtonLeft">&lt;</button>
+                    <div class="zoneDisplay">
+                        <span class="zoneNum" id="zoneNum">Zone 0</span>
+                        <span class="zoneTitle" id="zoneTitle">Home</span>
+                    </div>
+                    <button class="zoneNavButton" id="zoneButtonRight">&gt;</button>
+                </div>
+                <div class="playerCard">
+                    <span id="playerName" class="cardName textSelectable"></span>
+                    <span id="playerLvl" class="cardLvl textSelectable"></span>
+                    <label class="textSelectable" for="playerHealth">Health:</label>
+                    <meter id="playerHealth" class="healthBar textSelectable"></meter>
+                    <span id="playerHealthLabel" class="healthLabel textSelectable"></span>
+                    <div class="skillsContainer" id="playerSkillsContainer"></div>
+                </div>
+                <div class="enemyCard">
+                    <span id="enemyName" class="cardName textSelectable"></span>
+                    <span id="enemyLvl" class="cardLvl textSelectable"></span>
+                    <label class="textSelectable" for="enemyHealth">Health:</label>
+                    <meter id="enemyHealth" class="healthBar textSelectable"></meter>
+                    <span id="enemyHealthLabel" class="healthLabel textSelectable"></span>
+                    <div class="skillsContainer" id="enemySkillsContainer"></div>
+                </div>
+            </div>
+            <div class="screen" id="Attributes">
+                <h2>Base Stats:</h2>
+                <div class="attTable textSelectable">
+                    <div class="attCol" id="attTableLabels">
+                    </div>
+                    <div class="attCol" id="attTableNumbers">
+                    </div>
+                    <div class="attCol" id="attTableButtons">
+                    </div>
+                </div>
+                <div>
+                    <span>Available Stat Points:</span>
+                    <span id="statPointsValue"></span>
+                    <button onclick="AttributeManager.saveStats()">Save</button>
+                </div>
+            </div>
+            <div class="screen" id="Stats">
+                Stats...
+            </div>
+            <div class="screen" id="Help">
+                All art created using <a target="_blank" href="https://labs.openai.com/">DALL-E</a>.
+            </div>
+            <div class="screen" id="Options">
+                <div class="optionsList">
+                    <button class="optionButton" id="loggingOptionsButton">Logging Options</button>
+                </div>
+            </div>
+            <div class="screen" id="Quit">
+                Quit...
+            </div>
+            <div class="screen" id="Inventory">
+                <div id="equipContainer">
+                    <div id="equipSlotsContainer">
+                        
+                    </div>
+                    <div id="equipStatsContainer" class="textSelectable">
+                        <h3 id="equipStatsHeader">Equipment Stats:</h3>
+                        <ul id="equipStatsList">
+
+                        </ul>
+                    </div>
+                </div>
+                <div class="inventoryContainer" id="inventoryContainer">
+                </div>
+            </div>
+            <div class="screen" id="cardGame">
+                <canvas width="1920" height="1080" id="cardGameCanvas"></canvas>
+            </div>
+            <div class="logs">
+                <div class="logBox textSelectable" id="logBox">
+                    <span class="logMessage">Welcome to the game!</span>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="js/app.js"></script>
+  </body>
+</html>  

@@ -1,0 +1,451 @@
+html {
+    user-select: none;
+}
+
+.playerCard {
+    border: 3px solid black;
+    background-color: lightgrey;
+    width: 30%;
+    position: relative;
+    float: left;
+    margin-left: 3vw;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.playerCard label {
+    padding-top: 1em;
+    width: 100%;
+    display: block;
+}
+
+.navMenu {
+    width: 10vw;
+    border: 2px solid black;
+    display: inline-block;
+}
+
+.menuButton {
+    display: block;
+    width: 100%;
+    height: 1.5em;
+    border: none;
+    font-size: 1.5em;
+    margin: 0em;
+    padding: 0em;
+}
+
+.menuButton+.menuButton {
+    border-top: 1px solid black;
+}
+
+.enemyCard {
+    border: 3px outset black;
+    background-color: lightgrey;
+    width: 30%;
+    position: relative;
+    float: right;
+    margin-right: 3vw;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.enemyCard label {
+    padding-top: 1em;
+    width: 100%;
+    display: block;
+}
+
+.cardName {
+    padding: 0.5em 0.5em 0 0.5em;
+    font-size: 2em;
+}
+
+.cardLvl {
+    padding: 0.5em 0.5em 0 0.5em;
+    font-size: 2em;
+}
+
+.healthBar {
+    width: 100%;
+    height: 4em;
+    vertical-align: -1em;
+}
+
+.healthLabel {
+    font-size: 2em;
+    position: absolute;
+    top: 3.1em;
+    left: 0.2em;
+}
+
+::-webkit-meter-bar {
+    height: 100%;
+    background: none;
+    background-color: red;
+    border: 1px solid black;
+    border-left: 0px;
+    border-right: 0px;
+    border-radius: 0px;
+}
+
+::-webkit-meter-inner-element {
+    display: block;
+}
+
+.screen {
+    display: none;
+    width: 100%;
+    margin-bottom: 1em;
+}
+
+.cooldownBar {
+    width: 100%;
+    height: 4em;
+    vertical-align: -1em;
+    -webkit-appearance: none;
+    border: 1px solid black;
+    border-left: 0px;
+    border-right: 0px;
+}
+
+::-webkit-progress-value {
+    height: 100%;
+    background-color: aqua;
+}
+
+.screenContainer {
+    display: inline-block;
+    width: 80vw;
+    margin: 0 auto;
+    vertical-align: top;
+}
+
+.logs {
+    width: 100%;
+    display: inline-block;
+}
+
+.logBox {
+    margin-left: 3vw;
+    margin-right: 3vw;
+    border: 3px solid black;
+    background-color: lightgrey;
+    height: 15em;
+    overflow: auto;
+}
+
+.logMessage {
+    font-style: italic;
+    display: block;
+    border: 1px solid grey;
+    width: inherit;
+}
+
+.inventoryContainer {
+    margin-left: 3vw;
+    margin-right: 3vw;
+    border: 3px solid black;
+    display: flex;
+    aspect-ratio: 6;
+    flex-wrap: wrap;
+}
+
+.inventoryBox {
+    background-color: lightgrey;
+    height: 50%;
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    border: 1px solid black;
+}
+
+.item {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.zoneNav {
+    width: fit-content;
+    margin: 0 auto;
+    padding: 0.2em;
+    border: 3px solid black;
+    background-color: lightgrey;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1em;
+}
+
+.zoneDisplay{
+    display: flex;
+    flex-direction: column;
+    margin: 0 2em;
+}
+
+.zoneNavButton {
+    font-size: 1.5em;
+    padding: 0 0.5em;
+}
+
+.zoneNum {
+    text-align: center;
+}
+
+.zoneTitle {
+    text-align: center;
+    font-size: 1.5em;
+}
+
+.skillsContainer {
+    background-color: lightgrey;
+    display: flex;
+    margin-top: 5px;
+    aspect-ratio: 4;
+    flex-wrap: wrap;
+}
+
+.skillBox {
+    height: 100%;
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    border: 1px solid black;
+    position: relative;
+    --perc: 0%;
+}
+
+.skill {
+    width: 100%;
+    height: 100%;
+}
+
+.skillBox::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    bottom: 0; left: 0;
+    background: conic-gradient(rgb(65, 65, 65, 0), rgb(65, 65, 65, 0) var(--perc), rgb(65, 65, 65, 0.7) var(--perc), rgb(65, 65, 65, 0.7));
+}
+
+.optionsList {
+    margin-left: 3vw;
+    margin-right: 3vw;
+    display: flex;
+}
+
+.optionButton {
+    display: block;
+    width: 40%;
+    height: 1.5em;
+    border-width: 1px;
+    font-size: 1.5em;
+    margin: 0em;
+    padding: 0em;
+}
+
+#popupOverlay {
+    position: fixed;
+    display: block;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 2;
+    cursor: pointer;
+}
+
+.popup {
+    position: fixed;
+    display: none;
+    top: 10vh;
+    left: 10vw;
+    background-color: white;
+    width: 80vw;
+    height: 80vh;
+    cursor: auto;
+    z-index: 3;
+}
+
+#popupContainer {
+    display: none;
+}
+
+#loggingOptionsList {
+    font-size: 2em;
+}
+
+#loggingOptionsList tr td:first-child {
+    padding-right: 2em;
+}
+
+.optionSelect {
+    font-size: inherit;
+    border-radius: 0.2em;
+    background: lightgray;
+}
+
+#tooltip {
+    position: fixed;
+    display: none;
+    width: 15em;
+    /*height: 20vh;*/
+    background-color: white;
+    padding: 0.5em;
+    border: solid black 2px;
+    border-radius: 12px;
+    z-index: 4;
+    transition: display 0.5s;
+}
+
+#tooltipTitle {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+}
+
+.tooltipHeader {
+    margin: 0.5em 0em;
+}
+
+.tooltipList {
+    list-style: none;
+    margin: 0;
+    padding-left: 1em;
+}
+
+.tooltipText {
+    margin: 0 !important;
+}
+
+#equipContainer {
+    display: flex;
+}
+
+#equipSlotsContainer {
+    margin: 0 7.5% 1em calc(7.5% + 3vw);
+    display: block;
+    width: 35%;
+    border: 3px solid black;
+    border-radius: 1vw;
+    background-color: lightgray;
+    position: relative;
+    height: calc((74vw - 6px)*3/8);
+}
+
+.equipBox {
+    --width: calc((74vw - 6px)/12);
+    background-color: white;
+    box-sizing: border-box;
+    border: 1px solid black;
+    width: var(--width);
+    height: var(--width);
+}
+
+#equipStatsContainer {
+    margin-right: 3vw;
+    width: 50%;
+}
+
+#equipStatsHeader {
+    padding-left: 3vw;
+    margin: 0em 0em 0.5em 0em;
+}
+
+#equipStatsList {
+    padding-left: 4vw;
+    display: flex;
+    flex-wrap: wrap;
+    list-style: none;
+    flex-direction: column;
+}
+
+#helmSlot {
+    position: absolute;
+    left: calc(50% - var(--width)/2);
+    top: 2.2%;
+}
+
+#chestSlot {
+    position: absolute;
+    left: calc(50% - var(--width)/2);
+    top: calc(var(--width) + 4.4%);
+}
+
+#legSlot {
+    position: absolute;
+    left: calc(50% - var(--width)/2);
+    top: calc(var(--width)*2 + 6.6%);
+}
+
+#bootSlot {
+    position: absolute;
+    left: calc(50% - var(--width)/2);
+    top: calc(var(--width)*3 + 8.8%);
+}
+
+#weaponSlot {
+    position: absolute;
+    left: calc(48% - var(--width)*1.5);
+    top: calc(var(--width)*1.5 + 5.5%);
+}
+
+#accessorySlot {
+    position: absolute;
+    left: calc(52% + var(--width)/2);
+    top: calc(var(--width)*1.5 + 5.5%);
+}
+
+#cardGameCanvas {
+    margin-left: 6vw;
+    margin-right: 6vw;
+    width: calc(100% - 12vw);
+    aspect-ratio: 16/9;
+    border: 3px solid black;
+}
+
+.textSelectable {
+    user-select: text;
+}
+
+.darken {
+    filter: brightness(50%);
+}
+
+.highlight {
+    border-color: red;
+    filter: brightness(80%);
+}
+
+.attTable {
+    display: flex;
+    height: 40vh;
+}
+
+.attCol {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 0 1em 0 0;
+    text-transform: capitalize;
+}
+
+.attCol button {
+    font-size: 1em;
+    width: 1.5em;
+    margin: auto 2px;
+}
+
+.attCol div {
+    height: 2em;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: space-evenly;
+}
+
+#Attributes > * {
+    margin-left: 3vw;
+    font-size: 1.5em;
+    margin-bottom: 1em;
+}

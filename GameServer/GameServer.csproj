@@ -1,0 +1,92 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TypeScriptTarget>ES6</TypeScriptTarget>
+    <TypeScriptNoImplicitAny>True</TypeScriptNoImplicitAny>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TypeScriptTarget>ES6</TypeScriptTarget>
+    <TypeScriptNoImplicitAny>True</TypeScriptNoImplicitAny>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>833b3795-b73b-4bf2-9f64-57e6b0301ccf</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <TypeScriptModuleKind>commonjs</TypeScriptModuleKind>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="wwwroot\css\style.css" />
+    <Content Remove="wwwroot\img\Beginner Bow.png" />
+    <Content Remove="wwwroot\img\Beginner Daggers.png" />
+    <Content Remove="wwwroot\img\Beginner Staff.png" />
+    <Content Remove="wwwroot\img\Beginner Sword.png" />
+    <Content Remove="wwwroot\img\Bronze Helm.png" />
+    <Content Remove="wwwroot\img\card\CardBase.png" />
+    <Content Remove="wwwroot\img\card\HighlightedCardBase.png" />
+    <Content Remove="wwwroot\img\card\Placeholder.png" />
+    <Content Remove="wwwroot\img\Fire Bolt.png" />
+    <Content Remove="wwwroot\img\Giant Stick.png" />
+    <Content Remove="wwwroot\img\Iron Axe.png" />
+    <Content Remove="wwwroot\img\Leather Boots.png" />
+    <Content Remove="wwwroot\img\Leather Helm.png" />
+    <Content Remove="wwwroot\img\Leather Pants.png" />
+    <Content Remove="wwwroot\img\Leather Shirt.png" />
+    <Content Remove="wwwroot\img\Punch.png" />
+    <Content Remove="wwwroot\img\Rat Tail.png" />
+    <Content Remove="wwwroot\img\Slap.png" />
+    <Content Remove="wwwroot\img\Slime Ball.png" />
+    <Content Remove="wwwroot\img\test.png" />
+    <Content Remove="wwwroot\img\Trash Can.png" />
+    <Content Remove="wwwroot\img\trash2.png" />
+    <Content Remove="wwwroot\js\.js" />
+    <Content Remove="wwwroot\js\.ts" />
+    <Content Remove="wwwroot\js\test.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.TypeScript.MSBuild" Version="5.2.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.4" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\css\style.css" />
+    <None Include="wwwroot\img\Beginner Bow.png" />
+    <None Include="wwwroot\img\Beginner Daggers.png" />
+    <None Include="wwwroot\img\Beginner Staff.png" />
+    <None Include="wwwroot\img\Beginner Sword.png" />
+    <None Include="wwwroot\img\Bronze Helm.png" />
+    <None Include="wwwroot\img\card\CardBase.png" />
+    <None Include="wwwroot\img\card\HighlightedCardBase.png" />
+    <None Include="wwwroot\img\card\Placeholder.png" />
+    <None Include="wwwroot\img\Fire Bolt.png" />
+    <None Include="wwwroot\img\Giant Stick.png" />
+    <None Include="wwwroot\img\Iron Axe.png" />
+    <None Include="wwwroot\img\Leather Boots.png" />
+    <None Include="wwwroot\img\Leather Helm.png" />
+    <None Include="wwwroot\img\Leather Pants.png" />
+    <None Include="wwwroot\img\Leather Shirt.png" />
+    <None Include="wwwroot\img\Punch.png" />
+    <None Include="wwwroot\img\Rat Tail.png" />
+    <None Include="wwwroot\img\Slap.png" />
+    <None Include="wwwroot\img\Slime Ball.png" />
+    <None Include="wwwroot\img\test.png" />
+    <None Include="wwwroot\img\Trash Can.png" />
+    <None Include="wwwroot\img\trash2.png" />
+    <None Include="wwwroot\js\test.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
+    <ProjectReference Include="..\GameLibrary\GameLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
