@@ -45,7 +45,6 @@
     <Content Remove="wwwroot\img\trash2.png" />
     <Content Remove="wwwroot\js\.js" />
     <Content Remove="wwwroot\js\.ts" />
-    <Content Remove="wwwroot\js\test.js" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,12 +80,15 @@
     <None Include="wwwroot\img\test.png" />
     <None Include="wwwroot\img\Trash Can.png" />
     <None Include="wwwroot\img\trash2.png" />
-    <None Include="wwwroot\js\test.js" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
     <ProjectReference Include="..\GameLibrary\GameLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\js\" />
   </ItemGroup>
 
 </Project>
