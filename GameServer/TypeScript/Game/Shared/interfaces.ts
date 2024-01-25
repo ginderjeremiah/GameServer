@@ -23,6 +23,11 @@ interface EnemyData {
     selectedSkills: number[];
 }
 
+interface NewEnemy {
+    cooldown: number,
+    enemyInstance: EnemyInstance
+}
+
 interface EnemyInstance {
     enemyId: number;
     enemyLevel: number;

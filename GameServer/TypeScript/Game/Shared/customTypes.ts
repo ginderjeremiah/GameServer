@@ -19,7 +19,7 @@ type ApiResponseTypes = {
     '/api/AdminTools/SetTagsForItemMod': void
     '/api/Enemy/DefeatEnemy': DefeatResults
     '/api/Enemy/Enemies': EnemyData[]
-    '/api/Enemy/NewEnemy': EnemyInstance | {cooldown: number}
+    '/api/Enemy/NewEnemy': NewEnemy
     '/api/Item/Items': ItemData[]
     '/api/Item/SlotsForItem': ItemSlot[]
     '/api/Item/SlotTypes': SlotType[]

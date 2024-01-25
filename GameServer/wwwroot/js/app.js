@@ -733,11 +733,11 @@ class DataManager {
             ApiRequest.get('/api/Enemy/NewEnemy', { newZoneId: zoneId }),
             DataManager.enemies
         ]).then(async (results) => {
-            if (!IsEnemyInstance(results[0])) {
+            if (results[0].cooldown) {
                 return delay(results[0].cooldown).then(async () => await this.newEnemy(zoneId));
             }
             else {
-                return { enemyInstance: results[0], enemyData: results[1][results[0].enemyId] };
+                return { enemyInstance: results[0].enemyInstance, enemyData: results[1][results[0].enemyInstance.enemyId] };
             }
         });
     }
