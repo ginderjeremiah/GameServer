@@ -14,7 +14,7 @@ namespace DataAccess.Repositories
 
         public Players(string connectionString) : base(connectionString) { }
 
-        [RedisSubscriber(Constants.REDIS_PLAYER_CHANNEL, Constants.REDIS_PLAYER_QUEUE)]
+        [RedisSubscriber(Constants.REDIS_PLAYER_CHANNEL)]
         internal static void SubscriberCallback(RepositoryManager repos, RedisValue value)
         {
             if (!_processingQueue)

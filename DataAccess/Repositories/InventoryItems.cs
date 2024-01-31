@@ -24,7 +24,7 @@ namespace DataAccess.Repositories
             _repositoryManager = repos;
         }
 
-        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL, Constants.REDIS_INVENTORY_QUEUE)]
+        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL)]
         internal static void InventorySubscriberCallback(RepositoryManager repos, RedisValue value)
         {
             if (!_processingInventoryQueue)
@@ -44,7 +44,7 @@ namespace DataAccess.Repositories
             }
         }
 
-        [RedisSubscriber(Constants.REDIS_EQUIPPED_CHANNEL, Constants.REDIS_EQUIPPED_QUEUE)]
+        [RedisSubscriber(Constants.REDIS_EQUIPPED_CHANNEL)]
         internal static void EquippedSubscriberCallback(RepositoryManager repos, RedisValue value)
         {
             if (!_processingEquippedQueue)

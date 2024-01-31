@@ -6,11 +6,9 @@ namespace DataAccess.Redis
     internal class RedisSubscriberAttribute : Attribute
     {
         public RedisChannel Channel { get; set; }
-        public RedisValue QueueName { get; set; }
-        public RedisSubscriberAttribute(string channel, string queueName)
+        public RedisSubscriberAttribute(string channel)
         {
             Channel = RedisChannel.Literal(channel);
-            QueueName = queueName;
         }
     }
 }
