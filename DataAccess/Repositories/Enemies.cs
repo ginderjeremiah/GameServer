@@ -9,10 +9,44 @@ namespace DataAccess.Repositories
 {
     internal class Enemies : BaseRepository, IEnemies
     {
+        private static readonly SharedProbabilityTable zoneEnemiesTable = new();
+        private static readonly object _lock = new();
+        private static List<Enemy>? _enemyList;
 
         public Enemies(string connectionString) : base(connectionString) { }
 
-        public DataSet GetProbabilitiesAndAliases(int zoneId)
+        public List<Enemy> AllEnemies()
+        {
+            return _enemyList ??= GetAllEnemyData();
+        }
+
+        public Enemy GetEnemy(int enemyId)
+        {
+            return AllEnemies()[enemyId];
+        }
+
+        public Enemy GetRandomEnemy(int zoneId)
+        {
+            if (!zoneEnemiesTable.HasProbabilities(zoneId))
+            {
+                lock (_lock)
+                {
+                    if (!zoneEnemiesTable.HasProbabilities(zoneId))
+                    {
+                        var ds = GetProbabilitiesAndAliases(zoneId);
+                        var probData = ds.Tables[0].To<ProbabilityData>();
+                        var aliases = ds.Tables[1].AsEnumerable().Select(row => (row["Alias"].AsInt(), row["Value"].AsInt())).ToList();
+
+                        zoneEnemiesTable.AddProbabilities(probData, zoneId);
+                        zoneEnemiesTable.AddAliases(aliases);
+                    }
+                }
+            }
+
+            return AllEnemies()[zoneEnemiesTable.GetRandomValue(zoneId)];
+        }
+
+        private DataSet GetProbabilitiesAndAliases(int zoneId)
         {
             var commandText = @"
                 SELECT
@@ -36,7 +70,7 @@ namespace DataAccess.Repositories
             return FillSet(commandText, new SqlParameter("@ZoneId", zoneId));
         }
 
-        public List<Enemy> GetAllEnemyData()
+        private List<Enemy> GetAllEnemyData()
         {
             var commandText = @"
                 SELECT
@@ -91,7 +125,8 @@ namespace DataAccess.Repositories
 
     public interface IEnemies
     {
-        public DataSet GetProbabilitiesAndAliases(int zoneId);
-        public List<Enemy> GetAllEnemyData();
+        public List<Enemy> AllEnemies();
+        public Enemy GetEnemy(int enemyId);
+        public Enemy GetRandomEnemy(int zoneId);
     }
 }

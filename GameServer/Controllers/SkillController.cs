@@ -12,13 +12,13 @@ namespace GameServer.Controllers
     [ApiController]
     public class SkillController : BaseController
     {
-        public SkillController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public SkillController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<Skill>> Skills()
         {
-            return Success(Caches.SkillCache.AllSkills());
+            return Success(Repositories.Skills.AllSkills());
         }
     }
 }

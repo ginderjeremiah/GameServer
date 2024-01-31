@@ -12,13 +12,13 @@ namespace GameServer.Controllers
     [ApiController]
     public class ItemModController : BaseController
     {
-        public ItemModController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public ItemModController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
-        public ApiResponse<List<ItemMod>> ItemMods()
+        public ApiResponse<List<ItemMod>> ItemMods(bool refreshCache = false)
         {
-            return Success(Repositories.ItemMods.AllItemMods());
+            return Success(Repositories.ItemMods.AllItemMods(refreshCache));
         }
 
     }

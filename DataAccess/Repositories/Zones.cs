@@ -7,9 +7,31 @@ namespace DataAccess.Repositories
 {
     internal class Zones : BaseRepository, IZones
     {
+        private static List<Zone>? _zoneList;
+
         public Zones(string connectionString) : base(connectionString) { }
 
         public List<Zone> AllZones()
+        {
+            return _zoneList ??= GetAllZones();
+        }
+
+        public Zone GetZone(int zoneId)
+        {
+            if (!ValidateZoneId(zoneId))
+            {
+                throw new ArgumentOutOfRangeException(nameof(zoneId));
+            }
+
+            return GetAllZones()[zoneId];
+        }
+
+        public bool ValidateZoneId(int zoneId)
+        {
+            return zoneId >= 0 && zoneId < GetAllZones().Count;
+        }
+
+        private List<Zone> GetAllZones()
         {
             var commandText = @"
                 SELECT
@@ -51,5 +73,7 @@ namespace DataAccess.Repositories
     public interface IZones
     {
         public List<Zone> AllZones();
+        public Zone GetZone(int zoneId);
+        public bool ValidateZoneId(int zoneId);
     }
 }

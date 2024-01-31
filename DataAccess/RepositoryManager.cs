@@ -1,4 +1,5 @@
-﻿using DataAccess.Repositories;
+﻿using DataAccess.Redis;
+using DataAccess.Repositories;
 
 namespace DataAccess
 {
@@ -19,8 +20,8 @@ namespace DataAccess
         private Zones? _zones;
         private Skills? _skills;
 
-        public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_connectionString);
-        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_connectionString);
+        public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_connectionString, this);
+        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_connectionString, Redis);
         public ILogPreferences LogPreferences => _logPreferences ??= new LogPreferences(_connectionString);
         public IPlayers Players => _players ??= new Players(_connectionString);
         public ITags Tags => _itemTags ??= new Tags(_connectionString);
@@ -32,10 +33,12 @@ namespace DataAccess
         public IEnemies Enemies => _enemies ??= new Enemies(_connectionString);
         public IZones Zones => _zones ??= new Zones(_connectionString);
         public ISkills Skills => _skills ??= new Skills(_connectionString);
+        internal RedisStore Redis { get; }
 
-        public RepositoryManager(string connectionString)
+        public RepositoryManager(IDataConfiguration config)
         {
-            _connectionString = connectionString;
+            _connectionString = config.DbConnectionString;
+            Redis = RedisStore.GetInstance(config);
         }
     }
 

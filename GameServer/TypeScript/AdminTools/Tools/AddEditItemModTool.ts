@@ -4,7 +4,7 @@
 
     static async init(renderParent: HTMLDivElement) {
         const data = await Promise.all([
-            ApiRequest.get('/api/ItemMod/ItemMods'),
+            ApiRequest.get('/api/ItemMod/ItemMods', { refreshCache: true }),
             ApiRequest.get('/api/Item/SlotTypes')
         ]);
         const slotTypeOpts = data[1].map(slotType => ({

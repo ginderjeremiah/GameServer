@@ -11,10 +11,10 @@ namespace GameServer.Controllers
     [Route("/[action]")]
     public class GameController : BaseController
     {
-        private readonly string baseViewPath = "~/Views";
+        private readonly string _baseViewPath = "~/Views";
 
-        public GameController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public GameController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [Route("/")]
         [ApiExplorerSettings(IgnoreApi = true)]
@@ -26,20 +26,20 @@ namespace GameServer.Controllers
         [ApiExplorerSettings(IgnoreApi = true)]
         public IActionResult Game()
         {
-            return View($"{baseViewPath}/Game.cshtml");
+            return View($"{_baseViewPath}/Game.cshtml");
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
         public IActionResult Test()
         {
-            return View($"{baseViewPath}/Test.cshtml");
+            return View($"{_baseViewPath}/Test.cshtml");
         }
 
         [SessionAuthorize]
         [ApiExplorerSettings(IgnoreApi = true)]
         public IActionResult AdminTools()
         {
-            return View($"{baseViewPath}/AdminTools/AdminTools.cshtml");
+            return View($"{_baseViewPath}/AdminTools/AdminTools.cshtml");
         }
 
         [SessionAuthorize]
@@ -66,10 +66,7 @@ namespace GameServer.Controllers
             if (passHash != player.PassHash)
                 return Error<LoginResponse>("Incorrect password");
 
-            if (!Repositories.SessionStore.TryGetSession(player.PlayerId, out var sessionData))
-            {
-                sessionData = Repositories.SessionStore.GetNewSessionData(Guid.NewGuid().ToString(), player.PlayerId);
-            }
+            var sessionData = Repositories.SessionStore.GetNewSessionData(player.PlayerId);
 
             var session = new Session(sessionData, Repositories);
             var token = session.GetNewToken();

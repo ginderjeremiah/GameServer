@@ -16,8 +16,8 @@ namespace GameServer.Controllers
     [ApiController]
     public class AdminToolsController : BaseController
     {
-        public AdminToolsController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public AdminToolsController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpPost]
         public ApiResponse<string> SetTagsForItem([FromBody] SetTagsData setTagsData)

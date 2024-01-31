@@ -3,14 +3,14 @@ using GameServer.Models.Request;
 
 namespace GameServer.Auth
 {
-    public class InventoryData
+    public class SessionInventory
     {
         private const int INV_SLOTS = 23;
         private const int EQUIP_SLOTS = 6;
         public List<InventoryItem?> Inventory { get; set; }
         public List<InventoryItem?> Equipped { get; set; }
 
-        public InventoryData(IEnumerable<InventoryItem> inventoryItems)
+        public SessionInventory(IEnumerable<InventoryItem> inventoryItems)
         {
             var inventory = NewInventoryList();
             var equipped = NewEquippedList();

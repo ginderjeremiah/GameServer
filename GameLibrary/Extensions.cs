@@ -1,6 +1,5 @@
-﻿using System.Data;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
+﻿using StackExchange.Redis;
+using System.Data;
 using System.Text;
 using System.Text.Json;
 
@@ -95,9 +94,26 @@ namespace GameLibrary
             return JsonSerializer.Deserialize<T>(msg.Content.ReadAsStream(), _options);
         }
 
-        public static JsonContent Serialize<T>(this T content)
+        public static T? Deserialize<T>(this string str)
         {
-            return JsonContent.Create(content, new MediaTypeHeaderValue("application/json"), _options);
+            return JsonSerializer.Deserialize<T>(str, _options);
+        }
+
+        public static T? Deserialize<T>(this RedisValue val)
+        {
+            if ((string)val is null)
+            {
+                return default;
+            }
+            else
+            {
+                return JsonSerializer.Deserialize<T>(val, _options);
+            }
+        }
+
+        public static string Serialize<T>(this T obj)
+        {
+            return JsonSerializer.Serialize(obj, _options);
         }
     }
 }

@@ -8,7 +8,7 @@
     static slotTypeCache = new DataCache(() => ApiRequest.get('/api/Item/SlotTypes'));
     static itemModCache = new DataCache(() => ApiRequest.get('/api/ItemMod/ItemMods'));
 
-    static async init(renderParent: HTMLDivElement) {
+    static async init(renderParent: HTMLDivElement, initialSelection?: number) {
         this.initCaches();
         renderParent.replaceChildren();
 
@@ -70,7 +70,7 @@
             AddEditItemSlotTool.tableDiv.hidden = false;
             const selected = AddEditItemSlotTool.itemSelect.selectedOptions[0];
             const itemId = Number(selected.value);
-            const itemSlots = await ApiRequest.get('/api/Item/SlotsForItem', { itemId: itemId });
+            const itemSlots = await ApiRequest.get('/api/Item/SlotsForItem', { itemId: itemId, refreshCache: true });
 
             this.slotTable = new TableDataEditor(itemSlots, AddEditItemSlotTool.tableDiv, "itemSlotId", {
                 "itemId": (i: ItemSlot) => itemOpts,
@@ -93,13 +93,19 @@
             AddEditItemSlotTool.submit();
         });
         renderParent.appendChild(submitButton);
+
+        if (initialSelection) {
+            this.itemSelect.selectedIndex = initialSelection;
+            this.itemSelect.dispatchEvent(new Event('change'));
+        }
     }
      
     static async submit() {
         const changes = this.slotTable.getChanges();
         if (changes.length > 0) {
             await new ApiRequest('/api/AdminTools/AddEditItemSlots').post(changes);
-            AddEditItemSlotTool.init(this.renderParent);
+            const selectedIndex = AddEditItemSlotTool.itemSelect.selectedOptions[0].index;
+            AddEditItemSlotTool.init(this.renderParent, selectedIndex);
         }
     }
 

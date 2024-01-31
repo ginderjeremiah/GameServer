@@ -1,15 +1,12 @@
-﻿using DataAccess.Caches;
-using DataAccess.Models.Player;
+﻿using DataAccess.Models.Players;
 using DataAccess.Models.SessionStore;
-using DataAccess.Models.Skills;
 using DataAccess.Models.Stats;
 using GameServer.BattleSimulation;
-using System.Data;
 using System.Text.Json.Serialization;
 
 namespace GameServer.Auth
 {
-    public class PlayerData
+    public class SessionPlayer
     {
         private readonly SessionData _sessionData;
 
@@ -29,7 +26,7 @@ namespace GameServer.Auth
         public int StatPointsGained { get => Player.StatPointsGained; set => Player.StatPointsGained = value; }
         public int StatPointsUsed { get => Player.StatPointsUsed; private set => Player.StatPointsUsed = value; }
 
-        public PlayerData(SessionData sessionData)
+        public SessionPlayer(SessionData sessionData)
         {
             _sessionData = sessionData;
             Stats = new BattleBaseStats()
@@ -41,11 +38,6 @@ namespace GameServer.Auth
                 Dexterity = sessionData.Stats.Dexterity,
                 Luck = sessionData.Stats.Luck,
             };
-        }
-
-        public List<Skill> GetSkills(ISkillCache skillCache)
-        {
-            return SelectedSkills.Select(skillCache.GetSkill).ToList();
         }
 
         public bool ChangeStats(BattleBaseStats changedStats)

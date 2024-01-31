@@ -13,13 +13,13 @@ namespace GameServer.Controllers
         private readonly IApiLogger _logger;
         private Session? _session;
         private long _beginTimestamp;
+        private string? _route;
 
         //HttpContext.Items["Session"] is populated via SessionAuthorize attribute;
         //Session can only be null if SessionAuthorize is not used or (AllowAll = true) is specified in the SessionAuthorize attribute;
         protected Session Session => _session ??= (Session?)HttpContext.Items["Session"];
         protected int PlayerId => Session.PlayerData.PlayerId;
         protected IRepositoryManager Repositories { get; }
-        protected ICacheManager Caches { get; }
         protected CookieOptions DefaultCookieOptions
         {
             get
@@ -33,10 +33,9 @@ namespace GameServer.Controllers
             }
         }
 
-        public BaseController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
+        public BaseController(IRepositoryManager repositoryManager, IApiLogger logger)
         {
             Repositories = repositoryManager;
-            Caches = cacheManager;
             _logger = logger;
         }
 
@@ -45,7 +44,8 @@ namespace GameServer.Controllers
         public override void OnActionExecuting(ActionExecutingContext context)
         {
             _beginTimestamp = Stopwatch.GetTimestamp();
-            Log("Begin request");
+            _route = $"{context.RouteData.Values["controller"]}/{context.RouteData.Values["action"]}";
+            Log($"Begin {_route} request");
         }
 
         [NonAction]
@@ -55,7 +55,8 @@ namespace GameServer.Controllers
             {
                 LogError(context.Exception);
             }
-            Log($"End request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
+            Session?.Save();
+            Log($"End {_route} request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
         }
 
         [ApiExplorerSettings(IgnoreApi = true)]
@@ -104,6 +105,7 @@ namespace GameServer.Controllers
         [NonAction]
         public ApiResponse<T> Error<T>(string message)
         {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiResponse<T>
             {
                 Error = message
@@ -113,6 +115,7 @@ namespace GameServer.Controllers
         [NonAction]
         public ApiResponse<T> ErrorWithData<T>(string message, T data)
         {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiResponse<T>
             {
                 Data = data,

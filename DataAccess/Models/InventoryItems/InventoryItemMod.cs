@@ -2,7 +2,7 @@
 {
     public class InventoryItemMod
     {
-        public int ItemSlotId { get; set; }
         public int ItemModId { get; set; }
+        public int ItemSlotId { get; set; }
     }
 }

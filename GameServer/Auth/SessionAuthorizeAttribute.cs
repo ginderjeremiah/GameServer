@@ -20,7 +20,6 @@ namespace GameServer.Auth
         {
             long startTime = Stopwatch.GetTimestamp();
             var logger = context.HttpContext.RequestServices.GetRequiredService<IApiLogger>();
-            var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
             var repos = context.HttpContext.RequestServices.GetRequiredService<IRepositoryManager>();
             logger.Log("Starting SessionAuthorize.");
 
@@ -29,16 +28,16 @@ namespace GameServer.Auth
             var now = DateTime.UtcNow;
 
             if (tokenParts == null || tokenParts.Length != 3
-                || !repos.SessionStore.TryGetSession(tokenParts[0].FromBase64(), out var sessionData)
                 || !long.TryParse(tokenParts[1].FromBase64(), out var ticks)
                 || ticks < now.Ticks
+                || !repos.SessionStore.TryGetSession(tokenParts[0].FromBase64(), out var sessionData)
                 || tokenParts[2].FromBase64() != $"{tokenParts[0]}.{tokenParts[1]}".Hash(sessionData.PlayerData.Salt.ToString(), 1))
             {
                 if (!AllowAll)
                 {
                     context.Result = new ForbidResult();
                 }
-                logger.LogError($"Failed SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds}");
+                logger.LogError($"Failed SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
                 return;
             }
 
@@ -55,7 +54,7 @@ namespace GameServer.Auth
             }
 
             context.HttpContext.Items["Session"] = session;
-            logger.Log($"Succeeded SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds}");
+            logger.Log($"Succeeded SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
         }
     }
 }

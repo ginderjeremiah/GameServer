@@ -1,5 +1,5 @@
-﻿using DataAccess.Caches;
-using DataAccess.Models.Enemies;
+﻿using DataAccess.Models.Enemies;
+using DataAccess.Models.Skills;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
@@ -13,11 +13,11 @@ namespace GameServer.BattleSimulation
         private BattleEnemy Enemy { get; set; }
         private const int msPerTick = 6;
 
-        public BattleSimulator(PlayerData playerData, Enemy enemy, EnemyInstance enemyInstance, ISkillCache skillCache)
+        public BattleSimulator(SessionPlayer playerData, Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
         {
             Rng = new Mulberry32(enemyInstance.Seed);
-            Player = new BattlePlayer(playerData, skillCache);
-            Enemy = new BattleEnemy(enemy, enemyInstance, skillCache);
+            Player = new BattlePlayer(playerData, allSkills);
+            Enemy = new BattleEnemy(enemy, enemyInstance, allSkills);
         }
 
         public bool Simulate(out int totalMs)

@@ -14,8 +14,8 @@ namespace GameServer.Controllers
     [ApiController]
     public class ItemController : BaseController
     {
-        public ItemController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public ItemController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<Item>> Items()
@@ -24,9 +24,9 @@ namespace GameServer.Controllers
         }
 
         [HttpGet]
-        public ApiResponse<List<ItemSlot>> SlotsForItem(int itemId)
+        public ApiResponse<List<ItemSlot>> SlotsForItem(int itemId, bool refreshCache = false)
         {
-            return Success(Repositories.ItemSlots.SlotsForItem(itemId));
+            return Success(Repositories.ItemSlots.SlotsForItem(itemId, refreshCache));
         }
 
         [HttpGet]

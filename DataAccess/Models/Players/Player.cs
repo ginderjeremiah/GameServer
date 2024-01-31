@@ -1,4 +1,4 @@
-﻿namespace DataAccess.Models.Player
+﻿namespace DataAccess.Models.Players
 {
     public class Player
     {

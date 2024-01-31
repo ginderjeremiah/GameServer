@@ -12,13 +12,13 @@ namespace GameServer.Controllers
     [ApiController]
     public class ZoneController : BaseController
     {
-        public ZoneController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public ZoneController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<Zone>> Zones()
         {
-            return Success(Caches.ZoneCache.AllZones());
+            return Success(Repositories.Zones.AllZones());
         }
     }
 }

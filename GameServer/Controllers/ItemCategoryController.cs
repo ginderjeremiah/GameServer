@@ -12,8 +12,8 @@ namespace GameServer.Controllers
     [ApiController]
     public class ItemCategoryController : BaseController
     {
-        public ItemCategoryController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public ItemCategoryController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<ItemCategory>> ItemCategories()

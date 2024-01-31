@@ -1,14 +1,68 @@
 ﻿using DataAccess.Models.InventoryItems;
+using DataAccess.Models.ItemMods;
+using DataAccess.Models.SessionStore;
+using DataAccess.Redis;
+using GameLibrary;
 using Microsoft.SqlServer.Server;
+using StackExchange.Redis;
 using System.Data;
 using System.Data.SqlClient;
-using System.Text.Json;
 
 namespace DataAccess.Repositories
 {
     internal class InventoryItems : BaseRepository, IInventoryItems
     {
-        public InventoryItems(string connectionString) : base(connectionString) { }
+        public static readonly object _inventoryLock = new();
+        public static bool _processingInventoryQueue = false;
+        public static readonly object _equippedLock = new();
+        public static bool _processingEquippedQueue = false;
+        private readonly RepositoryManager _repositoryManager;
+
+
+        public InventoryItems(string connectionString, RepositoryManager repos) : base(connectionString)
+        {
+            _repositoryManager = repos;
+        }
+
+        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL, Constants.REDIS_INVENTORY_QUEUE)]
+        internal static void InventorySubscriberCallback(RepositoryManager repos, RedisValue value)
+        {
+            if (!_processingInventoryQueue)
+            {
+                lock (_inventoryLock)
+                {
+                    _processingInventoryQueue = true;
+                    while (repos.Redis.TryGetFromQueue<string>(Constants.REDIS_INVENTORY_QUEUE, out var sessionId))
+                    {
+                        if (repos.Redis.TryGet<SessionData>($"{Constants.REDIS_SESSION_PREFIX}_{sessionId}", out var sessionData))
+                        {
+                            repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems.Where(i => i is not null && i.Equipped is false));
+                        }
+                    }
+                    _processingInventoryQueue = false;
+                }
+            }
+        }
+
+        [RedisSubscriber(Constants.REDIS_EQUIPPED_CHANNEL, Constants.REDIS_EQUIPPED_QUEUE)]
+        internal static void EquippedSubscriberCallback(RepositoryManager repos, RedisValue value)
+        {
+            if (!_processingEquippedQueue)
+            {
+                lock (_equippedLock)
+                {
+                    _processingEquippedQueue = true;
+                    while (repos.Redis.TryGetFromQueue<string>(Constants.REDIS_EQUIPPED_QUEUE, out var sessionId))
+                    {
+                        if (repos.Redis.TryGet<SessionData>($"{Constants.REDIS_SESSION_PREFIX}_{sessionId}", out var sessionData))
+                        {
+                            repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems.Where(i => i is not null && i.Equipped is true));
+                        }
+                    }
+                    _processingEquippedQueue = false;
+                }
+            }
+        }
 
         public List<InventoryItem> GetInventory(int playerId)
         {
@@ -40,8 +94,8 @@ namespace DataAccess.Repositories
 		            INSERT INTO #ItemModsJson
 		            (ItemModId, ItemSlotId)
 		            SELECT
-			            itemSlotId,
-			            itemModId
+			            ItemModId,
+			            ItemSlotId
 		            FROM OPENJSON(@ItemMods)
 		            WITH ( itemModId INT, itemSlotId INT)
 	            END
@@ -69,7 +123,7 @@ namespace DataAccess.Repositories
                 new SqlParameter("@Rating", inventoryItem.Rating),
                 new SqlParameter("@Equipped", inventoryItem.Equipped),
                 new SqlParameter("@SlotId", inventoryItem.SlotId),
-                new SqlParameter("@ItemMods", JsonSerializer.Serialize(inventoryItem.ItemMods)));
+                new SqlParameter("@ItemMods", inventoryItem.ItemMods.Serialize()));
 
             inventoryItem.InventoryItemId = id;
             return id;
@@ -125,6 +179,56 @@ namespace DataAccess.Repositories
 
             ExecuteNonQuery(commandText, new SqlParameter("@PlayerId", playerId), new SqlParameter("@InventoryItems", SqlDbType.Structured) { Value = records, TypeName = "InventoryUpdate" });
         }
+
+        public List<InventoryItem> RollDrops(int enemyId, int zoneId, int max)
+        {
+            var rng = new Random();
+            var drops = new List<InventoryItem>();
+            foreach (var drop in _repositoryManager.Enemies.GetEnemy(enemyId).EnemyDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
+            {
+                if (drops.Count < max)
+                {
+                    drops.Add(GetItemInstance(drop.ItemId, rng));
+                }
+            }
+            foreach (var drop in _repositoryManager.Zones.GetZone(zoneId).ZoneDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
+            {
+                if (drops.Count < max)
+                {
+                    drops.Add(GetItemInstance(drop.ItemId, rng));
+                }
+            }
+            return drops;
+        }
+
+        private InventoryItem GetItemInstance(int itemId, Random rng)
+        {
+            var slots = _repositoryManager.ItemSlots.SlotsForItem(itemId);
+            var itemMods = new List<ItemMod>();
+            var inventoryItemMods = new List<InventoryItemMod>();
+
+            foreach (var slot in slots.Where(s => (decimal)rng.NextSingle() < s.Probability))
+            {
+                var mod = _repositoryManager.ItemMods.GetItemMod(slot, rng, itemMods);
+                if (mod is not null)
+                {
+                    itemMods.Add(mod);
+                    inventoryItemMods.Add(new InventoryItemMod
+                    {
+                        ItemModId = mod.ItemModId,
+                        ItemSlotId = slot.ItemSlotId,
+                    });
+                }
+            }
+
+            return new InventoryItem
+            {
+                ItemId = itemId,
+                Rating = 0, //TODO: implement Rating calculation
+                Equipped = false,
+                ItemMods = inventoryItemMods
+            };
+        }
     }
 
     public interface IInventoryItems
@@ -133,5 +237,6 @@ namespace DataAccess.Repositories
         public int AddInventoryItem(InventoryItem inventoryItem);
         public void UpdateEquippedItemSlots(int playerId, IEnumerable<InventoryItem> equippedItems);
         public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems);
+        public List<InventoryItem> RollDrops(int enemyId, int zoneId, int max);
     }
 }

@@ -285,7 +285,14 @@
     addItems(items: InventoryItem[], itemData: ItemData[]): void {
         items.forEach(invItem => {
             const item = new Item(invItem, itemData[invItem.itemId]);
-            this.inventory[invItem.slotId] = item;
+            if (this.inventory[invItem.slotId]) {
+                const slotId = this.nextAvailableSlot();
+                this.inventory[slotId] = item;
+                item.slotId = slotId;
+                this.startSave();
+            } else {
+                this.inventory[invItem.slotId] = item;
+            }
             LogManager.logMessage("You found a " + item.itemName + "!", "Inventory");
             this.#createItem(this.inventorySlots[invItem.slotId], item.itemName);
         });
@@ -334,6 +341,15 @@
             let invSlot = document.getElementById(slot) as HTMLDivElement;
             invSlot.replaceChildren();
         });
+    }
+
+    nextAvailableSlot() {
+        for (let i = 0; i < this.inventory.length; i++) {
+            if (!this.inventory[i]) {
+                return i;
+            }
+        }
+        return this.inventory.length - 1;
     }
 
     getEquippedAsUpdates() {

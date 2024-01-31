@@ -14,19 +14,19 @@ namespace GameServer.Controllers
     [ApiController]
     public class PlayerController : BaseController
     {
-        public PlayerController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public PlayerController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
-        public ApiResponse<PlayerData> AllData()
+        public ApiResponse<SessionPlayer> AllData()
         {
             return Success(Session.PlayerData);
         }
 
         [HttpGet]
-        public ApiResponse<InventoryData> Inventory()
+        public ApiResponse<SessionInventory> Inventory()
         {
-            return Success(Session.Inventory);
+            return Success(Session.InventoryData);
         }
 
         [HttpPost]

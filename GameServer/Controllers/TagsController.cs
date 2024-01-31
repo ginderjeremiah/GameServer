@@ -12,8 +12,8 @@ namespace GameServer.Controllers
     [ApiController]
     public class TagsController : BaseController
     {
-        public TagsController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public TagsController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<Tag>> Tags()

@@ -1,5 +1,4 @@
 ﻿using DataAccess;
-using DataAccess.Caches;
 using DataAccess.Models.SessionStore;
 using GameLibrary;
 using GameServer.BattleSimulation;
@@ -12,31 +11,29 @@ namespace GameServer.Auth
     {
         private readonly SessionData _sessionData;
         private readonly IRepositoryManager _repos;
+        private bool _sessionDirty = false;
+        private bool _skillsDirty = false;
+        private bool _playerDirty = false;
+        private bool _inventoryDirty = false;
+        private bool _equippedDirty = false;
 
+        //TODO: Move to Constants static class
         public static TimeSpan TokenLifetime { get; } = TimeSpan.FromDays(1);
         public string SessionId => _sessionData.SessionId;
-        public DateTime LastUsed { get => _sessionData.LastUsed; private set => _sessionData.LastUsed = value; }
-        public DateTime EnemyCooldown { get => _sessionData.EnemyCooldown; set => _sessionData.EnemyCooldown = value; }
-        public string ActiveEnemyHash { get => _sessionData.ActiveEnemyHash; private set => _sessionData.ActiveEnemyHash = value; }
-        public DateTime EarliestDefeat { get => _sessionData.EarliestDefeat; private set => _sessionData.EarliestDefeat = value; }
-        public bool Victory { get => _sessionData.Victory; private set => _sessionData.Victory = value; }
-        public InventoryData Inventory { get; }
-        public PlayerData PlayerData { get; }
-        public int CurrentZone
-        {
-            get => _sessionData.CurrentZone;
-            set
-            {
-                _sessionData.CurrentZone = value;
-                SaveSession();
-            }
-        }
+        public DateTime LastUsed { get => _sessionData.LastUsed; private set => _sessionData.LastUsed = SetSessionDirty(value); }
+        public DateTime EnemyCooldown { get => _sessionData.EnemyCooldown; set => _sessionData.EnemyCooldown = SetSessionDirty(value); }
+        public string ActiveEnemyHash { get => _sessionData.ActiveEnemyHash; private set => _sessionData.ActiveEnemyHash = SetSessionDirty(value); }
+        public DateTime EarliestDefeat { get => _sessionData.EarliestDefeat; private set => _sessionData.EarliestDefeat = SetSessionDirty(value); }
+        public bool Victory { get => _sessionData.Victory; private set => _sessionData.Victory = SetSessionDirty(value); }
+        public int CurrentZone { get => _sessionData.CurrentZone; set => _sessionData.CurrentZone = SetSessionDirty(value); }
+        public SessionInventory InventoryData { get; }
+        public SessionPlayer PlayerData { get; }
 
         public Session(SessionData sessionData, IRepositoryManager repos)
         {
             _sessionData = sessionData;
-            PlayerData = new PlayerData(sessionData);
-            Inventory = new InventoryData(sessionData.InventoryItems);
+            PlayerData = new SessionPlayer(sessionData);
+            InventoryData = new SessionInventory(sessionData.InventoryItems);
             _repos = repos;
         }
 
@@ -45,7 +42,6 @@ namespace GameServer.Auth
             ActiveEnemyHash = activeEnemy.Hash();
             EarliestDefeat = earliestDefeat;
             Victory = victory;
-            SaveSession();
         }
 
         public bool ValidEnemyDefeat(EnemyInstance defeatedEnemy)
@@ -58,7 +54,6 @@ namespace GameServer.Auth
             ActiveEnemyHash = "";
             EarliestDefeat = DateTime.UnixEpoch;
             Victory = false;
-            SaveSession();
         }
 
         public string GetNewToken()
@@ -67,7 +62,7 @@ namespace GameServer.Auth
             return $"{tokenData}.{tokenData.Hash(PlayerData.Salt.ToString(), 1).ToBase64()}";
         }
 
-        public DefeatRewards GrantRewards(EnemyInstance enemy, ILootCache lootCache)
+        public DefeatRewards GrantRewards(EnemyInstance enemy)
         {
 
             var expReward = GetExpReward(enemy);
@@ -78,10 +73,10 @@ namespace GameServer.Auth
                 PlayerData.Level++;
                 PlayerData.StatPointsGained += 6;
             }
-            SavePlayerData();
+            _playerDirty = true;
 
-            var freeSlots = Inventory.GetFreeSlotIds();
-            var drops = lootCache.RollDrops(enemy.EnemyId, CurrentZone, freeSlots.Count);
+            var freeSlots = InventoryData.GetFreeSlotIds();
+            var drops = _repos.InventoryItems.RollDrops(enemy.EnemyId, CurrentZone, freeSlots.Count);
 
             for (int i = 0; i < drops.Count; i++)
             {
@@ -90,8 +85,9 @@ namespace GameServer.Auth
                 d.PlayerId = PlayerData.PlayerId;
                 d.SlotId = slotId;
                 _repos.InventoryItems.AddInventoryItem(d);
-                Inventory.Inventory[slotId] = d;
+                InventoryData.Inventory[slotId] = d;
                 _sessionData.InventoryItems.Add(d);
+                _sessionDirty = true; //TODO: Make inventory item adds (and dels) update to db async?
             }
 
             return new DefeatRewards
@@ -104,14 +100,14 @@ namespace GameServer.Auth
         public void UpdatePlayerStats(BattleBaseStats changedStats)
         {
             if (PlayerData.ChangeStats(changedStats))
-                SavePlayerData();
+                _playerDirty = true;
         }
 
         public bool TrySetSelectedSkills(List<int> skills)
         {
             //TODO: validate skills
             PlayerData.SelectedSkills = skills;
-            SaveSkills();
+            _skillsDirty = true;
             return true;
         }
 
@@ -125,12 +121,9 @@ namespace GameServer.Auth
                 return false;
             }
 
-            var validUpdate = Inventory.TrySetNewEquippedList(currentItems);
+            var validUpdate = InventoryData.TrySetNewEquippedList(currentItems);
 
-            if (validUpdate)
-            {
-                _repos.InventoryItems.UpdateEquippedItemSlots(PlayerData.PlayerId, Inventory.Equipped.Where(i => i is not null));
-            }
+            _equippedDirty = validUpdate || _equippedDirty;
 
             return validUpdate;
         }
@@ -144,12 +137,9 @@ namespace GameServer.Auth
                 return false;
             }
 
-            var validUpdate = Inventory.TrySetNewInventoryList(currentItems);
+            var validUpdate = InventoryData.TrySetNewInventoryList(currentItems);
 
-            if (validUpdate)
-            {
-                _repos.InventoryItems.UpdateInventoryItemSlots(PlayerData.PlayerId, Inventory.Inventory.Where(i => i is not null));
-            }
+            _inventoryDirty = validUpdate || _inventoryDirty;
 
             return validUpdate;
         }
@@ -162,24 +152,28 @@ namespace GameServer.Auth
             if (levelDifference is < (-2) or > 2)
             {
                 var bonus = 4 / Math.Pow(levelDifference, 2);
-                expMulti = levelDifference > 0 ? 2 - bonus : bonus;
+                expMulti = levelDifference < 0 ? 2 - bonus : bonus;
             }
             return (int)Math.Floor(enemy.Stats.Total * expMulti);
         }
 
-        private void SaveSession()
+        public void Save()
         {
-            _repos.SessionStore.SaveSession(_sessionData);
+            if (_sessionDirty || _playerDirty || _skillsDirty || _inventoryDirty || _equippedDirty)
+            {
+                _repos.SessionStore.Update(_sessionData, _playerDirty, _skillsDirty, _inventoryDirty, _equippedDirty);
+                _sessionDirty = false;
+                _playerDirty = false;
+                _skillsDirty = false;
+                _inventoryDirty = false;
+                _equippedDirty = false;
+            }
         }
 
-        private void SavePlayerData()
+        private T SetSessionDirty<T>(T data)
         {
-            _repos.SessionStore.SavePlayer(_sessionData);
-        }
-
-        private void SaveSkills()
-        {
-            _repos.SessionStore.SaveSkills(_sessionData);
+            _sessionDirty = true;
+            return data;
         }
     }
 }

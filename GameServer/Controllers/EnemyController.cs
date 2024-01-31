@@ -15,19 +15,19 @@ namespace GameServer.Controllers
     [ApiController]
     public class EnemyController : BaseController
     {
-        public EnemyController(IRepositoryManager repositoryManager, ICacheManager cacheManager, IApiLogger logger)
-            : base(repositoryManager, cacheManager, logger) { }
+        public EnemyController(IRepositoryManager repositoryManager, IApiLogger logger)
+            : base(repositoryManager, logger) { }
 
         [HttpGet]
         public ApiResponse<List<Enemy>> Enemies()
         {
-            return Success(Caches.EnemyCache.AllEnemies());
+            return Success(Repositories.Enemies.AllEnemies());
         }
 
         [HttpGet]
         public ApiResponse<NewEnemyResponse> NewEnemy(int newZoneId = -1)
         {
-            Log("Starting NewEnemy.");
+            //Log("Starting NewEnemy.");
             long startTime = Stopwatch.GetTimestamp();
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
@@ -38,14 +38,14 @@ namespace GameServer.Controllers
                 });
             }
 
-            if (newZoneId != -1 && newZoneId != Session.CurrentZone && Caches.ZoneCache.ValidateZoneId(newZoneId))
+            if (newZoneId != -1 && Repositories.Zones.ValidateZoneId(newZoneId))
             {
                 Session.CurrentZone = newZoneId;
             }
 
-            var zone = Caches.ZoneCache.GetZone(Session.CurrentZone);
+            var zone = Repositories.Zones.GetZone(Session.CurrentZone);
             var level = (int)new Random().NextInt64(zone.LevelMin, zone.LevelMax);
-            var enemy = Caches.EnemyCache.GetRandomEnemy(zone.ZoneId);
+            var enemy = Repositories.Enemies.GetRandomEnemy(zone.ZoneId);
             var seed = (uint)(now.Ticks % uint.MaxValue);
             var enemyInstance = new EnemyInstance()
             {
@@ -54,13 +54,13 @@ namespace GameServer.Controllers
                 Seed = seed
             };
 
-            var simulator = new BattleSimulator(Session.PlayerData, enemy, enemyInstance, Caches.SkillCache);
+            var simulator = new BattleSimulator(Session.PlayerData, enemy, enemyInstance, Repositories.Skills.AllSkills());
             var victory = simulator.Simulate(out var totalMs);
             var earliestDefeat = now.AddMilliseconds(totalMs);
 
             Session.SetActiveEnemy(enemyInstance, earliestDefeat, victory);
 
-            Log($"Finished NewEnemy: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds}");
+            //Log($"Finished NewEnemy: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
 
             return Success(new NewEnemyResponse
             {
@@ -78,7 +78,7 @@ namespace GameServer.Controllers
                 {
                     Session.ResetActiveEnemy();
                     Session.EnemyCooldown = now.AddSeconds(5);
-                    var rewards = Session.GrantRewards(enemyInstance, Caches.LootCache);
+                    var rewards = Session.GrantRewards(enemyInstance);
                     return Success(new DefeatEnemyResponse
                     {
                         Cooldown = 5000,

@@ -7,9 +7,26 @@ namespace DataAccess.Repositories
 {
     internal class Skills : BaseRepository, ISkills
     {
+        private static List<Skill>? _skillDataList;
+
         public Skills(string connectionString) : base(connectionString) { }
 
         public List<Skill> AllSkills()
+        {
+            return _skillDataList ??= GetAllSkills();
+        }
+
+        public Skill GetSkill(int skillId)
+        {
+            return AllSkills()[skillId];
+        }
+
+        public void SaveSkills(List<int> skillIds)
+        {
+            throw new NotImplementedException();
+        }
+
+        private List<Skill> GetAllSkills()
         {
             var commandText = @"
                 SELECT
@@ -45,5 +62,7 @@ namespace DataAccess.Repositories
     public interface ISkills
     {
         public List<Skill> AllSkills();
+        public Skill GetSkill(int skillId);
+        public void SaveSkills(List<int> skillIds);
     }
 }

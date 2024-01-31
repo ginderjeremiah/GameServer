@@ -1,5 +1,5 @@
-﻿using DataAccess.Caches;
-using DataAccess.Models.Enemies;
+﻿using DataAccess.Models.Enemies;
+using DataAccess.Models.Skills;
 using DataAccess.Models.Stats;
 using GameServer.Models.Common;
 
@@ -17,14 +17,14 @@ namespace GameServer.BattleSimulation
         public override double CurrentHealth { get; set; }
         public override List<BattleSkill> Skills { get; set; }
         public override int Level { get; set; }
-        public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance, ISkillCache skillCache)
+        public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
         {
             Level = enemyInstance.EnemyLevel;
             Stats = GetStats(enemy.StatDistribution);
             enemyInstance.Stats = Stats;
             DerivedStats = new DerivedStats(Stats);
             CurrentHealth = DerivedStats.MaxHealth;
-            Skills = enemy.GetSkills(skillCache).Select(skill => new BattleSkill(skill)).ToList();
+            Skills = enemy.SelectedSkills.Select(id => new BattleSkill(allSkills[id])).ToList();
         }
         private BattleBaseStats GetStats(BaseStatDistribution statDistribution)
         {
