@@ -46,21 +46,24 @@ namespace GameServer.Auth
         public bool TrySetNewInventoryList(IEnumerable<InventoryUpdate> inventoryUpdates)
         {
             var usedSlots = new HashSet<(bool, int)>();
-            var matchedUpdates = _sessionInventory.Select((inv, i) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.InventoryItemId == upd.InventoryItemId), i)).ToList();
+            var matchedUpdates = _sessionInventory.Select((inv) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.InventoryItemId == upd.InventoryItemId))).ToList();
             var validUpdate = true;
 
-            foreach (var match in matchedUpdates.Where(match => match.Item2 is not null))
+            foreach (var match in matchedUpdates)
             {
                 var update = match.Item2;
-                var slot = (update.Equipped, update.SlotId);
-                if (usedSlots.Contains(slot) || !IsValidInventoryUpdate(update))
+                if (update != null)
                 {
-                    validUpdate = false;
-                    break;
-                }
-                else
-                {
-                    usedSlots.Add(slot);
+                    var slot = (update.Equipped, update.SlotId);
+                    if (usedSlots.Contains(slot) || !IsValidInventoryUpdate(update))
+                    {
+                        validUpdate = false;
+                        break;
+                    }
+                    else
+                    {
+                        usedSlots.Add(slot);
+                    }
                 }
             }
 
@@ -75,7 +78,7 @@ namespace GameServer.Auth
                     }
                     else
                     {
-                        _sessionInventory.RemoveAt(match.i);
+                        _sessionInventory.Remove(match.inv);
                     }
                 }
                 Initialize(_sessionInventory);
