@@ -14,12 +14,8 @@ class BattleManager {
             BattleManager.#battleManager = this;
             this.#battleActive = false;
             this.#battleReady = false;
-            Promise.all([
-                this.newEnemy(),
-                DataManager.skills
-            ]).then((results) => {
-                this.#player = new Player(results[1]);
-            });
+            this.#player = new Player();
+            this.newEnemy();
         }
     }
 
@@ -74,23 +70,20 @@ class BattleManager {
         this.#battleActive = false;
         this.#battleReady = false;
         this.#enemy.clearSkillsDisplay();
-        this.#player.reset();
+        this.#player.reset(GameManager.getPlayerData());
         this.#msStore = 0;
         this.newEnemy(zoneId);
     }
 
     async newEnemy(zoneId?: number) {
-        return Promise.all([
-            DataManager.newEnemy(zoneId),
-            DataManager.skills
-        ]).then((results) => {
-            this.#enemy = new Enemy(results[0].enemyInstance, results[0].enemyData, results[1]);
+        return DataManager.newEnemy(zoneId).then((results) => {
+            this.#enemy = new Enemy(results.enemyInstance, results.enemyData);
             this.#battleReady = true;
         });
     }
 
-    getPlayerStats() {
-        return this.#player.stats;
+    getPlayerAttributes() {
+        return {statsVersion: this.#player.statsVersion, attributes: this.#player.attributes};
     }
 
     getOpponent(battler: Battler) {
@@ -99,6 +92,5 @@ class BattleManager {
 
     incrementPlayerStatsVersion() {
         this.#player.statsVersion++;
-        this.#player.derivedStats = this.#player.calculateDerivativeStats();
     }
 }

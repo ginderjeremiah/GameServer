@@ -1,4 +1,4 @@
-﻿using GameServer.Models;
+﻿using DataAccess.Models.ItemSlots;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories

@@ -8,7 +8,7 @@ namespace DataAccess.Models.Skills
     {
         public int SkillId { get; set; }
         public string SkillName { get; set; }
-        public int BaseDamage { get; set; }
+        public decimal BaseDamage { get; set; }
         public List<AttributeMultiplier> DamageMultipliers { get; set; }
         public string SkillDesc { get; set; }
         public int CooldownMS { get; set; }
@@ -18,14 +18,8 @@ namespace DataAccess.Models.Skills
         {
             SkillId = dataRow["SkillId"].AsInt();
             SkillName = dataRow["SkillName"].AsString();
-            BaseDamage = dataRow["BaseDamage"].AsInt();
-            DamageMultipliers = multipliers
-                .Select(x => new AttributeMultiplier
-                {
-                    AttributeName = x.AttributeName.ToLower(),
-                    Multiplier = x.Multiplier
-                })
-                .ToList();
+            BaseDamage = dataRow["BaseDamage"].AsDecimal();
+            DamageMultipliers = multipliers;
             SkillDesc = dataRow["SkillDesc"].AsString();
             CooldownMS = dataRow["CooldownMS"].AsInt();
             IconPath = dataRow["IconPath"].AsString();

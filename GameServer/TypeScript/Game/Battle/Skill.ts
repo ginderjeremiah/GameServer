@@ -4,7 +4,7 @@ class Skill extends Tooltippable implements SkillData {
     skillName: string;
     chargeTime: number;
     baseDamage: number;
-    damageMultipliers: [{ attributeName: string; multiplier: number; }];
+    damageMultipliers: AttributeMultiplier[];
     skillDesc: string;
     cooldownMS: number;
     iconPath: string;
@@ -27,7 +27,7 @@ class Skill extends Tooltippable implements SkillData {
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
         const target = GameManager.getOpponent(this.owner);
-        let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.derivedStats.cooldownRecovery / 100) * 1000);
+        let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.attributes.getValue(AttributeTypes.CooldownRecovery) / 100) * 1000);
         tooltipTitle.textContent = this.skillName + " (" + remainingCd.toFixed(2) + "s)";
         if (this.toolTipId !== prevId) {
             this.ownerStatsVersion = this.owner.statsVersion;
@@ -68,12 +68,12 @@ class Skill extends Tooltippable implements SkillData {
             this.target = target;
             let totDam = this.calculateDamage();
             let adjDamage = document.getElementById(this.skillName + '_aDmg') as HTMLLIElement; 
-            let adjDmg = (totDam - target.derivedStats.defense);
+            let adjDmg = totDam - target.attributes.getValue(AttributeTypes.Defense);
             adjDmg = adjDmg > 0 ? adjDmg : 0;
             adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
 
             let adjustedDamagePerSecond = document.getElementById(this.skillName + '_aDPS') as HTMLLIElement;
-            let adjustedDps = adjDmg / (this.cooldownMS / 1000 / (1 + this.owner.derivedStats.cooldownRecovery / 100));
+            let adjustedDps = adjDmg / (this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(AttributeTypes.CooldownRecovery) / 100));
             adjustedDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjustedDps) + '/s';
         }
         return this.toolTipId;
@@ -82,12 +82,13 @@ class Skill extends Tooltippable implements SkillData {
     calculateDamage() {
         let dmg = this.baseDamage;
         this.damageMultipliers.forEach((dmgType) => {
-            dmg += this.owner.baseStats[dmgType.attributeName] * dmgType.multiplier;
+            dmg += this.owner.attributes.getValue(dmgType.attributeId) * dmgType.multiplier;
         })
         return dmg
     }
 
     createDamageListContent(damageList: HTMLUListElement, target: Battler) {
+        const attributeData = DataManager.attributes;
         let baseDam = document.createElement("li");
         baseDam.textContent = "Base: " + this.baseDamage;
         damageList.appendChild(baseDam);
@@ -96,8 +97,8 @@ class Skill extends Tooltippable implements SkillData {
 
         this.damageMultipliers.forEach((mult) => {
             let multiplier = document.createElement("li");
-            let dam = this.owner.baseStats[mult.attributeName] * mult.multiplier;
-            multiplier.textContent = capitalize(mult.attributeName) + ": " + formatNum(dam) + " (" + formatNum(mult.multiplier) + "x)";
+            let dam = this.owner.attributes.getValue(mult.attributeId) * mult.multiplier;
+            multiplier.textContent = attributeData[mult.attributeId].attributeName + ": " + formatNum(dam) + " (" + formatNum(mult.multiplier) + "x)";
             totDam += dam;
             damageList.appendChild(multiplier);
         })
@@ -108,13 +109,13 @@ class Skill extends Tooltippable implements SkillData {
 
         let adjDamage = document.createElement("li"); 
         adjDamage.id = this.skillName + '_aDmg'
-        let adjDmg = (totDam - target.derivedStats.defense);
+        let adjDmg = totDam - target.attributes.getValue(AttributeTypes.Defense);
         adjDmg = adjDmg > 0 ? adjDmg : 0;
         adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
         damageList.appendChild(adjDamage);
 
         let cooldown = document.createElement("li");
-        let cd = this.cooldownMS / 1000 / (1 + this.owner.derivedStats.cooldownRecovery / 100);
+        let cd = this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(AttributeTypes.CooldownRecovery) / 100);
         cooldown.textContent = "Cooldown: " + formatNum(cd) + "s";
         damageList.appendChild(cooldown);
 

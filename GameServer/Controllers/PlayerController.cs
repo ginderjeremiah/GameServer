@@ -1,8 +1,8 @@
 ﻿using DataAccess;
 using DataAccess.Models.LogPreferences;
+using DataAccess.Models.PlayerAttributes;
 using GameLibrary;
 using GameServer.Auth;
-using GameServer.BattleSimulation;
 using GameServer.Models.Common;
 using GameServer.Models.Request;
 using Microsoft.AspNetCore.Mvc;
@@ -40,17 +40,6 @@ namespace GameServer.Controllers
             return Error<string>("Unable to set inventory items.");
         }
 
-        [HttpPost]
-        public ApiResponse<string> UpdateEquippedItems([FromBody] List<InventoryUpdate> equipped)
-        {
-            if (Session.TryUpdateEquippedItems(equipped))
-            {
-                return Success();
-            }
-
-            return Error<string>("Unable to set equipped items.");
-        }
-
         [HttpGet]
         public ApiResponse<Dictionary<string, bool>> LogPreferences()
         {
@@ -70,10 +59,10 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
-        public ApiResponse<BattleBaseStats> UpdatePlayerStats([FromBody] BattleBaseStats changedStats)
+        public ApiResponse<List<PlayerAttribute>> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
         {
-            Session.UpdatePlayerStats(changedStats);
-            return Success(Session.PlayerData.Stats);
+            Session.UpdatePlayerAttributes(changedAttributes);
+            return Success(Session.PlayerData.Attributes);
         }
     }
 }

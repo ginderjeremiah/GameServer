@@ -8,26 +8,15 @@ namespace DataAccess.Redis
     {
         private static RedisStore? _instance;
         private static readonly object _instanceLock = new();
+
+        private List<RedisQueue> Queues { get; } = new();
         private ConnectionMultiplexer Multiplexer { get; }
         public IDatabase Redis => Multiplexer.GetDatabase();
+
         private RedisStore(IDataConfiguration config)
         {
             Multiplexer = ConnectionMultiplexer.Connect(config.RedisConnectionString);
-            var subscriber = Multiplexer.GetSubscriber();
-            var assembly = Assembly.GetAssembly(typeof(RedisStore));
-            foreach (var type in assembly.GetTypes())
-            {
-                foreach (var method in type.GetMethods())
-                {
-                    var att = method.GetCustomAttribute<RedisSubscriberAttribute>();
-                    if (att != null)
-                    {
-                        var channel = att.Channel;
-                        var callback = method.CreateDelegate<Action<RepositoryManager, RedisValue>>();
-                        subscriber.Subscribe(channel, (channel, value) => callback(new RepositoryManager(config), value));
-                    }
-                }
-            }
+            InitializeSubscribers(config);
         }
 
         public static RedisStore GetInstance(IDataConfiguration config)
@@ -93,40 +82,44 @@ namespace DataAccess.Redis
         //    await Redis.StringSetAsync(key, value);
         //}
 
-        public void Publish(string channelName, object value)
-        {
-            Publish(channelName, value.Serialize());
-        }
-
-        public void Publish(string channelName, string value)
-        {
-            Redis.Publish(RedisChannel.Literal(channelName), value);
-        }
-
-        public T? GetFromQueue<T>(string queueName)
-        {
-            return Redis.ListLeftPop(queueName).Deserialize<T>();
-        }
-
-        public bool TryGetFromQueue<T>(string queueName, out T value)
-        {
-            value = GetFromQueue<T>(queueName);
-            return value is not null;
-        }
-
-        //public async Task<T?> GetFromQueueAsync<T>(string queueName)
+        //public void Publish(string channelName, object value)
         //{
-        //    return (await Redis.ListLeftPopAsync(queueName)).Deserialize<T>();
+        //    Publish(channelName, value.Serialize());
         //}
 
-        public void AddToQueue<T>(string queueName, T value)
+        //public void Publish(string channelName, string value)
+        //{
+        //    Redis.Publish(RedisChannel.Literal(channelName), value);
+        //}
+
+        public bool TryGetQueue(string queueName, out RedisQueue queue)
         {
-            AddToQueue(queueName, value.Serialize());
+            queue = Queues.FirstOrDefault(q => q.QueueName == queueName);
+            return queue is not null;
         }
 
-        public void AddToQueue(string queueName, string value)
+        private void InitializeSubscribers(IDataConfiguration config)
         {
-            Redis.ListRightPush(queueName, value);
+            var subscriber = Multiplexer.GetSubscriber();
+            var assembly = Assembly.GetAssembly(typeof(RedisStore));
+            foreach (var type in assembly.GetTypes())
+            {
+                foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic))
+                {
+                    var att = method.GetCustomAttribute<RedisSubscriberAttribute>();
+                    if (att != null)
+                    {
+                        var callbackDelegate = Delegate.CreateDelegate(typeof(Action<RepositoryManager, RedisValue>), method, false);
+                        if (callbackDelegate is Action<RepositoryManager, RedisValue> callback)
+                        {
+                            var queue = new RedisQueue(this, att.QueueName, att.Channel);
+                            Queues.Add(queue);
+                            var worker = new RedisSubscriberWorker(config, queue, callback);
+                            subscriber.Subscribe(att.Channel, (channel, value) => worker.Start());
+                        }
+                    }
+                }
+            }
         }
     }
 }

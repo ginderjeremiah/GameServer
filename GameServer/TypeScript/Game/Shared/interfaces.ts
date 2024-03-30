@@ -10,7 +10,7 @@ interface PlayerData {
     playerName: string;
     level: number;
     exp: number;
-    stats: BaseStats;
+    attributes: PlayerAttribute[];
     selectedSkills: number[];
     statPointsGained: number;
     statPointsUsed: number;
@@ -31,7 +31,7 @@ interface NewEnemy {
 interface EnemyInstance {
     enemyId: number;
     enemyLevel: number;
-    stats: BaseStats;
+    attributes: {attributeId: number, amount: number}[];
     seed: number;
 }
 
@@ -79,13 +79,15 @@ interface SkillData {
     skillId: number;
     skillName: string;
     baseDamage: number;
-    damageMultipliers: [{
-        attributeName: string,
-        multiplier: number
-    }];
+    damageMultipliers: AttributeMultiplier[];
     skillDesc: string;
     cooldownMS: number;
     iconPath: string;
+}
+
+interface AttributeMultiplier {
+    attributeId: number;
+    multiplier: number;
 }
 
 interface ItemDrop {
@@ -101,25 +103,10 @@ interface ZoneData {
     zoneOrder: number;
 }
 
-interface BaseStats extends Dict<number> {
-    strength: number;
-    endurance: number;
-    intellect: number;
-    agility: number;
-    dexterity: number;
-    luck: number;
-}
-
-interface DerivedStats {
-    maxHealth: number;
-    defense: number;
-    cooldownRecovery: number;
-    dropMod: number;
-    //critChance : number;
-    //critMulti : number;
-    //dodge : number;
-    //blockChance : number;
-    //blockMulti : number;
+interface PlayerAttribute {
+    playerId: number,
+    attributeId: number,
+    amount: number
 }
 
 interface Tag {
@@ -128,7 +115,7 @@ interface Tag {
     tagCategory: string;
 }
 
-interface ItemMod {
+interface ItemModData {
     itemModId: number;
     itemModName: string;
     removable: boolean;
@@ -175,6 +162,18 @@ interface SelOption {
 }
 
 interface InventoryUpdate {
-    inventoryItemId: number,
-    slotId: number
+    inventoryItemId: number;
+    slotId: number;
+    equipped: boolean;
+}
+
+interface AttributeUpdate {
+    attributeId: number,
+    amount: number
+}
+
+interface AttributeData {
+    attributeId: number,
+    attributeName: string,
+    attributeDesc: string
 }

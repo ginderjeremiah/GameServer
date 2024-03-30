@@ -6,7 +6,6 @@ using GameServer.BattleSimulation;
 using GameServer.Models.Common;
 using GameServer.Models.Response;
 using Microsoft.AspNetCore.Mvc;
-using System.Diagnostics;
 
 namespace GameServer.Controllers
 {
@@ -27,8 +26,6 @@ namespace GameServer.Controllers
         [HttpGet]
         public ApiResponse<NewEnemyResponse> NewEnemy(int newZoneId = -1)
         {
-            //Log("Starting NewEnemy.");
-            long startTime = Stopwatch.GetTimestamp();
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
             {
@@ -60,8 +57,6 @@ namespace GameServer.Controllers
 
             Session.SetActiveEnemy(enemyInstance, earliestDefeat, victory);
 
-            //Log($"Finished NewEnemy: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
-
             return Success(new NewEnemyResponse
             {
                 EnemyInstance = enemyInstance
@@ -87,7 +82,6 @@ namespace GameServer.Controllers
                 }
                 else
                 {
-                    HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
                     return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                     {
                         Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds

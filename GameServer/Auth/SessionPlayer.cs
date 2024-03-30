@@ -1,7 +1,7 @@
-﻿using DataAccess.Models.Players;
+﻿using DataAccess.Models.PlayerAttributes;
+using DataAccess.Models.Players;
 using DataAccess.Models.SessionStore;
-using DataAccess.Models.Stats;
-using GameServer.BattleSimulation;
+using GameServer.Models.Request;
 using System.Text.Json.Serialization;
 
 namespace GameServer.Auth
@@ -21,7 +21,7 @@ namespace GameServer.Auth
         public string PlayerName { get => Player.PlayerName; }
         public int Level { get => Player.Level; set => Player.Level = value; }
         public int Exp { get => Player.Exp; set => Player.Exp = value; }
-        public BattleBaseStats Stats { get; set; }
+        public List<PlayerAttribute> Attributes { get => _sessionData.Attributes; set => _sessionData.Attributes = value; }
         public List<int> SelectedSkills { get => _sessionData.SelectedSkills; set => _sessionData.SelectedSkills = value; }
         public int StatPointsGained { get => Player.StatPointsGained; set => Player.StatPointsGained = value; }
         public int StatPointsUsed { get => Player.StatPointsUsed; private set => Player.StatPointsUsed = value; }
@@ -29,34 +29,27 @@ namespace GameServer.Auth
         public SessionPlayer(SessionData sessionData)
         {
             _sessionData = sessionData;
-            Stats = new BattleBaseStats()
-            {
-                Strength = sessionData.Stats.Strength,
-                Endurance = sessionData.Stats.Endurance,
-                Intellect = sessionData.Stats.Intellect,
-                Agility = sessionData.Stats.Agility,
-                Dexterity = sessionData.Stats.Dexterity,
-                Luck = sessionData.Stats.Luck,
-            };
         }
 
-        public bool ChangeStats(BattleBaseStats changedStats)
+        public bool UpdateAttributes(List<AttributeUpdate> changedAttributes)
         {
-            var changed = changedStats.Total + Stats.Total <= StatPointsGained && Stats.ChangeStats(changedStats);
-            if (changed)
+            var availablePoints = StatPointsGained - StatPointsUsed;
+            var changedPoints = changedAttributes.Sum(att => att.Amount);
+            var matchedAtts = Attributes.Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.AttributeId == att.AttributeId)));
+            if (availablePoints - changedPoints >= 0 && matchedAtts.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
             {
-                StatPointsUsed = Stats.Total;
-                _sessionData.Stats = new BaseStats()
+                StatPointsUsed += availablePoints - changedPoints;
+                foreach (var (att, upd) in matchedAtts)
                 {
-                    Strength = Stats.Strength,
-                    Endurance = Stats.Endurance,
-                    Intellect = Stats.Intellect,
-                    Agility = Stats.Agility,
-                    Dexterity = Stats.Dexterity,
-                    Luck = Stats.Luck
-                };
+                    if (upd is not null)
+                    {
+                        att.Amount += upd.Amount;
+                    }
+                }
+                return true;
             }
-            return changed;
+
+            return false;
         }
     }
 }

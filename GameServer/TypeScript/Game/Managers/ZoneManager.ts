@@ -8,25 +8,19 @@
     //#delayedAction: DelayedAction;
 
     constructor(currentZoneId: number) {
+        this.#zoneNumDisplay = document.getElementById("zoneNum") as HTMLSpanElement;
+        this.#zoneTitleDisplay = document.getElementById("zoneTitle") as HTMLSpanElement;
         this.#currentZone = 0;
-        DataManager.zones.then(zones => this.#init(zones, currentZoneId));
+        const zones = DataManager.zones.slice();
+        this.#orderedZones = zones.sort((one, two) => one.zoneOrder - two.zoneOrder);
+        this.#currentZone = this.getOrderedIndex(currentZoneId);
+        this.updateZoneDisplay();
         document.getElementById("zoneButtonLeft")?.addEventListener('click', (event) => {
             GameManager.changeZone(-1);
         })
         document.getElementById("zoneButtonRight")?.addEventListener('click', (event) => {
             GameManager.changeZone(1);
         })
-        this.#zoneNumDisplay = document.getElementById("zoneNum") as HTMLSpanElement;
-        this.#zoneTitleDisplay = document.getElementById("zoneTitle") as HTMLSpanElement;
-        // this.#delayedAction = new DelayedAction(5000, () => (() => {
-        //     DataManager.setCurrentZone(this.currentZoneId)
-        // }).bind(this))
-    }
-
-    #init(zones: ZoneData[], currentZoneId: number) {
-        this.#orderedZones = zones.sort((one, two) => one.zoneOrder - two.zoneOrder);
-        this.#currentZone = this.getOrderedIndex(currentZoneId);
-        this.updateZoneDisplay();
     }
 
     changeZone(amount: number) {

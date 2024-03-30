@@ -1,6 +1,6 @@
-﻿using DataAccess.Models.Enemies;
+﻿using DataAccess.Models.Attributes;
+using DataAccess.Models.Enemies;
 using DataAccess.Models.Items;
-using DataAccess.Models.Stats;
 using GameLibrary;
 using System.Data;
 using System.Data.SqlClient;
@@ -74,20 +74,17 @@ namespace DataAccess.Repositories
         {
             var commandText = @"
                 SELECT
-	                E.EnemyId,
-	                E.EnemyName,
-                    EBSD.StrengthWeight,
-                    EBSD.EnduranceWeight,
-                    EBSD.IntellectWeight,
-                    EBSD.AgilityWeight,
-                    EBSD.DexterityWeight,
-                    EBSD.LuckWeight,
-                    EBSD.BaseStats,
-                    EBSD.StatsPerLevel
-                FROM Enemies AS E
-                INNER JOIN EnemyBaseStatDistributions AS EBSD
-                ON E.EnemyId = EBSD.EnemyId
-                ORDER BY E.EnemyId
+	                EnemyId,
+	                EnemyName
+                FROM Enemies
+                ORDER BY EnemyId
+
+                SELECT
+                    EnemyId,
+                    AttributeId,
+                    BaseAmount,
+                    AmountPerLevel
+                FROM EnemyAttributeDistributions
 
                 SELECT
 	                EnemyId AS DroppedById,
@@ -102,21 +99,24 @@ namespace DataAccess.Repositories
 
 
             var ds = FillSet(commandText);
-            var enemySkills = ds.Tables[2]
+            var attributes = ds.Tables[1].To<AttributeDistribution>()
+                .GroupBy(att => att.EnemyId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var drops = ds.Tables[2].To<ItemDrop>()
+                .GroupBy(drop => drop.DroppedById)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var enemySkills = ds.Tables[3]
                 .AsEnumerable()
                 .GroupBy(row => row["EnemyId"].AsInt())
                 .ToDictionary(g => g.Key, g => g.Select(row => row["SkillId"].AsInt()).ToList());
-            var drops = ds.Tables[1].To<ItemDrop>()
-                .GroupBy(drop => drop.DroppedById)
-                .ToDictionary(g => g.Key, g => g.ToList());
+
             return ds.Tables[0]
                 .AsEnumerable()
                 .Select(row =>
                 {
                     var enemyId = row["EnemyId"].AsInt();
-                    var statDist = row.To<BaseStatDistribution>();
                     drops.TryGetValue(enemyId, out var dropList);
-                    return new Enemy(enemyId, row["EnemyName"].AsString(), statDist, dropList ?? new List<ItemDrop>(), enemySkills[enemyId]);
+                    return new Enemy(enemyId, row["EnemyName"].AsString(), attributes[enemyId], dropList ?? new List<ItemDrop>(), enemySkills[enemyId]);
                 })
                 .OrderBy(enemy => enemy.EnemyId)
                 .ToList();

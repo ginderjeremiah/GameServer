@@ -24,8 +24,7 @@
             let element = this.#popups.item(i) as HTMLDivElement;
             if (element.id === popup) {
                 element.style.display = "block";
-            }
-            else {
+            } else {
                 element.style.display = "none";
             }
         }

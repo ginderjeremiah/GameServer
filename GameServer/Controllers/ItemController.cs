@@ -1,9 +1,9 @@
 ﻿using DataAccess;
 using DataAccess.Models.Items;
+using DataAccess.Models.ItemSlots;
 using DataAccess.Models.SlotTypes;
 using GameLibrary;
 using GameServer.Auth;
-using GameServer.Models;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 

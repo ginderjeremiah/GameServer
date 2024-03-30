@@ -1,5 +1,5 @@
-﻿using DataAccess.Models.Items;
-using DataAccess.Models.Stats;
+﻿using DataAccess.Models.Attributes;
+using DataAccess.Models.Items;
 using System.Text.Json.Serialization;
 
 namespace DataAccess.Models.Enemies
@@ -8,15 +8,15 @@ namespace DataAccess.Models.Enemies
     {
         public List<ItemDrop> EnemyDrops { get; set; }
         [JsonIgnore]
-        public BaseStatDistribution StatDistribution { get; set; }
+        public List<AttributeDistribution> AttributeDistribution { get; set; }
         public string EnemyName { get; set; }
         public int EnemyId { get; set; }
         public List<int> SelectedSkills { get; set; }
 
-        public Enemy(int enemyId, string enemyName, BaseStatDistribution stats, List<ItemDrop> enemyDrops, List<int> selectedSkills)
+        public Enemy(int enemyId, string enemyName, List<AttributeDistribution> attributeDist, List<ItemDrop> enemyDrops, List<int> selectedSkills)
         {
             EnemyDrops = enemyDrops;
-            StatDistribution = stats;
+            AttributeDistribution = attributeDist;
             EnemyName = enemyName;
             EnemyId = enemyId;
             SelectedSkills = selectedSkills;

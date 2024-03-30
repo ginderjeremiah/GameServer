@@ -2,26 +2,55 @@
 /// <reference path="../Shared/Api/ApiRequest.ts"/>
 
 class DataManager {
-    static #zones = new DataCache(this.#getZones);
-    static #enemies = new DataCache(this.#getEnemies);
-    static #items = new DataCache(this.#getItems);
-    static #skills = new DataCache(this.#getSkills);
+    // static #zones = new DataCache(this.#getZones);
+    // static #enemies = new DataCache(this.#getEnemies);
+    // static #items = new DataCache(this.#getItems);
+    // static #skills = new DataCache(this.#getSkills);
+    // static #itemMods = new DataCache(this.#getItemMods);
+    static zones: ZoneData[];
+    static enemies: EnemyData[];
+    static items: ItemData[];
+    static skills: SkillData[];
+    static itemMods: ItemModData[];
+    static attributes: AttributeData[];
 
-    static get zones() {
-        return this.#zones.data;
-    }
+    static async init() {
+        const staticData = await Promise.all([
+            this.#getZones(),
+            this.#getEnemies(),
+            this.#getItems(),
+            this.#getSkills(),
+            this.#getItemMods(),
+            this.#getAttributes()
+        ]);
 
-    static get enemies() {
-        return this.#enemies.data;
+        this.zones = staticData[0];
+        this.enemies = staticData[1];
+        this.items = staticData[2];
+        this.skills = staticData[3];
+        this.itemMods = staticData[4];
+        this.attributes = staticData[5];
     }
+    
+    // static get zones() {
+    //     return this.#zones.data;
+    // }
 
-    static get items() {
-        return this.#items.data;
-    }
+    // static get enemies() {
+    //     return this.#enemies.data;
+    // }
 
-    static get skills() {
-        return this.#skills.data;
-    }
+    // static get items() {
+    //     return this.#items.data;
+    // }
+
+    // static get skills() {
+    //     return this.#skills.data;
+    // }
+
+    // static get itemMods() {
+    //     return this .#itemMods.data;
+    // }
 
     static async getPlayerData() {
         return ApiRequest.get('/api/Player/AllData');
@@ -33,10 +62,6 @@ class DataManager {
 
     static async updateInventorySlots(updates: InventoryUpdate[]) {
         return ApiRequest.post('/api/Player/UpdateInventorySlots', updates);
-    }
-
-    static async updateEquippedItems(equipped: InventoryUpdate[]) {
-        return ApiRequest.post('/api/Player/UpdateEquippedItems', equipped);
     }
 
     static async getLogPreferences() {
@@ -73,8 +98,8 @@ class DataManager {
         return new ApiRequest('/LoginStatus').get();
     }
 
-    static async updatePlayerStats(stats: BaseStats) {
-        return ApiRequest.post('/api/Player/UpdatePlayerStats', stats)
+    static async updatePlayerStats(attUpds: AttributeUpdate[]) {
+        return ApiRequest.post('/api/Player/UpdatePlayerStats', attUpds)
     }
 
     static async #getZones() {
@@ -93,14 +118,13 @@ class DataManager {
         return ApiRequest.get('/api/Skill/Skills');
     }
 
-    static initStatics() {
-        this.zones;
-        this.enemies;
-        this.items;
-        this.skills;
+    static async #getItemMods() {
+        return ApiRequest.get('/api/ItemMod/ItemMods');
     }
 
-    
+    static async #getAttributes() {
+        return ApiRequest.get('/api/Attribute/Attributes');
+    }
 
     #resetPlayerData(): void {
         /*DataManager.savePlayerData({
@@ -132,26 +156,4 @@ class DataManager {
         this.#resetPlayerData();
         this.#resetInventoryData();
     }*/
-
-    /*
-    async fetchData() : Promise<ApiResponse[]> {
-        //let fetches : Promise<Response>[] = [
-        //    fetch("Enemies.json").then((response) => response.json()).then((data) => this.#enemies = data.Enemies),
-        //    fetch("Zones.json").then((response) => response.json()).then((data) => this.#zones = data.Zones),
-        //    fetch("Skills.json").then((response) => response.json()).then((data) => this.#skills = data.Skills),
-        //    fetch("Items.json").then((response) => response.json()).then((data) => this.#items = data.Items)
-        //]
-
-        return Promise.all([
-            {endp: 'api/Enemies/AllEnemies', then: (resp: ApiResponse) => this.#enemies = resp.json},
-            {endp: 'api/Zones/AllZones', then: (resp: ApiResponse) => this.#zones = resp.json},
-            {endp: 'api/Skills/AllSkills', then: (resp: ApiResponse) => this.#skills = resp.json},
-            {endp: 'api/Items/AllItems', then: (resp: ApiResponse) => this.#items = resp.json}
-        ].map(reqs => {
-            const req = new ApiRequest(reqs.endp);
-            return req.get().then(reqs.then);
-        }));
-        //return Promise.all(fetches);
-    }
-    */
 }

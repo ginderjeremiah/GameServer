@@ -1,12 +1,8 @@
 abstract class Battler {
-
     abstract name: string;
     abstract level: number;
     currentHealth: number;
-    statsSource: () => {
-        stats: BaseStats,
-    }
-    derivedStats: DerivedStats
+    attributes: BattleAttributes;
     skills: (Skill | undefined)[];
     maxSkills = 4;
     statsVersion = 0;
@@ -19,17 +15,17 @@ abstract class Battler {
     abstract nameLabel: HTMLSpanElement;
     abstract label: string;
 
-    constructor(statsSource: () => { stats: BaseStats, selectedSkills: number[] }, skillDatas: SkillData[]) {
-        this.statsSource = statsSource;
-        this.derivedStats = this.calculateDerivativeStats();
-        this.currentHealth = this.derivedStats.maxHealth;
-        this.skills = statsSource().selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
+    constructor(attributes: BattleAttributes, selectedSkills: number[]) {
+        const skillDatas = DataManager.skills;
+        this.attributes = attributes;
+        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.skills = selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
     }
 
     updateHealthDisplay(): void {
-        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.derivedStats.maxHealth;
+        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.attributes.getValue(AttributeTypes.MaxHealth);
         this.healthBar.value = this.currentHealth;
-        this.healthBar.max = this.derivedStats.maxHealth;
+        this.healthBar.max = this.attributes.getValue(AttributeTypes.MaxHealth);
     }
 
     updateLvlDisplay(): void {
@@ -80,7 +76,7 @@ abstract class Battler {
     //returns skills which fired
     advanceCooldown(timeDelta: number): Skill[] {
         let firedSkills: Skill[] = [];
-        let cdMultiplier = (1 + this.derivedStats.cooldownRecovery / 100);
+        let cdMultiplier = (1 + this.attributes.getValue(AttributeTypes.CooldownRecovery) / 100);
         this.skills.forEach((skill) => {
             if (skill) {
                 skill.chargeTime += timeDelta * cdMultiplier;
@@ -96,7 +92,7 @@ abstract class Battler {
 
     //returns actual damage dealt
     takeDamage(rawDamage: number): number { 
-        let damage = rawDamage - this.derivedStats.defense;
+        let damage = rawDamage - this.attributes.getValue(AttributeTypes.Defense);
         if (damage <= 0) {
             damage = 0;
         }
@@ -109,44 +105,11 @@ abstract class Battler {
         return this.currentHealth <= 0;
     }
 
-    calculateDerivativeStats(): DerivedStats {
-        this.statsVersion++;
-        return {
-            maxHealth: 50 + 20 * this.baseStats.endurance + 5 * this.baseStats.strength,
-            defense: 2 + this.baseStats.endurance + 0.5 * this.baseStats.agility,
-            cooldownRecovery: 0.4 * this.baseStats.agility + 0.1 * this.baseStats.dexterity,
-            dropMod: Math.log10(this.baseStats.luck)
-            //critChance;
-            //critMulti;
-            //dodge;
-            //blockChance;
-            //blockMulti; 
-        };
-    }
-
     get stats() {
-        return { statsVersion: this.statsVersion, baseStats: this.baseStats, derivedStats: this.derivedStats };
-    }
-
-    get baseStats() {
-        return this.statsSource().stats;
+        return { statsVersion: this.statsVersion, baseStats: this.attributes };
     }
 
     clearSkillsDisplay() {
         this.skillsContainer.replaceChildren();
-    }
-
-    reset() {
-        //this.skillsContainer.replaceChildren();
-        //this.skillSlots = [];
-        //this.initSkillsDisplay();
-        this.skills.forEach((skill) => {
-            if (skill) {
-                skill.chargeTime = 0
-            }
-        });
-        this.updateSkillsDisplay();
-        this.currentHealth = this.derivedStats.maxHealth;
-        this.updateHealthDisplay();
     }
 }

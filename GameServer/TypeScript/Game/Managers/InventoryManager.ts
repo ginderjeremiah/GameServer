@@ -15,19 +15,18 @@
     constructor() {
         Promise.all([
             DataManager.getInventoryData(),
-            DataManager.items
-        ]).then((results) => this.#init(results[0], results[1]));
-        this.#delayedAction = new DelayedAction(5000, (() => {
-            DataManager.updateInventorySlots(this.getInventoryAsUpdates())
-        }).bind(this));
+            DataManager.items,
+            DataManager.itemMods
+        ]).then((results) => this.#init(...results));
+        this.#delayedAction = new DelayedAction(5000, this.updateInventorySlots.bind(this));
     }
 
-    #init(invData: InventoryData, items: ItemData[]) {
+    #init(invData: InventoryData, itemsData: ItemData[], itemModsData: ItemModData[]) {
         this.inventory = invData.inventory.map((i) => {
-            return i ? new Item(i, items[i.itemId]) : i
+            return i ? new Item(i, itemsData[i.itemId], itemModsData) : i
         });
         this.equipped = invData.equipped.map((i) => {
-            return i ? new Item(i, items[i.itemId]) : i
+            return i ? new Item(i, itemsData[i.itemId], itemModsData) : i
         });
         this.#equippedStats = {};
         this.#initializeInventorySlots();
@@ -69,7 +68,6 @@
             equipSlot.addEventListener('mouseenter', (event: MouseEvent) => {
                 if (eq[index]) {
                     TooltipManager.setData(eq[index]!);
-                    //TooltipManager.updatePosition(event.clientX, event.clientY);
                 }
             });
             equipSlot.addEventListener('mousemove', (event: MouseEvent) => {
@@ -150,7 +148,6 @@
             invSlot.addEventListener('mouseenter', (event) => {
                 if (inv[i]) {
                     TooltipManager.setData(inv[i]!);
-                    //TooltipManager.updatePosition(event.clientX, event.clientY);
                 }
             });
             invSlot.addEventListener('mousemove', (event) => {
@@ -263,11 +260,12 @@
                 box2.appendChild(box1.firstChild);
             }
             source.slotId = slot2;
-            this.startSave()
             if (slotType1 !== slotType2) {
                 this.updateEquipmentStats();
-                DataManager.updateEquippedItems(this.getEquippedAsUpdates());
+                this.updateInventorySlots();
                 GameManager.updateEquipmentStats();
+            } else {
+                this.startSave()
             }
         }
     }
@@ -282,9 +280,9 @@
     }
 
     //add items to first available inventory slots
-    addItems(items: InventoryItem[], itemData: ItemData[]): void {
+    addItems(items: InventoryItem[], itemsData: ItemData[], itemModsData: ItemModData[]): void {
         items.forEach(invItem => {
-            const item = new Item(invItem, itemData[invItem.itemId]);
+            const item = new Item(invItem, itemsData[invItem.itemId], itemModsData);
             if (this.inventory[invItem.slotId]) {
                 const slotId = this.nextAvailableSlot();
                 this.inventory[slotId] = item;
@@ -302,7 +300,13 @@
         let base = this.getSlotContainers(type);
         base.items[slot] = null;
         base.slots[slot]?.firstChild?.remove();
-        this.startSave();
+        if (type == "equipped") {
+            this.updateEquipmentStats();
+            this.updateInventorySlots();
+            GameManager.updateEquipmentStats();
+        } else {
+            this.startSave();
+        }
     }
 
     getItemInfo(type: SlotVariant, slot: number): Item | null {
@@ -352,11 +356,9 @@
         return this.inventory.length - 1;
     }
 
-    getEquippedAsUpdates() {
-        return this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId} : []);
-    }
-
-    getInventoryAsUpdates() {
-        return this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId} : []);
+    updateInventorySlots() {
+        const inv = this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: false} : []);
+        inv.push(...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: true} : []));
+        DataManager.updateInventorySlots(inv);
     }
 }

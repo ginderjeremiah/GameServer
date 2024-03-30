@@ -1,9 +1,10 @@
-﻿namespace GameServer.BattleSimulation
+﻿using static DataAccess.Attributes;
+
+namespace GameServer.BattleSimulation
 {
     public abstract class Battler
     {
-        public abstract BattleBaseStats Stats { get; set; }
-        public abstract DerivedStats DerivedStats { get; set; }
+        public abstract BattleAttributes Attributes { get; set; }
         public abstract double CurrentHealth { get; set; }
         public abstract List<BattleSkill> Skills { get; set; }
         public abstract int Level { get; set; }
@@ -12,7 +13,7 @@
         public List<BattleSkill> AdvancedCooldowns(int timeDelta)
         {
             var firedSkills = new List<BattleSkill>();
-            var cdMultiplier = 1 + (DerivedStats.CooldownRecovery / 100);
+            var cdMultiplier = 1 + (Attributes[CooldownRecovery] / 100);
             foreach (var skill in Skills)
             {
                 skill.ChargeTime += timeDelta * cdMultiplier;
@@ -27,7 +28,7 @@
 
         public void TakeDamage(double rawDamage)
         {
-            var damage = rawDamage - DerivedStats.Defense;
+            var damage = rawDamage - Attributes[Defense];
             damage = damage > 0 ? damage : 0;
             CurrentHealth -= damage;
         }

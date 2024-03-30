@@ -2,7 +2,7 @@
 {
     public class AttributeMultiplier
     {
-        public string AttributeName { get; set; }
+        public DataAccess.Attributes AttributeId { get; set; }
         public decimal Multiplier { get; set; }
     }
 }

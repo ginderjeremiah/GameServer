@@ -19,6 +19,7 @@ namespace DataAccess
         private Enemies? _enemies;
         private Zones? _zones;
         private Skills? _skills;
+        private Repositories.Attributes? _attributes;
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_connectionString, this);
         public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_connectionString, Redis);
@@ -33,6 +34,7 @@ namespace DataAccess
         public IEnemies Enemies => _enemies ??= new Enemies(_connectionString);
         public IZones Zones => _zones ??= new Zones(_connectionString);
         public ISkills Skills => _skills ??= new Skills(_connectionString);
+        public IAttributes Attributes => _attributes ??= new Repositories.Attributes(_connectionString);
         internal RedisStore Redis { get; }
 
         public RepositoryManager(IDataConfiguration config)
@@ -57,6 +59,7 @@ namespace DataAccess
         public IEnemies Enemies { get; }
         public IZones Zones { get; }
         public ISkills Skills { get; }
+        public IAttributes Attributes { get; }
     }
 }
 

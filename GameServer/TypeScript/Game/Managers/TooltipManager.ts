@@ -5,7 +5,6 @@
     static tooltipContent = document.getElementById("tooltipContent") as HTMLDivElement;
     static displayedDataId: number = -1;
     static currData: Tooltippable;
-    static currPlayerStats?: { baseStats: BaseStats, derivedStats: DerivedStats };
     static active: boolean = false;
     static lockEnd: number = 0;
     static lockAmount: number = 10;

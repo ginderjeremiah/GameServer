@@ -15,7 +15,6 @@ namespace GameServer.Auth
         private bool _skillsDirty = false;
         private bool _playerDirty = false;
         private bool _inventoryDirty = false;
-        private bool _equippedDirty = false;
 
         //TODO: Move to Constants static class
         public static TimeSpan TokenLifetime { get; } = TimeSpan.FromDays(1);
@@ -87,7 +86,7 @@ namespace GameServer.Auth
                 _repos.InventoryItems.AddInventoryItem(d);
                 InventoryData.Inventory[slotId] = d;
                 _sessionData.InventoryItems.Add(d);
-                _sessionDirty = true; //TODO: Make inventory item adds (and dels) update to db async?
+                _sessionDirty = true;
             }
 
             return new DefeatRewards
@@ -97,9 +96,9 @@ namespace GameServer.Auth
             };
         }
 
-        public void UpdatePlayerStats(BattleBaseStats changedStats)
+        public void UpdatePlayerAttributes(List<AttributeUpdate> changedAttributes)
         {
-            if (PlayerData.ChangeStats(changedStats))
+            if (PlayerData.UpdateAttributes(changedAttributes))
                 _playerDirty = true;
         }
 
@@ -111,39 +110,12 @@ namespace GameServer.Auth
             return true;
         }
 
-#pragma warning disable CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types. --- Non-nulls are guaranteed by code but VS doesn't recognize
-        public bool TryUpdateEquippedItems(List<InventoryUpdate> inventoryUpdates)
-        {
-            var currentItems = inventoryUpdates.Select(invUp => (invUp, _sessionData.InventoryItems.FirstOrDefault(invItem => invItem.InventoryItemId == invUp.InventoryItemId)));
-
-            if (currentItems.Any(item => item.Item2 is null))
-            {
-                return false;
-            }
-
-            var validUpdate = InventoryData.TrySetNewEquippedList(currentItems);
-
-            _equippedDirty = validUpdate || _equippedDirty;
-
-            return validUpdate;
-        }
-
         public bool TryUpdateInventoryItems(List<InventoryUpdate> inventoryUpdates)
         {
-            var currentItems = inventoryUpdates.Select(invUp => (invUp, _sessionData.InventoryItems.FirstOrDefault(invItem => invItem.InventoryItemId == invUp.InventoryItemId)));
-
-            if (currentItems.Any(item => item.Item2 is null))
-            {
-                return false;
-            }
-
-            var validUpdate = InventoryData.TrySetNewInventoryList(currentItems);
-
+            var validUpdate = InventoryData.TrySetNewInventoryList(inventoryUpdates);
             _inventoryDirty = validUpdate || _inventoryDirty;
-
             return validUpdate;
         }
-#pragma warning restore CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types. --- Non-nulls are guaranteed by code but VS doesn't recognize
 
         private int GetExpReward(EnemyInstance enemy)
         {
@@ -154,19 +126,18 @@ namespace GameServer.Auth
                 var bonus = 4 / Math.Pow(levelDifference, 2);
                 expMulti = levelDifference < 0 ? 2 - bonus : bonus;
             }
-            return (int)Math.Floor(enemy.Stats.Total * expMulti);
+            return (int)Math.Floor((double)enemy.Attributes.Sum(att => att.Amount) * expMulti);
         }
 
         public void Save()
         {
-            if (_sessionDirty || _playerDirty || _skillsDirty || _inventoryDirty || _equippedDirty)
+            if (_sessionDirty || _playerDirty || _skillsDirty || _inventoryDirty)
             {
-                _repos.SessionStore.Update(_sessionData, _playerDirty, _skillsDirty, _inventoryDirty, _equippedDirty);
+                _repos.SessionStore.Update(_sessionData, _playerDirty, _skillsDirty, _inventoryDirty);
                 _sessionDirty = false;
                 _playerDirty = false;
                 _skillsDirty = false;
                 _inventoryDirty = false;
-                _equippedDirty = false;
             }
         }
 

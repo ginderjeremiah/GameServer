@@ -9,9 +9,9 @@ class Item extends Tooltippable implements InventoryItem, ItemData {
     itemCategoryId: number;
     equipped: boolean;
     slotId: number;
-    itemMods: InventoryItemMod[];
+    itemMods: ItemMod[];
 
-    constructor(invItem: InventoryItem, itemData: ItemData) {
+    constructor(invItem: InventoryItem, itemData: ItemData, itemModsData: ItemModData[]) {
         super();
         this.inventoryItemId = invItem.inventoryItemId;
         this.playerId = invItem.playerId;
@@ -22,7 +22,7 @@ class Item extends Tooltippable implements InventoryItem, ItemData {
         this.itemCategoryId = itemData.itemCategoryId;
         this.equipped = invItem.equipped;
         this.slotId = invItem.slotId;
-        this.itemMods = invItem.itemMods;
+        this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
     }
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
@@ -30,29 +30,49 @@ class Item extends Tooltippable implements InventoryItem, ItemData {
             tooltipTitle.textContent = this.itemName; //set title to item name (key)
             tooltipContent.replaceChildren(); //clear current content
 
-            let statsHeader = document.createElement("h3");
+            const statsHeader = document.createElement("h3");
             statsHeader.className = "tooltipHeader";
             statsHeader.textContent = "Stats:";
             tooltipContent.appendChild(statsHeader);
 
-            let statsList = document.createElement("ul");
+            const statsList = document.createElement("ul");
             statsList.className = "tooltipList";
             /*Object.keys(this.item.Stats).forEach((stat) => {
-                let listItem = document.createElement("li");
+                const listItem = document.createElement("li");
                 listItem.textContent = stat + " +" + this.item.Stats[stat];
                 statsList.appendChild(listItem);
             });*/
             tooltipContent.appendChild(statsList);
 
-            let descHeader = document.createElement("h3");
+            const descHeader = document.createElement("h3");
             descHeader.className = "tooltipHeader";
             descHeader.textContent = "Description:";
             tooltipContent.appendChild(descHeader);
 
-            let desc = document.createElement("p");
+            const desc = document.createElement("p");
             desc.className = "tooltipText";
             desc.textContent = this.itemDesc;
             tooltipContent.appendChild(desc);
+
+            const modsHeader = document.createElement("h3");
+            statsHeader.className = "tooltipHeader";
+            statsHeader.textContent = "Mods:";
+            tooltipContent.appendChild(modsHeader);
+
+            const modsList = document.createElement("ul");
+            statsList.className = "tooltipList";
+            this.itemMods.forEach((mod) => {
+                const listItem = document.createElement("li");
+                const nameSpan = document.createElement('span');
+                nameSpan.style.fontWeight = "bold";
+                nameSpan.textContent = mod.itemModName;
+                const descSpan = document.createElement('span');
+                descSpan.textContent = ": " + mod.itemModDesc;
+                listItem.appendChild(nameSpan);
+                listItem.appendChild(descSpan);
+                statsList.appendChild(listItem);
+            });
+            tooltipContent.appendChild(modsList);
         }
         return this.toolTipId;
     }

@@ -14,11 +14,11 @@ class Player extends Battler {
     healthLabel = document.getElementById("playerHealthLabel") as HTMLSpanElement;
     lvlLabel = document.getElementById("playerLvl") as HTMLSpanElement;
     nameLabel = document.getElementById("playerName") as HTMLSpanElement;
-    label = "player"
+    label = "player";
 
-    constructor(skillDatas: SkillData[]) {
+    constructor() {
         const playerData = GameManager.getPlayerData();
-        super(GameManager.getPlayerData, skillDatas);
+        super(new BattleAttributes(playerData.attributes), playerData.selectedSkills);
         this.name = playerData.playerName;
         this.level = playerData.level;
         this.currentExp = playerData.exp;
@@ -44,8 +44,7 @@ class Player extends Battler {
         this.currentExp -= this.level * 100;
         this.level++;
         this.statPointsGained += 6;
-        this.derivedStats = this.calculateDerivativeStats();
-        this.currentHealth = this.derivedStats.maxHealth;
+        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
         this.updateHealthDisplay();
         this.updateLvlDisplay();
         LogManager.logMessage("Congratulations, you leveled up!", "LevelUp");
@@ -54,5 +53,17 @@ class Player extends Battler {
 
     updateExpDisplay(): void {
         //TODO create meter for displaying exp?
+    }
+
+    reset(playerData: PlayerData) {
+        this.skills.forEach((skill) => {
+            if (skill) {
+                skill.chargeTime = 0
+            }
+        });
+        this.updateSkillsDisplay();
+        this.attributes = new BattleAttributes(playerData.attributes);
+        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.updateHealthDisplay();
     }
 }

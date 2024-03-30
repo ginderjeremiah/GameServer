@@ -1,8 +1,17 @@
-﻿namespace DataAccess.Models.LogPreferences
+﻿using GameLibrary;
+using System.Data.SqlClient;
+
+namespace DataAccess.Models.LogPreferences
 {
-    public class LogPreference
+    public class LogPreference : IModel
     {
         public string Name { get; set; }
         public bool Enabled { get; set; }
+
+        public void LoadFromReader(SqlDataReader reader)
+        {
+            Name = reader["Name"].AsString();
+            Enabled = reader["Enabled"].AsBool();
+        }
     }
 }

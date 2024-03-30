@@ -11,12 +11,12 @@ namespace GameServer.BattleSimulation
             Data = skillData;
         }
 
-        public double CalculateDamage(BattleBaseStats stats)
+        public double CalculateDamage(BattleAttributes atts)
         {
-            double damage = Data.BaseDamage;
+            double damage = (double)Data.BaseDamage;
             Data.DamageMultipliers.ForEach((dmgType) =>
             {
-                damage += stats[dmgType.AttributeName] * (double)dmgType.Multiplier;
+                damage += atts[dmgType.AttributeId] * (double)dmgType.Multiplier;
             });
             return damage;
         }

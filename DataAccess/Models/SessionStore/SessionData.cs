@@ -1,6 +1,6 @@
 ﻿using DataAccess.Models.InventoryItems;
+using DataAccess.Models.PlayerAttributes;
 using DataAccess.Models.Players;
-using DataAccess.Models.Stats;
 
 namespace DataAccess.Models.SessionStore
 {
@@ -15,7 +15,7 @@ namespace DataAccess.Models.SessionStore
         public DateTime EnemyCooldown { get; set; }
         public List<InventoryItem> InventoryItems { get; set; }
         public Player PlayerData { get; set; }
-        public BaseStats Stats { get; set; }
+        public List<PlayerAttribute> Attributes { get; set; }
         public List<int> SelectedSkills { get; set; }
     }
 }

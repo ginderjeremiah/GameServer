@@ -1,5 +1,5 @@
 ﻿class AddEditItemModTool {
-    static modTable: TableDataEditor<ItemMod>;
+    static modTable: TableDataEditor<ItemModData>;
     static renderParent: HTMLDivElement;
 
     static async init(renderParent: HTMLDivElement) {

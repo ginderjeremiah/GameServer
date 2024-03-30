@@ -8,16 +8,17 @@ namespace GameLibrary
     public static class Extensions
     {
         private static readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-        public static string AsString(this object? obj, string? defaultVal = null)
+
+        public static string AsString(this object? obj, string defaultVal = "")
         {
             return obj switch
             {
                 IEnumerable<object?> enumerable => string.Join(",", enumerable.Select(o => o.AsString())),
-                _ => obj?.ToString() ?? defaultVal ?? string.Empty,
+                _ => obj?.ToString() ?? defaultVal,
             };
         }
 
-        public static int AsInt(this object? obj, int defaultVal = 0)
+        public static int AsInt(this object? obj, int defaultVal = default)
         {
             if (obj is int intObj)
                 return intObj;
@@ -49,7 +50,7 @@ namespace GameLibrary
                 return defaultVal;
         }
 
-        public static short AsShort(this object? obj, short defaultVal = 0)
+        public static short AsShort(this object? obj, short defaultVal = default)
         {
             if (obj is short intObj)
                 return intObj;
@@ -59,12 +60,22 @@ namespace GameLibrary
                 return defaultVal;
         }
 
-        public static float AsFloat(this object? obj, float defaultVal = 0f)
+        public static float AsFloat(this object? obj, float defaultVal = default)
         {
             if (obj is float intObj)
                 return intObj;
             else if (float.TryParse(obj.AsString(), out var val))
                 return val;
+            else
+                return defaultVal;
+        }
+
+        public static decimal AsDecimal(this object? obj, decimal defaultVal = default)
+        {
+            if (obj is decimal decObj)
+                return decObj;
+            else if (decimal.TryParse(obj.AsString(), out var dec))
+                return dec;
             else
                 return defaultVal;
         }

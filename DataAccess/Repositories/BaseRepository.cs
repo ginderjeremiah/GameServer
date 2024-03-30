@@ -1,10 +1,12 @@
-﻿using System.Data;
+﻿using DataAccess.Models;
+using System.Data;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
 {
     internal class BaseRepository
     {
+        //private static readonly ConcurrentDictionary<Type, Dictionary<string, Action<object, object>>> _propertySetters = new();
         protected string ConnectionString { get; set; }
 
         protected BaseRepository(string connectionString)
@@ -55,7 +57,7 @@ namespace DataAccess.Repositories
             return dt;
         }
 
-        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : new()
+        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : IModel, new()
         {
             using var connection = new SqlConnection(ConnectionString);
             var command = connection.CreateCommand();
@@ -67,27 +69,35 @@ namespace DataAccess.Repositories
 
             var reader = command.ExecuteReader();
             var props = typeof(T).GetProperties();
+            //var props = GetPropertySetters(typeof(T));
             var objs = new List<T>();
 
             while (reader.Read())
             {
                 T obj = new();
-                foreach (var prop in props)
-                {
-                    switch (reader.GetValue(prop.Name))
-                    {
-                        case DBNull:
-                            prop.SetValue(obj, null);
-                            break;
-                        case object val:
-                            prop.SetValue(obj, val);
-                            break;
-                    }
-                }
+                obj.LoadFromReader(reader);
+                //foreach (var prop in props)
+                //{
+                //    switch (reader.GetValue(prop.Name))
+                //    {
+                //        case DBNull:
+                //            prop.SetValue(obj, null);
+                //            break;
+                //        case object val:
+                //            prop.SetValue(obj, val);
+                //            break;
+                //    }
+                //}
+                //for (int i = 0; i < reader.FieldCount; i++)
+                //{
+                //    var colName = reader.GetName(i);
+                //    props[colName](obj, reader.GetValue(i));
+                //}
                 objs.Add(obj);
             }
             return objs;
         }
+
         protected void ExecuteNonQuery(string commandText, params SqlParameter[] sqlParameters)
         {
             using var connection = new SqlConnection(ConnectionString);
@@ -115,5 +125,26 @@ namespace DataAccess.Repositories
             command.Parameters.AddRange(sqlParameters);
             return (T)command.ExecuteScalar();
         }
+
+        //private static Dictionary<string, Action<object, object>> GetPropertySetters(Type t)
+        //{
+        //    if (_propertySetters.TryGetValue(t, out var propertySetters))
+        //    {
+        //        return propertySetters;
+        //    }
+
+        //    return InitPropertySetters(t);
+        //}
+
+        //private static Dictionary<string, Action<object, object>> InitPropertySetters(Type t)
+        //{
+        //    var propertySetters = new Dictionary<string, Action<object, object>>();
+        //    foreach (var property in t.GetProperties())
+        //    {
+        //        propertySetters[property.Name] = (Action<object, object>)Delegate.CreateDelegate(typeof(Action<object, object>), property.GetSetMethod());
+        //    }
+        //    _propertySetters[t] = propertySetters;
+        //    return propertySetters;
+        //}
     }
 }

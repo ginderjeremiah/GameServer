@@ -41,11 +41,9 @@ namespace DataAccess.Repositories
 
                 SELECT
                     SkillId,
-                    AttributeName,
+                    AttributeId,
                     Multiplier
-                FROM SkillDamageMultipliers
-                INNER JOIN Attributes
-                ON SkillDamageMultipliers.AttributeId = Attributes.AttributeId";
+                FROM SkillDamageMultipliers";
 
             var ds = FillSet(commandText);
             var multipliers = ds.Tables[1].AsEnumerable()

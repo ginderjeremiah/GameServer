@@ -1,7 +1,7 @@
 ﻿class SetItemModTagsTool {
     static sel: HTMLSelectElement;
     static checkDiv: HTMLDivElement;
-    static items: ItemMod[];
+    static items: ItemModData[];
     static tags: Tag[];
     static selectedItemId: number;
 
@@ -72,7 +72,7 @@
             SetItemModTagsTool.submit();
         });
         renderParent.appendChild(submitButton);
-    }
+    } 
 
     static async setCheckBoxes(itemId: string) {
         this.selectedItemId = Number(itemId);

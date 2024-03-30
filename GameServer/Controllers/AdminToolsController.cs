@@ -1,10 +1,10 @@
 ﻿using DataAccess;
 using DataAccess.Models.ItemMods;
 using DataAccess.Models.Items;
+using DataAccess.Models.ItemSlots;
 using DataAccess.Models.Tags;
 using GameLibrary;
 using GameServer.Auth;
-using GameServer.Models;
 using GameServer.Models.Common;
 using GameServer.Models.Request;
 using Microsoft.AspNetCore.Mvc;

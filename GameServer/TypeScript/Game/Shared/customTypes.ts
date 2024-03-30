@@ -10,41 +10,6 @@ type ProgressionFunc = (percentComplete: number) => number
 
 type SlotVariant = "equipped" | "inventory";
 
-type ApiResponseTypes = {
-    '/api/AdminTools/AddEditItemMods': void
-    '/api/AdminTools/AddEditItems': void
-    '/api/AdminTools/AddEditItemSlots': void
-    '/api/AdminTools/AddEditTags': void
-    '/api/AdminTools/SetTagsForItem': void
-    '/api/AdminTools/SetTagsForItemMod': void
-    '/api/Enemy/DefeatEnemy': DefeatResults
-    '/api/Enemy/Enemies': EnemyData[]
-    '/api/Enemy/NewEnemy': NewEnemy
-    '/api/Item/Items': ItemData[]
-    '/api/Item/SlotsForItem': ItemSlot[]
-    '/api/Item/SlotTypes': SlotType[]
-    '/api/ItemCategory/ItemCategories': ItemCategory[]
-    '/api/ItemMod/ItemMods': ItemMod[]
-    '/api/Player/AllData': PlayerData
-    '/api/Player/Inventory': InventoryData
-    '/api/Player/LogPreferences': LogPreferences
-    '/api/Player/SaveLogPreferences': void
-    '/api/Player/UpdateEquippedItems': void
-    '/api/Player/UpdateInventorySlots': void
-    '/api/Player/UpdatePlayerStats': BaseStats
-    '/api/Skill/Skills': SkillData[]
-    '/api/Tags/Tags': Tag[]
-    '/api/Tags/TagsForItem': Tag[]
-    '/api/Tags/TagsForItemMod': Tag[]
-    '/api/Zone/Zones': ZoneData[]
-    '/Login': {currentZone: number, playerData: PlayerData}
-    '/LoginStatus': string
-}
-
-type ApiEndpoint = keyof ApiResponseTypes
-
-type ApiResponseType = ApiResponseTypes[ApiEndpoint]
-
 enum ChangeType {
     Edit = 0,
     Add = 1,

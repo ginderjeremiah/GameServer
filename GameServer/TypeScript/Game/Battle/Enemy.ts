@@ -1,6 +1,5 @@
 ﻿/// <reference path="Battler.ts"/>
 class Enemy extends Battler {
-
     name: string;
     level: number;
     drops: ItemDrop[];
@@ -15,8 +14,8 @@ class Enemy extends Battler {
     nameLabel = document.getElementById("enemyName") as HTMLSpanElement
     label = "enemy"
 
-    constructor(enemyInstance: EnemyInstance, enemyData: EnemyData, skillDatas: SkillData[]) {
-        super(() => ({ stats: enemyInstance.stats, selectedSkills: enemyData.selectedSkills }), skillDatas);
+    constructor(enemyInstance: EnemyInstance, enemyData: EnemyData) {
+        super(new BattleAttributes(enemyInstance.attributes), enemyData.selectedSkills);
         this.enemyInstance = enemyInstance;
         this.name = enemyData.enemyName;
         this.drops = enemyData.enemyDrops;

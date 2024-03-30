@@ -28,7 +28,7 @@ namespace GameServer.BattleSimulation
             {
                 foreach (var skill in Player.AdvancedCooldowns(msPerTick))
                 {
-                    Enemy.TakeDamage(skill.CalculateDamage(Player.Stats));
+                    Enemy.TakeDamage(skill.CalculateDamage(Player.Attributes));
                     //Console.WriteLine($"{totalMs}: Player uses {skill.Data.SkillName} and deals {skill.CalculateDamage(Player.Stats) - Enemy.DerivedStats.Defense} damage.");
                     //Console.WriteLine($"{totalMs}: Enemy hp: {Enemy.CurrentHealth}/{Enemy.DerivedStats.MaxHealth}");
                 }
@@ -39,7 +39,7 @@ namespace GameServer.BattleSimulation
                 }
                 foreach (var skill in Enemy.AdvancedCooldowns(msPerTick))
                 {
-                    Player.TakeDamage(skill.CalculateDamage(Enemy.Stats));
+                    Player.TakeDamage(skill.CalculateDamage(Enemy.Attributes));
                     //Console.WriteLine($"{totalMs}: Enemy uses {skill.Data.SkillName} and deals {skill.CalculateDamage(Enemy.Stats) - Player.DerivedStats.Defense} damage.");
                     //Console.WriteLine($"{totalMs}: Player hp: {Player.CurrentHealth}/{Player.DerivedStats.MaxHealth}");
                 }

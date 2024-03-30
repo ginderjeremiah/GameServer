@@ -1,6 +1,5 @@
 ﻿using DataAccess.Models.InventoryItems;
 using DataAccess.Models.ItemMods;
-using DataAccess.Models.SessionStore;
 using DataAccess.Redis;
 using GameLibrary;
 using Microsoft.SqlServer.Server;
@@ -24,46 +23,12 @@ namespace DataAccess.Repositories
             _repositoryManager = repos;
         }
 
-        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL)]
-        internal static void InventorySubscriberCallback(RepositoryManager repos, RedisValue value)
+        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL, Constants.REDIS_INVENTORY_QUEUE)]
+        internal static void ProcessInventoryUpdate(RepositoryManager repos, RedisValue queueValue)
         {
-            if (!_processingInventoryQueue)
-            {
-                lock (_inventoryLock)
-                {
-                    _processingInventoryQueue = true;
-                    while (repos.Redis.TryGetFromQueue<string>(Constants.REDIS_INVENTORY_QUEUE, out var sessionId))
-                    {
-                        if (repos.Redis.TryGet<SessionData>($"{Constants.REDIS_SESSION_PREFIX}_{sessionId}", out var sessionData))
-                        {
-                            repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems.Where(i => i is not null && i.Equipped is false));
-                        }
-                    }
-                    _processingInventoryQueue = false;
-                }
-            }
+            if (repos.SessionStore.TryGetSession(queueValue, out var sessionData))
+                repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems);
         }
-
-        [RedisSubscriber(Constants.REDIS_EQUIPPED_CHANNEL)]
-        internal static void EquippedSubscriberCallback(RepositoryManager repos, RedisValue value)
-        {
-            if (!_processingEquippedQueue)
-            {
-                lock (_equippedLock)
-                {
-                    _processingEquippedQueue = true;
-                    while (repos.Redis.TryGetFromQueue<string>(Constants.REDIS_EQUIPPED_QUEUE, out var sessionId))
-                    {
-                        if (repos.Redis.TryGet<SessionData>($"{Constants.REDIS_SESSION_PREFIX}_{sessionId}", out var sessionData))
-                        {
-                            repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems.Where(i => i is not null && i.Equipped is true));
-                        }
-                    }
-                    _processingEquippedQueue = false;
-                }
-            }
-        }
-
         public List<InventoryItem> GetInventory(int playerId)
         {
             var commandText = @"
@@ -128,51 +93,38 @@ namespace DataAccess.Repositories
             inventoryItem.InventoryItemId = id;
             return id;
         }
-        public void UpdateEquippedItemSlots(int playerId, IEnumerable<InventoryItem> equippedItems)
-        {
-            var data = new SqlMetaData[2];
-            data[0] = new SqlMetaData("InventoryItemId", SqlDbType.Int);
-            data[1] = new SqlMetaData("SlotId", SqlDbType.Int);
 
-            var records = equippedItems.Select(item =>
-            {
-                var record = new SqlDataRecord(data);
-                record.SetInt32(0, item.InventoryItemId);
-                record.SetInt32(1, item.SlotId);
-                return record;
-            }).ToArray();
-
-            var commandText = @"
-                UPDATE InventoryItems
-                SET Equipped = 0
-                WHERE PlayerId = @PlayerId
-
-                UPDATE II
-                SET Equipped = 1,
-                    SlotId = EI.SlotId
-                FROM InventoryItems II
-                INNER JOIN @EquippedItems EI
-                ON II.InventoryItemId = EI.InventoryItemId";
-
-            ExecuteNonQuery(commandText, new SqlParameter("@PlayerId", playerId), new SqlParameter("@EquippedItems", SqlDbType.Structured) { Value = records, TypeName = "InventoryUpdate" });
-        }
         public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems)
         {
-            var data = new SqlMetaData[2];
+            var data = new SqlMetaData[3];
             data[0] = new SqlMetaData("InventoryItemId", SqlDbType.Int);
             data[1] = new SqlMetaData("SlotId", SqlDbType.Int);
+            data[2] = new SqlMetaData("Equipped", SqlDbType.Bit);
 
             var records = inventoryItems.Select(item =>
             {
                 var record = new SqlDataRecord(data);
                 record.SetInt32(0, item.InventoryItemId);
                 record.SetInt32(1, item.SlotId);
+                record.SetBoolean(2, item.Equipped);
                 return record;
             }).ToArray();
 
+            if (records.Length == 0)
+            {
+                records = null;
+            }
+
             var commandText = @"
+                DELETE II
+                FROM InventoryItems II
+                LEFT JOIN @InventoryItems INVI
+                ON II.InventoryItemId = INVI.InventoryItemId
+                AND INVI.InventoryItemId IS NULL
+
                 UPDATE II
-                SET SlotId = INVI.SlotId
+                SET SlotId = INVI.SlotId,
+                    Equipped = INVI.Equipped
                 FROM InventoryItems II
                 INNER JOIN @InventoryItems INVI
                 ON II.InventoryItemId = INVI.InventoryItemId";
@@ -235,7 +187,6 @@ namespace DataAccess.Repositories
     {
         public List<InventoryItem> GetInventory(int playerId);
         public int AddInventoryItem(InventoryItem inventoryItem);
-        public void UpdateEquippedItemSlots(int playerId, IEnumerable<InventoryItem> equippedItems);
         public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems);
         public List<InventoryItem> RollDrops(int enemyId, int zoneId, int max);
     }

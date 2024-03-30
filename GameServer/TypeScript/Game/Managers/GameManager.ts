@@ -4,6 +4,7 @@
 /// <reference path="InventoryManager.ts"/>
 /// <reference path="LoginManager.ts"/>
 /// <reference path="DataManager.ts"/>
+/// <reference path="ScreenManager.ts"/>
 
 class GameManager {  
     static #inventoryManager : InventoryManager;
@@ -16,20 +17,18 @@ class GameManager {
     static #lastTime : number;
 
     static async init() {
+        ScreenManager.init();
         //TODO: Make login occur before accessing game page
         await LoginManager.showLogin();
-        const login = DataManager.login("", "").then((result) => {
-            GameManager.#playerData = result.data.playerData;
-            GameManager.#zoneManager = new ZoneManager(result.data.currentZone);
-            GameManager.#battleManager = new BattleManager();
-            AttributeManager.init();
-        });
-        ScreenManager.init();
-        DataManager.initStatics();
-        LogManager.init();
+        const login = await DataManager.login("", "");
+        await DataManager.init();
+        GameManager.#playerData = login.data.playerData;
+        GameManager.#zoneManager = new ZoneManager(login.data.currentZone);
+        GameManager.#battleManager = new BattleManager();
+        AttributeManager.init();
+        await LogManager.init();
         //TODO: create loading screen on init to load data into data manager?
         GameManager.#inventoryManager = new InventoryManager();
-        await login;
         GameManager.#startGame();
     }
 
@@ -69,8 +68,8 @@ class GameManager {
         return this.#zoneManager.currentZoneId;
     }
 
-    static getPlayerStats() : {statsVersion : number, baseStats : BaseStats, derivedStats : DerivedStats} {
-        return this.#battleManager.getPlayerStats();
+    static getPlayerAttributes() {
+        return this.#battleManager.getPlayerAttributes();
     }
 
     static getOpponent(battler: Battler) {
@@ -86,15 +85,19 @@ class GameManager {
     }
 
     static async addItems(items: InventoryItem[]) {
-        GameManager.#inventoryManager.addItems(items, await DataManager.items);
+        const results = await Promise.all([
+            await DataManager.items,
+            await DataManager.itemMods,
+        ]);
+        GameManager.#inventoryManager.addItems(items, ...results);
     }
 
-    static updateStats(statChanges: BaseStats) {
+    static updateStats(statChanges: AttributeUpdate[]) {
         DataManager.updatePlayerStats(statChanges).then(resp => {
-            this.#playerData.stats = resp
+            this.#playerData.attributes = resp
             this.#battleManager.incrementPlayerStatsVersion();
-            this.#playerData.statPointsUsed = keys(resp)
-                .map(key => resp[key])
+            this.#playerData.statPointsUsed += statChanges
+                .map(chg => chg.amount)
                 .reduce((prev, current) => prev + current);
         });    
     }
