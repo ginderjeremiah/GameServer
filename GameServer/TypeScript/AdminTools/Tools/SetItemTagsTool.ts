@@ -1,14 +1,14 @@
 ﻿class SetItemTagsTool {
     static sel: HTMLSelectElement;
     static checkDiv: HTMLDivElement;
-    static items: ItemData[];
-    static tags: Tag[];
+    static items: IItem[];
+    static tags: ITag[];
     static selectedItemId: number;
 
     static async init(renderParent: HTMLDivElement) {
         const reqs = Promise.all([
-            ApiRequest.get('/api/Item/Items'),
-            ApiRequest.get('/api/Tags/Tags')
+            ApiRequest.get('/api/Items'),
+            ApiRequest.get('/api/Tags')
         ]);
 
         this.initHtml(renderParent);

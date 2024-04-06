@@ -59,13 +59,6 @@ namespace GameServer.Controllers
             Log($"End {_route} request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
         }
 
-        [ApiExplorerSettings(IgnoreApi = true)]
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
-
         [NonAction]
         protected void Log(string message)
         {
@@ -85,12 +78,9 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiResponse<string> Success()
+        public ApiResponse Success()
         {
-            return new ApiResponse<string>
-            {
-                Data = "Success"
-            };
+            return new ApiResponse();
         }
 
         [NonAction]
@@ -99,6 +89,16 @@ namespace GameServer.Controllers
             return new ApiResponse<T>
             {
                 Data = data
+            };
+        }
+
+        [NonAction]
+        public ApiResponse Error(string message)
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return new ApiResponse
+            {
+                Error = message
             };
         }
 

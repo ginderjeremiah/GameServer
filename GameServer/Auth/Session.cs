@@ -1,9 +1,9 @@
 ﻿using DataAccess;
 using DataAccess.Models.SessionStore;
 using GameLibrary;
-using GameServer.BattleSimulation;
 using GameServer.Models.Common;
 using GameServer.Models.Request;
+using GameServer.Models.Response;
 
 namespace GameServer.Auth
 {

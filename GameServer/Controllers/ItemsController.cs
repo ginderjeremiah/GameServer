@@ -12,12 +12,12 @@ namespace GameServer.Controllers
     [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ItemController : BaseController
+    public class ItemsController : BaseController
     {
-        public ItemController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public ItemsController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<Item>> Items()
         {
             return Success(Repositories.Items.AllItems());

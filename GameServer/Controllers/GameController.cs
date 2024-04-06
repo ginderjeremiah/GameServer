@@ -42,29 +42,22 @@ namespace GameServer.Controllers
             return View($"{_baseViewPath}/AdminTools/AdminTools.cshtml");
         }
 
-        [SessionAuthorize]
-        [HttpGet]
-        public ApiResponse<string> LoginStatus()
-        {
-            return Success("Logged in");
-        }
-
         [SessionAuthorize(AllowAll = true)]
         [HttpPost]
-        public ApiResponse<LoginResponse> Login([FromBody] LoginCredentials creds)
+        public ApiResponse<LoginData> Login([FromBody] LoginCredentials creds)
         {
             if (Session != null)
-                return Success(new LoginResponse { CurrentZone = Session.CurrentZone, PlayerData = Session.PlayerData });
+                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = new PlayerData(Session.PlayerData) });
 
             var player = Repositories.Players.GetPlayerByUserName(creds.Username);
 
             if (player is null)
-                return Error<LoginResponse>("Username not found");
+                return Error<LoginData>("Username not found");
 
             var passHash = creds.Password.Hash(player.Salt.ToString());
 
             if (passHash != player.PassHash)
-                return Error<LoginResponse>("Incorrect password");
+                return Error<LoginData>("Incorrect password");
 
             var sessionData = Repositories.SessionStore.GetNewSessionData(player.PlayerId);
 
@@ -72,11 +65,18 @@ namespace GameServer.Controllers
             var token = session.GetNewToken();
             Response.Cookies.Append("sessionToken", token, DefaultCookieOptions);
 
-            return Success(new LoginResponse()
+            return Success(new LoginData()
             {
                 CurrentZone = session.CurrentZone,
-                PlayerData = session.PlayerData
+                PlayerData = new PlayerData(session.PlayerData)
             });
+        }
+
+        [SessionAuthorize]
+        [HttpGet]
+        public ApiResponse<string> LoginStatus()
+        {
+            return Success("Logged in");
         }
     }
 }

@@ -126,5 +126,16 @@ namespace GameLibrary
         {
             return JsonSerializer.Serialize(obj, _options);
         }
+
+        public static IEnumerable<T2> SelectNotNull<T1, T2>(this IEnumerable<T1> source, Func<T1, T2?> selector)
+        {
+            foreach (var item in source)
+            {
+                var result = selector(item);
+
+                if (result != null)
+                    yield return result;
+            }
+        }
     }
 }

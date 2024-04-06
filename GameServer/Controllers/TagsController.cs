@@ -15,7 +15,7 @@ namespace GameServer.Controllers
         public TagsController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<Tag>> Tags()
         {
             return Success(Repositories.Tags.AllTags());

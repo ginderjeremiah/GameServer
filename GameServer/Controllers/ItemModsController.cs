@@ -10,12 +10,12 @@ namespace GameServer.Controllers
     [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ItemModController : BaseController
+    public class ItemModsController : BaseController
     {
-        public ItemModController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public ItemModsController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<ItemMod>> ItemMods(bool refreshCache = false)
         {
             return Success(Repositories.ItemMods.AllItemMods(refreshCache));

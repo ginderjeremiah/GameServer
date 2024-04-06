@@ -1,11 +1,11 @@
 ﻿class AddEditItemModTool {
-    static modTable: TableDataEditor<ItemModData>;
+    static modTable: TableDataEditor<IItemMod>;
     static renderParent: HTMLDivElement;
 
     static async init(renderParent: HTMLDivElement) {
         const data = await Promise.all([
-            ApiRequest.get('/api/ItemMod/ItemMods', { refreshCache: true }),
-            ApiRequest.get('/api/Item/SlotTypes')
+            ApiRequest.get('/api/ItemMods', { refreshCache: true }),
+            ApiRequest.get('/api/Items/SlotTypes')
         ]);
         const slotTypeOpts = data[1].map(slotType => ({
             id: slotType.slotTypeId,

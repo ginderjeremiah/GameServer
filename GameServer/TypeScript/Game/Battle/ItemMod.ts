@@ -1,4 +1,4 @@
-class ItemMod implements InventoryItemMod, ItemModData {
+class ItemMod implements IInventoryItemMod, IItemMod {
     itemModId: number;
     itemSlotId: number;
     itemModName: string;
@@ -6,7 +6,7 @@ class ItemMod implements InventoryItemMod, ItemModData {
     removable: boolean;
     slotTypeId: number;
 
-    constructor(mod: InventoryItemMod, modData: ItemModData) {
+    constructor(mod: IInventoryItemMod, modData: IItemMod) {
         this.itemModId = mod.itemModId;
         this.itemSlotId = mod.itemSlotId;
         this.itemModName = modData.itemModName;

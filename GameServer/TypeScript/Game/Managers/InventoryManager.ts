@@ -21,7 +21,7 @@
         this.#delayedAction = new DelayedAction(5000, this.updateInventorySlots.bind(this));
     }
 
-    #init(invData: InventoryData, itemsData: ItemData[], itemModsData: ItemModData[]) {
+    #init(invData: IInventoryData, itemsData: IItem[], itemModsData: IItemMod[]) {
         this.inventory = invData.inventory.map((i) => {
             return i ? new Item(i, itemsData[i.itemId], itemModsData) : i
         });
@@ -280,7 +280,9 @@
     }
 
     //add items to first available inventory slots
-    addItems(items: InventoryItem[], itemsData: ItemData[], itemModsData: ItemModData[]): void {
+    addItems(items: IInventoryItem[]): void {
+        const itemsData = DataManager.items;
+        const itemModsData = DataManager.itemMods;
         items.forEach(invItem => {
             const item = new Item(invItem, itemsData[invItem.itemId], itemModsData);
             if (this.inventory[invItem.slotId]) {

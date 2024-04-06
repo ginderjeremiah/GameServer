@@ -1,12 +1,12 @@
 ﻿class AddEditItemSlotTool {
-    static slotTable: TableDataEditor<ItemSlot>;
+    static slotTable: TableDataEditor<IItemSlot>;
     static renderParent: HTMLDivElement;
     static tableDiv: HTMLDivElement;
     static itemSelect: HTMLSelectElement;
-    static itemCache = new DataCache(() => ApiRequest.get('/api/Item/Items'));
-    static items: ItemData[];
-    static slotTypeCache = new DataCache(() => ApiRequest.get('/api/Item/SlotTypes'));
-    static itemModCache = new DataCache(() => ApiRequest.get('/api/ItemMod/ItemMods'));
+    static itemCache = new DataCache(() => ApiRequest.get('/api/Items'));
+    static items: IItem[];
+    static slotTypeCache = new DataCache(() => ApiRequest.get('/api/Items/SlotTypes'));
+    static itemModCache = new DataCache(() => ApiRequest.get('/api/ItemMods'));
 
     static async init(renderParent: HTMLDivElement, initialSelection?: number) {
         this.initCaches();
@@ -70,12 +70,12 @@
             AddEditItemSlotTool.tableDiv.hidden = false;
             const selected = AddEditItemSlotTool.itemSelect.selectedOptions[0];
             const itemId = Number(selected.value);
-            const itemSlots = await ApiRequest.get('/api/Item/SlotsForItem', { itemId: itemId, refreshCache: true });
+            const itemSlots = await ApiRequest.get('/api/Items/SlotsForItem', { itemId: itemId, refreshCache: true });
 
             this.slotTable = new TableDataEditor(itemSlots, AddEditItemSlotTool.tableDiv, "itemSlotId", {
-                "itemId": (i: ItemSlot) => itemOpts,
-                "slotTypeId": (i: ItemSlot) => slotTypeOpts,
-                "guaranteedId": (i: ItemSlot) => itemModOpts[i.slotTypeId]
+                "itemId": (i: IItemSlot) => itemOpts,
+                "slotTypeId": (i: IItemSlot) => slotTypeOpts,
+                "guaranteedId": (i: IItemSlot) => itemModOpts[i.slotTypeId]
             }, {
                 itemSlotId: 0,
                 itemId: itemId,

@@ -10,12 +10,12 @@ namespace GameServer.Controllers
     [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class SkillController : BaseController
+    public class SkillsController : BaseController
     {
-        public SkillController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public SkillsController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<Skill>> Skills()
         {
             return Success(Repositories.Skills.AllSkills());

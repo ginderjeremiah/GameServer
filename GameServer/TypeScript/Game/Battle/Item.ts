@@ -1,5 +1,5 @@
 ﻿/// <reference path="../Abstract/Tooltippable.ts"/>
-class Item extends Tooltippable implements InventoryItem, ItemData {
+class Item extends Tooltippable implements IInventoryItem, IItem {
     inventoryItemId: number;
     playerId: number;
     rating: number;
@@ -11,7 +11,7 @@ class Item extends Tooltippable implements InventoryItem, ItemData {
     slotId: number;
     itemMods: ItemMod[];
 
-    constructor(invItem: InventoryItem, itemData: ItemData, itemModsData: ItemModData[]) {
+    constructor(invItem: IInventoryItem, itemData: IItem, itemModsData: IItemMod[]) {
         super();
         this.inventoryItemId = invItem.inventoryItemId;
         this.playerId = invItem.playerId;

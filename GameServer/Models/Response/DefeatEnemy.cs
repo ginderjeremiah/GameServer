@@ -1,8 +1,6 @@
-﻿using GameServer.BattleSimulation;
-
-namespace GameServer.Models.Response
+﻿namespace GameServer.Models.Response
 {
-    public class DefeatEnemyResponse
+    public class DefeatEnemy
     {
         public double Cooldown { get; set; }
         public DefeatRewards? Rewards { get; set; }

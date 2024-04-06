@@ -1,9 +1,9 @@
 ﻿class AddEditTagTool {
-    static tagsTable: TableDataEditor<Tag>;
+    static tagsTable: TableDataEditor<ITag>;
     static renderParent: HTMLDivElement;
 
     static async init(renderParent: HTMLDivElement) {
-        this.tagsTable = new TableDataEditor(await ApiRequest.get('/api/Tags/Tags'), renderParent, "tagId", {});
+        this.tagsTable = new TableDataEditor(await ApiRequest.get('/api/Tags'), renderParent, "tagId", {});
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');
         submitButton.textContent = 'Save';

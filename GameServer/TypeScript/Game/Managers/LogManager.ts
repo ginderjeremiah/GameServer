@@ -2,12 +2,12 @@
 class LogManager {
 
     static #logBox = document.getElementById("logBox") as HTMLDivElement;
-    static #logPreferences: LogPreferences;
-    static #updatedLogPreferences: LogPreferences;
+    static #logPreferences: ILogPreference[];
+    static #updatedLogPreferences: ILogPreference[];
 
     static async init() {
         this.#logPreferences = await DataManager.getLogPreferences()
-        this.#updatedLogPreferences = Object.assign({}, this.#logPreferences);
+        this.#updatedLogPreferences = this.#logPreferences.map(pref => Object.assign({}, pref));
 
         document.getElementById("loggingOptionsButton")!.addEventListener('click', async (event) => {
             await PopupManager.triggerPopup("loggingOptionsPopup");
@@ -16,7 +16,7 @@ class LogManager {
 
         let loggingSettingsList = document.getElementById("loggingOptionsList") as HTMLUListElement;
 
-        Object.keys(LogManager.#logPreferences).forEach((setting) => {
+        LogManager.#logPreferences.forEach((setting) => {
             let row = document.createElement("tr");
             loggingSettingsList.firstElementChild!.appendChild(row);
 
@@ -31,45 +31,48 @@ class LogManager {
             dropdown.className = "optionSelect";
             dropdown.addEventListener('change', (event) => {
                 let target = event.target as HTMLSelectElement;
-                LogManager.setSetting(setting, target.value == 'true')
+                LogManager.setSetting(setting.name, target.value == 'true')
             })
             dropdownCell.appendChild(dropdown);
 
             let enabled = document.createElement("option");
             enabled.label = "Enabled";
             enabled.value = "true";
-            enabled.selected = LogManager.#logPreferences[setting];
+            enabled.selected = setting.enabled;
             dropdown.appendChild(enabled);
 
             let disabled = document.createElement("option");
             disabled.label = "Disabled";
             disabled.value = "false";
-            disabled.selected = !LogManager.#logPreferences[setting];
+            disabled.selected = !setting.enabled;
             dropdown.appendChild(disabled);
         });
     }
 
     static setSetting(id: string, value: boolean): void {
-        this.#updatedLogPreferences[id] = value;
+        const pref = this.#updatedLogPreferences.find(pref => pref.name === id);
+        if (pref) {
+            pref.enabled = value;
+        }
     }
 
     static saveSettingChanges() {
-        const changes: Dict<any> = {};
+        const changes: ILogPreference[] = [];
         let changesExist = false;
-        Object.keys(this.#logPreferences).forEach(pref => {
-            if (this.#logPreferences[pref] !== this.#updatedLogPreferences[pref]) {
-                changes[pref] = this.#updatedLogPreferences[pref];
+        this.#updatedLogPreferences.forEach(pref => {
+            if (pref.enabled !== this.#logPreferences.find(updPref => updPref.name === pref.name)?.enabled) {
+                changes.push(pref);
                 changesExist = true;
             }
         });
         if (changesExist) {
-            Object.assign(this.#logPreferences, this.#updatedLogPreferences);
+            this.#logPreferences = this.#updatedLogPreferences.map(pref => Object.assign({}, pref));
             DataManager.saveLogPreferences(changes);
         }
     }
 
     static logMessage(message: string, logType: string) {
-        if (logType === "ERROR" || LogManager.#logPreferences[logType]) {
+        if (logType === "ERROR" || LogManager.#logPreferences.find(pref => pref.name === logType)?.enabled) {
             let childElementCount = LogManager.#logBox.childElementCount;
             let newMessage = document.createElement('span');
             newMessage.className = "logMessage";

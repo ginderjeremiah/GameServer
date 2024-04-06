@@ -1,0 +1,30 @@
+type ApiResponseTypes = {
+	'/api/AdminTools/AddEditItemMods': void
+	'/api/AdminTools/AddEditItems': void
+	'/api/AdminTools/AddEditItemSlots': void
+	'/api/AdminTools/AddEditTags': void
+	'/api/AdminTools/SetTagsForItem': void
+	'/api/AdminTools/SetTagsForItemMod': void
+	'/api/Attributes': IAttribute[]
+	'/api/Enemies': IEnemy[]
+	'/api/Enemies/DefeatEnemy': IDefeatEnemy
+	'/api/Enemies/NewEnemy': INewEnemy
+	'/api/ItemCategories': IItemCategory[]
+	'/api/ItemMods': IItemMod[]
+	'/api/Items': IItem[]
+	'/api/Items/SlotsForItem': IItemSlot[]
+	'/api/Items/SlotTypes': ISlotType[]
+	'/api/Player': IPlayerData
+	'/api/Player/Inventory': IInventoryData
+	'/api/Player/LogPreferences': ILogPreference[]
+	'/api/Player/SaveLogPreferences': void
+	'/api/Player/UpdateInventorySlots': void
+	'/api/Player/UpdatePlayerStats': IPlayerAttribute[]
+	'/api/Skills': ISkill[]
+	'/api/Tags': ITag[]
+	'/api/Tags/TagsForItem': ITag[]
+	'/api/Tags/TagsForItemMod': ITag[]
+	'/api/Zones': IZone[]
+	'/Login': ILoginData
+	'/LoginStatus': string
+}

@@ -20,44 +20,7 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpPost]
-        public ApiResponse<string> SetTagsForItem([FromBody] SetTagsData setTagsData)
-        {
-            Repositories.Tags.SetItemTags(setTagsData.Id, setTagsData.TagIds);
-            return Success();
-        }
-
-        [HttpPost]
-        public ApiResponse<string> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
-        {
-            Repositories.Tags.SetItemModTags(setTagsData.Id, setTagsData.TagIds);
-            return Success();
-
-        }
-
-        [HttpPost]
-        public ApiResponse<string> AddEditTags([FromBody] List<Change<Tag>> changes)
-        {
-            foreach (var change in changes)
-            {
-                var item = change.Item;
-                if (change.ChangeType == ChangeType.Add)
-                {
-                    Repositories.Tags.AddTag(item.TagName, item.TagCategory);
-                }
-                else if (change.ChangeType == ChangeType.Edit)
-                {
-                    Repositories.Tags.UpdateTag(item.TagId, item.TagName, item.TagCategory);
-                }
-                else if (change.ChangeType == ChangeType.Delete)
-                {
-                    Repositories.Tags.DeleteTag(item.TagId);
-                }
-            }
-            return Success();
-        }
-
-        [HttpPost]
-        public ApiResponse<string> AddEditItemMod([FromBody] List<Change<ItemMod>> changes)
+        public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
             foreach (var change in changes)
             {
@@ -80,7 +43,30 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
-        public ApiResponse<string> AddEditItems([FromBody] List<Change<Item>> changes)
+        public ApiResponse AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
+        {
+            foreach (var change in changes)
+            {
+                var item = change.Item;
+                if (change.ChangeType == ChangeType.Add)
+                {
+                    Repositories.ItemSlots.AddItemSlot(item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
+                }
+                else if (change.ChangeType == ChangeType.Edit)
+                {
+                    Repositories.ItemSlots.UpdateItemSlot(item.ItemSlotId, item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
+                }
+                else if (change.ChangeType == ChangeType.Delete)
+                {
+                    Repositories.ItemSlots.DeleteItemSlot(item.ItemSlotId);
+                }
+            }
+
+            return Success();
+        }
+
+        [HttpPost]
+        public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
 
             foreach (var change in changes)
@@ -103,26 +89,40 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
-        public ApiResponse<string> AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
+        public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
             foreach (var change in changes)
             {
                 var item = change.Item;
                 if (change.ChangeType == ChangeType.Add)
                 {
-                    Repositories.ItemSlots.AddItemSlot(item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
+                    Repositories.Tags.AddTag(item.TagName, item.TagCategory);
                 }
                 else if (change.ChangeType == ChangeType.Edit)
                 {
-                    Repositories.ItemSlots.UpdateItemSlot(item.ItemSlotId, item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
+                    Repositories.Tags.UpdateTag(item.TagId, item.TagName, item.TagCategory);
                 }
                 else if (change.ChangeType == ChangeType.Delete)
                 {
-                    Repositories.ItemSlots.DeleteItemSlot(item.ItemSlotId);
+                    Repositories.Tags.DeleteTag(item.TagId);
                 }
             }
-
             return Success();
+        }
+
+        [HttpPost]
+        public ApiResponse SetTagsForItem([FromBody] SetTagsData setTagsData)
+        {
+            Repositories.Tags.SetItemTags(setTagsData.Id, setTagsData.TagIds);
+            return Success();
+        }
+
+        [HttpPost]
+        public ApiResponse SetTagsForItemMod([FromBody] SetTagsData setTagsData)
+        {
+            Repositories.Tags.SetItemModTags(setTagsData.Id, setTagsData.TagIds);
+            return Success();
+
         }
     }
 }

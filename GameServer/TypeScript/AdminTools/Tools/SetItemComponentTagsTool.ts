@@ -1,14 +1,14 @@
 ﻿class SetItemModTagsTool {
     static sel: HTMLSelectElement;
     static checkDiv: HTMLDivElement;
-    static items: ItemModData[];
-    static tags: Tag[];
+    static items: IItemMod[];
+    static tags: ITag[];
     static selectedItemId: number;
 
     static async init(renderParent: HTMLDivElement) {
         const reqs = Promise.all([
-            ApiRequest.get('/api/ItemMod/ItemMods'),
-            ApiRequest.get('/api/Tags/Tags')
+            ApiRequest.get('/api/ItemMods'),
+            ApiRequest.get('/api/Tags')
         ]);
 
         this.initHtml(renderParent);

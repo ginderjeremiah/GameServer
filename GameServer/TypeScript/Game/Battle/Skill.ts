@@ -1,10 +1,10 @@
 ﻿/// <reference path="../Abstract/Tooltippable.ts"/>
-class Skill extends Tooltippable implements SkillData {
+class Skill extends Tooltippable implements ISkill {
     skillId: number
     skillName: string;
     chargeTime: number;
     baseDamage: number;
-    damageMultipliers: AttributeMultiplier[];
+    damageMultipliers: IAttributeMultiplier[];
     skillDesc: string;
     cooldownMS: number;
     iconPath: string;
@@ -12,7 +12,7 @@ class Skill extends Tooltippable implements SkillData {
     ownerStatsVersion = -1;
     target?: Battler;
 
-    constructor(data: SkillData, owner: Battler) {
+    constructor(data: ISkill, owner: Battler) {
         super();
         this.skillId = data.skillId
         this.skillName = data.skillName;

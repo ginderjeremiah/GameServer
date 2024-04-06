@@ -14,7 +14,6 @@ namespace GameServer
             RedisConnectionString = configuration["RedisConnectionString"] ?? throw new Exception("Could not retrieve Redis connection string.");
             HashPepper = configuration["HashPepper"] ?? throw new Exception("Could not retrieve pepper for Hashing.");
         }
-
     }
 
     public interface IConfig : IDataConfiguration

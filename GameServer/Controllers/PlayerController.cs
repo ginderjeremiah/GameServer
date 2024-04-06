@@ -5,6 +5,7 @@ using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Request;
+using GameServer.Models.Response;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -17,45 +18,40 @@ namespace GameServer.Controllers
         public PlayerController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
-        public ApiResponse<SessionPlayer> AllData()
+        [HttpGet("/api/[controller]")]
+        public ApiResponse<PlayerData> Player()
         {
-            return Success(Session.PlayerData);
+            return Success(new PlayerData(Session.PlayerData));
         }
 
         [HttpGet]
-        public ApiResponse<SessionInventory> Inventory()
+        public ApiResponse<InventoryData> Inventory()
         {
-            return Success(Session.InventoryData);
+            return Success(new InventoryData(Session.InventoryData));
+        }
+
+        [HttpGet]
+        public ApiResponse<List<LogPreference>> LogPreferences()
+        {
+            return Success(Repositories.LogPreferences.GetPreferences(PlayerId));
         }
 
         [HttpPost]
-        public ApiResponse<string> UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
+        public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
+        {
+            Repositories.LogPreferences.SavePreferences(PlayerId, prefs);
+            return Success();
+        }
+
+        [HttpPost]
+        public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
             if (Session.TryUpdateInventoryItems(inventory))
             {
                 return Success();
             }
 
-            return Error<string>("Unable to set inventory items.");
-        }
-
-        [HttpGet]
-        public ApiResponse<Dictionary<string, bool>> LogPreferences()
-        {
-            var preferences = Repositories.LogPreferences.GetPreferences(PlayerId);
-            return Success(preferences.ToDictionary(pref => pref.Name, pref => pref.Enabled));
-        }
-
-        [HttpPost]
-        public ApiResponse<string> SaveLogPreferences([FromBody] Dictionary<string, bool> prefs)
-        {
-            Repositories.LogPreferences.SavePreferences(PlayerId, prefs.Select(kvp => new LogPreference()
-            {
-                Name = kvp.Key,
-                Enabled = kvp.Value
-            }));
-            return Success();
+            return Error("Unable to set inventory items.");
         }
 
         [HttpPost]

@@ -10,12 +10,12 @@ namespace GameServer.Controllers
     [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ZoneController : BaseController
+    public class ZonesController : BaseController
     {
-        public ZoneController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public ZonesController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<Zone>> Zones()
         {
             return Success(Repositories.Zones.AllZones());

@@ -1,11 +1,9 @@
 ﻿class ZoneManager {
 
-    //#zones: ZoneData[];
-    #orderedZones!: ZoneData[];
+    #orderedZones!: IZone[];
     #currentZone: number;
     #zoneNumDisplay: HTMLSpanElement;
     #zoneTitleDisplay: HTMLSpanElement;
-    //#delayedAction: DelayedAction;
 
     constructor(currentZoneId: number) {
         this.#zoneNumDisplay = document.getElementById("zoneNum") as HTMLSpanElement;

@@ -2,10 +2,10 @@
 class Enemy extends Battler {
     name: string;
     level: number;
-    drops: ItemDrop[];
+    drops: IItemDrop[];
     //droppedItems: InventoryItem[];
     //victory: boolean;
-    enemyInstance: EnemyInstance
+    enemyInstance: IEnemyInstance
 
     skillsContainer = document.getElementById("enemySkillsContainer") as HTMLDivElement;
     healthBar = document.getElementById("enemyHealth") as HTMLMeterElement;
@@ -14,7 +14,7 @@ class Enemy extends Battler {
     nameLabel = document.getElementById("enemyName") as HTMLSpanElement
     label = "enemy"
 
-    constructor(enemyInstance: EnemyInstance, enemyData: EnemyData) {
+    constructor(enemyInstance: IEnemyInstance, enemyData: IEnemy) {
         super(new BattleAttributes(enemyInstance.attributes), enemyData.selectedSkills);
         this.enemyInstance = enemyInstance;
         this.name = enemyData.enemyName;

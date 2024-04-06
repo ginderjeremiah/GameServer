@@ -7,7 +7,7 @@ namespace DataAccess.Repositories
     {
         public LogPreferences(string connectionString) : base(connectionString) { }
 
-        public IEnumerable<LogPreference> GetPreferences(int playerId)
+        public List<LogPreference> GetPreferences(int playerId)
         {
             var commandText = @"
                 SELECT
@@ -61,7 +61,7 @@ namespace DataAccess.Repositories
 
     public interface ILogPreferences
     {
-        public IEnumerable<LogPreference> GetPreferences(int playerId);
+        public List<LogPreference> GetPreferences(int playerId);
         public void SavePreferences(int playerId, IEnumerable<LogPreference> prefs);
     }
 }

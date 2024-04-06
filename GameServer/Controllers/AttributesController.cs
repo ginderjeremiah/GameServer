@@ -10,12 +10,12 @@ namespace GameServer.Controllers
     [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class AttributeController : BaseController
+    public class AttributesController : BaseController
     {
-        public AttributeController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public AttributesController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
-        [HttpGet]
+        [HttpGet("/api/[controller]")]
         public ApiResponse<List<Attribute>> Attributes()
         {
             return Success(Repositories.Attributes.AllAttributes());

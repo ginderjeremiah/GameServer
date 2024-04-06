@@ -2,17 +2,12 @@
 /// <reference path="../Shared/Api/ApiRequest.ts"/>
 
 class DataManager {
-    // static #zones = new DataCache(this.#getZones);
-    // static #enemies = new DataCache(this.#getEnemies);
-    // static #items = new DataCache(this.#getItems);
-    // static #skills = new DataCache(this.#getSkills);
-    // static #itemMods = new DataCache(this.#getItemMods);
-    static zones: ZoneData[];
-    static enemies: EnemyData[];
-    static items: ItemData[];
-    static skills: SkillData[];
-    static itemMods: ItemModData[];
-    static attributes: AttributeData[];
+    static zones: IZone[];
+    static enemies: IEnemy[];
+    static items: IItem[];
+    static skills: ISkill[];
+    static itemMods: IItemMod[];
+    static attributes: IAttribute[];
 
     static async init() {
         const staticData = await Promise.all([
@@ -31,29 +26,9 @@ class DataManager {
         this.itemMods = staticData[4];
         this.attributes = staticData[5];
     }
-    
-    // static get zones() {
-    //     return this.#zones.data;
-    // }
-
-    // static get enemies() {
-    //     return this.#enemies.data;
-    // }
-
-    // static get items() {
-    //     return this.#items.data;
-    // }
-
-    // static get skills() {
-    //     return this.#skills.data;
-    // }
-
-    // static get itemMods() {
-    //     return this .#itemMods.data;
-    // }
 
     static async getPlayerData() {
-        return ApiRequest.get('/api/Player/AllData');
+        return ApiRequest.get('/api/Player');
     }
     
     static async getInventoryData() {
@@ -74,9 +49,9 @@ class DataManager {
 
     static async newEnemy(zoneId?: number) {
         return Promise.all([
-            ApiRequest.get('/api/Enemy/NewEnemy', {newZoneId: zoneId}), 
+            ApiRequest.get('/api/Enemies/NewEnemy', {newZoneId: zoneId}), 
             DataManager.enemies
-        ]).then(async (results): Promise<{enemyInstance: EnemyInstance, enemyData: EnemyData}> => {
+        ]).then(async (results): Promise<{enemyInstance: IEnemyInstance, enemyData: IEnemy}> => {
             if (results[0].cooldown) {
                 return delay(results[0].cooldown).then(async () => await this.newEnemy(zoneId))
             } else {
@@ -85,8 +60,8 @@ class DataManager {
         });
     }
 
-    static async defeatEnemy(enemyInstance: EnemyInstance) {
-        return new ApiRequest('/api/Enemy/DefeatEnemy').post(enemyInstance);
+    static async defeatEnemy(enemyInstance: IEnemyInstance) {
+        return new ApiRequest('/api/Enemies/DefeatEnemy').post(enemyInstance);
     }
 
     static async login(username: string, password: string) {
@@ -103,27 +78,27 @@ class DataManager {
     }
 
     static async #getZones() {
-        return ApiRequest.get('/api/Zone/Zones');
+        return ApiRequest.get('/api/Zones');
     }
 
     static async #getEnemies() {
-        return ApiRequest.get('/api/Enemy/Enemies');
+        return ApiRequest.get('/api/Enemies');
     }
 
     static async #getItems() {
-        return ApiRequest.get('/api/Item/Items');
+        return ApiRequest.get('/api/Items');
     }
 
     static async #getSkills() {
-        return ApiRequest.get('/api/Skill/Skills');
+        return ApiRequest.get('/api/Skills');
     }
 
     static async #getItemMods() {
-        return ApiRequest.get('/api/ItemMod/ItemMods');
+        return ApiRequest.get('/api/ItemMods');
     }
 
     static async #getAttributes() {
-        return ApiRequest.get('/api/Attribute/Attributes');
+        return ApiRequest.get('/api/Attributes');
     }
 
     #resetPlayerData(): void {

@@ -55,7 +55,7 @@ class Player extends Battler {
         //TODO create meter for displaying exp?
     }
 
-    reset(playerData: PlayerData) {
+    reset(playerData: IPlayerData) {
         this.skills.forEach((skill) => {
             if (skill) {
                 skill.chargeTime = 0

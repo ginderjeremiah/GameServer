@@ -32,37 +32,6 @@
     }
 }
 
-type ApiResponseTypes = {
-    '/api/AdminTools/AddEditItemMods': void
-    '/api/AdminTools/AddEditItems': void
-    '/api/AdminTools/AddEditItemSlots': void
-    '/api/AdminTools/AddEditTags': void
-    '/api/AdminTools/SetTagsForItem': void
-    '/api/AdminTools/SetTagsForItemMod': void
-    '/api/Attribute/Attributes': AttributeData[]
-    '/api/Enemy/DefeatEnemy': DefeatResults
-    '/api/Enemy/Enemies': EnemyData[]
-    '/api/Enemy/NewEnemy': NewEnemy
-    '/api/Item/Items': ItemData[]
-    '/api/Item/SlotsForItem': ItemSlot[]
-    '/api/Item/SlotTypes': SlotType[]
-    '/api/ItemCategory/ItemCategories': ItemCategory[]
-    '/api/ItemMod/ItemMods': ItemModData[]
-    '/api/Player/AllData': PlayerData
-    '/api/Player/Inventory': InventoryData
-    '/api/Player/LogPreferences': LogPreferences
-    '/api/Player/SaveLogPreferences': void
-    '/api/Player/UpdateInventorySlots': void
-    '/api/Player/UpdatePlayerStats': PlayerAttribute[]
-    '/api/Skill/Skills': SkillData[]
-    '/api/Tags/Tags': Tag[]
-    '/api/Tags/TagsForItem': Tag[]
-    '/api/Tags/TagsForItemMod': Tag[]
-    '/api/Zone/Zones': ZoneData[]
-    '/Login': {currentZone: number, playerData: PlayerData}
-    '/LoginStatus': string
-}
-
 type ApiEndpoint = keyof ApiResponseTypes
 
 type ApiResponseType = ApiResponseTypes[ApiEndpoint]

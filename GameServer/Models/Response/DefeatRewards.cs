@@ -1,6 +1,6 @@
 ﻿using DataAccess.Models.InventoryItems;
 
-namespace GameServer.BattleSimulation
+namespace GameServer.Models.Response
 {
     public class DefeatRewards
     {

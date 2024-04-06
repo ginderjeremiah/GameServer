@@ -1,16 +1,16 @@
 ﻿class AddEditItemTool {
-    static itemTable: TableDataEditor<ItemData>;
+    static itemTable: TableDataEditor<IItem>;
     static renderParent: HTMLDivElement;
 
     static async init(renderParent: HTMLDivElement) {
-        const itemCategoryOpts = (await ApiRequest.get('/api/ItemCategory/ItemCategories')).map(cat => ({
+        const itemCategoryOpts = (await ApiRequest.get('/api/ItemCategories')).map(cat => ({
             id: cat.itemCategoryId,
             name: cat.categoryName
         }));
-        const getItemCategories = (i: ItemData) => {
+        const getItemCategories = (i: IItem) => {
             return itemCategoryOpts;
         }
-        this.itemTable = new TableDataEditor(await ApiRequest.get('/api/Item/Items'), renderParent, "itemId", { "itemCategoryId": getItemCategories });
+        this.itemTable = new TableDataEditor(await ApiRequest.get('/api/Items'), renderParent, "itemId", { "itemCategoryId": getItemCategories });
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');
         submitButton.textContent = 'Save';

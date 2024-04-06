@@ -17,7 +17,7 @@ class AttributeManager {
         this.#statPointsValue.textContent = this.#availablePoints.toString();
 
         playerData.attributes
-            .filter(this.isCoreAttribute)
+            .filter(this.isCoreAttribute) 
             .sort((a, b) => a.attributeId - b.attributeId)
             .forEach(att => {
                 const attData = attributeData[att.attributeId];
@@ -73,7 +73,7 @@ class AttributeManager {
 
     static removeAttributePoint(attId: number) {
         const playerAtt = GameManager.getPlayerData().attributes.find(att => att.attributeId === attId);
-        if (playerAtt && playerAtt.amount + this.#changedStats[attId] > 1) {
+        if (playerAtt && this.isCoreAttribute(playerAtt) && playerAtt.amount + this.#changedStats[attId] > 1) {
             const attData = DataManager.attributes[attId];
             this.#changedStats[attId] -= 1;
             this.#availablePoints += 1;
@@ -90,7 +90,7 @@ class AttributeManager {
         this.#resetChangedStats();
     }
 
-    static isCoreAttribute(att: PlayerAttribute) {
+    static isCoreAttribute(att: IPlayerAttribute) {
         const id = att.attributeId;
         return id === AttributeTypes.Strength
             || id === AttributeTypes.Endurance

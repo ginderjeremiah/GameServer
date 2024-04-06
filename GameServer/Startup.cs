@@ -1,6 +1,7 @@
 using DataAccess;
 using GameLibrary;
 using GameServer.Auth;
+using GameServer.CodeGen;
 
 namespace GameServer
 {
@@ -38,6 +39,7 @@ namespace GameServer
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+                ApiCodeGenerator.GenerateResponseInterfaces();
             }
             else
             {

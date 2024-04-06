@@ -11,7 +11,7 @@ class GameManager {
     static #battleManager: BattleManager;
     static #zoneManager : ZoneManager;
     static #cardGameManager : CardGameManager;
-    static #playerData: PlayerData;
+    static #playerData: IPlayerData;
 
     static #resetDataFlag = false;
     static #lastTime : number;
@@ -84,12 +84,8 @@ class GameManager {
         return GameManager.#playerData;
     }
 
-    static async addItems(items: InventoryItem[]) {
-        const results = await Promise.all([
-            await DataManager.items,
-            await DataManager.itemMods,
-        ]);
-        GameManager.#inventoryManager.addItems(items, ...results);
+    static async addItems(items: IInventoryItem[]) {
+        GameManager.#inventoryManager.addItems(items);
     }
 
     static updateStats(statChanges: AttributeUpdate[]) {
