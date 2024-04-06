@@ -31,7 +31,3 @@
         return this.#responseJson ??= JSON.parse(this.#r.responseText)
     }
 }
-
-type ApiEndpoint = keyof ApiResponseTypes
-
-type ApiResponseType = ApiResponseTypes[ApiEndpoint]

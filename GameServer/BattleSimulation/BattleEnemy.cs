@@ -1,8 +1,7 @@
-﻿using DataAccess.Models.Enemies;
-using DataAccess.Models.PlayerAttributes;
-using DataAccess.Models.Skills;
-using GameServer.Models.Common;
-using static DataAccess.Attributes;
+﻿using DataAccess.Models.Skills;
+using GameServer.Models.Attributes;
+using GameServer.Models.Enemies;
+using static GameServer.AttributeType;
 
 namespace GameServer.BattleSimulation
 {
@@ -12,14 +11,10 @@ namespace GameServer.BattleSimulation
         public override double CurrentHealth { get; set; }
         public override List<BattleSkill> Skills { get; set; }
         public override int Level { get; set; }
-        public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
+        public BattleEnemy(DataAccess.Models.Enemies.Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
         {
             Level = enemyInstance.EnemyLevel;
-            var attributes = enemy.AttributeDistribution.Select(dist => new PlayerAttribute
-            {
-                AttributeId = dist.AttributeId,
-                Amount = dist.BaseAmount + dist.AmountPerLevel * enemyInstance.EnemyLevel
-            }).ToList();
+            var attributes = enemy.AttributeDistribution.Select(dist => new BattlerAttribute(dist, Level)).ToList();
             Attributes = new BattleAttributes(attributes);
             enemyInstance.Attributes = attributes;
             CurrentHealth = Attributes[MaxHealth];

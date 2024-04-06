@@ -137,5 +137,10 @@ namespace GameLibrary
                     yield return result;
             }
         }
+
+        public static string ToCamelCase(this string str)
+        {
+            return string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
+        }
     }
 }

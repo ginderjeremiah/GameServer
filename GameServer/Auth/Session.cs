@@ -1,9 +1,10 @@
 ﻿using DataAccess;
 using DataAccess.Models.SessionStore;
 using GameLibrary;
-using GameServer.Models.Common;
+using GameServer.Models.Attributes;
+using GameServer.Models.Enemies;
+using GameServer.Models.Player;
 using GameServer.Models.Request;
-using GameServer.Models.Response;
 
 namespace GameServer.Auth
 {
@@ -26,12 +27,13 @@ namespace GameServer.Auth
         public bool Victory { get => _sessionData.Victory; private set => _sessionData.Victory = SetSessionDirty(value); }
         public int CurrentZone { get => _sessionData.CurrentZone; set => _sessionData.CurrentZone = SetSessionDirty(value); }
         public SessionInventory InventoryData { get; }
-        public SessionPlayer PlayerData { get; }
+        public SessionPlayer Player { get; }
+        public PlayerData PlayerData => new(Player);
 
         public Session(SessionData sessionData, IRepositoryManager repos)
         {
             _sessionData = sessionData;
-            PlayerData = new SessionPlayer(sessionData);
+            Player = new SessionPlayer(sessionData);
             InventoryData = new SessionInventory(sessionData.InventoryItems);
             _repos = repos;
         }
@@ -58,19 +60,19 @@ namespace GameServer.Auth
         public string GetNewToken()
         {
             var tokenData = $"{SessionId.ToBase64()}.{DateTime.UtcNow.Add(TokenLifetime).Ticks.ToBase64()}";
-            return $"{tokenData}.{tokenData.Hash(PlayerData.Salt.ToString(), 1).ToBase64()}";
+            return $"{tokenData}.{tokenData.Hash(Player.Salt.ToString(), 1).ToBase64()}";
         }
 
         public DefeatRewards GrantRewards(EnemyInstance enemy)
         {
 
             var expReward = GetExpReward(enemy);
-            PlayerData.Exp += expReward;
-            if (PlayerData.Exp > PlayerData.Level * 100)
+            Player.Exp += expReward;
+            if (Player.Exp > Player.Level * 100)
             {
-                PlayerData.Exp -= PlayerData.Level * 100;
-                PlayerData.Level++;
-                PlayerData.StatPointsGained += 6;
+                Player.Exp -= Player.Level * 100;
+                Player.Level++;
+                Player.StatPointsGained += 6;
             }
             _playerDirty = true;
 
@@ -81,7 +83,7 @@ namespace GameServer.Auth
             {
                 var d = drops[i];
                 var slotId = freeSlots[i];
-                d.PlayerId = PlayerData.PlayerId;
+                d.PlayerId = Player.PlayerId;
                 d.SlotId = slotId;
                 _repos.InventoryItems.AddInventoryItem(d);
                 InventoryData.Inventory[slotId] = d;
@@ -98,14 +100,14 @@ namespace GameServer.Auth
 
         public void UpdatePlayerAttributes(List<AttributeUpdate> changedAttributes)
         {
-            if (PlayerData.UpdateAttributes(changedAttributes))
+            if (Player.UpdateAttributes(changedAttributes))
                 _playerDirty = true;
         }
 
         public bool TrySetSelectedSkills(List<int> skills)
         {
             //TODO: validate skills
-            PlayerData.SelectedSkills = skills;
+            Player.SelectedSkills = skills;
             _skillsDirty = true;
             return true;
         }
@@ -119,7 +121,7 @@ namespace GameServer.Auth
 
         private int GetExpReward(EnemyInstance enemy)
         {
-            var levelDifference = PlayerData.Level - enemy.EnemyLevel;
+            var levelDifference = Player.Level - enemy.EnemyLevel;
             double expMulti = 1;
             if (levelDifference is < (-2) or > 2)
             {

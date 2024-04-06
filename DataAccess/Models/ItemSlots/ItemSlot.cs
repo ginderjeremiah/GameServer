@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.ItemSlots
 {
-    public class ItemSlot : IModel
+    public class ItemSlot : IDataModel
     {
         public int ItemSlotId { get; set; }
         public int ItemId { get; set; }

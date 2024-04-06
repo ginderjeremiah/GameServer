@@ -9,9 +9,3 @@ type CheckFunc<Type> = (data: Type) => boolean;
 type ProgressionFunc = (percentComplete: number) => number
 
 type SlotVariant = "equipped" | "inventory";
-
-enum ChangeType {
-    Edit = 0,
-    Add = 1,
-    Delete = 2
-}

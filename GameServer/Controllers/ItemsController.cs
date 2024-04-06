@@ -1,10 +1,8 @@
 ﻿using DataAccess;
-using DataAccess.Models.Items;
-using DataAccess.Models.ItemSlots;
-using DataAccess.Models.SlotTypes;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Items;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -18,21 +16,21 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<Item>> Items()
+        public ApiListResponse<Item> Items()
         {
-            return Success(Repositories.Items.AllItems());
+            return Success(Repositories.Items.AllItems().Select(item => new Item(item)));
         }
 
         [HttpGet]
-        public ApiResponse<List<ItemSlot>> SlotsForItem(int itemId, bool refreshCache = false)
+        public ApiListResponse<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
-            return Success(Repositories.ItemSlots.SlotsForItem(itemId, refreshCache));
+            return Success(Repositories.ItemSlots.SlotsForItem(itemId, refreshCache).Select(slot => new ItemSlot(slot)));
         }
 
         [HttpGet]
-        public ApiResponse<List<SlotType>> SlotTypes()
+        public ApiListResponse<SlotType> SlotTypes()
         {
-            return Success(Repositories.SlotTypes.AllSlotTypes());
+            return Success(Repositories.SlotTypes.AllSlotTypes().Select(type => new SlotType(type)));
         }
     }
 }

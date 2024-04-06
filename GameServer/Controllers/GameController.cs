@@ -2,8 +2,8 @@
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Player;
 using GameServer.Models.Request;
-using GameServer.Models.Response;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -47,7 +47,7 @@ namespace GameServer.Controllers
         public ApiResponse<LoginData> Login([FromBody] LoginCredentials creds)
         {
             if (Session != null)
-                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = new PlayerData(Session.PlayerData) });
+                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = Session.PlayerData });
 
             var player = Repositories.Players.GetPlayerByUserName(creds.Username);
 
@@ -68,15 +68,15 @@ namespace GameServer.Controllers
             return Success(new LoginData()
             {
                 CurrentZone = session.CurrentZone,
-                PlayerData = new PlayerData(session.PlayerData)
+                PlayerData = session.PlayerData
             });
         }
 
         [SessionAuthorize]
         [HttpGet]
-        public ApiResponse<string> LoginStatus()
+        public ApiResponse LoginStatus()
         {
-            return Success("Logged in");
+            return Success();
         }
     }
 }

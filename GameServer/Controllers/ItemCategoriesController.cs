@@ -1,8 +1,8 @@
 ﻿using DataAccess;
-using DataAccess.Models.ItemCategories;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Items;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -16,9 +16,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<ItemCategory>> ItemCategories()
+        public ApiListResponse<ItemCategory> ItemCategories()
         {
-            return Success(Repositories.ItemCategories.GetItemCategories());
+            return Success(Repositories.ItemCategories.GetItemCategories().Select(cat => new ItemCategory(cat)));
         }
     }
 }

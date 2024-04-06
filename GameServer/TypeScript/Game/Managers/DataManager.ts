@@ -35,7 +35,7 @@ class DataManager {
         return ApiRequest.get('/api/Player/Inventory');
     }
 
-    static async updateInventorySlots(updates: InventoryUpdate[]) {
+    static async updateInventorySlots(updates: IInventoryUpdate[]) {
         return ApiRequest.post('/api/Player/UpdateInventorySlots', updates);
     }
 
@@ -43,7 +43,7 @@ class DataManager {
         return ApiRequest.get('/api/Player/LogPreferences');
     }
 
-    static async saveLogPreferences(prefs: Dict<any>) {
+    static async saveLogPreferences(prefs: ILogPreference[]) {
         return ApiRequest.post('/api/Player/SaveLogPreferences', prefs)
     }
 
@@ -73,7 +73,7 @@ class DataManager {
         return new ApiRequest('/LoginStatus').get();
     }
 
-    static async updatePlayerStats(attUpds: AttributeUpdate[]) {
+    static async updatePlayerStats(attUpds: IAttributeUpdate[]) {
         return ApiRequest.post('/api/Player/UpdatePlayerStats', attUpds)
     }
 

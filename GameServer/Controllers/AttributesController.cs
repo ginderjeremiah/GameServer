@@ -3,7 +3,7 @@ using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;
-using Attribute = DataAccess.Models.Attributes.Attribute;
+using Attribute = GameServer.Models.Attributes.Attribute;
 
 namespace GameServer.Controllers
 {
@@ -16,9 +16,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<Attribute>> Attributes()
+        public ApiListResponse<Attribute> Attributes()
         {
-            return Success(Repositories.Attributes.AllAttributes());
+            return Success(Repositories.Attributes.AllAttributes().Select(att => new Attribute(att)).ToList());
         }
     }
 }

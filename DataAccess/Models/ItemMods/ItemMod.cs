@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.ItemMods
 {
-    public class ItemMod : IModel
+    public class ItemMod : IDataModel
     {
         public int ItemModId { get; set; }
         public string ItemModName { get; set; }

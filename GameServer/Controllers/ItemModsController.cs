@@ -1,8 +1,8 @@
 ﻿using DataAccess;
-using DataAccess.Models.ItemMods;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Items;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -16,9 +16,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<ItemMod>> ItemMods(bool refreshCache = false)
+        public ApiListResponse<ItemMod> ItemMods(bool refreshCache = false)
         {
-            return Success(Repositories.ItemMods.AllItemMods(refreshCache));
+            return Success(Repositories.ItemMods.AllItemMods(refreshCache).Select(mod => new ItemMod(mod)));
         }
 
     }

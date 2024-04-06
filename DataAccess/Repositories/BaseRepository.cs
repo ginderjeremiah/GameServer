@@ -56,7 +56,7 @@ namespace DataAccess.Repositories
             return dt;
         }
 
-        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : IModel, new()
+        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : IDataModel, new()
         {
             using var connection = new SqlConnection(ConnectionString);
             var command = connection.CreateCommand();

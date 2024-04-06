@@ -88,7 +88,7 @@ class GameManager {
         GameManager.#inventoryManager.addItems(items);
     }
 
-    static updateStats(statChanges: AttributeUpdate[]) {
+    static updateStats(statChanges: IAttributeUpdate[]) {
         DataManager.updatePlayerStats(statChanges).then(resp => {
             this.#playerData.attributes = resp
             this.#battleManager.incrementPlayerStatsVersion();

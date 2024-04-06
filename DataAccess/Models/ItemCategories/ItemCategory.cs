@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.ItemCategories
 {
-    public class ItemCategory : IModel
+    public class ItemCategory : IDataModel
     {
         public int ItemCategoryId { get; set; }
         public string CategoryName { get; set; }

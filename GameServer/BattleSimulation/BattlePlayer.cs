@@ -1,6 +1,6 @@
 ﻿using DataAccess.Models.Skills;
-using GameServer.Auth;
-using static DataAccess.Attributes;
+using GameServer.Models.Player;
+using static GameServer.AttributeType;
 
 namespace GameServer.BattleSimulation
 {
@@ -11,7 +11,7 @@ namespace GameServer.BattleSimulation
         public override List<BattleSkill> Skills { get; set; }
         public override int Level { get; set; }
 
-        public BattlePlayer(SessionPlayer playerData, List<Skill> skills)
+        public BattlePlayer(PlayerData playerData, List<Skill> skills)
         {
             Attributes = new BattleAttributes(playerData.Attributes);
             CurrentHealth = Attributes[MaxHealth];

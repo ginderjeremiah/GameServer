@@ -1,7 +1,7 @@
 ﻿using DataAccess.Models.PlayerAttributes;
 using DataAccess.Models.Players;
 using DataAccess.Models.SessionStore;
-using GameServer.Models.Request;
+using GameServer.Models.Attributes;
 
 namespace GameServer.Auth
 {
@@ -31,7 +31,7 @@ namespace GameServer.Auth
         public bool UpdateAttributes(List<AttributeUpdate> changedAttributes)
         {
             var availablePoints = StatPointsGained - StatPointsUsed;
-            var matchedAtts = Attributes.Where(att => att.IsCoreAttribute).Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.AttributeId == att.AttributeId)));
+            var matchedAtts = Attributes.Where(att => att.IsCoreAttribute()).Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.AttributeId == att.AttributeId)));
             var changedPoints = matchedAtts.Sum(match => match.upd?.Amount ?? 0);
             if (availablePoints - changedPoints >= 0 && matchedAtts.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
             {

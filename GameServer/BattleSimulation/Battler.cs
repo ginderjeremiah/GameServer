@@ -1,4 +1,4 @@
-﻿using static DataAccess.Attributes;
+﻿using static GameServer.AttributeType;
 
 namespace GameServer.BattleSimulation
 {

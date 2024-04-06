@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.Players
 {
-    public class Player : IModel
+    public class Player : IDataModel
     {
         public int PlayerId { get; set; }
         public string UserName { get; set; }

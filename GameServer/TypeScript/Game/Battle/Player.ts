@@ -44,7 +44,7 @@ class Player extends Battler {
         this.currentExp -= this.level * 100;
         this.level++;
         this.statPointsGained += 6;
-        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
         this.updateHealthDisplay();
         this.updateLvlDisplay();
         LogManager.logMessage("Congratulations, you leveled up!", "LevelUp");
@@ -63,7 +63,7 @@ class Player extends Battler {
         });
         this.updateSkillsDisplay();
         this.attributes = new BattleAttributes(playerData.attributes);
-        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
         this.updateHealthDisplay();
     }
 }

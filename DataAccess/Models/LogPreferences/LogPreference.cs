@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.LogPreferences
 {
-    public class LogPreference : IModel
+    public class LogPreference : IDataModel
     {
         public string Name { get; set; }
         public bool Enabled { get; set; }

@@ -1,6 +1,6 @@
-/// <reference path="../Shared/enums.ts"/>
+/// <reference path="../Shared/Enums.ts"/>
 class BattleAttributes {
-    static #attributesMaxId = AttributeTypes.__LAST - 1;
+    static #attributesMaxId = AttributeType.__LAST - 1;
     attributes: number[];
 
     constructor(attList: {attributeId: number, amount: number}[]) {
@@ -15,10 +15,10 @@ class BattleAttributes {
     }
 
     #calculateDerivedStats() {
-        this.attributes[AttributeTypes.MaxHealth] += 50 + (20 * this.attributes[AttributeTypes.Endurance]) + (5 * this.attributes[AttributeTypes.Strength]);
-        this.attributes[AttributeTypes.Defense] += 2 + this.attributes[AttributeTypes.Endurance] + (0.5 * this.attributes[AttributeTypes.Agility]);
-        this.attributes[AttributeTypes.CooldownRecovery] += (0.4 * this.attributes[AttributeTypes.Agility]) + (0.1 * this.attributes[AttributeTypes.Dexterity]);
-        this.attributes[AttributeTypes.DropBonus] += Math.log10(this.attributes[AttributeTypes.Luck]);
+        this.attributes[AttributeType.MaxHealth] += 50 + (20 * this.attributes[AttributeType.Endurance]) + (5 * this.attributes[AttributeType.Strength]);
+        this.attributes[AttributeType.Defense] += 2 + this.attributes[AttributeType.Endurance] + (0.5 * this.attributes[AttributeType.Agility]);
+        this.attributes[AttributeType.CooldownRecovery] += (0.4 * this.attributes[AttributeType.Agility]) + (0.1 * this.attributes[AttributeType.Dexterity]);
+        this.attributes[AttributeType.DropBonus] += Math.log10(this.attributes[AttributeType.Luck]);
         // this.attributes[AttributeTypes.CriticalChance] = 0;
         // this.attributes[AttributeTypes.CriticalDamage] = 0;
         // this.attributes[AttributeTypes.DodgeChance] = 0;

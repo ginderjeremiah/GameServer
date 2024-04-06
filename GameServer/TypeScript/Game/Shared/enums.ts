@@ -1,4 +1,4 @@
-enum AttributeTypes {
+enum AttributeType {
     Strength = 0,
     Endurance = 1,
     Intellect = 2,
@@ -15,4 +15,10 @@ enum AttributeTypes {
     BlockChance = 13,
     BlockReduction = 14,
     __LAST //Make sure this is always last
+}
+
+enum ChangeType {
+    Edit = 0,
+    Add = 1,
+    Delete = 2
 }

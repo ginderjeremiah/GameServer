@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.Tags
 {
-    public class Tag : IModel
+    public class Tag : IDataModel
     {
         public int TagId { get; set; }
         public string TagName { get; set; }

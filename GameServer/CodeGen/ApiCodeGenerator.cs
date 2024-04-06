@@ -1,4 +1,5 @@
-﻿using GameServer.Controllers;
+﻿using GameLibrary;
+using GameServer.Controllers;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -12,7 +13,7 @@ namespace GameServer.CodeGen
         public static void GenerateResponseInterfaces()
         {
             var usedTypes = new HashSet<Type>();
-            var endpointResponseMap = new List<EndpointResponseData>();
+            var endpointMetadata = new List<EndpointMetaData>();
             var assembly = Assembly.GetAssembly(typeof(ApiCodeGenerator));
             var controllerTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(BaseController)));
             foreach (var controller in controllerTypes)
@@ -23,32 +24,46 @@ namespace GameServer.CodeGen
                 foreach (var endpoint in endpointMethods.Where(method => method.GetCustomAttribute<NonActionAttribute>() is null && method.ReturnType.IsAssignableTo(typeof(IApiResponse))))
                 {
                     var routeTemplate = controllerRouteTemplate;
+                    var methodAtt = endpoint.GetCustomAttributes().FirstOrDefault(att => att is HttpMethodAttribute) as HttpMethodAttribute;
+                    if (methodAtt is not null && methodAtt.Template is not null)
+                    {
+                        routeTemplate = methodAtt.Template;
+                    }
                     if (endpoint.GetCustomAttribute<RouteAttribute>() is RouteAttribute routeAtt && routeAtt.Template is not null)
                     {
                         routeTemplate = routeAtt.Template;
-                    }
-                    else if (endpoint.GetCustomAttributes().FirstOrDefault(att => att is HttpMethodAttribute) is HttpMethodAttribute methodAtt && methodAtt.Template is not null)
-                    {
-                        routeTemplate = methodAtt.Template;
                     }
                     var route = routeTemplate is not null
                         ? routeTemplate.Replace("[controller]", controllerName).Replace("[action]", endpoint.Name)
                         : $"/api/{controllerName}/{endpoint.Name}";
 
                     var responseType = endpoint.ReturnType.IsConstructedGenericType
-                        ? endpoint.ReturnType.GetGenericArguments()[0]
+                        ? endpoint.ReturnType.IsAssignableTo(typeof(IApiListResponse))
+                            ? typeof(List<>).MakeGenericType(endpoint.ReturnType.GetGenericArguments()[0])
+                            : endpoint.ReturnType.GetGenericArguments()[0]
                         : null;
 
                     if (responseType != null && NeedsInterface(responseType))
                     {
-                        usedTypes.Add(GetInterfaceType(responseType));
+                        usedTypes.UnionWith(GetInterfaceTypes(responseType));
                     }
 
-                    endpointResponseMap.Add(new EndpointResponseData
+                    var metaData = new EndpointMetaData
                     {
                         Endpoint = route,
                         ResponseType = responseType,
-                    });
+                        Parameters = endpoint.GetParameters().Select(p => new EndpointParameterData
+                        {
+                            ParameterName = p.Name,
+                            ParameterType = p.ParameterType,
+                            HasDefault = p.HasDefaultValue,
+                        }).ToList(),
+                        IsGet = methodAtt.HttpMethods.Contains("GET")
+                    };
+
+                    endpointMetadata.Add(metaData);
+
+                    usedTypes.UnionWith(metaData.Parameters.Where(p => NeedsInterface(p.ParameterType)).SelectMany(p => GetInterfaceTypes(p.ParameterType)));
                 }
             }
 
@@ -56,16 +71,16 @@ namespace GameServer.CodeGen
             var assemblyName = assembly.GetName().Name;
             var projectDir = currentDir[..(currentDir.LastIndexOf(assemblyName) + assemblyName.Length)];
             var targetDir = $"{projectDir}\\TypeScript\\Game\\Shared\\Api";
-            var responseTypesPath = $"{targetDir}\\ApiResponseTypes.ts";
+            var typeMapPath = $"{targetDir}\\ApiTypeMap.ts";
             var apiInterfacesBasePath = $"{targetDir}\\ApiInterfaces";
-            File.Delete(responseTypesPath);
+            File.Delete(typeMapPath);
             if (Directory.Exists(apiInterfacesBasePath))
                 Directory.Delete(apiInterfacesBasePath, true);
-            WriteResponseTypes(endpointResponseMap.OrderBy(end => end.Endpoint).ToList(), responseTypesPath);
+            WriteResponseTypes(endpointMetadata.OrderBy(end => end.Endpoint).ToList(), typeMapPath);
             WriteApiInterfaces(usedTypes, apiInterfacesBasePath);
         }
 
-        private static void WriteResponseTypes(List<EndpointResponseData> endpointData, string filePath)
+        private static void WriteResponseTypes(List<EndpointMetaData> endpointData, string filePath)
         {
             var strBuilder = new StringBuilder();
             strBuilder.AppendLine("type ApiResponseTypes = {");
@@ -73,17 +88,44 @@ namespace GameServer.CodeGen
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetTypeText(endpoint.ResponseType)}");
             }
-            strBuilder.Append('}');
+            strBuilder.AppendLine("}\n");
+
+            strBuilder.AppendLine("type ApiRequestTypes = {");
+            foreach (var endpoint in endpointData)
+            {
+                strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetParametersTypeText(endpoint)}");
+            }
+            strBuilder.AppendLine("}\n");
+
+            strBuilder.AppendLine("type ApiEndpoint = keyof ApiResponseTypes | keyof ApiRequestTypes\n");
+            strBuilder.AppendLine("type ApiResponseType = ApiResponseTypes[ApiEndpoint]\n");
+            strBuilder.AppendLine("type ApiRequestType = ApiRequestTypes[ApiEndpoint]");
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             File.WriteAllText(filePath, strBuilder.ToString());
+        }
+
+        private static string GetParametersTypeText(EndpointMetaData endpoint)
+        {
+            if (endpoint.Parameters.Count == 0)
+            {
+                return "undefined";
+            }
+            if (endpoint.Parameters.Count == 1 && !endpoint.IsGet)
+            {
+                return endpoint.Parameters[0].TypeText;
+            }
+            else //Construct anonymous json object type
+            {
+                return $"{{ {string.Join(", ", endpoint.Parameters.Select(p => $"{p.ParameterName.ToCamelCase()}: {p.TypeText}"))} }}";
+            }
         }
 
         private static string GetTypeText(Type? type)
         {
             if (type == null)
             {
-                return "void";
+                return "undefined";
             }
             else if (type == typeof(int)
                 || type == typeof(int?)
@@ -98,8 +140,7 @@ namespace GameServer.CodeGen
                 || type == typeof(long)
                 || type == typeof(long?)
                 || type == typeof(uint)
-                || type == typeof(uint?)
-                || type.IsEnum)
+                || type == typeof(uint?))
             {
                 return "number";
             }
@@ -111,13 +152,17 @@ namespace GameServer.CodeGen
             {
                 return "string";
             }
+            else if (type.IsEnum)
+            {
+                return type.Name;
+            }
             else if (IsListType(type))
             {
                 return $"{GetTypeText(type.GetGenericArguments()[0])}[]";
             }
             else
             {
-                return $"I{type.Name}";
+                return GetInterfaceName(type);
             }
         }
 
@@ -134,7 +179,7 @@ namespace GameServer.CodeGen
             foreach (var type in types)
             {
                 var nameSpace = type.Namespace;
-                var filePath = $"{baseDirectoryPath}{nameSpace[nameSpace.IndexOf('.')..].Replace('.', '\\')}.ts";
+                var filePath = $"{baseDirectoryPath}\\{nameSpace[(nameSpace.LastIndexOf('.') + 1)..]}.ts";
                 fileBuilders.TryGetValue(filePath, out var builder);
                 if (builder == null)
                 {
@@ -157,11 +202,25 @@ namespace GameServer.CodeGen
 
         private static void WriteInterfaceToBuilder(Type type, StringBuilder builder)
         {
-            builder.AppendLine($"interface I{type.Name} {{");
-            foreach (var prop in type.GetProperties())
+            builder.AppendLine($"interface {GetInterfaceName(type)} {{");
+            if (type.IsGenericTypeDefinition)
             {
-                var propName = string.Concat(prop.Name[0].ToString().ToLower(), prop.Name.AsSpan(1));
-                builder.AppendLine($"\t{propName}: {GetTypeText(prop.PropertyType)};");
+                var generics = type.GetGenericArguments().Select((t, i) => (type: t, index: i));
+                foreach (var prop in type.GetProperties())
+                {
+                    var generic = generics.FirstOrDefault(x => x.type == prop.PropertyType);
+                    var typeText = generic == default
+                        ? GetTypeText(prop.PropertyType)
+                        : "T" + generic.index.ToString();
+                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {typeText};");
+                }
+            }
+            else
+            {
+                foreach (var prop in type.GetProperties())
+                {
+                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {GetTypeText(prop.PropertyType)};");
+                }
             }
             builder.Append('}');
         }
@@ -169,8 +228,8 @@ namespace GameServer.CodeGen
         private static List<Type> GetSubTypes(Type type)
         {
             var props = type.GetProperties().Where(prop => NeedsInterface(prop.PropertyType));
-            var subTypes = props.SelectMany(prop => GetSubTypes(GetInterfaceType(prop.PropertyType)));
-            return props.Select(prop => GetInterfaceType(prop.PropertyType)).Concat(subTypes).ToList();
+            var subTypes = props.SelectMany(prop => GetInterfaceTypes(prop.PropertyType).SelectMany(GetSubTypes));
+            return props.SelectMany(prop => GetInterfaceTypes(prop.PropertyType)).Concat(subTypes).ToList();
         }
 
         private static bool NeedsInterface(Type type)
@@ -181,23 +240,30 @@ namespace GameServer.CodeGen
             }
             else
             {
-                return type.IsClass && type != typeof(string);
+                return type.IsClass && !type.IsGenericParameter && type != typeof(string);
             }
         }
 
-        private static Type GetInterfaceType(Type type)
+        private static List<Type> GetInterfaceTypes(Type type)
         {
             if (IsListType(type))
             {
-                return GetInterfaceType(type.GetGenericArguments()[0]);
+                return GetInterfaceTypes(type.GetGenericArguments()[0]);
+            }
+            else if (type.IsConstructedGenericType)
+            {
+                return type.GetGenericArguments()
+                    .SelectMany(GetInterfaceTypes)
+                    .Append(type.GetGenericTypeDefinition())
+                    .ToList();
             }
             else if (type.IsClass && type != typeof(string))
             {
-                return type;
+                return new List<Type> { type };
             }
             else
             {
-                return null;
+                return new List<Type>();
             }
         }
 
@@ -206,10 +272,50 @@ namespace GameServer.CodeGen
             return type.IsGenericType && type.IsAssignableTo(typeof(System.Collections.IList));
         }
 
-        private class EndpointResponseData
+        private static string GetInterfaceName(Type type)
+        {
+            if (type.IsGenericTypeDefinition)
+            {
+                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select((arg, i) => "T" + i))}>";
+            }
+            else if (type.IsConstructedGenericType)
+            {
+                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select(GetTypeText))}>";
+            }
+            else
+            {
+                return $"I{type.Name}";
+            }
+        }
+
+        private class EndpointMetaData
         {
             public string Endpoint { get; set; }
             public Type? ResponseType { get; set; }
+            public List<EndpointParameterData> Parameters { get; set; }
+            public bool IsGet { get; set; }
+        }
+
+        private class EndpointParameterData
+        {
+            public string ParameterName { get; set; }
+            public Type ParameterType { get; set; }
+            public bool HasDefault { get; set; }
+
+            public string TypeText
+            {
+                get
+                {
+                    if (HasDefault)
+                    {
+                        return GetTypeText(ParameterType) + " | undefined";
+                    }
+                    else
+                    {
+                        return GetTypeText(ParameterType);
+                    }
+                }
+            }
         }
     }
 }

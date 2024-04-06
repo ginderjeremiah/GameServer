@@ -1,8 +1,8 @@
 ﻿using DataAccess;
-using DataAccess.Models.Tags;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -16,21 +16,21 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<Tag>> Tags()
+        public ApiListResponse<Tag> Tags()
         {
-            return Success(Repositories.Tags.AllTags());
+            return Success(Repositories.Tags.AllTags().Select(t => new Tag(t)));
         }
 
         [HttpGet]
-        public ApiResponse<List<Tag>> TagsForItem(int itemId)
+        public ApiListResponse<Tag> TagsForItem(int itemId)
         {
-            return Success(Repositories.Tags.TagsForItem(itemId));
+            return Success(Repositories.Tags.TagsForItem(itemId).Select(t => new Tag(t)));
         }
 
         [HttpGet]
-        public ApiResponse<List<Tag>> TagsForItemMod(int itemModId)
+        public ApiListResponse<Tag> TagsForItemMod(int itemModId)
         {
-            return Success(Repositories.Tags.TagsForItemMod(itemModId));
+            return Success(Repositories.Tags.TagsForItemMod(itemModId).Select(t => new Tag(t)));
         }
     }
 }

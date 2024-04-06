@@ -143,7 +143,7 @@
     //}
 
     getChanges() {
-        const changes: Change<T>[] = [];
+        const changes: IChange<T>[] = [];
         for (const data of this.dataFinals) {
             const indexedData = data as Dict<any>;
             if (indexedData[this.primaryKey] < 0) {

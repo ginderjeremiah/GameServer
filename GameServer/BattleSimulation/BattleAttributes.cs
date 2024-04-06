@@ -1,13 +1,11 @@
-﻿using DataAccess;
-using DataAccess.Models.Attributes;
-using DataAccess.Models.PlayerAttributes;
-using static DataAccess.Attributes;
+﻿using GameServer.Models.Attributes;
+using static GameServer.AttributeType;
 
 namespace GameServer.BattleSimulation
 {
     public class BattleAttributes
     {
-        private static readonly int _attributesMaxId = (int)Enum.GetValues(typeof(Attributes)).GetValue(Enum.GetValues(typeof(Attributes)).Length - 1);
+        private static readonly int _attributesMaxId = (int)Enum.GetValues(typeof(AttributeType)).GetValue(Enum.GetValues(typeof(AttributeType)).Length - 1);
         private readonly List<decimal> _attributes;
 
         //public double this[int index]
@@ -16,28 +14,18 @@ namespace GameServer.BattleSimulation
         //    set => _attributes[index] = (decimal)value;
         //}
 
-        public double this[Attributes index]
+        public double this[AttributeType index]
         {
             get => (double)_attributes[(int)index];
             set => _attributes[(int)index] = (decimal)value;
         }
 
-        public BattleAttributes(List<PlayerAttribute> atts)
+        public BattleAttributes(List<BattlerAttribute> atts)
         {
             _attributes = GetEmptyAttributeList();
             foreach (var att in atts)
             {
-                _attributes[att.AttributeId] = att.Amount;
-            }
-            CalculateDerivedValues();
-        }
-
-        public BattleAttributes(int level, List<AttributeDistribution> attDists)
-        {
-            _attributes = GetEmptyAttributeList();
-            foreach (var dist in attDists)
-            {
-                _attributes[dist.AttributeId] = dist.BaseAmount + dist.AmountPerLevel * level;
+                _attributes[(int)att.AttributeId] = att.Amount;
             }
             CalculateDerivedValues();
         }

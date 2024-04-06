@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.Attributes
 {
-    public class Attribute : IModel
+    public class Attribute : IDataModel
     {
         public int AttributeId { get; set; }
         public string AttributeName { get; set; }

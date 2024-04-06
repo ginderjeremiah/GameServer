@@ -16,7 +16,7 @@ namespace GameServer.BattleSimulation
             double damage = (double)Data.BaseDamage;
             Data.DamageMultipliers.ForEach((dmgType) =>
             {
-                damage += atts[dmgType.AttributeId] * (double)dmgType.Multiplier;
+                damage += atts[(AttributeType)dmgType.AttributeId] * (double)dmgType.Multiplier;
             });
             return damage;
         }

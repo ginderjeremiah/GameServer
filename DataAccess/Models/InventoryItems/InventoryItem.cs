@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace DataAccess.Models.InventoryItems
 {
-    public class InventoryItem : IModel
+    public class InventoryItem : IDataModel
     {
         public int InventoryItemId { get; set; }
         public int PlayerId { get; set; }

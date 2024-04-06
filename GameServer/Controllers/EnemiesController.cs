@@ -1,10 +1,9 @@
 ﻿using DataAccess;
-using DataAccess.Models.Enemies;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.BattleSimulation;
 using GameServer.Models.Common;
-using GameServer.Models.Response;
+using GameServer.Models.Enemies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -18,9 +17,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<Enemy>> Enemies()
+        public ApiListResponse<Enemy> Enemies()
         {
-            return Success(Repositories.Enemies.AllEnemies());
+            return Success(Repositories.Enemies.AllEnemies().Select(enemy => new Enemy(enemy)));
         }
 
         [HttpPost]

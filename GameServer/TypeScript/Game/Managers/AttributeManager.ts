@@ -90,13 +90,13 @@ class AttributeManager {
         this.#resetChangedStats();
     }
 
-    static isCoreAttribute(att: IPlayerAttribute) {
+    static isCoreAttribute(att: IBattlerAttribute) {
         const id = att.attributeId;
-        return id === AttributeTypes.Strength
-            || id === AttributeTypes.Endurance
-            || id === AttributeTypes.Intellect
-            || id === AttributeTypes.Agility
-            || id === AttributeTypes.Dexterity
-            || id === AttributeTypes.Luck;
+        return id === AttributeType.Strength
+            || id === AttributeType.Endurance
+            || id === AttributeType.Intellect
+            || id === AttributeType.Agility
+            || id === AttributeType.Dexterity
+            || id === AttributeType.Luck;
     }
 }

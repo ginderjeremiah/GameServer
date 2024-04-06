@@ -1,6 +1,6 @@
 ﻿namespace GameServer.Models.Request
 {
-    public class Change<T>
+    public class Change<T> : IModel where T : IModel
     {
         public T Item { get; set; }
         public ChangeType ChangeType { get; set; }

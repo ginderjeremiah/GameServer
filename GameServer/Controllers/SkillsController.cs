@@ -1,8 +1,8 @@
 ﻿using DataAccess;
-using DataAccess.Models.Skills;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Skills;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -16,9 +16,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<List<Skill>> Skills()
+        public ApiListResponse<Skill> Skills()
         {
-            return Success(Repositories.Skills.AllSkills());
+            return Success(Repositories.Skills.AllSkills().Select(skill => new Skill(skill)));
         }
     }
 }

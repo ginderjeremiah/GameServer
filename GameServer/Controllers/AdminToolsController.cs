@@ -1,12 +1,10 @@
 ﻿using DataAccess;
-using DataAccess.Models.ItemMods;
-using DataAccess.Models.Items;
-using DataAccess.Models.ItemSlots;
-using DataAccess.Models.Tags;
 using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
+using GameServer.Models.Items;
 using GameServer.Models.Request;
+using GameServer.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -68,7 +66,6 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
-
             foreach (var change in changes)
             {
                 var item = change.Item;

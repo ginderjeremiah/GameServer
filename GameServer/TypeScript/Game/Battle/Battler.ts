@@ -18,14 +18,14 @@ abstract class Battler {
     constructor(attributes: BattleAttributes, selectedSkills: number[]) {
         const skillDatas = DataManager.skills;
         this.attributes = attributes;
-        this.currentHealth = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
         this.skills = selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
     }
 
     updateHealthDisplay(): void {
-        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.attributes.getValue(AttributeType.MaxHealth);
         this.healthBar.value = this.currentHealth;
-        this.healthBar.max = this.attributes.getValue(AttributeTypes.MaxHealth);
+        this.healthBar.max = this.attributes.getValue(AttributeType.MaxHealth);
     }
 
     updateLvlDisplay(): void {
@@ -76,7 +76,7 @@ abstract class Battler {
     //returns skills which fired
     advanceCooldown(timeDelta: number): Skill[] {
         let firedSkills: Skill[] = [];
-        let cdMultiplier = (1 + this.attributes.getValue(AttributeTypes.CooldownRecovery) / 100);
+        let cdMultiplier = (1 + this.attributes.getValue(AttributeType.CooldownRecovery) / 100);
         this.skills.forEach((skill) => {
             if (skill) {
                 skill.chargeTime += timeDelta * cdMultiplier;
@@ -92,7 +92,7 @@ abstract class Battler {
 
     //returns actual damage dealt
     takeDamage(rawDamage: number): number { 
-        let damage = rawDamage - this.attributes.getValue(AttributeTypes.Defense);
+        let damage = rawDamage - this.attributes.getValue(AttributeType.Defense);
         if (damage <= 0) {
             damage = 0;
         }
