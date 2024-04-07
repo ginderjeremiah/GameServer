@@ -1,3 +1,20 @@
+interface IItem {
+	itemId: number;
+	itemName: string;
+	itemDesc: string;
+	itemCategoryId: number;
+}
+
+interface IItemCategory {
+	itemCategoryId: number;
+	categoryName: string;
+}
+
+interface IItemDrop {
+	itemId: number;
+	dropRate: number;
+}
+
 interface IItemMod {
 	itemModId: number;
 	itemModName: string;
@@ -14,24 +31,7 @@ interface IItemSlot {
 	probability: number;
 }
 
-interface IItem {
-	itemId: number;
-	itemName: string;
-	itemDesc: string;
-	itemCategoryId: number;
-}
-
-interface IItemCategory {
-	itemCategoryId: number;
-	categoryName: string;
-}
-
 interface ISlotType {
 	slotTypeId: number;
 	slotTypeName: string;
-}
-
-interface IItemDrop {
-	itemId: number;
-	dropRate: number;
 }

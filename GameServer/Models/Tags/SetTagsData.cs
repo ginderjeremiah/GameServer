@@ -1,4 +1,4 @@
-﻿namespace GameServer.Models.Request
+﻿namespace GameServer.Models.Tags
 {
     public class SetTagsData : IModel
     {

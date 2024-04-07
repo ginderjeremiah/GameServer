@@ -12,3 +12,9 @@ interface IInventoryItemMod {
 	itemModId: number;
 	itemSlotId: number;
 }
+
+interface IInventoryUpdate {
+	inventoryItemId: number;
+	slotId: number;
+	equipped: boolean;
+}

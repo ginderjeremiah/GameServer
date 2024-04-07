@@ -3,7 +3,6 @@ using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
-using GameServer.Models.Request;
 using GameServer.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
 

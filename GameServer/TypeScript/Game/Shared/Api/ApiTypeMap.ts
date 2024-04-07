@@ -36,32 +36,22 @@ type ApiRequestTypes = {
 	'/api/AdminTools/AddEditTags': IChange<ITag>[]
 	'/api/AdminTools/SetTagsForItem': ISetTagsData
 	'/api/AdminTools/SetTagsForItemMod': ISetTagsData
-	'/api/Attributes': undefined
-	'/api/Enemies': undefined
 	'/api/Enemies/DefeatEnemy': IEnemyInstance
 	'/api/Enemies/NewEnemy': { newZoneId: number | undefined }
-	'/api/ItemCategories': undefined
 	'/api/ItemMods': { refreshCache: boolean | undefined }
-	'/api/Items': undefined
 	'/api/Items/SlotsForItem': { itemId: number, refreshCache: boolean | undefined }
-	'/api/Items/SlotTypes': undefined
-	'/api/Player': undefined
-	'/api/Player/Inventory': undefined
-	'/api/Player/LogPreferences': undefined
 	'/api/Player/SaveLogPreferences': ILogPreference[]
 	'/api/Player/UpdateInventorySlots': IInventoryUpdate[]
 	'/api/Player/UpdatePlayerStats': IAttributeUpdate[]
-	'/api/Skills': undefined
-	'/api/Tags': undefined
 	'/api/Tags/TagsForItem': { itemId: number }
 	'/api/Tags/TagsForItemMod': { itemModId: number }
-	'/api/Zones': undefined
 	'/Login': ILoginCredentials
-	'/LoginStatus': undefined
 }
 
-type ApiEndpoint = keyof ApiResponseTypes | keyof ApiRequestTypes
+type ApiEndpoint = keyof ApiResponseTypes
+
+type ApiEndpointWithRequest = keyof ApiRequestTypes
+
+type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>
 
 type ApiResponseType = ApiResponseTypes[ApiEndpoint]
-
-type ApiRequestType = ApiRequestTypes[ApiEndpoint]

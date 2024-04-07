@@ -71,17 +71,13 @@ namespace GameServer.CodeGen
             var assemblyName = assembly.GetName().Name;
             var projectDir = currentDir[..(currentDir.LastIndexOf(assemblyName) + assemblyName.Length)];
             var targetDir = $"{projectDir}\\TypeScript\\Game\\Shared\\Api";
-            var typeMapPath = $"{targetDir}\\ApiTypeMap.ts";
-            var apiInterfacesBasePath = $"{targetDir}\\ApiInterfaces";
-            File.Delete(typeMapPath);
-            if (Directory.Exists(apiInterfacesBasePath))
-                Directory.Delete(apiInterfacesBasePath, true);
-            WriteResponseTypes(endpointMetadata.OrderBy(end => end.Endpoint).ToList(), typeMapPath);
-            WriteApiInterfaces(usedTypes, apiInterfacesBasePath);
+            WriteApiMap(endpointMetadata.OrderBy(end => end.Endpoint).ToList(), targetDir);
+            WriteApiInterfaces(usedTypes, targetDir);
         }
 
-        private static void WriteResponseTypes(List<EndpointMetaData> endpointData, string filePath)
+        private static void WriteApiMap(List<EndpointMetaData> endpointData, string baseDirectoryPath)
         {
+            var filePath = $"{baseDirectoryPath}\\ApiTypeMap.ts";
             var strBuilder = new StringBuilder();
             strBuilder.AppendLine("type ApiResponseTypes = {");
             foreach (var endpoint in endpointData)
@@ -91,15 +87,15 @@ namespace GameServer.CodeGen
             strBuilder.AppendLine("}\n");
 
             strBuilder.AppendLine("type ApiRequestTypes = {");
-            foreach (var endpoint in endpointData)
+            foreach (var endpoint in endpointData.Where(endp => endp.Parameters.Count > 0))
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetParametersTypeText(endpoint)}");
             }
             strBuilder.AppendLine("}\n");
-
-            strBuilder.AppendLine("type ApiEndpoint = keyof ApiResponseTypes | keyof ApiRequestTypes\n");
-            strBuilder.AppendLine("type ApiResponseType = ApiResponseTypes[ApiEndpoint]\n");
-            strBuilder.AppendLine("type ApiRequestType = ApiRequestTypes[ApiEndpoint]");
+            strBuilder.AppendLine("type ApiEndpoint = keyof ApiResponseTypes\n");
+            strBuilder.AppendLine("type ApiEndpointWithRequest = keyof ApiRequestTypes\n");
+            strBuilder.AppendLine("type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>\n");
+            strBuilder.Append("type ApiResponseType = ApiResponseTypes[ApiEndpoint]");
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             File.WriteAllText(filePath, strBuilder.ToString());
@@ -109,7 +105,7 @@ namespace GameServer.CodeGen
         {
             if (endpoint.Parameters.Count == 0)
             {
-                return "undefined";
+                return "void";
             }
             if (endpoint.Parameters.Count == 1 && !endpoint.IsGet)
             {
@@ -168,6 +164,12 @@ namespace GameServer.CodeGen
 
         private static void WriteApiInterfaces(HashSet<Type> types, string baseDirectoryPath)
         {
+            var interfacesPath = $"{baseDirectoryPath}\\Interfaces";
+            var enumPath = $"{baseDirectoryPath}\\Enums.ts";
+
+            if (Directory.Exists(interfacesPath))
+                Directory.Delete(interfacesPath, true);
+
             var fileBuilders = new Dictionary<string, StringBuilder>();
             var subTypes = types.Select(GetSubTypes).ToList();
 
@@ -176,10 +178,12 @@ namespace GameServer.CodeGen
                 types.UnionWith(subTypeList);
             }
 
-            foreach (var type in types)
+            foreach (var type in types.OrderBy(GetTypeText))
             {
-                var nameSpace = type.Namespace;
-                var filePath = $"{baseDirectoryPath}\\{nameSpace[(nameSpace.LastIndexOf('.') + 1)..]}.ts";
+                var filePath = type.IsEnum
+                    ? enumPath
+                    : $"{interfacesPath}\\{type.Namespace[(type.Namespace.LastIndexOf('.') + 1)..]}.ts";
+
                 fileBuilders.TryGetValue(filePath, out var builder);
                 if (builder == null)
                 {
@@ -190,7 +194,11 @@ namespace GameServer.CodeGen
                 {
                     builder.Append("\n\n");
                 }
-                WriteInterfaceToBuilder(type, builder);
+
+                if (type.IsEnum)
+                    WriteEnumToBuilder(type, builder);
+                else
+                    WriteInterfaceToBuilder(type, builder);
             }
 
             foreach ((var path, var builder) in fileBuilders)
@@ -198,6 +206,17 @@ namespace GameServer.CodeGen
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(path, builder.ToString());
             }
+        }
+
+        private static void WriteEnumToBuilder(Type type, StringBuilder builder)
+        {
+            builder.AppendLine($"enum {GetTypeText(type)} {{");
+            var values = type.GetEnumValues();
+            foreach (var value in values)
+            {
+                builder.AppendLine($"\t{value.ToString()} = {(int)value},");
+            }
+            builder.Append('}');
         }
 
         private static void WriteInterfaceToBuilder(Type type, StringBuilder builder)
@@ -240,7 +259,7 @@ namespace GameServer.CodeGen
             }
             else
             {
-                return type.IsClass && !type.IsGenericParameter && type != typeof(string);
+                return type.IsEnum || (type.IsClass && !type.IsGenericParameter && type != typeof(string));
             }
         }
 
@@ -257,7 +276,7 @@ namespace GameServer.CodeGen
                     .Append(type.GetGenericTypeDefinition())
                     .ToList();
             }
-            else if (type.IsClass && type != typeof(string))
+            else if (type.IsEnum || (type.IsClass && !type.IsGenericParameter && type != typeof(string)))
             {
                 return new List<Type> { type };
             }

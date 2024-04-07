@@ -7,7 +7,9 @@
         this.endpoint = endpoint;
     }
 
-    public get(urlParams?: ApiRequestTypes[U]) {
+    public get<T extends ApiEndpointNoRequest>(urlParams?: never): Promise<ApiResponse<ApiResponseTypes[U]>>;
+    public get<T extends ApiEndpointWithRequest>(urlParams: ApiRequestTypes[T]): Promise<ApiResponse<ApiResponseTypes[U]>>;
+    public get(urlParams?: any) {
         const params = this.encodeParams(urlParams)
         const endpoint = params
             ? this.endpoint + '?' + params
@@ -22,12 +24,15 @@
         });
     }
 
-    public static get<U extends ApiEndpoint>(endpoint: U, urlParams?: ApiRequestTypes[U]) {
+    public static get<U extends ApiEndpointNoRequest>(endpoint: U, urlParams?: never): Promise<ApiResponseTypes[U]>
+    public static get<U extends ApiEndpointWithRequest>(endpoint: U, urlParams?: ApiRequestTypes[U]): Promise<ApiResponseTypes[U]>
+    public static async get<U extends ApiEndpoint>(endpoint: U, urlParams?: any) {
         const request = new ApiRequest(endpoint);
-        return new Promise<ApiResponseTypes[U]>(async resolved => resolved((await request.get(urlParams)).data));
+        const result = await request.get(urlParams);
+        return result.data;
     }
-
-    public post(payload?: ApiRequestTypes[U]) {
+    
+    public post<T extends U & ApiEndpointWithRequest>(payload: ApiRequestTypes[T]) {
         this.r.open('POST', this.endpoint, true); 
         const r = this.r;
         r.setRequestHeader('content-type', 'application/json');
@@ -40,9 +45,10 @@
         });
     }
 
-    public static post<U extends ApiEndpoint>(endpoint: U, payload?: ApiRequestTypes[U]) {
+    public static async post<T extends ApiEndpointWithRequest>(endpoint: T, payload: ApiRequestTypes[T]) {
         const request = new ApiRequest(endpoint);
-        return new Promise<ApiResponseTypes[U]>(async resolved => resolved((await request.post(payload)).data));
+        const result = await request.post(payload);
+        return result.data;
     }
 
     private encodeParams(urlParams: any) {

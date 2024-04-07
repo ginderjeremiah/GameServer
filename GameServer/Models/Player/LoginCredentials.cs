@@ -1,4 +1,4 @@
-﻿namespace GameServer.Models.Request
+﻿namespace GameServer.Models.Player
 {
     public class LoginCredentials : IModel
     {

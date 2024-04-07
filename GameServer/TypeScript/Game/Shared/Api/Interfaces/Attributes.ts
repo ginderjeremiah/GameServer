@@ -4,17 +4,6 @@ interface IAttribute {
 	attributeDesc: string;
 }
 
-interface IBattlerAttribute {
-	attributeId: AttributeType;
-	amount: number;
-	isCoreAttribute: boolean;
-}
-
-interface IAttributeUpdate {
-	attributeId: number;
-	amount: number;
-}
-
 interface IAttributeDistribution {
 	attributeId: AttributeType;
 	baseAmount: number;
@@ -24,4 +13,15 @@ interface IAttributeDistribution {
 interface IAttributeMultiplier {
 	attributeId: AttributeType;
 	multiplier: number;
+}
+
+interface IAttributeUpdate {
+	attributeId: number;
+	amount: number;
+}
+
+interface IBattlerAttribute {
+	attributeId: AttributeType;
+	amount: number;
+	isCoreAttribute: boolean;
 }

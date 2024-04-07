@@ -18,4 +18,11 @@
         BlockChance = 13,
         BlockReduction = 14,
     }
+
+    public enum ChangeType
+    {
+        Edit = 0,
+        Add = 1,
+        Delete = 2
+    }
 }

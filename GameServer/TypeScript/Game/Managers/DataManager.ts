@@ -1,5 +1,4 @@
-﻿/// <reference path="../Shared/Api/DataCache.ts"/>
-/// <reference path="../Shared/Api/ApiRequest.ts"/>
+﻿/// <reference path="../Shared/Api/ApiRequest.ts"/>
 
 class DataManager {
     static zones: IZone[];
@@ -65,8 +64,7 @@ class DataManager {
     }
 
     static async login(username: string, password: string) {
-        const req = new ApiRequest("/Login");
-        return req.post({username: username, password: password});
+        return ApiRequest.post("/Login", {username: username, password: password});
     }
 
     static async loginStatus() {

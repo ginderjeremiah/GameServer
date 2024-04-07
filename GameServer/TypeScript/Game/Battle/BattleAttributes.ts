@@ -1,6 +1,6 @@
-/// <reference path="../Shared/Enums.ts"/>
+/// <reference path="../Shared/Api/Enums.ts"/>
 class BattleAttributes {
-    static #attributesMaxId = AttributeType.__LAST - 1;
+    static #attributesMaxId = Object.entries(AttributeType)[Object.keys(AttributeType).length / 2 - 1][1] as number;
     attributes: number[];
 
     constructor(attList: {attributeId: number, amount: number}[]) {

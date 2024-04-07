@@ -3,8 +3,8 @@ using DataAccess.Models.SessionStore;
 using GameLibrary;
 using GameServer.Models.Attributes;
 using GameServer.Models.Enemies;
+using GameServer.Models.InventoryItems;
 using GameServer.Models.Player;
-using GameServer.Models.Request;
 
 namespace GameServer.Auth
 {

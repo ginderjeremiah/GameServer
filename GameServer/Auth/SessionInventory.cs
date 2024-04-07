@@ -1,5 +1,4 @@
 ﻿using DataAccess.Models.InventoryItems;
-using GameServer.Models.Request;
 
 namespace GameServer.Auth
 {
@@ -43,7 +42,7 @@ namespace GameServer.Auth
             return Inventory.Select((item, index) => (item, index)).Where(p => p.item is null).Select(p => p.index).ToList();
         }
 
-        public bool TrySetNewInventoryList(IEnumerable<InventoryUpdate> inventoryUpdates)
+        public bool TrySetNewInventoryList(IEnumerable<Models.InventoryItems.InventoryUpdate> inventoryUpdates)
         {
             var usedSlots = new HashSet<(bool, int)>();
             var matchedUpdates = _sessionInventory.Select((inv) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.InventoryItemId == upd.InventoryItemId))).ToList();
@@ -87,7 +86,7 @@ namespace GameServer.Auth
             return validUpdate;
         }
 
-        private bool IsValidInventoryUpdate(InventoryUpdate item)
+        private bool IsValidInventoryUpdate(Models.InventoryItems.InventoryUpdate item)
         {
             return _sessionInventory.Any(inv => inv.InventoryItemId == item.InventoryItemId)
                 && item.SlotId is >= 0

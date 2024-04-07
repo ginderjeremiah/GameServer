@@ -3,7 +3,6 @@ using GameLibrary;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Player;
-using GameServer.Models.Request;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
