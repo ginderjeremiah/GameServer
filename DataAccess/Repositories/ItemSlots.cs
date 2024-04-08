@@ -18,11 +18,11 @@ namespace DataAccess.Repositories
                     (@ItemId, @SlotTypeId, @GuaranteedId, @Probability)";
 
             ExecuteNonQuery(commandText,
-                            new SqlParameter("@ItemId", itemId),
-                            new SqlParameter("@SlotTypeId", slotTypeId),
-                            new SqlParameter("@GuaranteedId", guaranteedId),
-                            new SqlParameter("@Probability", probability)
-                        );
+                new SqlParameter("@ItemId", itemId),
+                new SqlParameter("@SlotTypeId", slotTypeId),
+                new SqlParameter("@GuaranteedId", guaranteedId),
+                new SqlParameter("@Probability", probability)
+            );
         }
 
         public void UpdateItemSlot(int itemSlotId, int itemId, int slotTypeId, int guaranteedId, decimal probability)
@@ -36,12 +36,12 @@ namespace DataAccess.Repositories
                 WHERE ItemSlotId = @ItemSlotId";
 
             ExecuteNonQuery(commandText,
-                            new SqlParameter("@ItemId", itemId),
-                            new SqlParameter("@SlotTypeId", slotTypeId),
-                            new SqlParameter("@GuaranteedId", guaranteedId),
-                            new SqlParameter("@Probability", probability),
-                            new SqlParameter("@ItemSlotId", itemSlotId)
-                        );
+                new SqlParameter("@ItemId", itemId),
+                new SqlParameter("@SlotTypeId", slotTypeId),
+                new SqlParameter("@GuaranteedId", guaranteedId),
+                new SqlParameter("@Probability", probability),
+                new SqlParameter("@ItemSlotId", itemSlotId)
+            );
         }
 
         public void DeleteItemSlot(int itemSlotId)

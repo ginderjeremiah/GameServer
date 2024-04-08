@@ -64,7 +64,7 @@ class DataManager {
     }
 
     static async login(username: string, password: string) {
-        return ApiRequest.post("/Login", {username: username, password: password});
+        return new ApiRequest("/Login").post({ username: username, password: password })
     }
 
     static async loginStatus() {

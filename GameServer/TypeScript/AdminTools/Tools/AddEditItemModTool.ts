@@ -12,10 +12,13 @@
             name: slotType.slotTypeName
         }));
         const getSlotTypes = () => {
-            return slotTypeOpts;
+            return {options: slotTypeOpts};
         };
 
-        this.modTable = new TableDataEditor(data[0], renderParent, "itemModId", { slotTypeId: getSlotTypes });
+        this.modTable = new TableDataEditor(data[0], renderParent, {
+            primaryKey: "itemModId",
+            selOptions: {slotTypeId: getSlotTypes }
+        });
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');
         submitButton.textContent = 'Save';

@@ -29,6 +29,7 @@ namespace DataAccess.Repositories
             if (repos.SessionStore.TryGetSession(queueValue, out var sessionData))
                 repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems);
         }
+
         public List<InventoryItem> GetInventory(int playerId)
         {
             var commandText = @"

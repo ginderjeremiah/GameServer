@@ -5,10 +5,11 @@ class AdminTools {
     static adminToolSelect: HTMLSelectElement;
     static renderParent: HTMLDivElement;
     static adminTools: { [key: string]: (d: HTMLDivElement) => void } = {
-        "Add/Edit Tags": (d: HTMLDivElement) => AddEditTagTool.init(d),
+        "Add/Edit Items": (d: HTMLDivElement) => AddEditItemTool.init(d),
+        "Add/Edit Item Attributes": (d: HTMLDivElement) => AddEditItemAttributeTool.init(d),
         "Add/Edit Item Mods": (d: HTMLDivElement) => AddEditItemModTool.init(d),
         "Add/Edit Item Slots": (d: HTMLDivElement) => AddEditItemSlotTool.init(d),
-        "Add/Edit Items": (d: HTMLDivElement) => AddEditItemTool.init(d),
+        "Add/Edit Tags": (d: HTMLDivElement) => AddEditTagTool.init(d),
         "Set Item Tags": (d: HTMLDivElement) => SetItemTagsTool.init(d),
         "Set Item Component Tags": (d: HTMLDivElement) => SetItemModTagsTool.init(d)
     }

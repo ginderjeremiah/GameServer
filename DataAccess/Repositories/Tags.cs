@@ -13,7 +13,7 @@ namespace DataAccess.Repositories
                 SELECT
                     TagId,
                     TagName,
-                    TagCategory
+                    TagCategoryId
                 FROM Tags";
 
             return QueryToList<Tag>(commandText);
@@ -25,7 +25,7 @@ namespace DataAccess.Repositories
                 SELECT
                     T.TagId,
                     T.TagName,
-                    T.TagCategory
+                    T.TagCategoryId
                 FROM ItemTags AS IT
                 INNER JOIN Tags AS T
                 ON T.TagId = IT.TagId
@@ -40,7 +40,7 @@ namespace DataAccess.Repositories
                 SELECT
                     T.TagId,
                     T.TagName,
-                    T.TagCategory
+                    T.TagCategoryId
                 FROM ItemModTags AS IMT
                 INNER JOIN Tags AS T
                 ON T.TagId = IMT.TagId
@@ -83,25 +83,25 @@ namespace DataAccess.Repositories
             ExecuteNonQuery(commandText, new SqlParameter("@ItemModId", itemModId), new SqlParameter("@TagIds", tagIdStr));
         }
 
-        public void AddTag(string tagName, string tagCategory)
+        public void AddTag(string tagName, int tagCategoryId)
         {
             var commandText = @"
                 INSERT INTO Tags
                 VALUES
-                    (@TagName, @TagCategory)";
+                    (@TagName, @TagCategoryId)";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategory", tagCategory));
+            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategoryId", tagCategoryId));
         }
 
-        public void UpdateTag(int tagId, string tagName, string tagCategory)
+        public void UpdateTag(int tagId, string tagName, int tagCategoryId)
         {
             var commandText = @"
                 UPDATE Tags
                 SET TagName = @TagName,
-                    TagCategory = @TagCategory
+                    TagCategoryId = @TagCategoryId
                 WHERE TagId = @TagId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategory", tagCategory), new SqlParameter("@TagId", tagId));
+            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategoryId", tagCategoryId), new SqlParameter("@TagId", tagId));
         }
 
         public void DeleteTag(int tagId)
@@ -121,8 +121,8 @@ namespace DataAccess.Repositories
         public List<Tag> TagsForItemMod(int itemModId);
         public void SetItemTags(int itemId, IEnumerable<int> tagIds);
         public void SetItemModTags(int itemModId, IEnumerable<int> tagIds);
-        public void AddTag(string tagName, string tagCategory);
-        public void UpdateTag(int tagId, string tagName, string tagCategory);
+        public void AddTag(string tagName, int tagCategoryId);
+        public void UpdateTag(int tagId, string tagName, int tagCategoryId);
         public void DeleteTag(int tagId);
     }
 }

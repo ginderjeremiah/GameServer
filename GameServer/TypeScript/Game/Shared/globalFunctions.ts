@@ -19,6 +19,11 @@ function keys(obj?: {}) {
     return obj ? Object.keys(obj) : [];
 }
 
+function enumPairs(obj?: any) {
+    const allKeys = keys(obj);
+    return allKeys.slice(0, allKeys.length / 2).map(key => ({id: key as unknown as number, name: obj[key] as string}))
+}
+
 function capitalize(str: string) {
     return str[0].toUpperCase() + str.slice(1);
 }

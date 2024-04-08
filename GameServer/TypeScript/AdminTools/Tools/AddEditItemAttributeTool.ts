@@ -1,11 +1,9 @@
-﻿class AddEditItemSlotTool {
-    static slotTable: TableDataEditor<IItemSlot>;
+class AddEditItemAttributeTool {
+    static slotTable: TableDataEditor<IItemAttribute>;
     static renderParent: HTMLDivElement;
     static tableDiv: HTMLDivElement;
     static itemSelect: HTMLSelectElement;
     static items: IItem[];
-    static slotTypes: ISlotType[];
-    static itemMods: IItemMod[];
 
     static async init(renderParent: HTMLDivElement, initialSelection?: number) {
         renderParent.replaceChildren();
@@ -31,12 +29,8 @@
         this.tableDiv.style.border = '2px solid black';
         this.tableDiv.style.padding = '1em';
         renderParent.appendChild(this.tableDiv);
-        const data = await Promise.all([
-            ApiRequest.get('/api/Items'),
-            ApiRequest.get('/api/Items/SlotTypes'),
-            ApiRequest.get('/api/ItemMods')
-        ]);
-        this.items = data[0];
+
+        this.items = await ApiRequest.get('/api/Items');
         if (!this.items[0]) {
             this.items = this.items.slice(1);
         }
@@ -48,47 +42,30 @@
             opt.selected = false;
             this.itemSelect.appendChild(opt);
         });
+
         const itemOpts = this.items.map(item => ({
             id: item.itemId,
             name: item.itemName
         }));
-        this.slotTypes = data[1];
-        this.itemMods = data[2];
-        const slotTypeOpts = this.slotTypes.map(slotType => ({
-            id: slotType.slotTypeId,
-            name: slotType.slotTypeName
-        }));
-        const groupedMods = groupBy(this.itemMods, i => i.slotTypeId.toString());
-        const itemModOpts: { [key: number]: SelOptions } = {};
-        keys(groupedMods).forEach(key => {
-            itemModOpts[Number(key)] = {
-                allowBlanks: true,
-                options: groupedMods[key].map(mod => ({
-                    id: mod.itemModId,
-                    name: mod.itemModName
-                }))
-            };
-        });
-        this.itemSelect.addEventListener('change', async () => {
-            AddEditItemSlotTool.tableDiv.hidden = false;
-            const selected = AddEditItemSlotTool.itemSelect.selectedOptions[0];
-            const itemId = Number(selected.value);
-            const itemSlots = await ApiRequest.get('/api/Items/SlotsForItem', { itemId: itemId, refreshCache: true });
 
-            this.slotTable = new TableDataEditor(itemSlots, AddEditItemSlotTool.tableDiv, {
-                primaryKey: "itemSlotId",
+        const attributeOpts = enumPairs(AttributeType).map(pair => ({id: pair.id, name: normalizeText(pair.name)}));
+
+        this.itemSelect.addEventListener('change', async () => {
+            AddEditItemAttributeTool.tableDiv.hidden = false;
+            const selected = AddEditItemAttributeTool.itemSelect.selectedOptions[0];
+            const itemId = Number(selected.value);
+
+            this.slotTable = new TableDataEditor(this.items[itemId].attributes, AddEditItemAttributeTool.tableDiv, {
                 selOptions: {
                     "itemId": () => ({options: itemOpts}),
-                    "slotTypeId": () => ({options: slotTypeOpts}),
-                    "guaranteedId": (i: IItemSlot) => itemModOpts[i.slotTypeId]
-                },
+                    "attributeId": () => ({options: attributeOpts})
+                }, 
                 sampleItem: {
-                    itemSlotId: 0,
                     itemId: itemId,
-                    slotTypeId: 1,
-                    guaranteedId: 0,
-                    probability: 1.00
-                }
+                    attributeId: AttributeType.Strength,
+                    amount: 1.00
+                },
+                disabledColumns: ["itemId"]
             });
         });
 
@@ -97,7 +74,7 @@
         submitButton.textContent = 'Save';
         submitButton.style.marginTop = '1em';
         submitButton.addEventListener('click', () => {
-            AddEditItemSlotTool.submit();
+            AddEditItemAttributeTool.submit();
         });
         renderParent.appendChild(submitButton);
 
@@ -110,9 +87,9 @@
     static async submit() {
         const changes = this.slotTable.getChanges();
         if (changes.length > 0) {
-            await new ApiRequest('/api/AdminTools/AddEditItemSlots').post(changes);
-            const selectedIndex = AddEditItemSlotTool.itemSelect.selectedOptions[0].index;
-            AddEditItemSlotTool.init(this.renderParent, selectedIndex);
+            await new ApiRequest('/api/AdminTools/AddEditItemAttributes').post(changes);
+            const selectedIndex = AddEditItemAttributeTool.itemSelect.selectedOptions[0].index;
+            AddEditItemAttributeTool.init(this.renderParent, selectedIndex);
         }
     }
 }

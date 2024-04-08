@@ -15,7 +15,7 @@ interface SlotType {
     slotTypeName: string;
 }
 
-interface SelOption {
-    id: number;
-    name: string;
+interface SelOptions {
+    allowBlanks?: boolean
+    options: {id: number, name: string}[]
 }

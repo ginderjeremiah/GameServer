@@ -1,19 +1,17 @@
 ﻿using GameLibrary;
 using System.Data.SqlClient;
 
-namespace DataAccess.Models.Tags
+namespace DataAccess.Models.TagCategories
 {
-    public class Tag : IDataModel
+    public class TagCategory : IDataModel
     {
-        public int TagId { get; set; }
-        public string TagName { get; set; }
         public int TagCategoryId { get; set; }
+        public string TagCategoryName { get; set; }
 
         public void LoadFromReader(SqlDataReader reader)
         {
-            TagId = reader["TagId"].AsInt();
-            TagName = reader["TagName"].AsString();
             TagCategoryId = reader["TagCategoryId"].AsInt();
+            TagCategoryName = reader["TagCategoryName"].AsString();
         }
     }
 }

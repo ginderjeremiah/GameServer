@@ -1,4 +1,5 @@
 type ApiResponseTypes = {
+	'/api/AdminTools/AddEditItemAttributes': undefined
 	'/api/AdminTools/AddEditItemMods': undefined
 	'/api/AdminTools/AddEditItems': undefined
 	'/api/AdminTools/AddEditItemSlots': undefined
@@ -22,6 +23,7 @@ type ApiResponseTypes = {
 	'/api/Player/UpdatePlayerStats': IBattlerAttribute[]
 	'/api/Skills': ISkill[]
 	'/api/Tags': ITag[]
+	'/api/Tags/TagCategories': ITagCategory[]
 	'/api/Tags/TagsForItem': ITag[]
 	'/api/Tags/TagsForItemMod': ITag[]
 	'/api/Zones': IZone[]
@@ -30,6 +32,7 @@ type ApiResponseTypes = {
 }
 
 type ApiRequestTypes = {
+	'/api/AdminTools/AddEditItemAttributes': IChange<IItemAttribute>[]
 	'/api/AdminTools/AddEditItemMods': IChange<IItemMod>[]
 	'/api/AdminTools/AddEditItems': IChange<IItem>[]
 	'/api/AdminTools/AddEditItemSlots': IChange<IItemSlot>[]

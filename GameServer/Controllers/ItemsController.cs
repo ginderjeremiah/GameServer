@@ -32,5 +32,11 @@ namespace GameServer.Controllers
         {
             return Success(Repositories.SlotTypes.AllSlotTypes().Select(type => new SlotType(type)));
         }
+
+        //[HttpGet]
+        //public ApiListResponse<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
+        //{
+        //    return Success(Repositories.ItemSlots.SlotsForItem(itemId, refreshCache).Select(slot => new ItemSlot(slot)));
+        //}
     }
 }

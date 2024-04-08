@@ -17,7 +17,7 @@ enum AttributeType {
 }
 
 enum ChangeType {
-	Edit = 0,
-	Add = 1,
+	Add = 0,
+	Edit = 1,
 	Delete = 2,
 }

@@ -22,6 +22,12 @@ namespace GameServer.Controllers
         }
 
         [HttpGet]
+        public ApiListResponse<TagCategory> TagCategories()
+        {
+            return Success(Repositories.TagCategories.GetTagCategories().Select(tc => new TagCategory(tc)));
+        }
+
+        [HttpGet]
         public ApiListResponse<Tag> TagsForItem(int itemId)
         {
             return Success(Repositories.Tags.TagsForItem(itemId).Select(t => new Tag(t)));

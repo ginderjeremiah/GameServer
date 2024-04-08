@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
 using System.Data.SqlClient;
+using System.Text.Json;
 
 namespace DataAccess.Models.Items
 {
@@ -9,6 +10,7 @@ namespace DataAccess.Models.Items
         public string ItemName { get; set; }
         public string ItemDesc { get; set; }
         public int ItemCategoryId { get; set; }
+        public List<ItemAttribute> Attributes { get; set; }
 
         public void LoadFromReader(SqlDataReader reader)
         {
@@ -16,6 +18,7 @@ namespace DataAccess.Models.Items
             ItemName = reader["ItemName"].AsString();
             ItemDesc = reader["ItemDesc"].AsString();
             ItemCategoryId = reader["ItemCategoryId"].AsInt();
+            Attributes = JsonSerializer.Deserialize<List<ItemAttribute>>(reader["AttributesJson"].AsString());
         }
     }
 }

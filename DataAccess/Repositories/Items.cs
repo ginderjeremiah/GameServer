@@ -11,12 +11,22 @@ namespace DataAccess.Repositories
         {
             var commandText = @"
                 SELECT
-                    ItemId,
-                    ItemName,
-                    ItemDesc,
-                    ItemCategoryId
+                    I.ItemId,
+                    I.ItemName,
+                    I.ItemDesc,
+                    I.ItemCategoryId,
+	                COALESCE(AttJSON.JSONData, '[]') AS AttributesJSON
                 FROM
-                    Items";
+                    Items I
+                OUTER APPLY (
+	                SELECT
+                        IA.ItemId,
+		                IA.AttributeId,
+		                IA.Amount
+	                FROM ItemAttributes IA
+	                WHERE IA.ItemId = I.ItemId
+	                FOR JSON PATH
+                ) AS AttJSON(JSONData)";
 
             return QueryToList<Item>(commandText);
         }

@@ -3,14 +3,25 @@
     static renderParent: HTMLDivElement;
 
     static async init(renderParent: HTMLDivElement) {
-        const itemCategoryOpts = (await ApiRequest.get('/api/ItemCategories')).map(cat => ({
+        const data = await Promise.all([
+            ApiRequest.get('/api/ItemCategories'),
+            ApiRequest.get('/api/Items')
+        ])
+        const itemCategoryOpts = data[0].map(cat => ({
             id: cat.itemCategoryId,
             name: cat.categoryName
         }));
         const getItemCategories = (i: IItem) => {
-            return itemCategoryOpts;
+            return {options: itemCategoryOpts};
         }
-        this.itemTable = new TableDataEditor(await ApiRequest.get('/api/Items'), renderParent, "itemId", { "itemCategoryId": getItemCategories });
+        this.itemTable = new TableDataEditor(data[1],
+            renderParent,
+            {
+                primaryKey: "itemId",
+                selOptions: { "itemCategoryId": getItemCategories },
+                hiddenColumns: ["attributes"]
+            }
+        );
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');
         submitButton.textContent = 'Save';
@@ -24,7 +35,7 @@
     static async submit() {
         const changes = this.itemTable.getChanges();
         if (changes.length > 0) {
-            await new ApiRequest('/api/AdminTools/AddEditItems').post(changes);
+            await ApiRequest.post('/api/AdminTools/AddEditItems', changes);
             AddEditItemTool.init(this.renderParent);
         }
     }

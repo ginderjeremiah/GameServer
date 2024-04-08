@@ -23,14 +23,9 @@ namespace GameServer
 
             builder.Services.AddAuthentication(options =>
             {
-                options.DefaultChallengeScheme = "Default";
-                options.AddScheme<SessionAuthHandler>("Default", nameof(SessionAuthHandler));
+                options.DefaultChallengeScheme = "SessionAuth";
+                options.AddScheme<SessionAuthHandler>("SessionAuth", nameof(SessionAuthHandler));
             });
-
-            //builder.Services.AddSession((options) =>
-            //{
-            //    options.Cookie
-            //});
 
             var app = builder.Build();
 
@@ -53,7 +48,8 @@ namespace GameServer
 
             app.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Home}/{action=Game}");
+                pattern: "{controller=Home}/{action=Game}"
+            );
 
             app.Run();
         }

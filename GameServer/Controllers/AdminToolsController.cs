@@ -5,6 +5,7 @@ using GameServer.Models.Common;
 using GameServer.Models.Items;
 using GameServer.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
+using static GameServer.ChangeType;
 
 namespace GameServer.Controllers
 {
@@ -17,20 +18,43 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpPost]
+        public ApiResponse AddEditItemAttributes([FromBody] List<Change<ItemAttribute>> changes)
+        {
+            foreach (var change in changes)
+            {
+                var item = change.Item;
+                if (change.ChangeType == Add)
+                {
+                    Repositories.ItemAttributes.AddItemAttribute(item.ItemId, (int)item.AttributeId, item.Amount);
+                }
+                else if (change.ChangeType == Edit)
+                {
+                    Repositories.ItemAttributes.UpdateItemAttribute(item.ItemId, (int)item.AttributeId, item.Amount);
+                }
+                else if (change.ChangeType == Delete)
+                {
+                    Repositories.ItemAttributes.DeleteItemAttribute(item.ItemId, (int)item.AttributeId);
+                }
+            }
+
+            return Success();
+        }
+
+        [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
             foreach (var change in changes)
             {
                 var item = change.Item;
-                if (change.ChangeType == ChangeType.Add)
+                if (change.ChangeType == Add)
                 {
                     Repositories.ItemMods.AddItemMod(item.ItemModName, item.Removable, item.ItemModDesc);
                 }
-                else if (change.ChangeType == ChangeType.Edit)
+                else if (change.ChangeType == Edit)
                 {
                     Repositories.ItemMods.UpdateItemMod(item.ItemModId, item.ItemModName, item.Removable, item.ItemModDesc);
                 }
-                else if (change.ChangeType == ChangeType.Delete)
+                else if (change.ChangeType == Delete)
                 {
                     Repositories.ItemMods.DeleteItemMod(item.ItemModId);
                 }
@@ -40,20 +64,42 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
+        public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
+        {
+            foreach (var change in changes)
+            {
+                var item = change.Item;
+                if (change.ChangeType == Add)
+                {
+                    Repositories.Items.AddItem(item.ItemName, item.ItemDesc, item.ItemCategoryId);
+                }
+                else if (change.ChangeType == Edit)
+                {
+                    Repositories.Items.UpdateItem(item.ItemId, item.ItemName, item.ItemDesc, item.ItemCategoryId);
+                }
+                else if (change.ChangeType == Delete)
+                {
+                    Repositories.Items.DeleteItem(item.ItemId);
+                }
+            }
+            return Success();
+        }
+
+        [HttpPost]
         public ApiResponse AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
         {
             foreach (var change in changes)
             {
                 var item = change.Item;
-                if (change.ChangeType == ChangeType.Add)
+                if (change.ChangeType == Add)
                 {
                     Repositories.ItemSlots.AddItemSlot(item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
                 }
-                else if (change.ChangeType == ChangeType.Edit)
+                else if (change.ChangeType == Edit)
                 {
                     Repositories.ItemSlots.UpdateItemSlot(item.ItemSlotId, item.ItemId, item.SlotTypeId, item.GuaranteedId, item.Probability);
                 }
-                else if (change.ChangeType == ChangeType.Delete)
+                else if (change.ChangeType == Delete)
                 {
                     Repositories.ItemSlots.DeleteItemSlot(item.ItemSlotId);
                 }
@@ -63,42 +109,20 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
-        public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
-        {
-            foreach (var change in changes)
-            {
-                var item = change.Item;
-                if (change.ChangeType == ChangeType.Add)
-                {
-                    Repositories.Items.AddItem(item.ItemName, item.ItemDesc, item.ItemCategoryId);
-                }
-                else if (change.ChangeType == ChangeType.Edit)
-                {
-                    Repositories.Items.UpdateItem(item.ItemId, item.ItemName, item.ItemDesc, item.ItemCategoryId);
-                }
-                else if (change.ChangeType == ChangeType.Delete)
-                {
-                    Repositories.Items.DeleteItem(item.ItemId);
-                }
-            }
-            return Success();
-        }
-
-        [HttpPost]
         public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
             foreach (var change in changes)
             {
                 var item = change.Item;
-                if (change.ChangeType == ChangeType.Add)
+                if (change.ChangeType == Add)
                 {
-                    Repositories.Tags.AddTag(item.TagName, item.TagCategory);
+                    Repositories.Tags.AddTag(item.TagName, item.TagCategoryId);
                 }
-                else if (change.ChangeType == ChangeType.Edit)
+                else if (change.ChangeType == Edit)
                 {
-                    Repositories.Tags.UpdateTag(item.TagId, item.TagName, item.TagCategory);
+                    Repositories.Tags.UpdateTag(item.TagId, item.TagName, item.TagCategoryId);
                 }
-                else if (change.ChangeType == ChangeType.Delete)
+                else if (change.ChangeType == Delete)
                 {
                     Repositories.Tags.DeleteTag(item.TagId);
                 }

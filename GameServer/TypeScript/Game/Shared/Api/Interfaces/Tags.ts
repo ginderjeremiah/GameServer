@@ -6,5 +6,10 @@ interface ISetTagsData {
 interface ITag {
 	tagId: number;
 	tagName: string;
-	tagCategory: string;
+	tagCategoryId: number;
+}
+
+interface ITagCategory {
+	tagCategoryId: number;
+	tagCategoryName: string;
 }

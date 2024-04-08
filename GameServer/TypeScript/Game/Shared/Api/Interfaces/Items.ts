@@ -3,6 +3,13 @@ interface IItem {
 	itemName: string;
 	itemDesc: string;
 	itemCategoryId: number;
+	attributes: IItemAttribute[];
+}
+
+interface IItemAttribute {
+	itemId: number;
+	attributeId: AttributeType;
+	amount: number;
 }
 
 interface IItemCategory {
