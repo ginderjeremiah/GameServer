@@ -1,5 +1,5 @@
 ﻿using DataAccess.Models.PlayerAttributes;
-using GameServer.Models.Attributes;
+using static GameServer.AttributeType;
 
 namespace GameServer
 {
@@ -7,7 +7,12 @@ namespace GameServer
     {
         public static bool IsCoreAttribute(this PlayerAttribute att)
         {
-            return new BattlerAttribute(att).IsCoreAttribute;
+            return ((AttributeType)att.AttributeId).IsCoreAttribute();
+        }
+
+        public static bool IsCoreAttribute(this AttributeType att)
+        {
+            return att is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
         }
     }
 }

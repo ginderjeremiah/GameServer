@@ -18,22 +18,22 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpPost]
-        public ApiResponse AddEditItemAttributes([FromBody] List<Change<ItemAttribute>> changes)
+        public ApiResponse AddEditItemAttributes([FromBody] AddEditItemAttributesData changeData)
         {
-            foreach (var change in changes)
+            foreach (var change in changeData.Changes)
             {
                 var item = change.Item;
                 if (change.ChangeType == Add)
                 {
-                    Repositories.ItemAttributes.AddItemAttribute(item.ItemId, (int)item.AttributeId, item.Amount);
+                    Repositories.ItemAttributes.AddItemAttribute(changeData.ItemId, (int)item.AttributeId, item.Amount);
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    Repositories.ItemAttributes.UpdateItemAttribute(item.ItemId, (int)item.AttributeId, item.Amount);
+                    Repositories.ItemAttributes.UpdateItemAttribute(changeData.ItemId, (int)item.AttributeId, item.Amount);
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    Repositories.ItemAttributes.DeleteItemAttribute(item.ItemId, (int)item.AttributeId);
+                    Repositories.ItemAttributes.DeleteItemAttribute(changeData.ItemId, (int)item.AttributeId);
                 }
             }
 

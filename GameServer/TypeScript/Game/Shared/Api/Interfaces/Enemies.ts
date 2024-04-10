@@ -9,16 +9,16 @@ interface IDefeatRewards {
 }
 
 interface IEnemy {
-	enemyDrops: IItemDrop[];
-	attributeDistribution: IAttributeDistribution[];
-	enemyName: string;
 	enemyId: number;
+	name: string;
+	drops: IItemDrop[];
+	attributeDistribution: IAttributeDistribution[];
 	selectedSkills: number[];
 }
 
 interface IEnemyInstance {
 	enemyId: number;
-	enemyLevel: number;
+	level: number;
 	attributes: IBattlerAttribute[];
 	seed: number;
 }

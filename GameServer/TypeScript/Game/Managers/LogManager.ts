@@ -5,8 +5,8 @@ class LogManager {
     static #logPreferences: ILogPreference[];
     static #updatedLogPreferences: ILogPreference[];
 
-    static async init() {
-        this.#logPreferences = await DataManager.getLogPreferences()
+    static init(logPrefs: ILogPreference[]) {
+        this.#logPreferences = logPrefs;
         this.#updatedLogPreferences = this.#logPreferences.map(pref => Object.assign({}, pref));
 
         document.getElementById("loggingOptionsButton")!.addEventListener('click', async (event) => {
@@ -22,7 +22,7 @@ class LogManager {
 
             let label = document.createElement("td");
             row.appendChild(label);
-            label.textContent = setting + ":";
+            label.textContent = setting.name + ":";
 
             let dropdownCell = document.createElement("td");
             row.appendChild(dropdownCell);

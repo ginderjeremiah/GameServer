@@ -351,14 +351,20 @@ html {
 #equipStatsHeader {
     padding-left: 3vw;
     margin: 0em 0em 0.5em 0em;
+    font-size: 1.5em;
 }
 
 #equipStatsList {
-    padding-left: 4vw;
+    padding-left: 3vw;
     display: flex;
     flex-wrap: wrap;
     list-style: none;
     flex-direction: column;
+    font-size: 1.3em;
+}
+
+#equipStatsList > li + li {
+    margin-top: 0.1em;
 }
 
 #helmSlot {
@@ -420,7 +426,9 @@ html {
 
 .attTable {
     display: flex;
-    height: 40vh;
+    height: 35vh;
+    font-size: 1.5em;
+    margin-bottom: 1em;
 }
 
 .attCol {
@@ -444,8 +452,36 @@ html {
     align-content: space-evenly;
 }
 
-#Attributes > * {
-    margin-left: 3vw;
-    font-size: 1.5em;
+#attributesContainer {
+    display: flex;
     margin-bottom: 1em;
+}
+
+#coreAttributesContainer {
+    margin-left: 3vw;
+    width: 50%;
+}
+
+#totalAttributesContainer {
+    margin-right: 3vw;
+    width: 50%;
+}
+
+#totalAttributesList {
+    list-style: none;
+    padding-inline-start: 0;
+    font-size: 1.3em;
+}
+
+#totalAttributesList > li + li {
+    margin-top: 0.1em;
+}
+
+#availableAttributePoints {
+    font-size: 1.5em;
+}
+
+#availableAttributePoints > button {
+    margin-left: 0.5em;
+    font-size: 1em;
 }

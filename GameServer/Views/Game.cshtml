@@ -72,20 +72,30 @@
                 </div>
             </div>
             <div class="screen" id="Attributes">
-                <h2>Core Attributes:</h2>
-                <div class="attTable textSelectable">
-                    <div class="attCol" id="attTableLabels">
+                <div id="attributesContainer">
+                    <div id="coreAttributesContainer">
+                        <h2>Core Attributes:</h2>
+                        <div class="attTable textSelectable">
+                            <div class="attCol" id="attTableLabels">
+                            </div>
+                            <div class="attCol" id="attTableNumbers">
+                            </div>
+                            <div class="attCol" id="attTableButtons">
+                            </div>
+                        </div>
+                        <div id="availableAttributePoints">
+                            <span>Available Attribute Points:</span>
+                            <span id="attributePointsValue"></span>
+                            <button onclick="AttributeManager.saveStats()">Save</button>
+                        </div>
                     </div>
-                    <div class="attCol" id="attTableNumbers">
-                    </div>
-                    <div class="attCol" id="attTableButtons">
+                    <div id="totalAttributesContainer">
+                        <h2>All Attributes:</h2>
+                        <ul id="totalAttributesList">
+                        </ul>
                     </div>
                 </div>
-                <div>
-                    <span>Available Stat Points:</span>
-                    <span id="statPointsValue"></span>
-                    <button onclick="AttributeManager.saveStats()">Save</button>
-                </div>
+                
             </div>
             <div class="screen" id="Stats">
                 Stats...

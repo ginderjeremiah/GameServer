@@ -6,7 +6,7 @@ namespace GameServer.Models.Player
     public class PlayerData : IModel
     {
         public string UserName { get; set; }
-        public string PlayerName { get; set; }
+        public string Name { get; set; }
         public int Level { get; set; }
         public int Exp { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
@@ -17,7 +17,7 @@ namespace GameServer.Models.Player
         public PlayerData(SessionPlayer sessionPlayer)
         {
             UserName = sessionPlayer.UserName;
-            PlayerName = sessionPlayer.PlayerName;
+            Name = sessionPlayer.PlayerName;
             Level = sessionPlayer.Level;
             Exp = sessionPlayer.Exp;
             Attributes = sessionPlayer.Attributes.Select(att => new BattlerAttribute(att)).ToList();

@@ -1,12 +1,11 @@
-﻿using DataAccess.Models.PlayerAttributes;
-using static GameServer.AttributeType;
+﻿using DataAccess.Models.Items;
+using DataAccess.Models.PlayerAttributes;
 namespace GameServer.Models.Attributes
 {
     public class BattlerAttribute : IModel
     {
         public AttributeType AttributeId { get; set; }
         public decimal Amount { get; set; }
-        public bool IsCoreAttribute => AttributeId is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
 
         public BattlerAttribute(PlayerAttribute playerAttribute)
         {
@@ -18,6 +17,12 @@ namespace GameServer.Models.Attributes
         {
             AttributeId = (AttributeType)distribution.AttributeId;
             Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;
+        }
+
+        public BattlerAttribute(ItemAttribute itemAttribute)
+        {
+            AttributeId = (AttributeType)itemAttribute.AttributeId;
+            Amount = itemAttribute.Amount;
         }
 
         public BattlerAttribute() { }

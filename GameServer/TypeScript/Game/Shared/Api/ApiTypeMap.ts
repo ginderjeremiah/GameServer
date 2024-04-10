@@ -32,7 +32,7 @@ type ApiResponseTypes = {
 }
 
 type ApiRequestTypes = {
-	'/api/AdminTools/AddEditItemAttributes': IChange<IItemAttribute>[]
+	'/api/AdminTools/AddEditItemAttributes': IAddEditItemAttributesData
 	'/api/AdminTools/AddEditItemMods': IChange<IItemMod>[]
 	'/api/AdminTools/AddEditItems': IChange<IItem>[]
 	'/api/AdminTools/AddEditItemSlots': IChange<IItemSlot>[]

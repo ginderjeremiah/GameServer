@@ -1,5 +1,5 @@
 class AddEditItemAttributeTool {
-    static slotTable: TableDataEditor<IItemAttribute>;
+    static slotTable: TableDataEditor<IBattlerAttribute>;
     static renderParent: HTMLDivElement;
     static tableDiv: HTMLDivElement;
     static itemSelect: HTMLSelectElement;
@@ -43,11 +43,6 @@ class AddEditItemAttributeTool {
             this.itemSelect.appendChild(opt);
         });
 
-        const itemOpts = this.items.map(item => ({
-            id: item.itemId,
-            name: item.itemName
-        }));
-
         const attributeOpts = enumPairs(AttributeType).map(pair => ({id: pair.id, name: normalizeText(pair.name)}));
 
         this.itemSelect.addEventListener('change', async () => {
@@ -57,15 +52,12 @@ class AddEditItemAttributeTool {
 
             this.slotTable = new TableDataEditor(this.items[itemId].attributes, AddEditItemAttributeTool.tableDiv, {
                 selOptions: {
-                    "itemId": () => ({options: itemOpts}),
                     "attributeId": () => ({options: attributeOpts})
                 }, 
                 sampleItem: {
-                    itemId: itemId,
                     attributeId: AttributeType.Strength,
                     amount: 1.00
-                },
-                disabledColumns: ["itemId"]
+                }
             });
         });
 
@@ -87,7 +79,9 @@ class AddEditItemAttributeTool {
     static async submit() {
         const changes = this.slotTable.getChanges();
         if (changes.length > 0) {
-            await new ApiRequest('/api/AdminTools/AddEditItemAttributes').post(changes);
+            const selected = AddEditItemAttributeTool.itemSelect.selectedOptions[0];
+            const itemId = Number(selected.value);
+            await new ApiRequest('/api/AdminTools/AddEditItemAttributes').post({itemId, changes});
             const selectedIndex = AddEditItemAttributeTool.itemSelect.selectedOptions[0].index;
             AddEditItemAttributeTool.init(this.renderParent, selectedIndex);
         }

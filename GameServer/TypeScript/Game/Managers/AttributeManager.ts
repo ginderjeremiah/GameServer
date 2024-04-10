@@ -3,19 +3,32 @@ class AttributeManager {
     static #attTableLabels = document.getElementById("attTableLabels") as HTMLDivElement;
     static #attTableButtons = document.getElementById("attTableButtons") as HTMLDivElement;
     static #attTableNumbers = document.getElementById("attTableNumbers") as HTMLDivElement;
-    static #statPointsValue = document.getElementById("statPointsValue") as HTMLSpanElement;
-    static #changedStats: number[];
+    static #attributePointsValue = document.getElementById("attributePointsValue") as HTMLSpanElement;
+    static #totalAttributesList = document.getElementById("totalAttributesList") as HTMLUListElement;
+    static #changedAttributes: number[];
     static #availablePoints: number;
 
-    static init() {
-        //figure out best way to sync player data... maybe create class where all instances are backed by a single data object?
-        //display derived stats here?
-        const playerData = GameManager.getPlayerData();
-        const attributeData = DataManager.attributes;
+    static init(playerData: IPlayerData, equipmentAttributes: BattleAttributes) {
         this.#resetChangedStats();
-        this.#availablePoints = playerData.statPointsGained - playerData.statPointsUsed;
-        this.#statPointsValue.textContent = this.#availablePoints.toString();
+        this.createCoreAttributesUi(playerData);
+        this.createAllAttributesUI(playerData, equipmentAttributes);
+    }
 
+    static createAllAttributesUI(playerData: IPlayerData, equipmentAttributes: BattleAttributes) {
+        const allAtts = new BattleAttributes(playerData.attributes, false);
+        allAtts.addAttributes(equipmentAttributes.battlerAttributes);
+        const listItems = allAtts.getAttributeMap(true).map(att => {
+            let listItem = document.createElement("li");
+            listItem.textContent = normalizeText(att.name) + ": " + formatNum(att.value);
+            return listItem;
+        });
+        this.#totalAttributesList.replaceChildren(...listItems);
+    }
+
+    static createCoreAttributesUi(playerData: IPlayerData) {
+        const attributeData = DataManager.attributes;
+        this.#availablePoints = playerData.statPointsGained - playerData.statPointsUsed;
+        this.#attributePointsValue.textContent = this.#availablePoints.toString();
         playerData.attributes
             .filter(this.isCoreAttribute) 
             .sort((a, b) => a.attributeId - b.attributeId)
@@ -52,41 +65,41 @@ class AttributeManager {
     }
 
     static #resetChangedStats() {
-        this.#changedStats = [];
+        this.#changedAttributes = [];
     }
 
     static addAttributePoint(attId: number) {
         if (this.#availablePoints > 0) {
-            const playerAtt = GameManager.getPlayerData().attributes.find(att => att.attributeId === attId);
+            const playerAtt = GameManager.playerData.attributes.find(att => att.attributeId === attId);
             if (playerAtt && this.isCoreAttribute(playerAtt)) {
                 const attData = DataManager.attributes[attId];
-                this.#changedStats[attId] += 1;
+                this.#changedAttributes[attId] += 1;
                 this.#availablePoints -= 1;
                 const numberSpan = document.getElementById(attData.attributeName + '_number');
                 if (numberSpan) {
-                    numberSpan.textContent = (playerAtt.amount + this.#changedStats[attId]).toString();
+                    numberSpan.textContent = (playerAtt.amount + this.#changedAttributes[attId]).toString();
                 }
-                this.#statPointsValue.textContent = this.#availablePoints.toString();
+                this.#attributePointsValue.textContent = this.#availablePoints.toString();
             }
         }
     }
 
     static removeAttributePoint(attId: number) {
-        const playerAtt = GameManager.getPlayerData().attributes.find(att => att.attributeId === attId);
-        if (playerAtt && this.isCoreAttribute(playerAtt) && playerAtt.amount + this.#changedStats[attId] > 1) {
+        const playerAtt = GameManager.playerData.attributes.find(att => att.attributeId === attId);
+        if (playerAtt && this.isCoreAttribute(playerAtt) && playerAtt.amount + this.#changedAttributes[attId] > 1) {
             const attData = DataManager.attributes[attId];
-            this.#changedStats[attId] -= 1;
+            this.#changedAttributes[attId] -= 1;
             this.#availablePoints += 1;
             const numberSpan = document.getElementById(attData.attributeName + '_number');
             if (numberSpan) {
-                numberSpan.textContent = (playerAtt.amount + this.#changedStats[attId]).toString();
+                numberSpan.textContent = (playerAtt.amount + this.#changedAttributes[attId]).toString();
             }
-            this.#statPointsValue.textContent = this.#availablePoints.toString();
+            this.#attributePointsValue.textContent = this.#availablePoints.toString();
         }
     }
 
     static saveStats() {
-        GameManager.updateStats(this.#changedStats.map((amount, id) => ({ attributeId: id, amount: amount})));
+        GameManager.updateStats(this.#changedAttributes.map((amount, id) => ({ attributeId: id, amount: amount})));
         this.#resetChangedStats();
     }
 

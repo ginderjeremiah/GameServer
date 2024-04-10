@@ -26,8 +26,9 @@
         if (newZone >= 0 && newZone < this.#orderedZones.length) {
             this.#currentZone = newZone;
             this.updateZoneDisplay();
+            return true;
         }
-        return this.currentZoneId;
+        return false;
     }
 
     updateZoneDisplay(): void {

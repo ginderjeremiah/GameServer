@@ -46,17 +46,14 @@ class DataManager {
         return ApiRequest.post('/api/Player/SaveLogPreferences', prefs)
     }
 
-    static async newEnemy(zoneId?: number) {
-        return Promise.all([
-            ApiRequest.get('/api/Enemies/NewEnemy', {newZoneId: zoneId}), 
-            DataManager.enemies
-        ]).then(async (results): Promise<{enemyInstance: IEnemyInstance, enemyData: IEnemy}> => {
-            if (results[0].cooldown) {
-                return delay(results[0].cooldown).then(async () => await this.newEnemy(zoneId))
-            } else {
-                return {enemyInstance: results[0].enemyInstance, enemyData: results[1][results[0].enemyInstance.enemyId]}
-            }
-        });
+    static async newEnemy(zoneId?: number): Promise<IEnemyInstance> {
+        const result = await ApiRequest.get('/api/Enemies/NewEnemy', {newZoneId: zoneId})
+        if (result.cooldown) {
+            await delay(result.cooldown);
+            return await this.newEnemy(zoneId);
+        } else {
+            return result.enemyInstance;
+        }
     }
 
     static async defeatEnemy(enemyInstance: IEnemyInstance) {

@@ -1,9 +1,9 @@
 ﻿interface Dict<Type> {
-    [key: string]: Type
+    [key: string]: Type;
 }
 
 interface Listable<Type extends Listable<Type>> {
-    lNode: ListNode<Type>
+    lNode: ListNode<Type>;
 }
 
 function IsEnemyInstance(instance: IEnemyInstance | any): instance is IEnemyInstance {
@@ -16,6 +16,12 @@ interface SlotType {
 }
 
 interface SelOptions {
-    allowBlanks?: boolean
-    options: {id: number, name: string}[]
+    allowBlanks?: boolean;
+    options: {id: number, name: string}[];
+}
+
+interface BattleResult {
+    victory: boolean;
+    enemyInstance: IEnemyInstance;
+    timeElapsed: number;
 }

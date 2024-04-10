@@ -121,7 +121,7 @@ namespace GameServer.Auth
 
         private int GetExpReward(EnemyInstance enemy)
         {
-            var levelDifference = Player.Level - enemy.EnemyLevel;
+            var levelDifference = Player.Level - enemy.Level;
             double expMulti = 1;
             if (levelDifference is < (-2) or > 2)
             {

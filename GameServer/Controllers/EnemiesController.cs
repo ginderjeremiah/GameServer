@@ -73,7 +73,7 @@ namespace GameServer.Controllers
             var enemyInstance = new EnemyInstance()
             {
                 EnemyId = enemy.EnemyId,
-                EnemyLevel = level,
+                Level = level,
                 Seed = seed
             };
 

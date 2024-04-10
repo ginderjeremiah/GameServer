@@ -11,13 +11,12 @@ namespace DataAccess.Repositories
         {
             var commandText = @"
                 SELECT
-                    LogSettingName AS Name,
-                    Enabled
-                FROM LogPreferences
-                INNER JOIN LogSettings
-                ON LogPreferences.LogSettingId = LogSettings.LogSettingId
-                WHERE
-                    PlayerId = @PlayerId";
+                    LS.LogSettingName AS Name,
+                    COALESCE(LP.Enabled, LS.DefaultValue) AS Enabled
+                FROM LogSettings LS
+                LEFT JOIN LogPreferences LP 
+                ON LP.LogSettingId = LS.LogSettingId
+                AND LP.PlayerId = @PlayerId";
 
             return QueryToList<LogPreference>(commandText, new SqlParameter("@PlayerId", playerId));
         }
@@ -35,11 +34,26 @@ namespace DataAccess.Repositories
                     SET Enabled = 0
                 FROM LogPreferences LP
                 INNER JOIN LogSettings LS
-                ON LP.LogSettingId = LS.LogSettingId
+                    ON LP.LogSettingId = LS.LogSettingId
                 INNER JOIN STRING_SPLIT(@DisabledSettings, ',') DS
-                ON DS.value = LS.LogSettingName
+                    ON DS.value = LS.LogSettingName
                 WHERE
                     PlayerId = @PlayerId
+
+                INSERT INTO LogPreferences
+                (PlayerId, LogSettingId, Enabled)
+                SELECT
+                    @PlayerId,
+                    LS.LogSettingId,
+                    0
+                FROM STRING_SPLIT(@DisabledSettings, ',') DS
+                INNER JOIN LogSettings LS
+                    ON DS.value = LS.LogSettingName
+                LEFT JOIN LogPreferences LP
+                    ON LS.LogSettingId = LP.LogSettingId
+                    AND LP.PlayerId = @PlayerId
+                WHERE
+                    LP.Enabled IS NULL
 
                 UPDATE LP
                     SET Enabled = 1
@@ -49,7 +63,22 @@ namespace DataAccess.Repositories
                 INNER JOIN STRING_SPLIT(@EnabledSettings, ',') ES
                 ON ES.value = LS.LogSettingName
                 WHERE
-                    PlayerId = @PlayerId";
+                    PlayerId = @PlayerId
+
+                INSERT INTO LogPreferences
+                (PlayerId, LogSettingId, Enabled)
+                SELECT
+                    @PlayerId,
+                    LS.LogSettingId,
+                    1
+                FROM STRING_SPLIT(@EnabledSettings, ',') ES
+                INNER JOIN LogSettings LS
+                    ON ES.value = LS.LogSettingName
+                LEFT JOIN LogPreferences LP
+                    ON LS.LogSettingId = LP.LogSettingId
+                    AND LP.PlayerId = @PlayerId
+                WHERE
+                    LP.Enabled IS NULL";
 
             ExecuteNonQuery(commandText,
                 new SqlParameter("@PlayerId", playerId),

@@ -1,25 +1,30 @@
 abstract class Battler {
-    abstract name: string;
-    abstract level: number;
-    currentHealth: number;
-    attributes: BattleAttributes;
-    skills: (Skill | undefined)[];
+    name: string;
+    level: number;
+    currentHealth!: number;
+    attributes!: BattleAttributes;
+    skills!: (Skill | undefined)[];
     maxSkills = 4;
-    statsVersion = 0;
 
-    abstract skillsContainer: HTMLDivElement;
+    skillsContainer: HTMLDivElement;
     skillSlots: HTMLDivElement[] = [];
-    abstract healthBar: HTMLMeterElement;
-    abstract healthLabel: HTMLSpanElement;
-    abstract lvlLabel: HTMLSpanElement;
-    abstract nameLabel: HTMLSpanElement;
-    abstract label: string;
+    healthBar: HTMLMeterElement;
+    healthLabel: HTMLSpanElement;
+    lvlLabel: HTMLSpanElement;
+    nameLabel: HTMLSpanElement;
+    label: "player" | "enemy";
 
-    constructor(attributes: BattleAttributes, selectedSkills: number[]) {
-        const skillDatas = DataManager.skills;
-        this.attributes = attributes;
-        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
-        this.skills = selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
+    constructor(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], name: string, level: number}, label: "player" | "enemy") {
+        this.label = label;
+        this.name = battlerData.name;
+        this.level = battlerData.level;
+        this.skillsContainer = document.getElementById(label + "SkillsContainer") as HTMLDivElement;
+        this.healthBar = document.getElementById(label + "Health") as HTMLMeterElement;
+        this.healthLabel = document.getElementById(label + "HealthLabel") as HTMLSpanElement;
+        this.lvlLabel = document.getElementById(label + "Lvl") as HTMLSpanElement;
+        this.nameLabel = document.getElementById(label + "Name") as HTMLSpanElement;
+        this.nameLabel.textContent = this.name;
+        this.reset(battlerData);
     }
 
     updateHealthDisplay(): void {
@@ -33,9 +38,11 @@ abstract class Battler {
     }
 
     initSkillsDisplay(): void {
-        let skills = this.skills;
+        this.skillsContainer.replaceChildren();
+        this.skillSlots = [];
+        const skills = this.skills;
         for (let i = 0; i < this.maxSkills; i++) {
-            let skillBox = document.createElement("div");
+            const skillBox = document.createElement("div");
             skillBox.className = "skillBox";
             skillBox.id = this.label + "Skill" + i;
             skillBox.addEventListener('mousemove', (event) => {
@@ -105,11 +112,15 @@ abstract class Battler {
         return this.currentHealth <= 0;
     }
 
-    get stats() {
-        return { statsVersion: this.statsVersion, baseStats: this.attributes };
-    }
-
-    clearSkillsDisplay() {
-        this.skillsContainer.replaceChildren();
+    reset(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], level: number}) {
+        const skillDatas = DataManager.skills;
+        this.attributes = new BattleAttributes(battlerData.attributes);
+        this.skills = battlerData.selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
+        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
+        this.level = battlerData.level;
+        this.initSkillsDisplay();
+        this.updateSkillsDisplay();
+        this.updateHealthDisplay();
+        this.updateLvlDisplay();
     }
 }

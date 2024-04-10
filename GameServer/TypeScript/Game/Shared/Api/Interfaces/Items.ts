@@ -1,15 +1,14 @@
+interface IAddEditItemAttributesData {
+	itemId: number;
+	changes: IChange<IBattlerAttribute>[];
+}
+
 interface IItem {
 	itemId: number;
 	itemName: string;
 	itemDesc: string;
 	itemCategoryId: number;
-	attributes: IItemAttribute[];
-}
-
-interface IItemAttribute {
-	itemId: number;
-	attributeId: AttributeType;
-	amount: number;
+	attributes: IBattlerAttribute[];
 }
 
 interface IItemCategory {

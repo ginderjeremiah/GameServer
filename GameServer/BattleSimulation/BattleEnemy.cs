@@ -13,7 +13,7 @@ namespace GameServer.BattleSimulation
         public override int Level { get; set; }
         public BattleEnemy(DataAccess.Models.Enemies.Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
         {
-            Level = enemyInstance.EnemyLevel;
+            Level = enemyInstance.Level;
             var attributes = enemy.AttributeDistribution.Select(dist => new BattlerAttribute(dist, Level)).ToList();
             Attributes = new BattleAttributes(attributes);
             enemyInstance.Attributes = attributes;

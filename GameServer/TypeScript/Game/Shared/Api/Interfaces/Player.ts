@@ -20,7 +20,7 @@ interface ILogPreference {
 
 interface IPlayerData {
 	userName: string;
-	playerName: string;
+	name: string;
 	level: number;
 	exp: number;
 	attributes: IBattlerAttribute[];

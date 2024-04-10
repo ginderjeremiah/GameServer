@@ -10,7 +10,8 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
     equipped: boolean;
     slotId: number;
     itemMods: ItemMod[];
-    attributes: IItemAttribute[]
+    attributes: IBattlerAttribute[];
+    totalAttributes: BattleAttributes;
 
     constructor(invItem: IInventoryItem, itemData: IItem, itemModsData: IItemMod[]) {
         super();
@@ -25,6 +26,7 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
         this.equipped = invItem.equipped;
         this.slotId = invItem.slotId;
         this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
+        this.totalAttributes = new BattleAttributes(this.attributes, false);
     }
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
@@ -39,12 +41,34 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
 
             const statsList = document.createElement("ul");
             statsList.className = "tooltipList";
-            /*Object.keys(this.item.Stats).forEach((stat) => {
+            this.totalAttributes.getAttributeMap().forEach((att) => {
                 const listItem = document.createElement("li");
-                listItem.textContent = stat + " +" + this.item.Stats[stat];
+                listItem.textContent = att.name + " +" + att.value;
                 statsList.appendChild(listItem);
-            });*/
+            });
             tooltipContent.appendChild(statsList);
+
+            if (this.itemMods.length > 0) {
+                const modsHeader = document.createElement("h3");
+                modsHeader.className = "tooltipHeader";
+                modsHeader.textContent = "Mods:";
+                tooltipContent.appendChild(modsHeader);
+
+                const modsList = document.createElement("ul");
+                modsList.className = "tooltipList";
+                this.itemMods.forEach((mod) => {
+                    const listItem = document.createElement("li");
+                    const nameSpan = document.createElement('span');
+                    nameSpan.style.fontWeight = "bold";
+                    nameSpan.textContent = mod.itemModName;
+                    const descSpan = document.createElement('span');
+                    descSpan.textContent = ": " + mod.itemModDesc;
+                    listItem.appendChild(nameSpan);
+                    listItem.appendChild(descSpan);
+                    modsList.appendChild(listItem);
+                });
+                tooltipContent.appendChild(modsList);
+            }
 
             const descHeader = document.createElement("h3");
             descHeader.className = "tooltipHeader";
@@ -55,26 +79,6 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
             desc.className = "tooltipText";
             desc.textContent = this.itemDesc;
             tooltipContent.appendChild(desc);
-
-            const modsHeader = document.createElement("h3");
-            statsHeader.className = "tooltipHeader";
-            statsHeader.textContent = "Mods:";
-            tooltipContent.appendChild(modsHeader);
-
-            const modsList = document.createElement("ul");
-            statsList.className = "tooltipList";
-            this.itemMods.forEach((mod) => {
-                const listItem = document.createElement("li");
-                const nameSpan = document.createElement('span');
-                nameSpan.style.fontWeight = "bold";
-                nameSpan.textContent = mod.itemModName;
-                const descSpan = document.createElement('span');
-                descSpan.textContent = ": " + mod.itemModDesc;
-                listItem.appendChild(nameSpan);
-                listItem.appendChild(descSpan);
-                statsList.appendChild(listItem);
-            });
-            tooltipContent.appendChild(modsList);
         }
         return this.toolTipId;
     }

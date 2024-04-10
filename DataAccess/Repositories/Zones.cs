@@ -23,12 +23,12 @@ namespace DataAccess.Repositories
                 throw new ArgumentOutOfRangeException(nameof(zoneId));
             }
 
-            return GetAllZones()[zoneId];
+            return AllZones()[zoneId];
         }
 
         public bool ValidateZoneId(int zoneId)
         {
-            return zoneId >= 0 && zoneId < GetAllZones().Count;
+            return zoneId >= 0 && zoneId < AllZones().Count;
         }
 
         private List<Zone> GetAllZones()

@@ -23,5 +23,4 @@ interface IAttributeUpdate {
 interface IBattlerAttribute {
 	attributeId: AttributeType;
 	amount: number;
-	isCoreAttribute: boolean;
 }

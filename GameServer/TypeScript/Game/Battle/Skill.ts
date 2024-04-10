@@ -29,8 +29,7 @@ class Skill extends Tooltippable implements ISkill {
         const target = GameManager.getOpponent(this.owner);
         let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100) * 1000);
         tooltipTitle.textContent = this.skillName + " (" + remainingCd.toFixed(2) + "s)";
-        if (this.toolTipId !== prevId) {
-            this.ownerStatsVersion = this.owner.statsVersion;
+        if (this.toolTipId !== prevId || (!this.target && target)) {
             this.target = target;
             tooltipContent.replaceChildren();
 
@@ -56,25 +55,6 @@ class Skill extends Tooltippable implements ISkill {
             desc.className = "tooltipText";
             desc.textContent = "Descriptions coming soon!";
             tooltipContent.appendChild(desc);
-        } else if (this.ownerStatsVersion !== this.owner.statsVersion) {
-            this.ownerStatsVersion = this.owner.statsVersion;
-            this.target = target;
-            let damageList = document.getElementById(this.skillName + "_damageList") as HTMLUListElement;
-            damageList.replaceChildren();
-
-            this.createDamageListContent(damageList, target);
-            
-        } else if(this.target !== target) {
-            this.target = target;
-            let totDam = this.calculateDamage();
-            let adjDamage = document.getElementById(this.skillName + '_aDmg') as HTMLLIElement; 
-            let adjDmg = totDam - target.attributes.getValue(AttributeType.Defense);
-            adjDmg = adjDmg > 0 ? adjDmg : 0;
-            adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
-
-            let adjustedDamagePerSecond = document.getElementById(this.skillName + '_aDPS') as HTMLLIElement;
-            let adjustedDps = adjDmg / (this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100));
-            adjustedDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjustedDps) + '/s';
         }
         return this.toolTipId;
     }
@@ -107,12 +87,14 @@ class Skill extends Tooltippable implements ISkill {
         totalDam.textContent = "Total: " + formatNum(totDam);
         damageList.appendChild(totalDam);
 
-        let adjDamage = document.createElement("li"); 
-        adjDamage.id = this.skillName + '_aDmg'
-        let adjDmg = totDam - target.attributes.getValue(AttributeType.Defense);
-        adjDmg = adjDmg > 0 ? adjDmg : 0;
-        adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
-        damageList.appendChild(adjDamage);
+        if (target) {
+            let adjDamage = document.createElement("li"); 
+            adjDamage.id = this.skillName + '_aDmg'
+            let adjDmg = totDam - target.attributes.getValue(AttributeType.Defense);
+            adjDmg = adjDmg > 0 ? adjDmg : 0;
+            adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
+            damageList.appendChild(adjDamage);
+        }
 
         let cooldown = document.createElement("li");
         let cd = this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100);
@@ -124,10 +106,13 @@ class Skill extends Tooltippable implements ISkill {
         damagePerSecond.textContent = "DPS: " + formatNum(dps) + "/s";
         damageList.appendChild(damagePerSecond);
 
-        let adjDamagePerSecond = document.createElement('li');
-        adjDamagePerSecond.id = this.skillName + '_aDPS';
-        let adjDps = adjDmg / cd;
-        adjDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjDps) + '/s';
-        damageList.appendChild(adjDamagePerSecond);
+        if (target) {
+            let adjDamagePerSecond = document.createElement('li');
+            adjDamagePerSecond.id = this.skillName + '_aDPS';
+            let adjDps = (totDam - target.attributes.getValue(AttributeType.Defense)) / cd;
+            adjDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjDps) + '/s';
+            damageList.appendChild(adjDamagePerSecond);
+
+        }
     }
 }

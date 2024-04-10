@@ -1,48 +1,34 @@
 class BattleManager {
-    #player! : Player;
-    #enemy! : Enemy;
+    #player: Player;
+    #enemy: Enemy;
+    #enemyInstance: IEnemyInstance
     #battleActive: boolean;
-    #battleReady: boolean;
-    static #battleManager: BattleManager
     #tickSize = 6; //number of ms per logic tick
     #msStore = 0; //number of ms to be allocated to ticks
+    #timeElapsed = 0; //number of ms simulated during battle
 
-    constructor() {
-        if(BattleManager.#battleManager) {
-            throw new ReferenceError("BattleManager already exists.")
-        } else {
-            BattleManager.#battleManager = this;
-            this.#battleActive = false;
-            this.#battleReady = false;
-            this.#player = new Player();
-            this.newEnemy();
-        }
+    constructor(playerData: IPlayerData, enemyInstance: IEnemyInstance) {
+        const enemyData = DataManager.enemies;
+        this.#battleActive = true;
+        this.#player = new Player(playerData);
+        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.enemyId]);
+        this.#enemyInstance = enemyInstance;
     }
 
-    update(timeDelta: number) {
-        this.#battleActive = this.#battleReady ? !(this.#battleReady = false) : this.#battleActive;
+    update(timeDelta: number): BattleResult | void {
         if (this.#battleActive) {
             this.#msStore += timeDelta;
             while (this.#battleActive && this.#msStore > this.#tickSize) {
                 this.#msStore -= this.#tickSize;
+                this.#timeElapsed += this.#tickSize;
                 this.computeTick();
-                if (this.#enemy.isDead) {
+                if (this.#enemy.isDead || this.#player.isDead) {
                     this.#battleActive = false;
-                    DataManager.defeatEnemy(this.#enemy.enemyInstance).then(response => {
-                        const responseData = response.data
-                        if (response.status == 200 && responseData.rewards) {
-                            LogManager.logMessage(this.#enemy.name + " was defeated!", "Enemy Defeated");
-                            this.#player.grantExp(responseData.rewards.expReward);
-                            GameManager.addItems(responseData.rewards.drops);
-                        } else {
-                            LogManager.logMessage("There was an error defeating the enemy.", "ERROR");
-                        }
-                        delay(responseData.cooldown).then(() => this.reset())
-                    });
-                }
-                else if (this.#player.isDead) {
-                    LogManager.logMessage("You've been defeated!", "Enemy Defeated");
-                    this.reset();
+                    return {
+                        victory: this.#enemy.isDead,
+                        enemyInstance: this.#enemyInstance,
+                        timeElapsed: this.#timeElapsed
+                    }
                 }
             }
         }
@@ -65,32 +51,25 @@ class BattleManager {
         }
     }
 
-
-    reset(zoneId?: number) {
+    stop() {
         this.#battleActive = false;
-        this.#battleReady = false;
-        this.#enemy.clearSkillsDisplay();
-        this.#player.reset(GameManager.getPlayerData());
-        this.#msStore = 0;
-        this.newEnemy(zoneId);
     }
 
-    async newEnemy(zoneId?: number) {
-        return DataManager.newEnemy(zoneId).then((results) => {
-            this.#enemy = new Enemy(results.enemyInstance, results.enemyData);
-            this.#battleReady = true;
-        });
+    reset(playerData: IPlayerData, enemyInstance: IEnemyInstance) {
+        const enemyData = DataManager.enemies;
+        this.#msStore = 0;
+        this.#timeElapsed = 0;
+        this.#player.reset(playerData);
+        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.enemyId]);
+        this.#enemyInstance = enemyInstance;
+        this.#battleActive = true;
     }
 
     getPlayerAttributes() {
-        return {statsVersion: this.#player.statsVersion, attributes: this.#player.attributes};
+        return this.#player.attributes;
     }
 
     getOpponent(battler: Battler) {
         return battler === this.#player ? this.#enemy : this.#player;
-    }
-
-    incrementPlayerStatsVersion() {
-        this.#player.statsVersion++;
     }
 }

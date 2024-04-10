@@ -8,31 +8,24 @@
     equippedIds: string[] = ["helmSlot", "chestSlot", "legSlot", "bootSlot", "weaponSlot", "accessorySlot"];
     equippedSlots: HTMLDivElement[] = [];
     equippedDisplay = document.getElementById("equipSlotsContainer") as HTMLDivElement;
-    #equippedStats!: Dict<number>; //JSON Object containing total stats of equipped items
+    #equippedStats!: BattleAttributes; 
     #equippedStatsList = document.getElementById("equipStatsList") as HTMLUListElement; //reference to equipment HTML list for total equipped stats
     #delayedAction: DelayedAction;
 
-    constructor() {
-        Promise.all([
-            DataManager.getInventoryData(),
-            DataManager.items,
-            DataManager.itemMods
-        ]).then((results) => this.#init(...results));
-        this.#delayedAction = new DelayedAction(5000, this.updateInventorySlots.bind(this));
-    }
-
-    #init(invData: IInventoryData, itemsData: IItem[], itemModsData: IItemMod[]) {
+    constructor(invData: IInventoryData) {
+        const itemsData = DataManager.items;
+        const itemModsData = DataManager.itemMods;
         this.inventory = invData.inventory.map((i) => {
             return i ? new Item(i, itemsData[i.itemId], itemModsData) : i
         });
         this.equipped = invData.equipped.map((i) => {
             return i ? new Item(i, itemsData[i.itemId], itemModsData) : i
         });
-        this.#equippedStats = {};
+        this.#equippedStats = this.getEquippedStats();
         this.#initializeInventorySlots();
         this.#initializeEquipmentSlots();
         this.updateEquipmentStats();
-        
+        this.#delayedAction = new DelayedAction(5000, this.updateInventorySlots.bind(this));
     }
 
     #initializeEquipmentSlots(): void {
@@ -315,26 +308,16 @@
         return this.getSlotContainers(type).items[slot];
     }
 
-    updateEquipmentStats(): void {
-        this.#equippedStats = {};
-        /*for (let i = 0; i < this.equipped.length; i++) {
-            const e = this.equipped[i];
-            if (e) {
-                Object.keys(this.e.Stats).forEach((stat) => {
-                    if (this.#equippedStats[stat]) {
-                        this.#equippedStats[stat] += e.Stats[stat];
-                    } else {
-                        this.#equippedStats[stat] = e.Stats[stat];
-                    }
-                });
-            }
-        };*/
-        let listItems = Object.keys(this.#equippedStats).map((stat) => {
+    updateEquipmentStats() {
+        this.#equippedStats = this.getEquippedStats();
+        let listItems = this.#equippedStats.getAttributeMap()
+        .map((att) => {
             let listItem = document.createElement("li");
-            listItem.textContent = stat + " +" + this.#equippedStats[stat];
+            listItem.textContent = att.name + " +" + att.value;
             return listItem;
         });
         this.#equippedStatsList.replaceChildren(...listItems);
+        return this.#equippedStats;
     }
 
     async startSave() {
@@ -362,5 +345,9 @@
         const inv = this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: false} : []);
         inv.push(...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: true} : []));
         DataManager.updateInventorySlots(inv);
+    }
+
+    getEquippedStats() {
+        return new BattleAttributes(this.equipped.flatMap(item => item?.attributes ?? []), false);
     }
 }
