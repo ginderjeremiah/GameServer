@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary;
+using GameLibrary.Logging;
 using GameServer.Auth;
 using GameServer.Models;
 using GameServer.Models.Common;
@@ -79,13 +79,13 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiResponse Success()
+        protected ApiResponse Success()
         {
             return new ApiResponse();
         }
 
         [NonAction]
-        public ApiResponse<T> Success<T>(T data) where T : IModel
+        protected ApiResponse<T> Success<T>(T data) where T : IModel
         {
             return new ApiResponse<T>
             {
@@ -94,7 +94,7 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiListResponse<T> Success<T>(IEnumerable<T> data) where T : IModel
+        protected ApiListResponse<T> Success<T>(IEnumerable<T> data) where T : IModel
         {
             return new ApiListResponse<T>
             {
@@ -103,7 +103,7 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiResponse Error(string message)
+        protected ApiResponse Error(string message)
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiResponse
@@ -113,7 +113,7 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiResponse<T> Error<T>(string message) where T : IModel
+        protected ApiResponse<T> Error<T>(string message) where T : IModel
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiResponse<T>
@@ -123,7 +123,7 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiResponse<T> ErrorWithData<T>(string message, T data) where T : IModel
+        protected ApiResponse<T> ErrorWithData<T>(string message, T data) where T : IModel
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiResponse<T>
@@ -134,7 +134,7 @@ namespace GameServer.Controllers
         }
 
         [NonAction]
-        public ApiListResponse<T> ErrorWithListData<T>(string message, List<T> data) where T : IModel
+        protected ApiListResponse<T> ErrorWithListData<T>(string message, List<T> data) where T : IModel
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
             return new ApiListResponse<T>

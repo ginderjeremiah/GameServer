@@ -30,7 +30,10 @@ namespace DataAccess.Redis
             }
             return _instance;
         }
-
+        public string? Get(string key)
+        {
+            return Redis.StringGet(key);
+        }
 
         public T? Get<T>(string key)
         {
@@ -41,6 +44,15 @@ namespace DataAccess.Redis
         //{
         //    return (await Redis.StringGetAsync(key)).Deserialize<T>();
         //}
+        public string? GetDelete(string key)
+        {
+            return Redis.StringGetDelete(key);
+        }
+
+        public T? GetDelete<T>(string key)
+        {
+            return Redis.StringGetDelete(key).Deserialize<T>();
+        }
 
         public bool TryGet<T>(string key, out T result)
         {

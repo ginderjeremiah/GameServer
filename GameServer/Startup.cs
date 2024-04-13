@@ -1,5 +1,6 @@
 using DataAccess;
 using GameLibrary;
+using GameLibrary.Logging;
 using GameServer.Auth;
 using GameServer.CodeGen;
 

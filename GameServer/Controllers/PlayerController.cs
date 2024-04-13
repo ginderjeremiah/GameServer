@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary;
+using GameLibrary.Logging;
 using GameServer.Auth;
 using GameServer.Models.Attributes;
 using GameServer.Models.Common;

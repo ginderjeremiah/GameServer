@@ -7,7 +7,6 @@ namespace DataAccess.Entities.SessionStore
     public class SessionData
     {
         public int CurrentZone { get; set; }
-        public string ActiveEnemyHash { get; set; }
         public DateTime EarliestDefeat { get; set; }
         public bool Victory { get; set; }
         public string SessionId { get; set; }

@@ -17,12 +17,9 @@ namespace GameServer.Auth
         private bool _playerDirty = false;
         private bool _inventoryDirty = false;
 
-        //TODO: Move to Constants static class
-        public static TimeSpan TokenLifetime { get; } = TimeSpan.FromDays(1);
         public string SessionId => _sessionData.SessionId;
         public DateTime LastUsed { get => _sessionData.LastUsed; private set => _sessionData.LastUsed = SetSessionDirty(value); }
         public DateTime EnemyCooldown { get => _sessionData.EnemyCooldown; set => _sessionData.EnemyCooldown = SetSessionDirty(value); }
-        public string ActiveEnemyHash { get => _sessionData.ActiveEnemyHash; private set => _sessionData.ActiveEnemyHash = SetSessionDirty(value); }
         public DateTime EarliestDefeat { get => _sessionData.EarliestDefeat; private set => _sessionData.EarliestDefeat = SetSessionDirty(value); }
         public bool Victory { get => _sessionData.Victory; private set => _sessionData.Victory = SetSessionDirty(value); }
         public int CurrentZone { get => _sessionData.CurrentZone; set => _sessionData.CurrentZone = SetSessionDirty(value); }
@@ -40,26 +37,25 @@ namespace GameServer.Auth
 
         public void SetActiveEnemy(EnemyInstance activeEnemy, DateTime earliestDefeat, bool victory)
         {
-            ActiveEnemyHash = activeEnemy.Hash();
+            _repos.SessionStore.SetActiveEnemyHash(_sessionData, activeEnemy.Hash());
             EarliestDefeat = earliestDefeat;
             Victory = victory;
         }
 
-        public bool ValidEnemyDefeat(EnemyInstance defeatedEnemy)
+        public bool DefeatEnemy(EnemyInstance defeatedEnemy)
         {
-            return Victory && EarliestDefeat <= DateTime.UtcNow && defeatedEnemy.Hash() == ActiveEnemyHash;
-        }
+            if (Victory && EarliestDefeat <= DateTime.UtcNow)
+            {
+                var activeEnemyHash = _repos.SessionStore.GetAndDeleteActiveEnemyHash(_sessionData);
+                return defeatedEnemy.Hash() == activeEnemyHash;
+            }
 
-        public void ResetActiveEnemy()
-        {
-            ActiveEnemyHash = "";
-            EarliestDefeat = DateTime.UnixEpoch;
-            Victory = false;
+            return false;
         }
 
         public string GetNewToken()
         {
-            var tokenData = $"{SessionId.ToBase64()}.{DateTime.UtcNow.Add(TokenLifetime).Ticks.ToBase64()}";
+            var tokenData = $"{SessionId.ToBase64()}.{DateTime.UtcNow.Add(Constants.TokenLifetime).Ticks.ToBase64()}";
             return $"{tokenData}.{tokenData.Hash(Player.Salt.ToString(), 1).ToBase64()}";
         }
 
@@ -121,14 +117,11 @@ namespace GameServer.Auth
 
         private int GetExpReward(EnemyInstance enemy)
         {
-            var levelDifference = Player.Level - enemy.Level;
-            double expMulti = 1;
-            if (levelDifference is < (-2) or > 2)
-            {
-                var bonus = 4 / Math.Pow(levelDifference, 2);
-                expMulti = levelDifference < 0 ? 2 - bonus : bonus;
-            }
-            return (int)Math.Floor((double)enemy.Attributes.Sum(att => att.Amount) * expMulti);
+            var enemyAttTotal = enemy.Attributes.Sum(att => att.Amount);
+            var playerAttTotal = Player.Attributes.Sum(att => att.Amount);
+            var attRatio = (double)(playerAttTotal / enemyAttTotal);
+            double expMulti = attRatio is < 0.8 or > 1.2 ? Math.Pow(attRatio, 2) : 1.0;
+            return (int)Math.Floor((double)enemyAttTotal * expMulti);
         }
 
         public void Save()

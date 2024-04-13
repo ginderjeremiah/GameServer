@@ -9,5 +9,6 @@
         public const string REDIS_SKILLS_QUEUE = "SkillsUpdateQueue";
         public const string REDIS_INVENTORY_CHANNEL = "inventory";
         public const string REDIS_INVENTORY_QUEUE = "InventoryUpdateQueue";
+        public const string REDIS_ACTIVE_ENEMY_PREFIX = "ActiveEnemy";
     }
 }

@@ -1,5 +1,6 @@
 ﻿using DataAccess;
 using GameLibrary;
+using GameLibrary.Logging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Diagnostics;
@@ -43,13 +44,13 @@ namespace GameServer.Auth
 
             var session = new Session(sessionData, repos);
 
-            if (ticks < now.Add(Session.TokenLifetime / 2).Ticks)
+            if (ticks < now.Add(Constants.TokenLifetime / 2).Ticks)
             {
                 context.HttpContext.Response.Cookies.Append("sessionToken", session.GetNewToken(), new CookieOptions()
                 {
                     Secure = true,
                     HttpOnly = true,
-                    Expires = now.Add(Session.TokenLifetime)
+                    Expires = now.Add(Constants.TokenLifetime)
                 });
             }
 

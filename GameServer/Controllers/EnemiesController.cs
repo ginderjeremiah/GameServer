@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary;
+using GameLibrary.Logging;
 using GameServer.Auth;
 using GameServer.BattleSimulation;
 using GameServer.Models.Common;
@@ -25,29 +25,25 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse<DefeatEnemy> DefeatEnemy([FromBody] EnemyInstance enemyInstance)
         {
-            lock (Session)
+            var now = DateTime.UtcNow;
+            if (Session.DefeatEnemy(enemyInstance))
             {
-                var now = DateTime.UtcNow;
-                if (Session.ValidEnemyDefeat(enemyInstance))
+                Log($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
+                Session.EnemyCooldown = now.AddSeconds(5);
+                var rewards = Session.GrantRewards(enemyInstance);
+                return Success(new DefeatEnemy
                 {
-                    Log($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
-                    Session.ResetActiveEnemy();
-                    Session.EnemyCooldown = now.AddSeconds(5);
-                    var rewards = Session.GrantRewards(enemyInstance);
-                    return Success(new DefeatEnemy
-                    {
-                        Cooldown = 5000,
-                        Rewards = rewards
-                    });
-                }
-                else
+                    Cooldown = 5000,
+                    Rewards = rewards
+                });
+            }
+            else
+            {
+                LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
+                return ErrorWithData("Enemy could not be defeated.", new DefeatEnemy
                 {
-                    LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms, activeHash: {Session.ActiveEnemyHash}, calculatedHash: {enemyInstance.Hash()}}}");
-                    return ErrorWithData("Enemy could not be defeated.", new DefeatEnemy
-                    {
-                        Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
-                    });
-                }
+                    Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
+                });
             }
         }
 

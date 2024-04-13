@@ -2,7 +2,7 @@
 
 namespace GameServer
 {
-    public class Config : IConfig
+    public class Config : IDataConfiguration
     {
         public string DbConnectionString { get; }
         public string RedisConnectionString { get; }
@@ -14,10 +14,5 @@ namespace GameServer
             RedisConnectionString = configuration["RedisConnectionString"] ?? throw new Exception("Could not retrieve Redis connection string.");
             HashPepper = configuration["HashPepper"] ?? throw new Exception("Could not retrieve pepper for Hashing.");
         }
-    }
-
-    public interface IConfig : IDataConfiguration
-    {
-        public string HashPepper { get; }
     }
 }

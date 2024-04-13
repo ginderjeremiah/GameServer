@@ -82,7 +82,6 @@ namespace DataAccess.Repositories
                 PlayerData = result.Item1.First(),
                 InventoryItems = result.Item4,
                 EnemyCooldown = DateTime.UnixEpoch,
-                ActiveEnemyHash = "",
                 EarliestDefeat = DateTime.UnixEpoch,
                 Victory = false,
                 Attributes = result.Item2,
@@ -112,6 +111,16 @@ namespace DataAccess.Repositories
                     queue.AddToQueue(sessionData.SessionId);
             }
         }
+
+        public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
+        {
+            _redisStore.SetAndForget($"{Constants.REDIS_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}", activeEnemyHash);
+        }
+
+        public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
+        {
+            return _redisStore.GetDelete<string>($"{Constants.REDIS_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}");
+        }
     }
 
     public interface ISessionStore
@@ -119,5 +128,7 @@ namespace DataAccess.Repositories
         public bool TryGetSession(string id, out SessionData session);
         public SessionData GetNewSessionData(int playerId);
         public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty);
+        public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash);
+        public string GetAndDeleteActiveEnemyHash(SessionData sessionData);
     }
 }
