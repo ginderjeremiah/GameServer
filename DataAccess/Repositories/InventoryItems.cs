@@ -119,6 +119,7 @@ namespace DataAccess.Repositories
                 FROM InventoryItems II
                 LEFT JOIN @InventoryItems INVI
                 ON II.InventoryItemId = INVI.InventoryItemId
+                WHERE II.PlayerId = @PlayerId
                 AND INVI.InventoryItemId IS NULL
 
                 UPDATE II

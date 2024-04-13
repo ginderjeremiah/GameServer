@@ -119,7 +119,7 @@ namespace DataAccess.Repositories
 
         public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
         {
-            return _redisStore.GetDelete<string>($"{Constants.REDIS_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}");
+            return _redisStore.GetDelete($"{Constants.REDIS_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}");
         }
     }
 

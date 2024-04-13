@@ -119,7 +119,7 @@ namespace GameServer.Auth
         {
             var enemyAttTotal = enemy.Attributes.Sum(att => att.Amount);
             var playerAttTotal = Player.Attributes.Sum(att => att.Amount);
-            var attRatio = (double)(playerAttTotal / enemyAttTotal);
+            var attRatio = (double)(enemyAttTotal / playerAttTotal);
             double expMulti = attRatio is < 0.8 or > 1.2 ? Math.Pow(attRatio, 2) : 1.0;
             return (int)Math.Floor((double)enemyAttTotal * expMulti);
         }

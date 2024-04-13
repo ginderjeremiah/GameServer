@@ -64,7 +64,7 @@ class AttributeManager {
     }
 
     static #resetChangedAtts() {
-        this.#changedAttributes = [];
+        this.#changedAttributes = [0, 0, 0, 0, 0, 0];
     }
 
     static addAttributePoint(attId: number) {
