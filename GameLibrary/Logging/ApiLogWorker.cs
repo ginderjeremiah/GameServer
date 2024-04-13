@@ -7,6 +7,7 @@ namespace GameLibrary.Logging
         private const int BATCH_SIZE = 5;
 
         private static readonly ConcurrentQueue<LogMessage> _logQueue = new();
+        private static readonly ConcurrentQueue<LogMessage> _logErrors = new();
         private static readonly AutoResetEvent _resetEvent = new(false);
         private static readonly object _lock = new();
         private static ApiLogWorker _worker;
@@ -41,7 +42,20 @@ namespace GameLibrary.Logging
             {
                 while (_logQueue.TryDequeue(out var log))
                 {
-                    Log(log);
+                    try
+                    {
+                        Log(log);
+                        if (!_logErrors.IsEmpty)
+                            EnqueueErrors();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (log.LoggingError is null)
+                        {
+                            log.LoggingError = $"Logging Error: {ex.Message}\nTrace: {ex.StackTrace}";
+                            _logErrors.Enqueue(log);
+                        }
+                    }
                 }
             }
         }
@@ -55,6 +69,14 @@ namespace GameLibrary.Logging
 
             if (logMessage.Color is not null)
                 Console.ResetColor();
+        }
+
+        private void EnqueueErrors()
+        {
+            foreach (var error in _logErrors)
+            {
+                _logQueue.Enqueue(error);
+            }
         }
     }
 

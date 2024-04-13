@@ -11,7 +11,7 @@ namespace DataAccess.Entities.InventoryItems
         public int ItemId { get; set; }
         public int Rating { get; set; }
         public bool Equipped { get; set; }
-        public int SlotId { get; set; }
+        public int InventorySlotNumber { get; set; }
         public List<InventoryItemMod> ItemMods { get; set; }
 
         public void LoadFromReader(SqlDataReader reader)
@@ -21,7 +21,7 @@ namespace DataAccess.Entities.InventoryItems
             ItemId = reader["ItemId"].AsInt();
             Rating = reader["Rating"].AsInt();
             Equipped = reader["Equipped"].AsBool();
-            SlotId = reader["SlotId"].AsInt();
+            InventorySlotNumber = reader["InventorySlotNumber"].AsInt();
             ItemMods = JsonSerializer.Deserialize<List<InventoryItemMod>>(reader["ItemModJSON"].AsString());
         }
     }

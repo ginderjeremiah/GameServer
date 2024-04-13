@@ -8,7 +8,7 @@ interface IInventoryItem {
 	itemId: number;
 	rating: number;
 	equipped: boolean;
-	slotId: number;
+	inventorySlotNumber: number;
 	itemMods: IInventoryItemMod[];
 }
 
@@ -19,6 +19,6 @@ interface IInventoryItemMod {
 
 interface IInventoryUpdate {
 	inventoryItemId: number;
-	slotId: number;
+	inventorySlotNumber: number;
 	equipped: boolean;
 }

@@ -245,14 +245,14 @@
                     box1.appendChild(box2.firstChild);
                 }
                 base1.items[slot1] = target;
-                target.slotId = slot1;
+                target.inventorySlotNumber = slot1;
             } else {
                 delete base1.items[slot1];
             }
             if (box1.firstChild) {
                 box2.appendChild(box1.firstChild);
             }
-            source.slotId = slot2;
+            source.inventorySlotNumber = slot2;
             if (slotType1 !== slotType2) {
                 this.updateEquipmentStats();
                 this.updateInventorySlots();
@@ -278,16 +278,16 @@
         const itemModsData = DataManager.itemMods;
         items.forEach(invItem => {
             const item = new Item(invItem, itemsData[invItem.itemId], itemModsData);
-            if (this.inventory[invItem.slotId]) {
-                const slotId = this.nextAvailableSlot();
-                this.inventory[slotId] = item;
-                item.slotId = slotId;
+            if (this.inventory[invItem.inventorySlotNumber]) {
+                const inventorySlotNumber = this.nextAvailableSlot();
+                this.inventory[inventorySlotNumber] = item;
+                item.inventorySlotNumber = inventorySlotNumber;
                 this.startSave();
             } else {
-                this.inventory[invItem.slotId] = item;
+                this.inventory[invItem.inventorySlotNumber] = item;
             }
             LogManager.logMessage("You found a " + item.itemName + "!", "Inventory");
-            this.#createItem(this.inventorySlots[invItem.slotId], item.itemName);
+            this.#createItem(this.inventorySlots[invItem.inventorySlotNumber], item.itemName);
         });
     }
 
@@ -343,8 +343,8 @@
 
     updateInventorySlots() {
         const inv = [
-            ...this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: false} : []),
-            ...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: true} : [])
+            ...this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, inventorySlotNumber: item.inventorySlotNumber, equipped: false} : []),
+            ...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, inventorySlotNumber: item.inventorySlotNumber, equipped: true} : [])
         ];
         DataManager.updateInventorySlots(inv);
     }

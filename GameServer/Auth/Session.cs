@@ -72,17 +72,17 @@ namespace GameServer.Auth
             }
             _playerDirty = true;
 
-            var freeSlots = InventoryData.GetFreeSlotIds();
+            var freeSlots = InventoryData.GetFreeSlotNumbers();
             var drops = _repos.InventoryItems.RollDrops(enemy.EnemyId, CurrentZone, freeSlots.Count);
 
             for (int i = 0; i < drops.Count; i++)
             {
                 var d = drops[i];
-                var slotId = freeSlots[i];
+                var slotNumber = freeSlots[i];
                 d.PlayerId = Player.PlayerId;
-                d.SlotId = slotId;
+                d.InventorySlotNumber = slotNumber;
                 _repos.InventoryItems.AddInventoryItem(d);
-                InventoryData.Inventory[slotId] = new InventoryItem(d);
+                InventoryData.Inventory[slotNumber] = new InventoryItem(d);
                 _sessionData.InventoryItems.Add(d);
                 _sessionDirty = true;
             }

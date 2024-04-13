@@ -1,4 +1,5 @@
 ﻿using GameLibrary;
+using GameLibrary.Logging;
 using StackExchange.Redis;
 using System.Reflection;
 
@@ -13,19 +14,20 @@ namespace DataAccess.Redis
         private ConnectionMultiplexer Multiplexer { get; }
         public IDatabase Redis => Multiplexer.GetDatabase();
 
-        private RedisStore(IDataConfiguration config)
+        private RedisStore(IDataConfiguration config, IApiLogger logger)
         {
+            _logger = logger;
             Multiplexer = ConnectionMultiplexer.Connect(config.RedisConnectionString);
-            InitializeSubscribers(config);
+            InitializeSubscribers(config, logger);
         }
 
-        public static RedisStore GetInstance(IDataConfiguration config)
+        public static RedisStore GetInstance(IDataConfiguration config, IApiLogger logger)
         {
             if (_instance == null)
             {
                 lock (_instanceLock)
                 {
-                    _instance ??= new RedisStore(config);
+                    _instance ??= new RedisStore(config, logger);
                 }
             }
             return _instance;
@@ -110,7 +112,7 @@ namespace DataAccess.Redis
             return queue is not null;
         }
 
-        private void InitializeSubscribers(IDataConfiguration config)
+        private void InitializeSubscribers(IDataConfiguration config, IApiLogger logger)
         {
             var subscriber = Multiplexer.GetSubscriber();
             var assembly = Assembly.GetAssembly(typeof(RedisStore));
@@ -126,7 +128,7 @@ namespace DataAccess.Redis
                         {
                             var queue = new RedisQueue(this, att.QueueName, att.Channel);
                             Queues.Add(queue);
-                            var worker = new RedisSubscriberWorker(config, queue, callback);
+                            var worker = new RedisSubscriberWorker(config, queue, callback, logger);
                             subscriber.Subscribe(att.Channel, (channel, value) => worker.Start());
                         }
                     }

@@ -25,11 +25,11 @@ namespace GameServer.Auth
             {
                 if (item.Equipped)
                 {
-                    equipped[item.SlotId] = new InventoryItem(item);
+                    equipped[item.InventorySlotNumber] = new InventoryItem(item);
                 }
                 else
                 {
-                    inventory[item.SlotId] = new InventoryItem(item);
+                    inventory[item.InventorySlotNumber] = new InventoryItem(item);
                 }
             }
 
@@ -37,7 +37,7 @@ namespace GameServer.Auth
             Equipped = equipped;
         }
 
-        public List<int> GetFreeSlotIds()
+        public List<int> GetFreeSlotNumbers()
         {
             return Inventory.Select((item, index) => (item, index)).Where(p => p.item is null).Select(p => p.index).ToList();
         }
@@ -53,7 +53,7 @@ namespace GameServer.Auth
                 var update = match.Item2;
                 if (update != null)
                 {
-                    var slot = (update.Equipped, update.SlotId);
+                    var slot = (update.Equipped, update.InventorySlotNumber);
                     if (usedSlots.Contains(slot) || !IsValidInventoryUpdate(update))
                     {
                         validUpdate = false;
@@ -72,7 +72,7 @@ namespace GameServer.Auth
                 {
                     if (match.Item2 is not null)
                     {
-                        match.inv.SlotId = match.Item2.SlotId;
+                        match.inv.InventorySlotNumber = match.Item2.InventorySlotNumber;
                         match.inv.Equipped = match.Item2.Equipped;
                     }
                     else
@@ -89,9 +89,9 @@ namespace GameServer.Auth
         private bool IsValidInventoryUpdate(InventoryUpdate item)
         {
             return _sessionInventory.Any(inv => inv.InventoryItemId == item.InventoryItemId)
-                && item.SlotId is >= 0
-                && ((item.Equipped && item.SlotId is < EQUIP_SLOTS)
-                    || (!item.Equipped && item.SlotId is < INV_SLOTS));
+                && item.InventorySlotNumber is >= 0
+                && ((item.Equipped && item.InventorySlotNumber is < EQUIP_SLOTS)
+                    || (!item.Equipped && item.InventorySlotNumber is < INV_SLOTS));
         }
 
         private static List<InventoryItem?> NewEquippedList()

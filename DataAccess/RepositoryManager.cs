@@ -1,10 +1,12 @@
 ﻿using DataAccess.Redis;
 using DataAccess.Repositories;
+using GameLibrary.Logging;
 
 namespace DataAccess
 {
     public class RepositoryManager : IRepositoryManager
     {
+        private readonly IApiLogger _logger;
         private readonly string _connectionString;
         private SessionStore? _sessionStore;
         private InventoryItems? _inventoryItems;
@@ -43,10 +45,11 @@ namespace DataAccess
         public IItemModAttributes ItemModAttributes => _itemModAttributes ??= new ItemModAttributes(_connectionString);
         internal RedisStore Redis { get; }
 
-        public RepositoryManager(IDataConfiguration config)
+        public RepositoryManager(IDataConfiguration config, IApiLogger logger)
         {
             _connectionString = config.DbConnectionString;
-            Redis = RedisStore.GetInstance(config);
+            _logger = logger;
+            Redis = RedisStore.GetInstance(config, logger);
         }
     }
 

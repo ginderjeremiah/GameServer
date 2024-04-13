@@ -6,7 +6,7 @@
         public int ItemId { get; set; }
         public int Rating { get; set; }
         public bool Equipped { get; set; }
-        public int SlotId { get; set; }
+        public int InventorySlotNumber { get; set; }
         public List<InventoryItemMod> ItemMods { get; set; }
 
         public InventoryItem(DataAccess.Entities.InventoryItems.InventoryItem invItem)
@@ -15,7 +15,7 @@
             ItemId = invItem.ItemId;
             Rating = invItem.Rating;
             Equipped = invItem.Equipped;
-            SlotId = invItem.SlotId;
+            InventorySlotNumber = invItem.InventorySlotNumber;
             ItemMods = invItem.ItemMods.Select(mod => new InventoryItemMod(mod)).ToList();
         }
     }

@@ -59,7 +59,7 @@ namespace DataAccess.Repositories
                     II.ItemId,
                     II.Rating,
                     II.Equipped,
-                    II.SlotId,
+                    II.InventorySlotNumber,
 	                COALESCE(ItemModJSON.JSONData, '[]') AS ItemModJSON
                 FROM InventoryItems AS II
                 OUTER APPLY (

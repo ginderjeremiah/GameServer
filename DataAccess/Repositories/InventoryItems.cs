@@ -37,7 +37,7 @@ namespace DataAccess.Repositories
                     ItemId,
                     Rating,
                     Equipped,
-                    SlotId
+                    InventorySlotNumber
                 FROM InventoryItems
                 WHERE
                     PlayerId = @PlayerId";
@@ -66,7 +66,7 @@ namespace DataAccess.Repositories
 
                 INSERT INTO InventoryItems
                 VALUES
-                    (@PlayerId, @ItemId, @Rating, @Equipped, @SlotId)
+                    (@PlayerId, @ItemId, @Rating, @Equipped, @InventorySlotNumber)
                 
                 DECLARE @Id INT = SCOPE_IDENTITY()
  
@@ -86,7 +86,7 @@ namespace DataAccess.Repositories
                 new SqlParameter("@ItemId", inventoryItem.ItemId),
                 new SqlParameter("@Rating", inventoryItem.Rating),
                 new SqlParameter("@Equipped", inventoryItem.Equipped),
-                new SqlParameter("@SlotId", inventoryItem.SlotId),
+                new SqlParameter("@InventorySlotNumber", inventoryItem.InventorySlotNumber),
                 new SqlParameter("@ItemMods", inventoryItem.ItemMods.Serialize()));
 
             inventoryItem.InventoryItemId = id;
@@ -97,14 +97,14 @@ namespace DataAccess.Repositories
         {
             var data = new SqlMetaData[3];
             data[0] = new SqlMetaData("InventoryItemId", SqlDbType.Int);
-            data[1] = new SqlMetaData("SlotId", SqlDbType.Int);
+            data[1] = new SqlMetaData("InventorySlotNumber", SqlDbType.Int);
             data[2] = new SqlMetaData("Equipped", SqlDbType.Bit);
 
             var records = inventoryItems.Select(item =>
             {
                 var record = new SqlDataRecord(data);
                 record.SetInt32(0, item.InventoryItemId);
-                record.SetInt32(1, item.SlotId);
+                record.SetInt32(1, item.InventorySlotNumber);
                 record.SetBoolean(2, item.Equipped);
                 return record;
             }).ToArray();
@@ -123,7 +123,7 @@ namespace DataAccess.Repositories
                 AND INVI.InventoryItemId IS NULL
 
                 UPDATE II
-                SET SlotId = INVI.SlotId,
+                SET InventorySlotNumber = INVI.InventorySlotNumber,
                     Equipped = INVI.Equipped
                 FROM InventoryItems II
                 INNER JOIN @InventoryItems INVI
