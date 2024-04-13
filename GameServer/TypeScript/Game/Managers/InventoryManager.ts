@@ -103,7 +103,7 @@
             this.equippedSlots.push(equipSlot);
             const e = this.equipped[i];
             if (e) {
-                this.#createItem(equipSlot, e.itemName);
+                this.#createItem(equipSlot, e);
             }
         });
     }
@@ -183,7 +183,7 @@
             this.inventorySlots.push(invSlot);
             const item = this.inventory[index];
             if (item) {
-                this.#createItem(invSlot, item.itemName);
+                this.#createItem(invSlot, item);
             }
         }
         let trashSlot = document.createElement('div');
@@ -221,11 +221,11 @@
     }
 
     //create an HTML element for item given its id and adds it to given slot
-    #createItem(invSlot: HTMLDivElement, item: string) {
+    #createItem(invSlot: HTMLDivElement, item: Item) {
         let invItem = document.createElement('img');
         invItem.draggable = false;
         invItem.className = "item";
-        invItem.src = "img/" + item + ".png";
+        invItem.src = item.iconPath;
         invSlot.appendChild(invItem);
     }
 
@@ -287,7 +287,7 @@
                 this.inventory[invItem.inventorySlotNumber] = item;
             }
             LogManager.logMessage("You found a " + item.itemName + "!", "Inventory");
-            this.#createItem(this.inventorySlots[invItem.inventorySlotNumber], item.itemName);
+            this.#createItem(this.inventorySlots[invItem.inventorySlotNumber], item);
         });
     }
 

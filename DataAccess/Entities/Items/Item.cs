@@ -10,6 +10,7 @@ namespace DataAccess.Entities.Items
         public string ItemName { get; set; }
         public string ItemDesc { get; set; }
         public int ItemCategoryId { get; set; }
+        public string IconPath { get; set; }
         public List<ItemAttribute> Attributes { get; set; }
 
         public void LoadFromReader(SqlDataReader reader)
@@ -18,6 +19,7 @@ namespace DataAccess.Entities.Items
             ItemName = reader["ItemName"].AsString();
             ItemDesc = reader["ItemDesc"].AsString();
             ItemCategoryId = reader["ItemCategoryId"].AsInt();
+            IconPath = reader["IconPath"].AsString();
             Attributes = JsonSerializer.Deserialize<List<ItemAttribute>>(reader["AttributesJSON"].AsString());
         }
     }

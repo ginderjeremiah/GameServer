@@ -7,6 +7,7 @@ namespace GameServer.Models.Items
         public string ItemName { get; set; }
         public string ItemDesc { get; set; }
         public int ItemCategoryId { get; set; }
+        public string IconPath { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
 
         public Item(DataAccess.Entities.Items.Item item)
@@ -15,6 +16,7 @@ namespace GameServer.Models.Items
             ItemName = item.ItemName;
             ItemDesc = item.ItemDesc;
             ItemCategoryId = item.ItemCategoryId;
+            IconPath = item.IconPath;
             Attributes = item.Attributes.Select(itemAtt => new BattlerAttribute(itemAtt)).ToList();
         }
     }

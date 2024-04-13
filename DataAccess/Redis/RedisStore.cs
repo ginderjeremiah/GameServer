@@ -16,7 +16,6 @@ namespace DataAccess.Redis
 
         private RedisStore(IDataConfiguration config, IApiLogger logger)
         {
-            _logger = logger;
             Multiplexer = ConnectionMultiplexer.Connect(config.RedisConnectionString);
             InitializeSubscribers(config, logger);
         }

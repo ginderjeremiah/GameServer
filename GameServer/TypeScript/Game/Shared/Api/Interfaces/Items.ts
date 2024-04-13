@@ -13,6 +13,7 @@ interface IItem {
 	itemName: string;
 	itemDesc: string;
 	itemCategoryId: number;
+	iconPath: string;
 	attributes: IBattlerAttribute[];
 }
 

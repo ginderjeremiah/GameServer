@@ -25,6 +25,7 @@ namespace DataAccess.Repositories
                     I.ItemName,
                     I.ItemDesc,
                     I.ItemCategoryId,
+                    I.IconPath,
 	                COALESCE(AttJSON.JSONData, '[]') AS AttributesJSON
                 FROM
                     Items I
@@ -41,35 +42,38 @@ namespace DataAccess.Repositories
             return QueryToList<Item>(commandText);
         }
 
-        public void AddItem(string itemName, string itemDesc, int itemCategoryId)
+        public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath)
         {
             var commandText = @"
                 INSERT INTO Items
                 VALUES
-                    (@ItemName, @ItemDesc, @ItemCategoryId)";
+                    (@ItemName, @ItemDesc, @ItemCategoryId, @IconPath)";
 
             ExecuteNonQuery(commandText,
-                            new SqlParameter("@ItemName", itemName),
-                            new SqlParameter("@ItemDesc", itemDesc),
-                            new SqlParameter("@ItemCategoryId", itemCategoryId)
-                        );
+                new SqlParameter("@ItemName", itemName),
+                new SqlParameter("@ItemDesc", itemDesc),
+                new SqlParameter("@ItemCategoryId", itemCategoryId),
+                new SqlParameter("@IconPath", iconPath)
+            );
         }
 
-        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId)
+        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId, string iconPath)
         {
             var commandText = @"
                 UPDATE Items
                 SET ItemName = @ItemName,
                     ItemDesc = @ItemDesc,
-                    ItemCategoryId = @ItemCategoryId
+                    ItemCategoryId = @ItemCategoryId,
+                    IconPath = @IconPath
                 WHERE ItemId = @ItemId";
 
             ExecuteNonQuery(commandText,
-                            new SqlParameter("@ItemId", itemId),
-                            new SqlParameter("@ItemName", itemName),
-                            new SqlParameter("@ItemDesc", itemDesc),
-                            new SqlParameter("@ItemCategoryId", itemCategoryId)
-                        );
+                new SqlParameter("@ItemId", itemId),
+                new SqlParameter("@ItemName", itemName),
+                new SqlParameter("@ItemDesc", itemDesc),
+                new SqlParameter("@ItemCategoryId", itemCategoryId),
+                new SqlParameter("@IconPath", iconPath)
+            );
         }
 
         public void DeleteItem(int itemId)
@@ -85,8 +89,8 @@ namespace DataAccess.Repositories
     public interface IItems
     {
         public List<Item> AllItems(bool refreshCache = false);
-        public void AddItem(string itemName, string itemDesc, int itemCategoryId);
-        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId);
+        public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath);
+        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId, string iconPath);
         public void DeleteItem(int itemId);
     }
 }

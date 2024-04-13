@@ -94,11 +94,11 @@ namespace GameServer.Controllers
                 var item = change.Item;
                 if (change.ChangeType == Add)
                 {
-                    Repositories.Items.AddItem(item.ItemName, item.ItemDesc, item.ItemCategoryId);
+                    Repositories.Items.AddItem(item.ItemName, item.ItemDesc, item.ItemCategoryId, item.IconPath);
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    Repositories.Items.UpdateItem(item.ItemId, item.ItemName, item.ItemDesc, item.ItemCategoryId);
+                    Repositories.Items.UpdateItem(item.ItemId, item.ItemName, item.ItemDesc, item.ItemCategoryId, item.IconPath);
                 }
                 else if (change.ChangeType == Delete)
                 {

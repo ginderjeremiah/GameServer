@@ -6,6 +6,7 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
     itemName: string;
     itemDesc: string;
     itemCategoryId: number;
+    iconPath: string;
     equipped: boolean;
     inventorySlotNumber: number;
     itemMods: ItemMod[];
@@ -20,7 +21,8 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
         this.itemName = itemData.itemName;
         this.itemDesc = itemData.itemDesc;
         this.itemCategoryId = itemData.itemCategoryId;
-        this.attributes = itemData.attributes
+        this.attributes = itemData.attributes;
+        this.iconPath = itemData.iconPath;
         this.equipped = invItem.equipped;
         this.inventorySlotNumber = invItem.inventorySlotNumber;
         this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
