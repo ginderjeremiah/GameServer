@@ -3,6 +3,11 @@ interface IAddEditItemAttributesData {
 	changes: IChange<IBattlerAttribute>[];
 }
 
+interface IAddEditItemModAttributesData {
+	itemModId: number;
+	changes: IChange<IBattlerAttribute>[];
+}
+
 interface IItem {
 	itemId: number;
 	itemName: string;
@@ -27,6 +32,7 @@ interface IItemMod {
 	removable: boolean;
 	itemModDesc: string;
 	slotTypeId: number;
+	attributes: IBattlerAttribute[];
 }
 
 interface IItemSlot {

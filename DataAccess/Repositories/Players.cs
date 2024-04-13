@@ -1,5 +1,5 @@
-﻿using DataAccess.Models.PlayerAttributes;
-using DataAccess.Models.Players;
+﻿using DataAccess.Entities.PlayerAttributes;
+using DataAccess.Entities.Players;
 using DataAccess.Redis;
 using Microsoft.SqlServer.Server;
 using StackExchange.Redis;

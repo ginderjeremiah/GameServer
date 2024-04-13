@@ -9,15 +9,15 @@ namespace GameServer.Models.Enemies
         public string Name { get; set; }
         public List<ItemDrop> Drops { get; set; }
         public List<AttributeDistribution> AttributeDistribution { get; set; }
-        public List<int> SelectedSkills { get; set; }
+        public List<int> SkillPool { get; set; }
 
-        public Enemy(DataAccess.Models.Enemies.Enemy enemy)
+        public Enemy(DataAccess.Entities.Enemies.Enemy enemy)
         {
             Drops = enemy.EnemyDrops.Select(drop => new ItemDrop(drop)).ToList();
             AttributeDistribution = enemy.AttributeDistribution.Select(dist => new AttributeDistribution(dist)).ToList();
             Name = enemy.EnemyName;
             EnemyId = enemy.EnemyId;
-            SelectedSkills = enemy.SelectedSkills;
+            SkillPool = enemy.SkillPool;
         }
     }
 }

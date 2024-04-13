@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.LogPreferences;
+﻿using DataAccess.Entities.LogPreferences;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories

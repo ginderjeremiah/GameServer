@@ -1,7 +1,6 @@
-﻿using DataAccess.Models.InventoryItems;
-using GameServer.Auth;
+﻿using GameServer.Auth;
 
-namespace GameServer.Models.Player
+namespace GameServer.Models.InventoryItems
 {
     public class InventoryData : IModel
     {

@@ -1,7 +1,6 @@
 ﻿/// <reference path="../Abstract/Tooltippable.ts"/>
 class Item extends Tooltippable implements IInventoryItem, IItem {
     inventoryItemId: number;
-    playerId: number;
     rating: number;
     itemId: number;
     itemName: string;
@@ -16,7 +15,6 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
     constructor(invItem: IInventoryItem, itemData: IItem, itemModsData: IItemMod[]) {
         super();
         this.inventoryItemId = invItem.inventoryItemId;
-        this.playerId = invItem.playerId;
         this.rating = invItem.rating;
         this.itemId = invItem.itemId;
         this.itemName = itemData.itemName;
@@ -26,7 +24,8 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
         this.equipped = invItem.equipped;
         this.slotId = invItem.slotId;
         this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
-        this.totalAttributes = new BattleAttributes(this.attributes, false);
+        const itemModAttributes = this.itemMods.flatMap(mod => mod.attributes);
+        this.totalAttributes = new BattleAttributes([...this.attributes, ...itemModAttributes], false);
     }
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {

@@ -5,7 +5,7 @@
         public int SlotTypeId { get; set; }
         public string SlotTypeName { get; set; }
 
-        public SlotType(DataAccess.Models.SlotTypes.SlotType slotType)
+        public SlotType(DataAccess.Entities.SlotTypes.SlotType slotType)
         {
             SlotTypeId = slotType.SlotTypeId;
             SlotTypeName = slotType.SlotTypeName;

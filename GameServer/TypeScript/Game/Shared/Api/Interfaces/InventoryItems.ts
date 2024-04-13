@@ -1,6 +1,10 @@
+interface IInventoryData {
+	inventory: IInventoryItem[];
+	equipped: IInventoryItem[];
+}
+
 interface IInventoryItem {
 	inventoryItemId: number;
-	playerId: number;
 	itemId: number;
 	rating: number;
 	equipped: boolean;

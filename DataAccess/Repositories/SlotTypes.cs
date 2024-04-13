@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.SlotTypes;
+﻿using DataAccess.Entities.SlotTypes;
 
 namespace DataAccess.Repositories
 {

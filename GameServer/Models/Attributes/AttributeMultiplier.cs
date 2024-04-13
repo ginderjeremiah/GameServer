@@ -5,7 +5,7 @@
         public AttributeType AttributeId { get; set; }
         public decimal Multiplier { get; set; }
 
-        public AttributeMultiplier(DataAccess.Models.Attributes.AttributeMultiplier attributeMultiplier)
+        public AttributeMultiplier(DataAccess.Entities.Skills.SkillDamageMultiplier attributeMultiplier)
         {
             AttributeId = (AttributeType)attributeMultiplier.AttributeId;
             Multiplier = attributeMultiplier.Multiplier;

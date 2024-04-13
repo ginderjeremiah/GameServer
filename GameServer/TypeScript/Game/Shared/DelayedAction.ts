@@ -10,9 +10,9 @@ class DelayedAction {
     }
 
     async start() {
-        this.#triggerStartTime = Date.now();
+        this.#triggerStartTime = performance.now();
         await delay(this.#delayLength);
-        const now = Date.now();
+        const now = performance.now();
         if (now - this.#triggerStartTime >= this.#delayLength * 0.95) {
             this.#triggerStartTime = now;
             this.#action();

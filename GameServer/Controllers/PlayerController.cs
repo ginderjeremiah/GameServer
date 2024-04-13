@@ -24,12 +24,6 @@ namespace GameServer.Controllers
         }
 
         [HttpGet]
-        public ApiResponse<InventoryData> Inventory()
-        {
-            return Success(new InventoryData(Session.InventoryData));
-        }
-
-        [HttpGet]
         public ApiListResponse<LogPreference> LogPreferences()
         {
             return Success(Repositories.LogPreferences.GetPreferences(PlayerId).Select(pref => new LogPreference(pref)));
@@ -38,7 +32,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
         {
-            Repositories.LogPreferences.SavePreferences(PlayerId, prefs.Select(pref => new DataAccess.Models.LogPreferences.LogPreference
+            Repositories.LogPreferences.SavePreferences(PlayerId, prefs.Select(pref => new DataAccess.Entities.LogPreferences.LogPreference
             {
                 Name = pref.Name,
                 Enabled = pref.Enabled,

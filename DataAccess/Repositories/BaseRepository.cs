@@ -1,5 +1,4 @@
-﻿using DataAccess.Models;
-using System.Data;
+﻿using DataAccess.Entities;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
@@ -13,60 +12,51 @@ namespace DataAccess.Repositories
             ConnectionString = connectionString;
         }
 
-        protected DataSet FillSet(string selectCommandText, params SqlParameter[] sqlParameters)
-        {
-            DataSet ds = new();
-            using var connection = new SqlConnection(ConnectionString);
-            var command = new SqlCommand(selectCommandText, connection);
-            command.Parameters.AddRange(sqlParameters);
-            var adapter = new SqlDataAdapter(command);
-            adapter.Fill(ds);
-            return ds;
-        }
-
-        protected DataTable FillTable(string selectCommandText, params SqlParameter[] sqlParameters)
-        {
-            DataTable dt = new();
-            using var connection = new SqlConnection(ConnectionString);
-            var command = new SqlCommand(selectCommandText, connection);
-            command.Parameters.AddRange(sqlParameters);
-            var adapter = new SqlDataAdapter(command);
-            adapter.Fill(dt);
-            return dt;
-        }
-
-        internal static DataTable FillTable<T>(IEnumerable<T> objList)
-        {
-            DataTable dt = new();
-            var props = typeof(T).GetProperties();
-            dt.Reset();
-            foreach (var prop in props)
-            {
-                dt.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
-            }
-            foreach (var obj in objList)
-            {
-                var row = dt.NewRow();
-                foreach (var prop in props)
-                {
-                    row[prop.Name] = prop.GetValue(obj);
-                }
-                dt.Rows.Add(row);
-            }
-            return dt;
-        }
-
-        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : IDataModel, new()
+        protected List<T> QueryToList<T>(string commandText, params SqlParameter[] sqlParameters) where T : IEntity, new()
         {
             using var connection = new SqlConnection(ConnectionString);
-            var command = connection.CreateCommand();
+            return LoadFromReader<T>(connection.GetReader(commandText, sqlParameters));
+        }
 
-            command.CommandText = commandText;
-            command.CommandType = CommandType.Text;
-            command.Parameters.AddRange(sqlParameters);
-            connection.Open();
+        protected (List<T1>, List<T2>) QueryToList<T1, T2>(string commandText, params SqlParameter[] sqlParameters) where T1 : IEntity, new() where T2 : IEntity, new()
+        {
+            using var connection = new SqlConnection(ConnectionString);
+            var reader = connection.GetReader(commandText, sqlParameters);
+            var first = LoadFromReader<T1>(reader);
+            var second = reader.NextResult() ? LoadFromReader<T2>(reader) : new List<T2>();
+            return (first, second);
+        }
 
-            var reader = command.ExecuteReader();
+        protected (List<T1>, List<T2>, List<T3>) QueryToList<T1, T2, T3>(string commandText, params SqlParameter[] sqlParameters)
+            where T1 : IEntity, new()
+            where T2 : IEntity, new()
+            where T3 : IEntity, new()
+        {
+            using var connection = new SqlConnection(ConnectionString);
+            var reader = connection.GetReader(commandText, sqlParameters);
+            var first = LoadFromReader<T1>(reader);
+            var second = reader.NextResult() ? LoadFromReader<T2>(reader) : new();
+            var third = reader.NextResult() ? LoadFromReader<T3>(reader) : new();
+            return (first, second, third);
+        }
+
+        protected (List<T1>, List<T2>, List<T3>, List<T4>) QueryToList<T1, T2, T3, T4>(string commandText, params SqlParameter[] sqlParameters)
+            where T1 : IEntity, new()
+            where T2 : IEntity, new()
+            where T3 : IEntity, new()
+            where T4 : IEntity, new()
+        {
+            using var connection = new SqlConnection(ConnectionString);
+            var reader = connection.GetReader(commandText, sqlParameters);
+            var first = LoadFromReader<T1>(reader);
+            var second = reader.NextResult() ? LoadFromReader<T2>(reader) : new();
+            var third = reader.NextResult() ? LoadFromReader<T3>(reader) : new();
+            var fourth = reader.NextResult() ? LoadFromReader<T4>(reader) : new();
+            return (first, second, third, fourth);
+        }
+
+        private static List<T> LoadFromReader<T>(SqlDataReader reader) where T : IEntity, new()
+        {
             var data = new List<T>();
 
             while (reader.Read())

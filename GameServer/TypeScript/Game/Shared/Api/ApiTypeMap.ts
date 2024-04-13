@@ -1,5 +1,6 @@
 type ApiResponseTypes = {
 	'/api/AdminTools/AddEditItemAttributes': undefined
+	'/api/AdminTools/AddEditItemModAttributes': undefined
 	'/api/AdminTools/AddEditItemMods': undefined
 	'/api/AdminTools/AddEditItems': undefined
 	'/api/AdminTools/AddEditItemSlots': undefined
@@ -16,7 +17,6 @@ type ApiResponseTypes = {
 	'/api/Items/SlotsForItem': IItemSlot[]
 	'/api/Items/SlotTypes': ISlotType[]
 	'/api/Player': IPlayerData
-	'/api/Player/Inventory': IInventoryData
 	'/api/Player/LogPreferences': ILogPreference[]
 	'/api/Player/SaveLogPreferences': undefined
 	'/api/Player/UpdateInventorySlots': undefined
@@ -33,6 +33,7 @@ type ApiResponseTypes = {
 
 type ApiRequestTypes = {
 	'/api/AdminTools/AddEditItemAttributes': IAddEditItemAttributesData
+	'/api/AdminTools/AddEditItemModAttributes': IAddEditItemModAttributesData
 	'/api/AdminTools/AddEditItemMods': IChange<IItemMod>[]
 	'/api/AdminTools/AddEditItems': IChange<IItem>[]
 	'/api/AdminTools/AddEditItemSlots': IChange<IItemSlot>[]

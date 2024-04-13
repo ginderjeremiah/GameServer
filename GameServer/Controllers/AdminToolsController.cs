@@ -41,6 +41,29 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
+        public ApiResponse AddEditItemModAttributes([FromBody] AddEditItemModAttributesData changeData)
+        {
+            foreach (var change in changeData.Changes)
+            {
+                var item = change.Item;
+                if (change.ChangeType == Add)
+                {
+                    Repositories.ItemModAttributes.AddItemModAttribute(changeData.ItemModId, (int)item.AttributeId, item.Amount);
+                }
+                else if (change.ChangeType == Edit)
+                {
+                    Repositories.ItemModAttributes.UpdateItemModAttribute(changeData.ItemModId, (int)item.AttributeId, item.Amount);
+                }
+                else if (change.ChangeType == Delete)
+                {
+                    Repositories.ItemModAttributes.DeleteItemModAttribute(changeData.ItemModId, (int)item.AttributeId);
+                }
+            }
+
+            return Success();
+        }
+
+        [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
             foreach (var change in changes)

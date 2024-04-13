@@ -18,7 +18,7 @@ class AddEditItemAttributeTool {
         this.itemSelect.style.marginBottom = '2em';
         const blankOpt = document.createElement('option');
         blankOpt.selected = true;
-        blankOpt.disabled = true;
+        blankOpt.disabled = true; 
         blankOpt.hidden = true;
         this.itemSelect.appendChild(blankOpt);
         renderParent.appendChild(this.itemSelect);

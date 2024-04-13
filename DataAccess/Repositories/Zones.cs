@@ -1,7 +1,5 @@
-﻿using DataAccess.Models.Items;
-using DataAccess.Models.Zones;
-using GameLibrary;
-using System.Data;
+﻿using DataAccess.Entities.Drops;
+using DataAccess.Entities.Zones;
 
 namespace DataAccess.Repositories
 {
@@ -50,23 +48,18 @@ namespace DataAccess.Repositories
                     DropRate
                 FROM ZoneDrops";
 
-            var ds = FillSet(commandText);
-            var drops = ds.Tables[1].To<ItemDrop>()
+            var result = QueryToList<Zone, ItemDrop>(commandText);
+
+            var drops = result.Item2
                 .GroupBy(drop => drop.DroppedById)
                 .ToDictionary(g => g.Key, g => g.ToList());
-            return ds.Tables[0]
-                .AsEnumerable()
-                .Select(row => new Zone()
-                {
-                    ZoneId = row["ZoneId"].AsInt(),
-                    ZoneName = row["ZoneName"].AsString(),
-                    ZoneDesc = row["ZoneDesc"].AsString(),
-                    ZoneOrder = row["ZoneOrder"].AsInt(),
-                    LevelMin = row["LevelMin"].AsInt(),
-                    LevelMax = row["LevelMax"].AsInt(),
-                    ZoneDrops = drops[row["zoneId"].AsInt()]
-                })
-                .ToList();
+
+            foreach (var zone in result.Item1)
+            {
+                zone.ZoneDrops = drops[zone.ZoneId];
+            }
+
+            return result.Item1;
         }
     }
 

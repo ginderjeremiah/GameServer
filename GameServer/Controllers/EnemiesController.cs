@@ -30,6 +30,7 @@ namespace GameServer.Controllers
                 var now = DateTime.UtcNow;
                 if (Session.ValidEnemyDefeat(enemyInstance))
                 {
+                    Log($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                     Session.ResetActiveEnemy();
                     Session.EnemyCooldown = now.AddSeconds(5);
                     var rewards = Session.GrantRewards(enemyInstance);
@@ -41,6 +42,7 @@ namespace GameServer.Controllers
                 }
                 else
                 {
+                    LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms, activeHash: {Session.ActiveEnemyHash}, calculatedHash: {enemyInstance.Hash()}}}");
                     return ErrorWithData("Enemy could not be defeated.", new DefeatEnemy
                     {
                         Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
@@ -77,11 +79,13 @@ namespace GameServer.Controllers
                 Seed = seed
             };
 
-            var simulator = new BattleSimulator(Session.PlayerData, enemy, enemyInstance, Repositories.Skills.AllSkills());
+            var simulator = new BattleSimulator(Session.PlayerData, enemy, enemyInstance, Repositories);
             var victory = simulator.Simulate(out var totalMs);
             var earliestDefeat = now.AddMilliseconds(totalMs);
 
             Session.SetActiveEnemy(enemyInstance, earliestDefeat, victory);
+
+            Log($"NewEnemy: {{victory: {victory}, battleTime: {totalMs} ms, now: {now:O}, earliestDefeat: {earliestDefeat:O}}}");
 
             return Success(new NewEnemy
             {

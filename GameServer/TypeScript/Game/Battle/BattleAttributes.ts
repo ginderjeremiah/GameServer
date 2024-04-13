@@ -2,34 +2,38 @@
 class BattleAttributes {
     static #attributesMaxId = Object.values(AttributeType)[Object.values(AttributeType).length - 1] as number;
     attributes: number[];
-    battlerAttributes: IBattlerAttribute[];
+    //battlerAttributes: IBattlerAttribute[];
 
     constructor(attList: IBattlerAttribute[], calcDerivedStats: boolean = true) {
-        this.battlerAttributes = attList.slice();
+        //this.battlerAttributes = attList;
         this.attributes = new Array<number>(BattleAttributes.#attributesMaxId);
-        this.resetAttributes(calcDerivedStats);
+        this.attributes.fill(0, 0, BattleAttributes.#attributesMaxId);
+        attList.forEach(att => this.attributes[att.attributeId] += att.amount);
+        if (calcDerivedStats) {
+            this.#calculateDerivedStats()
+        }
     }
 
     getValue(attId: number) {
         return this.attributes[attId];
     }
 
-    resetAttributes(calcDerivedStats: boolean = true) {
-        this.attributes.fill(0, 0, BattleAttributes.#attributesMaxId);
-        this.battlerAttributes.forEach(att => this.attributes[att.attributeId] += att.amount);
-        if (calcDerivedStats) {
-            this.#calculateDerivedStats()
-        }
-    }
+    // resetAttributes(calcDerivedStats: boolean = true) {
+    //     this.attributes.fill(0, 0, BattleAttributes.#attributesMaxId);
+    //     this.battlerAttributes.forEach(att => this.attributes[att.attributeId] += att.amount);
+    //     if (calcDerivedStats) {
+    //         this.#calculateDerivedStats()
+    //     }
+    // }
 
-    addAttributes(attList: IBattlerAttribute[], calcDerivedStats: boolean = true) {
-        this.battlerAttributes.push(...attList);
-        this.resetAttributes(calcDerivedStats);
-    }
+    // addAttributes(attList: IBattlerAttribute[], calcDerivedStats: boolean = true) {
+    //     this.battlerAttributes.push(...attList);
+    //     this.resetAttributes(calcDerivedStats);
+    // }
 
     getAttributeMap(includeZeroes: boolean = false) {
         return this.attributes
-            .map((att, i) => ({name: AttributeType[i], value: att}))
+            .map((att, i) => ({name: normalizeText(AttributeType[i]), value: att}))
             .filter(att => att.value != 0 || includeZeroes);
     }
 

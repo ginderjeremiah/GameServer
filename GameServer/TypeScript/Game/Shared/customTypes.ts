@@ -9,3 +9,5 @@ type CheckFunc<Type> = (data: Type) => boolean;
 type ProgressionFunc = (percentComplete: number) => number
 
 type SlotVariant = "equipped" | "inventory";
+
+type Screens = "Fight" | "Attributes" | "Stats" | "Help" | "Options" | "Quit" | "Inventory" | "cardGame"

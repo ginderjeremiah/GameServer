@@ -5,7 +5,7 @@
         public int ItemId { get; set; }
         public decimal DropRate { get; set; }
 
-        public ItemDrop(DataAccess.Models.Items.ItemDrop drop)
+        public ItemDrop(DataAccess.Entities.Drops.ItemDrop drop)
         {
             ItemId = drop.ItemId;
             DropRate = drop.DropRate;

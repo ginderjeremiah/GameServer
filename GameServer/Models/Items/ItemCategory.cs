@@ -5,7 +5,7 @@
         public int ItemCategoryId { get; set; }
         public string CategoryName { get; set; }
 
-        public ItemCategory(DataAccess.Models.ItemCategories.ItemCategory itemCategory)
+        public ItemCategory(DataAccess.Entities.ItemCategories.ItemCategory itemCategory)
         {
             ItemCategoryId = itemCategory.ItemCategoryId;
             CategoryName = itemCategory.CategoryName;

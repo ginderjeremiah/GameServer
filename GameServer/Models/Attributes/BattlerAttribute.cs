@@ -1,5 +1,6 @@
-﻿using DataAccess.Models.Items;
-using DataAccess.Models.PlayerAttributes;
+﻿using DataAccess.Entities.ItemMods;
+using DataAccess.Entities.Items;
+using DataAccess.Entities.PlayerAttributes;
 namespace GameServer.Models.Attributes
 {
     public class BattlerAttribute : IModel
@@ -13,7 +14,7 @@ namespace GameServer.Models.Attributes
             Amount = playerAttribute.Amount;
         }
 
-        public BattlerAttribute(DataAccess.Models.Attributes.AttributeDistribution distribution, int level)
+        public BattlerAttribute(DataAccess.Entities.Enemies.AttributeDistribution distribution, int level)
         {
             AttributeId = (AttributeType)distribution.AttributeId;
             Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;
@@ -23,6 +24,12 @@ namespace GameServer.Models.Attributes
         {
             AttributeId = (AttributeType)itemAttribute.AttributeId;
             Amount = itemAttribute.Amount;
+        }
+
+        public BattlerAttribute(ItemModAttribute itemModAttribute)
+        {
+            AttributeId = (AttributeType)itemModAttribute.AttributeId;
+            Amount = itemModAttribute.Amount;
         }
 
         public BattlerAttribute() { }

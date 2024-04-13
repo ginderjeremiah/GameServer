@@ -1,10 +1,8 @@
-﻿using DataAccess.Models.InventoryItems;
-using DataAccess.Models.PlayerAttributes;
-using DataAccess.Models.Players;
-using DataAccess.Models.SessionStore;
+﻿using DataAccess.Entities.InventoryItems;
+using DataAccess.Entities.PlayerAttributes;
+using DataAccess.Entities.Players;
+using DataAccess.Entities.SessionStore;
 using DataAccess.Redis;
-using GameLibrary;
-using System.Data;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
@@ -48,80 +46,47 @@ namespace DataAccess.Repositories
                 WHERE PlayerId = @PlayerId
 
                 SELECT
-                    SkillId
+                    PlayerId,
+                    SkillId,
+                    Selected
                 FROM PlayerSkills
                 WHERE 
                     PlayerId = @PlayerId
-                    AND Selected = 1
 
                 SELECT
+                    II.PlayerId,
                     II.InventoryItemId,
                     II.ItemId,
                     II.Rating,
                     II.Equipped,
                     II.SlotId,
-                    IIM.ItemModId,
-                    IIM.ItemSlotId
+	                COALESCE(ItemModJSON.JSONData, '[]') AS ItemModJSON
                 FROM InventoryItems AS II
-                LEFT JOIN InventoryItemMods AS IIM
-                ON II.InventoryItemId = IIM.InventoryItemId
+                OUTER APPLY (
+	                SELECT
+		                IIM.ItemModId,
+		                IIM.ItemSlotId
+	                FROM InventoryItemMods AS IIM
+	                WHERE II.InventoryItemId = IIM.InventoryItemId
+	                FOR JSON PATH
+                ) AS ItemModJSON(JSONData)
                 WHERE II.PlayerId = @PlayerId";
 
-            var ds = FillSet(commandText, new SqlParameter("@PlayerId", playerId));
-            var playerRow = ds.Tables[0].Rows[0];
-            var playerData = new Player
-            {
-                PlayerId = playerRow["PlayerId"].AsInt(),
-                UserName = playerRow["UserName"].AsString(),
-                Salt = new Guid(playerRow["Salt"].AsString()),
-                PassHash = playerRow["PassHash"].AsString(),
-                PlayerName = playerRow["PlayerName"].AsString(),
-                Level = playerRow["Level"].AsInt(),
-                Exp = playerRow["Exp"].AsInt(),
-                StatPointsGained = playerRow["StatPointsGained"].AsInt(),
-                StatPointsUsed = playerRow["StatPointsUsed"].AsInt(),
-            };
-
-
-            var attributes = ds.Tables[1].AsEnumerable().Select(row => new PlayerAttribute
-            {
-                PlayerId = row["PlayerId"].AsInt(),
-                AttributeId = row["AttributeId"].AsInt(),
-                Amount = row["Amount"].AsDecimal()
-            }).ToList();
-
-            var selectedSkills = ds.Tables[2].AsEnumerable().Select(row => row["SkillId"].AsInt()).ToList();
-
-            var inventoryItems = ds.Tables[3].AsEnumerable()
-                    .GroupBy(row => row["InventoryItemId"].AsInt())
-                    .Select(g => new InventoryItem
-                    {
-                        InventoryItemId = g.Key,
-                        ItemId = g.First()["ItemId"].AsInt(),
-                        Rating = g.First()["Rating"].AsInt(),
-                        Equipped = g.First()["Equipped"].AsBool(),
-                        SlotId = g.First()["SlotId"].AsInt(),
-                        ItemMods = g.Where(r => r["ItemModId"] is not null and not DBNull)
-                            .Select(r => new InventoryItemMod()
-                            {
-                                ItemModId = r["ItemModId"].AsInt(),
-                                ItemSlotId = r["ItemSlotId"].AsInt()
-                            }).ToList()
-                    }).ToList();
+            var result = QueryToList<Player, PlayerAttribute, PlayerSkill, InventoryItem>(commandText, new SqlParameter("@PlayerId", playerId));
 
             var sessionData = new SessionData
             {
                 SessionId = Guid.NewGuid().ToString(),
                 LastUsed = DateTime.UtcNow,
                 CurrentZone = 0,
-                PlayerData = playerData,
-                InventoryItems = inventoryItems,
+                PlayerData = result.Item1.First(),
+                InventoryItems = result.Item4,
                 EnemyCooldown = DateTime.UnixEpoch,
                 ActiveEnemyHash = "",
                 EarliestDefeat = DateTime.UnixEpoch,
                 Victory = false,
-                Attributes = attributes,
-                SelectedSkills = selectedSkills,
+                Attributes = result.Item2,
+                PlayerSkills = result.Item3,
             };
 
             _redisStore.SetAndForget($"{SessionPrefix}_{sessionData.SessionId}", sessionData);

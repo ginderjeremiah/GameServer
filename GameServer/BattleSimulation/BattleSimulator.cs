@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.Skills;
+﻿using DataAccess;
 using GameLibrary;
 using GameServer.Models.Enemies;
 using GameServer.Models.Player;
@@ -12,11 +12,14 @@ namespace GameServer.BattleSimulation
         private BattleEnemy Enemy { get; set; }
         private const int msPerTick = 6;
 
-        public BattleSimulator(PlayerData playerData, DataAccess.Models.Enemies.Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
+        public BattleSimulator(PlayerData playerData, DataAccess.Entities.Enemies.Enemy enemy, EnemyInstance enemyInstance, IRepositoryManager repositories)
         {
+            var skills = repositories.Skills.AllSkills();
+            var items = repositories.Items.AllItems();
+            var itemMods = repositories.ItemMods.AllItemMods();
             Rng = new Mulberry32(enemyInstance.Seed);
-            Player = new BattlePlayer(playerData, allSkills);
-            Enemy = new BattleEnemy(enemy, enemyInstance, allSkills);
+            Player = new BattlePlayer(playerData, skills, items, itemMods);
+            Enemy = new BattleEnemy(enemy, enemyInstance, skills);
         }
 
         public bool Simulate(out int totalMs)

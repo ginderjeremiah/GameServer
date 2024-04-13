@@ -8,6 +8,7 @@ class AdminTools {
         "Add/Edit Items": (d: HTMLDivElement) => AddEditItemTool.init(d),
         "Add/Edit Item Attributes": (d: HTMLDivElement) => AddEditItemAttributeTool.init(d),
         "Add/Edit Item Mods": (d: HTMLDivElement) => AddEditItemModTool.init(d),
+        "Add/Edit Item Mod Attributes": (d: HTMLDivElement) => AddEditItemModAttributeTool.init(d),
         "Add/Edit Item Slots": (d: HTMLDivElement) => AddEditItemSlotTool.init(d),
         "Add/Edit Tags": (d: HTMLDivElement) => AddEditTagTool.init(d),
         "Set Item Tags": (d: HTMLDivElement) => SetItemTagsTool.init(d),

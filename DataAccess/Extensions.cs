@@ -1,6 +1,7 @@
 ﻿using DataAccess.CustomAttributes;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Data.SqlClient;
 using System.Reflection;
 
 namespace DataAccess
@@ -27,6 +28,16 @@ namespace DataAccess
                 prop.SetValue(t, dataRow[prop.Name]);
             }
             return t;
+        }
+
+        internal static SqlDataReader GetReader(this SqlConnection connection, string commandText, params SqlParameter[] sqlParameters)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = commandText;
+            command.CommandType = CommandType.Text;
+            command.Parameters.AddRange(sqlParameters);
+            connection.Open();
+            return command.ExecuteReader();
         }
     }
 

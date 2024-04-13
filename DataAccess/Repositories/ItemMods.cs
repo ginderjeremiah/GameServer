@@ -1,5 +1,4 @@
-﻿using DataAccess.Models.ItemMods;
-using DataAccess.Models.ItemSlots;
+﻿using DataAccess.Entities.ItemMods;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
@@ -7,7 +6,7 @@ namespace DataAccess.Repositories
     internal class ItemMods : BaseRepository, IItemMods
     {
         private static List<ItemMod>? _allMods;
-        private static readonly List<Dictionary<int, List<ItemMod>>?> _itemModsBySlot = new();
+        private static readonly List<Dictionary<int, List<ItemModWithoutAttributes>>?> _itemModsBySlot = new();
         private static readonly object _lockForItem = new();
 
         public ItemMods(string connectionString) : base(connectionString) { }
@@ -25,12 +24,22 @@ namespace DataAccess.Repositories
         {
             var commandText = @"
                 SELECT
-                    ItemModId,
-                    ItemModName,
-                    Removable,
-                    ItemModDesc,
-                    SlotTypeId
-                FROM ItemMods
+                    IM.ItemModId,
+                    IM.ItemModName,
+                    IM.Removable,
+                    IM.ItemModDesc,
+                    IM.SlotTypeId,
+	                COALESCE(AttJSON.JSONData, '[]') AS AttributesJSON
+                FROM ItemMods IM
+                OUTER APPLY (
+	                SELECT
+                        IMA.ItemModId,
+		                IMA.AttributeId,
+		                IMA.Amount
+	                FROM ItemModAttributes IMA
+	                WHERE IMA.ItemModId = IM.ItemModId
+	                FOR JSON PATH
+                ) AS AttJSON(JSONData)
                 ORDER BY ItemModId";
 
             return QueryToList<ItemMod>(commandText);
@@ -70,29 +79,7 @@ namespace DataAccess.Repositories
             ExecuteNonQuery(commandText, new SqlParameter("@ItemModId", itemModId));
         }
 
-        public ItemMod? GetItemMod(ItemSlot itemSlot, Random rng, List<ItemMod> exclList)
-        {
-            if (itemSlot.GuaranteedId == -1)
-            {
-                var mods = GetModsForItemBySlot(itemSlot.ItemId);
-                if (mods.TryGetValue(itemSlot.SlotTypeId, out var itemMods))
-                {
-                    //TODO Add weights for item mods
-                    var actualMods = itemMods.Except(exclList).ToList();
-                    return actualMods.Any()
-                        ? actualMods[rng.Next(0, actualMods.Count - 1)]
-                        : null;
-                }
-            }
-            else
-            {
-                return AllItemMods()[itemSlot.GuaranteedId];
-            }
-
-            return null;
-        }
-
-        public Dictionary<int, List<ItemMod>> GetModsForItemBySlot(int itemId)
+        public Dictionary<int, List<ItemModWithoutAttributes>> GetModsForItemBySlot(int itemId)
         {
             if (itemId >= _itemModsBySlot.Count || _itemModsBySlot[itemId] is null)
             {
@@ -108,7 +95,7 @@ namespace DataAccess.Repositories
             return _itemModsBySlot[itemId];
         }
 
-        private Dictionary<int, List<ItemMod>> ModsForItemBySlot(int itemId)
+        private Dictionary<int, List<ItemModWithoutAttributes>> ModsForItemBySlot(int itemId)
         {
             var commandText = @"
                 SELECT DISTINCT
@@ -126,7 +113,7 @@ namespace DataAccess.Repositories
                 ON I.ItemId = IT.ItemId
                 WHERE I.ItemId = @ItemId";
 
-            return QueryToList<ItemMod>(commandText, new SqlParameter("@ItemId", itemId))
+            return QueryToList<ItemModWithoutAttributes>(commandText, new SqlParameter("@ItemId", itemId))
                     .GroupBy(mod => mod.SlotTypeId)
                     .ToDictionary(g => g.Key, g => g.ToList());
         }
@@ -135,8 +122,7 @@ namespace DataAccess.Repositories
     public interface IItemMods
     {
         public List<ItemMod> AllItemMods(bool refreshCache = false);
-        public ItemMod? GetItemMod(ItemSlot itemSlot, Random rng, List<ItemMod> exclList);
-        public Dictionary<int, List<ItemMod>> GetModsForItemBySlot(int itemId);
+        public Dictionary<int, List<ItemModWithoutAttributes>> GetModsForItemBySlot(int itemId);
         public void AddItemMod(string itemModName, bool removable, string itemModDesc);
         public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc);
         public void DeleteItemMod(int itemModId);

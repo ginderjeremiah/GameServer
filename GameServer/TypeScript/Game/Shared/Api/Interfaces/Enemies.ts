@@ -13,7 +13,7 @@ interface IEnemy {
 	name: string;
 	drops: IItemDrop[];
 	attributeDistribution: IAttributeDistribution[];
-	selectedSkills: number[];
+	skillPool: number[];
 }
 
 interface IEnemyInstance {
@@ -21,6 +21,7 @@ interface IEnemyInstance {
 	level: number;
 	attributes: IBattlerAttribute[];
 	seed: number;
+	selectedSkills: number[];
 }
 
 interface INewEnemy {

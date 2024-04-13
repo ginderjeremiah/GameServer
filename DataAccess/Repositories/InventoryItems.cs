@@ -1,5 +1,4 @@
-﻿using DataAccess.Models.InventoryItems;
-using DataAccess.Models.ItemMods;
+﻿using DataAccess.Entities.InventoryItems;
 using DataAccess.Redis;
 using GameLibrary;
 using Microsoft.SqlServer.Server;
@@ -16,7 +15,6 @@ namespace DataAccess.Repositories
         public static readonly object _equippedLock = new();
         public static bool _processingEquippedQueue = false;
         private readonly RepositoryManager _repositoryManager;
-
 
         public InventoryItems(string connectionString, RepositoryManager repos) : base(connectionString)
         {
@@ -130,7 +128,10 @@ namespace DataAccess.Repositories
                 INNER JOIN @InventoryItems INVI
                 ON II.InventoryItemId = INVI.InventoryItemId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@PlayerId", playerId), new SqlParameter("@InventoryItems", SqlDbType.Structured) { Value = records, TypeName = "InventoryUpdate" });
+            ExecuteNonQuery(commandText,
+                new SqlParameter("@PlayerId", playerId),
+                new SqlParameter("@InventoryItems", SqlDbType.Structured) { Value = records, TypeName = "InventoryUpdate" }
+            );
         }
 
         public List<InventoryItem> RollDrops(int enemyId, int zoneId, int max)
@@ -157,18 +158,36 @@ namespace DataAccess.Repositories
         private InventoryItem GetItemInstance(int itemId, Random rng)
         {
             var slots = _repositoryManager.ItemSlots.SlotsForItem(itemId);
-            var itemMods = new List<ItemMod>();
+            var itemMods = new List<int>();
             var inventoryItemMods = new List<InventoryItemMod>();
 
             foreach (var slot in slots.Where(s => (decimal)rng.NextSingle() < s.Probability))
             {
-                var mod = _repositoryManager.ItemMods.GetItemMod(slot, rng, itemMods);
-                if (mod is not null)
+                int? modId = null;
+                if (slot.GuaranteedId == -1)
                 {
-                    itemMods.Add(mod);
+                    var mods = _repositoryManager.ItemMods.GetModsForItemBySlot(slot.ItemId);
+                    if (mods.TryGetValue(slot.SlotTypeId, out var modsForSlot))
+                    {
+                        //TODO Add weights for item mods
+                        var actualMods = modsForSlot.Where(mod => !itemMods.Contains(mod.ItemModId)).ToList();
+                        if (actualMods.Any())
+                        {
+                            modId = actualMods[rng.Next(0, actualMods.Count - 1)].ItemModId;
+                        }
+                    }
+                }
+                else
+                {
+                    modId = _repositoryManager.ItemMods.AllItemMods()[slot.GuaranteedId].ItemModId;
+                }
+
+                if (modId is not null)
+                {
+                    itemMods.Add(modId.Value);
                     inventoryItemMods.Add(new InventoryItemMod
                     {
-                        ItemModId = mod.ItemModId,
+                        ItemModId = modId.Value,
                         ItemSlotId = slot.ItemSlotId,
                     });
                 }

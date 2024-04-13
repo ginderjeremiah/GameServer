@@ -6,7 +6,7 @@
         public string TagName { get; set; }
         public int TagCategoryId { get; set; }
 
-        public Tag(DataAccess.Models.Tags.Tag tag)
+        public Tag(DataAccess.Entities.Tags.Tag tag)
         {
             TagId = tag.TagId;
             TagName = tag.TagName;

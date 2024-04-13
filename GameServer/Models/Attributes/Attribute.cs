@@ -6,7 +6,7 @@
         public string AttributeName { get; set; }
         public string AttributeDesc { get; set; }
 
-        public Attribute(DataAccess.Models.Attributes.Attribute attribute)
+        public Attribute(DataAccess.Entities.Attributes.Attribute attribute)
         {
             AttributeId = (AttributeType)attribute.AttributeId;
             AttributeName = attribute.AttributeName;

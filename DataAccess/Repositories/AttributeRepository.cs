@@ -1,4 +1,4 @@
-﻿using Attribute = DataAccess.Models.Attributes.Attribute;
+﻿using Attribute = DataAccess.Entities.Attributes.Attribute;
 
 namespace DataAccess.Repositories
 {

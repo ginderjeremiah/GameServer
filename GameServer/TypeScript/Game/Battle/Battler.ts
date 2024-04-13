@@ -14,7 +14,7 @@ abstract class Battler {
     nameLabel: HTMLSpanElement;
     label: "player" | "enemy";
 
-    constructor(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], name: string, level: number}, label: "player" | "enemy") {
+    constructor(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], name: string, level: number}, label: "player" | "enemy", additionalAtttributes?: IBattlerAttribute[]) {
         this.label = label;
         this.name = battlerData.name;
         this.level = battlerData.level;
@@ -24,7 +24,7 @@ abstract class Battler {
         this.lvlLabel = document.getElementById(label + "Lvl") as HTMLSpanElement;
         this.nameLabel = document.getElementById(label + "Name") as HTMLSpanElement;
         this.nameLabel.textContent = this.name;
-        this.reset(battlerData);
+        this.reset(battlerData, additionalAtttributes);
     }
 
     updateHealthDisplay(): void {
@@ -92,10 +92,14 @@ abstract class Battler {
                     skill.chargeTime = 0;
                 }
             }
-        })
-        this.updateSkillsDisplay();
+        });
         return firedSkills;
-    } 
+    }
+
+    updateCombatDisplays() {
+        this.updateSkillsDisplay();
+        this.updateHealthDisplay();
+    }
 
     //returns actual damage dealt
     takeDamage(rawDamage: number): number { 
@@ -104,7 +108,6 @@ abstract class Battler {
             damage = 0;
         }
         this.currentHealth -= damage;
-        this.updateHealthDisplay();
         return damage;
     }
 
@@ -112,15 +115,15 @@ abstract class Battler {
         return this.currentHealth <= 0;
     }
 
-    reset(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], level: number}) {
+    reset(battlerData: {attributes: IBattlerAttribute[], selectedSkills: number[], level: number}, additionalAtttributes?: IBattlerAttribute[]) {
         const skillDatas = DataManager.skills;
-        this.attributes = new BattleAttributes(battlerData.attributes);
+        const atts = additionalAtttributes ? [...battlerData.attributes, ...additionalAtttributes] : battlerData.attributes;
+        this.attributes = new BattleAttributes(atts);
         this.skills = battlerData.selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
         this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
         this.level = battlerData.level;
         this.initSkillsDisplay();
-        this.updateSkillsDisplay();
-        this.updateHealthDisplay();
+        this.updateCombatDisplays()
         this.updateLvlDisplay();
     }
 }

@@ -5,8 +5,8 @@ class Player extends Battler {
     statPointsGained: number;
     statPointsUsed: number;
 
-    constructor(playerData: IPlayerData) {
-        super(playerData, "player");
+    constructor(playerData: IPlayerData, additionalAttributes: IBattlerAttribute[]) {
+        super(playerData, "player", additionalAttributes);
         this.currentExp = playerData.exp;
         this.statPointsGained = playerData.statPointsGained;
         this.statPointsUsed = playerData.statPointsUsed;

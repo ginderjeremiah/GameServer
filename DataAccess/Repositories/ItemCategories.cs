@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.ItemCategories;
+﻿using DataAccess.Entities.ItemCategories;
 
 namespace DataAccess.Repositories
 {

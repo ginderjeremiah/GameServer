@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.Skills;
+﻿using DataAccess.Entities.Skills;
 
 namespace GameServer.BattleSimulation
 {

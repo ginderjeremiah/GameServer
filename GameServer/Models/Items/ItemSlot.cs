@@ -8,7 +8,7 @@
         public int GuaranteedId { get; set; }
         public decimal Probability { get; set; }
 
-        public ItemSlot(DataAccess.Models.ItemSlots.ItemSlot itemSlot)
+        public ItemSlot(DataAccess.Entities.ItemSlots.ItemSlot itemSlot)
         {
             ItemSlotId = itemSlot.ItemId;
             ItemId = itemSlot.ItemId;

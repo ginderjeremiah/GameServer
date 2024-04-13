@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using DataAccess.Models.SessionStore;
+using DataAccess.Entities.SessionStore;
 using GameLibrary;
 using GameServer.Models.Attributes;
 using GameServer.Models.Enemies;
@@ -28,7 +28,7 @@ namespace GameServer.Auth
         public int CurrentZone { get => _sessionData.CurrentZone; set => _sessionData.CurrentZone = SetSessionDirty(value); }
         public SessionInventory InventoryData { get; }
         public SessionPlayer Player { get; }
-        public PlayerData PlayerData => new(Player);
+        public PlayerData PlayerData => new(Player, InventoryData);
 
         public Session(SessionData sessionData, IRepositoryManager repos)
         {
@@ -86,14 +86,14 @@ namespace GameServer.Auth
                 d.PlayerId = Player.PlayerId;
                 d.SlotId = slotId;
                 _repos.InventoryItems.AddInventoryItem(d);
-                InventoryData.Inventory[slotId] = d;
+                InventoryData.Inventory[slotId] = new InventoryItem(d);
                 _sessionData.InventoryItems.Add(d);
                 _sessionDirty = true;
             }
 
             return new DefeatRewards
             {
-                Drops = drops,
+                Drops = drops.Select(d => new InventoryItem(d)).ToList(),
                 ExpReward = expReward,
             };
         }
@@ -107,8 +107,8 @@ namespace GameServer.Auth
         public bool TrySetSelectedSkills(List<int> skills)
         {
             //TODO: validate skills
-            Player.SelectedSkills = skills;
-            _skillsDirty = true;
+            //Player.SelectedSkills = skills;
+            //_skillsDirty = true;
             return true;
         }
 

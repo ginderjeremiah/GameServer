@@ -1,4 +1,5 @@
-﻿using DataAccess.Models.TagCategories;
+﻿using DataAccess.Entities.TagCategories;
+
 namespace DataAccess.Repositories
 {
     internal class TagCategories : BaseRepository, ITagCategories

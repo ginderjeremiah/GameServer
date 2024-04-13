@@ -9,6 +9,7 @@ namespace GameServer.Models.Enemies
         public int Level { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
         public uint Seed { get; set; }
+        public List<int> SelectedSkills { get; set; }
 
         public string Hash()
         {

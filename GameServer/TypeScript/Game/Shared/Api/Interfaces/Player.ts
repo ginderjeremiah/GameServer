@@ -1,8 +1,3 @@
-interface IInventoryData {
-	inventory: IInventoryItem[];
-	equipped: IInventoryItem[];
-}
-
 interface ILoginCredentials {
 	username: string;
 	password: string;
@@ -27,4 +22,5 @@ interface IPlayerData {
 	selectedSkills: number[];
 	statPointsGained: number;
 	statPointsUsed: number;
+	inventoryData: IInventoryData;
 }

@@ -6,7 +6,7 @@
         public decimal BaseAmount { get; set; }
         public decimal AmountPerLevel { get; set; }
 
-        public AttributeDistribution(DataAccess.Models.Attributes.AttributeDistribution dist)
+        public AttributeDistribution(DataAccess.Entities.Enemies.AttributeDistribution dist)
         {
             AttributeId = (AttributeType)dist.AttributeId;
             BaseAmount = dist.BaseAmount;

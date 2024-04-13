@@ -8,7 +8,7 @@
     equippedIds: string[] = ["helmSlot", "chestSlot", "legSlot", "bootSlot", "weaponSlot", "accessorySlot"];
     equippedSlots: HTMLDivElement[] = [];
     equippedDisplay = document.getElementById("equipSlotsContainer") as HTMLDivElement;
-    #equippedStats!: BattleAttributes; 
+    #equippedStats!: IBattlerAttribute[]; 
     #equippedStatsList = document.getElementById("equipStatsList") as HTMLUListElement; //reference to equipment HTML list for total equipped stats
     #delayedAction: DelayedAction;
 
@@ -310,7 +310,7 @@
 
     updateEquipmentStats() {
         this.#equippedStats = this.getEquippedStats();
-        let listItems = this.#equippedStats.getAttributeMap()
+        const listItems = new BattleAttributes(this.#equippedStats, false).getAttributeMap()
         .map((att) => {
             let listItem = document.createElement("li");
             listItem.textContent = att.name + " +" + att.value;
@@ -342,12 +342,17 @@
     }
 
     updateInventorySlots() {
-        const inv = this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: false} : []);
-        inv.push(...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: true} : []));
+        const inv = [
+            ...this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: false} : []),
+            ...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, slotId: item.slotId, equipped: true} : [])
+        ];
         DataManager.updateInventorySlots(inv);
     }
 
     getEquippedStats() {
-        return new BattleAttributes(this.equipped.flatMap(item => item?.attributes ?? []), false);
+        return [
+            ...this.equipped.flatMap(item => item?.attributes ?? []),
+            ...this.equipped.flatMap(item => item?.itemMods.flatMap(mod => mod.attributes) ?? [])
+        ];
     }
 }

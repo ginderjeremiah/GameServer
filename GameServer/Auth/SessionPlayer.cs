@@ -1,6 +1,6 @@
-﻿using DataAccess.Models.PlayerAttributes;
-using DataAccess.Models.Players;
-using DataAccess.Models.SessionStore;
+﻿using DataAccess.Entities.PlayerAttributes;
+using DataAccess.Entities.Players;
+using DataAccess.Entities.SessionStore;
 using GameServer.Models.Attributes;
 
 namespace GameServer.Auth
@@ -19,7 +19,8 @@ namespace GameServer.Auth
         public int Level { get => Player.Level; set => Player.Level = value; }
         public int Exp { get => Player.Exp; set => Player.Exp = value; }
         public List<PlayerAttribute> Attributes { get => _sessionData.Attributes; set => _sessionData.Attributes = value; }
-        public List<int> SelectedSkills { get => _sessionData.SelectedSkills; set => _sessionData.SelectedSkills = value; }
+        public List<PlayerSkill> PlayerSkills { get => _sessionData.PlayerSkills; }
+        public List<int> SelectedSkills { get => _sessionData.PlayerSkills.Where(skill => skill.Selected).Select(skill => skill.SkillId).ToList(); }
         public int StatPointsGained { get => Player.StatPointsGained; set => Player.StatPointsGained = value; }
         public int StatPointsUsed { get => Player.StatPointsUsed; private set => Player.StatPointsUsed = value; }
 

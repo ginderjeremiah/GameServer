@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.Tags;
+﻿using DataAccess.Entities.Tags;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories

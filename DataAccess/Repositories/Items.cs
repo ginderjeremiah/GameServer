@@ -1,13 +1,23 @@
-﻿using DataAccess.Models.Items;
+﻿using DataAccess.Entities.Items;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
 {
     internal class Items : BaseRepository, IItems
     {
+        private static List<Item>? _allItems;
         public Items(string connectionString) : base(connectionString) { }
 
-        public List<Item> AllItems()
+        public List<Item> AllItems(bool refreshCache = false)
+        {
+            if (_allItems is null || refreshCache)
+            {
+                _allItems = GetItems();
+            }
+            return _allItems;
+        }
+
+        private List<Item> GetItems()
         {
             var commandText = @"
                 SELECT
@@ -74,7 +84,7 @@ namespace DataAccess.Repositories
 
     public interface IItems
     {
-        public List<Item> AllItems();
+        public List<Item> AllItems(bool refreshCache = false);
         public void AddItem(string itemName, string itemDesc, int itemCategoryId);
         public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId);
         public void DeleteItem(int itemId);

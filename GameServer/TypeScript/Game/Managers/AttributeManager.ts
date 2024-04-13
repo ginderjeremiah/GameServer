@@ -8,15 +8,14 @@ class AttributeManager {
     static #changedAttributes: number[];
     static #availablePoints: number;
 
-    static init(playerData: IPlayerData, equipmentAttributes: BattleAttributes) {
-        this.#resetChangedStats();
+    static init(playerData: IPlayerData, equipmentAttributes: IBattlerAttribute[]) {
+        this.#resetChangedAtts();
         this.createCoreAttributesUi(playerData);
         this.createAllAttributesUI(playerData, equipmentAttributes);
     }
 
-    static createAllAttributesUI(playerData: IPlayerData, equipmentAttributes: BattleAttributes) {
-        const allAtts = new BattleAttributes(playerData.attributes, false);
-        allAtts.addAttributes(equipmentAttributes.battlerAttributes);
+    static createAllAttributesUI(playerData: IPlayerData, equipmentAttributes: IBattlerAttribute[]) {
+        const allAtts = new BattleAttributes([...playerData.attributes, ...equipmentAttributes]);
         const listItems = allAtts.getAttributeMap(true).map(att => {
             let listItem = document.createElement("li");
             listItem.textContent = normalizeText(att.name) + ": " + formatNum(att.value);
@@ -64,7 +63,7 @@ class AttributeManager {
             });
     }
 
-    static #resetChangedStats() {
+    static #resetChangedAtts() {
         this.#changedAttributes = [];
     }
 
@@ -100,7 +99,7 @@ class AttributeManager {
 
     static saveStats() {
         GameManager.updateStats(this.#changedAttributes.map((amount, id) => ({ attributeId: id, amount: amount})));
-        this.#resetChangedStats();
+        this.#resetChangedAtts();
     }
 
     static isCoreAttribute(att: IBattlerAttribute) {

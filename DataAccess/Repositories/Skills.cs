@@ -1,7 +1,5 @@
-﻿using DataAccess.Models.Attributes;
-using DataAccess.Models.Skills;
-using GameLibrary;
-using System.Data;
+﻿using DataAccess.Entities.Skills;
+using StackExchange.Redis;
 
 namespace DataAccess.Repositories
 {
@@ -45,15 +43,18 @@ namespace DataAccess.Repositories
                     Multiplier
                 FROM SkillDamageMultipliers";
 
-            var ds = FillSet(commandText);
-            var multipliers = ds.Tables[1].AsEnumerable()
-                .GroupBy(row => row["SkillId"].AsInt())
-                .ToDictionary(g => g.Key, g => g.Select(row => row.To<AttributeMultiplier>()).ToList());
+            var result = QueryToList<Skill, SkillDamageMultiplier>(commandText);
 
-            return ds.Tables[0].
-                AsEnumerable()
-                .Select(row => new Skill(row, multipliers[row["SkillId"].AsInt()]))
-                .ToList();
+            var multipliers = result.Item2
+                .GroupBy(m => m.SkillId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var skill in result.Item1)
+            {
+                skill.DamageMultipliers = multipliers[skill.SkillId];
+            }
+
+            return result.Item1;
         }
     }
 

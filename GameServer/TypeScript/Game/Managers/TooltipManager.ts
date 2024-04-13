@@ -18,11 +18,11 @@
     //set lock to prevent erroneous mouse events from interfering with tooltip after a drag
     static setLock() {
         this.lockActive = true;
-        this.lockEnd = Date.now() + this.lockAmount;
+        this.lockEnd = performance.now() + this.lockAmount;
     }
 
     static checkLock() {
-        return this.lockActive ? (this.lockActive = Date.now() < this.lockEnd) : false;
+        return this.lockActive ? (this.lockActive = performance.now() < this.lockEnd) : false;
     }
 
     static setData(data: Tooltippable) {

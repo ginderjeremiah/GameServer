@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.InventoryItems;
+﻿using GameServer.Models.InventoryItems;
 
 namespace GameServer.Auth
 {
@@ -6,17 +6,17 @@ namespace GameServer.Auth
     {
         private const int INV_SLOTS = 23;
         private const int EQUIP_SLOTS = 6;
-        private readonly List<InventoryItem> _sessionInventory;
+        private readonly List<DataAccess.Entities.InventoryItems.InventoryItem> _sessionInventory;
         public List<InventoryItem?> Inventory { get; set; }
         public List<InventoryItem?> Equipped { get; set; }
 
-        public SessionInventory(List<InventoryItem> inventoryItems)
+        public SessionInventory(List<DataAccess.Entities.InventoryItems.InventoryItem> inventoryItems)
         {
             _sessionInventory = inventoryItems;
             Initialize(inventoryItems);
         }
 
-        private void Initialize(List<InventoryItem> inventoryItems)
+        private void Initialize(List<DataAccess.Entities.InventoryItems.InventoryItem> inventoryItems)
         {
             var inventory = NewInventoryList();
             var equipped = NewEquippedList();
@@ -25,11 +25,11 @@ namespace GameServer.Auth
             {
                 if (item.Equipped)
                 {
-                    equipped[item.SlotId] = item;
+                    equipped[item.SlotId] = new InventoryItem(item);
                 }
                 else
                 {
-                    inventory[item.SlotId] = item;
+                    inventory[item.SlotId] = new InventoryItem(item);
                 }
             }
 
@@ -42,7 +42,7 @@ namespace GameServer.Auth
             return Inventory.Select((item, index) => (item, index)).Where(p => p.item is null).Select(p => p.index).ToList();
         }
 
-        public bool TrySetNewInventoryList(IEnumerable<Models.InventoryItems.InventoryUpdate> inventoryUpdates)
+        public bool TrySetNewInventoryList(IEnumerable<InventoryUpdate> inventoryUpdates)
         {
             var usedSlots = new HashSet<(bool, int)>();
             var matchedUpdates = _sessionInventory.Select((inv) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.InventoryItemId == upd.InventoryItemId))).ToList();
@@ -86,7 +86,7 @@ namespace GameServer.Auth
             return validUpdate;
         }
 
-        private bool IsValidInventoryUpdate(Models.InventoryItems.InventoryUpdate item)
+        private bool IsValidInventoryUpdate(InventoryUpdate item)
         {
             return _sessionInventory.Any(inv => inv.InventoryItemId == item.InventoryItemId)
                 && item.SlotId is >= 0

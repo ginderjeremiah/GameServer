@@ -1,6 +1,5 @@
-﻿using DataAccess.Models.Attributes;
-using DataAccess.Models.Enemies;
-using DataAccess.Models.Items;
+﻿using DataAccess.Entities.Drops;
+using DataAccess.Entities.Enemies;
 using GameLibrary;
 using System.Data;
 using System.Data.SqlClient;
@@ -33,9 +32,9 @@ namespace DataAccess.Repositories
                 {
                     if (!zoneEnemiesTable.HasProbabilities(zoneId))
                     {
-                        var ds = GetProbabilitiesAndAliases(zoneId);
-                        var probData = ds.Tables[0].To<ProbabilityData>();
-                        var aliases = ds.Tables[1].AsEnumerable().Select(row => (row["Alias"].AsInt(), row["Value"].AsInt())).ToList();
+                        var data = GetProbabilitiesAndAliases(zoneId);
+                        var probData = data.Item1;
+                        var aliases = data.Item2;
 
                         zoneEnemiesTable.AddProbabilities(probData, zoneId);
                         zoneEnemiesTable.AddAliases(aliases);
@@ -46,7 +45,7 @@ namespace DataAccess.Repositories
             return AllEnemies()[zoneEnemiesTable.GetRandomValue(zoneId)];
         }
 
-        private DataSet GetProbabilitiesAndAliases(int zoneId)
+        private (List<ZoneEnemyProbability>, List<ZoneEnemyAlias>) GetProbabilitiesAndAliases(int zoneId)
         {
             var commandText = @"
                 SELECT
@@ -67,7 +66,7 @@ namespace DataAccess.Repositories
                 ON ZEA.ZoneEnemyIdAlias = ZE.ZoneEnemyId
                 WHERE ZE.ZoneId = @ZoneId";
 
-            return FillSet(commandText, new SqlParameter("@ZoneId", zoneId));
+            return QueryToList<ZoneEnemyProbability, ZoneEnemyAlias>(commandText, new SqlParameter("@ZoneId", zoneId));
         }
 
         private List<Enemy> GetAllEnemyData()
@@ -97,29 +96,29 @@ namespace DataAccess.Repositories
                     SkillId
                 FROM EnemySkills";
 
+            var result = QueryToList<Enemy, AttributeDistribution, ItemDrop, EnemySkill>(commandText);
 
-            var ds = FillSet(commandText);
-            var attributes = ds.Tables[1].To<AttributeDistribution>()
+            var attributes = result.Item2
                 .GroupBy(att => att.EnemyId)
                 .ToDictionary(g => g.Key, g => g.ToList());
-            var drops = ds.Tables[2].To<ItemDrop>()
+            var drops = result.Item3
                 .GroupBy(drop => drop.DroppedById)
                 .ToDictionary(g => g.Key, g => g.ToList());
-            var enemySkills = ds.Tables[3]
+            var enemySkills = result.Item4
                 .AsEnumerable()
-                .GroupBy(row => row["EnemyId"].AsInt())
-                .ToDictionary(g => g.Key, g => g.Select(row => row["SkillId"].AsInt()).ToList());
+                .GroupBy(enemySkill => enemySkill.EnemyId)
+                .ToDictionary(g => g.Key, g => g.Select(enemySkill => enemySkill.SkillId).ToList());
 
-            return ds.Tables[0]
-                .AsEnumerable()
-                .Select(row =>
-                {
-                    var enemyId = row["EnemyId"].AsInt();
-                    drops.TryGetValue(enemyId, out var dropList);
-                    return new Enemy(enemyId, row["EnemyName"].AsString(), attributes[enemyId], dropList ?? new List<ItemDrop>(), enemySkills[enemyId]);
-                })
-                .OrderBy(enemy => enemy.EnemyId)
-                .ToList();
+            foreach (var enemy in result.Item1)
+            {
+                var id = enemy.EnemyId;
+                drops.TryGetValue(id, out var dropList);
+                enemy.AttributeDistribution = attributes[id];
+                enemy.EnemyDrops = dropList ?? new List<ItemDrop>();
+                enemy.SkillPool = enemySkills[id];
+            }
+
+            return result.Item1;
         }
     }
 

@@ -58,7 +58,7 @@ namespace GameServer.CodeGen
                             ParameterType = p.ParameterType,
                             HasDefault = p.HasDefaultValue,
                         }).ToList(),
-                        IsGet = methodAtt.HttpMethods.Contains("GET")
+                        IsGet = methodAtt?.HttpMethods?.Contains("GET") ?? true
                     };
 
                     endpointMetadata.Add(metaData);

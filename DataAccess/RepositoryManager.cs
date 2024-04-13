@@ -22,6 +22,7 @@ namespace DataAccess
         private Attributes? _attributes;
         private ItemAttributes? _itemAttributes;
         private TagCategories? _tagCategories;
+        private ItemModAttributes? _itemModAttributes;
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_connectionString, this);
         public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_connectionString, Redis);
@@ -39,6 +40,7 @@ namespace DataAccess
         public IAttributes Attributes => _attributes ??= new Attributes(_connectionString);
         public IItemAttributes ItemAttributes => _itemAttributes ??= new ItemAttributes(_connectionString);
         public ITagCategories TagCategories => _tagCategories ??= new TagCategories(_connectionString);
+        public IItemModAttributes ItemModAttributes => _itemModAttributes ??= new ItemModAttributes(_connectionString);
         internal RedisStore Redis { get; }
 
         public RepositoryManager(IDataConfiguration config)
@@ -66,6 +68,7 @@ namespace DataAccess
         public IAttributes Attributes { get; }
         public IItemAttributes ItemAttributes { get; }
         public ITagCategories TagCategories { get; }
+        public IItemModAttributes ItemModAttributes { get; }
     }
 }
 

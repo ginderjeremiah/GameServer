@@ -2,7 +2,7 @@
 {
     public class SharedProbabilityTable
     {
-        private readonly List<List<ProbabilityData>?> probabilityTables;
+        private readonly List<List<IProbabilityData>?> probabilityTables;
         private readonly List<int?> aliases;
         private readonly Random random;
         public SharedProbabilityTable()
@@ -17,27 +17,27 @@
             return probabilityTables.Count > index && probabilityTables[index] != null;
         }
 
-        public void AddProbabilities(List<ProbabilityData> probabilities, int index)
+        public void AddProbabilities(IEnumerable<IProbabilityData> probabilities, int index)
         {
             for (int i = probabilityTables.Count; i <= index; i++)
             {
                 probabilityTables.Add(null);
             }
-            probabilityTables[index] = probabilities;
+            probabilityTables[index] = probabilities.ToList();
         }
 
-        public void AddAliases(List<(int, int)> newAliases)
+        public void AddAliases(IEnumerable<IAliasData> newAliases)
         {
-            if (newAliases.Count == 0)
+            if (!newAliases.Any())
                 return;
 
-            for (int i = aliases.Count; i <= newAliases.Max(alias => alias.Item1); i++)
+            for (int i = aliases.Count; i <= newAliases.Max(alias => alias.Alias); i++)
             {
                 aliases.Add(null);
             }
             foreach (var alias in newAliases)
             {
-                aliases[alias.Item1] = alias.Item2;
+                aliases[alias.Alias] = alias.Value;
             }
         }
 
@@ -58,18 +58,24 @@
         }
     }
 
-    public class ProbabilityData
-    {
-        public decimal Probability { get; set; }
-        public int Value { get; set; }
-        public int Alias { get; set; }
-    }
-
     public class AliasNotFoundException : Exception
     {
         public AliasNotFoundException(int index)
             : base($"Alias does not exist at index: {index}")
         {
         }
+    }
+
+    public interface IProbabilityData
+    {
+        public decimal Probability { get; set; }
+        public int Value { get; set; }
+        public int Alias { get; set; }
+    }
+
+    public interface IAliasData
+    {
+        public int Alias { get; set; }
+        public int Value { get; set; }
     }
 }

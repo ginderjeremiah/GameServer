@@ -20,12 +20,12 @@ namespace GameServer.BattleSimulation
             set => _attributes[(int)index] = (decimal)value;
         }
 
-        public BattleAttributes(List<BattlerAttribute> atts)
+        public BattleAttributes(IEnumerable<BattlerAttribute> atts)
         {
             _attributes = GetEmptyAttributeList();
             foreach (var att in atts)
             {
-                _attributes[(int)att.AttributeId] = att.Amount;
+                _attributes[(int)att.AttributeId] += att.Amount;
             }
             CalculateDerivedValues();
         }

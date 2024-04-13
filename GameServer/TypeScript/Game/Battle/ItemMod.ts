@@ -5,6 +5,7 @@ class ItemMod implements IInventoryItemMod, IItemMod {
     itemModDesc: string;
     removable: boolean;
     slotTypeId: number;
+    attributes: IBattlerAttribute[];
 
     constructor(mod: IInventoryItemMod, modData: IItemMod) {
         this.itemModId = mod.itemModId;
@@ -13,5 +14,6 @@ class ItemMod implements IInventoryItemMod, IItemMod {
         this.itemModDesc = modData.itemModDesc;
         this.removable = modData.removable;
         this.slotTypeId = modData.slotTypeId;
+        this.attributes = modData.attributes;
     }
 }

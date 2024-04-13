@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.InventoryItems;
+﻿using GameServer.Models.InventoryItems;
 
 namespace GameServer.Models.Enemies
 {

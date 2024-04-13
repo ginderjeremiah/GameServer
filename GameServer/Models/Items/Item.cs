@@ -9,7 +9,7 @@ namespace GameServer.Models.Items
         public int ItemCategoryId { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
 
-        public Item(DataAccess.Models.Items.Item item)
+        public Item(DataAccess.Entities.Items.Item item)
         {
             ItemId = item.ItemId;
             ItemName = item.ItemName;

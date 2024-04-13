@@ -11,12 +11,8 @@ class GameManager {
     static #battleManager: BattleManager;
     static #zoneManager : ZoneManager;
     static #cardGameManager : CardGameManager;
-    static #playerData: IPlayerData;
     static #lastTime : number;
-
-    static get playerData() {
-        return this.#playerData;
-    }
+    static playerData: IPlayerData;
 
     static async init() {
         ScreenManager.init();
@@ -26,28 +22,23 @@ class GameManager {
         const newEnemy = DataManager.newEnemy();
         const dataInit = await Promise.all([
             DataManager.init(),
-            DataManager.getLogPreferences(),
-            DataManager.getInventoryData(),
+            DataManager.getLogPreferences()
         ])
-        this.#playerData = login.data.playerData;
+        this.playerData = login.data.playerData;
         this.#zoneManager = new ZoneManager(login.data.currentZone);
+        this.#inventoryManager = new InventoryManager(this.playerData.inventoryData);
+        const equippedAtts = this.#inventoryManager.getEquippedStats();
+        AttributeManager.init(this.playerData, equippedAtts);
         LogManager.init(dataInit[1]);
-        this.#inventoryManager = new InventoryManager(dataInit[2]);
-        AttributeManager.init(this.#playerData, this.#inventoryManager.getEquippedStats());
-        this.#battleManager = new BattleManager(this.#playerData, await newEnemy);
-        this.#startGame();
-    }
-
-    static #startGame() : void {
+        this.#battleManager = new BattleManager(this.playerData, equippedAtts, await newEnemy);
         this.#cardGameManager = new CardGameManager();
-        this.#lastTime = 0;
+        this.#lastTime = performance.now();
         window.requestAnimationFrame(this.#gameLoop);
     }
 
     //need to use full GameManager identifier because function is callback for window.requestAnimationFrame
     static #gameLoop(ts : DOMHighResTimeStamp) : void {
-        let timeDelta = ts - GameManager.#lastTime;
-        //console.log(timeDelta);
+        const timeDelta = ts - GameManager.#lastTime;
         GameManager.#lastTime = ts;
         const battleResult = GameManager.#battleManager.update(timeDelta);
         if (battleResult) {
@@ -75,35 +66,35 @@ class GameManager {
             LogManager.logMessage("You've been defeated!", "Enemy Defeated");
         }
         const newEnemy = await DataManager.newEnemy();
-        this.#battleManager.reset(this.#playerData, newEnemy);
+        this.#battleManager.reset(this.playerData, this.#inventoryManager.getEquippedStats(), newEnemy);
     }
 
     static grantExp(exp: number) {
         LogManager.logMessage("Earned " + formatNum(exp) + " exp.", "Exp")
-        this.#playerData.exp += exp;
-        if (this.#playerData.exp >= this.#playerData.level * 100) {
+        this.playerData.exp += exp;
+        if (this.playerData.exp >= this.playerData.level * 100) {
             this.levelUp();
         }
     }
 
     static levelUp() {
-        this.#playerData.exp -= this.#playerData.level * 100;
-        this.#playerData.level++;
-        this.#playerData.statPointsGained += 6;
+        this.playerData.exp -= this.playerData.level * 100;
+        this.playerData.level++;
+        this.playerData.statPointsGained += 6;
         LogManager.logMessage("Congratulations, you leveled up!", "LevelUp");
-        LogManager.logMessage("You are now level " + this.#playerData.level + ".", "LevelUp");
+        LogManager.logMessage("You are now level " + this.playerData.level + ".", "LevelUp");
     }
 
     static updateEquipmentStats() : void {
         const equipStats = this.#inventoryManager.updateEquipmentStats();
-        AttributeManager.createAllAttributesUI(this.#playerData, equipStats);
+        AttributeManager.createAllAttributesUI(this.playerData, equipStats);
     }
     
     static async changeZone(amount : number) {
         if (this.#zoneManager.changeZone(amount)) {
-            this.#battleManager.stop();
+            this.#battleManager.pause();
             const newEnemy = await DataManager.newEnemy(this.#zoneManager.currentZoneId);
-            this.#battleManager.reset(this.#playerData, newEnemy);
+            this.#battleManager.reset(this.playerData, this.#inventoryManager.getEquippedStats(), newEnemy);
         }
     }
 
@@ -117,10 +108,10 @@ class GameManager {
 
     static async updateStats(statChanges: IAttributeUpdate[]) {
         const resp = await DataManager.updatePlayerStats(statChanges);
-        this.#playerData.attributes = resp;
-        this.#playerData.statPointsUsed += statChanges
+        this.playerData.attributes = resp;
+        this.playerData.statPointsUsed += statChanges
             .map(chg => chg.amount)
             .reduce((prev, current) => prev + current);
-        AttributeManager.createAllAttributesUI(this.#playerData, this.#inventoryManager.getEquippedStats())
+        AttributeManager.createAllAttributesUI(this.playerData, this.#inventoryManager.getEquippedStats())
     }
 } 

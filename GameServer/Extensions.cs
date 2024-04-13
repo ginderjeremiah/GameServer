@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.PlayerAttributes;
+﻿using DataAccess.Entities.PlayerAttributes;
 using static GameServer.AttributeType;
 
 namespace GameServer

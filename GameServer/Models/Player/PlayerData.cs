@@ -1,5 +1,6 @@
 ﻿using GameServer.Auth;
 using GameServer.Models.Attributes;
+using GameServer.Models.InventoryItems;
 
 namespace GameServer.Models.Player
 {
@@ -13,8 +14,9 @@ namespace GameServer.Models.Player
         public List<int> SelectedSkills { get; set; }
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
+        public InventoryData InventoryData { get; set; }
 
-        public PlayerData(SessionPlayer sessionPlayer)
+        public PlayerData(SessionPlayer sessionPlayer, SessionInventory sessionInventory)
         {
             UserName = sessionPlayer.UserName;
             Name = sessionPlayer.PlayerName;
@@ -24,6 +26,7 @@ namespace GameServer.Models.Player
             SelectedSkills = sessionPlayer.SelectedSkills;
             StatPointsGained = sessionPlayer.StatPointsGained;
             StatPointsUsed = sessionPlayer.StatPointsUsed;
+            InventoryData = new InventoryData(sessionInventory);
         }
     }
 }

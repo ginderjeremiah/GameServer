@@ -29,10 +29,6 @@ class DataManager {
     static async getPlayerData() {
         return ApiRequest.get('/api/Player');
     }
-    
-    static async getInventoryData() {
-        return ApiRequest.get('/api/Player/Inventory');
-    }
 
     static async updateInventorySlots(updates: IInventoryUpdate[]) {
         return ApiRequest.post('/api/Player/UpdateInventorySlots', updates);

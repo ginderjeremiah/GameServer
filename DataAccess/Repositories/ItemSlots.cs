@@ -1,4 +1,4 @@
-﻿using DataAccess.Models.ItemSlots;
+﻿using DataAccess.Entities.ItemSlots;
 using System.Data.SqlClient;
 
 namespace DataAccess.Repositories

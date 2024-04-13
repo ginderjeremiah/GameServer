@@ -17,7 +17,8 @@
 
         this.modTable = new TableDataEditor(data[0], renderParent, {
             primaryKey: "itemModId",
-            selOptions: {slotTypeId: getSlotTypes }
+            selOptions: {slotTypeId: getSlotTypes },
+            hiddenColumns: ["attributes"]
         });
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');
