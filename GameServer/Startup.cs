@@ -1,5 +1,7 @@
 using DataAccess;
 using GameLibrary;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 using GameLibrary.Logging;
 using GameServer.Auth;
 using GameServer.CodeGen;
@@ -20,6 +22,7 @@ namespace GameServer
             builder.Services.AddSwaggerGen();
             builder.Services.AddSingleton<IDataConfiguration>(config);
             builder.Services.AddTransient<IApiLogger, ApiLogger>();
+            builder.Services.AddTransient(services => DataProviderFactory.GetDataProvider(services.GetRequiredService<IDataConfiguration>()));
             builder.Services.AddTransient<IRepositoryManager, RepositoryManager>();
 
             builder.Services.AddAuthentication(options =>

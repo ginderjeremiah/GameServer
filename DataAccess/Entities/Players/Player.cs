@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Players
 {
@@ -15,17 +16,17 @@ namespace DataAccess.Entities.Players
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            PlayerId = reader["PlayerId"].AsInt();
-            UserName = reader["UserName"].AsString();
-            Salt = new Guid(reader["Salt"].AsString());
-            PassHash = reader["PassHash"].AsString();
-            PlayerName = reader["PlayerName"].AsString();
-            Level = reader["Level"].AsInt();
-            Exp = reader["Exp"].AsInt();
-            StatPointsGained = reader["StatPointsGained"].AsInt();
-            StatPointsUsed = reader["StatPointsUsed"].AsInt();
+            PlayerId = record["PlayerId"].AsInt();
+            UserName = record["UserName"].AsString();
+            Salt = new Guid(record["Salt"].AsString());
+            PassHash = record["PassHash"].AsString();
+            PlayerName = record["PlayerName"].AsString();
+            Level = record["Level"].AsInt();
+            Exp = record["Exp"].AsInt();
+            StatPointsGained = record["StatPointsGained"].AsInt();
+            StatPointsUsed = record["StatPointsUsed"].AsInt();
         }
     }
 }

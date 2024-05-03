@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Attributes
 {
@@ -9,11 +10,11 @@ namespace DataAccess.Entities.Attributes
         public string AttributeName { get; set; }
         public string AttributeDesc { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            AttributeId = reader["AttributeId"].AsInt();
-            AttributeName = reader["AttributeName"].AsString();
-            AttributeDesc = reader["AttributeDesc"].AsString();
+            AttributeId = record["AttributeId"].AsInt();
+            AttributeName = record["AttributeName"].AsString();
+            AttributeDesc = record["AttributeDesc"].AsString();
         }
     }
 }

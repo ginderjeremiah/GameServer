@@ -1,6 +1,7 @@
 ﻿using DataAccess.Entities.Drops;
 using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Zones
 {
@@ -14,14 +15,14 @@ namespace DataAccess.Entities.Zones
         public int LevelMax { get; set; }
         public List<ItemDrop> ZoneDrops { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ZoneId = reader["ZoneId"].AsInt();
-            ZoneName = reader["ZoneName"].AsString();
-            ZoneDesc = reader["ZoneDesc"].AsString();
-            ZoneOrder = reader["ZoneOrder"].AsInt();
-            LevelMin = reader["LevelMin"].AsInt();
-            LevelMax = reader["LevelMax"].AsInt();
+            ZoneId = record["ZoneId"].AsInt();
+            ZoneName = record["ZoneName"].AsString();
+            ZoneDesc = record["ZoneDesc"].AsString();
+            ZoneOrder = record["ZoneOrder"].AsInt();
+            LevelMin = record["LevelMin"].AsInt();
+            LevelMax = record["LevelMax"].AsInt();
         }
     }
 }

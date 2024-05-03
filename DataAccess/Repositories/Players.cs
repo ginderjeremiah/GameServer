@@ -1,10 +1,10 @@
 ﻿using DataAccess.Entities.PlayerAttributes;
 using DataAccess.Entities.Players;
 using DataAccess.Redis;
-using Microsoft.SqlServer.Server;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 using StackExchange.Redis;
 using System.Data;
-using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
 {
@@ -13,7 +13,7 @@ namespace DataAccess.Repositories
         public static readonly object _lock = new();
         public static bool _processingQueue = false;
 
-        public Players(string connectionString) : base(connectionString) { }
+        public Players(IDataProvider database) : base(database) { }
 
         [RedisSubscriber(Constants.REDIS_PLAYER_CHANNEL, Constants.REDIS_PLAYER_QUEUE)]
         internal static void ProcessPlayerUpdate(RepositoryManager repos, RedisValue queueValue)
@@ -38,27 +38,23 @@ namespace DataAccess.Repositories
                 FROM Players AS P
                 WHERE UserName = @UserName";
 
-            return QueryToList<Player>(commandText, new SqlParameter("@UserName", userName)).FirstOrDefault();
+            return Database.QueryToList<Player>(commandText, new QueryParameter("@UserName", userName)).FirstOrDefault();
         }
 
         public void SavePlayer(Player player, List<PlayerAttribute> attributes)
         {
-            var data = new SqlMetaData[2];
-            data[0] = new SqlMetaData("AttributeId", SqlDbType.Int);
-            data[1] = new SqlMetaData("Amount", SqlDbType.Decimal);
+            var structuredParameter = new StructuredQueryParameter("@Attributes", "AttributeUpdate");
 
-            var records = attributes.Select(att =>
-            {
-                var record = new SqlDataRecord(data);
-                record.SetInt32(0, att.AttributeId);
-                record.SetDecimal(1, att.Amount);
-                return record;
-            }).ToArray();
+            structuredParameter.AddColumns(
+                ("AttributeId", DbType.Int32),
+                ("Amount", DbType.Decimal)
+            );
 
-            if (records.Length == 0)
+            structuredParameter.AddRows(attributes.Select(att => new List<object?>
             {
-                records = null;
-            }
+                att.AttributeId,
+                att.Amount
+            }).ToList());
 
             var commandText = @"
                 UPDATE Players
@@ -81,17 +77,13 @@ namespace DataAccess.Repositories
                 ON PA.AttributeId = A.AttributeId
                 WHERE A.AttributeId IS NULL";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@PlayerId", player.PlayerId),
-                new SqlParameter("@Level", player.Level),
-                new SqlParameter("@Exp", player.Exp),
-                new SqlParameter("@StatPointsGained", player.StatPointsGained),
-                new SqlParameter("@StatPointsUsed", player.StatPointsUsed),
-                new SqlParameter("@Attributes", SqlDbType.Structured)
-                {
-                    Value = records,
-                    TypeName = "AttributeUpdate"
-                }
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@PlayerId", player.PlayerId),
+                new QueryParameter("@Level", player.Level),
+                new QueryParameter("@Exp", player.Exp),
+                new QueryParameter("@StatPointsGained", player.StatPointsGained),
+                new QueryParameter("@StatPointsUsed", player.StatPointsUsed),
+                structuredParameter
             );
         }
     }

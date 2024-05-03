@@ -1,4 +1,4 @@
-﻿using DataAccess;
+﻿using GameLibrary.Database.Interfaces;
 
 namespace GameServer
 {
@@ -7,7 +7,7 @@ namespace GameServer
         public string DbConnectionString { get; }
         public string RedisConnectionString { get; }
         public string HashPepper { get; }
-        public Config(ConfigurationManager configuration)
+        public Config(IConfiguration configuration)
         {
             //connection strings and hashPepper are set in user secrets
             DbConnectionString = configuration["DbConnectionString"] ?? throw new Exception("Could not retrieve DB connection string.");

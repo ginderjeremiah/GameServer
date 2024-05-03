@@ -1,10 +1,11 @@
-﻿using System.Data.SqlClient;
+﻿using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class ItemModAttributes : BaseRepository, IItemModAttributes
     {
-        public ItemModAttributes(string connectionString) : base(connectionString) { }
+        public ItemModAttributes(IDataProvider database) : base(database) { }
 
         public void AddItemModAttribute(int itemModId, int attributeId, decimal amount)
         {
@@ -13,10 +14,10 @@ namespace DataAccess.Repositories
                 VALUES
                     (@ItemModId, @AttributeId, @Amount)";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemModId", itemModId),
-                new SqlParameter("@AttributeId", attributeId),
-                new SqlParameter("@Amount", amount)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemModId", itemModId),
+                new QueryParameter("@AttributeId", attributeId),
+                new QueryParameter("@Amount", amount)
             );
         }
 
@@ -28,10 +29,10 @@ namespace DataAccess.Repositories
                 WHERE ItemModId = @ItemModId
                 AND AttributeId = @AttributeId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemModId", itemModId),
-                new SqlParameter("@AttributeId", attributeId),
-                new SqlParameter("@Amount", amount)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemModId", itemModId),
+                new QueryParameter("@AttributeId", attributeId),
+                new QueryParameter("@Amount", amount)
             );
         }
 
@@ -42,9 +43,9 @@ namespace DataAccess.Repositories
                 WHERE ItemModId = @ItemModId
                 AND AttributeId = @AttributeId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemModId", itemModId),
-                new SqlParameter("@AttributeId", attributeId)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemModId", itemModId),
+                new QueryParameter("@AttributeId", attributeId)
             );
         }
     }

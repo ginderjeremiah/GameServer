@@ -1,11 +1,12 @@
 ﻿using DataAccess.Entities.LogPreferences;
-using System.Data.SqlClient;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class LogPreferences : BaseRepository, ILogPreferences
     {
-        public LogPreferences(string connectionString) : base(connectionString) { }
+        public LogPreferences(IDataProvider database) : base(database) { }
 
         public List<LogPreference> GetPreferences(int playerId)
         {
@@ -18,7 +19,7 @@ namespace DataAccess.Repositories
                 ON LP.LogSettingId = LS.LogSettingId
                 AND LP.PlayerId = @PlayerId";
 
-            return QueryToList<LogPreference>(commandText, new SqlParameter("@PlayerId", playerId));
+            return Database.QueryToList<LogPreference>(commandText, new QueryParameter("@PlayerId", playerId));
         }
 
         public void SavePreferences(int playerId, IEnumerable<LogPreference> prefs)
@@ -80,11 +81,11 @@ namespace DataAccess.Repositories
                 WHERE
                     LP.Enabled IS NULL";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@PlayerId", playerId),
-                new SqlParameter("@EnabledSettings", enabledStr),
-                new SqlParameter("@DisabledSettings", disabledStr)
-                );
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@PlayerId", playerId),
+                new QueryParameter("@EnabledSettings", enabledStr),
+                new QueryParameter("@DisabledSettings", disabledStr)
+            );
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Skills
 {
@@ -13,14 +14,14 @@ namespace DataAccess.Entities.Skills
         public int CooldownMS { get; set; }
         public string IconPath { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            SkillId = reader["SkillId"].AsInt();
-            SkillName = reader["SkillName"].AsString();
-            BaseDamage = reader["BaseDamage"].AsDecimal();
-            SkillDesc = reader["SkillDesc"].AsString();
-            CooldownMS = reader["CooldownMS"].AsInt();
-            IconPath = reader["IconPath"].AsString();
+            SkillId = record["SkillId"].AsInt();
+            SkillName = record["SkillName"].AsString();
+            BaseDamage = record["BaseDamage"].AsDecimal();
+            SkillDesc = record["SkillDesc"].AsString();
+            CooldownMS = record["CooldownMS"].AsInt();
+            IconPath = record["IconPath"].AsString();
         }
     }
 }

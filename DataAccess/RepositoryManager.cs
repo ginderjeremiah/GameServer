@@ -1,13 +1,13 @@
 ﻿using DataAccess.Redis;
 using DataAccess.Repositories;
+using GameLibrary.Database.Interfaces;
 using GameLibrary.Logging;
 
 namespace DataAccess
 {
     public class RepositoryManager : IRepositoryManager
     {
-        private readonly IApiLogger _logger;
-        private readonly string _connectionString;
+        private readonly IDataProvider _database;
         private SessionStore? _sessionStore;
         private InventoryItems? _inventoryItems;
         private LogPreferences? _logPreferences;
@@ -26,30 +26,29 @@ namespace DataAccess
         private TagCategories? _tagCategories;
         private ItemModAttributes? _itemModAttributes;
 
-        public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_connectionString, this);
-        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_connectionString, Redis);
-        public ILogPreferences LogPreferences => _logPreferences ??= new LogPreferences(_connectionString);
-        public IPlayers Players => _players ??= new Players(_connectionString);
-        public ITags Tags => _itemTags ??= new Tags(_connectionString);
-        public IItemMods ItemMods => _itemMods ??= new ItemMods(_connectionString);
-        public IItems Items => _items ??= new Items(_connectionString);
-        public IItemSlots ItemSlots => _itemSlots ??= new ItemSlots(_connectionString);
-        public IItemCategories ItemCategories => _itemCategories ??= new ItemCategories(_connectionString);
-        public ISlotTypes SlotTypes => _slotTypes ??= new SlotTypes(_connectionString);
-        public IEnemies Enemies => _enemies ??= new Enemies(_connectionString);
-        public IZones Zones => _zones ??= new Zones(_connectionString);
-        public ISkills Skills => _skills ??= new Skills(_connectionString);
-        public IAttributes Attributes => _attributes ??= new Attributes(_connectionString);
-        public IItemAttributes ItemAttributes => _itemAttributes ??= new ItemAttributes(_connectionString);
-        public ITagCategories TagCategories => _tagCategories ??= new TagCategories(_connectionString);
-        public IItemModAttributes ItemModAttributes => _itemModAttributes ??= new ItemModAttributes(_connectionString);
+        public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_database);
+        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_database, Redis);
+        public ILogPreferences LogPreferences => _logPreferences ??= new LogPreferences(_database);
+        public IPlayers Players => _players ??= new Players(_database);
+        public ITags Tags => _itemTags ??= new Tags(_database);
+        public IItemMods ItemMods => _itemMods ??= new ItemMods(_database);
+        public IItems Items => _items ??= new Items(_database);
+        public IItemSlots ItemSlots => _itemSlots ??= new ItemSlots(_database);
+        public IItemCategories ItemCategories => _itemCategories ??= new ItemCategories(_database);
+        public ISlotTypes SlotTypes => _slotTypes ??= new SlotTypes(_database);
+        public IEnemies Enemies => _enemies ??= new Enemies(_database);
+        public IZones Zones => _zones ??= new Zones(_database);
+        public ISkills Skills => _skills ??= new Skills(_database);
+        public IAttributes Attributes => _attributes ??= new Attributes(_database);
+        public IItemAttributes ItemAttributes => _itemAttributes ??= new ItemAttributes(_database);
+        public ITagCategories TagCategories => _tagCategories ??= new TagCategories(_database);
+        public IItemModAttributes ItemModAttributes => _itemModAttributes ??= new ItemModAttributes(_database);
         internal RedisStore Redis { get; }
 
-        public RepositoryManager(IDataConfiguration config, IApiLogger logger)
+        public RepositoryManager(IDataConfiguration config, IApiLogger logger, IDataProvider database)
         {
-            _connectionString = config.DbConnectionString;
-            _logger = logger;
-            Redis = RedisStore.GetInstance(config, logger);
+            _database = database;
+            Redis = RedisStore.GetInstance(config, logger, database);
         }
     }
 

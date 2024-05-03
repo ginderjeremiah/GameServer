@@ -1,10 +1,11 @@
-﻿using System.Data.SqlClient;
+﻿using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class ItemAttributes : BaseRepository, IItemAttributes
     {
-        public ItemAttributes(string connectionString) : base(connectionString) { }
+        public ItemAttributes(IDataProvider database) : base(database) { }
 
         public void AddItemAttribute(int itemId, int attributeId, decimal amount)
         {
@@ -13,10 +14,10 @@ namespace DataAccess.Repositories
                 VALUES
                     (@ItemId, @AttributeId, @Amount)";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@AttributeId", attributeId),
-                new SqlParameter("@Amount", amount)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@AttributeId", attributeId),
+                new QueryParameter("@Amount", amount)
             );
         }
 
@@ -28,10 +29,10 @@ namespace DataAccess.Repositories
                 WHERE ItemId = @ItemId
                 AND AttributeId = @AttributeId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@AttributeId", attributeId),
-                new SqlParameter("@Amount", amount)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@AttributeId", attributeId),
+                new QueryParameter("@Amount", amount)
             );
         }
 
@@ -42,9 +43,9 @@ namespace DataAccess.Repositories
                 WHERE ItemId = @ItemId
                 AND AttributeId = @AttributeId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@AttributeId", attributeId)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@AttributeId", attributeId)
             );
         }
     }

@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.ItemCategories
 {
@@ -8,10 +9,10 @@ namespace DataAccess.Entities.ItemCategories
         public int ItemCategoryId { get; set; }
         public string CategoryName { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ItemCategoryId = reader["ItemCategoryId"].AsInt();
-            CategoryName = reader["CategoryName"].AsString();
+            ItemCategoryId = record["ItemCategoryId"].AsInt();
+            CategoryName = record["CategoryName"].AsString();
         }
     }
 }

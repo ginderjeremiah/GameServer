@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Tags
 {
@@ -9,11 +10,11 @@ namespace DataAccess.Entities.Tags
         public string TagName { get; set; }
         public int TagCategoryId { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            TagId = reader["TagId"].AsInt();
-            TagName = reader["TagName"].AsString();
-            TagCategoryId = reader["TagCategoryId"].AsInt();
+            TagId = record["TagId"].AsInt();
+            TagName = record["TagName"].AsString();
+            TagCategoryId = record["TagCategoryId"].AsInt();
         }
     }
 }

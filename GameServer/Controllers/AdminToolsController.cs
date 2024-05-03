@@ -9,7 +9,6 @@ using static GameServer.ChangeType;
 
 namespace GameServer.Controllers
 {
-    [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
     public class AdminToolsController : BaseController
@@ -17,6 +16,7 @@ namespace GameServer.Controllers
         public AdminToolsController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditItemAttributes([FromBody] AddEditItemAttributesData changeData)
         {
@@ -40,6 +40,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditItemModAttributes([FromBody] AddEditItemModAttributesData changeData)
         {
@@ -63,6 +64,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
@@ -86,6 +88,7 @@ namespace GameServer.Controllers
 
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
@@ -108,6 +111,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
         {
@@ -131,6 +135,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
@@ -153,6 +158,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse SetTagsForItem([FromBody] SetTagsData setTagsData)
         {
@@ -160,6 +166,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {

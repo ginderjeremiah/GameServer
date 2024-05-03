@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
 {
-    [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
     public class EnemiesController : BaseController
@@ -22,6 +21,7 @@ namespace GameServer.Controllers
             return Success(Repositories.Enemies.AllEnemies().Select(enemy => new Enemy(enemy)));
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse<DefeatEnemy> DefeatEnemy([FromBody] EnemyInstance enemyInstance)
         {
@@ -47,6 +47,7 @@ namespace GameServer.Controllers
             }
         }
 
+        [SessionAuthorize]
         [HttpGet]
         public ApiResponse<NewEnemy> NewEnemy(int newZoneId = -1)
         {

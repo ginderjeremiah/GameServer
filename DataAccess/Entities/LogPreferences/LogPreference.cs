@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.LogPreferences
 {
@@ -8,10 +9,10 @@ namespace DataAccess.Entities.LogPreferences
         public string Name { get; set; }
         public bool Enabled { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            Name = reader["Name"].AsString();
-            Enabled = reader["Enabled"].AsBool();
+            Name = record["Name"].AsString();
+            Enabled = record["Enabled"].AsBool();
         }
     }
 }

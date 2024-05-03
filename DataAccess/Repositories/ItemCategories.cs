@@ -1,10 +1,11 @@
 ﻿using DataAccess.Entities.ItemCategories;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class ItemCategories : BaseRepository, IItemCategories
     {
-        public ItemCategories(string connectionString) : base(connectionString) { }
+        public ItemCategories(IDataProvider database) : base(database) { }
 
         public List<ItemCategory> GetItemCategories()
         {
@@ -14,7 +15,7 @@ namespace DataAccess.Repositories
                     CategoryName
                 FROM ItemCategories";
 
-            return QueryToList<ItemCategory>(commandText);
+            return Database.QueryToList<ItemCategory>(commandText);
         }
     }
 

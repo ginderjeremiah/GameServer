@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.PlayerAttributes
 {
@@ -9,11 +10,11 @@ namespace DataAccess.Entities.PlayerAttributes
         public int AttributeId { get; set; }
         public decimal Amount { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            PlayerId = reader["PlayerId"].AsInt();
-            AttributeId = reader["AttributeId"].AsInt();
-            Amount = reader["Amount"].AsDecimal();
+            PlayerId = record["PlayerId"].AsInt();
+            AttributeId = record["AttributeId"].AsInt();
+            Amount = record["Amount"].AsDecimal();
         }
     }
 }

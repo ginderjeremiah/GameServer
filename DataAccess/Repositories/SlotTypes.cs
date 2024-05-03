@@ -1,10 +1,11 @@
 ﻿using DataAccess.Entities.SlotTypes;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class SlotTypes : BaseRepository, ISlotTypes
     {
-        public SlotTypes(string connectionString) : base(connectionString) { }
+        public SlotTypes(IDataProvider database) : base(database) { }
 
         public List<SlotType> AllSlotTypes()
         {
@@ -15,7 +16,7 @@ namespace DataAccess.Repositories
                 FROM
                     SlotTypes";
 
-            return QueryToList<SlotType>(commandText);
+            return Database.QueryToList<SlotType>(commandText);
         }
     }
 

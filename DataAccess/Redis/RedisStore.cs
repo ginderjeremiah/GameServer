@@ -1,6 +1,8 @@
 ﻿using GameLibrary;
+using GameLibrary.Database.Interfaces;
 using GameLibrary.Logging;
 using StackExchange.Redis;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace DataAccess.Redis
@@ -14,19 +16,19 @@ namespace DataAccess.Redis
         private ConnectionMultiplexer Multiplexer { get; }
         public IDatabase Redis => Multiplexer.GetDatabase();
 
-        private RedisStore(IDataConfiguration config, IApiLogger logger)
+        private RedisStore(IDataConfiguration config, IApiLogger logger, IDataProvider database)
         {
             Multiplexer = ConnectionMultiplexer.Connect(config.RedisConnectionString);
-            InitializeSubscribers(config, logger);
+            InitializeSubscribers(config, logger, database);
         }
 
-        public static RedisStore GetInstance(IDataConfiguration config, IApiLogger logger)
+        public static RedisStore GetInstance(IDataConfiguration config, IApiLogger logger, IDataProvider database)
         {
             if (_instance == null)
             {
                 lock (_instanceLock)
                 {
-                    _instance ??= new RedisStore(config, logger);
+                    _instance ??= new RedisStore(config, logger, database);
                 }
             }
             return _instance;
@@ -55,7 +57,7 @@ namespace DataAccess.Redis
             return Redis.StringGetDelete(key).Deserialize<T>();
         }
 
-        public bool TryGet<T>(string key, out T result)
+        public bool TryGet<T>(string key, [NotNullWhen(true)] out T? result)
         {
             result = Get<T>(key);
             return result is not null;
@@ -105,13 +107,13 @@ namespace DataAccess.Redis
         //    Redis.Publish(RedisChannel.Literal(channelName), value);
         //}
 
-        public bool TryGetQueue(string queueName, out RedisQueue queue)
+        public bool TryGetQueue(string queueName, [NotNullWhen(true)] out RedisQueue? queue)
         {
             queue = Queues.FirstOrDefault(q => q.QueueName == queueName);
             return queue is not null;
         }
 
-        private void InitializeSubscribers(IDataConfiguration config, IApiLogger logger)
+        private void InitializeSubscribers(IDataConfiguration config, IApiLogger logger, IDataProvider database)
         {
             var subscriber = Multiplexer.GetSubscriber();
             var assembly = Assembly.GetAssembly(typeof(RedisStore));
@@ -127,7 +129,7 @@ namespace DataAccess.Redis
                         {
                             var queue = new RedisQueue(this, att.QueueName, att.Channel);
                             Queues.Add(queue);
-                            var worker = new RedisSubscriberWorker(config, queue, callback, logger);
+                            var worker = new RedisSubscriberWorker(config, queue, callback, logger, database);
                             subscriber.Subscribe(att.Channel, (channel, value) => worker.Start());
                         }
                     }

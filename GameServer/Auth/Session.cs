@@ -73,7 +73,7 @@ namespace GameServer.Auth
             _playerDirty = true;
 
             var freeSlots = InventoryData.GetFreeSlotNumbers();
-            var drops = _repos.InventoryItems.RollDrops(enemy.EnemyId, CurrentZone, freeSlots.Count);
+            var drops = RollDrops(enemy.EnemyId, CurrentZone, freeSlots.Count);
 
             for (int i = 0; i < drops.Count; i++)
             {
@@ -140,6 +140,74 @@ namespace GameServer.Auth
         {
             _sessionDirty = true;
             return data;
+        }
+
+        public List<DataAccess.Entities.InventoryItems.InventoryItem> RollDrops(int enemyId, int zoneId, int max)
+        {
+            var rng = new Random();
+            var drops = new List<DataAccess.Entities.InventoryItems.InventoryItem>();
+            foreach (var drop in _repos.Enemies.GetEnemy(enemyId).EnemyDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
+            {
+                if (drops.Count < max)
+                {
+                    drops.Add(GetItemInstance(drop.ItemId, rng));
+                }
+            }
+            foreach (var drop in _repos.Zones.GetZone(zoneId).ZoneDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
+            {
+                if (drops.Count < max)
+                {
+                    drops.Add(GetItemInstance(drop.ItemId, rng));
+                }
+            }
+            return drops;
+        }
+
+        private DataAccess.Entities.InventoryItems.InventoryItem GetItemInstance(int itemId, Random rng)
+        {
+            var slots = _repos.ItemSlots.SlotsForItem(itemId);
+            var itemMods = new List<int>();
+            var inventoryItemMods = new List<DataAccess.Entities.InventoryItems.InventoryItemMod>();
+
+            foreach (var slot in slots.Where(s => (decimal)rng.NextSingle() < s.Probability))
+            {
+                int? modId = null;
+                if (slot.GuaranteedId == -1)
+                {
+                    var mods = _repos.ItemMods.GetModsForItemBySlot(slot.ItemId);
+                    if (mods.TryGetValue(slot.SlotTypeId, out var modsForSlot))
+                    {
+                        //TODO Add weights for item mods
+                        var actualMods = modsForSlot.Where(mod => !itemMods.Contains(mod.ItemModId)).ToList();
+                        if (actualMods.Any())
+                        {
+                            modId = actualMods[rng.Next(0, actualMods.Count - 1)].ItemModId;
+                        }
+                    }
+                }
+                else
+                {
+                    modId = _repos.ItemMods.AllItemMods()[slot.GuaranteedId].ItemModId;
+                }
+
+                if (modId is not null)
+                {
+                    itemMods.Add(modId.Value);
+                    inventoryItemMods.Add(new DataAccess.Entities.InventoryItems.InventoryItemMod
+                    {
+                        ItemModId = modId.Value,
+                        ItemSlotId = slot.ItemSlotId,
+                    });
+                }
+            }
+
+            return new DataAccess.Entities.InventoryItems.InventoryItem
+            {
+                ItemId = itemId,
+                Rating = 0, //TODO: implement Rating calculation
+                Equipped = false,
+                ItemMods = inventoryItemMods
+            };
         }
     }
 }

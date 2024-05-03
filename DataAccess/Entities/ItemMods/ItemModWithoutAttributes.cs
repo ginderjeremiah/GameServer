@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.ItemMods
 {
@@ -11,13 +12,13 @@ namespace DataAccess.Entities.ItemMods
         public string ItemModDesc { get; set; }
         public int SlotTypeId { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ItemModId = reader["ItemModId"].AsInt();
-            ItemModName = reader["ItemModName"].AsString();
-            Removable = reader["Removable"].AsBool();
-            ItemModDesc = reader["ItemModDesc"].AsString();
-            SlotTypeId = reader["SlotTypeId"].AsInt();
+            ItemModId = record["ItemModId"].AsInt();
+            ItemModName = record["ItemModName"].AsString();
+            Removable = record["Removable"].AsBool();
+            ItemModDesc = record["ItemModDesc"].AsString();
+            SlotTypeId = record["SlotTypeId"].AsInt();
         }
     }
 }

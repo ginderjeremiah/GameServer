@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 using System.Text.Json;
 
 namespace DataAccess.Entities.Items
@@ -13,14 +14,14 @@ namespace DataAccess.Entities.Items
         public string IconPath { get; set; }
         public List<ItemAttribute> Attributes { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ItemId = reader["ItemId"].AsInt();
-            ItemName = reader["ItemName"].AsString();
-            ItemDesc = reader["ItemDesc"].AsString();
-            ItemCategoryId = reader["ItemCategoryId"].AsInt();
-            IconPath = reader["IconPath"].AsString();
-            Attributes = JsonSerializer.Deserialize<List<ItemAttribute>>(reader["AttributesJSON"].AsString());
+            ItemId = record["ItemId"].AsInt();
+            ItemName = record["ItemName"].AsString();
+            ItemDesc = record["ItemDesc"].AsString();
+            ItemCategoryId = record["ItemCategoryId"].AsInt();
+            IconPath = record["IconPath"].AsString();
+            Attributes = JsonSerializer.Deserialize<List<ItemAttribute>>(record["AttributesJSON"].AsString()) ?? new List<ItemAttribute>();
         }
     }
 }

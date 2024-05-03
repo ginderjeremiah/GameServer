@@ -1,13 +1,11 @@
 ﻿using DataAccess;
 using GameLibrary.Logging;
-using GameServer.Auth;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 using Attribute = GameServer.Models.Attributes.Attribute;
 
 namespace GameServer.Controllers
 {
-    [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
     public class AttributesController : BaseController

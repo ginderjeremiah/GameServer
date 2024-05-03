@@ -16,15 +16,16 @@ class BattleManager {
     update(timeDelta: number): BattleResult | void {
         if (this.#battleActive) {
             this.#msStore += timeDelta;
-            while (this.#battleActive && this.#msStore > this.#tickSize) {
+            const tickComputed = this.#msStore >= this.#tickSize;
+            while (this.#msStore >= this.#tickSize) {
                 this.#msStore -= this.#tickSize;
                 this.#timeElapsed += this.#tickSize;
                 this.computeTick();
-                if (this.#enemy!.isDead || this.#player.isDead) {
+                if (this.#enemy.isDead || this.#player.isDead) {
                     return this.endBattle();
                 }
             }
-            if (ScreenManager.currentScreen === "Fight") {
+            if (tickComputed && ScreenManager.currentScreen === "Fight") {
                 this.#player.updateCombatDisplays();
                 this.#enemy.updateCombatDisplays();
             }

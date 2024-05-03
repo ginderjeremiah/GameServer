@@ -1,4 +1,6 @@
-﻿namespace DataAccess.Entities.Drops
+﻿using GameLibrary.Database.Interfaces;
+
+namespace DataAccess.Entities.Drops
 {
     interface IDrop : IEntity
     {

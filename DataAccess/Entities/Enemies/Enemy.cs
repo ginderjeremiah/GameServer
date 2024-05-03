@@ -1,6 +1,7 @@
 ﻿using DataAccess.Entities.Drops;
 using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Enemies
 {
@@ -12,10 +13,10 @@ namespace DataAccess.Entities.Enemies
         public List<ItemDrop> EnemyDrops { get; set; }
         public List<int> SkillPool { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            EnemyId = reader["EnemyId"].AsInt();
-            EnemyName = reader["EnemyName"].AsString();
+            EnemyId = record["EnemyId"].AsInt();
+            EnemyName = record["EnemyName"].AsString();
         }
     }
 }

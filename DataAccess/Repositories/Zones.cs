@@ -1,5 +1,6 @@
 ﻿using DataAccess.Entities.Drops;
 using DataAccess.Entities.Zones;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
@@ -7,7 +8,7 @@ namespace DataAccess.Repositories
     {
         private static List<Zone>? _zoneList;
 
-        public Zones(string connectionString) : base(connectionString) { }
+        public Zones(IDataProvider database) : base(database) { }
 
         public List<Zone> AllZones()
         {
@@ -48,7 +49,7 @@ namespace DataAccess.Repositories
                     DropRate
                 FROM ZoneDrops";
 
-            var result = QueryToList<Zone, ItemDrop>(commandText);
+            var result = Database.QueryToList<Zone, ItemDrop>(commandText);
 
             var drops = result.Item2
                 .GroupBy(drop => drop.DroppedById)

@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.SlotTypes
 {
@@ -8,10 +9,10 @@ namespace DataAccess.Entities.SlotTypes
         public int SlotTypeId { get; set; }
         public string SlotTypeName { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            SlotTypeId = reader["SlotTypeId"].AsInt();
-            SlotTypeName = reader["SlotTypeName"].AsString();
+            SlotTypeId = record["SlotTypeId"].AsInt();
+            SlotTypeName = record["SlotTypeName"].AsString();
         }
     }
 }

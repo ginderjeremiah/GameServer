@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 using System.Text.Json;
 
 namespace DataAccess.Entities.InventoryItems
@@ -14,15 +15,15 @@ namespace DataAccess.Entities.InventoryItems
         public int InventorySlotNumber { get; set; }
         public List<InventoryItemMod> ItemMods { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            InventoryItemId = reader["InventoryItemId"].AsInt();
-            PlayerId = reader["PlayerId"].AsInt();
-            ItemId = reader["ItemId"].AsInt();
-            Rating = reader["Rating"].AsInt();
-            Equipped = reader["Equipped"].AsBool();
-            InventorySlotNumber = reader["InventorySlotNumber"].AsInt();
-            ItemMods = JsonSerializer.Deserialize<List<InventoryItemMod>>(reader["ItemModJSON"].AsString());
+            InventoryItemId = record["InventoryItemId"].AsInt();
+            PlayerId = record["PlayerId"].AsInt();
+            ItemId = record["ItemId"].AsInt();
+            Rating = record["Rating"].AsInt();
+            Equipped = record["Equipped"].AsBool();
+            InventorySlotNumber = record["InventorySlotNumber"].AsInt();
+            ItemMods = JsonSerializer.Deserialize<List<InventoryItemMod>>(record["ItemModJSON"].AsString()) ?? new List<InventoryItemMod>();
         }
     }
 }

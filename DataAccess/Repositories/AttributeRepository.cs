@@ -1,10 +1,11 @@
-﻿using Attribute = DataAccess.Entities.Attributes.Attribute;
+﻿using GameLibrary.Database.Interfaces;
+using Attribute = DataAccess.Entities.Attributes.Attribute;
 
 namespace DataAccess.Repositories
 {
     internal class Attributes : BaseRepository, IAttributes
     {
-        public Attributes(string connectionString) : base(connectionString) { }
+        public Attributes(IDataProvider database) : base(database) { }
 
         public List<Attribute> AllAttributes()
         {
@@ -16,7 +17,7 @@ namespace DataAccess.Repositories
                 FROM Attributes
                 ORDER BY AttributeId";
 
-            return QueryToList<Attribute>(commandText);
+            return Database.Execute((executor) => executor.QueryToList<Attribute>(commandText));
         }
     }
 

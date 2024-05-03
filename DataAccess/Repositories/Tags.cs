@@ -1,11 +1,12 @@
 ﻿using DataAccess.Entities.Tags;
-using System.Data.SqlClient;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class Tags : BaseRepository, ITags
     {
-        public Tags(string connectionString) : base(connectionString) { }
+        public Tags(IDataProvider database) : base(database) { }
 
         public List<Tag> AllTags()
         {
@@ -16,7 +17,7 @@ namespace DataAccess.Repositories
                     TagCategoryId
                 FROM Tags";
 
-            return QueryToList<Tag>(commandText);
+            return Database.QueryToList<Tag>(commandText);
         }
 
         public List<Tag> TagsForItem(int itemId)
@@ -31,7 +32,7 @@ namespace DataAccess.Repositories
                 ON T.TagId = IT.TagId
                 WHERE ItemId = @ItemId";
 
-            return QueryToList<Tag>(commandText, new SqlParameter("@ItemId", itemId));
+            return Database.QueryToList<Tag>(commandText, new QueryParameter("@ItemId", itemId));
         }
 
         public List<Tag> TagsForItemMod(int itemModId)
@@ -46,7 +47,7 @@ namespace DataAccess.Repositories
                 ON T.TagId = IMT.TagId
                 WHERE ItemModId = @ItemModId";
 
-            return QueryToList<Tag>(commandText, new SqlParameter("@ItemModId", itemModId));
+            return Database.QueryToList<Tag>(commandText, new QueryParameter("@ItemModId", itemModId));
         }
 
         public void SetItemTags(int itemId, IEnumerable<int> tagIds)
@@ -63,7 +64,7 @@ namespace DataAccess.Repositories
                     STRING_SPLIT(@TagIds, ',')";
 
             var tagIdStr = string.Join(",", tagIds);
-            ExecuteNonQuery(commandText, new SqlParameter("@ItemId", itemId), new SqlParameter("@TagIds", tagIdStr));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemId", itemId), new QueryParameter("@TagIds", tagIdStr));
         }
 
         public void SetItemModTags(int itemModId, IEnumerable<int> tagIds)
@@ -80,7 +81,7 @@ namespace DataAccess.Repositories
                     STRING_SPLIT(@TagIds, ',')";
 
             var tagIdStr = string.Join(",", tagIds);
-            ExecuteNonQuery(commandText, new SqlParameter("@ItemModId", itemModId), new SqlParameter("@TagIds", tagIdStr));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemModId", itemModId), new QueryParameter("@TagIds", tagIdStr));
         }
 
         public void AddTag(string tagName, int tagCategoryId)
@@ -90,7 +91,7 @@ namespace DataAccess.Repositories
                 VALUES
                     (@TagName, @TagCategoryId)";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategoryId", tagCategoryId));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@TagName", tagName), new QueryParameter("@TagCategoryId", tagCategoryId));
         }
 
         public void UpdateTag(int tagId, string tagName, int tagCategoryId)
@@ -101,7 +102,11 @@ namespace DataAccess.Repositories
                     TagCategoryId = @TagCategoryId
                 WHERE TagId = @TagId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@TagName", tagName), new SqlParameter("@TagCategoryId", tagCategoryId), new SqlParameter("@TagId", tagId));
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@TagName", tagName),
+                new QueryParameter("@TagCategoryId", tagCategoryId),
+                new QueryParameter("@TagId", tagId)
+            );
         }
 
         public void DeleteTag(int tagId)
@@ -110,7 +115,7 @@ namespace DataAccess.Repositories
                 DELETE Tags
                 WHERE TagId = @TagId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@TagId", tagId));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@TagId", tagId));
         }
     }
 

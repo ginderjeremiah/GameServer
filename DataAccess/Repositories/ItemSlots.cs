@@ -1,5 +1,6 @@
 ﻿using DataAccess.Entities.ItemSlots;
-using System.Data.SqlClient;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
@@ -8,7 +9,7 @@ namespace DataAccess.Repositories
         private static readonly List<List<ItemSlot>?> _itemSlots = new();
         private static readonly object _lockForItemSlot = new();
 
-        public ItemSlots(string connectionString) : base(connectionString) { }
+        public ItemSlots(IDataProvider database) : base(database) { }
 
         public void AddItemSlot(int itemId, int slotTypeId, int guaranteedId, decimal probability)
         {
@@ -17,11 +18,11 @@ namespace DataAccess.Repositories
                 VALUES
                     (@ItemId, @SlotTypeId, @GuaranteedId, @Probability)";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@SlotTypeId", slotTypeId),
-                new SqlParameter("@GuaranteedId", guaranteedId),
-                new SqlParameter("@Probability", probability)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@SlotTypeId", slotTypeId),
+                new QueryParameter("@GuaranteedId", guaranteedId),
+                new QueryParameter("@Probability", probability)
             );
         }
 
@@ -35,12 +36,12 @@ namespace DataAccess.Repositories
                     Probability = @Probability
                 WHERE ItemSlotId = @ItemSlotId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@SlotTypeId", slotTypeId),
-                new SqlParameter("@GuaranteedId", guaranteedId),
-                new SqlParameter("@Probability", probability),
-                new SqlParameter("@ItemSlotId", itemSlotId)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@SlotTypeId", slotTypeId),
+                new QueryParameter("@GuaranteedId", guaranteedId),
+                new QueryParameter("@Probability", probability),
+                new QueryParameter("@ItemSlotId", itemSlotId)
             );
         }
 
@@ -50,7 +51,7 @@ namespace DataAccess.Repositories
                 DELETE ItemSlots
                 WHERE ItemSlotId = @ItemSlotId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@ItemSlotId", itemSlotId));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemSlotId", itemSlotId));
         }
 
         public List<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
@@ -85,7 +86,7 @@ namespace DataAccess.Repositories
                 WHERE
                     ItemId = @ItemId";
 
-            return QueryToList<ItemSlot>(commandText, new SqlParameter("@ItemId", itemId));
+            return Database.QueryToList<ItemSlot>(commandText, new QueryParameter("@ItemId", itemId));
         }
     }
 

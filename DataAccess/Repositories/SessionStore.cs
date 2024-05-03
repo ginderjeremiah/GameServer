@@ -3,7 +3,9 @@ using DataAccess.Entities.PlayerAttributes;
 using DataAccess.Entities.Players;
 using DataAccess.Entities.SessionStore;
 using DataAccess.Redis;
-using System.Data.SqlClient;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DataAccess.Repositories
 {
@@ -11,12 +13,12 @@ namespace DataAccess.Repositories
     {
         private readonly RedisStore _redisStore;
         private static string SessionPrefix => Constants.REDIS_SESSION_PREFIX;
-        public SessionStore(string connectionString, RedisStore redisStore) : base(connectionString)
+        public SessionStore(IDataProvider database, RedisStore redisStore) : base(database)
         {
             _redisStore = redisStore;
         }
 
-        public bool TryGetSession(string id, out SessionData session)
+        public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session)
         {
             return _redisStore.TryGet($"{SessionPrefix}_{id}", out session);
         }
@@ -72,7 +74,7 @@ namespace DataAccess.Repositories
                 ) AS ItemModJSON(JSONData)
                 WHERE II.PlayerId = @PlayerId";
 
-            var result = QueryToList<Player, PlayerAttribute, PlayerSkill, InventoryItem>(commandText, new SqlParameter("@PlayerId", playerId));
+            var result = Database.QueryToList<Player, PlayerAttribute, PlayerSkill, InventoryItem>(commandText, new QueryParameter("@PlayerId", playerId));
 
             var sessionData = new SessionData
             {
@@ -125,10 +127,10 @@ namespace DataAccess.Repositories
 
     public interface ISessionStore
     {
-        public bool TryGetSession(string id, out SessionData session);
+        public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session);
         public SessionData GetNewSessionData(int playerId);
         public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty);
         public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash);
-        public string GetAndDeleteActiveEnemyHash(SessionData sessionData);
+        public string? GetAndDeleteActiveEnemyHash(SessionData sessionData);
     }
 }

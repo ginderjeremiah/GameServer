@@ -1,12 +1,13 @@
 ﻿using DataAccess.Entities.Items;
-using System.Data.SqlClient;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
     internal class Items : BaseRepository, IItems
     {
         private static List<Item>? _allItems;
-        public Items(string connectionString) : base(connectionString) { }
+        public Items(IDataProvider database) : base(database) { }
 
         public List<Item> AllItems(bool refreshCache = false)
         {
@@ -39,7 +40,7 @@ namespace DataAccess.Repositories
 	                FOR JSON PATH
                 ) AS AttJSON(JSONData)";
 
-            return QueryToList<Item>(commandText);
+            return Database.QueryToList<Item>(commandText);
         }
 
         public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath)
@@ -49,11 +50,11 @@ namespace DataAccess.Repositories
                 VALUES
                     (@ItemName, @ItemDesc, @ItemCategoryId, @IconPath)";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemName", itemName),
-                new SqlParameter("@ItemDesc", itemDesc),
-                new SqlParameter("@ItemCategoryId", itemCategoryId),
-                new SqlParameter("@IconPath", iconPath)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemName", itemName),
+                new QueryParameter("@ItemDesc", itemDesc),
+                new QueryParameter("@ItemCategoryId", itemCategoryId),
+                new QueryParameter("@IconPath", iconPath)
             );
         }
 
@@ -67,12 +68,12 @@ namespace DataAccess.Repositories
                     IconPath = @IconPath
                 WHERE ItemId = @ItemId";
 
-            ExecuteNonQuery(commandText,
-                new SqlParameter("@ItemId", itemId),
-                new SqlParameter("@ItemName", itemName),
-                new SqlParameter("@ItemDesc", itemDesc),
-                new SqlParameter("@ItemCategoryId", itemCategoryId),
-                new SqlParameter("@IconPath", iconPath)
+            Database.ExecuteNonQuery(commandText,
+                new QueryParameter("@ItemId", itemId),
+                new QueryParameter("@ItemName", itemName),
+                new QueryParameter("@ItemDesc", itemDesc),
+                new QueryParameter("@ItemCategoryId", itemCategoryId),
+                new QueryParameter("@IconPath", iconPath)
             );
         }
 
@@ -82,7 +83,7 @@ namespace DataAccess.Repositories
                 DELETE Items
                 WHERE ItemId = @ItemId";
 
-            ExecuteNonQuery(commandText, new SqlParameter("@ItemId", itemId));
+            Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemId", itemId));
         }
     }
 

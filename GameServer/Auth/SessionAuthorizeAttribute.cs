@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace GameServer.Auth
 {
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+    [AttributeUsage(AttributeTargets.Method)]
     internal class SessionAuthorizeAttribute : Attribute, IAuthorizationFilter
     {
         public bool AllowAll { get; set; }

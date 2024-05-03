@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
 {
-    [SessionAuthorize]
     [Route("/api/[controller]/[action]")]
     [ApiController]
     public class PlayerController : BaseController
@@ -17,18 +16,21 @@ namespace GameServer.Controllers
         public PlayerController(IRepositoryManager repositoryManager, IApiLogger logger)
             : base(repositoryManager, logger) { }
 
+        [SessionAuthorize]
         [HttpGet("/api/[controller]")]
         public ApiResponse<PlayerData> Player()
         {
             return Success(Session.PlayerData);
         }
 
+        [SessionAuthorize]
         [HttpGet]
         public ApiListResponse<LogPreference> LogPreferences()
         {
             return Success(Repositories.LogPreferences.GetPreferences(PlayerId).Select(pref => new LogPreference(pref)));
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
         {
@@ -40,6 +42,7 @@ namespace GameServer.Controllers
             return Success();
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
@@ -51,6 +54,7 @@ namespace GameServer.Controllers
             return Error("Unable to set inventory items.");
         }
 
+        [SessionAuthorize]
         [HttpPost]
         public ApiListResponse<BattlerAttribute> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
         {

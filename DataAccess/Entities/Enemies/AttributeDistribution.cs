@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Enemies
 {
@@ -10,12 +11,12 @@ namespace DataAccess.Entities.Enemies
         public decimal BaseAmount { get; set; }
         public decimal AmountPerLevel { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            EnemyId = reader["EnemyId"].AsInt();
-            AttributeId = reader["AttributeId"].AsInt();
-            BaseAmount = reader["BaseAmount"].AsDecimal();
-            AmountPerLevel = reader["AmountPerLevel"].AsDecimal();
+            EnemyId = record["EnemyId"].AsInt();
+            AttributeId = record["AttributeId"].AsInt();
+            BaseAmount = record["BaseAmount"].AsDecimal();
+            AmountPerLevel = record["AmountPerLevel"].AsDecimal();
         }
     }
 }

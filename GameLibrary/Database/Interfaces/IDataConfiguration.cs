@@ -1,4 +1,4 @@
-﻿namespace DataAccess
+﻿namespace GameLibrary.Database.Interfaces
 {
     public interface IDataConfiguration
     {

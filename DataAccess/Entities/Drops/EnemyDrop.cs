@@ -1,5 +1,5 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using System.Data;
 
 namespace DataAccess.Entities.Drops
 {
@@ -10,12 +10,12 @@ namespace DataAccess.Entities.Drops
         public int ItemId { get; set; }
         public decimal DropRate { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            EnemyDropId = reader["EnemyDropId"].AsInt();
-            EnemyId = reader["EnemyId"].AsInt();
-            ItemId = reader["ItemId"].AsInt();
-            DropRate = reader["DropRate"].AsDecimal();
+            EnemyDropId = record["EnemyDropId"].AsInt();
+            EnemyId = record["EnemyId"].AsInt();
+            ItemId = record["ItemId"].AsInt();
+            DropRate = record["DropRate"].AsDecimal();
         }
     }
 }

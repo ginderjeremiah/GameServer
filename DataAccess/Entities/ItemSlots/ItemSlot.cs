@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.ItemSlots
 {
@@ -11,13 +12,13 @@ namespace DataAccess.Entities.ItemSlots
         public int GuaranteedId { get; set; }
         public decimal Probability { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ItemSlotId = reader["ItemSlotId"].AsInt();
-            ItemId = reader["ItemId"].AsInt();
-            SlotTypeId = reader["SlotTypeId"].AsInt();
-            GuaranteedId = reader["GuaranteedId"].AsInt();
-            Probability = reader["Probability"].AsDecimal();
+            ItemSlotId = record["ItemSlotId"].AsInt();
+            ItemId = record["ItemId"].AsInt();
+            SlotTypeId = record["SlotTypeId"].AsInt();
+            GuaranteedId = record["GuaranteedId"].AsInt();
+            Probability = record["Probability"].AsDecimal();
         }
     }
 }

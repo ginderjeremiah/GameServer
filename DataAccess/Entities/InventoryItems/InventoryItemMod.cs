@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.InventoryItems
 {
@@ -8,10 +9,10 @@ namespace DataAccess.Entities.InventoryItems
         public int ItemModId { get; set; }
         public int ItemSlotId { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            ItemModId = reader["ItemModId"].AsInt();
-            ItemSlotId = reader["ItemSlotId"].AsInt();
+            ItemModId = record["ItemModId"].AsInt();
+            ItemSlotId = record["ItemSlotId"].AsInt();
         }
     }
 }

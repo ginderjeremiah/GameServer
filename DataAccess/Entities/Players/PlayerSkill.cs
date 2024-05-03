@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Players
 {
@@ -9,11 +10,11 @@ namespace DataAccess.Entities.Players
         public int SkillId { get; set; }
         public bool Selected { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            PlayerId = reader["PlayerId"].AsInt();
-            SkillId = reader["SkillId"].AsInt();
-            Selected = reader["Selected"].AsBool();
+            PlayerId = record["PlayerId"].AsInt();
+            SkillId = record["SkillId"].AsInt();
+            Selected = record["Selected"].AsBool();
         }
     }
 }

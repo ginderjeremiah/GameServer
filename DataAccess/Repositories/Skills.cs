@@ -1,4 +1,5 @@
 ﻿using DataAccess.Entities.Skills;
+using GameLibrary.Database.Interfaces;
 using StackExchange.Redis;
 
 namespace DataAccess.Repositories
@@ -7,7 +8,7 @@ namespace DataAccess.Repositories
     {
         private static List<Skill>? _skillDataList;
 
-        public Skills(string connectionString) : base(connectionString) { }
+        public Skills(IDataProvider database) : base(database) { }
 
         public List<Skill> AllSkills()
         {
@@ -43,7 +44,7 @@ namespace DataAccess.Repositories
                     Multiplier
                 FROM SkillDamageMultipliers";
 
-            var result = QueryToList<Skill, SkillDamageMultiplier>(commandText);
+            var result = Database.QueryToList<Skill, SkillDamageMultiplier>(commandText);
 
             var multipliers = result.Item2
                 .GroupBy(m => m.SkillId)

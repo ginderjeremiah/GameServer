@@ -1,5 +1,6 @@
 ﻿using GameLibrary;
-using System.Data.SqlClient;
+using GameLibrary.Database.Interfaces;
+using System.Data;
 
 namespace DataAccess.Entities.Enemies
 {
@@ -8,10 +9,10 @@ namespace DataAccess.Entities.Enemies
         public int Alias { get; set; }
         public int Value { get; set; }
 
-        public void LoadFromReader(SqlDataReader reader)
+        public void LoadFromReader(IDataRecord record)
         {
-            Alias = reader["Alias"].AsInt();
-            Value = reader["Value"].AsInt();
+            Alias = record["Alias"].AsInt();
+            Value = record["Value"].AsInt();
         }
     }
 }

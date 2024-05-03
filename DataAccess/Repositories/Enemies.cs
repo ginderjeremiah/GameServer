@@ -1,8 +1,9 @@
 ﻿using DataAccess.Entities.Drops;
 using DataAccess.Entities.Enemies;
 using GameLibrary;
+using GameLibrary.Database;
+using GameLibrary.Database.Interfaces;
 using System.Data;
-using System.Data.SqlClient;
 
 namespace DataAccess.Repositories
 {
@@ -12,7 +13,7 @@ namespace DataAccess.Repositories
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
-        public Enemies(string connectionString) : base(connectionString) { }
+        public Enemies(IDataProvider database) : base(database) { }
 
         public List<Enemy> AllEnemies()
         {
@@ -66,7 +67,7 @@ namespace DataAccess.Repositories
                 ON ZEA.ZoneEnemyIdAlias = ZE.ZoneEnemyId
                 WHERE ZE.ZoneId = @ZoneId";
 
-            return QueryToList<ZoneEnemyProbability, ZoneEnemyAlias>(commandText, new SqlParameter("@ZoneId", zoneId));
+            return Database.QueryToList<ZoneEnemyProbability, ZoneEnemyAlias>(commandText, new QueryParameter("@ZoneId", zoneId));
         }
 
         private List<Enemy> GetAllEnemyData()
@@ -96,7 +97,7 @@ namespace DataAccess.Repositories
                     SkillId
                 FROM EnemySkills";
 
-            var result = QueryToList<Enemy, AttributeDistribution, ItemDrop, EnemySkill>(commandText);
+            var result = Database.QueryToList<Enemy, AttributeDistribution, ItemDrop, EnemySkill>(commandText);
 
             var attributes = result.Item2
                 .GroupBy(att => att.EnemyId)
