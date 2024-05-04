@@ -15,6 +15,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAccess", "DataAccess\Da
 		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameTests", "GameTests\GameTests.csproj", "{BFA2FC16-A24B-4D6D-AA58-FE22280A0E44}"
+	ProjectSection(ProjectDependencies) = postProject
+		{05C9FBD1-DCDF-4BD5-82DF-20C6E2D52F82} = {05C9FBD1-DCDF-4BD5-82DF-20C6E2D52F82}
+		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
+		{8F2F5F1B-72AB-401E-9828-BE082C5C0089} = {8F2F5F1B-72AB-401E-9828-BE082C5C0089}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +40,10 @@ Global
 		{8F2F5F1B-72AB-401E-9828-BE082C5C0089}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F2F5F1B-72AB-401E-9828-BE082C5C0089}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F2F5F1B-72AB-401E-9828-BE082C5C0089}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFA2FC16-A24B-4D6D-AA58-FE22280A0E44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFA2FC16-A24B-4D6D-AA58-FE22280A0E44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFA2FC16-A24B-4D6D-AA58-FE22280A0E44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFA2FC16-A24B-4D6D-AA58-FE22280A0E44}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
