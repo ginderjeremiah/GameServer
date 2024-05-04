@@ -1,6 +1,6 @@
 ﻿using DataAccess;
 using DataAccess.Entities.SessionStore;
-using GameLibrary;
+using GameCore;
 using GameServer.Models.Attributes;
 using GameServer.Models.Enemies;
 using GameServer.Models.InventoryItems;

@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary.Logging;
+using GameCore.Logging.Interfaces;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 using Attribute = GameServer.Models.Attributes.Attribute;

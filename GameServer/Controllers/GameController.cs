@@ -1,6 +1,6 @@
 ﻿using DataAccess;
-using GameLibrary;
-using GameLibrary.Logging;
+using GameCore;
+using GameCore.Logging.Interfaces;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Player;

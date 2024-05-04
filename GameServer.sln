@@ -4,10 +4,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.7.34202.233
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameServer", "GameServer\GameServer.csproj", "{05C9FBD1-DCDF-4BD5-82DF-20C6E2D52F82}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
+	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameLibrary", "GameLibrary\GameLibrary.csproj", "{2551BFA2-5CA0-4193-9E53-F9176279E88D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameCore", "GameCore\GameCore.csproj", "{2551BFA2-5CA0-4193-9E53-F9176279E88D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAccess", "DataAccess\DataAccess.csproj", "{8F2F5F1B-72AB-401E-9828-BE082C5C0089}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAccess", "DataAccess\DataAccess.csproj", "{8F2F5F1B-72AB-401E-9828-BE082C5C0089}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

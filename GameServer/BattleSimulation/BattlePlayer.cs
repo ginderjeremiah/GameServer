@@ -1,7 +1,7 @@
 ﻿using DataAccess.Entities.ItemMods;
 using DataAccess.Entities.Items;
 using DataAccess.Entities.Skills;
-using GameLibrary;
+using GameCore;
 using GameServer.Models.Attributes;
 using GameServer.Models.InventoryItems;
 using GameServer.Models.Player;

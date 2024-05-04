@@ -1,4 +1,4 @@
-﻿using GameLibrary.Database.Interfaces;
+﻿using GameCore.Database.Interfaces;
 using Attribute = DataAccess.Entities.Attributes.Attribute;
 
 namespace DataAccess.Repositories
@@ -17,7 +17,7 @@ namespace DataAccess.Repositories
                 FROM Attributes
                 ORDER BY AttributeId";
 
-            return Database.Execute((executor) => executor.QueryToList<Attribute>(commandText));
+            return Database.QueryToList<Attribute>(commandText);
         }
     }
 

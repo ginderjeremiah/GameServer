@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary;
+using GameCore;
 using GameServer.Models.Enemies;
 using GameServer.Models.Player;
 

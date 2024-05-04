@@ -1,9 +1,7 @@
 ﻿using DataAccess.Entities.PlayerAttributes;
 using DataAccess.Entities.Players;
-using DataAccess.Redis;
-using GameLibrary.Database;
-using GameLibrary.Database.Interfaces;
-using StackExchange.Redis;
+using GameCore.Database;
+using GameCore.Database.Interfaces;
 using System.Data;
 
 namespace DataAccess.Repositories
@@ -14,13 +12,6 @@ namespace DataAccess.Repositories
         public static bool _processingQueue = false;
 
         public Players(IDataProvider database) : base(database) { }
-
-        [RedisSubscriber(Constants.REDIS_PLAYER_CHANNEL, Constants.REDIS_PLAYER_QUEUE)]
-        internal static void ProcessPlayerUpdate(RepositoryManager repos, RedisValue queueValue)
-        {
-            if (repos.SessionStore.TryGetSession(queueValue, out var sessionData))
-                repos.Players.SavePlayer(sessionData.PlayerData, sessionData.Attributes);
-        }
 
         public Player? GetPlayerByUserName(string userName)
         {

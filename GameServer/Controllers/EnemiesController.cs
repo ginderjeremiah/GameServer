@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary.Logging;
+using GameCore.Logging.Interfaces;
 using GameServer.Auth;
 using GameServer.BattleSimulation;
 using GameServer.Models.Common;
@@ -28,7 +28,7 @@ namespace GameServer.Controllers
             var now = DateTime.UtcNow;
             if (Session.DefeatEnemy(enemyInstance))
             {
-                Log($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
+                Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
                 var rewards = Session.GrantRewards(enemyInstance);
                 return Success(new DefeatEnemy
@@ -39,7 +39,7 @@ namespace GameServer.Controllers
             }
             else
             {
-                LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
+                Logger.LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 return ErrorWithData("Enemy could not be defeated.", new DefeatEnemy
                 {
                     Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
@@ -82,7 +82,7 @@ namespace GameServer.Controllers
 
             Session.SetActiveEnemy(enemyInstance, earliestDefeat, victory);
 
-            Log($"NewEnemy: {{victory: {victory}, battleTime: {totalMs} ms, now: {now:O}, earliestDefeat: {earliestDefeat:O}}}");
+            Logger.LogDebug($"NewEnemy: {{victory: {victory}, battleTime: {totalMs} ms, now: {now:O}, earliestDefeat: {earliestDefeat:O}}}");
 
             return Success(new NewEnemy
             {

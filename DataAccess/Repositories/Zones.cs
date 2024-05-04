@@ -1,6 +1,6 @@
 ﻿using DataAccess.Entities.Drops;
 using DataAccess.Entities.Zones;
-using GameLibrary.Database.Interfaces;
+using GameCore.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {

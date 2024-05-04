@@ -1,5 +1,5 @@
 ﻿using DataAccess.Entities.Skills;
-using GameLibrary.Database.Interfaces;
+using GameCore.Database.Interfaces;
 using StackExchange.Redis;
 
 namespace DataAccess.Repositories

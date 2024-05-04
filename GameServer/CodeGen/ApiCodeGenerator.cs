@@ -1,4 +1,4 @@
-﻿using GameLibrary;
+﻿using GameCore;
 using GameServer.Controllers;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;

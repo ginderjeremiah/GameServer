@@ -1,4 +1,4 @@
-﻿using GameLibrary;
+﻿using GameCore;
 using GameServer.Models.Attributes;
 
 namespace GameServer.Models.Enemies

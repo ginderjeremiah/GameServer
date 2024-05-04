@@ -1,9 +1,7 @@
 ﻿using DataAccess.Entities.InventoryItems;
-using DataAccess.Redis;
-using GameLibrary;
-using GameLibrary.Database;
-using GameLibrary.Database.Interfaces;
-using StackExchange.Redis;
+using GameCore;
+using GameCore.Database;
+using GameCore.Database.Interfaces;
 using System.Data;
 
 namespace DataAccess.Repositories
@@ -16,13 +14,6 @@ namespace DataAccess.Repositories
         public static bool _processingEquippedQueue = false;
 
         public InventoryItems(IDataProvider database) : base(database) { }
-
-        [RedisSubscriber(Constants.REDIS_INVENTORY_CHANNEL, Constants.REDIS_INVENTORY_QUEUE)]
-        internal static void ProcessInventoryUpdate(RepositoryManager repos, RedisValue queueValue)
-        {
-            if (repos.SessionStore.TryGetSession(queueValue, out var sessionData))
-                repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems);
-        }
 
         public List<InventoryItem> GetInventory(int playerId)
         {

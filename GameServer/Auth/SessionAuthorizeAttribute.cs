@@ -1,6 +1,6 @@
 ﻿using DataAccess;
-using GameLibrary;
-using GameLibrary.Logging;
+using GameCore;
+using GameCore.Logging.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Diagnostics;
@@ -22,7 +22,7 @@ namespace GameServer.Auth
             long startTime = Stopwatch.GetTimestamp();
             var logger = context.HttpContext.RequestServices.GetRequiredService<IApiLogger>();
             var repos = context.HttpContext.RequestServices.GetRequiredService<IRepositoryManager>();
-            logger.Log("Starting SessionAuthorize.");
+            logger.LogDebug("Starting SessionAuthorize.");
 
             var token = context.HttpContext.Request.Cookies["sessionToken"];
             var tokenParts = token?.Split('.');
@@ -55,7 +55,7 @@ namespace GameServer.Auth
             }
 
             context.HttpContext.Items["Session"] = session;
-            logger.Log($"Succeeded SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
+            logger.LogDebug($"Succeeded SessionAuthorize: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
         }
     }
 }

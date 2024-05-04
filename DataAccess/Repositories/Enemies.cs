@@ -1,8 +1,8 @@
 ﻿using DataAccess.Entities.Drops;
 using DataAccess.Entities.Enemies;
-using GameLibrary;
-using GameLibrary.Database;
-using GameLibrary.Database.Interfaces;
+using GameCore;
+using GameCore.Database;
+using GameCore.Database.Interfaces;
 using System.Data;
 
 namespace DataAccess.Repositories

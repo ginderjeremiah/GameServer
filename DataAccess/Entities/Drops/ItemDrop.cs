@@ -1,4 +1,4 @@
-﻿using GameLibrary;
+﻿using GameCore;
 using System.Data;
 
 namespace DataAccess.Entities.Drops

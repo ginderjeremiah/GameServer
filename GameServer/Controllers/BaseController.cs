@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary.Logging;
+using GameCore.Logging.Interfaces;
 using GameServer.Auth;
 using GameServer.Models;
 using GameServer.Models.Common;
@@ -11,7 +11,6 @@ namespace GameServer.Controllers
 {
     public class BaseController : Controller
     {
-        private readonly IApiLogger _logger;
         private Session? _session;
         private long _beginTimestamp;
         private string? _route;
@@ -21,6 +20,7 @@ namespace GameServer.Controllers
         protected Session Session => _session ??= (Session?)HttpContext.Items["Session"];
         protected int PlayerId => Session.Player.PlayerId;
         protected IRepositoryManager Repositories { get; }
+        protected IApiLogger Logger { get; }
         protected CookieOptions DefaultCookieOptions
         {
             get
@@ -37,7 +37,7 @@ namespace GameServer.Controllers
         public BaseController(IRepositoryManager repositoryManager, IApiLogger logger)
         {
             Repositories = repositoryManager;
-            _logger = logger;
+            Logger = logger;
         }
 
         [NonAction]
@@ -46,7 +46,7 @@ namespace GameServer.Controllers
         {
             _beginTimestamp = Stopwatch.GetTimestamp();
             _route = $"{context.RouteData.Values["controller"]}/{context.RouteData.Values["action"]}";
-            Log($"Begin {_route} request");
+            Logger.LogInfo($"Begin {_route} request");
         }
 
         [NonAction]
@@ -54,28 +54,10 @@ namespace GameServer.Controllers
         {
             if (context.Exception is not null)
             {
-                LogError(context.Exception);
+                Logger.LogError(context.Exception);
             }
             Session?.Save();
-            Log($"End {_route} request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
-        }
-
-        [NonAction]
-        protected void Log(string message)
-        {
-            _logger.Log(message);
-        }
-
-        [NonAction]
-        protected void LogError(string message)
-        {
-            _logger.LogError(message);
-        }
-
-        [NonAction]
-        protected void LogError(Exception exception)
-        {
-            _logger.LogError(exception);
+            Logger.LogInfo($"End {_route} request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
         }
 
         [NonAction]

@@ -1,13 +1,16 @@
-﻿using DataAccess.Redis;
-using DataAccess.Repositories;
-using GameLibrary.Database.Interfaces;
-using GameLibrary.Logging;
+﻿using DataAccess.Repositories;
+using GameCore.Cache;
+using GameCore.Database.Interfaces;
+using GameCore.Logging.Interfaces;
+using GameCore.PubSub;
 
 namespace DataAccess
 {
     public class RepositoryManager : IRepositoryManager
     {
         private readonly IDataProvider _database;
+        private readonly ICacheProvider _cache;
+        private readonly DataProviderSynchronizer _synchronizer;
         private SessionStore? _sessionStore;
         private InventoryItems? _inventoryItems;
         private LogPreferences? _logPreferences;
@@ -27,7 +30,7 @@ namespace DataAccess
         private ItemModAttributes? _itemModAttributes;
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_database);
-        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_database, Redis);
+        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_database, _cache, _synchronizer);
         public ILogPreferences LogPreferences => _logPreferences ??= new LogPreferences(_database);
         public IPlayers Players => _players ??= new Players(_database);
         public ITags Tags => _itemTags ??= new Tags(_database);
@@ -43,34 +46,13 @@ namespace DataAccess
         public IItemAttributes ItemAttributes => _itemAttributes ??= new ItemAttributes(_database);
         public ITagCategories TagCategories => _tagCategories ??= new TagCategories(_database);
         public IItemModAttributes ItemModAttributes => _itemModAttributes ??= new ItemModAttributes(_database);
-        internal RedisStore Redis { get; }
 
-        public RepositoryManager(IDataConfiguration config, IApiLogger logger, IDataProvider database)
+        public RepositoryManager(IApiLogger logger, IDataProvider database, ICacheProvider cache, IPubSubProvider pubSubProvider)
         {
             _database = database;
-            Redis = RedisStore.GetInstance(config, logger, database);
+            _cache = cache;
+            _synchronizer = new(pubSubProvider, this);
         }
-    }
-
-    public interface IRepositoryManager
-    {
-        public IInventoryItems InventoryItems { get; }
-        public ISessionStore SessionStore { get; }
-        public ILogPreferences LogPreferences { get; }
-        public IPlayers Players { get; }
-        public ITags Tags { get; }
-        public IItemMods ItemMods { get; }
-        public IItems Items { get; }
-        public IItemSlots ItemSlots { get; }
-        public IItemCategories ItemCategories { get; }
-        public ISlotTypes SlotTypes { get; }
-        public IEnemies Enemies { get; }
-        public IZones Zones { get; }
-        public ISkills Skills { get; }
-        public IAttributes Attributes { get; }
-        public IItemAttributes ItemAttributes { get; }
-        public ITagCategories TagCategories { get; }
-        public IItemModAttributes ItemModAttributes { get; }
     }
 }
 

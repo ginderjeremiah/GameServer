@@ -1,5 +1,5 @@
 ﻿using DataAccess;
-using GameLibrary.Logging;
+using GameCore.Logging.Interfaces;
 using GameServer.Models.Common;
 using GameServer.Models.Skills;
 using Microsoft.AspNetCore.Mvc;

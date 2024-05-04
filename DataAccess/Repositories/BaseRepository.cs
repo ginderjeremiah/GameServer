@@ -1,4 +1,4 @@
-﻿using GameLibrary.Database.Interfaces;
+﻿using GameCore.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {

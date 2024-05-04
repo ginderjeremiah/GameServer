@@ -1,5 +1,5 @@
-﻿using GameLibrary.Database;
-using GameLibrary.Database.Interfaces;
+﻿using GameCore.Database;
+using GameCore.Database.Interfaces;
 
 namespace DataAccess.Repositories
 {
