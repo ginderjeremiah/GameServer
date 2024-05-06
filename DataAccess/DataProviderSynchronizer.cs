@@ -95,7 +95,9 @@ namespace DataAccess
                 while (queue.TryGetNext(out var sessionKey))
                 {
                     if (_repos.SessionStore.TryGetSession(sessionKey, out var sessionData))
+                    {
                         action(sessionData);
+                    }
                 }
             };
         }
