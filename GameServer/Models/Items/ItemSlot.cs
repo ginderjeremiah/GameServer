@@ -8,7 +8,9 @@
         public int GuaranteedId { get; set; }
         public decimal Probability { get; set; }
 
-        public ItemSlot(DataAccess.Entities.ItemSlots.ItemSlot itemSlot)
+        public ItemSlot() { }
+
+        public ItemSlot(GameCore.Entities.ItemSlots.ItemSlot itemSlot)
         {
             ItemSlotId = itemSlot.ItemId;
             ItemId = itemSlot.ItemId;

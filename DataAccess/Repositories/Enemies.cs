@@ -1,8 +1,8 @@
-﻿using DataAccess.Entities.Drops;
-using DataAccess.Entities.Enemies;
-using GameCore;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore;
+using GameCore.DataAccess;
+using GameCore.Entities.Drops;
+using GameCore.Entities.Enemies;
+using GameCore.Infrastructure;
 using System.Data;
 
 namespace DataAccess.Repositories
@@ -13,7 +13,7 @@ namespace DataAccess.Repositories
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
-        public Enemies(IDataProvider database) : base(database) { }
+        public Enemies(IDatabaseService database) : base(database) { }
 
         public List<Enemy> AllEnemies()
         {
@@ -121,12 +121,5 @@ namespace DataAccess.Repositories
 
             return result.Item1;
         }
-    }
-
-    public interface IEnemies
-    {
-        public List<Enemy> AllEnemies();
-        public Enemy GetEnemy(int enemyId);
-        public Enemy GetRandomEnemy(int zoneId);
     }
 }

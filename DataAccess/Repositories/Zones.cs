@@ -1,6 +1,7 @@
-﻿using DataAccess.Entities.Drops;
-using DataAccess.Entities.Zones;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.Drops;
+using GameCore.Entities.Zones;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
@@ -8,7 +9,7 @@ namespace DataAccess.Repositories
     {
         private static List<Zone>? _zoneList;
 
-        public Zones(IDataProvider database) : base(database) { }
+        public Zones(IDatabaseService database) : base(database) { }
 
         public List<Zone> AllZones()
         {
@@ -62,12 +63,5 @@ namespace DataAccess.Repositories
 
             return result.Item1;
         }
-    }
-
-    public interface IZones
-    {
-        public List<Zone> AllZones();
-        public Zone GetZone(int zoneId);
-        public bool ValidateZoneId(int zoneId);
     }
 }

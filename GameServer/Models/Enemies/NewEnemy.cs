@@ -1,4 +1,6 @@
-﻿namespace GameServer.Models.Enemies
+﻿using GameCore.BattleSimulation;
+
+namespace GameServer.Models.Enemies
 {
     public class NewEnemy : IModel
     {

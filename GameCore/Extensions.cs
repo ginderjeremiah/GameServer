@@ -1,13 +1,9 @@
-﻿using GameCore.Cache;
-using GameCore.Database;
-using GameCore.Logging;
-using GameCore.Logging.Interfaces;
-using GameCore.PubSub;
-using Microsoft.Extensions.DependencyInjection;
-using StackExchange.Redis;
+﻿using GameCore.BattleSimulation;
+using GameCore.Entities.PlayerAttributes;
 using System.Data;
 using System.Text;
 using System.Text.Json;
+using static GameCore.BattleSimulation.AttributeType;
 
 namespace GameCore
 {
@@ -123,19 +119,6 @@ namespace GameCore
             }
         }
 
-        public static T? Deserialize<T>(this RedisValue val)
-        {
-            var value = (string?)val;
-            if (value is null)
-            {
-                return default;
-            }
-            else
-            {
-                return JsonSerializer.Deserialize<T>(value, _options);
-            }
-        }
-
         public static string Serialize<T>(this T obj)
         {
             return JsonSerializer.Serialize(obj, _options);
@@ -161,25 +144,14 @@ namespace GameCore
         {
             return $"{exception.GetType()}: {exception.Message}\nStack Trace: {exception.StackTrace}";
         }
-
-        public static void AddDataProvider(this IServiceCollection services)
+        public static bool IsCoreAttribute(this PlayerAttribute att)
         {
-            DataProviderFactory.AddDataProviderService(services);
+            return ((AttributeType)att.AttributeId).IsCoreAttribute();
         }
 
-        public static void AddCacheProvider(this IServiceCollection services)
+        public static bool IsCoreAttribute(this AttributeType att)
         {
-            CacheProviderFactory.AddCacheProviderService(services);
-        }
-
-        public static void AddPubSubProvider(this IServiceCollection services)
-        {
-            PubSubProviderFactory.AddPubSubProviderService(services);
-        }
-
-        public static void AddApiLogging(this IServiceCollection services)
-        {
-            services.AddTransient<IApiLogger, ApiLogger>();
+            return att is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
         }
     }
 }

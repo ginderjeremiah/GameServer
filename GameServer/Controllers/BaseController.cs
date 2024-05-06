@@ -1,6 +1,5 @@
-﻿using DataAccess;
-using GameCore.Logging.Interfaces;
-using GameServer.Auth;
+﻿using GameCore;
+using GameCore.Sessions;
 using GameServer.Models;
 using GameServer.Models.Common;
 using Microsoft.AspNetCore.Mvc;

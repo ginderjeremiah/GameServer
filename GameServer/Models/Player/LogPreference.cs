@@ -6,7 +6,7 @@
         public bool Enabled { get; set; }
 
         public LogPreference() { }
-        public LogPreference(DataAccess.Entities.LogPreferences.LogPreference preference)
+        public LogPreference(GameCore.Entities.LogPreferences.LogPreference preference)
         {
             Name = preference.Name;
             Enabled = preference.Enabled;

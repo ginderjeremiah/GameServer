@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.ItemCategories;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.ItemCategories;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

@@ -1,20 +1,19 @@
-﻿using DataAccess.Entities.InventoryItems;
-using DataAccess.Entities.PlayerAttributes;
-using DataAccess.Entities.Players;
-using DataAccess.Entities.SessionStore;
-using GameCore.Cache;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.InventoryItems;
+using GameCore.Entities.PlayerAttributes;
+using GameCore.Entities.Players;
+using GameCore.Entities.SessionStore;
+using GameCore.Infrastructure;
 using System.Diagnostics.CodeAnalysis;
 
 namespace DataAccess.Repositories
 {
     internal class SessionStore : BaseRepository, ISessionStore
     {
-        private readonly ICacheProvider _cache;
+        private readonly ICacheService _cache;
         private readonly DataProviderSynchronizer _synchronizer;
         private static string SessionPrefix => Constants.CACHE_SESSION_PREFIX;
-        public SessionStore(IDataProvider database, ICacheProvider cache, DataProviderSynchronizer synchronizer) : base(database)
+        public SessionStore(IDatabaseService database, ICacheService cache, DataProviderSynchronizer synchronizer) : base(database)
         {
             _cache = cache;
             _synchronizer = synchronizer;
@@ -122,14 +121,5 @@ namespace DataAccess.Repositories
         {
             return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}");
         }
-    }
-
-    public interface ISessionStore
-    {
-        public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session);
-        public SessionData GetNewSessionData(int playerId);
-        public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty);
-        public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash);
-        public string? GetAndDeleteActiveEnemyHash(SessionData sessionData);
     }
 }

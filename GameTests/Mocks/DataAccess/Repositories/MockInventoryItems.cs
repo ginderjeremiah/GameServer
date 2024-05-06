@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.InventoryItems;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.InventoryItems;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

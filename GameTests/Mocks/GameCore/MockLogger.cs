@@ -1,7 +1,5 @@
 ﻿using GameCore;
-using GameCore.Logging;
-using GameCore.Logging.Interfaces;
-using static GameCore.Logging.LogLevel;
+using static GameCore.LogLevel;
 
 namespace GameTests.Mocks.GameCore
 {

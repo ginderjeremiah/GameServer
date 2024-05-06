@@ -1,7 +1,7 @@
-﻿using DataAccess.Entities.InventoryItems;
-using GameCore;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore;
+using GameCore.DataAccess;
+using GameCore.Entities.InventoryItems;
+using GameCore.Infrastructure;
 using System.Data;
 
 namespace DataAccess.Repositories
@@ -13,7 +13,7 @@ namespace DataAccess.Repositories
         public static readonly object _equippedLock = new();
         public static bool _processingEquippedQueue = false;
 
-        public InventoryItems(IDataProvider database) : base(database) { }
+        public InventoryItems(IDatabaseService database) : base(database) { }
 
         public List<InventoryItem> GetInventory(int playerId)
         {
@@ -74,7 +74,7 @@ namespace DataAccess.Repositories
                 new QueryParameter("@Rating", inventoryItem.Rating),
                 new QueryParameter("@Equipped", inventoryItem.Equipped),
                 new QueryParameter("@InventorySlotNumber", inventoryItem.InventorySlotNumber),
-                new QueryParameter("@ItemMods", inventoryItem.ItemMods.Serialize()));
+                new QueryParameter("@ItemMods", inventoryItem.ItemMods.Serialize(), DbType.String));
 
             inventoryItem.InventoryItemId = id;
             return id;
@@ -82,7 +82,7 @@ namespace DataAccess.Repositories
 
         public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems)
         {
-            var structuredParameter = new StructuredQueryParameter("@InventoryItems", "InventoryUpdate");
+            var structuredParameter = new QueryParameter("@InventoryItems", "InventoryUpdate");
 
             structuredParameter.AddColumns(
                 ("InventoryItemId", DbType.Int32),
@@ -117,12 +117,5 @@ namespace DataAccess.Repositories
                 structuredParameter
             );
         }
-    }
-
-    public interface IInventoryItems
-    {
-        public List<InventoryItem> GetInventory(int playerId);
-        public int AddInventoryItem(InventoryItem inventoryItem);
-        public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems);
     }
 }

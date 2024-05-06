@@ -1,6 +1,5 @@
-﻿using DataAccess;
-using GameCore;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
+using GameCore.Sessions;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Player;
@@ -47,7 +46,7 @@ namespace GameServer.Controllers
         public ApiResponse<LoginData> Login([FromBody] LoginCredentials creds)
         {
             if (Session != null)
-                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = Session.PlayerData });
+                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = Session.GetPlayerData() });
 
             var player = Repositories.Players.GetPlayerByUserName(creds.Username);
 
@@ -68,7 +67,7 @@ namespace GameServer.Controllers
             return Success(new LoginData()
             {
                 CurrentZone = session.CurrentZone,
-                PlayerData = session.PlayerData
+                PlayerData = session.GetPlayerData()
             });
         }
 

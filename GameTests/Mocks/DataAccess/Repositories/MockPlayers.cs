@@ -1,6 +1,6 @@
-﻿using DataAccess.Entities.PlayerAttributes;
-using DataAccess.Entities.Players;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.PlayerAttributes;
+using GameCore.Entities.Players;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

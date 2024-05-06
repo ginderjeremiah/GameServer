@@ -1,4 +1,5 @@
 ﻿using GameServer.Models.Attributes;
+
 namespace GameServer.Models.Items
 {
     public class Item : IModel
@@ -10,7 +11,9 @@ namespace GameServer.Models.Items
         public string IconPath { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
 
-        public Item(DataAccess.Entities.Items.Item item)
+        public Item() { }
+
+        public Item(GameCore.Entities.Items.Item item)
         {
             ItemId = item.ItemId;
             ItemName = item.ItemName;

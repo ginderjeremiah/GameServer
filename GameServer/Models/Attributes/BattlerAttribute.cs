@@ -1,6 +1,8 @@
-﻿using DataAccess.Entities.ItemMods;
-using DataAccess.Entities.Items;
-using DataAccess.Entities.PlayerAttributes;
+﻿using GameCore.BattleSimulation;
+using GameCore.Entities.ItemMods;
+using GameCore.Entities.Items;
+using GameCore.Entities.PlayerAttributes;
+
 namespace GameServer.Models.Attributes
 {
     public class BattlerAttribute : IModel
@@ -8,22 +10,12 @@ namespace GameServer.Models.Attributes
         public AttributeType AttributeId { get; set; }
         public decimal Amount { get; set; }
 
-        public BattlerAttribute(PlayerAttribute playerAttribute)
-        {
-            AttributeId = (AttributeType)playerAttribute.AttributeId;
-            Amount = playerAttribute.Amount;
-        }
+        public BattlerAttribute() { }
 
-        public BattlerAttribute(DataAccess.Entities.Enemies.AttributeDistribution distribution, int level)
+        public BattlerAttribute(GameCore.BattleSimulation.BattlerAttribute battlerAttribute)
         {
-            AttributeId = (AttributeType)distribution.AttributeId;
-            Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;
-        }
-
-        public BattlerAttribute(ItemAttribute itemAttribute)
-        {
-            AttributeId = (AttributeType)itemAttribute.AttributeId;
-            Amount = itemAttribute.Amount;
+            AttributeId = battlerAttribute.AttributeId;
+            Amount = battlerAttribute.Amount;
         }
 
         public BattlerAttribute(ItemModAttribute itemModAttribute)
@@ -32,6 +24,15 @@ namespace GameServer.Models.Attributes
             Amount = itemModAttribute.Amount;
         }
 
-        public BattlerAttribute() { }
+        public BattlerAttribute(ItemAttribute itemAttribute)
+        {
+            AttributeId = (AttributeType)itemAttribute.AttributeId;
+            Amount = itemAttribute.Amount;
+        }
+        public BattlerAttribute(PlayerAttribute playerAttribute)
+        {
+            AttributeId = (AttributeType)playerAttribute.AttributeId;
+            Amount = playerAttribute.Amount;
+        }
     }
 }

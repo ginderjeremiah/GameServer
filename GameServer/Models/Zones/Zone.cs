@@ -12,7 +12,7 @@ namespace GameServer.Models.Zones
         public int LevelMax { get; set; }
         public List<ItemDrop> ZoneDrops { get; set; }
 
-        public Zone(DataAccess.Entities.Zones.Zone zone)
+        public Zone(GameCore.Entities.Zones.Zone zone)
         {
             ZoneId = zone.ZoneId;
             ZoneName = zone.ZoneName;

@@ -1,6 +1,6 @@
-﻿using DataAccess.Entities.ItemMods;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.ItemMods;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
@@ -10,7 +10,7 @@ namespace DataAccess.Repositories
         private static readonly List<Dictionary<int, List<ItemModWithoutAttributes>>?> _itemModsBySlot = new();
         private static readonly object _lockForItem = new();
 
-        public ItemMods(IDataProvider database) : base(database) { }
+        public ItemMods(IDatabaseService database) : base(database) { }
 
         public List<ItemMod> AllItemMods(bool refreshCache = false)
         {
@@ -46,33 +46,36 @@ namespace DataAccess.Repositories
             return Database.QueryToList<ItemMod>(commandText);
         }
 
-        public void AddItemMod(string itemModName, bool removable, string itemModDesc)
+        public void AddItemMod(string itemModName, bool removable, string itemModDesc, int slotTypeId)
         {
             var commandText = @"
                 INSERT INTO ItemMods
                 VALUES
-                    (@ItemModName, @Removable, @ItemModDesc)";
+                    (@ItemModName, @Removable, @ItemModDesc, @SlotTypeId)";
 
             Database.ExecuteNonQuery(commandText,
                 new QueryParameter("@ItemModName", itemModName),
                 new QueryParameter("@Removable", removable),
-                new QueryParameter("@ItemModDesc", itemModDesc)
+                new QueryParameter("@ItemModDesc", itemModDesc),
+                new QueryParameter("@SlotTypeId", slotTypeId)
             );
         }
-        public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc)
+        public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc, int slotTypeId)
         {
             var commandText = @"
                 UPDATE ItemMods
                 SET ItemModName = @ItemModName,
                     Removable = @Removable,
-                    ItemModDesc = @ItemModDesc
+                    ItemModDesc = @ItemModDesc,
+                    SlotTypeId = @SlotTypeId
                 WHERE ItemModId = @ItemModId";
 
             Database.ExecuteNonQuery(commandText,
                 new QueryParameter("@ItemModName", itemModName),
                 new QueryParameter("@Removable", removable),
                 new QueryParameter("@ItemModDesc", itemModDesc),
-                new QueryParameter("@ItemModId", itemModId)
+                new QueryParameter("@ItemModId", itemModId),
+                new QueryParameter("@SlotTypeId", slotTypeId)
             );
         }
         public void DeleteItemMod(int itemModId)
@@ -122,14 +125,5 @@ namespace DataAccess.Repositories
                 .GroupBy(mod => mod.SlotTypeId)
                 .ToDictionary(g => g.Key, g => g.ToList());
         }
-    }
-
-    public interface IItemMods
-    {
-        public List<ItemMod> AllItemMods(bool refreshCache = false);
-        public Dictionary<int, List<ItemModWithoutAttributes>> GetModsForItemBySlot(int itemId);
-        public void AddItemMod(string itemModName, bool removable, string itemModDesc);
-        public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc);
-        public void DeleteItemMod(int itemModId);
     }
 }

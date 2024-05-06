@@ -1,4 +1,6 @@
-﻿namespace GameServer.Models.Attributes
+﻿using GameCore.BattleSimulation;
+
+namespace GameServer.Models.Attributes
 {
     public class Attribute : IModel
     {
@@ -6,7 +8,9 @@
         public string AttributeName { get; set; }
         public string AttributeDesc { get; set; }
 
-        public Attribute(DataAccess.Entities.Attributes.Attribute attribute)
+        public Attribute() { }
+
+        public Attribute(GameCore.Entities.Attributes.Attribute attribute)
         {
             AttributeId = (AttributeType)attribute.AttributeId;
             AttributeName = attribute.AttributeName;

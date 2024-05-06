@@ -1,14 +1,22 @@
-﻿using DataAccess;
-using DataAccess.Repositories;
+﻿using GameCore;
+using GameCore.DataAccess;
+using GameCore.Infrastructure;
 using GameTests.Mocks.DataAccess.Repositories;
 
 namespace GameTests.Mocks.DataAccess
 {
     internal class MockRepositoryManager : IRepositoryManager
     {
+        public ICacheService Cache { get; set; }
+        public MockRepositoryManager(ICacheService cache)
+        {
+            Cache = cache;
+            SessionStore = new MockSessionStore(Cache);
+        }
+
         public IInventoryItems InventoryItems { get; set; } = new MockInventoryItems();
 
-        public ISessionStore SessionStore { get; set; } = new MockSessionStore();
+        public ISessionStore SessionStore { get; set; }
 
         public ILogPreferences LogPreferences { get; set; } = new MockLogPreferences();
 

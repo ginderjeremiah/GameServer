@@ -1,6 +1,5 @@
-﻿using DataAccess;
-using GameCore;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
+using GameCore.Sessions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Diagnostics;
@@ -24,7 +23,7 @@ namespace GameServer.Auth
             var repos = context.HttpContext.RequestServices.GetRequiredService<IRepositoryManager>();
             logger.LogDebug("Starting SessionAuthorize.");
 
-            var token = context.HttpContext.Request.Cookies["sessionToken"];
+            var token = context.HttpContext.Request.Cookies[Constants.TOKEN_NAME];
             var tokenParts = token?.Split('.');
             var now = DateTime.UtcNow;
 
@@ -44,13 +43,13 @@ namespace GameServer.Auth
 
             var session = new Session(sessionData, repos);
 
-            if (ticks < now.Add(Constants.TokenLifetime / 2).Ticks)
+            if (ticks < now.Add(Constants.TOKEN_LIFETIME / 2).Ticks)
             {
-                context.HttpContext.Response.Cookies.Append("sessionToken", session.GetNewToken(), new CookieOptions()
+                context.HttpContext.Response.Cookies.Append(Constants.TOKEN_NAME, session.GetNewToken(), new CookieOptions()
                 {
                     Secure = true,
                     HttpOnly = true,
-                    Expires = now.Add(Constants.TokenLifetime)
+                    Expires = now.Add(Constants.TOKEN_LIFETIME)
                 });
             }
 

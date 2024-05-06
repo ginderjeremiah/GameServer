@@ -1,12 +1,14 @@
-﻿using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using Attribute = GameCore.Entities.Attributes.Attribute;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockAttributes : IAttributes
     {
-        public List<global::DataAccess.Entities.Attributes.Attribute> AllAttributes()
+        public List<Attribute> Attributes { get; set; } = new();
+        public List<Attribute> AllAttributes()
         {
-            throw new NotImplementedException();
+            return Attributes;
         }
     }
 }

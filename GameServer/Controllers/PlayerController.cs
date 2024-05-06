@@ -1,5 +1,5 @@
-﻿using DataAccess;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
+using GameCore.Sessions;
 using GameServer.Auth;
 using GameServer.Models.Attributes;
 using GameServer.Models.Common;
@@ -20,7 +20,7 @@ namespace GameServer.Controllers
         [HttpGet("/api/[controller]")]
         public ApiResponse<PlayerData> Player()
         {
-            return Success(Session.PlayerData);
+            return Success(Session.GetPlayerData());
         }
 
         [SessionAuthorize]
@@ -34,7 +34,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
         {
-            Repositories.LogPreferences.SavePreferences(PlayerId, prefs.Select(pref => new DataAccess.Entities.LogPreferences.LogPreference
+            Repositories.LogPreferences.SavePreferences(PlayerId, prefs.Select(pref => new GameCore.Entities.LogPreferences.LogPreference
             {
                 Name = pref.Name,
                 Enabled = pref.Enabled,
@@ -46,7 +46,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
-            if (Session.TryUpdateInventoryItems(inventory))
+            if (Session.TryUpdateInventoryItems(inventory.Cast<IInventoryUpdate>().ToList()))
             {
                 return Success();
             }
@@ -58,8 +58,8 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiListResponse<BattlerAttribute> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
         {
-            Session.UpdatePlayerAttributes(changedAttributes);
-            return Success(Session.Player.Attributes.Select(att => new BattlerAttribute(att)));
+            Session.UpdatePlayerAttributes(changedAttributes.Cast<IAttributeUpdate>().ToList());
+            return Success(Session.BattlerAttributes.Select(att => new BattlerAttribute(att)).ToList());
         }
     }
 }

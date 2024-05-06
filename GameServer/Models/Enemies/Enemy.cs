@@ -11,7 +11,9 @@ namespace GameServer.Models.Enemies
         public List<AttributeDistribution> AttributeDistribution { get; set; }
         public List<int> SkillPool { get; set; }
 
-        public Enemy(DataAccess.Entities.Enemies.Enemy enemy)
+        public Enemy() { }
+
+        public Enemy(GameCore.Entities.Enemies.Enemy enemy)
         {
             Drops = enemy.EnemyDrops.Select(drop => new ItemDrop(drop)).ToList();
             AttributeDistribution = enemy.AttributeDistribution.Select(dist => new AttributeDistribution(dist)).ToList();

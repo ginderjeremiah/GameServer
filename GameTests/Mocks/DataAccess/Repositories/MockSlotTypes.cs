@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.SlotTypes;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.SlotTypes;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

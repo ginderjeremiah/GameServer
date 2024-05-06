@@ -1,4 +1,4 @@
-﻿using GameServer.Auth;
+﻿using GameCore.Sessions;
 
 namespace GameServer.Models.InventoryItems
 {
@@ -9,8 +9,8 @@ namespace GameServer.Models.InventoryItems
 
         public InventoryData(SessionInventory sessionInventory)
         {
-            Inventory = sessionInventory.Inventory;
-            Equipped = sessionInventory.Equipped;
+            Inventory = sessionInventory.Inventory.Select(item => item is null ? null : new InventoryItem(item)).ToList();
+            Equipped = sessionInventory.Equipped.Select(item => item is null ? null : new InventoryItem(item)).ToList();
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using DataAccess;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
 using GameServer.Models.Common;
 using GameServer.Models.Tags;
 using Microsoft.AspNetCore.Mvc;

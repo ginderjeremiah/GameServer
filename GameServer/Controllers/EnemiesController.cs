@@ -1,10 +1,11 @@
-﻿using DataAccess;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
+using GameCore.BattleSimulation;
 using GameServer.Auth;
-using GameServer.BattleSimulation;
 using GameServer.Models.Common;
 using GameServer.Models.Enemies;
 using Microsoft.AspNetCore.Mvc;
+using EnemyInstance = GameCore.BattleSimulation.EnemyInstance;
+using EnemyInstanceModel = GameServer.Models.Enemies.EnemyInstance;
 
 namespace GameServer.Controllers
 {
@@ -23,18 +24,26 @@ namespace GameServer.Controllers
 
         [SessionAuthorize]
         [HttpPost]
-        public ApiResponse<DefeatEnemy> DefeatEnemy([FromBody] EnemyInstance enemyInstance)
+        public ApiResponse<DefeatEnemy> DefeatEnemy([FromBody] EnemyInstanceModel enemyInstance)
         {
             var now = DateTime.UtcNow;
-            if (Session.DefeatEnemy(enemyInstance))
+            var instance = new EnemyInstance
+            {
+                EnemyId = enemyInstance.EnemyId,
+                Level = enemyInstance.Level,
+                Seed = enemyInstance.Seed,
+                SelectedSkills = enemyInstance.SelectedSkills,
+                Attributes = enemyInstance.Attributes.Select(att => new BattlerAttribute { AttributeId = att.AttributeId, Amount = att.Amount }).ToList()
+            };
+            if (Session.DefeatEnemy(instance))
             {
                 Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
-                var rewards = Session.GrantRewards(enemyInstance);
+                var rewards = Session.GrantRewards(instance);
                 return Success(new DefeatEnemy
                 {
                     Cooldown = 5000,
-                    Rewards = rewards
+                    Rewards = new Models.Enemies.DefeatRewards(rewards)
                 });
             }
             else
@@ -76,7 +85,7 @@ namespace GameServer.Controllers
                 Seed = seed
             };
 
-            var simulator = new BattleSimulator(Session.PlayerData, enemy, enemyInstance, Repositories);
+            var simulator = new BattleSimulator(Session, enemy, enemyInstance, Repositories);
             var victory = simulator.Simulate(out var totalMs);
             var earliestDefeat = now.AddMilliseconds(totalMs);
 
@@ -86,7 +95,7 @@ namespace GameServer.Controllers
 
             return Success(new NewEnemy
             {
-                EnemyInstance = enemyInstance
+                EnemyInstance = new EnemyInstanceModel(enemyInstance)
             });
         }
     }

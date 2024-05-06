@@ -1,7 +1,7 @@
 using DataAccess;
 using GameCore;
-using GameCore.Database.Interfaces;
-using GameCore.Logging.Interfaces;
+using GameCore.Infrastructure;
+using GameInfrastructure;
 using GameServer.Auth;
 using GameServer.CodeGen;
 
@@ -19,12 +19,9 @@ namespace GameServer
             builder.Services.AddControllersWithViews();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            builder.Services.AddSingleton<ILogConfiguration>(config);
-            builder.Services.AddSingleton<IDataConfiguration>(config);
-            builder.Services.AddApiLogging();
-            builder.Services.AddCacheProvider();
-            builder.Services.AddPubSubProvider();
-            builder.Services.AddDataProvider();
+            builder.Services.AddSingleton<IDataServicesConfiguration, Config>();
+            builder.Services.AddTransient<IDataServicesFactory, DataServicesFactory>();
+            builder.Services.AddTransient(services => services.GetRequiredService<IDataServicesFactory>().Logger);
             builder.Services.AddTransient<IRepositoryManager, RepositoryManager>();
 
             builder.Services.AddAuthentication(options =>

@@ -1,6 +1,6 @@
-﻿using DataAccess.Entities.ItemSlots;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.ItemSlots;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
@@ -9,7 +9,7 @@ namespace DataAccess.Repositories
         private static readonly List<List<ItemSlot>?> _itemSlots = new();
         private static readonly object _lockForItemSlot = new();
 
-        public ItemSlots(IDataProvider database) : base(database) { }
+        public ItemSlots(IDatabaseService database) : base(database) { }
 
         public void AddItemSlot(int itemId, int slotTypeId, int guaranteedId, decimal probability)
         {
@@ -88,13 +88,5 @@ namespace DataAccess.Repositories
 
             return Database.QueryToList<ItemSlot>(commandText, new QueryParameter("@ItemId", itemId));
         }
-    }
-
-    public interface IItemSlots
-    {
-        public void AddItemSlot(int itemId, int slotTypeId, int guaranteedId, decimal probability);
-        public void UpdateItemSlot(int itemSlotId, int itemId, int slotTypeId, int guaranteedId, decimal probability);
-        public void DeleteItemSlot(int itemSlotId);
-        public List<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false);
     }
 }

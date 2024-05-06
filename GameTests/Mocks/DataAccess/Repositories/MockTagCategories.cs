@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.TagCategories;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.TagCategories;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

@@ -1,4 +1,6 @@
-﻿namespace GameServer.Models.Attributes
+﻿using GameCore.BattleSimulation;
+
+namespace GameServer.Models.Attributes
 {
     public class AttributeDistribution : IModel
     {
@@ -6,7 +8,7 @@
         public decimal BaseAmount { get; set; }
         public decimal AmountPerLevel { get; set; }
 
-        public AttributeDistribution(DataAccess.Entities.Enemies.AttributeDistribution dist)
+        public AttributeDistribution(GameCore.Entities.Enemies.AttributeDistribution dist)
         {
             AttributeId = (AttributeType)dist.AttributeId;
             BaseAmount = dist.BaseAmount;

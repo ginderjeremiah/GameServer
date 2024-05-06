@@ -1,11 +1,12 @@
-﻿using GameCore.Database.Interfaces;
-using Attribute = DataAccess.Entities.Attributes.Attribute;
+﻿using GameCore.DataAccess;
+using GameCore.Infrastructure;
+using Attribute = GameCore.Entities.Attributes.Attribute;
 
 namespace DataAccess.Repositories
 {
     internal class Attributes : BaseRepository, IAttributes
     {
-        public Attributes(IDataProvider database) : base(database) { }
+        public Attributes(IDatabaseService database) : base(database) { }
 
         public List<Attribute> AllAttributes()
         {
@@ -19,10 +20,5 @@ namespace DataAccess.Repositories
 
             return Database.QueryToList<Attribute>(commandText);
         }
-    }
-
-    public interface IAttributes
-    {
-        public List<Attribute> AllAttributes();
     }
 }

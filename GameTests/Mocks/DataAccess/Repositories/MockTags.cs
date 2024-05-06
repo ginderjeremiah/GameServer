@@ -1,48 +1,69 @@
-﻿using DataAccess.Entities.Tags;
-using DataAccess.Repositories;
+﻿using GameCore;
+using GameCore.DataAccess;
+using GameCore.Entities.Tags;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockTags : ITags
     {
+        public List<Tag> Tags { get; set; } = new();
+        public Dictionary<int, List<int>> ItemTagIds = new();
+        public Dictionary<int, List<int>> ItemModTagIds = new();
         public void AddTag(string tagName, int tagCategoryId)
         {
-            throw new NotImplementedException();
+            var maxId = Tags.Max(tag => tag.TagId) + 1;
+            Tags.Add(new Tag
+            {
+                TagId = maxId,
+                TagName = tagName,
+                TagCategoryId = tagCategoryId
+            });
         }
 
         public List<Tag> AllTags()
         {
-            throw new NotImplementedException();
+            return Tags;
         }
 
         public void DeleteTag(int tagId)
         {
-            throw new NotImplementedException();
+            var tagToRemove = Tags.FirstOrDefault(tag => tag.TagId == tagId);
+            if (tagToRemove != null)
+            {
+                Tags.Remove(tagToRemove);
+            }
         }
 
         public void SetItemModTags(int itemModId, IEnumerable<int> tagIds)
         {
-            throw new NotImplementedException();
+            ItemModTagIds[itemModId] = tagIds.ToList();
         }
 
         public void SetItemTags(int itemId, IEnumerable<int> tagIds)
         {
-            throw new NotImplementedException();
+            ItemTagIds[itemId] = tagIds.ToList();
         }
 
         public List<Tag> TagsForItem(int itemId)
         {
-            throw new NotImplementedException();
+            ItemTagIds.TryGetValue(itemId, out var tags);
+            return tags?.SelectNotNull(id => Tags.FirstOrDefault(tag => tag.TagId == id)).ToList() ?? new List<Tag>();
         }
 
         public List<Tag> TagsForItemMod(int itemModId)
         {
-            throw new NotImplementedException();
+            ItemModTagIds.TryGetValue(itemModId, out var tags);
+            return tags?.SelectNotNull(id => Tags.FirstOrDefault(tag => tag.TagId == id)).ToList() ?? new List<Tag>();
         }
 
         public void UpdateTag(int tagId, string tagName, int tagCategoryId)
         {
-            throw new NotImplementedException();
+            var tagToUpdate = Tags.FirstOrDefault(tag => tag.TagId == tagId);
+            if (tagToUpdate != null)
+            {
+                tagToUpdate.TagName = tagName;
+                tagToUpdate.TagCategoryId = tagCategoryId;
+            }
         }
     }
 }

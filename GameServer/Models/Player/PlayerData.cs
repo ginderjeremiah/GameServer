@@ -1,4 +1,4 @@
-﻿using GameServer.Auth;
+﻿using GameCore.Sessions;
 using GameServer.Models.Attributes;
 using GameServer.Models.InventoryItems;
 

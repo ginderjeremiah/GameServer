@@ -1,5 +1,6 @@
-﻿using DataAccess.Entities.SessionStore;
-using GameCore.PubSub;
+﻿using GameCore;
+using GameCore.Entities.SessionStore;
+using GameCore.Infrastructure;
 
 namespace DataAccess
 {
@@ -7,13 +8,13 @@ namespace DataAccess
     {
         private static bool _initialized = false;
         private static readonly object _lock = new();
-        private readonly IPubSubProvider _pubSub;
+        private readonly IPubSubService _pubSub;
         private readonly IRepositoryManager _repos;
 
-        public DataProviderSynchronizer(IPubSubProvider pubSubProvider, IRepositoryManager repos)
+        public DataProviderSynchronizer(IPubSubService pubSub, IRepositoryManager repos)
         {
             _repos = repos;
-            _pubSub = pubSubProvider;
+            _pubSub = pubSub;
             if (!_initialized)
             {
                 lock (_lock)

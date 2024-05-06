@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.Skills;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.Skills;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

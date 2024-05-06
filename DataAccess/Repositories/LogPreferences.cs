@@ -1,12 +1,12 @@
-﻿using DataAccess.Entities.LogPreferences;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.LogPreferences;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
     internal class LogPreferences : BaseRepository, ILogPreferences
     {
-        public LogPreferences(IDataProvider database) : base(database) { }
+        public LogPreferences(IDatabaseService database) : base(database) { }
 
         public List<LogPreference> GetPreferences(int playerId)
         {
@@ -87,11 +87,5 @@ namespace DataAccess.Repositories
                 new QueryParameter("@DisabledSettings", disabledStr)
             );
         }
-    }
-
-    public interface ILogPreferences
-    {
-        public List<LogPreference> GetPreferences(int playerId);
-        public void SavePreferences(int playerId, IEnumerable<LogPreference> prefs);
     }
 }

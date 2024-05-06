@@ -1,11 +1,12 @@
-﻿using DataAccess.Entities.TagCategories;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.TagCategories;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
     internal class TagCategories : BaseRepository, ITagCategories
     {
-        public TagCategories(IDataProvider database) : base(database) { }
+        public TagCategories(IDatabaseService database) : base(database) { }
 
         public List<TagCategory> GetTagCategories()
         {
@@ -17,10 +18,5 @@ namespace DataAccess.Repositories
 
             return Database.QueryToList<TagCategory>(commandText);
         }
-    }
-
-    public interface ITagCategories
-    {
-        public List<TagCategory> GetTagCategories();
     }
 }

@@ -1,13 +1,14 @@
-﻿using DataAccess.Entities.Items;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.Items;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
     internal class Items : BaseRepository, IItems
     {
+
         private static List<Item>? _allItems;
-        public Items(IDataProvider database) : base(database) { }
+        public Items(IDatabaseService database) : base(database) { }
 
         public List<Item> AllItems(bool refreshCache = false)
         {
@@ -85,13 +86,5 @@ namespace DataAccess.Repositories
 
             Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemId", itemId));
         }
-    }
-
-    public interface IItems
-    {
-        public List<Item> AllItems(bool refreshCache = false);
-        public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath);
-        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId, string iconPath);
-        public void DeleteItem(int itemId);
     }
 }

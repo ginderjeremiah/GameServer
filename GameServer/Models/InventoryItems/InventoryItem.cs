@@ -9,7 +9,7 @@
         public int InventorySlotNumber { get; set; }
         public List<InventoryItemMod> ItemMods { get; set; }
 
-        public InventoryItem(DataAccess.Entities.InventoryItems.InventoryItem invItem)
+        public InventoryItem(GameCore.Entities.InventoryItems.InventoryItem invItem)
         {
             InventoryItemId = invItem.InventoryItemId;
             ItemId = invItem.ItemId;

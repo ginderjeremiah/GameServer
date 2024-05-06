@@ -1,11 +1,11 @@
-﻿using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
     internal class ItemModAttributes : BaseRepository, IItemModAttributes
     {
-        public ItemModAttributes(IDataProvider database) : base(database) { }
+        public ItemModAttributes(IDatabaseService database) : base(database) { }
 
         public void AddItemModAttribute(int itemModId, int attributeId, decimal amount)
         {
@@ -48,12 +48,5 @@ namespace DataAccess.Repositories
                 new QueryParameter("@AttributeId", attributeId)
             );
         }
-    }
-
-    public interface IItemModAttributes
-    {
-        public void AddItemModAttribute(int itemModId, int attributeId, decimal amount);
-        public void UpdateItemModAttribute(int itemModId, int attributeId, decimal amount);
-        public void DeleteItemModAttribute(int itemModId, int attributeId);
     }
 }

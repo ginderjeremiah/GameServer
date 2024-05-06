@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.Zones;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.Zones;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

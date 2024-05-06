@@ -1,7 +1,7 @@
-﻿using DataAccess.Entities.PlayerAttributes;
-using DataAccess.Entities.Players;
-using GameCore.Database;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.PlayerAttributes;
+using GameCore.Entities.Players;
+using GameCore.Infrastructure;
 using System.Data;
 
 namespace DataAccess.Repositories
@@ -11,7 +11,7 @@ namespace DataAccess.Repositories
         public static readonly object _lock = new();
         public static bool _processingQueue = false;
 
-        public Players(IDataProvider database) : base(database) { }
+        public Players(IDatabaseService database) : base(database) { }
 
         public Player? GetPlayerByUserName(string userName)
         {
@@ -34,7 +34,7 @@ namespace DataAccess.Repositories
 
         public void SavePlayer(Player player, List<PlayerAttribute> attributes)
         {
-            var structuredParameter = new StructuredQueryParameter("@Attributes", "AttributeUpdate");
+            var structuredParameter = new QueryParameter("@Attributes", "AttributeUpdate");
 
             structuredParameter.AddColumns(
                 ("AttributeId", DbType.Int32),
@@ -77,11 +77,5 @@ namespace DataAccess.Repositories
                 structuredParameter
             );
         }
-    }
-
-    public interface IPlayers
-    {
-        public Player? GetPlayerByUserName(string userName);
-        public void SavePlayer(Player player, List<PlayerAttribute> attributes);
     }
 }

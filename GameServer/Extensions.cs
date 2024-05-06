@@ -1,18 +1,20 @@
-﻿using DataAccess.Entities.PlayerAttributes;
-using static GameServer.AttributeType;
+﻿using GameCore;
+using GameCore.Sessions;
+using GameServer.Models.Player;
 
 namespace GameServer
 {
     public static class Extensions
     {
-        public static bool IsCoreAttribute(this PlayerAttribute att)
+        public static string GetNewToken(this Session session)
         {
-            return ((AttributeType)att.AttributeId).IsCoreAttribute();
+            var tokenData = $"{session.SessionId.ToBase64()}.{DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME).Ticks.ToBase64()}";
+            return $"{tokenData}.{tokenData.Hash(session.Player.Salt.ToString(), 1).ToBase64()}";
         }
 
-        public static bool IsCoreAttribute(this AttributeType att)
+        public static PlayerData GetPlayerData(this Session session)
         {
-            return att is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
+            return new(session.Player, session.InventoryData);
         }
     }
 }

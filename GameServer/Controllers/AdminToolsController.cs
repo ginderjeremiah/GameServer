@@ -1,5 +1,4 @@
-﻿using DataAccess;
-using GameCore.Logging.Interfaces;
+﻿using GameCore;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
@@ -73,11 +72,11 @@ namespace GameServer.Controllers
                 var item = change.Item;
                 if (change.ChangeType == Add)
                 {
-                    Repositories.ItemMods.AddItemMod(item.ItemModName, item.Removable, item.ItemModDesc);
+                    Repositories.ItemMods.AddItemMod(item.ItemModName, item.Removable, item.ItemModDesc, item.SlotTypeId);
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    Repositories.ItemMods.UpdateItemMod(item.ItemModId, item.ItemModName, item.Removable, item.ItemModDesc);
+                    Repositories.ItemMods.UpdateItemMod(item.ItemModId, item.ItemModName, item.Removable, item.ItemModDesc, item.SlotTypeId);
                 }
                 else if (change.ChangeType == Delete)
                 {

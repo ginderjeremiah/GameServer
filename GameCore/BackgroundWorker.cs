@@ -1,8 +1,6 @@
-﻿using GameCore.Logging.Interfaces;
-
-namespace GameCore
+﻿namespace GameCore
 {
-    internal class BackgroundWorker
+    public class BackgroundWorker
     {
         private readonly AutoResetEvent _resetEvent = new(false);
         private readonly IApiLogger _logger;

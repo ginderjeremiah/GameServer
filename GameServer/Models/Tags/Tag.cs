@@ -6,7 +6,9 @@
         public string TagName { get; set; }
         public int TagCategoryId { get; set; }
 
-        public Tag(DataAccess.Entities.Tags.Tag tag)
+        public Tag() { }
+
+        public Tag(GameCore.Entities.Tags.Tag tag)
         {
             TagId = tag.TagId;
             TagName = tag.TagName;

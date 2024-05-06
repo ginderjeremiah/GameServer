@@ -11,7 +11,7 @@ namespace GameServer.Models.Skills
         public int CooldownMS { get; set; }
         public string IconPath { get; set; }
 
-        public Skill(DataAccess.Entities.Skills.Skill skill)
+        public Skill(GameCore.Entities.Skills.Skill skill)
         {
             SkillId = skill.SkillId;
             SkillName = skill.SkillName;

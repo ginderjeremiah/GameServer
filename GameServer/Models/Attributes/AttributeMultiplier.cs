@@ -1,11 +1,14 @@
-﻿namespace GameServer.Models.Attributes
+﻿using GameCore.BattleSimulation;
+using GameCore.Entities.Skills;
+
+namespace GameServer.Models.Attributes
 {
     public class AttributeMultiplier
     {
         public AttributeType AttributeId { get; set; }
         public decimal Multiplier { get; set; }
 
-        public AttributeMultiplier(DataAccess.Entities.Skills.SkillDamageMultiplier attributeMultiplier)
+        public AttributeMultiplier(SkillDamageMultiplier attributeMultiplier)
         {
             AttributeId = (AttributeType)attributeMultiplier.AttributeId;
             Multiplier = attributeMultiplier.Multiplier;

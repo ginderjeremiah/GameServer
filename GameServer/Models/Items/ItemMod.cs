@@ -11,7 +11,9 @@ namespace GameServer.Models.Items
         public int SlotTypeId { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
 
-        public ItemMod(DataAccess.Entities.ItemMods.ItemMod itemMod)
+        public ItemMod() { }
+
+        public ItemMod(GameCore.Entities.ItemMods.ItemMod itemMod)
         {
             ItemModId = itemMod.ItemModId;
             ItemModName = itemMod.ItemModName;

@@ -1,11 +1,12 @@
-﻿using DataAccess.Entities.SlotTypes;
-using GameCore.Database.Interfaces;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.SlotTypes;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
     internal class SlotTypes : BaseRepository, ISlotTypes
     {
-        public SlotTypes(IDataProvider database) : base(database) { }
+        public SlotTypes(IDatabaseService database) : base(database) { }
 
         public List<SlotType> AllSlotTypes()
         {
@@ -18,10 +19,5 @@ namespace DataAccess.Repositories
 
             return Database.QueryToList<SlotType>(commandText);
         }
-    }
-
-    public interface ISlotTypes
-    {
-        public List<SlotType> AllSlotTypes();
     }
 }

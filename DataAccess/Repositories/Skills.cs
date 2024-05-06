@@ -1,6 +1,6 @@
-﻿using DataAccess.Entities.Skills;
-using GameCore.Database.Interfaces;
-using StackExchange.Redis;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.Skills;
+using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
 {
@@ -8,7 +8,7 @@ namespace DataAccess.Repositories
     {
         private static List<Skill>? _skillDataList;
 
-        public Skills(IDataProvider database) : base(database) { }
+        public Skills(IDatabaseService database) : base(database) { }
 
         public List<Skill> AllSkills()
         {
@@ -57,12 +57,5 @@ namespace DataAccess.Repositories
 
             return result.Item1;
         }
-    }
-
-    public interface ISkills
-    {
-        public List<Skill> AllSkills();
-        public Skill GetSkill(int skillId);
-        public void SaveSkills(List<int> skillIds);
     }
 }

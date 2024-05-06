@@ -1,5 +1,5 @@
-﻿using DataAccess.Entities.LogPreferences;
-using DataAccess.Repositories;
+﻿using GameCore.DataAccess;
+using GameCore.Entities.LogPreferences;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {
