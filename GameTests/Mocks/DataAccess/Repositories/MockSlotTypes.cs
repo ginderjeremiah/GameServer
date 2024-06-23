@@ -5,9 +5,10 @@ namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockSlotTypes : ISlotTypes
     {
+        public List<SlotType> SlotTypes { get; set; } = new();
         public List<SlotType> AllSlotTypes()
         {
-            throw new NotImplementedException();
+            return SlotTypes;
         }
     }
 }

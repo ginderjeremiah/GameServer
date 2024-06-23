@@ -5,9 +5,10 @@ namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockItemCategories : IItemCategories
     {
+        public List<ItemCategory> ItemCategories { get; set; } = new();
         public List<ItemCategory> GetItemCategories()
         {
-            throw new NotImplementedException();
+            return ItemCategories;
         }
     }
 }

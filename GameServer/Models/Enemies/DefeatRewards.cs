@@ -7,6 +7,8 @@ namespace GameServer.Models.Enemies
         public int ExpReward { get; set; }
         public List<InventoryItem> Drops { get; set; }
 
+        public DefeatRewards() { }
+
         public DefeatRewards(GameCore.BattleSimulation.DefeatRewards rewards)
         {
             ExpReward = rewards.ExpReward;

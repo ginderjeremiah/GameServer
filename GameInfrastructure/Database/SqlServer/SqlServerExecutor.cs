@@ -144,7 +144,7 @@ namespace GameInfrastructure.Database.SqlServer
                 return new SqlParameter(parameter.ParameterName, SqlDbType.Structured)
                 {
                     Value = dataRecords.Length > 0 ? dataRecords : null,
-                    TypeName = parameter.TypeName
+                    TypeName = data.TypeName
                 };
             }
         }

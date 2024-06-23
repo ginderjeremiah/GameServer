@@ -16,6 +16,8 @@ namespace GameServer.Models.Player
         public int StatPointsUsed { get; set; }
         public InventoryData InventoryData { get; set; }
 
+        public PlayerData() { }
+
         public PlayerData(SessionPlayer sessionPlayer, SessionInventory sessionInventory)
         {
             UserName = sessionPlayer.UserName;

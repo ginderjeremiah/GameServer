@@ -15,17 +15,28 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
         {
-            throw new NotImplementedException();
+            return Cache.GetDelete($"ActiveEnemy_{sessionData.SessionId}");
         }
 
         public SessionData GetNewSessionData(int playerId)
         {
-            throw new NotImplementedException();
+            return new SessionData
+            {
+                SessionId = Guid.NewGuid().ToString(),
+                PlayerData = new()
+                {
+                    PlayerId = playerId,
+                    Salt = Guid.NewGuid()
+                },
+                InventoryItems = new(),
+                Attributes = new(),
+                PlayerSkills = new(),
+            };
         }
 
         public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
         {
-            throw new NotImplementedException();
+            Cache.Set($"ActiveEnemy_{sessionData.SessionId}", activeEnemyHash);
         }
 
         public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session)
@@ -35,7 +46,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty)
         {
-            throw new NotImplementedException();
+            Cache.Set(sessionData.SessionId, sessionData);
         }
     }
 }

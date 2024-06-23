@@ -34,7 +34,7 @@ namespace DataAccess.Repositories
 
         public void SavePlayer(Player player, List<PlayerAttribute> attributes)
         {
-            var structuredParameter = new QueryParameter("@Attributes", "AttributeUpdate");
+            var structuredParameter = new QueryParameter("@Attributes", StructuredType.AttributeUpdate);
 
             structuredParameter.AddColumns(
                 ("AttributeId", DbType.Int32),

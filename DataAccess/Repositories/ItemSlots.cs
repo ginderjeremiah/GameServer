@@ -56,6 +56,7 @@ namespace DataAccess.Repositories
 
         public List<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
+            //TODO make this only work for valid itemIds... maybe add slots to Item entity?
             if (itemId >= _itemSlots.Count || _itemSlots[itemId] is null || refreshCache)
             {
                 lock (_lockForItemSlot)

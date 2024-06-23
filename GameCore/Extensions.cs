@@ -104,7 +104,15 @@ namespace GameCore
 
         public static T? Deserialize<T>(this HttpResponseMessage msg)
         {
-            return JsonSerializer.Deserialize<T>(msg.Content.ReadAsStream(), _options);
+            var stream = msg.Content.ReadAsStream();
+            if (stream.Length > 0)
+            {
+                return JsonSerializer.Deserialize<T>(msg.Content.ReadAsStream(), _options);
+            }
+            else
+            {
+                return default;
+            }
         }
 
         public static T? Deserialize<T>(this string? str)

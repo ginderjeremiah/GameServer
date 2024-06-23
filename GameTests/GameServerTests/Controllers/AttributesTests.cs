@@ -26,7 +26,10 @@ namespace GameTests.GameServerTests.Controllers
             var data = response.Deserialize<ApiListResponse<AttributeModel>>();
 
             Assert.IsNotNull(data?.Data);
+            Assert.IsNull(data.Error);
             Assert.AreEqual(atts.Count, data.Data.Count);
+            Assert.AreEqual(atts[0].AttributeId, (int)data.Data[0].AttributeId);
+            Assert.AreEqual(atts[0].AttributeName, data.Data[0].AttributeName);
         }
     }
 }

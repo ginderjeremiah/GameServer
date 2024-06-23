@@ -5,19 +5,20 @@ namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockZones : IZones
     {
+        public List<Zone> Zones { get; set; } = new();
         public List<Zone> AllZones()
         {
-            throw new NotImplementedException();
+            return Zones;
         }
 
         public Zone GetZone(int zoneId)
         {
-            throw new NotImplementedException();
+            return Zones.First(zone => zone.ZoneId == zoneId);
         }
 
         public bool ValidateZoneId(int zoneId)
         {
-            throw new NotImplementedException();
+            return Zones.Any(zone => zone.ZoneId == zoneId);
         }
     }
 }

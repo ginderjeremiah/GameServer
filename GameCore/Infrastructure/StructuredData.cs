@@ -4,8 +4,14 @@ namespace GameCore.Infrastructure
 {
     public class StructuredData
     {
+        public string TypeName { get; private set; }
         public List<ValueTuple<string, DbType>> Columns { get; } = new();
         public List<List<object?>> Rows { get; } = new();
+
+        public StructuredData(StructuredType type)
+        {
+            TypeName = type.ToString();
+        }
 
         public void AddColumn(ValueTuple<string, DbType> column)
         {

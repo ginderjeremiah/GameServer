@@ -5,6 +5,8 @@
         public int SlotTypeId { get; set; }
         public string SlotTypeName { get; set; }
 
+        public SlotType() { }
+
         public SlotType(GameCore.Entities.SlotTypes.SlotType slotType)
         {
             SlotTypeId = slotType.SlotTypeId;

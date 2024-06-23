@@ -6,6 +6,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
     internal class MockItemMods : IItemMods
     {
         public List<ItemMod> ItemMods { get; set; } = new();
+        public bool Refreshed { get; set; } = false;
         public void AddItemMod(string itemModName, bool removable, string itemModDesc, int slotTypeId)
         {
             var nextId = ItemMods.Max(mod => mod.ItemModId) + 1;
@@ -21,6 +22,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public List<ItemMod> AllItemMods(bool refreshCache = false)
         {
+            Refreshed = refreshCache;
             return ItemMods;
         }
 

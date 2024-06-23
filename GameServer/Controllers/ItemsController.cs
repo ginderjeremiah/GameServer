@@ -13,9 +13,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<Item> Items()
+        public ApiListResponse<Item> Items(bool refreshCache = false)
         {
-            return Success(Repositories.Items.AllItems().Select(item => new Item(item)));
+            return Success(Repositories.Items.AllItems(refreshCache).Select(item => new Item(item)));
         }
 
         [HttpGet]
@@ -29,11 +29,5 @@ namespace GameServer.Controllers
         {
             return Success(Repositories.SlotTypes.AllSlotTypes().Select(type => new SlotType(type)));
         }
-
-        //[HttpGet]
-        //public ApiListResponse<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
-        //{
-        //    return Success(Repositories.ItemSlots.SlotsForItem(itemId, refreshCache).Select(slot => new ItemSlot(slot)));
-        //}
     }
 }

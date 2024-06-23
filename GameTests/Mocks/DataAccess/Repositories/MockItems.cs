@@ -6,6 +6,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
     internal class MockItems : IItems
     {
         public List<Item> Items { get; set; } = new();
+        public bool Refreshed { get; set; } = false;
 
         public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath)
         {
@@ -22,6 +23,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public List<Item> AllItems(bool refreshCache = false)
         {
+            Refreshed = refreshCache;
             return Items;
         }
 

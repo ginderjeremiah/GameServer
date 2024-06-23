@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using static System.Data.ParameterDirection;
 
 namespace GameCore.Infrastructure
@@ -6,14 +7,12 @@ namespace GameCore.Infrastructure
     public class QueryParameter
     {
         private object? _value;
-        private readonly StructuredData _data = new();
+        private readonly StructuredData? _data;
 
         public string ParameterName { get; }
         public object? Value { get => GetValue(); set => SetValue(value); }
         public DbType? Type { get; private set; }
         public ParameterDirection Direction { get; }
-        public string? TypeName { get; }
-
 
         public QueryParameter(string parameterName, object? value, DbType? dbType = null, ParameterDirection direction = Input)
         {
@@ -23,11 +22,11 @@ namespace GameCore.Infrastructure
             Type = dbType;
         }
 
-        public QueryParameter(string parameterName, string typeName, ParameterDirection direction = Input)
+        public QueryParameter(string parameterName, StructuredType type, ParameterDirection direction = Input)
         {
             ParameterName = parameterName;
-            TypeName = typeName;
             Direction = direction;
+            _data = new(type);
             Type = DbType.Object;
         }
 
@@ -41,7 +40,7 @@ namespace GameCore.Infrastructure
 
         public void AddColumn(ValueTuple<string, DbType> column)
         {
-            Type = DbType.Object;
+            EnsureDataExists();
             _data.AddColumn(column);
         }
 
@@ -55,13 +54,13 @@ namespace GameCore.Infrastructure
 
         public void AddRow(List<object?> row)
         {
-            Type = DbType.Object;
+            EnsureDataExists();
             _data.AddRow(row);
         }
 
         private object? GetValue()
         {
-            return Type == DbType.Object ? _data : _value;
+            return _data ?? _value;
         }
 
         private void SetValue(object? value)
@@ -73,6 +72,15 @@ namespace GameCore.Infrastructure
             else
             {
                 _value = value;
+            }
+        }
+
+        [MemberNotNull(nameof(_data))]
+        private void EnsureDataExists()
+        {
+            if (_data is null)
+            {
+                throw new InvalidOperationException("Cannot perform operation when not using structured data.");
             }
         }
     }

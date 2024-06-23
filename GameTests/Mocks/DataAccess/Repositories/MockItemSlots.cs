@@ -6,6 +6,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
     internal class MockItemSlots : IItemSlots
     {
         public List<ItemSlot> ItemSlots { get; set; } = new();
+        public bool Refreshed { get; set; } = false;
         public void AddItemSlot(int itemId, int slotTypeId, int guaranteedId, decimal probability)
         {
             var maxId = ItemSlots.Max(slot => slot.ItemSlotId) + 1;
@@ -30,7 +31,8 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public List<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
-            throw new NotImplementedException();
+            Refreshed = refreshCache;
+            return ItemSlots.Where(slot => slot.ItemId == itemId).ToList();
         }
 
         public void UpdateItemSlot(int itemSlotId, int itemId, int slotTypeId, int guaranteedId, decimal probability)

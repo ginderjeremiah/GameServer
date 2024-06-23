@@ -5,14 +5,15 @@ namespace GameTests.Mocks.DataAccess.Repositories
 {
     internal class MockSkills : ISkills
     {
+        public List<Skill> Skills { get; set; } = new();
         public List<Skill> AllSkills()
         {
-            throw new NotImplementedException();
+            return Skills;
         }
 
         public Skill GetSkill(int skillId)
         {
-            throw new NotImplementedException();
+            return Skills.First(skill => skill.SkillId == skillId);
         }
 
         public void SaveSkills(List<int> skillIds)

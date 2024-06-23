@@ -43,6 +43,7 @@ type ApiRequestTypes = {
 	'/api/Enemies/DefeatEnemy': IEnemyInstance
 	'/api/Enemies/NewEnemy': { newZoneId: number | undefined }
 	'/api/ItemMods': { refreshCache: boolean | undefined }
+	'/api/Items': { refreshCache: boolean | undefined }
 	'/api/Items/SlotsForItem': { itemId: number, refreshCache: boolean | undefined }
 	'/api/Player/SaveLogPreferences': ILogPreference[]
 	'/api/Player/UpdateInventorySlots': IInventoryUpdate[]

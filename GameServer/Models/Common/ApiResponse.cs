@@ -6,7 +6,7 @@
         public string? Error { get; set; }
     }
 
-    public class ApiListResponse<T> : IApiListResponse where T : IModel
+    public class ApiListResponse<T> : IApiListResponse<T> where T : IModel
     {
         public List<T>? Data { get; set; }
         public string? Error { get; set; }
@@ -17,8 +17,9 @@
         public string? Error { get; set; }
     }
 
-    public interface IApiListResponse : IApiResponse
+    public interface IApiListResponse<T> : IApiResponse where T : IModel
     {
+        public List<T>? Data { get; set; }
     }
 
     public interface IApiResponse

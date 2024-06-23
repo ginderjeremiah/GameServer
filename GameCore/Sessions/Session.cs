@@ -57,7 +57,7 @@ namespace GameCore.Sessions
             if (Player.Exp > Player.Level * 100)
             {
                 Player.Exp -= Player.Level * 100;
-                Player.Level++;
+                Player.Level ++;
                 Player.StatPointsGained += 6;
             }
             _playerDirty = true;

@@ -5,6 +5,8 @@
         public int ItemCategoryId { get; set; }
         public string CategoryName { get; set; }
 
+        public ItemCategory() { }
+
         public ItemCategory(GameCore.Entities.ItemCategories.ItemCategory itemCategory)
         {
             ItemCategoryId = itemCategory.ItemCategoryId;

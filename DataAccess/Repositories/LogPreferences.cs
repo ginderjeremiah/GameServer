@@ -12,6 +12,7 @@ namespace DataAccess.Repositories
         {
             var commandText = @"
                 SELECT
+                    LP.PlayerId,
                     LS.LogSettingName AS Name,
                     COALESCE(LP.Enabled, LS.DefaultValue) AS Enabled
                 FROM LogSettings LS

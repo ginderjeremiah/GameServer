@@ -20,9 +20,9 @@ namespace GameServer
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddSingleton<IDataServicesConfiguration, Config>();
-            builder.Services.AddTransient<IDataServicesFactory, DataServicesFactory>();
-            builder.Services.AddTransient(services => services.GetRequiredService<IDataServicesFactory>().Logger);
-            builder.Services.AddTransient<IRepositoryManager, RepositoryManager>();
+            builder.Services.AddScoped<IDataServicesFactory, DataServicesFactory>();
+            builder.Services.AddScoped(services => services.GetRequiredService<IDataServicesFactory>().Logger);
+            builder.Services.AddScoped<IRepositoryManager, RepositoryManager>();
 
             builder.Services.AddAuthentication(options =>
             {

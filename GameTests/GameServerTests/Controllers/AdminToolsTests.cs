@@ -78,6 +78,10 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -132,6 +136,10 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditItemModAttributes", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -183,6 +191,10 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditItemMods", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -234,6 +246,10 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditItems", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -285,6 +301,10 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditItemSlots", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -334,6 +354,26 @@ namespace GameTests.GameServerTests.Controllers
             var response = await client.PostAsJsonAsync("/api/AdminTools/AddEditTags", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
+        }
+
+        [TestMethod]
+        public async Task SetTagsForItem_NoSession_ReturnsForbidden()
+        {
+            using var app = new ApiAppFactory();
+            var client = app.CreateClient();
+            var payload = new SetTagsData();
+
+            var response = await client.PostAsJsonAsync("/api/AdminTools/SetTagsForItem", payload);
+
+            Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -366,15 +406,19 @@ namespace GameTests.GameServerTests.Controllers
         }
 
         [TestMethod]
-        public async Task SetTagsForItem_NoSession_ReturnsForbidden()
+        public async Task SetTagsForItemMod_NoSession_ReturnsForbidden()
         {
             using var app = new ApiAppFactory();
             var client = app.CreateClient();
             var payload = new SetTagsData();
 
-            var response = await client.PostAsJsonAsync("/api/AdminTools/SetTagsForItem", payload);
+            var response = await client.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod", payload);
 
             Assert.AreEqual(Forbidden, response.StatusCode);
+
+            var data = response.Deserialize<ApiResponse>();
+
+            Assert.IsNull(data);
         }
 
         [TestMethod]
@@ -404,18 +448,6 @@ namespace GameTests.GameServerTests.Controllers
             Assert.AreEqual(3, mockTags.Tags.Count);
             Assert.AreEqual(2, mockTags.ItemModTagIds[1].Count);
             Assert.IsTrue(mockTags.TagsForItemMod(1).All(tag => tag.TagId is 1 or 2));
-        }
-
-        [TestMethod]
-        public async Task SetTagsForItemMod_NoSession_ReturnsForbidden()
-        {
-            using var app = new ApiAppFactory();
-            var client = app.CreateClient();
-            var payload = new SetTagsData();
-
-            var response = await client.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod", payload);
-
-            Assert.AreEqual(Forbidden, response.StatusCode);
         }
     }
 }

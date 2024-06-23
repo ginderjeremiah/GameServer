@@ -7,6 +7,8 @@ namespace GameServer.Models.InventoryItems
         public List<InventoryItem?> Inventory { get; set; }
         public List<InventoryItem?> Equipped { get; set; }
 
+        public InventoryData() { }
+
         public InventoryData(SessionInventory sessionInventory)
         {
             Inventory = sessionInventory.Inventory.Select(item => item is null ? null : new InventoryItem(item)).ToList();

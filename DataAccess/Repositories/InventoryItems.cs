@@ -82,7 +82,7 @@ namespace DataAccess.Repositories
 
         public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems)
         {
-            var structuredParameter = new QueryParameter("@InventoryItems", "InventoryUpdate");
+            var structuredParameter = new QueryParameter("@InventoryItems", StructuredType.InventoryUpdate);
 
             structuredParameter.AddColumns(
                 ("InventoryItemId", DbType.Int32),
