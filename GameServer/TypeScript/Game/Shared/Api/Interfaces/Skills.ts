@@ -1,9 +1,9 @@
 interface ISkill {
-	skillId: number;
-	skillName: string;
+	id: number;
+	name: string;
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
-	skillDesc: string;
+	description: string;
 	cooldownMS: number;
 	iconPath: string;
 }

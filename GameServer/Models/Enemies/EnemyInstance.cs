@@ -4,7 +4,7 @@ namespace GameServer.Models.Enemies
 {
     public class EnemyInstance : IModel
     {
-        public int EnemyId { get; set; }
+        public int Id { get; set; }
         public int Level { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
         public uint Seed { get; set; }
@@ -14,7 +14,7 @@ namespace GameServer.Models.Enemies
 
         public EnemyInstance(GameCore.BattleSimulation.EnemyInstance enemyInstance)
         {
-            EnemyId = enemyInstance.EnemyId;
+            Id = enemyInstance.Id;
             Level = enemyInstance.Level;
             Attributes = enemyInstance.Attributes.Select(att => new BattlerAttribute(att)).ToList();
             Seed = enemyInstance.Seed;

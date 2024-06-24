@@ -2,20 +2,20 @@
 {
     public class ItemSlot : IModel
     {
-        public int ItemSlotId { get; set; }
+        public int Id { get; set; }
         public int ItemId { get; set; }
         public int SlotTypeId { get; set; }
-        public int GuaranteedId { get; set; }
+        public int GuaranteedItemModId { get; set; }
         public decimal Probability { get; set; }
 
         public ItemSlot() { }
 
-        public ItemSlot(GameCore.Entities.ItemSlots.ItemSlot itemSlot)
+        public ItemSlot(GameCore.Entities.ItemSlot itemSlot)
         {
-            ItemSlotId = itemSlot.ItemId;
+            Id = itemSlot.Id;
             ItemId = itemSlot.ItemId;
             SlotTypeId = itemSlot.SlotTypeId;
-            GuaranteedId = itemSlot.GuaranteedId;
+            GuaranteedItemModId = itemSlot.GuaranteedItemModId;
             Probability = itemSlot.Probability;
         }
     }

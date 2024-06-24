@@ -8,7 +8,7 @@ namespace GameServer.Models.Attributes
         public decimal BaseAmount { get; set; }
         public decimal AmountPerLevel { get; set; }
 
-        public AttributeDistribution(GameCore.Entities.Enemies.AttributeDistribution dist)
+        public AttributeDistribution(GameCore.Entities.AttributeDistribution dist)
         {
             AttributeId = (AttributeType)dist.AttributeId;
             BaseAmount = dist.BaseAmount;

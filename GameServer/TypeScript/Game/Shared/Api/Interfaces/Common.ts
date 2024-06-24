@@ -1,4 +1,4 @@
-interface IChange<T0> {
-	item: T0;
+interface IChange<T1> {
+	item: T1;
 	changeType: ChangeType;
 }

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-namespace GameCore.Infrastructure
+﻿namespace GameCore.Infrastructure
 {
     public interface ICacheService
     {
@@ -12,8 +10,6 @@ namespace GameCore.Infrastructure
         public T? GetDelete<T>(string key);
         public Task<string?> GetDeleteAsync(string key);
         public Task<T?> GetDeleteAsync<T>(string key);
-        public bool TryGet(string key, [NotNullWhen(true)] out string? result);
-        public bool TryGet<T>(string key, [NotNullWhen(true)] out T? result);
         public void Set(string key, string value);
         public void Set<T>(string key, T value);
         public Task SetAsync(string key, string value);

@@ -1,5 +1,5 @@
 ﻿using GameCore.BattleSimulation;
-using GameCore.Entities.Skills;
+using GameCore.Entities;
 
 namespace GameServer.Models.Attributes
 {

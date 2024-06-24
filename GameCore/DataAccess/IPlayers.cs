@@ -1,11 +1,10 @@
-﻿using GameCore.Entities.PlayerAttributes;
-using GameCore.Entities.Players;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IPlayers
     {
-        public Player? GetPlayerByUserName(string userName);
-        public void SavePlayer(Player player, List<PlayerAttribute> attributes);
+        public Task<Player?> GetPlayerByUserNameAsync(string userName);
+        public Task SavePlayerAsync(Player player, List<PlayerAttribute> attributes);
     }
 }

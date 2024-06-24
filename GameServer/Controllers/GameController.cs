@@ -3,6 +3,7 @@ using GameCore.Sessions;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Player;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -12,8 +13,8 @@ namespace GameServer.Controllers
     {
         private readonly string _baseViewPath = "~/Views";
 
-        public GameController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public GameController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [Route("/")]
         [ApiExplorerSettings(IgnoreApi = true)]
@@ -43,12 +44,12 @@ namespace GameServer.Controllers
 
         [SessionAuthorize(AllowAll = true)]
         [HttpPost]
-        public ApiResponse<LoginData> Login([FromBody] LoginCredentials creds)
+        public async Task<ApiResponse<LoginData>> Login([FromBody] LoginCredentials creds)
         {
-            if (Session != null)
+            if (SessionAvailable)
                 return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = Session.GetPlayerData() });
 
-            var player = Repositories.Players.GetPlayerByUserName(creds.Username);
+            var player = await Repositories.Players.GetPlayerByUserNameAsync(creds.Username);
 
             if (player is null)
                 return Error<LoginData>("Username not found");
@@ -58,7 +59,7 @@ namespace GameServer.Controllers
             if (passHash != player.PassHash)
                 return Error<LoginData>("Incorrect password");
 
-            var sessionData = Repositories.SessionStore.GetNewSessionData(player.PlayerId);
+            var sessionData = await Repositories.SessionStore.GetNewSessionDataAsync(player.Id);
 
             var session = new Session(sessionData, Repositories);
             var token = session.GetNewToken();

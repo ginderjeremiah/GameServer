@@ -1,11 +1,11 @@
-﻿using GameCore.Entities.Zones;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IZones
     {
-        public List<Zone> AllZones();
-        public Zone GetZone(int zoneId);
-        public bool ValidateZoneId(int zoneId);
+        public Task<IEnumerable<Zone>> AllZonesAsync();
+        public Task<Zone?> GetZoneAsync(int zoneId);
+        public Task<bool> ValidateZoneIdAsync(int zoneId);
     }
 }

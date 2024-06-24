@@ -1,9 +1,9 @@
-﻿using GameCore.Entities.ItemCategories;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IItemCategories
     {
-        public List<ItemCategory> GetItemCategories();
+        public IQueryable<ItemCategory> AllItemCategories();
     }
 }

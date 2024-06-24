@@ -1,7 +1,9 @@
 ﻿using GameCore;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameServer.Controllers
 {
@@ -9,13 +11,13 @@ namespace GameServer.Controllers
     [ApiController]
     public class ItemCategoriesController : BaseController
     {
-        public ItemCategoriesController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public ItemCategoriesController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<ItemCategory> ItemCategories()
+        public async Task<ApiListResponse<ItemCategory>> ItemCategories()
         {
-            return Success(Repositories.ItemCategories.GetItemCategories().Select(cat => new ItemCategory(cat)));
+            return Success(await Repositories.ItemCategories.AllItemCategories().Select(cat => new ItemCategory(cat)).ToListAsync());
         }
     }
 }

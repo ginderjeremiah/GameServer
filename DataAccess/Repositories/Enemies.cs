@@ -1,31 +1,42 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
-using GameCore.Entities.Drops;
-using GameCore.Entities.Enemies;
+using GameCore.Entities;
 using GameCore.Infrastructure;
-using System.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
-    internal class Enemies : BaseRepository, IEnemies
+    internal class Enemies(IDatabaseService database) : BaseRepository(database), IEnemies
     {
         private static readonly SharedProbabilityTable zoneEnemiesTable = new();
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
-        public Enemies(IDatabaseService database) : base(database) { }
-
-        public List<Enemy> AllEnemies()
+        public async Task<IEnumerable<Enemy>> AllEnemiesAsync()
         {
-            return _enemyList ??= GetAllEnemyData();
+            return _enemyList ??= await Database.Enemies
+                .AsNoTracking()
+                .Include(e => e.AttributeDistributions)
+                .Include(e => e.EnemyDrops.Select(ed => ed.Item))
+                .Include(e => e.EnemySkills.Select(es => es.Skill))
+                .OrderBy(e => e.Id)
+                .ToListAsync();
         }
 
-        public Enemy GetEnemy(int enemyId)
+        public async Task<Enemy?> GetEnemyAsync(int enemyId)
         {
-            return AllEnemies()[enemyId];
+            var enemies = (await AllEnemiesAsync()).ToList();
+            if (enemies.Count >= enemyId)
+            {
+                return null;
+            }
+            else
+            {
+                return enemies[enemyId];
+            }
         }
 
-        public Enemy GetRandomEnemy(int zoneId)
+        public async Task<Enemy> GetRandomEnemyAsync(int zoneId)
         {
             if (!zoneEnemiesTable.HasProbabilities(zoneId))
             {
@@ -43,83 +54,29 @@ namespace DataAccess.Repositories
                 }
             }
 
-            return AllEnemies()[zoneEnemiesTable.GetRandomValue(zoneId)];
+            var enemies = (await AllEnemiesAsync()).ToList();
+
+            return enemies[zoneEnemiesTable.GetRandomValue(zoneId)];
         }
 
-        private (List<ZoneEnemyProbability>, List<ZoneEnemyAlias>) GetProbabilitiesAndAliases(int zoneId)
+        private (List<ProbabilityData>, List<AliasData>) GetProbabilitiesAndAliases(int zoneId)
         {
-            var commandText = @"
-                SELECT
-                    ZEP.Probability,
-                    ZEP.ZoneEnemyId AS Alias,
-                    ZE.EnemyId AS Value
-                FROM ZoneEnemiesProbabilities AS ZEP
-                INNER JOIN ZoneEnemies AS ZE
-                ON ZEP.ZoneEnemyId = ZE.ZoneEnemyId
-                WHERE ZE.ZoneId = @ZoneId
-                ORDER BY ZEP.ZoneOrder
+            var probabilities = Database.ZoneEnemyProbabilities
+                .AsNoTracking()
+                .Include(zep => zep.ZoneEnemy)
+                .Where(zep => zep.ZoneEnemy.ZoneId == zoneId)
+                .OrderBy(zep => zep.ZoneOrder)
+                .Select(zep => new ProbabilityData { Alias = zep.ZoneEnemyId, Value = zep.ZoneEnemy.EnemyId, Probability = zep.Probability })
+                .ToList();
 
-                SELECT
-                    ZEA.ZoneEnemyId AS Alias,
-                    ZE.EnemyId AS Value
-                FROM ZoneEnemiesAliases AS ZEA
-                INNER JOIN ZoneEnemies AS ZE
-                ON ZEA.ZoneEnemyIdAlias = ZE.ZoneEnemyId
-                WHERE ZE.ZoneId = @ZoneId";
+            var aliases = Database.ZoneEnemyAliases
+                .AsNoTracking()
+                .Include(zea => zea.ZoneEnemy)
+                .Where(zea => zea.ZoneEnemy.ZoneId == zoneId)
+                .Select(zea => new AliasData { Alias = zea.ZoneEnemyId, Value = zea.ZoneEnemy.EnemyId })
+                .ToList();
 
-            return Database.QueryToList<ZoneEnemyProbability, ZoneEnemyAlias>(commandText, new QueryParameter("@ZoneId", zoneId));
-        }
-
-        private List<Enemy> GetAllEnemyData()
-        {
-            var commandText = @"
-                SELECT
-	                EnemyId,
-	                EnemyName
-                FROM Enemies
-                ORDER BY EnemyId
-
-                SELECT
-                    EnemyId,
-                    AttributeId,
-                    BaseAmount,
-                    AmountPerLevel
-                FROM EnemyAttributeDistributions
-
-                SELECT
-	                EnemyId AS DroppedById,
-	                ItemId,
-	                DropRate
-                FROM EnemyDrops
-
-                SELECT
-                    EnemyId,
-                    SkillId
-                FROM EnemySkills";
-
-            var result = Database.QueryToList<Enemy, AttributeDistribution, ItemDrop, EnemySkill>(commandText);
-
-            var attributes = result.Item2
-                .GroupBy(att => att.EnemyId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-            var drops = result.Item3
-                .GroupBy(drop => drop.DroppedById)
-                .ToDictionary(g => g.Key, g => g.ToList());
-            var enemySkills = result.Item4
-                .AsEnumerable()
-                .GroupBy(enemySkill => enemySkill.EnemyId)
-                .ToDictionary(g => g.Key, g => g.Select(enemySkill => enemySkill.SkillId).ToList());
-
-            foreach (var enemy in result.Item1)
-            {
-                var id = enemy.EnemyId;
-                drops.TryGetValue(id, out var dropList);
-                enemy.AttributeDistribution = attributes[id];
-                enemy.EnemyDrops = dropList ?? new List<ItemDrop>();
-                enemy.SkillPool = enemySkills[id];
-            }
-
-            return result.Item1;
+            return (probabilities, aliases);
         }
     }
 }

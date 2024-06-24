@@ -1,5 +1,4 @@
-﻿using GameCore.Entities.Enemies;
-using GameCore.Entities.Skills;
+﻿using GameCore.Entities;
 using static GameCore.BattleSimulation.AttributeType;
 
 namespace GameCore.BattleSimulation
@@ -11,17 +10,17 @@ namespace GameCore.BattleSimulation
         public override List<BattleSkill> Skills { get; set; }
         public override int Level { get; set; }
 
-        public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance, List<Skill> allSkills)
+        public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance)
         {
             var rng = new Random();
-            var selectedSkills = enemy.SkillPool.OrderBy(s => rng.Next()).Take(4).ToList();
-            var attributes = enemy.AttributeDistribution.Select(dist => new BattlerAttribute(dist, enemyInstance.Level)).ToList();
+            var selectedSkills = enemy.EnemySkills.OrderBy(es => rng.Next()).Take(4).Select(es => es.Skill).ToList();
+            var attributes = enemy.AttributeDistributions.Select(dist => new BattlerAttribute(dist, enemyInstance.Level)).ToList();
             Level = enemyInstance.Level;
             Attributes = new BattleAttributes(attributes);
             CurrentHealth = Attributes[MaxHealth];
-            Skills = selectedSkills.Select(id => new BattleSkill(allSkills[id])).ToList();
+            Skills = selectedSkills.Select(skill => new BattleSkill(skill)).ToList();
             enemyInstance.Attributes = attributes;
-            enemyInstance.SelectedSkills = selectedSkills;
+            enemyInstance.SelectedSkills = selectedSkills.Select(s => s.Id).ToList();
         }
     }
 }

@@ -2,57 +2,68 @@
 {
     public class SharedProbabilityTable
     {
-        private readonly List<List<IProbabilityData>?> probabilityTables;
-        private readonly List<int?> aliases;
-        private readonly Random random;
+        private readonly List<List<ProbabilityData>?> _probabilityTables;
+        private readonly List<int?> _aliases;
+        private readonly Random _random;
+        private readonly int _maxTables = 100;
+
         public SharedProbabilityTable()
         {
-            probabilityTables = new();
-            aliases = new();
-            random = new();
+            _probabilityTables = [];
+            _aliases = [];
+            _random = new();
+        }
+
+        public SharedProbabilityTable(int maxTables) : this()
+        {
+            _maxTables = maxTables;
         }
 
         public bool HasProbabilities(int index)
         {
-            return probabilityTables.Count > index && probabilityTables[index] != null;
+            return _probabilityTables.Count > index && _probabilityTables[index] != null;
         }
 
-        public void AddProbabilities(IEnumerable<IProbabilityData> probabilities, int index)
+        public void AddProbabilities(IEnumerable<ProbabilityData> probabilities, int index)
         {
-            for (int i = probabilityTables.Count; i <= index; i++)
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(index, _maxTables);
+
+            for (int i = _probabilityTables.Count; i <= index; i++)
             {
-                probabilityTables.Add(null);
+                _probabilityTables.Add(null);
             }
-            probabilityTables[index] = probabilities.ToList();
+
+            _probabilityTables[index] = probabilities.ToList();
         }
 
-        public void AddAliases(IEnumerable<IAliasData> newAliases)
+        public void AddAliases(IEnumerable<AliasData> newAliases)
         {
             if (!newAliases.Any())
                 return;
 
-            for (int i = aliases.Count; i <= newAliases.Max(alias => alias.Alias); i++)
+            for (int i = _aliases.Count; i <= newAliases.Max(alias => alias.Alias); i++)
             {
-                aliases.Add(null);
+                _aliases.Add(null);
             }
+
             foreach (var alias in newAliases)
             {
-                aliases[alias.Alias] = alias.Value;
+                _aliases[alias.Alias] = alias.Value;
             }
         }
 
         public int GetRandomValue(int index)
         {
-            var probabilities = (probabilityTables.Count > index
-                ? probabilityTables[index]
+            var probabilities = (_probabilityTables.Count > index
+                ? _probabilityTables[index]
                 : null) ?? throw new ArgumentOutOfRangeException(nameof(index), $"Probability table at index '{index}' does not exist.");
 
-            var rand = random.NextSingle() * probabilities.Count;
+            var rand = _random.NextSingle() * probabilities.Count;
             var randInt = (int)float.Floor(rand);
             var remainder = (decimal)(rand - randInt);
             var prob = probabilities[randInt];
 
-            return remainder < prob.Probability ? prob.Value : aliases[prob.Alias]
+            return remainder < prob.Probability ? prob.Value : _aliases[prob.Alias]
                 ?? throw new AliasNotFoundException(prob.Alias);
 
         }
@@ -66,14 +77,14 @@
         }
     }
 
-    public interface IProbabilityData
+    public class ProbabilityData
     {
         public decimal Probability { get; set; }
         public int Value { get; set; }
         public int Alias { get; set; }
     }
 
-    public interface IAliasData
+    public class AliasData
     {
         public int Alias { get; set; }
         public int Value { get; set; }

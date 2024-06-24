@@ -1,12 +1,10 @@
-﻿using GameCore.Entities.Items;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IItems
     {
-        public List<Item> AllItems(bool refreshCache = false);
-        public void AddItem(string itemName, string itemDesc, int itemCategoryId, string iconPath);
-        public void UpdateItem(int itemId, string itemName, string itemDesc, int itemCategoryId, string iconPath);
-        public void DeleteItem(int itemId);
+        public Task<IEnumerable<Item>> AllItemsAsync(bool refreshCache = false);
+        public Task<Item?> GetItemAsync(int itemId);
     }
 }

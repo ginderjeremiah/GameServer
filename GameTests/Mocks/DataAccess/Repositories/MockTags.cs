@@ -1,6 +1,6 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
-using GameCore.Entities.Tags;
+using GameCore.Entities;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

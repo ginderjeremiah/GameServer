@@ -8,7 +8,7 @@ using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using System.Net.Http.Json;
 using static System.Net.HttpStatusCode;
-using LogPreference = GameCore.Entities.LogPreferences.LogPreference;
+using LogPreference = GameCore.Entities.LogPreference;
 using LogPreferenceModel = GameServer.Models.Player.LogPreference;
 
 namespace GameTests.GameServerTests.Controllers

@@ -1,4 +1,4 @@
-﻿using GameCore.Entities.InventoryItems;
+﻿using GameCore.Entities;
 
 namespace GameCore.BattleSimulation
 {

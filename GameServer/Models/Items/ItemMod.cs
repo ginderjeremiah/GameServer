@@ -4,23 +4,23 @@ namespace GameServer.Models.Items
 {
     public class ItemMod : IModel
     {
-        public int ItemModId { get; set; }
-        public string ItemModName { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; }
         public bool Removable { get; set; }
-        public string ItemModDesc { get; set; }
+        public string Description { get; set; }
         public int SlotTypeId { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
 
         public ItemMod() { }
 
-        public ItemMod(GameCore.Entities.ItemMods.ItemMod itemMod)
+        public ItemMod(GameCore.Entities.ItemMod itemMod)
         {
-            ItemModId = itemMod.ItemModId;
-            ItemModName = itemMod.ItemModName;
+            Id = itemMod.Id;
+            Name = itemMod.Name;
             Removable = itemMod.Removable;
-            ItemModDesc = itemMod.ItemModDesc;
+            Description = itemMod.Description;
             SlotTypeId = itemMod.SlotTypeId;
-            Attributes = itemMod.Attributes.Select(a => new BattlerAttribute(a)).ToList();
+            Attributes = itemMod.ItemModAttributes.Select(a => new BattlerAttribute(a)).ToList();
         }
     }
 }

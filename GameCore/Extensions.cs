@@ -1,5 +1,5 @@
 ﻿using GameCore.BattleSimulation;
-using GameCore.Entities.PlayerAttributes;
+using GameCore.Entities;
 using System.Data;
 using System.Text;
 using System.Text.Json;

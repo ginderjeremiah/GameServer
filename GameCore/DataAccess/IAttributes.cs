@@ -1,9 +1,9 @@
-﻿using Attribute = GameCore.Entities.Attributes.Attribute;
+﻿using Attribute = GameCore.Entities.Attribute;
 
 namespace GameCore.DataAccess
 {
     public interface IAttributes
     {
-        public List<Attribute> AllAttributes();
+        public IQueryable<Attribute> AllAttributes();
     }
 }

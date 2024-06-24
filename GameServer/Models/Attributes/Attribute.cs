@@ -4,17 +4,17 @@ namespace GameServer.Models.Attributes
 {
     public class Attribute : IModel
     {
-        public AttributeType AttributeId { get; set; }
-        public string AttributeName { get; set; }
-        public string AttributeDesc { get; set; }
+        public AttributeType Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
 
         public Attribute() { }
 
-        public Attribute(GameCore.Entities.Attributes.Attribute attribute)
+        public Attribute(GameCore.Entities.Attribute attribute)
         {
-            AttributeId = (AttributeType)attribute.AttributeId;
-            AttributeName = attribute.AttributeName;
-            AttributeDesc = attribute.AttributeDesc;
+            Id = (AttributeType)attribute.Id;
+            Name = attribute.Name;
+            Description = attribute.Description;
         }
     }
 }

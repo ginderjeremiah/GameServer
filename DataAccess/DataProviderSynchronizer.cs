@@ -1,5 +1,5 @@
 ﻿using GameCore;
-using GameCore.Entities.SessionStore;
+using GameCore.Entities;
 using GameCore.Infrastructure;
 
 namespace DataAccess
@@ -61,8 +61,8 @@ namespace DataAccess
             var channel = Constants.PUBSUB_INVENTORY_CHANNEL;
             var queueName = Constants.PUBSUB_INVENTORY_QUEUE;
 
-            var inventoryProcessor = GetSessionQueueProcessor(sessionData =>
-                _repos.InventoryItems.UpdateInventoryItemSlots(sessionData.PlayerData.PlayerId, sessionData.InventoryItems)
+            var inventoryProcessor = GetSessionQueueProcessor(async sessionData =>
+                await _repos.InventoryItems.UpdateInventoryItemSlotsAsync(sessionData.PlayerData.Id, sessionData.InventoryItems)
             );
 
             _pubSub.Subscribe(channel, queueName, args => inventoryProcessor(args.queue));
@@ -73,7 +73,7 @@ namespace DataAccess
             var channel = Constants.PUBSUB_PLAYER_CHANNEL;
             var queueName = Constants.PUBSUB_PLAYER_QUEUE;
 
-            var playerProcessor = GetSessionQueueProcessor(sessionData => _repos.Players.SavePlayer(sessionData.PlayerData, sessionData.Attributes));
+            var playerProcessor = GetSessionQueueProcessor(sessionData => _repos.Players.SavePlayerAsync(sessionData.PlayerData, sessionData.Attributes));
 
             _pubSub.Subscribe(channel, queueName, args => playerProcessor(args.queue));
         }
@@ -88,15 +88,16 @@ namespace DataAccess
             _pubSub.Subscribe(channel, queueName, args => skillsProcessor(args.queue));
         }
 
-        private Action<IPubSubQueue> GetSessionQueueProcessor(Action<SessionData> action)
+        private Action<IPubSubQueue> GetSessionQueueProcessor(Func<SessionData, Task> action)
         {
-            return (IPubSubQueue queue) =>
+            return async (IPubSubQueue queue) =>
             {
                 while (queue.TryGetNext(out var sessionKey))
                 {
-                    if (_repos.SessionStore.TryGetSession(sessionKey, out var sessionData))
+                    var session = await _repos.SessionStore.GetSessionAsync(sessionKey);
+                    if (session is not null)
                     {
-                        action(sessionData);
+                        await action(session);
                     }
                 }
             };

@@ -1,7 +1,7 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.Drops;
-using GameCore.Entities.Zones;
+using GameCore.Entities;
 using GameCore.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
@@ -11,57 +11,27 @@ namespace DataAccess.Repositories
 
         public Zones(IDatabaseService database) : base(database) { }
 
-        public List<Zone> AllZones()
+        public async Task<IEnumerable<Zone>> AllZonesAsync()
         {
-            return _zoneList ??= GetAllZones();
+            return _zoneList ??= await Database.Zones
+                .AsNoTracking()
+                .Include(z => z.ZoneDrops)
+                .ToListAsync();
         }
 
-        public Zone GetZone(int zoneId)
+        public async Task<Zone?> GetZoneAsync(int zoneId)
         {
-            if (!ValidateZoneId(zoneId))
+            if (!await ValidateZoneIdAsync(zoneId))
             {
                 throw new ArgumentOutOfRangeException(nameof(zoneId));
             }
 
-            return AllZones()[zoneId];
+            return (await AllZonesAsync()).ToList()[zoneId];
         }
 
-        public bool ValidateZoneId(int zoneId)
+        public async Task<bool> ValidateZoneIdAsync(int zoneId)
         {
-            return zoneId >= 0 && zoneId < AllZones().Count;
-        }
-
-        private List<Zone> GetAllZones()
-        {
-            var commandText = @"
-                SELECT
-	                ZoneId,
-	                ZoneName,
-	                ZoneDesc,
-	                ZoneOrder,
-                    LevelMin,
-                    LevelMax
-                FROM Zones
-                ORDER BY ZoneId
-
-                SELECT
-                    ZoneId AS DroppedById,
-                    ItemId,
-                    DropRate
-                FROM ZoneDrops";
-
-            var result = Database.QueryToList<Zone, ItemDrop>(commandText);
-
-            var drops = result.Item2
-                .GroupBy(drop => drop.DroppedById)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            foreach (var zone in result.Item1)
-            {
-                zone.ZoneDrops = drops[zone.ZoneId];
-            }
-
-            return result.Item1;
+            return zoneId >= 0 && zoneId < (await AllZonesAsync()).ToList().Count;
         }
     }
 }

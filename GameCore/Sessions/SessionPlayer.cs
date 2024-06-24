@@ -1,6 +1,4 @@
-﻿using GameCore.Entities.PlayerAttributes;
-using GameCore.Entities.Players;
-using GameCore.Entities.SessionStore;
+﻿using GameCore.Entities;
 
 namespace GameCore.Sessions
 {
@@ -10,16 +8,16 @@ namespace GameCore.Sessions
 
         private Player Player => _sessionData.PlayerData;
 
-        public int PlayerId { get => Player.PlayerId; }
+        public int PlayerId { get => Player.Id; }
         public string UserName { get => Player.UserName; }
         public Guid Salt { get => Player.Salt; }
         public string PassHash { get => Player.PassHash; }
-        public string PlayerName { get => Player.PlayerName; }
+        public string PlayerName { get => Player.Name; }
         public int Level { get => Player.Level; set => Player.Level = value; }
         public int Exp { get => Player.Exp; set => Player.Exp = value; }
         public List<PlayerAttribute> Attributes { get => _sessionData.Attributes; set => _sessionData.Attributes = value; }
-        public List<PlayerSkill> PlayerSkills { get => _sessionData.PlayerSkills; }
-        public List<int> SelectedSkills { get => _sessionData.PlayerSkills.Where(skill => skill.Selected).Select(skill => skill.SkillId).ToList(); }
+        public List<PlayerSkill> PlayerSkills { get => _sessionData.Skills; }
+        public List<PlayerSkill> SelectedSkills { get => _sessionData.Skills.Where(skill => skill.Selected).ToList(); }
         public int StatPointsGained { get => Player.StatPointsGained; set => Player.StatPointsGained = value; }
         public int StatPointsUsed { get => Player.StatPointsUsed; private set => Player.StatPointsUsed = value; }
 

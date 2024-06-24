@@ -1,8 +1,8 @@
 ﻿using GameCore;
+using GameCore.Entities;
 using GameCore.Entities.InventoryItems;
 using GameCore.Entities.PlayerAttributes;
 using GameCore.Entities.Players;
-using GameCore.Entities.SessionStore;
 using GameCore.Infrastructure;
 using GameCore.Sessions;
 using GameServer;
@@ -50,7 +50,7 @@ namespace GameTests.Mocks.GameServer
                 UserName = "SwankyJeans"
             };
 
-            var sessionData = new SessionData
+            var sessionData = new SessionData(Guid.NewGuid().ToString())
             {
                 Attributes = new()
                 {
@@ -74,15 +74,14 @@ namespace GameTests.Mocks.GameServer
                 },
                 LastUsed = DateTime.UtcNow,
                 PlayerData = playerData,
-                PlayerSkills = new()
+                Skills = new()
                 {
                     new PlayerSkill { PlayerId = playerId, Selected = true, SkillId = 0, }
                 },
-                SessionId = Guid.NewGuid().ToString(),
                 Victory = true
             };
 
-            CacheService.Set(sessionData.SessionId, sessionData);
+            CacheService.Set(sessionData.Id, sessionData);
             ClientOptions.HandleCookies = false;
             Session = new(sessionData, Repositories);
             client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", $"{Constants.TOKEN_NAME}={Session.GetNewToken()}");

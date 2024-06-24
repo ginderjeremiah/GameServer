@@ -1,4 +1,4 @@
-﻿using GameCore.Entities.InventoryItems;
+﻿using GameCore.Entities;
 
 namespace GameCore.Sessions
 {
@@ -45,7 +45,7 @@ namespace GameCore.Sessions
         public bool TrySetNewInventoryList(IEnumerable<IInventoryUpdate> inventoryUpdates)
         {
             var usedSlots = new HashSet<(bool, int)>();
-            var matchedUpdates = _sessionInventory.Select((inv) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.InventoryItemId == upd.InventoryItemId))).ToList();
+            var matchedUpdates = _sessionInventory.Select((inv) => (inv, inventoryUpdates.FirstOrDefault(upd => inv.Id == upd.Id))).ToList();
             var validUpdate = true;
 
             foreach (var match in matchedUpdates)
@@ -88,7 +88,7 @@ namespace GameCore.Sessions
 
         private bool IsValidInventoryUpdate(IInventoryUpdate item)
         {
-            return _sessionInventory.Any(inv => inv.InventoryItemId == item.InventoryItemId)
+            return _sessionInventory.Any(inv => inv.Id == item.Id)
                 && item.InventorySlotNumber is >= 0
                 && (item.Equipped && item.InventorySlotNumber is < EQUIP_SLOTS
                     || !item.Equipped && item.InventorySlotNumber is < INV_SLOTS);

@@ -3,7 +3,7 @@ using GameServer.Models.Common;
 using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using static System.Net.HttpStatusCode;
-using ItemCategory = GameCore.Entities.ItemCategories.ItemCategory;
+using ItemCategory = GameCore.Entities.ItemCategory;
 using ItemCategoryModel = GameServer.Models.Items.ItemCategory;
 
 namespace GameTests.GameServerTests.Controllers

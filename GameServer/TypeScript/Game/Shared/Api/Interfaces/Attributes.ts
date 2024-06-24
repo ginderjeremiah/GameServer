@@ -1,7 +1,7 @@
 interface IAttribute {
-	attributeId: AttributeType;
-	attributeName: string;
-	attributeDesc: string;
+	id: AttributeType;
+	name: string;
+	description: string;
 }
 
 interface IAttributeDistribution {

@@ -1,7 +1,5 @@
 ﻿using GameCore.BattleSimulation;
-using GameCore.Entities.ItemMods;
-using GameCore.Entities.Items;
-using GameCore.Entities.PlayerAttributes;
+using GameCore.Entities;
 
 namespace GameServer.Models.Attributes
 {

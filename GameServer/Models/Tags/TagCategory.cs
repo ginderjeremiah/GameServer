@@ -2,13 +2,13 @@
 {
     public class TagCategory : IModel
     {
-        public int TagCategoryId { get; set; }
-        public string TagCategoryName { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; }
 
-        public TagCategory(GameCore.Entities.TagCategories.TagCategory tagCategory)
+        public TagCategory(GameCore.Entities.TagCategory tagCategory)
         {
-            TagCategoryId = tagCategory.TagCategoryId;
-            TagCategoryName = tagCategory.TagCategoryName;
+            Id = tagCategory.Id;
+            Name = tagCategory.Name;
         }
     }
 }

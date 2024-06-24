@@ -1,9 +1,9 @@
-﻿using GameCore.Entities.TagCategories;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface ITagCategories
     {
-        public List<TagCategory> GetTagCategories();
+        public IQueryable<TagCategory> AllTagCategories();
     }
 }

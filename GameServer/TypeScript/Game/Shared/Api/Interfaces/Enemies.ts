@@ -17,7 +17,7 @@ interface IEnemy {
 }
 
 interface IEnemyInstance {
-	enemyId: number;
+	id: number;
 	level: number;
 	attributes: IBattlerAttribute[];
 	seed: number;

@@ -1,4 +1,5 @@
 using GameCore;
+using GameCore.Entities;
 using GameCore.Entities.ItemMods;
 using GameCore.Entities.Items;
 using GameServer.Models.Common;
@@ -11,13 +12,13 @@ using static GameCore.BattleSimulation.AttributeType;
 using static GameServer.ChangeType;
 using static System.Net.HttpStatusCode;
 using BattlerAttribute = GameServer.Models.Attributes.BattlerAttribute;
-using Item = GameCore.Entities.Items.Item;
-using ItemMod = GameCore.Entities.ItemMods.ItemMod;
+using Item = GameCore.Entities.Item;
+using ItemMod = GameCore.Entities.ItemMod;
 using ItemModel = GameServer.Models.Items.Item;
 using ItemModModel = GameServer.Models.Items.ItemMod;
-using ItemSlot = GameCore.Entities.ItemSlots.ItemSlot;
+using ItemSlot = GameCore.Entities.ItemSlot;
 using ItemSlotModel = GameServer.Models.Items.ItemSlot;
-using Tag = GameCore.Entities.Tags.Tag;
+using Tag = GameCore.Entities.Tag;
 using TagModel = GameServer.Models.Tags.Tag;
 
 namespace GameTests.GameServerTests.Controllers

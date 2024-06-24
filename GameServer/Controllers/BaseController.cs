@@ -2,6 +2,7 @@
 using GameCore.Sessions;
 using GameServer.Models;
 using GameServer.Models.Common;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Diagnostics;
@@ -10,13 +11,13 @@ namespace GameServer.Controllers
 {
     public class BaseController : Controller
     {
-        private Session? _session;
         private long _beginTimestamp;
         private string? _route;
+        private readonly SessionService _sessionService;
 
-        //HttpContext.Items["Session"] is populated via SessionAuthorize attribute;
-        //Session can only be null if SessionAuthorize is not used or (AllowAll = true) is specified in the SessionAuthorize attribute;
-        protected Session Session => _session ??= (Session?)HttpContext.Items["Session"];
+        //Session can only be null if (AllowAll = true) is specified in the SessionAuthorize attribute;
+        protected Session Session => _sessionService.GetSession();
+        protected bool SessionAvailable => _sessionService.SessionAvailable;
         protected int PlayerId => Session.Player.PlayerId;
         protected IRepositoryManager Repositories { get; }
         protected IApiLogger Logger { get; }
@@ -33,29 +34,32 @@ namespace GameServer.Controllers
             }
         }
 
-        public BaseController(IRepositoryManager repositoryManager, IApiLogger logger)
+        public BaseController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
         {
             Repositories = repositoryManager;
             Logger = logger;
+            _sessionService = sessionService;
         }
 
         [NonAction]
-
-        public override void OnActionExecuting(ActionExecutingContext context)
+        public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             _beginTimestamp = Stopwatch.GetTimestamp();
             _route = $"{context.RouteData.Values["controller"]}/{context.RouteData.Values["action"]}";
             Logger.LogInfo($"Begin {_route} request");
-        }
 
-        [NonAction]
-        public override void OnActionExecuted(ActionExecutedContext context)
-        {
-            if (context.Exception is not null)
+            var resultContext = await next();
+
+            if (resultContext.Exception is not null)
             {
-                Logger.LogError(context.Exception);
+                Logger.LogError(resultContext.Exception);
             }
-            Session?.Save();
+
+            if (SessionAvailable)
+            {
+                await Session.Save();
+            }
+
             Logger.LogInfo($"End {_route} request: {Stopwatch.GetElapsedTime(_beginTimestamp).TotalMilliseconds} ms");
         }
 

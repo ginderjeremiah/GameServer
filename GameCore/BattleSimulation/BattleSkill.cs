@@ -1,4 +1,4 @@
-﻿using GameCore.Entities.Skills;
+﻿using GameCore.Entities;
 
 namespace GameCore.BattleSimulation
 {
@@ -14,7 +14,7 @@ namespace GameCore.BattleSimulation
         public double CalculateDamage(BattleAttributes atts)
         {
             double damage = (double)Data.BaseDamage;
-            Data.DamageMultipliers.ForEach((dmgType) =>
+            Data.SkillDamageMultipliers.ForEach((dmgType) =>
             {
                 damage += atts[(AttributeType)dmgType.AttributeId] * (double)dmgType.Multiplier;
             });

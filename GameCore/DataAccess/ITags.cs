@@ -1,16 +1,11 @@
-﻿using GameCore.Entities.Tags;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface ITags
     {
-        public List<Tag> AllTags();
-        public List<Tag> TagsForItem(int itemId);
-        public List<Tag> TagsForItemMod(int itemModId);
-        public void SetItemTags(int itemId, IEnumerable<int> tagIds);
-        public void SetItemModTags(int itemModId, IEnumerable<int> tagIds);
-        public void AddTag(string tagName, int tagCategoryId);
-        public void UpdateTag(int tagId, string tagName, int tagCategoryId);
-        public void DeleteTag(int tagId);
+        public IQueryable<Tag> AllTags();
+        public IQueryable<Tag> TagsForItem(int itemId);
+        public IQueryable<Tag> TagsForItemMod(int itemModId);
     }
 }

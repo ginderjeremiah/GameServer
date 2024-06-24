@@ -1,11 +1,10 @@
-﻿using GameCore.Entities.InventoryItems;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IInventoryItems
     {
-        public List<InventoryItem> GetInventory(int playerId);
-        public int AddInventoryItem(InventoryItem inventoryItem);
-        public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems);
+        public Task<IEnumerable<InventoryItem>> GetInventoryAsync(int playerId);
+        public Task UpdateInventoryItemSlotsAsync(int playerId, IEnumerable<InventoryItem> inventoryItems);
     }
 }

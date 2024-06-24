@@ -25,7 +25,7 @@ namespace GameServer.Models.Player
             Level = sessionPlayer.Level;
             Exp = sessionPlayer.Exp;
             Attributes = sessionPlayer.Attributes.Select(att => new BattlerAttribute(att)).ToList();
-            SelectedSkills = sessionPlayer.SelectedSkills;
+            SelectedSkills = sessionPlayer.SelectedSkills.Select(s => s.SkillId).ToList();
             StatPointsGained = sessionPlayer.StatPointsGained;
             StatPointsUsed = sessionPlayer.StatPointsUsed;
             InventoryData = new InventoryData(sessionInventory);

@@ -1,5 +1,5 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.SlotTypes;
+using GameCore.Entities;
 using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
@@ -8,16 +8,9 @@ namespace DataAccess.Repositories
     {
         public SlotTypes(IDatabaseService database) : base(database) { }
 
-        public List<SlotType> AllSlotTypes()
+        public IQueryable<SlotType> AllSlotTypes()
         {
-            var commandText = @"
-                SELECT
-                    SlotTypeId,
-                    SlotTypeName
-                FROM
-                    SlotTypes";
-
-            return Database.QueryToList<SlotType>(commandText);
+            return Database.SlotTypes;
         }
     }
 }

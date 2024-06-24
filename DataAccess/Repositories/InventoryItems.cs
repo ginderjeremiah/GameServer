@@ -1,8 +1,7 @@
-﻿using GameCore;
-using GameCore.DataAccess;
-using GameCore.Entities.InventoryItems;
+﻿using GameCore.DataAccess;
+using GameCore.Entities;
 using GameCore.Infrastructure;
-using System.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
@@ -15,107 +14,39 @@ namespace DataAccess.Repositories
 
         public InventoryItems(IDatabaseService database) : base(database) { }
 
-        public List<InventoryItem> GetInventory(int playerId)
+        public async Task<IEnumerable<InventoryItem>> GetInventoryAsync(int playerId)
         {
-            var commandText = @"
-                SELECT
-                    InventoryItemId,
-                    PlayerId,
-                    ItemId,
-                    Rating,
-                    Equipped,
-                    InventorySlotNumber
-                FROM InventoryItems
-                WHERE
-                    PlayerId = @PlayerId";
-
-            return Database.QueryToList<InventoryItem>(commandText, new QueryParameter("@PlayerId", playerId));
+            var player = await Database.Players
+                .Include(p => p.InventoryItems.Select(i => i.Item.ItemAttributes))
+                .Include(p => p.InventoryItems.Select(i => i.InventoryItemMods.Select(im => im.ItemMod.ItemModAttributes)))
+                .FirstOrDefaultAsync(p => p.Id == playerId);
+            return player?.InventoryItems ?? Enumerable.Empty<InventoryItem>();
         }
 
         public int AddInventoryItem(InventoryItem inventoryItem)
         {
-            var commandText = @"
-                CREATE TABLE #ItemModsJson (
-		            ItemModId INT,
-		            ItemSlotId INT
-	            )
-
-	            IF (@ItemMods <> '')
-	            BEGIN
-		            INSERT INTO #ItemModsJson
-		            (ItemModId, ItemSlotId)
-		            SELECT
-			            ItemModId,
-			            ItemSlotId
-		            FROM OPENJSON(@ItemMods)
-		            WITH ( itemModId INT, itemSlotId INT)
-	            END
-
-                INSERT INTO InventoryItems
-                VALUES
-                    (@PlayerId, @ItemId, @Rating, @Equipped, @InventorySlotNumber)
-                
-                DECLARE @Id INT = SCOPE_IDENTITY()
- 
-                INSERT INTO InventoryItemMods
-                (InventoryItemId, ItemSlotId, ItemModId)
-                SELECT
-                    @Id,
-                    itemSlotId,
-                    itemModId
-                FROM
-                    #ItemModsJson
-
-                SELECT @Id;";
-
-            var id = Database.ExecuteScalar<int>(commandText,
-                new QueryParameter("@PlayerId", inventoryItem.PlayerId),
-                new QueryParameter("@ItemId", inventoryItem.ItemId),
-                new QueryParameter("@Rating", inventoryItem.Rating),
-                new QueryParameter("@Equipped", inventoryItem.Equipped),
-                new QueryParameter("@InventorySlotNumber", inventoryItem.InventorySlotNumber),
-                new QueryParameter("@ItemMods", inventoryItem.ItemMods.Serialize(), DbType.String));
-
-            inventoryItem.InventoryItemId = id;
-            return id;
+            Database.Insert(inventoryItem);
+            return inventoryItem.Id;
         }
 
-        public void UpdateInventoryItemSlots(int playerId, IEnumerable<InventoryItem> inventoryItems)
+        public async Task UpdateInventoryItemSlotsAsync(int playerId, IEnumerable<InventoryItem> inventoryItems)
         {
-            var structuredParameter = new QueryParameter("@InventoryItems", StructuredType.InventoryUpdate);
-
-            structuredParameter.AddColumns(
-                ("InventoryItemId", DbType.Int32),
-                ("InventorySlotNumber", DbType.Int32),
-                ("Equipped", DbType.Boolean)
-            );
-
-            structuredParameter.AddRows(inventoryItems.Select(item => new List<object?>()
+            await Database.Players.SelectMany(p => p.InventoryItems).ForEachAsync(item =>
             {
-                item.InventoryItemId,
-                item.InventorySlotNumber,
-                item.Equipped
-            }).ToList());
+                var match = inventoryItems.FirstOrDefault(i => i.Id == item.Id);
+                if (match is null)
+                {
+                    Database.Delete(item);
+                }
+                else
+                {
+                    item.InventorySlotNumber = match.InventorySlotNumber;
+                    item.Equipped = match.Equipped;
+                    Database.Update(item);
+                }
+            });
 
-            var commandText = @"
-                DELETE II
-                FROM InventoryItems II
-                LEFT JOIN @InventoryItems INVI
-                ON II.InventoryItemId = INVI.InventoryItemId
-                WHERE II.PlayerId = @PlayerId
-                AND INVI.InventoryItemId IS NULL
-
-                UPDATE II
-                SET InventorySlotNumber = INVI.InventorySlotNumber,
-                    Equipped = INVI.Equipped
-                FROM InventoryItems II
-                INNER JOIN @InventoryItems INVI
-                ON II.InventoryItemId = INVI.InventoryItemId";
-
-            Database.ExecuteNonQuery(commandText,
-                new QueryParameter("@PlayerId", playerId),
-                structuredParameter
-            );
+            await Database.SaveChangesAsync();
         }
     }
 }

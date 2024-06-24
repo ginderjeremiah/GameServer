@@ -1,6 +1,4 @@
-﻿using GameCore.Entities.ItemMods;
-using GameCore.Entities.Items;
-using GameCore.Entities.PlayerAttributes;
+﻿using GameCore.Entities;
 
 namespace GameCore.BattleSimulation
 {
@@ -15,7 +13,7 @@ namespace GameCore.BattleSimulation
             Amount = playerAttribute.Amount;
         }
 
-        public BattlerAttribute(Entities.Enemies.AttributeDistribution distribution, int level)
+        public BattlerAttribute(AttributeDistribution distribution, int level)
         {
             AttributeId = (AttributeType)distribution.AttributeId;
             Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;

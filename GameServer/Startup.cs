@@ -4,6 +4,7 @@ using GameCore.Infrastructure;
 using GameInfrastructure;
 using GameServer.Auth;
 using GameServer.CodeGen;
+using GameServer.Services;
 
 namespace GameServer
 {
@@ -23,6 +24,7 @@ namespace GameServer
             builder.Services.AddScoped<IDataServicesFactory, DataServicesFactory>();
             builder.Services.AddScoped(services => services.GetRequiredService<IDataServicesFactory>().Logger);
             builder.Services.AddScoped<IRepositoryManager, RepositoryManager>();
+            builder.Services.AddScoped<SessionService>();
 
             builder.Services.AddAuthentication(options =>
             {
@@ -53,6 +55,8 @@ namespace GameServer
                 name: "default",
                 pattern: "{controller=Home}/{action=Game}"
             );
+
+            app.UseSessionAuth();
 
             app.Run();
         }

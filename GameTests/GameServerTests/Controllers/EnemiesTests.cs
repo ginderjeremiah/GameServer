@@ -1,5 +1,5 @@
 ﻿using GameCore;
-using GameCore.Entities.Enemies;
+using GameCore.Entities;
 using GameCore.Entities.Skills;
 using GameCore.Entities.Zones;
 using GameServer.Models.Common;
@@ -11,7 +11,7 @@ using static GameCore.BattleSimulation.AttributeType;
 using static System.Net.HttpStatusCode;
 using BattlerAttribute = GameCore.BattleSimulation.BattlerAttribute;
 using BattlerAttributeModel = GameServer.Models.Attributes.BattlerAttribute;
-using Enemy = GameCore.Entities.Enemies.Enemy;
+using Enemy = GameCore.Entities.Enemy;
 using EnemyInstance = GameCore.BattleSimulation.EnemyInstance;
 using EnemyInstanceModel = GameServer.Models.Enemies.EnemyInstance;
 using EnemyModel = GameServer.Models.Enemies.Enemy;

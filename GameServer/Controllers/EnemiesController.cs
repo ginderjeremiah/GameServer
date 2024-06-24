@@ -3,6 +3,7 @@ using GameCore.BattleSimulation;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Enemies;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using EnemyInstance = GameCore.BattleSimulation.EnemyInstance;
 using EnemyInstanceModel = GameServer.Models.Enemies.EnemyInstance;
@@ -13,23 +14,24 @@ namespace GameServer.Controllers
     [ApiController]
     public class EnemiesController : BaseController
     {
-        public EnemiesController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public EnemiesController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<Enemy> Enemies()
+        public async Task<ApiListResponse<Enemy>> Enemies()
         {
-            return Success(Repositories.Enemies.AllEnemies().Select(enemy => new Enemy(enemy)));
+            var enemies = await Repositories.Enemies.AllEnemiesAsync();
+            return Success(enemies.Select(enemy => new Enemy(enemy)));
         }
 
         [SessionAuthorize]
         [HttpPost]
-        public ApiResponse<DefeatEnemy> DefeatEnemy([FromBody] EnemyInstanceModel enemyInstance)
+        public async Task<ApiResponse<DefeatEnemy>> DefeatEnemy([FromBody] EnemyInstanceModel enemyInstance)
         {
             var now = DateTime.UtcNow;
             var instance = new EnemyInstance
             {
-                EnemyId = enemyInstance.EnemyId,
+                Id = enemyInstance.Id,
                 Level = enemyInstance.Level,
                 Seed = enemyInstance.Seed,
                 SelectedSkills = enemyInstance.SelectedSkills,
@@ -39,7 +41,7 @@ namespace GameServer.Controllers
             {
                 Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
-                var rewards = Session.GrantRewards(instance);
+                var rewards = await Session.GrantRewards(instance);
                 return Success(new DefeatEnemy
                 {
                     Cooldown = 5000,
@@ -58,7 +60,7 @@ namespace GameServer.Controllers
 
         [SessionAuthorize]
         [HttpGet]
-        public ApiResponse<NewEnemy> NewEnemy(int newZoneId = -1)
+        public async Task<ApiResponse<NewEnemy>> NewEnemy(int newZoneId = -1)
         {
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
@@ -69,18 +71,18 @@ namespace GameServer.Controllers
                 });
             }
 
-            if (newZoneId != -1 && Repositories.Zones.ValidateZoneId(newZoneId))
+            if (newZoneId != -1 && await Repositories.Zones.ValidateZoneIdAsync(newZoneId))
             {
                 Session.CurrentZone = newZoneId;
             }
 
-            var zone = Repositories.Zones.GetZone(Session.CurrentZone);
+            var zone = await Repositories.Zones.GetZoneAsync(Session.CurrentZone);
             var level = (int)new Random().NextInt64(zone.LevelMin, zone.LevelMax);
-            var enemy = Repositories.Enemies.GetRandomEnemy(zone.ZoneId);
+            var enemy = await Repositories.Enemies.GetRandomEnemyAsync(zone.Id);
             var seed = (uint)(now.Ticks % uint.MaxValue);
             var enemyInstance = new EnemyInstance()
             {
-                EnemyId = enemy.EnemyId,
+                Id = enemy.Id,
                 Level = level,
                 Seed = seed
             };
