@@ -1,4 +1,4 @@
-﻿using GameCore.Entities.Skills;
+﻿using GameCore.Entities;
 
 namespace GameCore.BattleSimulation
 {
@@ -6,6 +6,7 @@ namespace GameCore.BattleSimulation
     {
         public double ChargeTime { get; set; } = 0;
         public Skill Data;
+
         public BattleSkill(Skill skillData)
         {
             Data = skillData;
@@ -14,9 +15,9 @@ namespace GameCore.BattleSimulation
         public double CalculateDamage(BattleAttributes atts)
         {
             double damage = (double)Data.BaseDamage;
-            Data.DamageMultipliers.ForEach((dmgType) =>
+            Data.SkillDamageMultipliers.ForEach((dmgType) =>
             {
-                damage += atts[(AttributeType)dmgType.AttributeId] * (double)dmgType.Multiplier;
+                damage += atts[(EAttribute)dmgType.AttributeId] * (double)dmgType.Multiplier;
             });
             return damage;
         }

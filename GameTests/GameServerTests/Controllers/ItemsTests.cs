@@ -3,11 +3,11 @@ using GameServer.Models.Common;
 using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using static System.Net.HttpStatusCode;
-using Item = GameCore.Entities.Items.Item;
+using Item = GameCore.Entities.Item;
 using ItemModel = GameServer.Models.Items.Item;
-using ItemSlot = GameCore.Entities.ItemSlots.ItemSlot;
+using ItemSlot = GameCore.Entities.ItemSlot;
 using ItemSlotModel = GameServer.Models.Items.ItemSlot;
-using SlotType = GameCore.Entities.SlotTypes.SlotType;
+using SlotType = GameCore.Entities.SlotType;
 using SlotTypeModel = GameServer.Models.Items.SlotType;
 
 namespace GameTests.GameServerTests.Controllers

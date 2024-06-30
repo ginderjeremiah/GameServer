@@ -4,12 +4,22 @@ using GameCore.Infrastructure;
 using GameInfrastructure;
 using GameServer.Auth;
 using GameServer.CodeGen;
+using GameServer.Services;
+using System.Diagnostics;
 
 namespace GameServer
 {
+    /// <summary>
+    /// The class containing the entry point for the application.
+    /// </summary>
     public class Startup
     {
-        public static void Main(string[] args)
+        /// <summary>
+        /// The entry point of the application.
+        /// </summary>
+        /// <param name="args">No parameters are currently supported.</param>
+        /// <returns>An empty <see cref="Task"/>.</returns>
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
             var config = new Config(builder.Configuration);
@@ -17,24 +27,28 @@ namespace GameServer
 
             // Add services to the container.
             builder.Services.AddControllersWithViews();
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
-            builder.Services.AddSingleton<IDataServicesConfiguration, Config>();
-            builder.Services.AddScoped<IDataServicesFactory, DataServicesFactory>();
-            builder.Services.AddScoped(services => services.GetRequiredService<IDataServicesFactory>().Logger);
-            builder.Services.AddScoped<IRepositoryManager, RepositoryManager>();
-
-            builder.Services.AddAuthentication(options =>
-            {
-                options.DefaultChallengeScheme = "SessionAuth";
-                options.AddScheme<SessionAuthHandler>("SessionAuth", nameof(SessionAuthHandler));
-            });
+            builder.Services.AddEndpointsApiExplorer()
+                .AddSwaggerGen()
+                .AddSingleton<IDataServicesConfiguration, Config>()
+                .AddScoped<IDataServicesFactory, DataServicesFactory>()
+                .AddScoped(services => services.GetRequiredService<IDataServicesFactory>().Logger)
+                .AddScoped<IRepositoryManager, RepositoryManager>()
+                .AddScoped<SessionService>();
 
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
+                var dataServices = new DataServicesFactory(config);
+                var logger = dataServices.Logger;
+                var start = Stopwatch.GetTimestamp();
+                logger.LogDebug($"Beginning {nameof(dataServices.Database.EnsureDbUpdatedAsync)}");
+
+                await dataServices.Database.EnsureDbUpdatedAsync();
+
+                logger.LogDebug($"Finished {nameof(dataServices.Database.EnsureDbUpdatedAsync)}. Elapsed time {Stopwatch.GetElapsedTime(start)}");
+
                 app.UseSwagger();
                 app.UseSwaggerUI();
                 ApiCodeGenerator.GenerateResponseInterfaces();
@@ -53,6 +67,8 @@ namespace GameServer
                 name: "default",
                 pattern: "{controller=Home}/{action=Game}"
             );
+
+            app.UseSessionAuth();
 
             app.Run();
         }

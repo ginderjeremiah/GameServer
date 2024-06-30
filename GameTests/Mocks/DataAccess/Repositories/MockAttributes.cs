@@ -1,5 +1,5 @@
 ﻿using GameCore.DataAccess;
-using Attribute = GameCore.Entities.Attributes.Attribute;
+using Attribute = GameCore.Entities.Attribute;
 
 namespace GameTests.Mocks.DataAccess.Repositories
 {

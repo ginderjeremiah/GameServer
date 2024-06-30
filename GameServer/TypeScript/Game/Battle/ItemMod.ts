@@ -1,17 +1,17 @@
-class ItemMod implements IInventoryItemMod, IItemMod {
-    itemModId: number;
+class ItemMod implements IItemMod {
+    id: number;
     itemSlotId: number;
-    itemModName: string;
-    itemModDesc: string;
+    name: string;
+    description: string;
     removable: boolean;
     slotTypeId: number;
     attributes: IBattlerAttribute[];
 
     constructor(mod: IInventoryItemMod, modData: IItemMod) {
-        this.itemModId = mod.itemModId;
+        this.id = mod.itemModId;
         this.itemSlotId = mod.itemSlotId;
-        this.itemModName = modData.itemModName;
-        this.itemModDesc = modData.itemModDesc;
+        this.name = modData.name;
+        this.description = modData.description;
         this.removable = modData.removable;
         this.slotTypeId = modData.slotTypeId;
         this.attributes = modData.attributes;

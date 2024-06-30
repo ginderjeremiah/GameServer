@@ -4,12 +4,12 @@ interface ISetTagsData {
 }
 
 interface ITag {
-	tagId: number;
-	tagName: string;
+	id: number;
+	name: string;
 	tagCategoryId: number;
 }
 
 interface ITagCategory {
-	tagCategoryId: number;
-	tagCategoryName: string;
+	id: number;
+	name: string;
 }

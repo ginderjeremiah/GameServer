@@ -1,5 +1,5 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.TagCategories;
+using GameCore.Entities;
 using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
@@ -8,15 +8,9 @@ namespace DataAccess.Repositories
     {
         public TagCategories(IDatabaseService database) : base(database) { }
 
-        public List<TagCategory> GetTagCategories()
+        public IQueryable<TagCategory> AllTagCategories()
         {
-            var commandText = @"
-                SELECT
-                    TagCategoryId,
-                    TagCategoryName
-                FROM TagCategories";
-
-            return Database.QueryToList<TagCategory>(commandText);
+            return Database.TagCategories;
         }
     }
 }

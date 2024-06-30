@@ -1,9 +1,9 @@
-﻿using GameCore.Entities.SlotTypes;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface ISlotTypes
     {
-        public List<SlotType> AllSlotTypes();
+        public IQueryable<SlotType> AllSlotTypes();
     }
 }

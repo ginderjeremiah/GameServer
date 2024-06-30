@@ -1,35 +1,33 @@
-﻿using GameCore.Entities.ItemMods;
-using GameCore.Entities.Items;
-using GameCore.Entities.PlayerAttributes;
+﻿using GameCore.Entities;
 
 namespace GameCore.BattleSimulation
 {
     public class BattlerAttribute
     {
-        public AttributeType AttributeId { get; set; }
+        public EAttribute AttributeId { get; set; }
         public decimal Amount { get; set; }
 
         public BattlerAttribute(PlayerAttribute playerAttribute)
         {
-            AttributeId = (AttributeType)playerAttribute.AttributeId;
+            AttributeId = (EAttribute)playerAttribute.AttributeId;
             Amount = playerAttribute.Amount;
         }
 
-        public BattlerAttribute(Entities.Enemies.AttributeDistribution distribution, int level)
+        public BattlerAttribute(AttributeDistribution distribution, int level)
         {
-            AttributeId = (AttributeType)distribution.AttributeId;
+            AttributeId = (EAttribute)distribution.AttributeId;
             Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;
         }
 
         public BattlerAttribute(ItemAttribute itemAttribute)
         {
-            AttributeId = (AttributeType)itemAttribute.AttributeId;
+            AttributeId = (EAttribute)itemAttribute.AttributeId;
             Amount = itemAttribute.Amount;
         }
 
         public BattlerAttribute(ItemModAttribute itemModAttribute)
         {
-            AttributeId = (AttributeType)itemModAttribute.AttributeId;
+            AttributeId = (EAttribute)itemModAttribute.AttributeId;
             Amount = itemModAttribute.Amount;
         }
 

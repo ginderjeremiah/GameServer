@@ -4,7 +4,7 @@ interface IInventoryData {
 }
 
 interface IInventoryItem {
-	inventoryItemId: number;
+	id: number;
 	itemId: number;
 	rating: number;
 	equipped: boolean;
@@ -18,7 +18,7 @@ interface IInventoryItemMod {
 }
 
 interface IInventoryUpdate {
-	inventoryItemId: number;
+	id: number;
 	inventorySlotNumber: number;
 	equipped: boolean;
 }

@@ -1,9 +1,6 @@
-﻿using GameCore.Entities.InventoryItems;
-using GameCore.Entities.ItemMods;
-using GameCore.Entities.Items;
-using GameCore.Entities.Skills;
+﻿using GameCore.Entities;
 using GameCore.Sessions;
-using static GameCore.BattleSimulation.AttributeType;
+using static GameCore.EAttribute;
 
 namespace GameCore.BattleSimulation
 {
@@ -14,23 +11,26 @@ namespace GameCore.BattleSimulation
         public override List<BattleSkill> Skills { get; set; }
         public override int Level { get; set; }
 
-        public BattlePlayer(Session session, List<Skill> skills, List<Item> items, List<ItemMod> itemMods)
+        public BattlePlayer(Session session)
         {
             var itemAttributes = session.InventoryData.Equipped
                 .SelectNotNull(item => item)
-                .SelectMany(item => GetItemAttributes(item, items, itemMods));
+                .SelectMany(item => GetItemAttributes(item));
 
             Attributes = new BattleAttributes(session.BattlerAttributes.Concat(itemAttributes));
             CurrentHealth = Attributes[MaxHealth];
-            Skills = session.Player.SelectedSkills.Select(id => new BattleSkill(skills[id])).ToList();
+            Skills = session.Player.SelectedSkills.Select(skill => new BattleSkill(skill.Skill)).ToList();
             Level = session.Player.Level;
         }
 
-        private static IEnumerable<BattlerAttribute> GetItemAttributes(InventoryItem item, List<Item> items, List<ItemMod> itemMods)
+        private static IEnumerable<BattlerAttribute> GetItemAttributes(InventoryItem item)
         {
-            return item.ItemMods
-                .SelectMany(mod => itemMods[mod.ItemModId].Attributes.Select(att => new BattlerAttribute(att)))
-                .Concat(items[item.ItemId].Attributes.Select(att => new BattlerAttribute(att)));
+            return item.Item.ItemAttributes.Select(att => new BattlerAttribute(att))
+                .Concat(item.InventoryItemMods
+                    .SelectMany(mod => mod.ItemMod.ItemModAttributes.
+                        Select(att => new BattlerAttribute(att))
+                    )
+                );
         }
     }
 }

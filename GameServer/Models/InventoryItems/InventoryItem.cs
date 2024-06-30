@@ -2,21 +2,21 @@
 {
     public class InventoryItem : IModel
     {
-        public int InventoryItemId { get; set; }
+        public int Id { get; set; }
         public int ItemId { get; set; }
         public int Rating { get; set; }
         public bool Equipped { get; set; }
         public int InventorySlotNumber { get; set; }
         public List<InventoryItemMod> ItemMods { get; set; }
 
-        public InventoryItem(GameCore.Entities.InventoryItems.InventoryItem invItem)
+        public InventoryItem(GameCore.Entities.InventoryItem invItem)
         {
-            InventoryItemId = invItem.InventoryItemId;
+            Id = invItem.Id;
             ItemId = invItem.ItemId;
             Rating = invItem.Rating;
             Equipped = invItem.Equipped;
             InventorySlotNumber = invItem.InventorySlotNumber;
-            ItemMods = invItem.ItemMods.Select(mod => new InventoryItemMod(mod)).ToList();
+            ItemMods = invItem.InventoryItemMods.Select(mod => new InventoryItemMod(mod)).ToList();
         }
     }
 }

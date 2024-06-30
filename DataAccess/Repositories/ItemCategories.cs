@@ -1,5 +1,5 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.ItemCategories;
+using GameCore.Entities;
 using GameCore.Infrastructure;
 
 namespace DataAccess.Repositories
@@ -8,15 +8,9 @@ namespace DataAccess.Repositories
     {
         public ItemCategories(IDatabaseService database) : base(database) { }
 
-        public List<ItemCategory> GetItemCategories()
+        public IQueryable<ItemCategory> AllItemCategories()
         {
-            var commandText = @"
-                SELECT
-                    ItemCategoryId,
-                    CategoryName
-                FROM ItemCategories";
-
-            return Database.QueryToList<ItemCategory>(commandText);
+            return Database.ItemCategories;
         }
     }
 }

@@ -13,13 +13,13 @@ namespace GameServer.Models.Enemies
 
         public Enemy() { }
 
-        public Enemy(GameCore.Entities.Enemies.Enemy enemy)
+        public Enemy(GameCore.Entities.Enemy enemy)
         {
             Drops = enemy.EnemyDrops.Select(drop => new ItemDrop(drop)).ToList();
-            AttributeDistribution = enemy.AttributeDistribution.Select(dist => new AttributeDistribution(dist)).ToList();
-            Name = enemy.EnemyName;
-            EnemyId = enemy.EnemyId;
-            SkillPool = enemy.SkillPool;
+            AttributeDistribution = enemy.AttributeDistributions.Select(dist => new AttributeDistribution(dist)).ToList();
+            Name = enemy.Name;
+            EnemyId = enemy.Id;
+            SkillPool = enemy.EnemySkills.Select(s => s.SkillId).ToList();
         }
     }
 }

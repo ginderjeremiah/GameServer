@@ -37,8 +37,8 @@ class AddEditItemAttributeTool {
 
         this.items.forEach(item => {
             const opt = document.createElement('option');
-            opt.textContent = item.itemName;
-            opt.value = item.itemId.toString();
+            opt.textContent = item.name;
+            opt.value = item.id.toString();
             opt.selected = false;
             this.itemSelect.appendChild(opt);
         });
@@ -52,7 +52,7 @@ class AddEditItemAttributeTool {
 
             this.slotTable = new TableDataEditor(this.items[itemId].attributes, AddEditItemAttributeTool.tableDiv, {
                 selOptions: {
-                    "attributeId": () => ({options: attributeOpts})
+                    attributeId: () => ({options: attributeOpts})
                 }, 
                 sampleItem: {
                     attributeId: AttributeType.Strength,

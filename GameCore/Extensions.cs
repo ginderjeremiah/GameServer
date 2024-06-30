@@ -1,13 +1,13 @@
-﻿using GameCore.BattleSimulation;
-using GameCore.Entities.PlayerAttributes;
+﻿using GameCore.Entities;
 using System.Data;
 using System.Text;
 using System.Text.Json;
-using static GameCore.BattleSimulation.AttributeType;
+using System.Text.RegularExpressions;
+using static GameCore.EAttribute;
 
 namespace GameCore
 {
-    public static class Extensions
+    public static partial class Extensions
     {
         private static readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -86,9 +86,13 @@ namespace GameCore
         {
             T[] output = new T[first.Length + second.Length];
             for (int i = 0; i < first.Length; i++)
+            {
                 output[i] = first[i];
+            }
             for (int i = 0; i < second.Length; i++)
+            {
                 output[first.Length + i] = second[i];
+            }
             return output;
         }
 
@@ -143,23 +147,37 @@ namespace GameCore
             }
         }
 
-        public static string ToCamelCase(this string str)
+        public static string Decapitalize(this string str)
         {
             return string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
+        }
+
+        public static string Capitalize(this string str)
+        {
+            return string.Concat(str[0].ToString().ToUpper(), str.AsSpan(1));
+        }
+
+        public static string SpaceWords(this string str)
+        {
+            return WordBreakRegex().Replace(str, "$1 $2");
         }
 
         public static string GetDetails(this Exception exception)
         {
             return $"{exception.GetType()}: {exception.Message}\nStack Trace: {exception.StackTrace}";
         }
+
         public static bool IsCoreAttribute(this PlayerAttribute att)
         {
-            return ((AttributeType)att.AttributeId).IsCoreAttribute();
+            return ((EAttribute)att.AttributeId).IsCoreAttribute();
         }
 
-        public static bool IsCoreAttribute(this AttributeType att)
+        public static bool IsCoreAttribute(this EAttribute att)
         {
             return att is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
         }
+
+        [GeneratedRegex("([a-z])([A-Z])")]
+        private static partial Regex WordBreakRegex();
     }
 }

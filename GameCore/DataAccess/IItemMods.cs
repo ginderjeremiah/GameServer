@@ -1,13 +1,11 @@
-﻿using GameCore.Entities.ItemMods;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IItemMods
     {
-        public List<ItemMod> AllItemMods(bool refreshCache = false);
-        public Dictionary<int, List<ItemModWithoutAttributes>> GetModsForItemBySlot(int itemId);
-        public void AddItemMod(string itemModName, bool removable, string itemModDesc, int slotTypeId);
-        public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc, int slotTypeId);
-        public void DeleteItemMod(int itemModId);
+        public Task<IEnumerable<ItemMod>> AllItemModsAsync(bool refreshCache = false);
+        public Dictionary<int, IEnumerable<ItemMod>> GetModsForItemBySlot(int itemId);
+        public Task<ItemMod?> GetItemModAsync(int itemModId);
     }
 }

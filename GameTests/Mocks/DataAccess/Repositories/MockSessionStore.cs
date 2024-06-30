@@ -1,5 +1,5 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.SessionStore;
+using GameCore.Entities;
 using GameCore.Infrastructure;
 using System.Diagnostics.CodeAnalysis;
 
@@ -15,14 +15,13 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
         {
-            return Cache.GetDelete($"ActiveEnemy_{sessionData.SessionId}");
+            return Cache.GetDelete($"ActiveEnemy_{sessionData.Id}");
         }
 
         public SessionData GetNewSessionData(int playerId)
         {
-            return new SessionData
+            return new SessionData(Guid.NewGuid().ToString())
             {
-                SessionId = Guid.NewGuid().ToString(),
                 PlayerData = new()
                 {
                     PlayerId = playerId,
@@ -30,13 +29,13 @@ namespace GameTests.Mocks.DataAccess.Repositories
                 },
                 InventoryItems = new(),
                 Attributes = new(),
-                PlayerSkills = new(),
+                Skills = new(),
             };
         }
 
         public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
         {
-            Cache.Set($"ActiveEnemy_{sessionData.SessionId}", activeEnemyHash);
+            Cache.Set($"ActiveEnemy_{sessionData.Id}", activeEnemyHash);
         }
 
         public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session)
@@ -46,7 +45,7 @@ namespace GameTests.Mocks.DataAccess.Repositories
 
         public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty)
         {
-            Cache.Set(sessionData.SessionId, sessionData);
+            Cache.Set(sessionData.Id, sessionData);
         }
     }
 }

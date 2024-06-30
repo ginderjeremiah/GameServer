@@ -1,11 +1,11 @@
-﻿using GameCore.Entities.Skills;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface ISkills
     {
-        public List<Skill> AllSkills();
-        public Skill GetSkill(int skillId);
-        public void SaveSkills(List<int> skillIds);
+        public Task<IEnumerable<Skill>> AllSkillsAsync();
+        public Task<Skill?> GetSkillAsync(int skillId);
+        public Task SaveSkillsAsync(List<int> skillIds);
     }
 }

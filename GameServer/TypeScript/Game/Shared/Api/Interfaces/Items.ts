@@ -9,17 +9,17 @@ interface IAddEditItemModAttributesData {
 }
 
 interface IItem {
-	itemId: number;
-	itemName: string;
-	itemDesc: string;
+	id: number;
+	name: string;
+	description: string;
 	itemCategoryId: number;
 	iconPath: string;
 	attributes: IBattlerAttribute[];
 }
 
 interface IItemCategory {
-	itemCategoryId: number;
-	categoryName: string;
+	id: number;
+	name: string;
 }
 
 interface IItemDrop {
@@ -28,23 +28,23 @@ interface IItemDrop {
 }
 
 interface IItemMod {
-	itemModId: number;
-	itemModName: string;
+	id: number;
+	name: string;
 	removable: boolean;
-	itemModDesc: string;
+	description: string;
 	slotTypeId: number;
 	attributes: IBattlerAttribute[];
 }
 
 interface IItemSlot {
-	itemSlotId: number;
+	id: number;
 	itemId: number;
 	slotTypeId: number;
-	guaranteedId: number;
+	guaranteedItemModId: number;
 	probability: number;
 }
 
 interface ISlotType {
-	slotTypeId: number;
-	slotTypeName: string;
+	id: number;
+	name: string;
 }

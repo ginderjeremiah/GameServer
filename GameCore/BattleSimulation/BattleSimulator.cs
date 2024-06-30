@@ -1,4 +1,4 @@
-﻿using GameCore.Entities.Enemies;
+﻿using GameCore.Entities;
 using GameCore.Sessions;
 
 namespace GameCore.BattleSimulation
@@ -12,12 +12,9 @@ namespace GameCore.BattleSimulation
 
         public BattleSimulator(Session session, Enemy enemy, EnemyInstance enemyInstance, IRepositoryManager repositories)
         {
-            var skills = repositories.Skills.AllSkills();
-            var items = repositories.Items.AllItems();
-            var itemMods = repositories.ItemMods.AllItemMods();
             Rng = new Mulberry32(enemyInstance.Seed);
-            Player = new BattlePlayer(session, skills, items, itemMods);
-            Enemy = new BattleEnemy(enemy, enemyInstance, skills);
+            Player = new BattlePlayer(session);
+            Enemy = new BattleEnemy(enemy, enemyInstance);
         }
 
         public bool Simulate(out int totalMs)

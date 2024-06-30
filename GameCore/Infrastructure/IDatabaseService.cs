@@ -1,30 +1,35 @@
 ﻿using GameCore.Entities;
+using Attribute = GameCore.Entities.Attribute;
 
 namespace GameCore.Infrastructure
 {
     public interface IDatabaseService
     {
-        public void Execute(Action<IDatabaseExecutor> action);
+        public IQueryable<Attribute> Attributes { get; }
+        public IQueryable<Enemy> Enemies { get; }
+        public IQueryable<InventoryItem> InventoryItems { get; }
+        public IQueryable<ItemAttribute> ItemAttributes { get; }
+        public IQueryable<ItemCategory> ItemCategories { get; }
+        public IQueryable<ItemModAttribute> ItemModAttributes { get; }
+        public IQueryable<ItemMod> ItemMods { get; }
+        public IQueryable<Item> Items { get; }
+        public IQueryable<ItemSlot> ItemSlots { get; }
+        public IQueryable<LogPreference> LogPreferences { get; }
+        public IQueryable<Player> Players { get; }
+        public IQueryable<Skill> Skills { get; }
+        public IQueryable<SlotType> SlotTypes { get; }
+        public IQueryable<TagCategory> TagCategories { get; }
+        public IQueryable<Tag> Tags { get; }
+        public IQueryable<ZoneEnemy> ZoneEnemies { get; }
+        public IQueryable<ZoneEnemyProbability> ZoneEnemyProbabilities { get; }
+        public IQueryable<ZoneEnemyAlias> ZoneEnemyAliases { get; }
+        public IQueryable<Zone> Zones { get; }
 
-        public T Execute<T>(Func<IDatabaseExecutor, T> func);
-
-        public List<T> QueryToList<T>(string commandText, params QueryParameter[] parameters) where T : IEntity, new();
-
-        public (List<T1>, List<T2>) QueryToList<T1, T2>(string commandText, params QueryParameter[] parameters) where T1 : IEntity, new() where T2 : IEntity, new();
-
-        public (List<T1>, List<T2>, List<T3>) QueryToList<T1, T2, T3>(string commandText, params QueryParameter[] parameters)
-            where T1 : IEntity, new()
-            where T2 : IEntity, new()
-            where T3 : IEntity, new();
-
-        public (List<T1>, List<T2>, List<T3>, List<T4>) QueryToList<T1, T2, T3, T4>(string commandText, params QueryParameter[] parameters)
-            where T1 : IEntity, new()
-            where T2 : IEntity, new()
-            where T3 : IEntity, new()
-            where T4 : IEntity, new();
-
-        public void ExecuteNonQuery(string commandText, params QueryParameter[] parameters);
-
-        public T ExecuteScalar<T>(string commandText, params QueryParameter[] parameters);
+        public Task SaveChangesAsync();
+        public void Insert<Entity>(Entity entity) where Entity : class;
+        public void Delete<Entity>(Entity entity) where Entity : class;
+        public void Update<Entity>(Entity entity) where Entity : class;
+        public void Untrack<Entity>(Entity entity) where Entity : class;
+        public Task EnsureDbUpdatedAsync();
     }
 }

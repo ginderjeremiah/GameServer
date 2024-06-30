@@ -1,10 +1,7 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.InventoryItems;
-using GameCore.Entities.PlayerAttributes;
-using GameCore.Entities.Players;
-using GameCore.Entities.SessionStore;
+using GameCore.Entities;
 using GameCore.Infrastructure;
-using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
@@ -19,107 +16,70 @@ namespace DataAccess.Repositories
             _synchronizer = synchronizer;
         }
 
-        public bool TryGetSession(string id, [NotNullWhen(true)] out SessionData? session)
+        public async Task<SessionData?> GetSessionAsync(string id)
         {
-            return _cache.TryGet($"{SessionPrefix}_{id}", out session);
+            return await _cache.GetAsync<SessionData>($"{SessionPrefix}_{id}");
         }
 
-        public SessionData GetNewSessionData(int playerId)
+        public async Task<SessionData> GetNewSessionDataAsync(int playerId)
         {
-            string commandText = @"
-                SELECT
-                    PlayerId,
-                    PlayerName,
-                    UserName,
-                    Level,
-                    Salt,
-                    PassHash,
-	                Level,
-	                Exp,
-	                StatPointsGained,
-	                StatPointsUsed
-                FROM Players
-                WHERE PlayerId = @PlayerId
+            var player = await Database.Players
+                .AsNoTracking()
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.Item)
+                        .ThenInclude(i => i.ItemAttributes)
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.InventoryItemMods)
+                        .ThenInclude(iim => iim.ItemMod)
+                            .ThenInclude(im => im.ItemModAttributes)
+                .Include(p => p.PlayerAttributes)
+                .Include(p => p.PlayerSkills)
+                    .ThenInclude(ps => ps.Skill)
+                        .ThenInclude(s => s.SkillDamageMultipliers)
+                .Include(p => p.LogPreferences)
+                .FirstOrDefaultAsync() ?? throw new ArgumentOutOfRangeException(nameof(playerId));
 
-                SELECT
-                    PlayerId,
-                    AttributeId,
-                    Amount
-                FROM PlayerAttributes
-                WHERE PlayerId = @PlayerId
-
-                SELECT
-                    PlayerId,
-                    SkillId,
-                    Selected
-                FROM PlayerSkills
-                WHERE 
-                    PlayerId = @PlayerId
-
-                SELECT
-                    II.PlayerId,
-                    II.InventoryItemId,
-                    II.ItemId,
-                    II.Rating,
-                    II.Equipped,
-                    II.InventorySlotNumber,
-	                COALESCE(ItemModJSON.JSONData, '[]') AS ItemModJSON
-                FROM InventoryItems AS II
-                OUTER APPLY (
-	                SELECT
-		                IIM.ItemModId,
-		                IIM.ItemSlotId
-	                FROM InventoryItemMods AS IIM
-	                WHERE II.InventoryItemId = IIM.InventoryItemId
-	                FOR JSON PATH
-                ) AS ItemModJSON(JSONData)
-                WHERE II.PlayerId = @PlayerId";
-
-            var result = Database.QueryToList<Player, PlayerAttribute, PlayerSkill, InventoryItem>(commandText, new QueryParameter("@PlayerId", playerId));
-
-            var sessionData = new SessionData
+            var sessionData = new SessionData(Guid.NewGuid().ToString())
             {
-                SessionId = Guid.NewGuid().ToString(),
                 LastUsed = DateTime.UtcNow,
                 CurrentZone = 0,
-                PlayerData = result.Item1.First(),
-                InventoryItems = result.Item4,
+                PlayerData = player,
                 EnemyCooldown = DateTime.UnixEpoch,
                 EarliestDefeat = DateTime.UnixEpoch,
                 Victory = false,
-                Attributes = result.Item2,
-                PlayerSkills = result.Item3,
             };
 
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.SessionId}", sessionData);
+            _cache.SetAndForget($"{SessionPrefix}_{sessionData.Id}", sessionData);
             return sessionData;
         }
 
-        public void Update(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty)
+        public async Task UpdateAsync(SessionData sessionData, bool playerDirty, bool skillsDirty, bool inventoryDirty)
         {
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.SessionId}", sessionData);
+            _cache.SetAndForget($"{SessionPrefix}_{sessionData.Id}", sessionData);
             if (inventoryDirty)
             {
-                _synchronizer.SynchronizeInventory(sessionData.SessionId);
+                _synchronizer.SynchronizeInventory(sessionData.Id);
             }
             if (playerDirty)
             {
-                _synchronizer.SynchronizePlayerData(sessionData.SessionId);
+                _synchronizer.SynchronizePlayerData(sessionData.Id);
             }
             if (skillsDirty)
             {
-                _synchronizer.SynchronizeSkills(sessionData.SessionId);
+                _synchronizer.SynchronizeSkills(sessionData.Id);
             }
+
+            await Database.SaveChangesAsync();
         }
 
         public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
         {
-            _cache.SetAndForget($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}", activeEnemyHash);
+            _cache.SetAndForget($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.Id}", activeEnemyHash);
         }
 
         public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
         {
-            return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.SessionId}");
+            return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.Id}");
         }
     }
 }

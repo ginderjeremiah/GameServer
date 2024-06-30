@@ -2,16 +2,16 @@
 {
     public class Tag : IModel
     {
-        public int TagId { get; set; }
-        public string TagName { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; }
         public int TagCategoryId { get; set; }
 
         public Tag() { }
 
-        public Tag(GameCore.Entities.Tags.Tag tag)
+        public Tag(GameCore.Entities.Tag tag)
         {
-            TagId = tag.TagId;
-            TagName = tag.TagName;
+            Id = tag.Id;
+            Name = tag.Name;
             TagCategoryId = tag.TagCategoryId;
         }
     }

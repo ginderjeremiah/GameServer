@@ -1,6 +1,7 @@
 ﻿using GameCore;
 using GameServer.Models.Common;
 using GameServer.Models.Skills;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -9,13 +10,14 @@ namespace GameServer.Controllers
     [ApiController]
     public class SkillsController : BaseController
     {
-        public SkillsController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public SkillsController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<Skill> Skills()
+        public async Task<ApiListResponse<Skill>> Skills()
         {
-            return Success(Repositories.Skills.AllSkills().Select(skill => new Skill(skill)));
+            var skills = await Repositories.Skills.AllSkillsAsync();
+            return Success(skills.Select(skill => new Skill(skill)));
         }
     }
 }

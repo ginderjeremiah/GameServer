@@ -1,93 +1,28 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.ItemMods;
+using GameCore.Entities;
 using GameCore.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
     internal class ItemMods : BaseRepository, IItemMods
     {
         private static List<ItemMod>? _allMods;
-        private static readonly List<Dictionary<int, List<ItemModWithoutAttributes>>?> _itemModsBySlot = new();
+        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsBySlot = new();
         private static readonly object _lockForItem = new();
 
         public ItemMods(IDatabaseService database) : base(database) { }
 
-        public List<ItemMod> AllItemMods(bool refreshCache = false)
+        public async Task<IEnumerable<ItemMod>> AllItemModsAsync(bool refreshCache = false)
         {
             if (_allMods is null || refreshCache)
             {
-                _allMods = GetItemMods();
+                _allMods = await Database.ItemMods.Include(im => im.ItemModAttributes).ToListAsync();
             }
             return _allMods;
         }
 
-        private List<ItemMod> GetItemMods()
-        {
-            var commandText = @"
-                SELECT
-                    IM.ItemModId,
-                    IM.ItemModName,
-                    IM.Removable,
-                    IM.ItemModDesc,
-                    IM.SlotTypeId,
-	                COALESCE(AttJSON.JSONData, '[]') AS AttributesJSON
-                FROM ItemMods IM
-                OUTER APPLY (
-	                SELECT
-                        IMA.ItemModId,
-		                IMA.AttributeId,
-		                IMA.Amount
-	                FROM ItemModAttributes IMA
-	                WHERE IMA.ItemModId = IM.ItemModId
-	                FOR JSON PATH
-                ) AS AttJSON(JSONData)
-                ORDER BY ItemModId";
-
-            return Database.QueryToList<ItemMod>(commandText);
-        }
-
-        public void AddItemMod(string itemModName, bool removable, string itemModDesc, int slotTypeId)
-        {
-            var commandText = @"
-                INSERT INTO ItemMods
-                VALUES
-                    (@ItemModName, @Removable, @ItemModDesc, @SlotTypeId)";
-
-            Database.ExecuteNonQuery(commandText,
-                new QueryParameter("@ItemModName", itemModName),
-                new QueryParameter("@Removable", removable),
-                new QueryParameter("@ItemModDesc", itemModDesc),
-                new QueryParameter("@SlotTypeId", slotTypeId)
-            );
-        }
-        public void UpdateItemMod(int itemModId, string itemModName, bool removable, string itemModDesc, int slotTypeId)
-        {
-            var commandText = @"
-                UPDATE ItemMods
-                SET ItemModName = @ItemModName,
-                    Removable = @Removable,
-                    ItemModDesc = @ItemModDesc,
-                    SlotTypeId = @SlotTypeId
-                WHERE ItemModId = @ItemModId";
-
-            Database.ExecuteNonQuery(commandText,
-                new QueryParameter("@ItemModName", itemModName),
-                new QueryParameter("@Removable", removable),
-                new QueryParameter("@ItemModDesc", itemModDesc),
-                new QueryParameter("@ItemModId", itemModId),
-                new QueryParameter("@SlotTypeId", slotTypeId)
-            );
-        }
-        public void DeleteItemMod(int itemModId)
-        {
-            var commandText = @"
-                DELETE ItemMods
-                WHERE ItemModId = @ItemModId";
-
-            Database.ExecuteNonQuery(commandText, new QueryParameter("@ItemModId", itemModId));
-        }
-
-        public Dictionary<int, List<ItemModWithoutAttributes>> GetModsForItemBySlot(int itemId)
+        public Dictionary<int, IEnumerable<ItemMod>> GetModsForItemBySlot(int itemId)
         {
             if (itemId >= _itemModsBySlot.Count || _itemModsBySlot[itemId] is null)
             {
@@ -103,27 +38,22 @@ namespace DataAccess.Repositories
             return _itemModsBySlot[itemId];
         }
 
-        private Dictionary<int, List<ItemModWithoutAttributes>> ModsForItemBySlot(int itemId)
+        public async Task<ItemMod?> GetItemModAsync(int itemModId)
         {
-            var commandText = @"
-                SELECT DISTINCT
-                    IM.ItemModId,
-                    IM.ItemModName,
-                    IM.Removable,
-                    IM.ItemModDesc,
-                    IM.SlotTypeId
-                FROM ItemMods AS IM
-                INNER JOIN ItemModTags AS IMT
-                ON IM.ItemModId = IMT.ItemModId
-                INNER JOIN ItemTags AS IT
-                ON IT.TagId = IMT.TagId
-                INNER JOIN Items as I
-                ON I.ItemId = IT.ItemId
-                WHERE I.ItemId = @ItemId";
+            var itemMods = (await AllItemModsAsync()).ToList();
+            return itemMods.Count > itemModId ? null : itemMods[itemModId];
+        }
 
-            return Database.QueryToList<ItemModWithoutAttributes>(commandText, new QueryParameter("@ItemId", itemId))
-                .GroupBy(mod => mod.SlotTypeId)
-                .ToDictionary(g => g.Key, g => g.ToList());
+        private Dictionary<int, IEnumerable<ItemMod>> ModsForItemBySlot(int itemId)
+        {
+            return Database.Items
+                .Where(i => i.Id == itemId)
+                .Include(i => i.Tags)
+                    .ThenInclude(t => t.ItemMods)
+                .SelectMany(i => i.Tags.SelectMany(t => t.ItemMods))
+                .Distinct()
+                .GroupBy(im => im.SlotTypeId)
+                .ToDictionary(grp => grp.Key, grp => grp.AsEnumerable());
         }
     }
 }

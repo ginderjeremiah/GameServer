@@ -1,11 +1,11 @@
-﻿using GameCore.Entities.Enemies;
+﻿using GameCore.Entities;
 
 namespace GameCore.DataAccess
 {
     public interface IEnemies
     {
-        public List<Enemy> AllEnemies();
-        public Enemy GetEnemy(int enemyId);
-        public Enemy GetRandomEnemy(int zoneId);
+        public Task<IEnumerable<Enemy>> AllEnemiesAsync();
+        public Task<Enemy?> GetEnemyAsync(int enemyId);
+        public Task<Enemy> GetRandomEnemyAsync(int zoneId);
     }
 }

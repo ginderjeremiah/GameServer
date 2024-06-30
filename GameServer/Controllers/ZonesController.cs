@@ -1,6 +1,7 @@
 ﻿using GameCore;
 using GameServer.Models.Common;
 using GameServer.Models.Zones;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -9,13 +10,14 @@ namespace GameServer.Controllers
     [ApiController]
     public class ZonesController : BaseController
     {
-        public ZonesController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public ZonesController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<Zone> Zones()
+        public async Task<ApiListResponse<Zone>> Zones()
         {
-            return Success(Repositories.Zones.AllZones().Select(z => new Zone(z)));
+            var zones = await Repositories.Zones.AllZonesAsync();
+            return Success(zones.Select(z => new Zone(z)));
         }
     }
 }

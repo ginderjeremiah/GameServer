@@ -1,7 +1,9 @@
 ﻿using GameCore;
 using GameServer.Models.Common;
 using GameServer.Models.Tags;
+using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameServer.Controllers
 {
@@ -9,31 +11,31 @@ namespace GameServer.Controllers
     [ApiController]
     public class TagsController : BaseController
     {
-        public TagsController(IRepositoryManager repositoryManager, IApiLogger logger)
-            : base(repositoryManager, logger) { }
+        public TagsController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+            : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public ApiListResponse<Tag> Tags()
+        public async Task<ApiListResponse<Tag>> Tags()
         {
-            return Success(Repositories.Tags.AllTags().Select(t => new Tag(t)));
+            return Success(await Repositories.Tags.AllTags().Select(t => new Tag(t)).ToListAsync());
         }
 
         [HttpGet]
-        public ApiListResponse<TagCategory> TagCategories()
+        public async Task<ApiListResponse<TagCategory>> TagCategories()
         {
-            return Success(Repositories.TagCategories.GetTagCategories().Select(tc => new TagCategory(tc)));
+            return Success(await Repositories.TagCategories.AllTagCategories().Select(tc => new TagCategory(tc)).ToListAsync());
         }
 
         [HttpGet]
-        public ApiListResponse<Tag> TagsForItem(int itemId)
+        public async Task<ApiListResponse<Tag>> TagsForItem(int itemId)
         {
-            return Success(Repositories.Tags.TagsForItem(itemId).Select(t => new Tag(t)));
+            return Success(await Repositories.Tags.TagsForItem(itemId).Select(t => new Tag(t)).ToListAsync());
         }
 
         [HttpGet]
-        public ApiListResponse<Tag> TagsForItemMod(int itemModId)
+        public async Task<ApiListResponse<Tag>> TagsForItemMod(int itemModId)
         {
-            return Success(Repositories.Tags.TagsForItemMod(itemModId).Select(t => new Tag(t)));
+            return Success(await Repositories.Tags.TagsForItemMod(itemModId).Select(t => new Tag(t)).ToListAsync());
         }
     }
 }

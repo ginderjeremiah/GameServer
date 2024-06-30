@@ -1,6 +1,6 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Infrastructure;
-using Attribute = GameCore.Entities.Attributes.Attribute;
+using Attribute = GameCore.Entities.Attribute;
 
 namespace DataAccess.Repositories
 {
@@ -8,17 +8,9 @@ namespace DataAccess.Repositories
     {
         public Attributes(IDatabaseService database) : base(database) { }
 
-        public List<Attribute> AllAttributes()
+        public IQueryable<Attribute> AllAttributes()
         {
-            var commandText = @"
-                SELECT
-                    AttributeId,
-                    AttributeName,
-                    AttributeDesc
-                FROM Attributes
-                ORDER BY AttributeId";
-
-            return Database.QueryToList<Attribute>(commandText);
+            return Database.Attributes;
         }
     }
 }

@@ -1,10 +1,10 @@
 ﻿/// <reference path="../Abstract/Tooltippable.ts"/>
-class Item extends Tooltippable implements IInventoryItem, IItem {
-    inventoryItemId: number;
+class Item extends Tooltippable implements IItem {
+    id: number;
     rating: number;
     itemId: number;
-    itemName: string;
-    itemDesc: string;
+    name: string;
+    description: string;
     itemCategoryId: number;
     iconPath: string;
     equipped: boolean;
@@ -15,11 +15,11 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
 
     constructor(invItem: IInventoryItem, itemData: IItem, itemModsData: IItemMod[]) {
         super();
-        this.inventoryItemId = invItem.inventoryItemId;
+        this.id = invItem.id;
         this.rating = invItem.rating;
         this.itemId = invItem.itemId;
-        this.itemName = itemData.itemName;
-        this.itemDesc = itemData.itemDesc;
+        this.name = itemData.name;
+        this.description = itemData.description;
         this.itemCategoryId = itemData.itemCategoryId;
         this.attributes = itemData.attributes;
         this.iconPath = itemData.iconPath;
@@ -32,7 +32,7 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
         if (this.toolTipId !== prevId) {
-            tooltipTitle.textContent = this.itemName; //set title to item name (key)
+            tooltipTitle.textContent = this.name; //set title to item name (key)
             tooltipContent.replaceChildren(); //clear current content
 
             const statsHeader = document.createElement("h3");
@@ -61,9 +61,9 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
                     const listItem = document.createElement("li");
                     const nameSpan = document.createElement('span');
                     nameSpan.style.fontWeight = "bold";
-                    nameSpan.textContent = mod.itemModName;
+                    nameSpan.textContent = mod.name;
                     const descSpan = document.createElement('span');
-                    descSpan.textContent = ": " + mod.itemModDesc;
+                    descSpan.textContent = ": " + mod.description;
                     listItem.appendChild(nameSpan);
                     listItem.appendChild(descSpan);
                     modsList.appendChild(listItem);
@@ -78,7 +78,7 @@ class Item extends Tooltippable implements IInventoryItem, IItem {
 
             const desc = document.createElement("p");
             desc.className = "tooltipText";
-            desc.textContent = this.itemDesc;
+            desc.textContent = this.description;
             tooltipContent.appendChild(desc);
         }
         return this.toolTipId;

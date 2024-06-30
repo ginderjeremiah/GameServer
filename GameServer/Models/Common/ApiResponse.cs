@@ -17,10 +17,13 @@
         public string? Error { get; set; }
     }
 
-    public interface IApiListResponse<T> : IApiResponse where T : IModel
+    public interface IApiListResponse<T> : IApiListResponse where T : IModel
     {
         public List<T>? Data { get; set; }
     }
+
+    public interface IApiListResponse : IApiResponse
+    { }
 
     public interface IApiResponse
     {

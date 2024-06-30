@@ -37,8 +37,8 @@ class AddEditItemModAttributeTool {
 
         this.itemMods.forEach(itemMod => {
             const opt = document.createElement('option');
-            opt.textContent = itemMod.itemModName;
-            opt.value = itemMod.itemModId.toString();
+            opt.textContent = itemMod.name;
+            opt.value = itemMod.id.toString();
             opt.selected = false;
             this.itemModSelect.appendChild(opt);
         });
@@ -52,7 +52,7 @@ class AddEditItemModAttributeTool {
 
             this.slotTable = new TableDataEditor(this.itemMods[itemModId].attributes, AddEditItemModAttributeTool.tableDiv, {
                 selOptions: {
-                    "attributeId": () => ({options: attributeOpts})
+                    attributeId: () => ({options: attributeOpts})
                 }, 
                 sampleItem: {
                     attributeId: AttributeType.Strength,

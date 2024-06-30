@@ -43,29 +43,23 @@
 
         this.items.forEach(item => {
             const opt = document.createElement('option');
-            opt.textContent = item.itemName;
-            opt.value = item.itemId.toString();
+            opt.textContent = item.name;
+            opt.value = item.id.toString();
             opt.selected = false;
             this.itemSelect.appendChild(opt);
         });
-        const itemOpts = this.items.map(item => ({
-            id: item.itemId,
-            name: item.itemName
-        }));
+        const itemOpts = this.items;
         this.slotTypes = data[1];
         this.itemMods = data[2];
-        const slotTypeOpts = this.slotTypes.map(slotType => ({
-            id: slotType.slotTypeId,
-            name: slotType.slotTypeName
-        }));
+        const slotTypeOpts = this.slotTypes;
         const groupedMods = groupBy(this.itemMods, i => i.slotTypeId.toString());
         const itemModOpts: { [key: number]: SelOptions } = {};
         keys(groupedMods).forEach(key => {
             itemModOpts[Number(key)] = {
                 allowBlanks: true,
                 options: groupedMods[key].map(mod => ({
-                    id: mod.itemModId,
-                    name: mod.itemModName
+                    id: mod.id,
+                    name: mod.name
                 }))
             };
         });
@@ -76,17 +70,17 @@
             const itemSlots = await ApiRequest.get('/api/Items/SlotsForItem', { itemId: itemId, refreshCache: true });
 
             this.slotTable = new TableDataEditor(itemSlots, AddEditItemSlotTool.tableDiv, {
-                primaryKey: "itemSlotId",
+                primaryKey: "id",
                 selOptions: {
                     "itemId": () => ({options: itemOpts}),
                     "slotTypeId": () => ({options: slotTypeOpts}),
                     "guaranteedId": (i: IItemSlot) => itemModOpts[i.slotTypeId]
                 },
                 sampleItem: {
-                    itemSlotId: 0,
+                    id: 0,
                     itemId: itemId,
                     slotTypeId: 1,
-                    guaranteedId: 0,
+                    guaranteedItemModId: 0,
                     probability: 1.00
                 }
             });

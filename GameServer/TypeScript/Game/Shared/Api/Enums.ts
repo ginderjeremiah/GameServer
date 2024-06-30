@@ -1,4 +1,10 @@
-enum AttributeType {
+enum ChangeType {
+	Add = 0,
+	Edit = 1,
+	Delete = 2,
+}
+
+enum EAttribute {
 	Strength = 0,
 	Endurance = 1,
 	Intellect = 2,
@@ -14,10 +20,4 @@ enum AttributeType {
 	DodgeChance = 12,
 	BlockChance = 13,
 	BlockReduction = 14,
-}
-
-enum ChangeType {
-	Add = 0,
-	Edit = 1,
-	Delete = 2,
 }

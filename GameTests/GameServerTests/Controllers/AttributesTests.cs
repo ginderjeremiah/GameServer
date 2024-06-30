@@ -3,7 +3,7 @@ using GameServer.Models.Common;
 using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using static System.Net.HttpStatusCode;
-using Attribute = GameCore.Entities.Attributes.Attribute;
+using Attribute = GameCore.Entities.Attribute;
 using AttributeModel = GameServer.Models.Attributes.Attribute;
 
 namespace GameTests.GameServerTests.Controllers

@@ -21,7 +21,15 @@ namespace GameServer.CodeGen
                 var controllerRouteTemplate = controller.GetCustomAttribute<RouteAttribute>()?.Template;
                 var controllerName = controller.Name.Replace("Controller", string.Empty);
                 var endpointMethods = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance);
-                foreach (var endpoint in endpointMethods.Where(method => method.GetCustomAttribute<NonActionAttribute>() is null && method.ReturnType.IsAssignableTo(typeof(IApiResponse))))
+                var endpoints = endpointMethods
+                    .Where(method => method.GetCustomAttribute<NonActionAttribute>() is null
+                        && (method.ReturnType.IsAssignableTo(typeof(IApiResponse))
+                            || (method.ReturnType.IsAssignableTo(typeof(Task))
+                                && method.ReturnType.IsGenericType
+                                && method.ReturnType.GetGenericArguments()[0].IsAssignableTo(typeof(IApiResponse))))
+                     );
+
+                foreach (var endpoint in endpoints)
                 {
                     var routeTemplate = controllerRouteTemplate;
                     var methodAtt = endpoint.GetCustomAttributes().FirstOrDefault(att => att is HttpMethodAttribute) as HttpMethodAttribute;
@@ -33,14 +41,18 @@ namespace GameServer.CodeGen
                     {
                         routeTemplate = routeAtt.Template;
                     }
+
                     var route = routeTemplate is not null
                         ? routeTemplate.Replace("[controller]", controllerName).Replace("[action]", endpoint.Name)
                         : $"/api/{controllerName}/{endpoint.Name}";
 
-                    var responseType = endpoint.ReturnType.IsConstructedGenericType
-                        ? endpoint.ReturnType.IsAssignableTo(typeof(IApiListResponse))
-                            ? typeof(List<>).MakeGenericType(endpoint.ReturnType.GetGenericArguments()[0])
-                            : endpoint.ReturnType.GetGenericArguments()[0]
+                    var unwrappedResponseType = endpoint.ReturnType.IsAssignableTo(typeof(Task))
+                        ? endpoint.ReturnType.GetGenericArguments()[0] : endpoint.ReturnType;
+
+                    var responseType = unwrappedResponseType.IsConstructedGenericType
+                        ? unwrappedResponseType.IsAssignableTo(typeof(IApiListResponse))
+                            ? typeof(List<>).MakeGenericType(unwrappedResponseType.GetGenericArguments()[0])
+                            : unwrappedResponseType.GetGenericArguments()[0]
                         : null;
 
                     if (responseType != null && NeedsInterface(responseType))
@@ -68,10 +80,10 @@ namespace GameServer.CodeGen
             }
 
             var currentDir = Directory.GetCurrentDirectory();
-            var assemblyName = assembly.GetName().Name;
+            var assemblyName = assembly.GetName().Name ?? "Unknown";
             var projectDir = currentDir[..(currentDir.LastIndexOf(assemblyName) + assemblyName.Length)];
             var targetDir = $"{projectDir}\\TypeScript\\Game\\Shared\\Api";
-            WriteApiMap(endpointMetadata.OrderBy(end => end.Endpoint).ToList(), targetDir);
+            WriteApiMap([.. endpointMetadata.OrderBy(end => end.Endpoint)], targetDir);
             WriteApiInterfaces(usedTypes, targetDir);
         }
 
@@ -113,7 +125,7 @@ namespace GameServer.CodeGen
             }
             else //Construct anonymous json object type
             {
-                return $"{{ {string.Join(", ", endpoint.Parameters.Select(p => $"{p.ParameterName.ToCamelCase()}: {p.TypeText}"))} }}";
+                return $"{{ {string.Join(", ", endpoint.Parameters.Select(p => $"{p.ParameterName.Decapitalize()}: {p.TypeText}"))} }}";
             }
         }
 
@@ -224,21 +236,21 @@ namespace GameServer.CodeGen
             builder.AppendLine($"interface {GetInterfaceName(type)} {{");
             if (type.IsGenericTypeDefinition)
             {
-                var generics = type.GetGenericArguments().Select((t, i) => (type: t, index: i));
+                var generics = type.GetGenericArguments().Select((t, i) => (type: t, index: i + 1));
                 foreach (var prop in type.GetProperties())
                 {
                     var generic = generics.FirstOrDefault(x => x.type == prop.PropertyType);
                     var typeText = generic == default
                         ? GetTypeText(prop.PropertyType)
                         : "T" + generic.index.ToString();
-                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {typeText};");
+                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {typeText};");
                 }
             }
             else
             {
                 foreach (var prop in type.GetProperties())
                 {
-                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {GetTypeText(prop.PropertyType)};");
+                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {GetTypeText(prop.PropertyType)};");
                 }
             }
             builder.Append('}');
@@ -295,7 +307,7 @@ namespace GameServer.CodeGen
         {
             if (type.IsGenericTypeDefinition)
             {
-                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select((arg, i) => "T" + i))}>";
+                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select((arg, i) => "T" + (i + 1)))}>";
             }
             else if (type.IsConstructedGenericType)
             {

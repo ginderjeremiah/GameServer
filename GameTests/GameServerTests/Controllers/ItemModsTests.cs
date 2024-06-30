@@ -3,7 +3,7 @@ using GameServer.Models.Common;
 using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using static System.Net.HttpStatusCode;
-using ItemMod = GameCore.Entities.ItemMods.ItemMod;
+using ItemMod = GameCore.Entities.ItemMod;
 using ItemModModel = GameServer.Models.Items.ItemMod;
 
 namespace GameTests.GameServerTests.Controllers

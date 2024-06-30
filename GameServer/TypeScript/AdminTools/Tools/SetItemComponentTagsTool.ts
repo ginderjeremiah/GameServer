@@ -18,18 +18,18 @@
         this.tags = res[1];
         this.items.splice(1).forEach(item => {
             const selOption = document.createElement('option');
-            selOption.value = item.itemModId.toString();
-            selOption.text = item.itemModName;
+            selOption.value = item.id.toString();
+            selOption.text = item.name;
             this.sel.appendChild(selOption);
         });
         this.tags.forEach(tag => {
             const checkBox = document.createElement('input');
             checkBox.type = 'checkbox';
-            checkBox.id = 'checkbox' + tag.tagId;
-            checkBox.value = tag.tagId.toString();
+            checkBox.id = 'checkbox' + tag.id;
+            checkBox.value = tag.id.toString();
             const checkLabel = document.createElement('label');
-            checkLabel.htmlFor = 'checkbox' + tag.tagId;
-            checkLabel.textContent = tag.tagName;
+            checkLabel.htmlFor = 'checkbox' + tag.id;
+            checkLabel.textContent = tag.name;
             this.checkDiv.appendChild(checkBox);
             this.checkDiv.appendChild(checkLabel);
             this.checkDiv.appendChild(document.createElement('br'))
@@ -81,7 +81,7 @@
             child.checked = false;
         }
         (await selectedTags).forEach(tag => {
-            const checkB = document.getElementById('checkbox' + tag.tagId) as HTMLInputElement;
+            const checkB = document.getElementById('checkbox' + tag.id) as HTMLInputElement;
             checkB.checked = true;
         });
     }

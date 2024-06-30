@@ -1,8 +1,7 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Entities.PlayerAttributes;
-using GameCore.Entities.Players;
+using GameCore.Entities;
 using GameCore.Infrastructure;
-using System.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
@@ -13,69 +12,19 @@ namespace DataAccess.Repositories
 
         public Players(IDatabaseService database) : base(database) { }
 
-        public Player? GetPlayerByUserName(string userName)
+        public async Task<Player?> GetPlayerByUserNameAsync(string userName)
         {
-            var commandText = @"
-                SELECT TOP(1)
-                    PlayerId,
-                    PlayerName,
-                    UserName,
-                    Level,
-                    Exp,
-                    StatPointsGained,
-                    StatPointsUsed,
-                    Salt,
-                    PassHash
-                FROM Players AS P
-                WHERE UserName = @UserName";
-
-            return Database.QueryToList<Player>(commandText, new QueryParameter("@UserName", userName)).FirstOrDefault();
+            return await Database.Players
+                .Include(p => p.PlayerAttributes)
+                .Include(p => p.PlayerSkills)
+                .FirstOrDefaultAsync();
         }
 
-        public void SavePlayer(Player player, List<PlayerAttribute> attributes)
+        public async Task SavePlayerAsync(Player player)
         {
-            var structuredParameter = new QueryParameter("@Attributes", StructuredType.AttributeUpdate);
-
-            structuredParameter.AddColumns(
-                ("AttributeId", DbType.Int32),
-                ("Amount", DbType.Decimal)
-            );
-
-            structuredParameter.AddRows(attributes.Select(att => new List<object?>
-            {
-                att.AttributeId,
-                att.Amount
-            }).ToList());
-
-            var commandText = @"
-                UPDATE Players
-                SET Level = @Level,
-                    Exp = @Exp,
-                    StatPointsGained = @StatPointsGained,
-                    StatPointsUsed = @StatPointsUsed
-                WHERE PlayerId = @PlayerId
-            
-                UPDATE PA
-                SET Amount = A.Amount
-                FROM PlayerAttributes PA
-                INNER JOIN @Attributes A
-                ON PA.AttributeId = A.AttributeId
-                WHERE PlayerId = @PlayerId
-
-                DELETE PA
-                FROM PlayerAttributes PA
-                LEFT JOIN @Attributes A
-                ON PA.AttributeId = A.AttributeId
-                WHERE A.AttributeId IS NULL";
-
-            Database.ExecuteNonQuery(commandText,
-                new QueryParameter("@PlayerId", player.PlayerId),
-                new QueryParameter("@Level", player.Level),
-                new QueryParameter("@Exp", player.Exp),
-                new QueryParameter("@StatPointsGained", player.StatPointsGained),
-                new QueryParameter("@StatPointsUsed", player.StatPointsUsed),
-                structuredParameter
-            );
+            Database.Update(player);
+            await Database.SaveChangesAsync();
+            Database.Untrack(player);
         }
     }
 }

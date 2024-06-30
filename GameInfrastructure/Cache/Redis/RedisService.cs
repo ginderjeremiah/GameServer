@@ -1,7 +1,6 @@
 ﻿using GameCore;
 using GameCore.Infrastructure;
 using StackExchange.Redis;
-using System.Diagnostics.CodeAnalysis;
 
 namespace GameInfrastructure.Cache.Redis
 {
@@ -55,18 +54,6 @@ namespace GameInfrastructure.Cache.Redis
         {
             var val = await GetDeleteAsync(key);
             return val.Deserialize<T>();
-        }
-
-        public bool TryGet(string key, [NotNullWhen(true)] out string? result)
-        {
-            result = Get(key);
-            return result is not null;
-        }
-
-        public bool TryGet<T>(string key, [NotNullWhen(true)] out T? result)
-        {
-            result = Get<T>(key);
-            return result is not null;
         }
 
         public void Set(string key, string value)

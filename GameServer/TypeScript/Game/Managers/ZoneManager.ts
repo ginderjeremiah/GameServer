@@ -10,7 +10,7 @@
         this.#zoneTitleDisplay = document.getElementById("zoneTitle") as HTMLSpanElement;
         this.#currentZone = 0;
         const zones = DataManager.zones.slice();
-        this.#orderedZones = zones.sort((one, two) => one.zoneOrder - two.zoneOrder);
+        this.#orderedZones = zones.sort((one, two) => one.order - two.order);
         this.#currentZone = this.getOrderedIndex(currentZoneId);
         this.updateZoneDisplay();
         document.getElementById("zoneButtonLeft")?.addEventListener('click', (event) => {
@@ -33,7 +33,7 @@
 
     updateZoneDisplay(): void {
         this.#zoneNumDisplay.textContent = "Zone " + this.#currentZone;
-        this.#zoneTitleDisplay.textContent = this.#orderedZones[this.#currentZone].zoneName;
+        this.#zoneTitleDisplay.textContent = this.#orderedZones[this.#currentZone].name;
     }
 
     getZoneInfo() {
@@ -42,13 +42,13 @@
 
     getOrderedIndex(zoneId: number) {
         for (let i = 0; i < this.#orderedZones.length; i++) {
-            if (this.#orderedZones[i].zoneId === zoneId)
+            if (this.#orderedZones[i].id === zoneId)
                 return i;
         }
         return 0;
     }
 
     get currentZoneId() {
-        return this.#orderedZones[this.#currentZone].zoneId;
+        return this.#orderedZones[this.#currentZone].id;
     }
 }

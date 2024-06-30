@@ -2,15 +2,15 @@
 {
     public class ItemCategory : IModel
     {
-        public int ItemCategoryId { get; set; }
-        public string CategoryName { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; }
 
         public ItemCategory() { }
 
-        public ItemCategory(GameCore.Entities.ItemCategories.ItemCategory itemCategory)
+        public ItemCategory(GameCore.Entities.ItemCategory itemCategory)
         {
-            ItemCategoryId = itemCategory.ItemCategoryId;
-            CategoryName = itemCategory.CategoryName;
+            Id = itemCategory.Id;
+            Name = itemCategory.Name;
         }
     }
 }

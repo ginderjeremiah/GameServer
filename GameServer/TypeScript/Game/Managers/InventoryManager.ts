@@ -286,7 +286,7 @@
             } else {
                 this.inventory[invItem.inventorySlotNumber] = item;
             }
-            LogManager.logMessage("You found a " + item.itemName + "!", "Inventory");
+            LogManager.logMessage("You found a " + item.name + "!", "Inventory");
             this.#createItem(this.inventorySlots[invItem.inventorySlotNumber], item);
         });
     }
@@ -343,8 +343,8 @@
 
     updateInventorySlots() {
         const inv = [
-            ...this.inventory.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, inventorySlotNumber: item.inventorySlotNumber, equipped: false} : []),
-            ...this.equipped.flatMap((item) => item ? {inventoryItemId: item.inventoryItemId, inventorySlotNumber: item.inventorySlotNumber, equipped: true} : [])
+            ...this.inventory.flatMap((item) => item ? {id: item.id, inventorySlotNumber: item.inventorySlotNumber, equipped: false} : []),
+            ...this.equipped.flatMap((item) => item ? {id: item.id, inventorySlotNumber: item.inventorySlotNumber, equipped: true} : [])
         ];
         DataManager.updateInventorySlots(inv);
     }

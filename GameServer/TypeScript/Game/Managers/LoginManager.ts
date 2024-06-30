@@ -29,7 +29,7 @@ class LoginManager {
                 if(response.status === 200) {
                     PopupManager.clearPopups(false);
                 } else {
-                    this.#errorSpan.textContent = "ERROR: " + response.responseText; 
+                    this.#errorSpan.textContent = "ERROR: " + response.error; 
                 }
             })
         }
