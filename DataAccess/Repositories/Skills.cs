@@ -22,7 +22,7 @@ namespace DataAccess.Repositories
         public async Task<Skill?> GetSkillAsync(int skillId)
         {
             var skills = (await AllSkillsAsync()).ToList();
-            return skills.Count > skillId ? null : skills[skillId];
+            return skills.Count >= skillId ? null : skills[skillId];
         }
 
         public Task SaveSkillsAsync(List<int> skillIds)

@@ -1,4 +1,5 @@
 ﻿using GameServer.Models.Attributes;
+
 namespace GameServer.Models.Skills
 {
     public class Skill : IModel

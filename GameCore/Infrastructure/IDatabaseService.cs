@@ -25,9 +25,11 @@ namespace GameCore.Infrastructure
         public IQueryable<ZoneEnemyAlias> ZoneEnemyAliases { get; }
         public IQueryable<Zone> Zones { get; }
 
-        public Task<int> SaveChangesAsync(CancellationToken token = default);
+        public Task SaveChangesAsync();
         public void Insert<Entity>(Entity entity) where Entity : class;
         public void Delete<Entity>(Entity entity) where Entity : class;
         public void Update<Entity>(Entity entity) where Entity : class;
+        public void Untrack<Entity>(Entity entity) where Entity : class;
+        public Task EnsureDbUpdatedAsync();
     }
 }

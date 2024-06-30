@@ -18,6 +18,7 @@
     <UserSecretsId>833b3795-b73b-4bf2-9f64-57e6b0301ccf</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <TypeScriptModuleKind>commonjs</TypeScriptModuleKind>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

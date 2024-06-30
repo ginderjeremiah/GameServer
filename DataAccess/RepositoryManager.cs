@@ -26,7 +26,7 @@ namespace DataAccess
         private IDatabaseService Database => _dataServices.Database;
         private ICacheService Cache => _dataServices.Cache;
         private IPubSubService PubSub => _dataServices.PubSub;
-        private DataProviderSynchronizer Synchronizer => _synchronizer ??= new(PubSub, this);
+        private DataProviderSynchronizer Synchronizer => _synchronizer ??= new(_dataServices);
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(Database);
         public ISessionStore SessionStore => _sessionStore ??= new SessionStore(Database, Cache, Synchronizer);
@@ -42,10 +42,25 @@ namespace DataAccess
         public IAttributes Attributes => _attributes ??= new Attributes(Database);
         public ITagCategories TagCategories => _tagCategories ??= new TagCategories(Database);
 
-        public Task SaveChangesAsync() => Database.SaveChangesAsync();
-        public void Insert<Entity>(Entity entity) where Entity : class => Database.Insert(entity);
-        public void Delete<Entity>(Entity entity) where Entity : class => Database.Delete(entity);
-        public void Update<Entity>(Entity entity) where Entity : class => Database.Update(entity);
+        public Task SaveChangesAsync()
+        {
+            return Database.SaveChangesAsync();
+        }
+
+        public void Insert<Entity>(Entity entity) where Entity : class
+        {
+            Database.Insert(entity);
+        }
+
+        public void Delete<Entity>(Entity entity) where Entity : class
+        {
+            Database.Delete(entity);
+        }
+
+        public void Update<Entity>(Entity entity) where Entity : class
+        {
+            Database.Update(entity);
+        }
     }
 }
 

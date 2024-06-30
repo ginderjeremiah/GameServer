@@ -6,5 +6,6 @@
         public string Name { get; set; }
 
         public virtual List<Item> Items { get; set; }
+        public virtual List<EquipmentSlot> EquipmentSlots { get; set; }
     }
 }

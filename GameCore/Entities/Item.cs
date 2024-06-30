@@ -1,4 +1,6 @@
-﻿namespace GameCore.Entities
+﻿using System.Text.Json.Serialization;
+
+namespace GameCore.Entities
 {
     public class Item
     {
@@ -12,8 +14,11 @@
         public virtual ItemCategory ItemCategory { get; set; }
         public virtual List<ItemSlot> ItemSlots { get; set; }
         public virtual List<Tag> Tags { get; set; }
+        [JsonIgnore]
         public virtual List<EnemyDrop> EnemyDrops { get; set; }
+        [JsonIgnore]
         public virtual List<ZoneDrop> ZoneDrops { get; set; }
+        [JsonIgnore]
         public virtual List<InventoryItem> InventoryItems { get; set; }
     }
 }

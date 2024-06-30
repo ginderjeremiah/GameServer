@@ -5,7 +5,7 @@
         public int Id { get; set; }
         public int ItemId { get; set; }
         public int SlotTypeId { get; set; }
-        public int GuaranteedItemModId { get; set; }
+        public int? GuaranteedItemModId { get; set; }
         public decimal Probability { get; set; }
 
         public ItemSlot() { }

@@ -17,8 +17,11 @@ namespace DataAccess.Repositories
             return _enemyList ??= await Database.Enemies
                 .AsNoTracking()
                 .Include(e => e.AttributeDistributions)
-                .Include(e => e.EnemyDrops.Select(ed => ed.Item))
-                .Include(e => e.EnemySkills.Select(es => es.Skill))
+                .Include(e => e.EnemyDrops)
+                    .ThenInclude(ed => ed.Item)
+                .Include(e => e.EnemySkills)
+                    .ThenInclude(es => es.Skill)
+                        .ThenInclude(s => s.SkillDamageMultipliers)
                 .OrderBy(e => e.Id)
                 .ToListAsync();
         }
@@ -26,14 +29,7 @@ namespace DataAccess.Repositories
         public async Task<Enemy?> GetEnemyAsync(int enemyId)
         {
             var enemies = (await AllEnemiesAsync()).ToList();
-            if (enemies.Count >= enemyId)
-            {
-                return null;
-            }
-            else
-            {
-                return enemies[enemyId];
-            }
+            return enemies.Count >= enemyId ? null : enemies[enemyId];
         }
 
         public async Task<Enemy> GetRandomEnemyAsync(int zoneId)

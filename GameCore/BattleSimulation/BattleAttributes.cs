@@ -1,19 +1,13 @@
-﻿using static GameCore.BattleSimulation.AttributeType;
+﻿using static GameCore.EAttribute;
 
 namespace GameCore.BattleSimulation
 {
     public class BattleAttributes
     {
-        private static readonly int _attributesMaxId = (int)Enum.GetValues(typeof(AttributeType)).GetValue(Enum.GetValues(typeof(AttributeType)).Length - 1);
+        private static readonly int _attributesMaxId = (int)Enum.GetValues(typeof(EAttribute)).GetValue(Enum.GetValues(typeof(EAttribute)).Length - 1);
         private readonly List<decimal> _attributes;
 
-        //public double this[int index]
-        //{
-        //    get => (double)_attributes[index];
-        //    set => _attributes[index] = (decimal)value;
-        //}
-
-        public double this[AttributeType index]
+        public double this[EAttribute index]
         {
             get => (double)_attributes[(int)index];
             set => _attributes[(int)index] = (decimal)value;
@@ -31,7 +25,7 @@ namespace GameCore.BattleSimulation
 
         private static List<decimal> GetEmptyAttributeList()
         {
-            return Enumerable.Repeat(0m, _attributesMaxId).ToList();
+            return Enumerable.Repeat(0m, _attributesMaxId + 1).ToList();
         }
 
         private void CalculateDerivedValues()
@@ -39,7 +33,7 @@ namespace GameCore.BattleSimulation
             this[MaxHealth] += 50.0 + (20.0 * this[Endurance]) + (5 * this[Strength]);
             this[Defense] += 2.0 + this[Endurance] + (0.5 * this[Agility]);
             this[CooldownRecovery] += (0.4 * this[Agility]) + (0.1 * this[Dexterity]);
-            this[DropBonus] += Math.Log10(this[Luck]);
+            this[DropBonus] += this[Luck] > 0.0 ? Math.Log10(this[Luck]) : 0.0;
             //this[CriticalChance] = 0.0;
             //this[CriticalDamage] = 0.0;
             //this[DodgeChance] = 0.0;

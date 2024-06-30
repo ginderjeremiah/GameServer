@@ -57,7 +57,7 @@ class GameManager {
                 const rewards = defeatResponse.data.rewards
                 this.grantExp(rewards.expReward);
                 this.addItems(rewards.drops);
-                LogManager.logMessage(enemyData[battleResult.enemyInstance.enemyId].name + " was defeated!", "Enemy Defeated");
+                LogManager.logMessage(enemyData[battleResult.enemyInstance.id].name + " was defeated!", "Enemy Defeated");
             } else {
                 LogManager.logMessage("There was an error defeating the enemy.", "ERROR");
             }

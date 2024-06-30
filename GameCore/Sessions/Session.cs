@@ -26,7 +26,7 @@ namespace GameCore.Sessions
         {
             _sessionData = sessionData;
             Player = new SessionPlayer(sessionData);
-            InventoryData = new SessionInventory(sessionData.InventoryItems);
+            InventoryData = new SessionInventory(sessionData.PlayerData.InventoryItems);
             _repos = repos;
         }
 
@@ -72,7 +72,7 @@ namespace GameCore.Sessions
                 d.InventorySlotNumber = slotNumber;
                 _repos.Insert(d);
                 InventoryData.Inventory[slotNumber] = d;
-                _sessionData.InventoryItems.Add(d);
+                _sessionData.PlayerData.InventoryItems.Add(d);
                 _sessionDirty = true;
             }
 
@@ -172,7 +172,7 @@ namespace GameCore.Sessions
             foreach (var slot in slots.Where(s => (decimal)rng.NextSingle() < s.Probability))
             {
                 int? modId = null;
-                if (slot.GuaranteedItemModId == -1)
+                if (slot.GuaranteedItemModId is null)
                 {
                     var mods = _repos.ItemMods.GetModsForItemBySlot(slot.ItemId);
                     if (mods.TryGetValue(slot.SlotTypeId, out var modsForSlot))
@@ -187,7 +187,7 @@ namespace GameCore.Sessions
                 }
                 else
                 {
-                    modId = allMods[slot.GuaranteedItemModId].Id;
+                    modId = allMods[slot.GuaranteedItemModId.Value].Id;
                 }
 
                 if (modId is not null)

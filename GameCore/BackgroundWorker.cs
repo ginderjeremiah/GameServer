@@ -19,6 +19,17 @@
             _logger = logger;
             Task.Run(CreateWorkerLoop(action));
         }
+        public BackgroundWorker(IApiLogger logger, Func<IApiLogger, Task> action)
+        {
+            _logger = logger;
+            Task.Run(CreateAsyncWorkerLoop(async () => await action(logger)));
+        }
+
+        public BackgroundWorker(IApiLogger logger, Func<Task> action)
+        {
+            _logger = logger;
+            Task.Run(CreateAsyncWorkerLoop(action));
+        }
 
         public void Start()
         {
@@ -42,6 +53,26 @@
                     try
                     {
                         loopAction();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex);
+                    }
+                    IsRunning = false;
+                    _logger.Log($"Sleeping background worker '{Name}'.");
+                }
+            };
+        }
+
+        private Action CreateAsyncWorkerLoop(Func<Task> loopAction)
+        {
+            return async () =>
+            {
+                while (_resetEvent.WaitOne())
+                {
+                    try
+                    {
+                        await loopAction();
                     }
                     catch (Exception ex)
                     {

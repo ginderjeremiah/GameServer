@@ -16,8 +16,13 @@ namespace GameInfrastructure
         private IPubSubService? _pubsub;
 
         public IApiLogger Logger => _logger ??= new ApiLogger(_config);
-        public IDatabaseService Database => _databaseService ??= new GameContext(_config);
+        public IDatabaseService Database => _databaseService ??= GetNewDatabaseService();
         public ICacheService Cache => _cache ??= CacheServiceFactory.GetCacheService(_config);
         public IPubSubService PubSub => _pubsub ??= PubSubServiceFactory.GetPubSubService(_config, Logger);
+
+        public IDatabaseService GetNewDatabaseService()
+        {
+            return new DatabaseService(_config);
+        }
     }
 }

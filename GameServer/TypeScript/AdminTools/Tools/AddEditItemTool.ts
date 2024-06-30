@@ -8,8 +8,8 @@
             ApiRequest.get('/api/Items')
         ])
         const itemCategoryOpts = data[0].map(cat => ({
-            id: cat.itemCategoryId,
-            name: cat.categoryName
+            id: cat.id,
+            name: cat.name
         }));
         const getItemCategories = (i: IItem) => {
             return {options: itemCategoryOpts};
@@ -17,8 +17,8 @@
         this.itemTable = new TableDataEditor(data[1],
             renderParent,
             {
-                primaryKey: "itemId",
-                selOptions: { "itemCategoryId": getItemCategories },
+                primaryKey: "id",
+                selOptions: { itemCategoryId: getItemCategories },
                 hiddenColumns: ["attributes"]
             }
         );

@@ -125,7 +125,7 @@ namespace GameServer.CodeGen
             }
             else //Construct anonymous json object type
             {
-                return $"{{ {string.Join(", ", endpoint.Parameters.Select(p => $"{p.ParameterName.ToCamelCase()}: {p.TypeText}"))} }}";
+                return $"{{ {string.Join(", ", endpoint.Parameters.Select(p => $"{p.ParameterName.Decapitalize()}: {p.TypeText}"))} }}";
             }
         }
 
@@ -243,14 +243,14 @@ namespace GameServer.CodeGen
                     var typeText = generic == default
                         ? GetTypeText(prop.PropertyType)
                         : "T" + generic.index.ToString();
-                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {typeText};");
+                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {typeText};");
                 }
             }
             else
             {
                 foreach (var prop in type.GetProperties())
                 {
-                    builder.AppendLine($"\t{prop.Name.ToCamelCase()}: {GetTypeText(prop.PropertyType)};");
+                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {GetTypeText(prop.PropertyType)};");
                 }
             }
             builder.Append('}');

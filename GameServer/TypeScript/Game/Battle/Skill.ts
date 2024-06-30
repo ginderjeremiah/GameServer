@@ -1,11 +1,11 @@
 ﻿/// <reference path="../Abstract/Tooltippable.ts"/>
 class Skill extends Tooltippable implements ISkill {
-    skillId: number
-    skillName: string;
+    id: number
+    name: string;
     chargeTime: number;
     baseDamage: number;
     damageMultipliers: IAttributeMultiplier[];
-    skillDesc: string;
+    description: string;
     cooldownMS: number;
     iconPath: string;
     owner: Battler;
@@ -14,11 +14,11 @@ class Skill extends Tooltippable implements ISkill {
 
     constructor(data: ISkill, owner: Battler) {
         super();
-        this.skillId = data.skillId
-        this.skillName = data.skillName;
+        this.id = data.id
+        this.name = data.name;
         this.baseDamage = data.baseDamage;
         this.damageMultipliers = data.damageMultipliers;
-        this.skillDesc = data.skillDesc;
+        this.description = data.description;
         this.cooldownMS = data.cooldownMS;
         this.chargeTime = 0;
         this.iconPath = data.iconPath;
@@ -28,7 +28,7 @@ class Skill extends Tooltippable implements ISkill {
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
         const target = GameManager.getOpponent(this.owner);
         let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100) * 1000);
-        tooltipTitle.textContent = this.skillName + " (" + remainingCd.toFixed(2) + "s)";
+        tooltipTitle.textContent = this.name + " (" + remainingCd.toFixed(2) + "s)";
         if (this.toolTipId !== prevId || (!this.target && target)) {
             this.target = target;
             tooltipContent.replaceChildren();
@@ -40,7 +40,7 @@ class Skill extends Tooltippable implements ISkill {
 
             let damageList = document.createElement("ul");
             damageList.className = "tooltipList";
-            damageList.id = this.skillName + "_damageList" 
+            damageList.id = this.name + "_damageList" 
 
             this.createDamageListContent(damageList, target);
 
@@ -78,7 +78,7 @@ class Skill extends Tooltippable implements ISkill {
         this.damageMultipliers.forEach((mult) => {
             let multiplier = document.createElement("li");
             let dam = this.owner.attributes.getValue(mult.attributeId) * mult.multiplier;
-            multiplier.textContent = attributeData[mult.attributeId].attributeName + ": " + formatNum(dam) + " (" + formatNum(mult.multiplier) + "x)";
+            multiplier.textContent = attributeData[mult.attributeId].name + ": " + formatNum(dam) + " (" + formatNum(mult.multiplier) + "x)";
             totDam += dam;
             damageList.appendChild(multiplier);
         })
@@ -89,7 +89,7 @@ class Skill extends Tooltippable implements ISkill {
 
         if (target) {
             let adjDamage = document.createElement("li"); 
-            adjDamage.id = this.skillName + '_aDmg'
+            adjDamage.id = this.name + '_aDmg'
             let adjDmg = totDam - target.attributes.getValue(AttributeType.Defense);
             adjDmg = adjDmg > 0 ? adjDmg : 0;
             adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
@@ -108,7 +108,7 @@ class Skill extends Tooltippable implements ISkill {
 
         if (target) {
             let adjDamagePerSecond = document.createElement('li');
-            adjDamagePerSecond.id = this.skillName + '_aDPS';
+            adjDamagePerSecond.id = this.name + '_aDPS';
             let adjDps = (totDam - target.attributes.getValue(AttributeType.Defense)) / cd;
             adjDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjDps) + '/s';
             damageList.appendChild(adjDamagePerSecond);

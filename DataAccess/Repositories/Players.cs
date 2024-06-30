@@ -20,34 +20,11 @@ namespace DataAccess.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task SavePlayerAsync(Player player, List<PlayerAttribute> attributes)
+        public async Task SavePlayerAsync(Player player)
         {
-            //var usedAtts = new List<PlayerAttribute>();
-
-            //await Database.Players.SelectMany(p => p.PlayerAttributes).ForEachAsync(att =>
-            //{
-            //    var match = attributes.FirstOrDefault(attribute => attribute.AttributeId == att.AttributeId);
-            //    if (match is null)
-            //    {
-            //        Database.Delete(att);
-            //    }
-            //    else
-            //    {
-            //        att.Amount = match.Amount;
-            //        Database.Update(att);
-            //        usedAtts.Add(att);
-            //    }
-            //});
-
-            //foreach (var att in attributes.Except(usedAtts))
-            //{
-
-            //}
-
-            player.PlayerAttributes = attributes;
             Database.Update(player);
-
             await Database.SaveChangesAsync();
+            Database.Untrack(player);
         }
     }
 }

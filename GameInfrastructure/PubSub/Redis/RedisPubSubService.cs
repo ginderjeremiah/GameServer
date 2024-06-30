@@ -49,8 +49,21 @@ namespace GameInfrastructure.PubSub.Redis
         {
             Logger.LogInfo($"Creating redis subscriber on channel '{channel}' with queue '{queueName}'.");
             var queue = new RedisQueue(Redis, queueName);
-            var worker = new BackgroundWorker(Logger, () => action((queue, channel)));
-            worker.Name = $"RedisSubWorker_{queueName}";
+            var worker = new BackgroundWorker(Logger, () => action((queue, channel)))
+            {
+                Name = $"RedisSubWorker_{queueName}"
+            };
+            Subscriber.Subscribe(RedisChannel.Literal(channel), (_, _) => worker.Start());
+        }
+
+        public void Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action)
+        {
+            Logger.LogInfo($"Creating redis subscriber on channel '{channel}' with queue '{queueName}'.");
+            var queue = new RedisQueue(Redis, queueName);
+            var worker = new BackgroundWorker(Logger, async () => await action((queue, channel)))
+            {
+                Name = $"RedisSubWorker_{queueName}"
+            };
             Subscriber.Subscribe(RedisChannel.Literal(channel), (_, _) => worker.Start());
         }
     }

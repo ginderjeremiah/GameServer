@@ -1,4 +1,6 @@
-﻿namespace GameCore.Entities
+﻿using System.Text.Json.Serialization;
+
+namespace GameCore.Entities
 {
     public class SkillDamageMultiplier
     {
@@ -6,6 +8,7 @@
         public int AttributeId { get; set; }
         public decimal Multiplier { get; set; }
 
+        [JsonIgnore]
         public virtual Skill Skill { get; set; }
         public virtual Attribute Attribute { get; set; }
     }

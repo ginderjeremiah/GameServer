@@ -1,4 +1,6 @@
-﻿namespace GameCore.Entities
+﻿using System.Text.Json.Serialization;
+
+namespace GameCore.Entities
 {
     public class Skill
     {
@@ -10,7 +12,9 @@
         public string IconPath { get; set; }
 
         public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
+        [JsonIgnore]
         public virtual List<EnemySkill> EnemySkills { get; set; }
+        [JsonIgnore]
         public virtual List<PlayerSkill> PlayerSkills { get; set; }
     }
 }

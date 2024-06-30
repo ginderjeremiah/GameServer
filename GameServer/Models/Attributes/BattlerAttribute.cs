@@ -1,11 +1,11 @@
-﻿using GameCore.BattleSimulation;
+﻿using GameCore;
 using GameCore.Entities;
 
 namespace GameServer.Models.Attributes
 {
     public class BattlerAttribute : IModel
     {
-        public AttributeType AttributeId { get; set; }
+        public EAttribute AttributeId { get; set; }
         public decimal Amount { get; set; }
 
         public BattlerAttribute() { }
@@ -18,18 +18,18 @@ namespace GameServer.Models.Attributes
 
         public BattlerAttribute(ItemModAttribute itemModAttribute)
         {
-            AttributeId = (AttributeType)itemModAttribute.AttributeId;
+            AttributeId = (EAttribute)itemModAttribute.AttributeId;
             Amount = itemModAttribute.Amount;
         }
 
         public BattlerAttribute(ItemAttribute itemAttribute)
         {
-            AttributeId = (AttributeType)itemAttribute.AttributeId;
+            AttributeId = (EAttribute)itemAttribute.AttributeId;
             Amount = itemAttribute.Amount;
         }
         public BattlerAttribute(PlayerAttribute playerAttribute)
         {
-            AttributeId = (AttributeType)playerAttribute.AttributeId;
+            AttributeId = (EAttribute)playerAttribute.AttributeId;
             Amount = playerAttribute.Amount;
         }
     }

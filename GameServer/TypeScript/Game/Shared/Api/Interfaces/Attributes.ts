@@ -1,17 +1,17 @@
 interface IAttribute {
-	id: AttributeType;
+	id: EAttribute;
 	name: string;
 	description: string;
 }
 
 interface IAttributeDistribution {
-	attributeId: AttributeType;
+	attributeId: EAttribute;
 	baseAmount: number;
 	amountPerLevel: number;
 }
 
 interface IAttributeMultiplier {
-	attributeId: AttributeType;
+	attributeId: EAttribute;
 	multiplier: number;
 }
 
@@ -21,6 +21,6 @@ interface IAttributeUpdate {
 }
 
 interface IBattlerAttribute {
-	attributeId: AttributeType;
+	attributeId: EAttribute;
 	amount: number;
 }

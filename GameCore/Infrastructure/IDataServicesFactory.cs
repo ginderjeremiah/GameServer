@@ -6,5 +6,7 @@
         public IDatabaseService Database { get; }
         public ICacheService Cache { get; }
         public IPubSubService PubSub { get; }
+
+        public IDatabaseService GetNewDatabaseService();
     }
 }

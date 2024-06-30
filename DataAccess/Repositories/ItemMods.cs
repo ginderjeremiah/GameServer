@@ -17,7 +17,7 @@ namespace DataAccess.Repositories
         {
             if (_allMods is null || refreshCache)
             {
-                _allMods = await Database.ItemMods.ToListAsync();
+                _allMods = await Database.ItemMods.Include(im => im.ItemModAttributes).ToListAsync();
             }
             return _allMods;
         }
@@ -48,18 +48,12 @@ namespace DataAccess.Repositories
         {
             return Database.Items
                 .Where(i => i.Id == itemId)
-                .Include(i => i.Tags.Select(t => t.ItemMods))
+                .Include(i => i.Tags)
+                    .ThenInclude(t => t.ItemMods)
                 .SelectMany(i => i.Tags.SelectMany(t => t.ItemMods))
                 .Distinct()
                 .GroupBy(im => im.SlotTypeId)
                 .ToDictionary(grp => grp.Key, grp => grp.AsEnumerable());
-
-            //return Database.ItemMods
-            //    .AsNoTracking()
-            //    .Include(im => im.Tags.Select(t => t.Items))
-            //    .Where(im => im.Tags.Any(t => t.Items.Any(i => i.Id == itemId)))
-            //    .GroupBy(im => im.SlotTypeId)
-            //    .ToDictionary(grp => grp.Key, grp => grp.ToList());
         }
     }
 }

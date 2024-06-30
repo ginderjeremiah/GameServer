@@ -10,7 +10,7 @@ class BattleManager {
         const enemyData = DataManager.enemies;
         this.#battleActive = true;
         this.#player = new Player(playerData, equipmentAttributes);
-        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.enemyId]);
+        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.id]);
     }
 
     update(timeDelta: number): BattleResult | void {
@@ -37,14 +37,14 @@ class BattleManager {
         playerSkillsFired.forEach(skill => {
             const dmg = skill.calculateDamage();
             let finalDmg = this.#enemy.takeDamage(dmg);
-            LogManager.logMessage("You used " + skill.skillName + " and dealt " + formatNum(finalDmg) + " damage!", "Damage");
+            LogManager.logMessage("You used " + skill.name + " and dealt " + formatNum(finalDmg) + " damage!", "Damage");
         });
         if (!this.#enemy.isDead) {
             const enemySkillsFired = this.#enemy.advanceCooldown(this.#tickSize);
             enemySkillsFired.forEach(skill => {
                 const dmg = skill.calculateDamage();
                 let finalDmg = this.#player.takeDamage(dmg);
-                LogManager.logMessage(this.#enemy.name + " used " + skill.skillName + " and dealt " + formatNum(finalDmg) + " damage!", "Damage");
+                LogManager.logMessage(this.#enemy.name + " used " + skill.name + " and dealt " + formatNum(finalDmg) + " damage!", "Damage");
             });
         }
     }
@@ -73,7 +73,7 @@ class BattleManager {
         this.#msStore = 0;
         this.#timeElapsed = 0;
         this.#player.reset(playerData, equipmentAttributes);
-        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.enemyId]);
+        this.#enemy = new Enemy(enemyInstance, enemyData[enemyInstance.id]);
         this.#battleActive = true;
     }
 

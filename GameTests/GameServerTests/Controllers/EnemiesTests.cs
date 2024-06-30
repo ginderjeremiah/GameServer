@@ -1,14 +1,13 @@
 ﻿using GameCore;
 using GameCore.Entities;
-using GameCore.Entities.Skills;
-using GameCore.Entities.Zones;
 using GameServer.Models.Common;
 using GameServer.Models.Enemies;
 using GameTests.Mocks.DataAccess.Repositories;
 using GameTests.Mocks.GameServer;
 using System.Net.Http.Json;
-using static GameCore.BattleSimulation.AttributeType;
+using static GameCore.EAttribute;
 using static System.Net.HttpStatusCode;
+using AttributeDistribution = GameCore.Entities.AttributeDistribution;
 using BattlerAttribute = GameCore.BattleSimulation.BattlerAttribute;
 using BattlerAttributeModel = GameServer.Models.Attributes.BattlerAttribute;
 using Enemy = GameCore.Entities.Enemy;
@@ -28,14 +27,14 @@ namespace GameTests.GameServerTests.Controllers
             using var app = new ApiAppFactory();
             var client = app.CreateClient();
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new(), AttributeDistribution = new() });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [], AttributeDistributions = [] });
             var payload = new EnemyInstanceModel
             {
-                EnemyId = 1,
+                Id = 1,
                 Level = 1,
-                Attributes = new() { new BattlerAttributeModel { AttributeId = Strength, Amount = 1.0m } },
+                Attributes = [new BattlerAttributeModel { AttributeId = Strength, Amount = 1.0m }],
                 Seed = 1,
-                SelectedSkills = new() { 1 }
+                SelectedSkills = [1]
             };
 
             var response = await client.PostAsJsonAsync("/api/Enemies/DefeatEnemy", payload);
@@ -54,16 +53,16 @@ namespace GameTests.GameServerTests.Controllers
             var client = app.CreateClient();
             app.AddAuthorizedSession(client);
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new(), AttributeDistribution = new() });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [], AttributeDistributions = [] });
             var zones = ((MockZones)app.Repositories.Zones).Zones;
-            zones.Add(new Zone { ZoneId = 1, LevelMax = 1, LevelMin = 1, ZoneDesc = "", ZoneDrops = new(), ZoneName = "", ZoneOrder = 1 });
+            zones.Add(new Zone { Id = 1, LevelMax = 1, LevelMin = 1, Description = "", ZoneDrops = [], Name = "", Order = 1 });
             var enemy = new EnemyInstance
             {
-                EnemyId = 1,
+                Id = 1,
                 Level = 1,
-                Attributes = new() { new BattlerAttribute { AttributeId = Strength, Amount = 1.0m } },
+                Attributes = [new BattlerAttribute { AttributeId = Strength, Amount = 1.0m }],
                 Seed = 1,
-                SelectedSkills = new() { 1 }
+                SelectedSkills = [1]
             };
             app.Session.SetActiveEnemy(enemy, DateTime.UtcNow, true);
             var payload = new EnemyInstanceModel(enemy);
@@ -85,7 +84,7 @@ namespace GameTests.GameServerTests.Controllers
             using var app = new ApiAppFactory();
             var client = app.CreateClient();
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new(), AttributeDistribution = new() });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [], AttributeDistributions = [] });
 
             var response = await client.GetAsync("/api/Enemies/NewEnemy");
 
@@ -103,11 +102,11 @@ namespace GameTests.GameServerTests.Controllers
             var client = app.CreateClient();
             app.AddAuthorizedSession(client);
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new() { 0 }, AttributeDistribution = new() { new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m } } });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [new EnemySkill { EnemyId = 1, SkillId = 0 }], AttributeDistributions = [new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m }] });
             var zones = ((MockZones)app.Repositories.Zones).Zones;
-            zones.Add(new Zone { ZoneId = 1, LevelMax = 1, LevelMin = 1, ZoneDesc = "", ZoneDrops = new(), ZoneName = "", ZoneOrder = 1 });
+            zones.Add(new Zone { Id = 1, LevelMax = 1, LevelMin = 1, Description = "", ZoneDrops = [], Name = "", Order = 1 });
             var skills = ((MockSkills)app.Repositories.Skills).Skills;
-            skills.Add(new Skill { SkillId = 0, SkillName = "", SkillDesc = "", IconPath = "", BaseDamage = 1.0m, CooldownMS = 1000, DamageMultipliers = new() });
+            skills.Add(new Skill { Id = 0, Name = "", Description = "", IconPath = "", BaseDamage = 1.0m, CooldownMS = 1000, SkillDamageMultipliers = [] });
 
             var response = await client.GetAsync("/api/Enemies/NewEnemy");
 
@@ -126,11 +125,11 @@ namespace GameTests.GameServerTests.Controllers
             var client = app.CreateClient();
             app.AddAuthorizedSession(client);
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new() { 0 }, AttributeDistribution = new() { new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m } } });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [new EnemySkill { EnemyId = 1, SkillId = 0 }], AttributeDistributions = [new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m }] });
             var zones = ((MockZones)app.Repositories.Zones).Zones;
-            zones.Add(new Zone { ZoneId = 1, LevelMax = 1, LevelMin = 1, ZoneDesc = "", ZoneDrops = new(), ZoneName = "", ZoneOrder = 1 });
+            zones.Add(new Zone { Id = 1, LevelMax = 1, LevelMin = 1, Description = "", ZoneDrops = [], Name = "", Order = 1 });
             var skills = ((MockSkills)app.Repositories.Skills).Skills;
-            skills.Add(new Skill { SkillId = 0, SkillName = "", SkillDesc = "", IconPath = "", BaseDamage = 1.0m, CooldownMS = 1000, DamageMultipliers = new() });
+            skills.Add(new Skill { Id = 0, Name = "", Description = "", IconPath = "", BaseDamage = 1.0m, CooldownMS = 1000, SkillDamageMultipliers = [] });
             app.Session.CurrentZone = 0;
             var newZoneId = 1;
 
@@ -152,11 +151,11 @@ namespace GameTests.GameServerTests.Controllers
             var client = app.CreateClient();
             app.AddAuthorizedSession(client);
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new() { 0 }, AttributeDistribution = new() { new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m } } });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [new EnemySkill { EnemyId = 1, SkillId = 0 }], AttributeDistributions = [new AttributeDistribution { AttributeId = 5, BaseAmount = 1.0m }] });
             var zones = ((MockZones)app.Repositories.Zones).Zones;
-            zones.Add(new Zone { ZoneId = 1, LevelMax = 1, LevelMin = 1, ZoneDesc = "", ZoneDrops = new(), ZoneName = "", ZoneOrder = 1 });
+            zones.Add(new Zone { Id = 1, LevelMax = 1, LevelMin = 1, Description = "", ZoneDrops = [], Name = "", Order = 1 });
             var skills = ((MockSkills)app.Repositories.Skills).Skills;
-            skills.Add(new Skill { SkillId = 0, SkillName = "", SkillDesc = "", IconPath = "", BaseDamage = 10.0m, CooldownMS = 10, DamageMultipliers = new() });
+            skills.Add(new Skill { Id = 0, Name = "", Description = "", IconPath = "", BaseDamage = 10.0m, CooldownMS = 10, SkillDamageMultipliers = [] });
             app.Session.CurrentZone = 0;
             var newZoneId = 1;
 
@@ -192,7 +191,7 @@ namespace GameTests.GameServerTests.Controllers
             using var app = new ApiAppFactory();
             var client = app.CreateClient();
             var enemies = ((MockEnemies)app.Repositories.Enemies).Enemies;
-            enemies.Add(new Enemy { EnemyId = 1, EnemyName = "Test1", EnemyDrops = new(), SkillPool = new(), AttributeDistribution = new() });
+            enemies.Add(new Enemy { Id = 1, Name = "Test1", EnemyDrops = [], EnemySkills = [], AttributeDistributions = [] });
 
             var response = await client.GetAsync("/api/Enemies");
 

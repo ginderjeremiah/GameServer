@@ -1,4 +1,4 @@
-﻿using static GameCore.BattleSimulation.AttributeType;
+﻿using static GameCore.EAttribute;
 
 namespace GameCore.BattleSimulation
 {

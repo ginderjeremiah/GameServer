@@ -24,10 +24,19 @@ namespace DataAccess.Repositories
         public async Task<SessionData> GetNewSessionDataAsync(int playerId)
         {
             var player = await Database.Players
-                .Include(p => p.InventoryItems.Select(i => i.Item.ItemAttributes))
-                .Include(p => p.InventoryItems.Select(i => i.InventoryItemMods.Select(im => im.ItemMod.ItemModAttributes)))
+                .AsNoTracking()
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.Item)
+                        .ThenInclude(i => i.ItemAttributes)
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.InventoryItemMods)
+                        .ThenInclude(iim => iim.ItemMod)
+                            .ThenInclude(im => im.ItemModAttributes)
                 .Include(p => p.PlayerAttributes)
                 .Include(p => p.PlayerSkills)
+                    .ThenInclude(ps => ps.Skill)
+                        .ThenInclude(s => s.SkillDamageMultipliers)
+                .Include(p => p.LogPreferences)
                 .FirstOrDefaultAsync() ?? throw new ArgumentOutOfRangeException(nameof(playerId));
 
             var sessionData = new SessionData(Guid.NewGuid().ToString())

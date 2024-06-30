@@ -35,13 +35,13 @@ class AttributeManager {
                 const attData = attributeData[att.attributeId];
                 const spanLabelDiv = document.createElement('div');
                 const spanLabel = document.createElement('span');
-                spanLabel.textContent = attData.attributeName + ': ';
+                spanLabel.textContent = attData.name + ': ';
                 spanLabelDiv.append(spanLabel);
                 this.#attTableLabels.append(spanLabelDiv);
 
                 const spanNumberDiv = document.createElement('div');
                 const spanNumber = document.createElement('span');
-                spanNumber.id = attData.attributeName + '_number';
+                spanNumber.id = attData.name + '_number';
                 spanNumber.textContent = att.amount.toString();
                 spanNumberDiv.append(spanNumber);
                 this.#attTableNumbers.append(spanNumberDiv);
@@ -74,7 +74,7 @@ class AttributeManager {
                 const attData = DataManager.attributes[attId];
                 this.#changedAttributes[attId] += 1;
                 this.#availablePoints -= 1;
-                const numberSpan = document.getElementById(attData.attributeName + '_number');
+                const numberSpan = document.getElementById(attData.name + '_number');
                 if (numberSpan) {
                     numberSpan.textContent = (playerAtt.amount + this.#changedAttributes[attId]).toString();
                 }
@@ -89,7 +89,7 @@ class AttributeManager {
             const attData = DataManager.attributes[attId];
             this.#changedAttributes[attId] -= 1;
             this.#availablePoints += 1;
-            const numberSpan = document.getElementById(attData.attributeName + '_number');
+            const numberSpan = document.getElementById(attData.name + '_number');
             if (numberSpan) {
                 numberSpan.textContent = (playerAtt.amount + this.#changedAttributes[attId]).toString();
             }

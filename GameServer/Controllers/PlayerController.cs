@@ -28,8 +28,7 @@ namespace GameServer.Controllers
         [HttpGet]
         public ApiListResponse<LogPreference> LogPreferences()
         {
-            //TODO get LogPreferences from session player
-            throw new NotImplementedException();
+            return Success(Session.Player.LogPreferences.Select(lp => new LogPreference(lp)));
         }
 
         [SessionAuthorize]
@@ -44,12 +43,9 @@ namespace GameServer.Controllers
         [HttpPost]
         public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
-            if (Session.TryUpdateInventoryItems(inventory.Cast<IInventoryUpdate>().ToList()))
-            {
-                return Success();
-            }
-
-            return Error("Unable to set inventory items.");
+            return Session.TryUpdateInventoryItems(inventory.Cast<IInventoryUpdate>().ToList())
+                ? Success()
+                : Error("Unable to set inventory items.");
         }
 
         [SessionAuthorize]

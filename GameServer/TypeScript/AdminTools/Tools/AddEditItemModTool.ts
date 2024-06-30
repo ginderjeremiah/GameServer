@@ -7,16 +7,13 @@
             ApiRequest.get('/api/ItemMods', { refreshCache: true }),
             ApiRequest.get('/api/Items/SlotTypes')
         ]);
-        const slotTypeOpts = data[1].map(slotType => ({
-            id: slotType.slotTypeId,
-            name: slotType.slotTypeName
-        }));
+        const slotTypeOpts = data[1];
         const getSlotTypes = () => {
             return {options: slotTypeOpts};
         };
 
         this.modTable = new TableDataEditor(data[0], renderParent, {
-            primaryKey: "itemModId",
+            primaryKey: "id",
             selOptions: {slotTypeId: getSlotTypes },
             hiddenColumns: ["attributes"]
         });

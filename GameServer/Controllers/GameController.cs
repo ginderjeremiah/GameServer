@@ -72,11 +72,10 @@ namespace GameServer.Controllers
             });
         }
 
-        [SessionAuthorize]
         [HttpGet]
         public ApiResponse LoginStatus()
         {
-            return Success();
+            return SessionAvailable ? Success() : Error("Not logged in");
         }
     }
 }

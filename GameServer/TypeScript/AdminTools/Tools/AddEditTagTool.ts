@@ -7,13 +7,10 @@
             ApiRequest.get('/api/Tags'),
             ApiRequest.get('/api/Tags/TagCategories')
         ])
-        const tagCategoryOpts = data[1].map(cat => ({
-            id: cat.tagCategoryId,
-            name: cat.tagCategoryName
-        }));
+        const tagCategoryOpts = data[1];
         this.tagsTable = new TableDataEditor(data[0], renderParent, {
-            primaryKey: "tagId",
-            selOptions: {"tagCategoryId": () => ({options: tagCategoryOpts})}
+            primaryKey: "id",
+            selOptions: {tagCategoryId: () => ({options: tagCategoryOpts})}
         });
         this.renderParent = renderParent;
         const submitButton = document.createElement('button');

@@ -1,4 +1,4 @@
-﻿namespace DataAccess.Models.Drops
+﻿namespace GameServer.Models.Drops
 {
     public class ZoneDrop : IDrop
     {
