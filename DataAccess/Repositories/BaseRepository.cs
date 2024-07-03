@@ -1,12 +1,12 @@
-﻿using GameCore.Infrastructure;
+﻿using GameInfrastructure.Database;
 
 namespace DataAccess.Repositories
 {
     internal class BaseRepository
     {
-        protected IDatabaseService Database { get; set; }
+        protected GameContext Database { get; set; }
 
-        protected BaseRepository(IDatabaseService database)
+        protected BaseRepository(GameContext database)
         {
             Database = database;
         }

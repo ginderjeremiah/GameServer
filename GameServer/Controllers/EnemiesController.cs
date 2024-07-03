@@ -1,5 +1,6 @@
 ﻿using GameCore;
 using GameCore.BattleSimulation;
+using GameCore.DataAccess;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Enemies;
@@ -18,9 +19,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public async Task<ApiListResponse<Enemy>> Enemies()
+        public ApiListResponse<Enemy> Enemies()
         {
-            var enemies = await Repositories.Enemies.AllEnemiesAsync();
+            var enemies = Repositories.Enemies.AllEnemies();
             return Success(enemies.Select(enemy => new Enemy(enemy)));
         }
 
@@ -41,7 +42,7 @@ namespace GameServer.Controllers
             {
                 Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
-                var rewards = await Session.GrantRewards(instance);
+                var rewards = Session.GrantRewards(instance);
                 return Success(new DefeatEnemy
                 {
                     Cooldown = 5000,
@@ -60,7 +61,7 @@ namespace GameServer.Controllers
 
         [SessionAuthorize]
         [HttpGet]
-        public async Task<ApiResponse<NewEnemy>> NewEnemy(int newZoneId = -1)
+        public ApiResponse<NewEnemy> NewEnemy(int newZoneId = -1)
         {
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
@@ -71,14 +72,14 @@ namespace GameServer.Controllers
                 });
             }
 
-            if (newZoneId != -1 && await Repositories.Zones.ValidateZoneIdAsync(newZoneId))
+            if (newZoneId != -1 && Repositories.Zones.ValidateZoneId(newZoneId))
             {
                 Session.CurrentZone = newZoneId;
             }
 
-            var zone = await Repositories.Zones.GetZoneAsync(Session.CurrentZone);
+            var zone = Repositories.Zones.GetZone(Session.CurrentZone);
             var level = (int)new Random().NextInt64(zone.LevelMin, zone.LevelMax);
-            var enemy = await Repositories.Enemies.GetRandomEnemyAsync(zone.Id);
+            var enemy = Repositories.Enemies.GetRandomEnemy(zone.Id);
             var seed = (uint)(now.Ticks % uint.MaxValue);
             var enemyInstance = new EnemyInstance()
             {
@@ -86,6 +87,11 @@ namespace GameServer.Controllers
                 Level = level,
                 Seed = seed
             };
+
+            foreach (var enemySkill in enemy.EnemySkills)
+            {
+                enemySkill.Skill = Repositories.Skills.GetSkill(enemySkill.SkillId);
+            }
 
             var simulator = new BattleSimulator(Session, enemy, enemyInstance, Repositories);
             var victory = simulator.Simulate(out var totalMs);

@@ -1,13 +1,12 @@
 ﻿using GameCore;
 using GameInfrastructure;
-using GameInfrastructure.Cache;
-using GameInfrastructure.PubSub;
 using LogLevel = GameCore.LogLevel;
 
 namespace GameServer
 {
     public class Config : IDataServicesConfiguration
     {
+        public DatabaseSystem DatabaseSystem { get; }
         public string DbConnectionString { get; }
         public CacheSystem CacheSystem { get; }
         public string CacheConnectionString { get; }
@@ -24,8 +23,9 @@ namespace GameServer
             HashPepper = configuration["HashPepper"] ?? throw new Exception("Could not retrieve pepper for Hashing.");
 
             //appsettings fields
-            CacheSystem = (CacheSystem)Enum.Parse(typeof(CacheSystem), configuration["CacheSystem"].AsString());
-            PubSubSystem = (PubSubSystem)Enum.Parse(typeof(PubSubSystem), configuration["PubSubSystem"].AsString());
+            DatabaseSystem = Enum.Parse<DatabaseSystem>(configuration["DatabaseSystem"].AsString());
+            CacheSystem = Enum.Parse<CacheSystem>(configuration["CacheSystem"].AsString());
+            PubSubSystem = Enum.Parse<PubSubSystem>(configuration["PubSubSystem"].AsString());
             MinimumLevel = Enum.Parse<LogLevel>(configuration["MinimumLogLevel"] ?? LogLevel.Info.ToString());
         }
     }

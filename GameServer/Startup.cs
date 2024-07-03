@@ -1,10 +1,11 @@
 using DataAccess;
 using GameCore;
-using GameCore.Infrastructure;
+using GameCore.DataAccess;
 using GameInfrastructure;
 using GameServer.Auth;
 using GameServer.CodeGen;
 using GameServer.Services;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
 namespace GameServer
@@ -43,11 +44,11 @@ namespace GameServer
                 var dataServices = new DataServicesFactory(config);
                 var logger = dataServices.Logger;
                 var start = Stopwatch.GetTimestamp();
-                logger.LogDebug($"Beginning {nameof(dataServices.Database.EnsureDbUpdatedAsync)}");
+                logger.LogDebug($"Beginning migration.");
 
-                await dataServices.Database.EnsureDbUpdatedAsync();
+                await dataServices.DbContext.Database.MigrateAsync();
 
-                logger.LogDebug($"Finished {nameof(dataServices.Database.EnsureDbUpdatedAsync)}. Elapsed time {Stopwatch.GetElapsedTime(start)}");
+                logger.LogDebug($"Finished migration. Elapsed time {Stopwatch.GetElapsedTime(start)}");
 
                 app.UseSwagger();
                 app.UseSwaggerUI();

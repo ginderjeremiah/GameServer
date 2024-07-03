@@ -1,7 +1,8 @@
 ﻿using DataAccess.Repositories;
-using GameCore;
 using GameCore.DataAccess;
 using GameCore.Infrastructure;
+using GameInfrastructure;
+using GameInfrastructure.Database;
 
 namespace DataAccess
 {
@@ -23,7 +24,7 @@ namespace DataAccess
         private Attributes? _attributes;
         private TagCategories? _tagCategories;
 
-        private IDatabaseService Database => _dataServices.Database;
+        private GameContext Database => _dataServices.DbContext;
         private ICacheService Cache => _dataServices.Cache;
         private IPubSubService PubSub => _dataServices.PubSub;
         private DataProviderSynchronizer Synchronizer => _synchronizer ??= new(_dataServices);
@@ -49,12 +50,12 @@ namespace DataAccess
 
         public void Insert<Entity>(Entity entity) where Entity : class
         {
-            Database.Insert(entity);
+            Database.Add(entity);
         }
 
         public void Delete<Entity>(Entity entity) where Entity : class
         {
-            Database.Delete(entity);
+            Database.Remove(entity);
         }
 
         public void Update<Entity>(Entity entity) where Entity : class

@@ -1,5 +1,7 @@
 ﻿using GameCore.Entities;
 using GameCore.Infrastructure;
+using GameInfrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
@@ -67,7 +69,6 @@ namespace DataAccess
                     foreach (var item in sessionData.PlayerData.InventoryItems)
                     {
                         item.InventoryItemMods = null;
-                        item.Item = null;
                     }
                     player.InventoryItems = sessionData.PlayerData.InventoryItems;
                 }
@@ -109,7 +110,7 @@ namespace DataAccess
             _dataServices.PubSub.Subscribe(channel, queueName, async args => await skillsProcessor(args.queue));
         }
 
-        private Func<IPubSubQueue, Task> GetSessionQueueProcessor(Func<IDatabaseService, SessionData, Task> action)
+        private Func<IPubSubQueue, Task> GetSessionQueueProcessor(Func<GameContext, SessionData, Task> action)
         {
             return async (IPubSubQueue queue) =>
             {
@@ -118,7 +119,7 @@ namespace DataAccess
                     var session = await _dataServices.Cache.GetAsync<SessionData>($"{Constants.CACHE_SESSION_PREFIX}_{sessionKey}");
                     if (session is not null)
                     {
-                        await action(_dataServices.GetNewDatabaseService(), session);
+                        await action(_dataServices.GetNewDbContext(), session);
                     }
                 }
             };

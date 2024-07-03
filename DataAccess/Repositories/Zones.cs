@@ -1,6 +1,6 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
@@ -9,29 +9,29 @@ namespace DataAccess.Repositories
     {
         private static List<Zone>? _zoneList;
 
-        public Zones(IDatabaseService database) : base(database) { }
+        public Zones(GameContext database) : base(database) { }
 
-        public async Task<IEnumerable<Zone>> AllZonesAsync()
+        public List<Zone> AllZones(bool refreshCache = false)
         {
-            return _zoneList ??= await Database.Zones
-                .AsNoTracking()
-                .Include(z => z.ZoneDrops)
-                .ToListAsync();
-        }
-
-        public async Task<Zone?> GetZoneAsync(int zoneId)
-        {
-            if (!await ValidateZoneIdAsync(zoneId))
+            if (_zoneList is null || refreshCache)
             {
-                throw new ArgumentOutOfRangeException(nameof(zoneId));
+                _zoneList ??= [.. Database.Zones
+                   .AsNoTracking()
+                   .Include(z => z.ZoneDrops)];
             }
-
-            return (await AllZonesAsync()).ToList()[zoneId];
+            return _zoneList;
         }
 
-        public async Task<bool> ValidateZoneIdAsync(int zoneId)
+        public Zone? GetZone(int zoneId)
         {
-            return zoneId >= 0 && zoneId < (await AllZonesAsync()).ToList().Count;
+            return !ValidateZoneId(zoneId)
+                ? throw new ArgumentOutOfRangeException(nameof(zoneId))
+                : AllZones()[zoneId];
+        }
+
+        public bool ValidateZoneId(int zoneId)
+        {
+            return zoneId >= 0 && zoneId < AllZones().Count;
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameCore.Sessions;
 using GameServer.Models;
 using GameServer.Models.Common;
@@ -21,18 +22,12 @@ namespace GameServer.Controllers
         protected int PlayerId => Session.Player.PlayerId;
         protected IRepositoryManager Repositories { get; }
         protected IApiLogger Logger { get; }
-        protected CookieOptions DefaultCookieOptions
+        protected CookieOptions DefaultCookieOptions => new()
         {
-            get
-            {
-                return new CookieOptions()
-                {
-                    Secure = true,
-                    HttpOnly = true,
-                    Expires = DateTime.UtcNow.AddDays(1)
-                };
-            }
-        }
+            Secure = true,
+            HttpOnly = true,
+            Expires = DateTime.UtcNow.AddDays(1)
+        };
 
         public BaseController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
         {

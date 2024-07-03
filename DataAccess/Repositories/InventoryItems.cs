@@ -1,6 +1,6 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
@@ -12,7 +12,7 @@ namespace DataAccess.Repositories
         public static readonly object _equippedLock = new();
         public static bool _processingEquippedQueue = false;
 
-        public InventoryItems(IDatabaseService database) : base(database) { }
+        public InventoryItems(GameContext database) : base(database) { }
 
         public async Task<IEnumerable<InventoryItem>> GetInventoryAsync(int playerId)
         {
@@ -20,12 +20,14 @@ namespace DataAccess.Repositories
                 .Include(p => p.InventoryItems.Select(i => i.Item.ItemAttributes))
                 .Include(p => p.InventoryItems.Select(i => i.InventoryItemMods.Select(im => im.ItemMod.ItemModAttributes)))
                 .FirstOrDefaultAsync(p => p.Id == playerId);
+
             return player?.InventoryItems ?? Enumerable.Empty<InventoryItem>();
         }
 
-        public int AddInventoryItem(InventoryItem inventoryItem)
+        public async Task<int> AddInventoryItemAsync(InventoryItem inventoryItem)
         {
-            Database.Insert(inventoryItem);
+            Database.Add(inventoryItem);
+            await Database.SaveChangesAsync();
             return inventoryItem.Id;
         }
 
@@ -36,7 +38,7 @@ namespace DataAccess.Repositories
                 var match = inventoryItems.FirstOrDefault(i => i.Id == item.Id);
                 if (match is null)
                 {
-                    Database.Delete(item);
+                    Database.Remove(item);
                 }
                 else
                 {

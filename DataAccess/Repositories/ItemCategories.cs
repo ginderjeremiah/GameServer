@@ -1,12 +1,12 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 
 namespace DataAccess.Repositories
 {
     internal class ItemCategories : BaseRepository, IItemCategories
     {
-        public ItemCategories(IDatabaseService database) : base(database) { }
+        public ItemCategories(GameContext database) : base(database) { }
 
         public IQueryable<ItemCategory> AllItemCategories()
         {

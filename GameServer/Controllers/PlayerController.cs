@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameCore.Sessions;
 using GameServer.Auth;
 using GameServer.Models.Attributes;

@@ -1,4 +1,4 @@
-﻿using GameCore;
+﻿using GameCore.DataAccess;
 using GameCore.Sessions;
 
 namespace GameServer.Services

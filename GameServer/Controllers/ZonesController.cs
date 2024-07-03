@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameServer.Models.Common;
 using GameServer.Models.Zones;
 using GameServer.Services;
@@ -14,9 +15,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public async Task<ApiListResponse<Zone>> Zones()
+        public ApiListResponse<Zone> Zones()
         {
-            var zones = await Repositories.Zones.AllZonesAsync();
+            var zones = Repositories.Zones.AllZones();
             return Success(zones.Select(z => new Zone(z)));
         }
     }

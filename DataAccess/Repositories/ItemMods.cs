@@ -1,6 +1,6 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
@@ -8,16 +8,16 @@ namespace DataAccess.Repositories
     internal class ItemMods : BaseRepository, IItemMods
     {
         private static List<ItemMod>? _allMods;
-        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsBySlot = new();
+        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsBySlot = [];
         private static readonly object _lockForItem = new();
 
-        public ItemMods(IDatabaseService database) : base(database) { }
+        public ItemMods(GameContext database) : base(database) { }
 
-        public async Task<IEnumerable<ItemMod>> AllItemModsAsync(bool refreshCache = false)
+        public List<ItemMod> AllItemMods(bool refreshCache = false)
         {
             if (_allMods is null || refreshCache)
             {
-                _allMods = await Database.ItemMods.Include(im => im.ItemModAttributes).ToListAsync();
+                _allMods = Database.ItemMods.Include(im => im.ItemModAttributes).ToList();
             }
             return _allMods;
         }
@@ -38,9 +38,9 @@ namespace DataAccess.Repositories
             return _itemModsBySlot[itemId];
         }
 
-        public async Task<ItemMod?> GetItemModAsync(int itemModId)
+        public ItemMod? GetItemMod(int itemModId)
         {
-            var itemMods = (await AllItemModsAsync()).ToList();
+            var itemMods = AllItemMods();
             return itemMods.Count > itemModId ? null : itemMods[itemModId];
         }
 

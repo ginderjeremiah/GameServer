@@ -1,12 +1,12 @@
 ﻿using GameCore.DataAccess;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Attribute = GameCore.Entities.Attribute;
 
 namespace DataAccess.Repositories
 {
     internal class Attributes : BaseRepository, IAttributes
     {
-        public Attributes(IDatabaseService database) : base(database) { }
+        public Attributes(GameContext database) : base(database) { }
 
         public IQueryable<Attribute> AllAttributes()
         {

@@ -1,4 +1,5 @@
 ﻿using GameCore.BattleSimulation;
+using GameCore.DataAccess;
 using GameCore.Entities;
 
 namespace GameCore.Sessions
@@ -48,7 +49,7 @@ namespace GameCore.Sessions
             return false;
         }
 
-        public async Task<DefeatRewards> GrantRewards(EnemyInstance enemy)
+        public DefeatRewards GrantRewards(EnemyInstance enemy)
         {
 
             var expReward = GetExpReward(enemy);
@@ -62,7 +63,7 @@ namespace GameCore.Sessions
             _playerDirty = true;
 
             var freeSlots = InventoryData.GetFreeSlotNumbers();
-            var drops = await RollDrops(enemy.Id, CurrentZone, freeSlots.Count);
+            var drops = RollDrops(enemy.Id, CurrentZone, freeSlots.Count);
 
             for (int i = 0; i < drops.Count; i++)
             {
@@ -125,46 +126,65 @@ namespace GameCore.Sessions
             }
         }
 
-        private T SetSessionDirty<T>(T data)
-        {
-            _sessionDirty = true;
-            return data;
-        }
-
-        public async Task<List<InventoryItem>> RollDrops(int enemyId, int zoneId, int max)
+        public List<InventoryItem> RollDrops(int enemyId, int zoneId, int max)
         {
             var rng = new Random();
             var drops = new List<InventoryItem>();
-            var enemy = await _repos.Enemies.GetEnemyAsync(enemyId);
+            var enemy = _repos.Enemies.GetEnemy(enemyId);
             if (enemy is not null)
             {
                 foreach (var drop in enemy.EnemyDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
                 {
                     if (drops.Count < max)
                     {
-                        drops.Add(await GetItemInstance(drop.ItemId, rng));
+                        drops.Add(GetItemInstance(drop.ItemId, rng));
                     }
                 }
 
             }
-            var zone = await _repos.Zones.GetZoneAsync(zoneId);
+            var zone = _repos.Zones.GetZone(zoneId);
             if (zone is not null)
             {
                 foreach (var drop in zone.ZoneDrops.Where(d => (decimal)rng.NextSingle() < d.DropRate))
                 {
                     if (drops.Count < max)
                     {
-                        drops.Add(await GetItemInstance(drop.ItemId, rng));
+                        drops.Add(GetItemInstance(drop.ItemId, rng));
                     }
                 }
             }
             return drops;
         }
 
-        private async Task<InventoryItem> GetItemInstance(int itemId, Random rng)
+        public IEnumerable<BattlerAttribute> GetInventoryAttributes()
         {
-            var item = await _repos.Items.GetItemAsync(itemId);
-            var allMods = (await _repos.ItemMods.AllItemModsAsync()).ToList();
+            return InventoryData.Equipped
+                .SelectNotNull(item => item)
+                .SelectMany(item => _repos.Items.GetItem(item.ItemId).ItemAttributes
+                    .Select(att => new BattlerAttribute(att))
+                    .Concat(item.InventoryItemMods
+                        .SelectMany(mod => _repos.ItemMods.GetItemMod(mod.ItemModId).ItemModAttributes.
+                            Select(att => new BattlerAttribute(att))
+                        )
+                    )
+                );
+        }
+
+        public IEnumerable<Skill> GetSelectedSkills()
+        {
+            return Player.SelectedSkills.Select(s => _repos.Skills.GetSkill(s.SkillId));
+        }
+
+        private T SetSessionDirty<T>(T data)
+        {
+            _sessionDirty = true;
+            return data;
+        }
+
+        private InventoryItem GetItemInstance(int itemId, Random rng)
+        {
+            var item = _repos.Items.GetItem(itemId);
+            var allMods = _repos.ItemMods.AllItemMods();
             var slots = item?.ItemSlots ?? [];
             var itemMods = new List<int>();
             var inventoryItemMods = new List<InventoryItemMod>();
