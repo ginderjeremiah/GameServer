@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameServer.Models.Common;
 using GameServer.Models.Skills;
 using GameServer.Services;
@@ -14,9 +15,9 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public async Task<ApiListResponse<Skill>> Skills()
+        public ApiListResponse<Skill> Skills()
         {
-            var skills = await Repositories.Skills.AllSkillsAsync();
+            var skills = Repositories.Skills.AllSkills();
             return Success(skills.Select(skill => new Skill(skill)));
         }
     }

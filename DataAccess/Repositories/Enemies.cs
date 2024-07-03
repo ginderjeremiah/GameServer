@@ -1,38 +1,39 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
-    internal class Enemies(IDatabaseService database) : BaseRepository(database), IEnemies
+    internal class Enemies(GameContext database) : BaseRepository(database), IEnemies
     {
         private static readonly SharedProbabilityTable zoneEnemiesTable = new();
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
-        public async Task<IEnumerable<Enemy>> AllEnemiesAsync()
+        public List<Enemy> AllEnemies(bool refreshCache = false)
         {
-            return _enemyList ??= await Database.Enemies
-                .AsNoTracking()
-                .Include(e => e.AttributeDistributions)
-                .Include(e => e.EnemyDrops)
-                    .ThenInclude(ed => ed.Item)
-                .Include(e => e.EnemySkills)
-                    .ThenInclude(es => es.Skill)
-                        .ThenInclude(s => s.SkillDamageMultipliers)
-                .OrderBy(e => e.Id)
-                .ToListAsync();
+            if (_enemyList is null || refreshCache)
+            {
+                _enemyList ??= [.. Database.Enemies
+                    .AsNoTracking()
+                    .Include(e => e.AttributeDistributions)
+                    .Include(e => e.EnemyDrops)
+                    .Include(e => e.EnemySkills)
+                    .OrderBy(e => e.Id)];
+            }
+
+            return _enemyList;
         }
 
-        public async Task<Enemy?> GetEnemyAsync(int enemyId)
+        public Enemy? GetEnemy(int enemyId)
         {
-            var enemies = (await AllEnemiesAsync()).ToList();
+            var enemies = AllEnemies();
             return enemies.Count >= enemyId ? null : enemies[enemyId];
         }
 
-        public async Task<Enemy> GetRandomEnemyAsync(int zoneId)
+        public Enemy GetRandomEnemy(int zoneId)
         {
             if (!zoneEnemiesTable.HasProbabilities(zoneId))
             {
@@ -50,7 +51,7 @@ namespace DataAccess.Repositories
                 }
             }
 
-            var enemies = (await AllEnemiesAsync()).ToList();
+            var enemies = AllEnemies();
 
             return enemies[zoneEnemiesTable.GetRandomValue(zoneId)];
         }

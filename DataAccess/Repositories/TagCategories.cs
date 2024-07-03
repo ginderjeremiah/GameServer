@@ -1,12 +1,12 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 
 namespace DataAccess.Repositories
 {
     internal class TagCategories : BaseRepository, ITagCategories
     {
-        public TagCategories(IDatabaseService database) : base(database) { }
+        public TagCategories(GameContext database) : base(database) { }
 
         public IQueryable<TagCategory> AllTagCategories()
         {

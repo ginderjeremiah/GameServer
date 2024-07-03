@@ -1,13 +1,13 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
-using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
 {
     internal class Tags : BaseRepository, ITags
     {
-        public Tags(IDatabaseService database) : base(database) { }
+        public Tags(GameContext database) : base(database) { }
 
         public IQueryable<Tag> AllTags()
         {

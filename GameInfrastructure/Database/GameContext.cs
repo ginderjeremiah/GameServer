@@ -5,7 +5,7 @@ using Attribute = GameCore.Entities.Attribute;
 
 namespace GameInfrastructure.Database
 {
-    internal class GameContext : DbContext
+    public class GameContext : DbContext
     {
         public GameContext() { }
 

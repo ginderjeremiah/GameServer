@@ -4,8 +4,8 @@ namespace GameCore.DataAccess
 {
     public interface ISkills
     {
-        public Task<IEnumerable<Skill>> AllSkillsAsync();
-        public Task<Skill?> GetSkillAsync(int skillId);
+        public List<Skill> AllSkills(bool refreshCache = false);
+        public Skill? GetSkill(int skillId);
         public Task SaveSkillsAsync(List<int> skillIds);
     }
 }

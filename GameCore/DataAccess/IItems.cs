@@ -4,7 +4,7 @@ namespace GameCore.DataAccess
 {
     public interface IItems
     {
-        public Task<IEnumerable<Item>> AllItemsAsync(bool refreshCache = false);
-        public Task<Item?> GetItemAsync(int itemId);
+        public List<Item> AllItems(bool refreshCache = false);
+        public Item? GetItem(int itemId);
     }
 }

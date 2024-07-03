@@ -1,6 +1,7 @@
 ﻿using GameCore.DataAccess;
 using GameCore.Entities;
 using GameCore.Infrastructure;
+using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess.Repositories
@@ -10,7 +11,7 @@ namespace DataAccess.Repositories
         private readonly ICacheService _cache;
         private readonly DataProviderSynchronizer _synchronizer;
         private static string SessionPrefix => Constants.CACHE_SESSION_PREFIX;
-        public SessionStore(IDatabaseService database, ICacheService cache, DataProviderSynchronizer synchronizer) : base(database)
+        public SessionStore(GameContext database, ICacheService cache, DataProviderSynchronizer synchronizer) : base(database)
         {
             _cache = cache;
             _synchronizer = synchronizer;
@@ -26,16 +27,9 @@ namespace DataAccess.Repositories
             var player = await Database.Players
                 .AsNoTracking()
                 .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.Item)
-                        .ThenInclude(i => i.ItemAttributes)
-                .Include(p => p.InventoryItems)
                     .ThenInclude(ii => ii.InventoryItemMods)
-                        .ThenInclude(iim => iim.ItemMod)
-                            .ThenInclude(im => im.ItemModAttributes)
                 .Include(p => p.PlayerAttributes)
                 .Include(p => p.PlayerSkills)
-                    .ThenInclude(ps => ps.Skill)
-                        .ThenInclude(s => s.SkillDamageMultipliers)
                 .Include(p => p.LogPreferences)
                 .FirstOrDefaultAsync() ?? throw new ArgumentOutOfRangeException(nameof(playerId));
 

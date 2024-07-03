@@ -11,18 +11,18 @@ namespace GameInfrastructure
     {
         private readonly IDataServicesConfiguration _config = config;
         private IApiLogger? _logger;
-        private IDatabaseService? _databaseService;
+        private GameContext? _dbContext;
         private ICacheService? _cache;
         private IPubSubService? _pubsub;
 
         public IApiLogger Logger => _logger ??= new ApiLogger(_config);
-        public IDatabaseService Database => _databaseService ??= GetNewDatabaseService();
+        public GameContext DbContext => _dbContext ??= GetNewDbContext();
         public ICacheService Cache => _cache ??= CacheServiceFactory.GetCacheService(_config);
         public IPubSubService PubSub => _pubsub ??= PubSubServiceFactory.GetPubSubService(_config, Logger);
 
-        public IDatabaseService GetNewDatabaseService()
+        public GameContext GetNewDbContext()
         {
-            return new DatabaseService(_config);
+            return GameContextFactory.GetGameContext(_config);
         }
     }
 }

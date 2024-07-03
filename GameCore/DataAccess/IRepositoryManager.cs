@@ -1,6 +1,4 @@
-﻿using GameCore.DataAccess;
-
-namespace GameCore
+﻿namespace GameCore.DataAccess
 {
     public interface IRepositoryManager
     {

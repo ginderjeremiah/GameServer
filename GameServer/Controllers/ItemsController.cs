@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
 using GameServer.Services;
@@ -14,16 +15,16 @@ namespace GameServer.Controllers
             : base(repositoryManager, logger, sessionService) { }
 
         [HttpGet("/api/[controller]")]
-        public async Task<ApiListResponse<Item>> Items(bool refreshCache = false)
+        public ApiListResponse<Item> Items(bool refreshCache = false)
         {
-            var items = await Repositories.Items.AllItemsAsync(refreshCache);
+            var items = Repositories.Items.AllItems(refreshCache);
             return Success(items.Select(item => new Item(item)));
         }
 
         [HttpGet]
-        public async Task<ApiListResponse<ItemSlot>> SlotsForItem(int itemId, bool refreshCache = false)
+        public ApiListResponse<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
-            var items = await Repositories.Items.AllItemsAsync(refreshCache);
+            var items = Repositories.Items.AllItems(refreshCache);
 
             return Success(items.Select(item => item.ItemSlots.Select(slot => new ItemSlot(slot))).FirstOrDefault() ?? []);
         }

@@ -1,4 +1,5 @@
 ﻿using GameCore;
+using GameCore.DataAccess;
 using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
@@ -21,7 +22,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public async Task<ApiResponse> AddEditItemAttributes([FromBody] AddEditItemAttributesData changeData)
         {
-            var item = await Repositories.Items.GetItemAsync(changeData.ItemId);
+            var item = Repositories.Items.GetItem(changeData.ItemId);
             if (item is null)
             {
                 return Error("Item does not exist.");
@@ -64,7 +65,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public async Task<ApiResponse> AddEditItemModAttributes([FromBody] AddEditItemModAttributesData changeData)
         {
-            var itemMod = await Repositories.ItemMods.GetItemModAsync(changeData.ItemModId);
+            var itemMod = Repositories.ItemMods.GetItemMod(changeData.ItemModId);
             if (itemMod is null)
             {
                 return Error("Item Mod does not exist.");
@@ -121,7 +122,7 @@ namespace GameServer.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var itemMod = await Repositories.ItemMods.GetItemModAsync(change.Item.Id);
+                    var itemMod = Repositories.ItemMods.GetItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
                         itemMod.Name = change.Item.Name;
@@ -133,7 +134,7 @@ namespace GameServer.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var itemMod = await Repositories.ItemMods.GetItemModAsync(change.Item.Id);
+                    var itemMod = Repositories.ItemMods.GetItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
                         Repositories.Delete(itemMod);
@@ -163,7 +164,7 @@ namespace GameServer.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var item = await Repositories.Items.GetItemAsync(change.Item.Id);
+                    var item = Repositories.Items.GetItem(change.Item.Id);
                     if (item is not null)
                     {
                         item.Name = change.Item.Name;
@@ -175,7 +176,7 @@ namespace GameServer.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var item = await Repositories.Items.GetItemAsync(change.Item.Id);
+                    var item = Repositories.Items.GetItem(change.Item.Id);
                     if (item is not null)
                     {
                         Repositories.Delete(item);
@@ -267,7 +268,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItem([FromBody] SetTagsData setTagsData)
         {
-            var item = await Repositories.Items.GetItemAsync(setTagsData.Id);
+            var item = Repositories.Items.GetItem(setTagsData.Id);
             if (item is not null)
             {
                 var tags = await Repositories.Tags.AllTags().Where(t => setTagsData.TagIds.Contains(t.Id)).ToListAsync();
@@ -282,7 +283,7 @@ namespace GameServer.Controllers
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {
-            var itemMod = await Repositories.ItemMods.GetItemModAsync(setTagsData.Id);
+            var itemMod = Repositories.ItemMods.GetItemMod(setTagsData.Id);
             if (itemMod is not null)
             {
                 var tags = await Repositories.Tags.AllTags().Where(t => setTagsData.TagIds.Contains(t.Id)).ToListAsync();
