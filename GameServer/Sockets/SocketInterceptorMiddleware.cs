@@ -28,12 +28,12 @@ namespace GameServer.Sockets
                         var player = sessionService.GetSession().Player;
                         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                         var socketHandler = new SocketHandler(webSocket, commandFactory, logger, player.Id);
-                        logger.LogDebug($"Initiated socket for player: {player.UserName} ({player.Id}), with Id: {socketHandler.Id}");
                         await socketManager.RegisterSocket(socketHandler);
+                        logger.LogDebug($"Initiated socket for player: {player.UserName} ({player.Id}), with Id: {socketHandler.Id}");
 
                         var closeReason = await socketHandler.SocketFinished.Task;
                         await socketManager.UnRegisterSocket(socketHandler);
-                        if (!webSocket.CloseStatus.HasValue)
+                        if (webSocket.State is WebSocketState.Open)
                         {
                             await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
                             logger.LogDebug($"Closing socket for player: {player.UserName}, {player.Id}, with Id: {socketHandler.Id}");

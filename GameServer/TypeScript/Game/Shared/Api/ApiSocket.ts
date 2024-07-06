@@ -39,10 +39,12 @@ class ApiSocket {
     }
 
     private processCommandQueue() {
-        let request: ApiSocketRequest<any> | undefined;
-        while(request = this.socketCommandQueue.shift()) {
-            this.inFlightCommands.push(request);
-            this.socket.send(JSON.stringify(request.getCommandInfo()));
+        if (this.socket.readyState === this.socket.OPEN) {
+            let request: ApiSocketRequest<any> | undefined;
+            while(request = this.socketCommandQueue.shift()) {
+                this.inFlightCommands.push(request);
+                this.socket.send(JSON.stringify(request.getCommandInfo()));
+            }
         }
     }
 
