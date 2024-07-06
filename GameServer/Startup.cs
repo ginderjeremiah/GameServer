@@ -5,6 +5,7 @@ using GameInfrastructure;
 using GameServer.Auth;
 using GameServer.CodeGen;
 using GameServer.Services;
+using GameServer.Sockets;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
@@ -31,10 +32,12 @@ namespace GameServer
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddSingleton<IDataServicesConfiguration, Config>()
-                .AddScoped<IDataServicesFactory, DataServicesFactory>()
-                .AddScoped(services => services.GetRequiredService<IDataServicesFactory>().Logger)
-                .AddScoped<IRepositoryManager, RepositoryManager>()
-                .AddScoped<SessionService>();
+                .AddTransient<IDataServicesFactory, DataServicesFactory>()
+                .AddTransient(services => services.GetRequiredService<IDataServicesFactory>().Logger)
+                .AddTransient<IRepositoryManager, RepositoryManager>()
+                .AddScoped<SessionService>()
+                .AddTransient<SocketManagerService>()
+                .AddTransient<SocketCommandFactory>();
 
             var app = builder.Build();
 
@@ -63,13 +66,14 @@ namespace GameServer
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+            app.UseSessionAuth();
+            app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
+            app.UseSocketInterceptor();
 
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Game}"
             );
-
-            app.UseSessionAuth();
 
             app.Run();
         }

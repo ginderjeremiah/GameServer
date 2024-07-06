@@ -40,7 +40,7 @@ interface IItemSlot {
 	id: number;
 	itemId: number;
 	slotTypeId: number;
-	guaranteedItemModId: number;
+	guaranteedItemModId?: number;
 	probability: number;
 }
 

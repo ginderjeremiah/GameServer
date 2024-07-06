@@ -1,8 +1,6 @@
-﻿using GameCore.BattleSimulation;
-
-namespace GameServer.Models.Enemies
+﻿namespace GameServer.Models.Enemies
 {
-    public class NewEnemy : IModel
+    public class NewEnemyModel : IModel
     {
         public double? Cooldown { get; set; }
         public EnemyInstance? EnemyInstance { get; set; }

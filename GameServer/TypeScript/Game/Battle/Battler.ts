@@ -28,9 +28,9 @@ abstract class Battler {
     }
 
     updateHealthDisplay(): void {
-        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.attributes.getValue(AttributeType.MaxHealth);
+        this.healthLabel.textContent = formatNum(this.currentHealth) + "/" + this.attributes.getValue(EAttribute.MaxHealth);
         this.healthBar.value = this.currentHealth;
-        this.healthBar.max = this.attributes.getValue(AttributeType.MaxHealth);
+        this.healthBar.max = this.attributes.getValue(EAttribute.MaxHealth);
     }
 
     updateLvlDisplay(): void {
@@ -83,7 +83,7 @@ abstract class Battler {
     //returns skills which fired
     advanceCooldown(timeDelta: number): Skill[] {
         let firedSkills: Skill[] = [];
-        let cdMultiplier = (1 + this.attributes.getValue(AttributeType.CooldownRecovery) / 100);
+        let cdMultiplier = (1 + this.attributes.getValue(EAttribute.CooldownRecovery) / 100);
         this.skills.forEach((skill) => {
             if (skill) {
                 skill.chargeTime += timeDelta * cdMultiplier;
@@ -103,7 +103,7 @@ abstract class Battler {
 
     //returns actual damage dealt
     takeDamage(rawDamage: number): number { 
-        let damage = rawDamage - this.attributes.getValue(AttributeType.Defense);
+        let damage = rawDamage - this.attributes.getValue(EAttribute.Defense);
         if (damage <= 0) {
             damage = 0;
         }
@@ -120,7 +120,7 @@ abstract class Battler {
         const atts = additionalAtttributes ? [...battlerData.attributes, ...additionalAtttributes] : battlerData.attributes;
         this.attributes = new BattleAttributes(atts);
         this.skills = battlerData.selectedSkills.map((skillId) => new Skill(skillDatas[skillId], this));
-        this.currentHealth = this.attributes.getValue(AttributeType.MaxHealth);
+        this.currentHealth = this.attributes.getValue(EAttribute.MaxHealth);
         this.level = battlerData.level;
         this.initSkillsDisplay();
         this.updateCombatDisplays()

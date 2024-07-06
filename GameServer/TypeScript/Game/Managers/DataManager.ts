@@ -7,8 +7,10 @@ class DataManager {
     static skills: ISkill[];
     static itemMods: IItemMod[];
     static attributes: IAttribute[];
+    static #socket: ApiSocket;
 
     static async init() {
+        this.#socket = new ApiSocket();
         const staticData = await Promise.all([
             this.#getZones(),
             this.#getEnemies(),
@@ -43,17 +45,17 @@ class DataManager {
     }
 
     static async newEnemy(zoneId?: number): Promise<IEnemyInstance> {
-        const result = await ApiRequest.get('/api/Enemies/NewEnemy', {newZoneId: zoneId})
-        if (result.cooldown) {
-            await delay(result.cooldown);
+        const result = await this.#socket.sendSocketCommand("NewEnemy", { newZoneId: zoneId });
+        if (result.data?.cooldown) {
+            await delay(result.data.cooldown);
             return await this.newEnemy(zoneId);
         } else {
-            return result.enemyInstance;
+            return result.data?.enemyInstance!;
         }
     }
 
     static async defeatEnemy(enemyInstance: IEnemyInstance) {
-        return new ApiRequest('/api/Enemies/DefeatEnemy').post(enemyInstance);
+        return await this.#socket.sendSocketCommand("DefeatEnemy", enemyInstance);
     }
 
     static async login(username: string, password: string) {

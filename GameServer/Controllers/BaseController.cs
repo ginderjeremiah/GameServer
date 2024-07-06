@@ -19,7 +19,7 @@ namespace GameServer.Controllers
         //Session can only be null if (AllowAll = true) is specified in the SessionAuthorize attribute;
         protected Session Session => _sessionService.GetSession();
         protected bool SessionAvailable => _sessionService.SessionAvailable;
-        protected int PlayerId => Session.Player.PlayerId;
+        protected int PlayerId => Session.Player.Id;
         protected IRepositoryManager Repositories { get; }
         protected IApiLogger Logger { get; }
         protected CookieOptions DefaultCookieOptions => new()

@@ -35,7 +35,17 @@ namespace GameServer.Services
         public async Task<Session?> LoadSession(string sessionId)
         {
             var sessionData = await _repos.SessionStore.GetSessionAsync(sessionId);
-            return sessionData == null ? null : (_session = new Session(sessionData, _repos));
+            if (sessionData is not null)
+            {
+                var playerData = await _repos.Players.GetPlayerAsync(sessionData.PlayerId);
+                if (playerData is not null)
+                {
+                    _session = new Session(sessionData, playerData, _repos);
+                    return _session;
+                }
+            }
+
+            return null;
         }
     }
 

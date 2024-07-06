@@ -22,64 +22,34 @@ namespace GameCore
 
         public static int AsInt(this object? obj, int defaultVal = default)
         {
-            if (obj is int intObj)
-                return intObj;
-            else if (int.TryParse(obj.AsString(), out var val))
-                return val;
-            else
-                return defaultVal;
+            return obj is int intObj ? intObj : int.TryParse(obj.AsString(), out var val) ? val : defaultVal;
         }
 
         public static DateTime AsDate(this object? obj, DateTime? defaultVal = null)
         {
-            if (obj is DateTime dtObj)
-                return dtObj;
-            else if (DateTime.TryParse(obj.AsString(), out var dt))
-                return dt;
-            else
-                return defaultVal ?? DateTime.MinValue;
+            return obj is DateTime dtObj ? dtObj : DateTime.TryParse(obj.AsString(), out var dt) ? dt : defaultVal ?? DateTime.MinValue;
         }
 
         public static bool AsBool(this object? obj, bool defaultVal = false)
         {
             if (obj is bool boolObj)
                 return boolObj;
-            else if (obj is int intObj)
-                return !(intObj == 0);
-            else if (bool.TryParse(obj.AsString(), out var b))
-                return b;
-            else
-                return defaultVal;
+            else return obj is int intObj ? !(intObj == 0) : bool.TryParse(obj.AsString(), out var b) ? b : defaultVal;
         }
 
         public static short AsShort(this object? obj, short defaultVal = default)
         {
-            if (obj is short intObj)
-                return intObj;
-            else if (short.TryParse(obj.AsString(), out var val))
-                return val;
-            else
-                return defaultVal;
+            return obj is short intObj ? intObj : short.TryParse(obj.AsString(), out var val) ? val : defaultVal;
         }
 
         public static float AsFloat(this object? obj, float defaultVal = default)
         {
-            if (obj is float intObj)
-                return intObj;
-            else if (float.TryParse(obj.AsString(), out var val))
-                return val;
-            else
-                return defaultVal;
+            return obj is float intObj ? intObj : float.TryParse(obj.AsString(), out var val) ? val : defaultVal;
         }
 
         public static decimal AsDecimal(this object? obj, decimal defaultVal = default)
         {
-            if (obj is decimal decObj)
-                return decObj;
-            else if (decimal.TryParse(obj.AsString(), out var dec))
-                return dec;
-            else
-                return defaultVal;
+            return obj is decimal decObj ? decObj : decimal.TryParse(obj.AsString(), out var dec) ? dec : defaultVal;
         }
 
         public static T[] AppendAll<T>(this T[] first, T[] second)
@@ -89,10 +59,12 @@ namespace GameCore
             {
                 output[i] = first[i];
             }
+
             for (int i = 0; i < second.Length; i++)
             {
                 output[first.Length + i] = second[i];
             }
+
             return output;
         }
 
@@ -109,29 +81,15 @@ namespace GameCore
         public static T? Deserialize<T>(this HttpResponseMessage msg)
         {
             var stream = msg.Content.ReadAsStream();
-            if (stream.Length > 0)
-            {
-                return JsonSerializer.Deserialize<T>(msg.Content.ReadAsStream(), _options);
-            }
-            else
-            {
-                return default;
-            }
+            return stream.Length > 0 ? JsonSerializer.Deserialize<T>(msg.Content.ReadAsStream(), _options) : default;
         }
 
         public static T? Deserialize<T>(this string? str)
         {
-            if (str == null)
-            {
-                return default;
-            }
-            else
-            {
-                return JsonSerializer.Deserialize<T>(str, _options);
-            }
+            return str is null ? default : JsonSerializer.Deserialize<T>(str, _options);
         }
 
-        public static string Serialize<T>(this T obj)
+        public static string Serialize(this object obj)
         {
             return JsonSerializer.Serialize(obj, _options);
         }

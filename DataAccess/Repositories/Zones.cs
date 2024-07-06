@@ -24,9 +24,9 @@ namespace DataAccess.Repositories
 
         public Zone? GetZone(int zoneId)
         {
-            return !ValidateZoneId(zoneId)
-                ? throw new ArgumentOutOfRangeException(nameof(zoneId))
-                : AllZones()[zoneId];
+            return ValidateZoneId(zoneId)
+                ? AllZones()[zoneId]
+                : throw new ArgumentOutOfRangeException(nameof(zoneId));
         }
 
         public bool ValidateZoneId(int zoneId)

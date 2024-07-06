@@ -38,9 +38,8 @@ function plural(str: string) {
         case 'y':
             return str.slice(0, last) + 'ies';
         case 'x':
-            return str + 'es';
         case 's':
-            return str;
+            return str + 'es';
         default:
             return str + 's';
     }
@@ -48,13 +47,14 @@ function plural(str: string) {
 
 function groupBy<T>(arr: T[], groupFn: (item: T) => string) {
     const ret: { [key: string]: T[] } = {};
-    arr.forEach(t => {
+    for (const t of arr)
+    {
         const key = groupFn(t);
         if (ret[key]) {
             ret[key].push(t);
         } else {
             ret[key] = [t];
         }
-    })
+    }
     return ret;
 }

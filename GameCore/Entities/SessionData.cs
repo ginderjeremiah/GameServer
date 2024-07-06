@@ -8,7 +8,7 @@
         public string Id { get; set; }
         public DateTime LastUsed { get; set; }
         public DateTime EnemyCooldown { get; set; }
-        public Player PlayerData { get; set; } = new();
+        public int PlayerId { get; set; }
 
         public SessionData(string id)
         {

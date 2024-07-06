@@ -29,5 +29,16 @@ namespace GameServer
         {
             return new(session.Player, session.InventoryData);
         }
+
+        public static string GetDescription(this ESocketCloseReason reason)
+        {
+            return reason switch
+            {
+                ESocketCloseReason.Inactivity => "The socket has been closed due to inactivity.",
+                ESocketCloseReason.SocketReplaced => "The socket has been closed because a new one was established.",
+                //ESocketCloseReason.Finished
+                _ => "The socket has been closed normally."
+            };
+        }
     }
 }

@@ -9,8 +9,8 @@ type ApiResponseTypes = {
 	'/api/AdminTools/SetTagsForItemMod': undefined
 	'/api/Attributes': IAttribute[]
 	'/api/Enemies': IEnemy[]
-	'/api/Enemies/DefeatEnemy': IDefeatEnemy
-	'/api/Enemies/NewEnemy': INewEnemy
+	'/api/Enemies/DefeatEnemy': IDefeatEnemyResponse
+	'/api/Enemies/NewEnemy': INewEnemyModel
 	'/api/ItemCategories': IItemCategory[]
 	'/api/ItemMods': IItemMod[]
 	'/api/Items': IItem[]

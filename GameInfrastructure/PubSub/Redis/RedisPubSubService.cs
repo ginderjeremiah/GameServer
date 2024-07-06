@@ -1,11 +1,14 @@
 ﻿using GameCore;
 using GameCore.Infrastructure;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 
 namespace GameInfrastructure.PubSub.Redis
 {
     internal class RedisPubSubService : IPubSubService
     {
+        private static readonly ConcurrentDictionary<string, (Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
+
         private ConnectionMultiplexer Multiplexer { get; }
         private IApiLogger Logger { get; }
 
@@ -18,53 +21,107 @@ namespace GameInfrastructure.PubSub.Redis
             Logger = logger;
         }
 
-        public void Publish(string channel, string message)
+        public async Task Publish(string channel, string message)
         {
-            Redis.Publish(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget);
+            await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget);
         }
 
-        public void Publish(string channel, string queueName, string? queueData)
+        public async Task Publish(string channel, string queueName, string queueData)
         {
-            var queue = new RedisQueue(Redis, queueName);
-            queue.AddToQueue(queueData);
-            Redis.Publish(RedisChannel.Literal(channel), "");
+            var queue = new RedisQueue(Redis, queueName, Logger);
+            await queue.AddToQueueAsync(queueData);
+            await Redis.PublishAsync(RedisChannel.Literal(channel), "");
         }
 
-        public void Publish<T>(string channel, string queueName, T queueData)
+        public async Task Publish<T>(string channel, string queueName, T queueData)
         {
             var data = queueData.Serialize();
-            Publish(channel, queueName, data);
+            await Publish(channel, queueName, data);
         }
 
-        public void Subscribe(string channel, Action<(string message, string channel)> action)
+        public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)
         {
             Logger.LogInfo($"Creating redis subscriber on channel '{channel}'.");
-            Subscriber.Subscribe(RedisChannel.Literal(channel), (_, message) =>
+            if (id is not null)
+            {
+                if (!_handles.TryAdd(id, (handle, null)))
+                {
+                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
+                }
+            }
+
+            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+
+            void handle(RedisChannel _, RedisValue message)
             {
                 action((message.AsString(), channel));
-            });
+            }
         }
 
-        public void Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action)
+        public async Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null)
         {
             Logger.LogInfo($"Creating redis subscriber on channel '{channel}' with queue '{queueName}'.");
-            var queue = new RedisQueue(Redis, queueName);
+            var queue = new RedisQueue(Redis, queueName, Logger);
             var worker = new BackgroundWorker(Logger, () => action((queue, channel)))
             {
                 Name = $"RedisSubWorker_{queueName}"
             };
-            Subscriber.Subscribe(RedisChannel.Literal(channel), (_, _) => worker.Start());
+
+            if (id is not null)
+            {
+                if (!_handles.TryAdd(id, (handle, worker)))
+                {
+                    worker.Kill();
+                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
+                }
+            }
+
+            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+
+            void handle(RedisChannel _c, RedisValue _v)
+            {
+                worker.Start();
+            }
         }
 
-        public void Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action)
+        public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
         {
             Logger.LogInfo($"Creating redis subscriber on channel '{channel}' with queue '{queueName}'.");
-            var queue = new RedisQueue(Redis, queueName);
+            var queue = new RedisQueue(Redis, queueName, Logger);
             var worker = new BackgroundWorker(Logger, async () => await action((queue, channel)))
             {
                 Name = $"RedisSubWorker_{queueName}"
             };
-            Subscriber.Subscribe(RedisChannel.Literal(channel), (_, _) => worker.Start());
+
+            if (id is not null)
+            {
+                if (!_handles.TryAdd(id, (handle, worker)))
+                {
+                    worker.Kill();
+                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
+                }
+            }
+
+            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+
+            void handle(RedisChannel _c, RedisValue _v)
+            {
+                worker.Start();
+            }
+        }
+
+        public async Task UnSubscribe(string channel)
+        {
+            await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel));
+        }
+
+        public async Task UnSubscribe(string channel, string id)
+        {
+            if (_handles.TryRemove(id, out var handle))
+            {
+                handle.worker?.Kill();
+                await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel), handle.handler);
+            }
         }
     }
 }

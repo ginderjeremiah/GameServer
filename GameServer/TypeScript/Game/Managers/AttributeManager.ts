@@ -104,11 +104,11 @@ class AttributeManager {
 
     static isCoreAttribute(att: IBattlerAttribute) {
         const id = att.attributeId;
-        return id === AttributeType.Strength
-            || id === AttributeType.Endurance
-            || id === AttributeType.Intellect
-            || id === AttributeType.Agility
-            || id === AttributeType.Dexterity
-            || id === AttributeType.Luck;
+        return id === EAttribute.Strength
+            || id === EAttribute.Endurance
+            || id === EAttribute.Intellect
+            || id === EAttribute.Agility
+            || id === EAttribute.Dexterity
+            || id === EAttribute.Luck;
     }
 }

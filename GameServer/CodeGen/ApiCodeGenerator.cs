@@ -1,6 +1,7 @@
 ﻿using GameCore;
 using GameServer.Controllers;
 using GameServer.Models.Common;
+using GameServer.Sockets.Commands;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using System.Reflection;
@@ -13,8 +14,9 @@ namespace GameServer.CodeGen
         public static void GenerateResponseInterfaces()
         {
             var usedTypes = new HashSet<Type>();
+            var socketMetaData = new List<SocketCommandMetadata>();
             var endpointMetadata = new List<EndpointMetaData>();
-            var assembly = Assembly.GetAssembly(typeof(ApiCodeGenerator));
+            var assembly = typeof(ApiCodeGenerator).Assembly;
             var controllerTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(BaseController)));
             foreach (var controller in controllerTypes)
             {
@@ -37,6 +39,7 @@ namespace GameServer.CodeGen
                     {
                         routeTemplate = methodAtt.Template;
                     }
+
                     if (endpoint.GetCustomAttribute<RouteAttribute>() is RouteAttribute routeAtt && routeAtt.Template is not null)
                     {
                         routeTemplate = routeAtt.Template;
@@ -79,11 +82,50 @@ namespace GameServer.CodeGen
                 }
             }
 
+            var socketCommandTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(AbstractSocketCommand)) && !type.IsAbstract);
+            foreach (var socketCommand in socketCommandTypes)
+            {
+                Type? parameterType = null;
+                Type? responseType = null;
+                if (socketCommand.BaseType is Type baseType && baseType.IsGenericType)
+                {
+                    parameterType = baseType.GetGenericArguments()[0];
+                }
+
+                var execute = socketCommand.GetMethod("ExecuteInternal", BindingFlags.NonPublic | BindingFlags.Instance) ?? socketCommand.GetMethod("Execute");
+                if (execute is not null)
+                {
+                    var unwrappedResponseType = execute.ReturnType.IsAssignableTo(typeof(Task))
+                        ? execute.ReturnType.GetGenericArguments()[0] : execute.ReturnType;
+
+                    responseType = unwrappedResponseType.IsConstructedGenericType
+                        ? unwrappedResponseType.GetGenericArguments()[0] : null;
+                }
+
+                if (responseType != null && NeedsInterface(responseType))
+                {
+                    usedTypes.UnionWith(GetInterfaceTypes(responseType));
+                }
+
+                if (parameterType != null && NeedsInterface(parameterType))
+                {
+                    usedTypes.UnionWith(GetInterfaceTypes(parameterType));
+                }
+
+                socketMetaData.Add(new SocketCommandMetadata
+                {
+                    CommandName = socketCommand.Name,
+                    ParameterType = parameterType,
+                    ResponseType = responseType,
+                });
+            }
+
             var currentDir = Directory.GetCurrentDirectory();
             var assemblyName = assembly.GetName().Name ?? "Unknown";
             var projectDir = currentDir[..(currentDir.LastIndexOf(assemblyName) + assemblyName.Length)];
             var targetDir = $"{projectDir}\\TypeScript\\Game\\Shared\\Api";
             WriteApiMap([.. endpointMetadata.OrderBy(end => end.Endpoint)], targetDir);
+            WriteApiSocketMap([.. socketMetaData.OrderBy(c => c.CommandName)], targetDir);
             WriteApiInterfaces(usedTypes, targetDir);
         }
 
@@ -96,6 +138,7 @@ namespace GameServer.CodeGen
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetTypeText(endpoint.ResponseType)}");
             }
+
             strBuilder.AppendLine("}\n");
 
             strBuilder.AppendLine("type ApiRequestTypes = {");
@@ -103,11 +146,40 @@ namespace GameServer.CodeGen
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetParametersTypeText(endpoint)}");
             }
+
             strBuilder.AppendLine("}\n");
             strBuilder.AppendLine("type ApiEndpoint = keyof ApiResponseTypes\n");
             strBuilder.AppendLine("type ApiEndpointWithRequest = keyof ApiRequestTypes\n");
             strBuilder.AppendLine("type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>\n");
             strBuilder.Append("type ApiResponseType = ApiResponseTypes[ApiEndpoint]");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+            File.WriteAllText(filePath, strBuilder.ToString());
+        }
+
+        private static void WriteApiSocketMap(List<SocketCommandMetadata> commandData, string baseDirectoryPath)
+        {
+            var filePath = $"{baseDirectoryPath}\\ApiSocketTypeMap.ts";
+            var strBuilder = new StringBuilder();
+            strBuilder.AppendLine("type ApiSocketResponseTypes = {");
+            foreach (var command in commandData)
+            {
+                strBuilder.AppendLine($"\t'{command.CommandName}': {GetTypeText(command.ResponseType)}");
+            }
+
+            strBuilder.AppendLine("}\n");
+
+            strBuilder.AppendLine("type ApiSocketRequestTypes = {");
+            foreach (var command in commandData.Where(c => c.ParameterType is not null))
+            {
+                strBuilder.AppendLine($"\t'{command.CommandName}': {GetTypeText(command.ParameterType)}");
+            }
+
+            strBuilder.AppendLine("}\n");
+            strBuilder.AppendLine("type ApiSocketCommand = keyof ApiSocketResponseTypes\n");
+            strBuilder.AppendLine("type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes\n");
+            strBuilder.AppendLine("type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>\n");
+            strBuilder.Append("type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]");
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             File.WriteAllText(filePath, strBuilder.ToString());
@@ -119,7 +191,7 @@ namespace GameServer.CodeGen
             {
                 return "void";
             }
-            if (endpoint.Parameters.Count == 1 && !endpoint.IsGet)
+            else if (endpoint.Parameters.Count == 1 && !endpoint.IsGet)
             {
                 return endpoint.Parameters[0].TypeText;
             }
@@ -129,32 +201,39 @@ namespace GameServer.CodeGen
             }
         }
 
-        private static string GetTypeText(Type? type)
+        private static string GetTypeText(Type? type, bool showNullable = false)
         {
             if (type == null)
             {
                 return "undefined";
             }
             else if (type == typeof(int)
-                || type == typeof(int?)
                 || type == typeof(decimal)
-                || type == typeof(decimal?)
                 || type == typeof(double)
-                || type == typeof(double?)
                 || type == typeof(float)
-                || type == typeof(float?)
                 || type == typeof(short)
-                || type == typeof(short?)
                 || type == typeof(long)
-                || type == typeof(long?)
-                || type == typeof(uint)
-                || type == typeof(uint?))
+                || type == typeof(uint))
             {
                 return "number";
             }
-            else if (type == typeof(bool) || type == typeof(bool?))
+            else if (type == typeof(int?)
+                || type == typeof(decimal?)
+                || type == typeof(double?)
+                || type == typeof(float?)
+                || type == typeof(short?)
+                || type == typeof(long?)
+                || type == typeof(uint?))
+            {
+                return showNullable ? "?number" : "number";
+            }
+            else if (type == typeof(bool))
             {
                 return "boolean";
+            }
+            else if (type == typeof(bool?))
+            {
+                return showNullable ? "?boolean" : "boolean";
             }
             else if (type == typeof(string))
             {
@@ -190,7 +269,7 @@ namespace GameServer.CodeGen
                 types.UnionWith(subTypeList);
             }
 
-            foreach (var type in types.OrderBy(GetTypeText))
+            foreach (var type in types.OrderBy(t => GetTypeText(t)))
             {
                 var filePath = type.IsEnum
                     ? enumPath
@@ -228,11 +307,13 @@ namespace GameServer.CodeGen
             {
                 builder.AppendLine($"\t{value.ToString()} = {(int)value},");
             }
+
             builder.Append('}');
         }
 
         private static void WriteInterfaceToBuilder(Type type, StringBuilder builder)
         {
+            var nullabilityContext = new NullabilityInfoContext();
             builder.AppendLine($"interface {GetInterfaceName(type)} {{");
             if (type.IsGenericTypeDefinition)
             {
@@ -241,18 +322,43 @@ namespace GameServer.CodeGen
                 {
                     var generic = generics.FirstOrDefault(x => x.type == prop.PropertyType);
                     var typeText = generic == default
-                        ? GetTypeText(prop.PropertyType)
+                        ? GetTypeText(prop.PropertyType, true)
                         : "T" + generic.index.ToString();
-                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {typeText};");
+
+                    if (typeText.StartsWith('?'))
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}?: {typeText.AsSpan(1)};");
+                    }
+                    else if (nullabilityContext.Create(prop).ReadState == NullabilityState.Nullable)
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}?: {typeText};");
+                    }
+                    else
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}: {typeText};");
+                    }
                 }
             }
             else
             {
                 foreach (var prop in type.GetProperties())
                 {
-                    builder.AppendLine($"\t{prop.Name.Decapitalize()}: {GetTypeText(prop.PropertyType)};");
+                    var typeText = GetTypeText(prop.PropertyType, true);
+                    if (typeText.StartsWith('?'))
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}?: {typeText.AsSpan(1)};");
+                    }
+                    else if (nullabilityContext.Create(prop).ReadState == NullabilityState.Nullable)
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}?: {typeText};");
+                    }
+                    else
+                    {
+                        builder.AppendLine($"\t{prop.Name.Decapitalize()}: {typeText};");
+                    }
                 }
             }
+
             builder.Append('}');
         }
 
@@ -290,11 +396,11 @@ namespace GameServer.CodeGen
             }
             else if (type.IsEnum || (type.IsClass && !type.IsGenericParameter && type != typeof(string)))
             {
-                return new List<Type> { type };
+                return [type];
             }
             else
             {
-                return new List<Type>();
+                return [];
             }
         }
 
@@ -311,12 +417,18 @@ namespace GameServer.CodeGen
             }
             else if (type.IsConstructedGenericType)
             {
-                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select(GetTypeText))}>";
+                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select(t => GetTypeText(t)))}>";
             }
             else
             {
                 return $"I{type.Name}";
             }
+        }
+        private class SocketCommandMetadata
+        {
+            public string CommandName { get; set; }
+            public Type? ResponseType { get; set; }
+            public Type? ParameterType { get; set; }
         }
 
         private class EndpointMetaData

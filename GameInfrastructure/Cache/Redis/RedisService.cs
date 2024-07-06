@@ -56,6 +56,27 @@ namespace GameInfrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
+        public string? GetSet(string key, string value)
+        {
+            return Redis.StringGetSet(key, value);
+        }
+
+        public T? GetSet<T>(string key, T value)
+        {
+            return GetSet(key, value.Serialize()).Deserialize<T>();
+        }
+
+        public async Task<string?> GetSetAsync(string key, string value)
+        {
+            return await Redis.StringGetSetAsync(key, value);
+        }
+
+        public async Task<T?> GetSetAsync<T>(string key, T value)
+        {
+            var val = await GetSetAsync(key, value.Serialize());
+            return val.Deserialize<T>();
+        }
+
         public void Set(string key, string value)
         {
             StringSet(key, value);
@@ -66,14 +87,14 @@ namespace GameInfrastructure.Cache.Redis
             Set(key, value.Serialize());
         }
 
-        public Task SetAsync(string key, string value)
+        public async Task SetAsync(string key, string value)
         {
-            return StringSetAsync(key, value);
+            await StringSetAsync(key, value);
         }
 
-        public Task SetAsync<T>(string key, T value)
+        public async Task SetAsync<T>(string key, T value)
         {
-            return SetAsync(key, value.Serialize());
+            await SetAsync(key, value.Serialize());
         }
 
         public void SetAndForget(string key, string value)
@@ -86,24 +107,54 @@ namespace GameInfrastructure.Cache.Redis
             SetAndForget(key, value.Serialize());
         }
 
-        public Task SetAndForgetAsync(string key, string value)
+        public async Task SetAndForgetAsync(string key, string value)
         {
-            return StringSetAsync(key, value, CommandFlags.FireAndForget);
+            await StringSetAsync(key, value, CommandFlags.FireAndForget);
         }
 
-        public Task SetAndForgetAsync<T>(string key, T value)
+        public async Task SetAndForgetAsync<T>(string key, T value)
         {
-            return SetAndForgetAsync(key, value.Serialize());
+            await SetAndForgetAsync(key, value.Serialize());
         }
 
-        private void StringSet(string key, string value, CommandFlags flags = CommandFlags.None)
+        public void SetNotExists(string key, string value)
         {
-            Redis.StringSet(key, value, flags: flags);
+            StringSet(key, value, when: When.NotExists);
         }
 
-        private async Task StringSetAsync(string key, string value, CommandFlags flags = CommandFlags.None)
+        public async Task SetNotExistsAsync(string key, string value)
         {
-            await Redis.StringSetAsync(key, value, flags: flags);
+            await StringSetAsync(key, value, when: When.NotExists);
+        }
+
+        public void CompareAndDelete(string key, string deleteIfValue)
+        {
+            Redis.ScriptEvaluate("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]);
+        }
+
+        public async Task CompareAndDeleteAsync(string key, string deleteIfValue)
+        {
+            await Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]);
+        }
+
+        public void Delete(string key)
+        {
+            Redis.KeyDelete(key);
+        }
+
+        public async Task DeleteAsync(string key)
+        {
+            await Redis.KeyDeleteAsync(key);
+        }
+
+        private void StringSet(string key, string value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        {
+            Redis.StringSet(key, value, flags: flags, when: when);
+        }
+
+        private async Task StringSetAsync(string key, string value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        {
+            await Redis.StringSetAsync(key, value, flags: flags, when: when);
         }
     }
 }

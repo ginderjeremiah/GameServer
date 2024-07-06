@@ -62,7 +62,7 @@ namespace GameServer.Controllers
 
             var sessionData = await Repositories.SessionStore.GetNewSessionDataAsync(player.Id);
 
-            var session = new Session(sessionData, Repositories);
+            var session = new Session(sessionData, player, Repositories);
             var token = session.GetNewToken();
             Response.Cookies.Append("sessionToken", token, DefaultCookieOptions);
 

@@ -19,11 +19,11 @@ class GameManager {
         //TODO: Make login occur before accessing game page
         await LoginManager.showLogin();
         const login = await DataManager.login("", "");
-        const newEnemy = DataManager.newEnemy();
         const dataInit = await Promise.all([
             DataManager.init(),
             DataManager.getLogPreferences()
         ])
+        const newEnemy = DataManager.newEnemy();
         this.playerData = login.data.playerData;
         this.#zoneManager = new ZoneManager(login.data.currentZone);
         this.#inventoryManager = new InventoryManager(this.playerData.inventoryData);
@@ -52,14 +52,14 @@ class GameManager {
     static async handleBattleResult(battleResult: BattleResult) {
         if (battleResult.victory) {
             const defeatResponse = await DataManager.defeatEnemy(battleResult.enemyInstance);
-            if (defeatResponse.status == 200 && defeatResponse.data.rewards) {
+            if (!defeatResponse.error && defeatResponse.data.rewards) {
                 const enemyData = DataManager.enemies;
                 const rewards = defeatResponse.data.rewards
                 this.grantExp(rewards.expReward);
                 this.addItems(rewards.drops);
                 LogManager.logMessage(enemyData[battleResult.enemyInstance.id].name + " was defeated!", "Enemy Defeated");
             } else {
-                LogManager.logMessage("There was an error defeating the enemy.", "ERROR");
+                LogManager.logMessage("There was an error defeating the enemy: " + defeatResponse.error, "ERROR");
             }
             await delay(defeatResponse.data.cooldown);
         } else {

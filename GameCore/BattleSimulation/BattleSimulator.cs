@@ -9,6 +9,7 @@ namespace GameCore.BattleSimulation
         private Mulberry32 Rng { get; set; }
         private BattlePlayer Player { get; set; }
         private BattleEnemy Enemy { get; set; }
+
         private const int msPerTick = 6;
 
         public BattleSimulator(Session session, Enemy enemy, EnemyInstance enemyInstance, IRepositoryManager repositories)
@@ -27,14 +28,17 @@ namespace GameCore.BattleSimulation
                 {
                     Enemy.TakeDamage(skill.CalculateDamage(Player.Attributes));
                 }
+
                 if (Enemy.IsDead)
                 {
                     return true;
                 }
+
                 foreach (var skill in Enemy.AdvancedCooldowns(msPerTick))
                 {
                     Player.TakeDamage(skill.CalculateDamage(Enemy.Attributes));
                 }
+
                 if (Player.IsDead)
                 {
                     return false;

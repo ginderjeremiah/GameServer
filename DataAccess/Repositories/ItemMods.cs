@@ -41,7 +41,7 @@ namespace DataAccess.Repositories
         public ItemMod? GetItemMod(int itemModId)
         {
             var itemMods = AllItemMods();
-            return itemMods.Count > itemModId ? null : itemMods[itemModId];
+            return itemMods.Count <= itemModId ? null : itemMods[itemModId];
         }
 
         private Dictionary<int, IEnumerable<ItemMod>> ModsForItemBySlot(int itemId)

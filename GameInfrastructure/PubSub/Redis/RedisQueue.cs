@@ -1,24 +1,31 @@
 ﻿using GameCore;
 using GameCore.Infrastructure;
 using StackExchange.Redis;
-using System.Diagnostics.CodeAnalysis;
 
 namespace GameInfrastructure.PubSub.Redis
 {
     internal class RedisQueue : IPubSubQueue
     {
+        private readonly IApiLogger _logger;
         private IDatabase Redis { get; }
         public string QueueName { get; }
 
-        public RedisQueue(IDatabase redis, string queueName)
+        public RedisQueue(IDatabase redis, string queueName, IApiLogger logger)
         {
             Redis = redis;
             QueueName = queueName;
+            _logger = logger;
         }
 
         public string? GetNext()
         {
-            return Redis.ListLeftPop(QueueName);
+            var value = Redis.ListLeftPop(QueueName);
+            if (value.HasValue)
+            {
+                _logger.Log($"Retrieved value from RedisQueue: {QueueName}, value: {value}");
+            }
+
+            return value;
         }
 
         public T? GetNext<T>()
@@ -28,7 +35,13 @@ namespace GameInfrastructure.PubSub.Redis
 
         public async Task<string?> GetNextAsync()
         {
-            return await Redis.ListLeftPopAsync(QueueName);
+            var value = await Redis.ListLeftPopAsync(QueueName);
+            if (value.HasValue)
+            {
+                _logger.Log($"Retrieved value from RedisQueue: {QueueName}, value: {value}");
+            }
+
+            return value;
         }
 
         public async Task<T?> GetNextAsync<T>()
@@ -37,20 +50,9 @@ namespace GameInfrastructure.PubSub.Redis
             return val.Deserialize<T>();
         }
 
-        public bool TryGetNext([NotNullWhen(true)] out string? value)
+        public void AddToQueue(string value)
         {
-            value = GetNext();
-            return value is not null;
-        }
-
-        public bool TryGetNext<T>([NotNullWhen(true)] out T? value)
-        {
-            value = GetNext<T>();
-            return value is not null;
-        }
-
-        public void AddToQueue(string? value)
-        {
+            _logger.Log($"Adding value to RedisQueue: {QueueName}, value: {value}");
             Redis.ListRightPush(QueueName, value);
         }
 
@@ -61,6 +63,7 @@ namespace GameInfrastructure.PubSub.Redis
 
         public Task AddToQueueAsync(string value)
         {
+            _logger.Log($"Adding value to RedisQueue: {QueueName}, value: {value}");
             return Redis.ListRightPushAsync(QueueName, value);
         }
 

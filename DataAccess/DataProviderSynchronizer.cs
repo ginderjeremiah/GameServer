@@ -2,7 +2,6 @@
 using GameCore.Infrastructure;
 using GameInfrastructure;
 using GameInfrastructure.Database;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
 {
@@ -28,25 +27,25 @@ namespace DataAccess
             }
         }
 
-        public void SynchronizeInventory(string sessionKey)
+        public async Task SynchronizeInventory(string sessionKey)
         {
             var channel = Constants.PUBSUB_INVENTORY_CHANNEL;
             var queueName = Constants.PUBSUB_INVENTORY_QUEUE;
-            _dataServices.PubSub.Publish(channel, queueName, sessionKey);
+            await _dataServices.PubSub.Publish(channel, queueName, sessionKey);
         }
 
-        public void SynchronizePlayerData(string sessionKey)
+        public async Task SynchronizePlayerData(string sessionKey)
         {
             var channel = Constants.PUBSUB_PLAYER_CHANNEL;
             var queueName = Constants.PUBSUB_PLAYER_QUEUE;
-            _dataServices.PubSub.Publish(channel, queueName, sessionKey);
+            await _dataServices.PubSub.Publish(channel, queueName, sessionKey);
         }
 
-        public void SynchronizeSkills(string sessionKey)
+        public async Task SynchronizeSkills(string sessionKey)
         {
             var channel = Constants.PUBSUB_SKILLS_CHANNEL;
             var queueName = Constants.PUBSUB_SKILLS_QUEUE;
-            _dataServices.PubSub.Publish(channel, queueName, sessionKey);
+            await _dataServices.PubSub.Publish(channel, queueName, sessionKey);
         }
 
         private void InitSynchronizers()
@@ -61,17 +60,17 @@ namespace DataAccess
             var channel = Constants.PUBSUB_INVENTORY_CHANNEL;
             var queueName = Constants.PUBSUB_INVENTORY_QUEUE;
 
-            var inventoryProcessor = GetSessionQueueProcessor(async (database, sessionData) =>
+            var inventoryProcessor = GetPlayerQueueProcessor(async (database, player) =>
             {
-                var player = database.Players.Include(p => p.InventoryItems).FirstOrDefault(p => p.Id == sessionData.PlayerData.Id);
-                if (player is not null)
+                foreach (var item in player.InventoryItems)
                 {
-                    foreach (var item in sessionData.PlayerData.InventoryItems)
-                    {
-                        item.InventoryItemMods = null;
-                    }
-                    player.InventoryItems = sessionData.PlayerData.InventoryItems;
+                    item.InventoryItemMods = null;
                 }
+
+                player.LogPreferences = null;
+                player.PlayerSkills = null;
+                player.PlayerAttributes = null;
+                database.Update(player);
                 await database.SaveChangesAsync();
             });
 
@@ -83,17 +82,13 @@ namespace DataAccess
             var channel = Constants.PUBSUB_PLAYER_CHANNEL;
             var queueName = Constants.PUBSUB_PLAYER_QUEUE;
 
-            var playerProcessor = GetSessionQueueProcessor(async (database, sessionData) =>
+            var playerProcessor = GetPlayerQueueProcessor(async (database, player) =>
             {
-                var player = database.Players.Include(p => p.PlayerAttributes).FirstOrDefault(p => p.Id == sessionData.PlayerData.Id);
-                if (player is not null)
-                {
-                    player.Exp = sessionData.PlayerData.Exp;
-                    player.Level = sessionData.PlayerData.Level;
-                    player.StatPointsGained = sessionData.PlayerData.StatPointsGained;
-                    player.StatPointsUsed = sessionData.PlayerData.StatPointsUsed;
-                    player.PlayerAttributes = sessionData.PlayerData.PlayerAttributes;
-                }
+                player.InventoryItems = null;
+                player.LogPreferences = null;
+                player.PlayerSkills = null;
+                player.PlayerAttributes = null;
+                database.Update(player);
                 await database.SaveChangesAsync();
             });
 
@@ -105,22 +100,24 @@ namespace DataAccess
             var channel = Constants.PUBSUB_SKILLS_CHANNEL;
             var queueName = Constants.PUBSUB_SKILLS_QUEUE;
 
-            var skillsProcessor = GetSessionQueueProcessor((database, sessionData) => throw new NotImplementedException());
+            var skillsProcessor = GetPlayerQueueProcessor((database, player) => throw new NotImplementedException());
 
             _dataServices.PubSub.Subscribe(channel, queueName, async args => await skillsProcessor(args.queue));
         }
 
-        private Func<IPubSubQueue, Task> GetSessionQueueProcessor(Func<GameContext, SessionData, Task> action)
+        private Func<IPubSubQueue, Task> GetPlayerQueueProcessor(Func<GameContext, Player, Task> action)
         {
             return async (IPubSubQueue queue) =>
             {
-                while (queue.TryGetNext(out var sessionKey))
+                var nextKey = await queue.GetNextAsync();
+                while (nextKey is not null)
                 {
-                    var session = await _dataServices.Cache.GetAsync<SessionData>($"{Constants.CACHE_SESSION_PREFIX}_{sessionKey}");
-                    if (session is not null)
+                    var player = await _dataServices.Cache.GetAsync<Player>(nextKey);
+                    if (player is not null)
                     {
-                        await action(_dataServices.GetNewDbContext(), session);
+                        await action(_dataServices.GetNewDbContext(), player);
                     }
+                    nextKey = await queue.GetNextAsync();
                 }
             };
         }

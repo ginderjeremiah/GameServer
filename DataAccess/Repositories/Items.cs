@@ -28,7 +28,7 @@ namespace DataAccess.Repositories
         public Item? GetItem(int itemId)
         {
             var items = AllItems();
-            return items.Count > itemId ? null : items[itemId];
+            return items.Count <= itemId ? null : items[itemId];
         }
     }
 }

@@ -5,6 +5,7 @@
         //Cache Keys
         internal const string CACHE_SESSION_PREFIX = "Session";
         internal const string CACHE_ACTIVE_ENEMY_PREFIX = "ActiveEnemy";
+        internal const string CACHE_PLAYER_PREFIX = "Player";
 
         //Pub/Sub Channels/Queues
         internal const string PUBSUB_PLAYER_CHANNEL = "player";

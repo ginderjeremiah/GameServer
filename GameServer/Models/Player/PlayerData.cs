@@ -21,7 +21,7 @@ namespace GameServer.Models.Player
         public PlayerData(SessionPlayer sessionPlayer, SessionInventory sessionInventory)
         {
             UserName = sessionPlayer.UserName;
-            Name = sessionPlayer.PlayerName;
+            Name = sessionPlayer.Name;
             Level = sessionPlayer.Level;
             Exp = sessionPlayer.Exp;
             Attributes = sessionPlayer.Attributes.Select(att => new BattlerAttribute(att)).ToList();

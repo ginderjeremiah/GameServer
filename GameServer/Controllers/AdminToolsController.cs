@@ -7,7 +7,7 @@ using GameServer.Models.Tags;
 using GameServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using static GameServer.ChangeType;
+using static GameServer.EChangeType;
 
 namespace GameServer.Controllers
 {

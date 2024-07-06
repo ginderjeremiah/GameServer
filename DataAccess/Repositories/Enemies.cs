@@ -30,7 +30,7 @@ namespace DataAccess.Repositories
         public Enemy? GetEnemy(int enemyId)
         {
             var enemies = AllEnemies();
-            return enemies.Count >= enemyId ? null : enemies[enemyId];
+            return enemies.Count <= enemyId ? null : enemies[enemyId];
         }
 
         public Enemy GetRandomEnemy(int zoneId)

@@ -1,6 +1,6 @@
-interface IDefeatEnemy {
+interface IDefeatEnemyResponse {
 	cooldown: number;
-	rewards: IDefeatRewards;
+	rewards?: IDefeatRewards;
 }
 
 interface IDefeatRewards {
@@ -24,7 +24,11 @@ interface IEnemyInstance {
 	selectedSkills: number[];
 }
 
-interface INewEnemy {
-	cooldown: number;
-	enemyInstance: IEnemyInstance;
+interface INewEnemyModel {
+	cooldown?: number;
+	enemyInstance?: IEnemyInstance;
+}
+
+interface INewEnemyRequest {
+	newZoneId?: number;
 }

@@ -4,27 +4,25 @@ namespace GameCore.Sessions
 {
     public class SessionPlayer
     {
-        private readonly SessionData _sessionData;
+        private readonly Player _player;
 
-        private Player Player => _sessionData.PlayerData;
-
-        public int PlayerId => Player.Id;
-        public string UserName => Player.UserName;
-        public Guid Salt => Player.Salt;
-        public string PassHash => Player.PassHash;
-        public string PlayerName => Player.Name;
-        public int Level { get => Player.Level; set => Player.Level = value; }
-        public int Exp { get => Player.Exp; set => Player.Exp = value; }
-        public List<PlayerAttribute> Attributes { get => Player.PlayerAttributes; set => Player.PlayerAttributes = value; }
-        public List<PlayerSkill> PlayerSkills => Player.PlayerSkills;
+        public int Id => _player.Id;
+        public string UserName => _player.UserName;
+        public Guid Salt => _player.Salt;
+        public string PassHash => _player.PassHash;
+        public string Name => _player.Name;
+        public int Level { get => _player.Level; set => _player.Level = value; }
+        public int Exp { get => _player.Exp; set => _player.Exp = value; }
+        public List<PlayerAttribute> Attributes { get => _player.PlayerAttributes; set => _player.PlayerAttributes = value; }
+        public List<PlayerSkill> PlayerSkills => _player.PlayerSkills;
         public List<PlayerSkill> SelectedSkills => PlayerSkills.Where(skill => skill.Selected).ToList();
-        public List<LogPreference> LogPreferences => Player.LogPreferences;
-        public int StatPointsGained { get => Player.StatPointsGained; set => Player.StatPointsGained = value; }
-        public int StatPointsUsed { get => Player.StatPointsUsed; private set => Player.StatPointsUsed = value; }
+        public List<LogPreference> LogPreferences => _player.LogPreferences;
+        public int StatPointsGained { get => _player.StatPointsGained; set => _player.StatPointsGained = value; }
+        public int StatPointsUsed { get => _player.StatPointsUsed; private set => _player.StatPointsUsed = value; }
 
-        public SessionPlayer(SessionData sessionData)
+        public SessionPlayer(Player player)
         {
-            _sessionData = sessionData;
+            _player = player;
         }
 
         public bool UpdateAttributes(List<IAttributeUpdate> changedAttributes)
@@ -42,6 +40,7 @@ namespace GameCore.Sessions
                         att.Amount += upd.Amount;
                     }
                 }
+
                 return true;
             }
 

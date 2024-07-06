@@ -30,8 +30,8 @@ namespace DataAccess
         private DataProviderSynchronizer Synchronizer => _synchronizer ??= new(_dataServices);
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(Database);
-        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(Database, Cache, Synchronizer);
-        public IPlayers Players => _players ??= new Players(Database);
+        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(Database, Cache);
+        public IPlayers Players => _players ??= new Players(Database, Cache, Synchronizer);
         public ITags Tags => _itemTags ??= new Tags(Database);
         public IItemMods ItemMods => _itemMods ??= new ItemMods(Database);
         public IItems Items => _items ??= new Items(Database);

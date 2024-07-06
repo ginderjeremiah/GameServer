@@ -27,7 +27,7 @@ class Skill extends Tooltippable implements ISkill {
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
         const target = GameManager.getOpponent(this.owner);
-        let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100) * 1000);
+        let remainingCd = (this.cooldownMS - this.chargeTime) / ((1 + this.owner.attributes.getValue(EAttribute.CooldownRecovery) / 100) * 1000);
         tooltipTitle.textContent = this.name + " (" + remainingCd.toFixed(2) + "s)";
         if (this.toolTipId !== prevId || (!this.target && target)) {
             this.target = target;
@@ -90,14 +90,14 @@ class Skill extends Tooltippable implements ISkill {
         if (target) {
             let adjDamage = document.createElement("li"); 
             adjDamage.id = this.name + '_aDmg'
-            let adjDmg = totDam - target.attributes.getValue(AttributeType.Defense);
+            let adjDmg = totDam - target.attributes.getValue(EAttribute.Defense);
             adjDmg = adjDmg > 0 ? adjDmg : 0;
             adjDamage.textContent = "Adjusted Total: " + formatNum(adjDmg);
             damageList.appendChild(adjDamage);
         }
 
         let cooldown = document.createElement("li");
-        let cd = this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(AttributeType.CooldownRecovery) / 100);
+        let cd = this.cooldownMS / 1000 / (1 + this.owner.attributes.getValue(EAttribute.CooldownRecovery) / 100);
         cooldown.textContent = "Cooldown: " + formatNum(cd) + "s";
         damageList.appendChild(cooldown);
 
@@ -109,7 +109,7 @@ class Skill extends Tooltippable implements ISkill {
         if (target) {
             let adjDamagePerSecond = document.createElement('li');
             adjDamagePerSecond.id = this.name + '_aDPS';
-            let adjDps = (totDam - target.attributes.getValue(AttributeType.Defense)) / cd;
+            let adjDps = (totDam - target.attributes.getValue(EAttribute.Defense)) / cd;
             adjDamagePerSecond.textContent = "Adjusted DPS: " + formatNum(adjDps) + '/s';
             damageList.appendChild(adjDamagePerSecond);
 

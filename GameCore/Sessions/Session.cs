@@ -7,6 +7,7 @@ namespace GameCore.Sessions
     public class Session
     {
         private readonly SessionData _sessionData;
+        private readonly Player _player;
         private readonly IRepositoryManager _repos;
         private bool _sessionDirty = false;
         private bool _skillsDirty = false;
@@ -23,11 +24,12 @@ namespace GameCore.Sessions
         public SessionPlayer Player { get; }
         public IEnumerable<BattlerAttribute> BattlerAttributes => Player.Attributes.Select(att => new BattlerAttribute(att));
 
-        public Session(SessionData sessionData, IRepositoryManager repos)
+        public Session(SessionData sessionData, Player playerData, IRepositoryManager repos)
         {
             _sessionData = sessionData;
-            Player = new SessionPlayer(sessionData);
-            InventoryData = new SessionInventory(sessionData.PlayerData.InventoryItems);
+            _player = playerData;
+            Player = new SessionPlayer(playerData);
+            InventoryData = new SessionInventory(playerData.InventoryItems);
             _repos = repos;
         }
 
@@ -60,6 +62,7 @@ namespace GameCore.Sessions
                 Player.Level++;
                 Player.StatPointsGained += 6;
             }
+
             _playerDirty = true;
 
             var freeSlots = InventoryData.GetFreeSlotNumbers();
@@ -69,11 +72,11 @@ namespace GameCore.Sessions
             {
                 var d = drops[i];
                 var slotNumber = freeSlots[i];
-                d.PlayerId = Player.PlayerId;
+                d.PlayerId = Player.Id;
                 d.InventorySlotNumber = slotNumber;
                 _repos.Insert(d);
                 InventoryData.Inventory[slotNumber] = d;
-                _sessionData.PlayerData.InventoryItems.Add(d);
+                _player.InventoryItems.Add(d);
                 _sessionDirty = true;
             }
 
@@ -116,13 +119,18 @@ namespace GameCore.Sessions
 
         public async Task Save()
         {
-            if (_sessionDirty || _playerDirty || _skillsDirty || _inventoryDirty)
+            if (_sessionDirty)
             {
-                await _repos.SessionStore.UpdateAsync(_sessionData, _playerDirty, _skillsDirty, _inventoryDirty);
+                _repos.SessionStore.Update(_sessionData);
                 _sessionDirty = false;
+            }
+
+            if (_playerDirty || _skillsDirty || _inventoryDirty)
+            {
+                await _repos.Players.SavePlayerAsync(_player, _playerDirty, _inventoryDirty, _skillsDirty);
                 _playerDirty = false;
-                _skillsDirty = false;
                 _inventoryDirty = false;
+                _skillsDirty = false;
             }
         }
 
@@ -140,8 +148,8 @@ namespace GameCore.Sessions
                         drops.Add(GetItemInstance(drop.ItemId, rng));
                     }
                 }
-
             }
+
             var zone = _repos.Zones.GetZone(zoneId);
             if (zone is not null)
             {
@@ -153,6 +161,7 @@ namespace GameCore.Sessions
                     }
                 }
             }
+
             return drops;
         }
 

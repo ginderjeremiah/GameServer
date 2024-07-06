@@ -27,7 +27,7 @@ namespace GameServer.Controllers
 
         [SessionAuthorize]
         [HttpPost]
-        public async Task<ApiResponse<DefeatEnemy>> DefeatEnemy([FromBody] EnemyInstanceModel enemyInstance)
+        public async Task<ApiResponse<DefeatEnemyResponse>> DefeatEnemy([FromBody] EnemyInstanceModel enemyInstance)
         {
             var now = DateTime.UtcNow;
             var instance = new EnemyInstance
@@ -43,7 +43,7 @@ namespace GameServer.Controllers
                 Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
                 var rewards = Session.GrantRewards(instance);
-                return Success(new DefeatEnemy
+                return Success(new DefeatEnemyResponse
                 {
                     Cooldown = 5000,
                     Rewards = new Models.Enemies.DefeatRewards(rewards)
@@ -52,7 +52,7 @@ namespace GameServer.Controllers
             else
             {
                 Logger.LogError($"DefeatEnemy: {{victory: {Session.Victory}, currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
-                return ErrorWithData("Enemy could not be defeated.", new DefeatEnemy
+                return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                 {
                     Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
                 });
@@ -61,12 +61,12 @@ namespace GameServer.Controllers
 
         [SessionAuthorize]
         [HttpGet]
-        public ApiResponse<NewEnemy> NewEnemy(int newZoneId = -1)
+        public ApiResponse<NewEnemyModel> NewEnemy(int newZoneId = -1)
         {
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
             {
-                return Success(new NewEnemy
+                return Success(new NewEnemyModel
                 {
                     Cooldown = (Session.EnemyCooldown - now).TotalMilliseconds
                 });
@@ -101,7 +101,7 @@ namespace GameServer.Controllers
 
             Logger.LogDebug($"NewEnemy: {{victory: {victory}, battleTime: {totalMs} ms, now: {now:O}, earliestDefeat: {earliestDefeat:O}}}");
 
-            return Success(new NewEnemy
+            return Success(new NewEnemyModel
             {
                 EnemyInstance = new EnemyInstanceModel(enemyInstance)
             });
