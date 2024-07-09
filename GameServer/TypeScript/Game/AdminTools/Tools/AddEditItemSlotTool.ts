@@ -1,4 +1,10 @@
-﻿class AddEditItemSlotTool {
+﻿import { TableDataEditor } from "../TableDataEditor";
+import { IItemSlot, IItem, ISlotType, IItemMod } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+import { groupBy, keys } from "../../Shared/GlobalFunctions";
+import { SelOptions } from "../../Shared/GlobalInterfaces";
+
+export class AddEditItemSlotTool {
     static slotTable: TableDataEditor<IItemSlot>;
     static renderParent: HTMLDivElement;
     static tableDiv: HTMLDivElement;

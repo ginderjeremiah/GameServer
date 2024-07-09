@@ -1,4 +1,9 @@
-﻿abstract class Renderable implements Listable<Renderable> {
+﻿import { ListNode } from "../Shared/ListNode";
+import { Listable } from "../Shared/GlobalInterfaces";
+import { RenderInfo } from "../CardGame/RenderInfo";
+import { AnimationSequence } from "../CardGame/AnimationSequence";
+
+export abstract class Renderable implements Listable<Renderable> {
     lNode!: ListNode<Renderable>;
     renderInfo!: RenderInfo;
     hover: boolean = false;

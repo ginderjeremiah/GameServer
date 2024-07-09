@@ -1,5 +1,8 @@
-/// <reference path="../Shared/Api/Enums.ts"/>
-class BattleAttributes {
+import { EAttribute } from "../Shared/Api/Enums";
+import { IBattlerAttribute } from "../Shared/Api/Types";
+import { normalizeText } from "../Shared/GlobalFunctions";
+
+export class BattleAttributes {
     static #attributesMaxId = Object.values(EAttribute)[Object.values(EAttribute).length - 1] as number;
     attributes: number[];
     //battlerAttributes: IBattlerAttribute[];

@@ -1,4 +1,6 @@
-﻿abstract class Tooltippable {
+﻿import { TooltipManager } from "../Managers/TooltipManager";
+
+export abstract class Tooltippable {
     toolTipId: number;
 
     constructor() {

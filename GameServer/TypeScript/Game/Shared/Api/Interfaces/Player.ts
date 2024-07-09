@@ -1,19 +1,16 @@
-interface ILoginCredentials {
-	username: string;
-	password: string;
-}
+import { IBattlerAttribute, IInventoryData } from "../Types"
 
-interface ILoginData {
+export interface ILoginData {
 	currentZone: number;
 	playerData: IPlayerData;
 }
 
-interface ILogPreference {
-	name: string;
-	enabled: boolean;
+export interface ILoginCredentials {
+	username: string;
+	password: string;
 }
 
-interface IPlayerData {
+export interface IPlayerData {
 	userName: string;
 	name: string;
 	level: number;
@@ -23,4 +20,9 @@ interface IPlayerData {
 	statPointsGained: number;
 	statPointsUsed: number;
 	inventoryData: IInventoryData;
+}
+
+export interface ILogPreference {
+	name: string;
+	enabled: boolean;
 }

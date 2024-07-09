@@ -1,18 +1,25 @@
-type ApiSocketResponseTypes = {
+import {
+	IDefeatEnemyResponse,
+	IEnemyInstance,
+	INewEnemyModel,
+	INewEnemyRequest
+} from "./Types"
+
+export type ApiSocketResponseTypes = {
 	'DefeatEnemy': IDefeatEnemyResponse
 	'NewEnemy': INewEnemyModel
 	'SocketReplaced': undefined
 }
 
-type ApiSocketRequestTypes = {
+export type ApiSocketRequestTypes = {
 	'DefeatEnemy': IEnemyInstance
 	'NewEnemy': INewEnemyRequest
 }
 
-type ApiSocketCommand = keyof ApiSocketResponseTypes
+export type ApiSocketCommand = keyof ApiSocketResponseTypes
 
-type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes
+export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes
 
-type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>
+export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>
 
-type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]
+export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]

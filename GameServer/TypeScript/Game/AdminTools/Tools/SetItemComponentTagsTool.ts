@@ -1,4 +1,7 @@
-﻿class SetItemModTagsTool {
+﻿import { ITag, IItemMod } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+
+export class SetItemModTagsTool {
     static sel: HTMLSelectElement;
     static checkDiv: HTMLDivElement;
     static items: IItemMod[];

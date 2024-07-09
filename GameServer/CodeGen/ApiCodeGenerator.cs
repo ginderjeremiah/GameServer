@@ -133,7 +133,19 @@ namespace GameServer.CodeGen
         {
             var filePath = $"{baseDirectoryPath}\\ApiTypeMap.ts";
             var strBuilder = new StringBuilder();
-            strBuilder.AppendLine("type ApiResponseTypes = {");
+            var allTypes = endpointData.SelectMany(e =>
+                e.Parameters
+                    .Where(p => NeedsInterface(p.ParameterType))
+                    .Select(p => p.ParameterType)
+                    .Append(e.ResponseType)
+            ).SelectNotNull();
+
+            if (allTypes.Any())
+            {
+                strBuilder.AppendLine(GetImportText(allTypes));
+            }
+
+            strBuilder.AppendLine("export type ApiResponseTypes = {");
             foreach (var endpoint in endpointData)
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetTypeText(endpoint.ResponseType)}");
@@ -141,17 +153,17 @@ namespace GameServer.CodeGen
 
             strBuilder.AppendLine("}\n");
 
-            strBuilder.AppendLine("type ApiRequestTypes = {");
+            strBuilder.AppendLine("export type ApiRequestTypes = {");
             foreach (var endpoint in endpointData.Where(endp => endp.Parameters.Count > 0))
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {GetParametersTypeText(endpoint)}");
             }
 
             strBuilder.AppendLine("}\n");
-            strBuilder.AppendLine("type ApiEndpoint = keyof ApiResponseTypes\n");
-            strBuilder.AppendLine("type ApiEndpointWithRequest = keyof ApiRequestTypes\n");
-            strBuilder.AppendLine("type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>\n");
-            strBuilder.Append("type ApiResponseType = ApiResponseTypes[ApiEndpoint]");
+            strBuilder.AppendLine("export type ApiEndpoint = keyof ApiResponseTypes\n");
+            strBuilder.AppendLine("export type ApiEndpointWithRequest = keyof ApiRequestTypes\n");
+            strBuilder.AppendLine("export type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>\n");
+            strBuilder.Append("export type ApiResponseType = ApiResponseTypes[ApiEndpoint]");
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             File.WriteAllText(filePath, strBuilder.ToString());
@@ -161,7 +173,17 @@ namespace GameServer.CodeGen
         {
             var filePath = $"{baseDirectoryPath}\\ApiSocketTypeMap.ts";
             var strBuilder = new StringBuilder();
-            strBuilder.AppendLine("type ApiSocketResponseTypes = {");
+            var allTypes = commandData
+                .SelectNotNull(c => c.ResponseType)
+                .Concat(commandData.SelectNotNull(c => c.ParameterType))
+                .Where(NeedsInterface);
+
+            if (allTypes.Any())
+            {
+                strBuilder.AppendLine(GetImportText(allTypes));
+            }
+
+            strBuilder.AppendLine("export type ApiSocketResponseTypes = {");
             foreach (var command in commandData)
             {
                 strBuilder.AppendLine($"\t'{command.CommandName}': {GetTypeText(command.ResponseType)}");
@@ -169,17 +191,17 @@ namespace GameServer.CodeGen
 
             strBuilder.AppendLine("}\n");
 
-            strBuilder.AppendLine("type ApiSocketRequestTypes = {");
+            strBuilder.AppendLine("export type ApiSocketRequestTypes = {");
             foreach (var command in commandData.Where(c => c.ParameterType is not null))
             {
                 strBuilder.AppendLine($"\t'{command.CommandName}': {GetTypeText(command.ParameterType)}");
             }
 
             strBuilder.AppendLine("}\n");
-            strBuilder.AppendLine("type ApiSocketCommand = keyof ApiSocketResponseTypes\n");
-            strBuilder.AppendLine("type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes\n");
-            strBuilder.AppendLine("type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>\n");
-            strBuilder.Append("type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]");
+            strBuilder.AppendLine("export type ApiSocketCommand = keyof ApiSocketResponseTypes\n");
+            strBuilder.AppendLine("export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes\n");
+            strBuilder.AppendLine("export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>\n");
+            strBuilder.Append("export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]");
 
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             File.WriteAllText(filePath, strBuilder.ToString());
@@ -201,7 +223,7 @@ namespace GameServer.CodeGen
             }
         }
 
-        private static string GetTypeText(Type? type, bool showNullable = false)
+        private static string GetTypeText(Type? type, bool showNullable = false, bool importMode = false)
         {
             if (type == null)
             {
@@ -245,23 +267,26 @@ namespace GameServer.CodeGen
             }
             else if (IsListType(type))
             {
-                return $"{GetTypeText(type.GetGenericArguments()[0])}[]";
+                return $"{GetTypeText(type.GetGenericArguments()[0], importMode: importMode)}{(importMode ? "" : "[]")}";
             }
             else
             {
-                return GetInterfaceName(type);
+                return GetInterfaceName(type, !importMode);
             }
         }
 
         private static void WriteApiInterfaces(HashSet<Type> types, string baseDirectoryPath)
         {
-            var interfacesPath = $"{baseDirectoryPath}\\Interfaces";
-            var enumPath = $"{baseDirectoryPath}\\Enums.ts";
+            var interfacesPath = "Interfaces\\";
+            var enumPath = "Enums.ts";
+            var exportPath = "Types.ts";
 
             if (Directory.Exists(interfacesPath))
                 Directory.Delete(interfacesPath, true);
 
-            var fileBuilders = new Dictionary<string, StringBuilder>();
+            Directory.CreateDirectory(interfacesPath);
+
+            //var fileBuilders = new Dictionary<string, StringBuilder>();
             var subTypes = types.Select(GetSubTypes).ToList();
 
             foreach (var subTypeList in subTypes)
@@ -269,39 +294,51 @@ namespace GameServer.CodeGen
                 types.UnionWith(subTypeList);
             }
 
-            foreach (var type in types.OrderBy(t => GetTypeText(t)))
+            var interfaceDataGroups = types.Select(t => new InterfaceTypeData
             {
-                var filePath = type.IsEnum
-                    ? enumPath
-                    : $"{interfacesPath}\\{type.Namespace[(type.Namespace.LastIndexOf('.') + 1)..]}.ts";
+                Type = t,
+                TypeText = GetTypeText(t),
+                FilePath = t.IsEnum ? enumPath : $"{interfacesPath}{t.Namespace[(t.Namespace.LastIndexOf('.') + 1)..]}.ts"
+            })
+            .GroupBy(data => data.FilePath);
 
-                fileBuilders.TryGetValue(filePath, out var builder);
-                if (builder == null)
+            foreach (var group in interfaceDataGroups)
+            {
+                var fileBuilder = new StringBuilder();
+                var currentExports = group.Select(data => GetTypeText(data.Type, importMode: true));
+                var importedTypes = group
+                    .SelectMany(data => data.Type.GetProperties().Select(p => p.PropertyType))
+                    .Where(NeedsInterface)
+                    .ExceptBy(currentExports, t => GetTypeText(t, importMode: true));
+
+                if (importedTypes.Any())
                 {
-                    builder = new StringBuilder();
-                    fileBuilders.Add(filePath, builder);
-                }
-                else
-                {
-                    builder.Append("\n\n");
+                    fileBuilder.AppendLine(GetImportText(importedTypes, "../Types"));
                 }
 
-                if (type.IsEnum)
-                    WriteEnumToBuilder(type, builder);
-                else
-                    WriteInterfaceToBuilder(type, builder);
+                foreach (var interfaceType in group)
+                {
+                    if (interfaceType.Type.IsEnum)
+                    {
+                        WriteEnumToBuilder(interfaceType.Type, fileBuilder);
+                    }
+                    else
+                    {
+                        WriteInterfaceToBuilder(interfaceType.Type, fileBuilder);
+                    }
+
+                    fileBuilder.AppendLine("\n");
+                }
+
+                File.WriteAllText($"{baseDirectoryPath}\\{group.Key}", fileBuilder.ToString().TrimEnd());
             }
 
-            foreach ((var path, var builder) in fileBuilders)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, builder.ToString());
-            }
+            File.WriteAllText($"{baseDirectoryPath}\\{exportPath}", string.Join("\n", interfaceDataGroups.Select(g => $"export * from \"./{g.Key.Replace("\\", "/").Replace(".ts", null)}\"")));
         }
 
         private static void WriteEnumToBuilder(Type type, StringBuilder builder)
         {
-            builder.AppendLine($"enum {GetTypeText(type)} {{");
+            builder.AppendLine($"export enum {GetTypeText(type)} {{");
             var values = type.GetEnumValues();
             foreach (var value in values)
             {
@@ -314,7 +351,7 @@ namespace GameServer.CodeGen
         private static void WriteInterfaceToBuilder(Type type, StringBuilder builder)
         {
             var nullabilityContext = new NullabilityInfoContext();
-            builder.AppendLine($"interface {GetInterfaceName(type)} {{");
+            builder.AppendLine($"export interface {GetInterfaceName(type)} {{");
             if (type.IsGenericTypeDefinition)
             {
                 var generics = type.GetGenericArguments().Select((t, i) => (type: t, index: i + 1));
@@ -409,21 +446,42 @@ namespace GameServer.CodeGen
             return type.IsGenericType && type.IsAssignableTo(typeof(System.Collections.IList));
         }
 
-        private static string GetInterfaceName(Type type)
+        private static string GetInterfaceName(Type type, bool includeGenerics = true)
         {
-            if (type.IsGenericTypeDefinition)
+            if (type.IsGenericTypeDefinition && includeGenerics)
             {
-                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select((arg, i) => "T" + (i + 1)))}>";
+                return $"I{type.Name[..type.Name.IndexOf('`')]}<{string.Join(", ", type.GetGenericArguments().Select((arg, i) => "T" + (i + 1)))}>";
             }
-            else if (type.IsConstructedGenericType)
+            else if (type.IsConstructedGenericType && includeGenerics)
             {
-                return $"I{type.Name[..type.Name.IndexOf("`")]}<{string.Join(", ", type.GetGenericArguments().Select(t => GetTypeText(t)))}>";
+                return $"I{type.Name[..type.Name.IndexOf('`')]}<{string.Join(", ", type.GetGenericArguments().Select(t => GetTypeText(t)))}>";
+            }
+            else if (type.IsGenericTypeDefinition || type.IsConstructedGenericType) // includeGenerics = false
+            {
+                return $"I{type.Name[..type.Name.IndexOf('`')]}";
             }
             else
             {
                 return $"I{type.Name}";
             }
         }
+
+        private static string GetImportText(IEnumerable<Type> types, string typesPath = "./Types")
+        {
+            var test = types.ToList();
+            var typeStrings = test.Select(t => GetTypeText(t, importMode: true)).Distinct().OrderBy(t => t);
+            return typeStrings.Count() > 3
+                ? $"import {{\n\t{string.Join(",\n\t", typeStrings)}\n}} from \"{typesPath}\"\n"
+                : $"import {{ {string.Join(", ", typeStrings)} }} from \"{typesPath}\"\n";
+        }
+
+        private class InterfaceTypeData
+        {
+            public Type Type { get; set; }
+            public string TypeText { get; set; }
+            public string FilePath { get; set; }
+        }
+
         private class SocketCommandMetadata
         {
             public string CommandName { get; set; }

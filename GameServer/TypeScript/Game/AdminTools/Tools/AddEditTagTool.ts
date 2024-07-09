@@ -1,4 +1,8 @@
-﻿class AddEditTagTool {
+﻿import { TableDataEditor } from "../TableDataEditor";
+import { ITag } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+
+export class AddEditTagTool {
     static tagsTable: TableDataEditor<ITag>;
     static renderParent: HTMLDivElement;
 

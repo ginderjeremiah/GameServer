@@ -1,4 +1,8 @@
-﻿class TableDataRow<T extends {}> {
+﻿import { keys } from "../Shared/GlobalFunctions";
+import { SelOptions, Dict } from "../Shared/GlobalInterfaces";
+import { TableDataOptions } from "./TableDataOptions";
+
+export class TableDataRow<T extends {}> {
     index: number;
     data: T;
     originalData: T;

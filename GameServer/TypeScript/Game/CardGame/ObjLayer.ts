@@ -1,4 +1,7 @@
-﻿class ObjLayer {
+﻿import { LinkedList } from "../Shared/LinkedList";
+import { Renderable } from "../Abstract/Renderable";
+
+export class ObjLayer {
     objList;
     dirty;
 

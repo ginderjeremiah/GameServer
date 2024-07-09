@@ -1,4 +1,10 @@
-﻿class AnimationSequence implements Listable<AnimationSequence> {
+﻿import { Listable } from "../Shared/GlobalInterfaces";
+import { Renderable } from "../Abstract/Renderable";
+import { CheckFunc } from "../Shared/CustomTypes";
+import { ListNode } from "../Shared/ListNode";
+import { Anim } from "./Anim";
+
+export class AnimationSequence implements Listable<AnimationSequence> {
     obj: Renderable;
     animations: Anim[];
     cancelCondition: CheckFunc<Renderable>;

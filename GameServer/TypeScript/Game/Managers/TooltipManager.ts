@@ -1,5 +1,6 @@
-﻿class TooltipManager {
+﻿import { Tooltippable } from "../Abstract/Tooltippable";
 
+export class TooltipManager {
     static tooltipElement = document.getElementById("tooltip") as HTMLDivElement;
     static tooltipTitle = document.getElementById("tooltipTitle") as HTMLHeadingElement;
     static tooltipContent = document.getElementById("tooltipContent") as HTMLDivElement;

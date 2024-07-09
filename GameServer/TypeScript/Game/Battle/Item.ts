@@ -1,5 +1,9 @@
-﻿/// <reference path="../Abstract/Tooltippable.ts"/>
-class Item extends Tooltippable implements IItem {
+﻿import { Tooltippable } from "../Abstract/Tooltippable";
+import { IItem, IBattlerAttribute, IItemMod, IInventoryItem } from "../Shared/Api/Types";
+import { ItemMod } from "./ItemMod";
+import { BattleAttributes } from "./BattleAttributes";
+
+export class Item extends Tooltippable implements IItem {
     id: number;
     rating: number;
     itemId: number;

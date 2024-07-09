@@ -1,5 +1,4 @@
-﻿class PopupManager {
-
+﻿export class PopupManager {
     static #popupContainer = document.getElementById("popupContainer") as HTMLDivElement;
     static #popups = document.getElementsByClassName("popup");
     static currentResolve: ((value: boolean | PromiseLike<boolean>) => void) | null;

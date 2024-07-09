@@ -1,4 +1,9 @@
-class AddEditItemModAttributeTool {
+import { TableDataEditor } from "../TableDataEditor";
+import { IItemMod, IBattlerAttribute, EAttribute } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+import { enumPairs, normalizeText } from "../../Shared/GlobalFunctions";
+
+export class AddEditItemModAttributeTool {
     static slotTable: TableDataEditor<IBattlerAttribute>;
     static renderParent: HTMLDivElement;
     static tableDiv: HTMLDivElement;
@@ -43,7 +48,7 @@ class AddEditItemModAttributeTool {
             this.itemModSelect.appendChild(opt);
         });
 
-        const attributeOpts = enumPairs(AttributeType).map(pair => ({id: pair.id, name: normalizeText(pair.name)}));
+        const attributeOpts = enumPairs(EAttribute).map(pair => ({id: pair.id, name: normalizeText(pair.name)}));
 
         this.itemModSelect.addEventListener('change', async () => {
             AddEditItemModAttributeTool.tableDiv.hidden = false;
@@ -55,7 +60,7 @@ class AddEditItemModAttributeTool {
                     attributeId: () => ({options: attributeOpts})
                 }, 
                 sampleItem: {
-                    attributeId: AttributeType.Strength,
+                    attributeId: EAttribute.Strength,
                     amount: 1.00
                 }
             });

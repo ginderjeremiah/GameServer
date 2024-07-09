@@ -1,4 +1,4 @@
-﻿class CardText {
+﻿export class CardText {
     text;
     fontSize;
 

@@ -1,6 +1,9 @@
-﻿/// <reference path="../Shared/Api/ApiRequest.ts"/>
+﻿import { IZone, IEnemy, IItem, ISkill, IItemMod, IAttribute, IInventoryUpdate, ILogPreference, IEnemyInstance, IAttributeUpdate } from "../Shared/Api/Types";
+import { ApiSocket } from "../Shared/Api/ApiSocket";
+import { ApiRequest } from "../Shared/Api/ApiRequest";
+import { delay } from "../Shared/GlobalFunctions";
 
-class DataManager {
+export class DataManager {
     static zones: IZone[];
     static enemies: IEnemy[];
     static items: IItem[];

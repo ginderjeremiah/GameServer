@@ -1,33 +1,16 @@
-interface IAddEditItemAttributesData {
+import { IBattlerAttribute, IChange } from "../Types"
+
+export interface IAddEditItemAttributesData {
 	itemId: number;
 	changes: IChange<IBattlerAttribute>[];
 }
 
-interface IAddEditItemModAttributesData {
+export interface IAddEditItemModAttributesData {
 	itemModId: number;
 	changes: IChange<IBattlerAttribute>[];
 }
 
-interface IItem {
-	id: number;
-	name: string;
-	description: string;
-	itemCategoryId: number;
-	iconPath: string;
-	attributes: IBattlerAttribute[];
-}
-
-interface IItemCategory {
-	id: number;
-	name: string;
-}
-
-interface IItemDrop {
-	itemId: number;
-	dropRate: number;
-}
-
-interface IItemMod {
+export interface IItemMod {
 	id: number;
 	name: string;
 	removable: boolean;
@@ -36,7 +19,16 @@ interface IItemMod {
 	attributes: IBattlerAttribute[];
 }
 
-interface IItemSlot {
+export interface IItem {
+	id: number;
+	name: string;
+	description: string;
+	itemCategoryId: number;
+	iconPath: string;
+	attributes: IBattlerAttribute[];
+}
+
+export interface IItemSlot {
 	id: number;
 	itemId: number;
 	slotTypeId: number;
@@ -44,7 +36,17 @@ interface IItemSlot {
 	probability: number;
 }
 
-interface ISlotType {
+export interface IItemCategory {
 	id: number;
 	name: string;
+}
+
+export interface ISlotType {
+	id: number;
+	name: string;
+}
+
+export interface IItemDrop {
+	itemId: number;
+	dropRate: number;
 }

@@ -1,4 +1,7 @@
-﻿class Transform {
+﻿import { ProgressionFunc } from "../Shared/CustomTypes";
+import { Renderable } from "../Abstract/Renderable";
+
+export class Transform {
     parameter: string;
     magnitude: number;
     progressionFunc: ProgressionFunc;

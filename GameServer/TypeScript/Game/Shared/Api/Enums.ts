@@ -1,4 +1,4 @@
-enum EAttribute {
+export enum EAttribute {
 	Strength = 0,
 	Endurance = 1,
 	Intellect = 2,
@@ -16,7 +16,7 @@ enum EAttribute {
 	BlockReduction = 14,
 }
 
-enum EChangeType {
+export enum EChangeType {
 	Add = 0,
 	Edit = 1,
 	Delete = 2,

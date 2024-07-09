@@ -1,11 +1,15 @@
-interface IApiSocketResponse<T extends ApiSocketCommand> {
+import { ApiSocketCommand, ApiSocketResponseTypes, ApiSocketCommandNoRequest, ApiSocketCommandWithRequest, ApiSocketRequestTypes } from "./ApiSocketTypeMap"; 
+import { ApiSocketRequest } from "./ApiSocketRequest";
+import { Action } from "../CustomTypes";
+
+export interface IApiSocketResponse<T extends ApiSocketCommand> {
     id: string,
     name: T,
     error?: string,
     data: ApiSocketResponseTypes[T];
 }
 
-class ApiSocket {
+export class ApiSocket {
     private socket: WebSocket;
     private socketCommandQueue: ApiSocketRequest<any>[] = [];
     private inFlightCommands: ApiSocketRequest<any>[] = [];

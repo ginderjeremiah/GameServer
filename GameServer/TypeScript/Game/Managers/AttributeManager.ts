@@ -1,5 +1,10 @@
-class AttributeManager {
+import { IPlayerData, IBattlerAttribute, EAttribute } from "../Shared/Api/Types";
+import { BattleAttributes } from "../Battle/BattleAttributes";
+import { formatNum, normalizeText } from "../Shared/GlobalFunctions";
+import { GameManager } from "./GameManager";
+import { DataManager } from "./DataManager";
 
+export class AttributeManager {
     static #attTableLabels = document.getElementById("attTableLabels") as HTMLDivElement;
     static #attTableButtons = document.getElementById("attTableButtons") as HTMLDivElement;
     static #attTableNumbers = document.getElementById("attTableNumbers") as HTMLDivElement;

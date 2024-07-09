@@ -1,4 +1,8 @@
-﻿class ApiRequest<U extends ApiEndpoint> {
+﻿import { ApiEndpoint, ApiEndpointWithRequest, ApiEndpointNoRequest, ApiRequestTypes, ApiResponseTypes } from "./ApiTypeMap";
+import { ApiResponse } from "./ApiResponse";
+import { keys } from "../GlobalFunctions";
+
+export class ApiRequest<U extends ApiEndpoint> {
     r: XMLHttpRequest;
     endpoint: U;
 

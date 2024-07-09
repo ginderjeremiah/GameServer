@@ -1,14 +1,11 @@
-interface IDefeatEnemyResponse {
-	cooldown: number;
-	rewards?: IDefeatRewards;
-}
+import {
+	IAttributeDistribution,
+	IBattlerAttribute,
+	IInventoryItem,
+	IItemDrop
+} from "../Types"
 
-interface IDefeatRewards {
-	expReward: number;
-	drops: IInventoryItem[];
-}
-
-interface IEnemy {
+export interface IEnemy {
 	enemyId: number;
 	name: string;
 	drops: IItemDrop[];
@@ -16,7 +13,12 @@ interface IEnemy {
 	skillPool: number[];
 }
 
-interface IEnemyInstance {
+export interface IDefeatEnemyResponse {
+	cooldown: number;
+	rewards?: IDefeatRewards;
+}
+
+export interface IEnemyInstance {
 	id: number;
 	level: number;
 	attributes: IBattlerAttribute[];
@@ -24,11 +26,16 @@ interface IEnemyInstance {
 	selectedSkills: number[];
 }
 
-interface INewEnemyModel {
+export interface INewEnemyModel {
 	cooldown?: number;
 	enemyInstance?: IEnemyInstance;
 }
 
-interface INewEnemyRequest {
+export interface INewEnemyRequest {
 	newZoneId?: number;
+}
+
+export interface IDefeatRewards {
+	expReward: number;
+	drops: IInventoryItem[];
 }

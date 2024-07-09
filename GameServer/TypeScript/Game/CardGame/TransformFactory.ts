@@ -1,4 +1,6 @@
-﻿class TransformFactory {
+﻿import { Transform } from "./Transform";
+
+export class TransformFactory {
 
     static newLinearTransform(parameter: string, magnitude: number, relative: boolean): Transform {
         let t: Transform = new Transform(parameter, magnitude, relative, (percentComplete: number) => {

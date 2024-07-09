@@ -1,4 +1,7 @@
-class ApiSocketRequest<T extends ApiSocketCommand> {
+import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketResponseTypes } from "./ApiSocketTypeMap";
+import { IApiSocketResponse } from "./ApiSocket";
+
+export class ApiSocketRequest<T extends ApiSocketCommand> {
     private dataPromise: Promise<IApiSocketResponse<T>>;
     private promiseResolver!: (value: IApiSocketResponse<T>) => void;
     id: string;

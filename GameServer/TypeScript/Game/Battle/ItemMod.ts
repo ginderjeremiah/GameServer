@@ -1,4 +1,6 @@
-class ItemMod implements IItemMod {
+import { IBattlerAttribute, IInventoryItemMod, IItemMod } from "../Shared/Api/Types";
+
+export class ItemMod implements IItemMod {
     id: number;
     itemSlotId: number;
     name: string;

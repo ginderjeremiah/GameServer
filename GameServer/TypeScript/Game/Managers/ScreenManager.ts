@@ -1,4 +1,7 @@
-﻿class ScreenManager {
+﻿import { Screens } from "../Shared/CustomTypes";
+import { LogManager } from "./LogManager";
+
+export class ScreenManager {
     static #screens = document.getElementsByClassName("screen"); //reference to all screen elements
     static currentScreen: Screens = "Fight"
 

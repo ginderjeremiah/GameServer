@@ -1,4 +1,7 @@
-﻿class RenderInfo {
+﻿import { Renderable } from "../Abstract/Renderable";
+import { Action } from "../Shared/CustomTypes";
+
+export class RenderInfo {
     data: {
         x: number;
         y: number;

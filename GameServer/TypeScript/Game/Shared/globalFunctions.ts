@@ -1,38 +1,38 @@
 ﻿// randomInt between num1 (inclusive) and num2 (exclusive)
-function randomInt(num1: number, num2: number): number {
+export function randomInt(num1: number, num2: number): number {
     return Math.floor(num1 + Math.random() * (num2 - num1));
 }
 
 // formats a number to a specific string representation
-function formatNum(num: number): string {
+export function formatNum(num: number): string {
     return "" + parseFloat(num.toFixed(2));
 }
 
-async function delay(delay: number) {
+export async function delay(delay: number) {
     return new Promise<void>(res => {
         setTimeout(() => res(), delay);
     });
     
 }
 
-function keys(obj?: {}) {
+export function keys(obj?: {}) {
     return obj ? Object.keys(obj) : [];
 }
 
-function enumPairs(obj?: any) {
+export function enumPairs(obj?: any) {
     const allKeys = keys(obj);
     return allKeys.slice(0, allKeys.length / 2).map(key => ({id: key as unknown as number, name: obj[key] as string}))
 }
 
-function capitalize(str: string) {
+export function capitalize(str: string) {
     return str[0].toUpperCase() + str.slice(1);
 }
 
-function normalizeText(str: string) {
+export function normalizeText(str: string) {
     return capitalize(str).replaceAll(/([a-z])([A-Z])/g, "$1 $2")
 }
 
-function plural(str: string) {
+export function plural(str: string) {
     const last = str.length - 1;
     switch (str.at(last)) {
         case 'y':
@@ -45,7 +45,7 @@ function plural(str: string) {
     }
 }
 
-function groupBy<T>(arr: T[], groupFn: (item: T) => string) {
+export function groupBy<T>(arr: T[], groupFn: (item: T) => string) {
     const ret: { [key: string]: T[] } = {};
     for (const t of arr)
     {

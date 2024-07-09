@@ -1,3 +1,3 @@
-﻿/// <reference path="Managers/GameManager.ts"/>
+﻿import { GameManager } from "./Managers/GameManager";
 
 GameManager.init();

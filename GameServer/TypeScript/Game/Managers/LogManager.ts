@@ -1,5 +1,8 @@
-﻿
-class LogManager {
+﻿import { ILogPreference } from "../Shared/Api/Types";
+import { PopupManager } from "./PopupManager";
+import { DataManager } from "./DataManager";
+
+export class LogManager {
 
     static #logBox = document.getElementById("logBox") as HTMLDivElement;
     static #logPreferences: ILogPreference[];

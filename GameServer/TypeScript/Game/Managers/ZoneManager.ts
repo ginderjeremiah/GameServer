@@ -1,5 +1,8 @@
-﻿class ZoneManager {
+﻿import { GameManager } from "./GameManager";
+import { DataManager } from "./DataManager";
+import { IZone } from "../Shared/Api/Types";
 
+export class ZoneManager {
     #orderedZones!: IZone[];
     #currentZone: number;
     #zoneNumDisplay: HTMLSpanElement;

@@ -1,4 +1,7 @@
-﻿class ListNode<Type extends Listable<Type>> {
+﻿import { Listable } from "./GlobalInterfaces";
+import { LinkedList } from "./LinkedList";
+
+export class ListNode<Type extends Listable<Type>> {
     data: Type;
     prev: ListNode<Type> | null;
     next: ListNode<Type> | null;

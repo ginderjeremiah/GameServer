@@ -1,4 +1,29 @@
-type ApiResponseTypes = {
+import {
+	IAddEditItemAttributesData,
+	IAddEditItemModAttributesData,
+	IAttribute,
+	IAttributeUpdate,
+	IBattlerAttribute,
+	IChange,
+	IEnemy,
+	IInventoryUpdate,
+	IItem,
+	IItemCategory,
+	IItemMod,
+	IItemSlot,
+	ILoginCredentials,
+	ILoginData,
+	ILogPreference,
+	IPlayerData,
+	ISetTagsData,
+	ISkill,
+	ISlotType,
+	ITag,
+	ITagCategory,
+	IZone
+} from "./Types"
+
+export type ApiResponseTypes = {
 	'/api/AdminTools/AddEditItemAttributes': undefined
 	'/api/AdminTools/AddEditItemModAttributes': undefined
 	'/api/AdminTools/AddEditItemMods': undefined
@@ -9,8 +34,6 @@ type ApiResponseTypes = {
 	'/api/AdminTools/SetTagsForItemMod': undefined
 	'/api/Attributes': IAttribute[]
 	'/api/Enemies': IEnemy[]
-	'/api/Enemies/DefeatEnemy': IDefeatEnemyResponse
-	'/api/Enemies/NewEnemy': INewEnemyModel
 	'/api/ItemCategories': IItemCategory[]
 	'/api/ItemMods': IItemMod[]
 	'/api/Items': IItem[]
@@ -31,7 +54,7 @@ type ApiResponseTypes = {
 	'/LoginStatus': undefined
 }
 
-type ApiRequestTypes = {
+export type ApiRequestTypes = {
 	'/api/AdminTools/AddEditItemAttributes': IAddEditItemAttributesData
 	'/api/AdminTools/AddEditItemModAttributes': IAddEditItemModAttributesData
 	'/api/AdminTools/AddEditItemMods': IChange<IItemMod>[]
@@ -40,8 +63,6 @@ type ApiRequestTypes = {
 	'/api/AdminTools/AddEditTags': IChange<ITag>[]
 	'/api/AdminTools/SetTagsForItem': ISetTagsData
 	'/api/AdminTools/SetTagsForItemMod': ISetTagsData
-	'/api/Enemies/DefeatEnemy': IEnemyInstance
-	'/api/Enemies/NewEnemy': { newZoneId: number | undefined }
 	'/api/ItemMods': { refreshCache: boolean | undefined }
 	'/api/Items': { refreshCache: boolean | undefined }
 	'/api/Items/SlotsForItem': { itemId: number, refreshCache: boolean | undefined }
@@ -53,10 +74,10 @@ type ApiRequestTypes = {
 	'/Login': ILoginCredentials
 }
 
-type ApiEndpoint = keyof ApiResponseTypes
+export type ApiEndpoint = keyof ApiResponseTypes
 
-type ApiEndpointWithRequest = keyof ApiRequestTypes
+export type ApiEndpointWithRequest = keyof ApiRequestTypes
 
-type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>
+export type ApiEndpointNoRequest = Exclude<ApiEndpoint, ApiEndpointWithRequest>
 
-type ApiResponseType = ApiResponseTypes[ApiEndpoint]
+export type ApiResponseType = ApiResponseTypes[ApiEndpoint]

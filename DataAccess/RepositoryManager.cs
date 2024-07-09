@@ -26,7 +26,7 @@ namespace DataAccess
 
         private GameContext Database => _dataServices.DbContext;
         private ICacheService Cache => _dataServices.Cache;
-        private IPubSubService PubSub => _dataServices.PubSub;
+        //private IPubSubService PubSub => _dataServices.PubSub;
         private DataProviderSynchronizer Synchronizer => _synchronizer ??= new(_dataServices);
 
         public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(Database);

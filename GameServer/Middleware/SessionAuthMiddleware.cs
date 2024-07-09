@@ -1,9 +1,10 @@
 ﻿using GameCore;
+using GameServer.Auth;
 using GameServer.Services;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Diagnostics;
 
-namespace GameServer.Auth
+namespace GameServer.Middleware
 {
     /// <summary>
     /// Middleware to enable initializing a <see cref="SessionService"/> using authorization info in the request.

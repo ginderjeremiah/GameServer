@@ -1,4 +1,14 @@
-class BattleManager {
+import { IPlayerData, IBattlerAttribute, IEnemyInstance } from "../Shared/Api/Types";
+import { BattleResult } from "../Shared/GlobalInterfaces";
+import { Player } from "../Battle/Player";
+import { Enemy } from "../Battle/Enemy";
+import { DataManager } from "./DataManager";
+import { LogManager } from "./LogManager";
+import { ScreenManager } from "./ScreenManager";
+import { Battler } from "../Battle/Battler";
+import { formatNum } from "../Shared/GlobalFunctions";
+
+export class BattleManager {
     #player: Player;
     #enemy: Enemy;
     #battleActive: boolean;

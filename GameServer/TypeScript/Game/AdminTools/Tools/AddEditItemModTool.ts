@@ -1,4 +1,8 @@
-﻿class AddEditItemModTool {
+﻿import { TableDataEditor } from "../TableDataEditor";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+import { IItemMod } from "../../Shared/Api/Types";
+
+export class AddEditItemModTool {
     static modTable: TableDataEditor<IItemMod>;
     static renderParent: HTMLDivElement;
 

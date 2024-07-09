@@ -1,7 +1,14 @@
-﻿/// <reference path="Shared/Api/ApiRequest.ts"/>
-/// <reference path="Shared/interfaces.ts"/>
+﻿import { AddEditItemAttributeTool } from "./Tools/AddEditItemAttributeTool";
+import { AddEditItemModAttributeTool } from "./Tools/AddEditItemModAttributeTool";
+import { AddEditItemTool } from "./Tools/AddEditItemTool";
+import { AddEditItemModTool } from "./Tools/AddEditItemModTool";
+import { AddEditItemSlotTool } from "./Tools/AddEditItemSlotTool";
+import { AddEditTagTool } from "./Tools/AddEditTagTool";
+import { SetItemTagsTool } from "./Tools/SetItemTagsTool";
+import { SetItemModTagsTool } from "./Tools/SetItemComponentTagsTool";
+import { keys } from "../Shared/GlobalFunctions";
 
-class AdminTools {
+export class AdminTools {
     static adminToolSelect: HTMLSelectElement;
     static renderParent: HTMLDivElement;
     static adminTools: { [key: string]: (d: HTMLDivElement) => void } = {

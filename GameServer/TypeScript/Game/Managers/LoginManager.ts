@@ -1,6 +1,7 @@
-/// <reference path="PopupManager.ts"/>
+import { DataManager } from "./DataManager";
+import { PopupManager } from "./PopupManager";
 
-class LoginManager {
+export class LoginManager {
     
     static #username = document.getElementById("Username") as HTMLInputElement;
     static #password = document.getElementById("Password") as HTMLInputElement;

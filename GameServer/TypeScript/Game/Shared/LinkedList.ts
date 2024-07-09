@@ -1,4 +1,8 @@
-﻿class LinkedList<Type extends Listable<Type>> {
+﻿import { ListNode } from "./ListNode";
+import { Listable } from "./GlobalInterfaces";
+import { Comparator, CheckFunc, Action, Converter } from "./CustomTypes";
+
+export class LinkedList<Type extends Listable<Type>> {
     head: ListNode<Type> | null;
     tail: ListNode<Type> | null;
     length: number;
@@ -84,7 +88,7 @@
     }
 
     select<Type2>(func: Converter<Type, Type2>): Type2[] {
-        let results = [];
+        let results = [] as Type2[];
         let curr = this.head;
         while (curr) {
             results.push(func(curr.data));

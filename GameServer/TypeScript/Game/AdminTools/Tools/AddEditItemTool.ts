@@ -1,4 +1,9 @@
-﻿class AddEditItemTool {
+﻿import { TableDataEditor } from "../TableDataEditor";
+import { IItem } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+
+
+export class AddEditItemTool {
     static itemTable: TableDataEditor<IItem>;
     static renderParent: HTMLDivElement;
 

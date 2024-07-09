@@ -94,6 +94,15 @@ namespace GameCore
             return JsonSerializer.Serialize(obj, _options);
         }
 
+        public static IEnumerable<T1> SelectNotNull<T1>(this IEnumerable<T1?> source)
+        {
+            foreach (var item in source)
+            {
+                if (item != null)
+                    yield return item;
+            }
+        }
+
         public static IEnumerable<T2> SelectNotNull<T1, T2>(this IEnumerable<T1> source, Func<T1, T2?> selector)
         {
             foreach (var item in source)

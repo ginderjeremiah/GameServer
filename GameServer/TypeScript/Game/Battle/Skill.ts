@@ -1,5 +1,11 @@
-﻿/// <reference path="../Abstract/Tooltippable.ts"/>
-class Skill extends Tooltippable implements ISkill {
+﻿import { Tooltippable } from "../Abstract/Tooltippable";
+import { ISkill, IAttributeMultiplier, EAttribute } from "../Shared/Api/Types";
+import { Battler } from "./Battler";
+import { GameManager } from "../Managers/GameManager";
+import { DataManager } from "../Managers/DataManager";
+import { formatNum } from "../Shared/GlobalFunctions";
+
+export class Skill extends Tooltippable implements ISkill {
     id: number
     name: string;
     chargeTime: number;

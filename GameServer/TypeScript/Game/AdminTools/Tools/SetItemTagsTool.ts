@@ -1,4 +1,7 @@
-﻿class SetItemTagsTool {
+﻿import { ITag, IItem } from "../../Shared/Api/Types";
+import { ApiRequest } from "../../Shared/Api/ApiRequest";
+
+export class SetItemTagsTool {
     static sel: HTMLSelectElement;
     static checkDiv: HTMLDivElement;
     static items: IItem[];

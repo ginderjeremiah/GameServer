@@ -1,13 +1,13 @@
-﻿type Comparator<Type> = (currData: Type, objData: Type) => boolean;
+﻿export type Comparator<Type> = (currData: Type, objData: Type) => boolean;
 
-type Action<Type> = (data: Type) => void;
+export type Action<Type> = (data: Type) => void;
 
-type Converter<Type, Type2> = (data: Type) => Type2;
+export type Converter<Type, Type2> = (data: Type) => Type2;
 
-type CheckFunc<Type> = (data: Type) => boolean;
+export type CheckFunc<Type> = (data: Type) => boolean;
 
-type ProgressionFunc = (percentComplete: number) => number
+export type ProgressionFunc = (percentComplete: number) => number
 
-type SlotVariant = "equipped" | "inventory";
+export type SlotVariant = "equipped" | "inventory";
 
-type Screens = "Fight" | "Attributes" | "Stats" | "Help" | "Options" | "Quit" | "Inventory" | "cardGame"
+export type Screens = "Fight" | "Attributes" | "Stats" | "Help" | "Options" | "Quit" | "Inventory" | "cardGame"

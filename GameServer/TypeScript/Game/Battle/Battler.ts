@@ -1,4 +1,11 @@
-abstract class Battler {
+import { Skill } from "./Skill";
+import { BattleAttributes } from "./BattleAttributes";
+import { IBattlerAttribute, EAttribute } from "../Shared/Api/Types";
+import { formatNum } from "../Shared/GlobalFunctions";
+import { TooltipManager } from "../Managers/TooltipManager";
+import { DataManager } from "../Managers/DataManager";
+
+export abstract class Battler {
     name: string;
     level: number;
     currentHealth!: number;

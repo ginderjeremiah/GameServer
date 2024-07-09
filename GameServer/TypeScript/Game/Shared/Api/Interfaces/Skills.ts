@@ -1,4 +1,6 @@
-interface ISkill {
+import { IAttributeMultiplier } from "../Types"
+
+export interface ISkill {
 	id: number;
 	name: string;
 	baseDamage: number;

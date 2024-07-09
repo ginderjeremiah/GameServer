@@ -1,8 +1,9 @@
 ﻿using GameCore;
 using GameServer.Services;
+using GameServer.Sockets;
 using System.Net.WebSockets;
 
-namespace GameServer.Sockets
+namespace GameServer.Middleware
 {
     public class SocketInterceptorMiddleware(RequestDelegate next)
     {

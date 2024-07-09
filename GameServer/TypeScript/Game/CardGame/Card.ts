@@ -1,4 +1,11 @@
-﻿class Card extends Renderable {
+﻿import { Renderable } from "../Abstract/Renderable";
+import { CardImage } from "./CardImage";
+import { CardText } from "./CardText";
+import { LinkedList } from "../Shared/LinkedList";
+import { AnimationSequence } from "./AnimationSequence";
+import { RenderInfo } from "./RenderInfo";
+
+export class Card extends Renderable {
     //renderInfo! : RenderInfo;
     cardImage: CardImage;
     titleText: CardText;

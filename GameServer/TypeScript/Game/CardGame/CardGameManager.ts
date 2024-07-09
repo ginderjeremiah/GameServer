@@ -1,4 +1,8 @@
-﻿class CardGameManager {
+﻿import { Renderable } from "../Abstract/Renderable";
+import { ObjLayer } from "./ObjLayer";
+import { CardHand } from "./CardHand";
+
+export class CardGameManager {
     #cardGameCanvas;
     #context;
     #hand;

@@ -1,4 +1,6 @@
-﻿class ApiResponse<T extends ApiResponseType> {
+﻿import { ApiResponseType } from "./ApiTypeMap";
+
+export class ApiResponse<T extends ApiResponseType> {
     #r: XMLHttpRequest;
     #ev: ProgressEvent<EventTarget>;
     #responseJson?: { data: T, error: string}

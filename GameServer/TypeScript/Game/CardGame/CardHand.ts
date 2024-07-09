@@ -1,4 +1,11 @@
-﻿class CardHand {
+﻿import { Card } from "./Card";
+import { ObjLayer } from "./ObjLayer";
+import { Anim } from "./Anim";
+import { AnimationSequence } from "./AnimationSequence";
+import { RenderInfo } from "./RenderInfo";
+
+
+export class CardHand {
     cards: Card[];
     cardLayer: ObjLayer;
 

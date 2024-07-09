@@ -1,4 +1,7 @@
-﻿class Anim {
+﻿import { Dict } from "../Shared/GlobalInterfaces";
+import { Renderable } from "../Abstract/Renderable";
+
+export class Anim {
     duration: number;
     transformData: Dict<number>;
     //cancelCondition;

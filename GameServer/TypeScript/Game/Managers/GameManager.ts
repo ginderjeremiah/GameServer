@@ -1,12 +1,20 @@
-/// <reference path="ZoneManager.ts"/>
-/// <reference path="LogManager.ts"/>
-/// <reference path="BattleManager.ts"/>
-/// <reference path="InventoryManager.ts"/>
-/// <reference path="LoginManager.ts"/>
-/// <reference path="DataManager.ts"/>
-/// <reference path="ScreenManager.ts"/>
+import { InventoryManager } from "./InventoryManager";
+import { BattleManager } from "./BattleManager";
+import { ZoneManager } from "./ZoneManager";
+import { CardGameManager } from "../CardGame/CardGameManager";
+import { ScreenManager } from "./ScreenManager";
+import { LoginManager } from "./LoginManager";
+import { DataManager } from "./DataManager";
+import { AttributeManager } from "./AttributeManager";
+import { LogManager } from "./LogManager";
+import { TooltipManager } from "./TooltipManager";
+import { BattleResult } from "../Shared/GlobalInterfaces";
+import { Battler } from "../Battle/Battler";
+import { delay, formatNum } from "../Shared/GlobalFunctions";
+import { IPlayerData, IInventoryItem, IAttributeUpdate } from "../Shared/Api/Types";
 
-class GameManager {  
+
+export class GameManager {  
     static #inventoryManager : InventoryManager;
     static #battleManager: BattleManager;
     static #zoneManager : ZoneManager;

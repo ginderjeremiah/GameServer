@@ -1,5 +1,4 @@
-class Mulberry32
-{
+export class Mulberry32 {
     #seed: number
 
     constructor(seed: number) {

@@ -1,4 +1,6 @@
-﻿class CardImage {
+﻿import { Card } from "./Card";
+
+export class CardImage {
     card: Card;
     imgMarginTop = 80;
     imgMarginHorizontal = 20;

@@ -1,4 +1,7 @@
-class DelayedAction {
+import { Action } from "./CustomTypes";
+import { delay } from "./GlobalFunctions";
+
+export class DelayedAction {
     #action: Action<void>
     #delayLength: number
     #triggerStartTime: number

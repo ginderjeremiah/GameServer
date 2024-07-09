@@ -1,4 +1,10 @@
-﻿class TableDataEditor<T extends {}> {
+﻿import { TableDataRow } from "./TableDataRow";
+import { TableDataOptions } from "./TableDataOptions";
+import { keys, normalizeText } from "../Shared/GlobalFunctions";
+import { EChangeType, IChange } from "../Shared/Api/Types";
+import { Dict } from "../Shared/GlobalInterfaces";
+
+export class TableDataEditor<T extends {}> {
     dataRows: TableDataRow<T>[];
     table: HTMLTableElement;
     sampleItem: T;
@@ -63,18 +69,18 @@
         for (const row of this.dataRows) {
             if (row.isDeleted) {
                 changes.push({
-                    changeType: ChangeType.Delete,
+                    changeType: EChangeType.Delete,
                     item: row.data
                 });
             } else if (row.index < 0) {
                 changes.push({
-                    changeType: ChangeType.Add,
+                    changeType: EChangeType.Add,
                     item: row.data
                 });
             } else {
                 if (row.dataChanged()) {
                     changes.push({
-                        changeType: ChangeType.Edit,
+                        changeType: EChangeType.Edit,
                         item: row.data
                     });
                 }

@@ -1,4 +1,6 @@
-﻿class LoopAnimation extends AnimationSequence {
+﻿import { AnimationSequence } from "./AnimationSequence";
+
+export class LoopAnimation extends AnimationSequence {
     currentAnim = 0;
 
     calcAnimChange(delta: number) {

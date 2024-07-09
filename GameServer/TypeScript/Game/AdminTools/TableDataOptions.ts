@@ -1,4 +1,6 @@
-﻿interface TableDataOptions<T extends {}> {
+﻿import { SelOptions } from "../Shared/GlobalInterfaces";
+
+export interface TableDataOptions<T extends {}> {
     primaryKey?: string;
     hiddenColumns?: string[];
     disabledColumns?: string[];

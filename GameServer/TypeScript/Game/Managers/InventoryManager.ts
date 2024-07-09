@@ -1,5 +1,14 @@
-﻿class InventoryManager {
+﻿import { IBattlerAttribute, IInventoryData, IInventoryItem } from "../Shared/Api/Types";
+import { GameManager } from "./GameManager";
+import { DataManager } from "./DataManager";
+import { TooltipManager } from "./TooltipManager";
+import { LogManager } from "./LogManager";
+import { Item } from "../Battle/Item";
+import { DelayedAction } from "../Shared/DelayedAction";
+import { SlotVariant } from "../Shared/CustomTypes";
+import { BattleAttributes } from "../Battle/BattleAttributes";
 
+export class InventoryManager {
     #maxInventoryItems: number = 23; //23 inventory slots and one trash slot
     inventory!: (Item | null)[]; //array containing inventory data
     inventorySlots: HTMLDivElement[] = [];

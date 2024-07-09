@@ -1,5 +1,7 @@
-﻿/// <reference path="Battler.ts"/>
-class Enemy extends Battler {
+﻿import { Battler } from "./Battler";
+import { IItemDrop, IEnemyInstance, IEnemy } from "../Shared/Api/Types";
+
+export class Enemy extends Battler {
     drops: IItemDrop[];
     //droppedItems: InventoryItem[];
     //victory: boolean;

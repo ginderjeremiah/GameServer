@@ -21,7 +21,7 @@ namespace DataAccess
                     if (!_initialized)
                     {
                         _initialized = true;
-                        InitSynchronizers();
+                        Task.Run(InitSynchronizers);
                     }
                 }
             }
@@ -48,14 +48,14 @@ namespace DataAccess
             await _dataServices.PubSub.Publish(channel, queueName, sessionKey);
         }
 
-        private void InitSynchronizers()
+        private async Task InitSynchronizers()
         {
-            InitInventorySynchronizer();
-            InitPlayerDataSynchronizer();
-            InitSkillsSynchronizer();
+            await InitInventorySynchronizer();
+            await InitPlayerDataSynchronizer();
+            await InitSkillsSynchronizer();
         }
 
-        private void InitInventorySynchronizer()
+        private async Task InitInventorySynchronizer()
         {
             var channel = Constants.PUBSUB_INVENTORY_CHANNEL;
             var queueName = Constants.PUBSUB_INVENTORY_QUEUE;
@@ -74,10 +74,10 @@ namespace DataAccess
                 await database.SaveChangesAsync();
             });
 
-            _dataServices.PubSub.Subscribe(channel, queueName, async args => await inventoryProcessor(args.queue));
+            await _dataServices.PubSub.Subscribe(channel, queueName, async args => await inventoryProcessor(args.queue));
         }
 
-        private void InitPlayerDataSynchronizer()
+        private async Task InitPlayerDataSynchronizer()
         {
             var channel = Constants.PUBSUB_PLAYER_CHANNEL;
             var queueName = Constants.PUBSUB_PLAYER_QUEUE;
@@ -92,17 +92,17 @@ namespace DataAccess
                 await database.SaveChangesAsync();
             });
 
-            _dataServices.PubSub.Subscribe(channel, queueName, async args => await playerProcessor(args.queue));
+            await _dataServices.PubSub.Subscribe(channel, queueName, async args => await playerProcessor(args.queue));
         }
 
-        private void InitSkillsSynchronizer()
+        private async Task InitSkillsSynchronizer()
         {
             var channel = Constants.PUBSUB_SKILLS_CHANNEL;
             var queueName = Constants.PUBSUB_SKILLS_QUEUE;
 
             var skillsProcessor = GetPlayerQueueProcessor((database, player) => throw new NotImplementedException());
 
-            _dataServices.PubSub.Subscribe(channel, queueName, async args => await skillsProcessor(args.queue));
+            await _dataServices.PubSub.Subscribe(channel, queueName, async args => await skillsProcessor(args.queue));
         }
 
         private Func<IPubSubQueue, Task> GetPlayerQueueProcessor(Func<GameContext, Player, Task> action)

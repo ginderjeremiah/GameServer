@@ -1,5 +1,7 @@
-﻿/// <reference path="Battler.ts"/>
-class Player extends Battler {
+﻿import { Battler } from "./Battler";
+import { IPlayerData, IBattlerAttribute } from "../Shared/Api/Types";
+
+export class Player extends Battler {
     currentExp: number;
     maxSkills: number = 4;
     statPointsGained: number;
