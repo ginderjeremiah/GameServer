@@ -26,7 +26,6 @@ namespace GameServer.Services
             {
                 var command = new SocketReplacedInfo(oldSocketId);
                 await EmitSocketCommand(command, oldSocketId);
-                await UnRegisterSocketCommandListener(oldSocketId);
             }
 
             await RegisterSocketCommandListener(socket);

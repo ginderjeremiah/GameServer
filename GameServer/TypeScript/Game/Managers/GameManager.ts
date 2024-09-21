@@ -14,12 +14,12 @@ import { delay, formatNum } from "../Shared/GlobalFunctions";
 import { IPlayerData, IInventoryItem, IAttributeUpdate } from "../Shared/Api/Types";
 
 
-export class GameManager {  
-    static #inventoryManager : InventoryManager;
+export class GameManager {
+    static #inventoryManager: InventoryManager;
     static #battleManager: BattleManager;
-    static #zoneManager : ZoneManager;
-    static #cardGameManager : CardGameManager;
-    static #lastTime : number;
+    static #zoneManager: ZoneManager;
+    static #cardGameManager: CardGameManager;
+    static #lastTime: number;
     static playerData: IPlayerData;
 
     static async init() {
@@ -27,17 +27,14 @@ export class GameManager {
         //TODO: Make login occur before accessing game page
         await LoginManager.showLogin();
         const login = await DataManager.login("", "");
-        const dataInit = await Promise.all([
-            DataManager.init(),
-            DataManager.getLogPreferences()
-        ])
+        await DataManager.init();
         const newEnemy = DataManager.newEnemy();
         this.playerData = login.data.playerData;
         this.#zoneManager = new ZoneManager(login.data.currentZone);
         this.#inventoryManager = new InventoryManager(this.playerData.inventoryData);
         const equippedAtts = this.#inventoryManager.getEquippedStats();
         AttributeManager.init(this.playerData, equippedAtts);
-        LogManager.init(dataInit[1]);
+        LogManager.init(this.playerData.logPreferences);
         this.#battleManager = new BattleManager(this.playerData, equippedAtts, await newEnemy);
         this.#cardGameManager = new CardGameManager();
         this.#lastTime = performance.now();
@@ -45,7 +42,7 @@ export class GameManager {
     }
 
     //need to use full GameManager identifier because function is callback for window.requestAnimationFrame
-    static #gameLoop(ts : DOMHighResTimeStamp) : void {
+    static #gameLoop(ts: DOMHighResTimeStamp): void {
         const timeDelta = ts - GameManager.#lastTime;
         GameManager.#lastTime = ts;
         const battleResult = GameManager.#battleManager.update(timeDelta);
@@ -93,12 +90,12 @@ export class GameManager {
         LogManager.logMessage("You are now level " + this.playerData.level + ".", "LevelUp");
     }
 
-    static updateEquipmentStats() : void {
+    static updateEquipmentStats(): void {
         const equipStats = this.#inventoryManager.updateEquipmentStats();
         AttributeManager.createAllAttributesUI(this.playerData, equipStats);
     }
-    
-    static async changeZone(amount : number) {
+
+    static async changeZone(amount: number) {
         if (this.#zoneManager.changeZone(amount)) {
             this.#battleManager.pause();
             const newEnemy = await DataManager.newEnemy(this.#zoneManager.currentZoneId);

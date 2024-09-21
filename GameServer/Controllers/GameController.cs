@@ -1,10 +1,10 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
 using GameCore.Sessions;
-using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Player;
 using GameServer.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GameServer.Controllers
@@ -13,9 +13,13 @@ namespace GameServer.Controllers
     public class GameController : BaseController
     {
         private readonly string _baseViewPath = "~/Views";
+        private readonly SessionService _sessionService;
 
         public GameController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
-            : base(repositoryManager, logger, sessionService) { }
+            : base(repositoryManager, logger, sessionService)
+        {
+            _sessionService = sessionService;
+        }
 
         [Route("/")]
         [ApiExplorerSettings(IgnoreApi = true)]
@@ -36,41 +40,32 @@ namespace GameServer.Controllers
             return View($"{_baseViewPath}/Test.cshtml");
         }
 
-        [SessionAuthorize]
         [ApiExplorerSettings(IgnoreApi = true)]
         public IActionResult AdminTools()
         {
             return View($"{_baseViewPath}/AdminTools/AdminTools.cshtml");
         }
 
-        [SessionAuthorize(AllowAll = true)]
+        [AllowAnonymous]
         [HttpPost]
-        public async Task<ApiResponse<LoginData>> Login([FromBody] LoginCredentials creds)
+        public async Task<ApiResponse<PlayerData>> Login([FromBody] LoginCredentials creds)
         {
             if (SessionAvailable)
-                return Success(new LoginData { CurrentZone = Session.CurrentZone, PlayerData = Session.GetPlayerData() });
+                return Success(Session.GetPlayerData());
 
             var player = await Repositories.Players.GetPlayerByUserNameAsync(creds.Username);
 
             if (player is null)
-                return Error<LoginData>("Username not found");
+                return Error<PlayerData>("Username not found");
 
             var passHash = creds.Password.Hash(player.Salt.ToString());
 
             if (passHash != player.PassHash)
-                return Error<LoginData>("Incorrect password");
+                return Error<PlayerData>("Incorrect password");
 
-            var sessionData = await Repositories.SessionStore.GetNewSessionDataAsync(player.Id);
+            await _sessionService.CreateSession(player);
 
-            var session = new Session(sessionData, player, Repositories);
-            var token = session.GetNewToken();
-            Response.Cookies.Append("sessionToken", token, DefaultCookieOptions);
-
-            return Success(new LoginData()
-            {
-                CurrentZone = session.CurrentZone,
-                PlayerData = session.GetPlayerData()
-            });
+            return Success(Session.GetPlayerData());
         }
 
         [HttpGet]

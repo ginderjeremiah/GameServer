@@ -1,6 +1,5 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
-using GameServer.Auth;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
 using GameServer.Models.Tags;
@@ -18,7 +17,6 @@ namespace GameServer.Controllers
         public AdminToolsController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
             : base(repositoryManager, logger, sessionService) { }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditItemAttributes([FromBody] AddEditItemAttributesData changeData)
         {
@@ -61,7 +59,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditItemModAttributes([FromBody] AddEditItemModAttributesData changeData)
         {
@@ -104,7 +101,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
@@ -146,7 +142,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditItems([FromBody] List<Change<Item>> changes)
         {
@@ -188,7 +183,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
         {
@@ -228,7 +222,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> AddEditTags([FromBody] List<Change<Tag>> changes)
         {
@@ -264,7 +257,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItem([FromBody] SetTagsData setTagsData)
         {
@@ -279,7 +271,6 @@ namespace GameServer.Controllers
             return Success();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {

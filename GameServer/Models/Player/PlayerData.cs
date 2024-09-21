@@ -12,13 +12,15 @@ namespace GameServer.Models.Player
         public int Exp { get; set; }
         public List<BattlerAttribute> Attributes { get; set; }
         public List<int> SelectedSkills { get; set; }
+        public int CurrentZone { get; set; }
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
         public InventoryData InventoryData { get; set; }
+        public List<LogPreference> LogPreferences { get; set; }
 
         public PlayerData() { }
 
-        public PlayerData(SessionPlayer sessionPlayer, SessionInventory sessionInventory)
+        public PlayerData(SessionPlayer sessionPlayer, SessionInventory sessionInventory, int currentZone)
         {
             UserName = sessionPlayer.UserName;
             Name = sessionPlayer.Name;
@@ -29,6 +31,8 @@ namespace GameServer.Models.Player
             StatPointsGained = sessionPlayer.StatPointsGained;
             StatPointsUsed = sessionPlayer.StatPointsUsed;
             InventoryData = new InventoryData(sessionInventory);
+            LogPreferences = sessionPlayer.LogPreferences.Select(s => new LogPreference(s)).ToList();
+            CurrentZone = currentZone;
         }
     }
 }

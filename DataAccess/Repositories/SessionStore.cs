@@ -14,9 +14,9 @@ namespace DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<SessionData?> GetSessionAsync(string id)
+        public async Task<SessionData?> GetSessionAsync(int playerId)
         {
-            return await _cache.GetAsync<SessionData>($"{SessionPrefix}_{id}");
+            return await _cache.GetAsync<SessionData>($"{SessionPrefix}_{playerId}");
         }
 
         public async Task<SessionData> GetNewSessionDataAsync(int playerId)
@@ -31,23 +31,23 @@ namespace DataAccess.Repositories
                 PlayerId = playerId
             };
 
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.Id}", sessionData);
+            _cache.SetAndForget($"{SessionPrefix}_{sessionData.PlayerId}", sessionData);
             return sessionData;
         }
 
         public void Update(SessionData sessionData)
         {
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.Id}", sessionData);
+            _cache.SetAndForget($"{SessionPrefix}_{sessionData.PlayerId}", sessionData);
         }
 
         public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
         {
-            _cache.SetAndForget($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.Id}", activeEnemyHash);
+            _cache.SetAndForget($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.PlayerId}", activeEnemyHash);
         }
 
         public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
         {
-            return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.Id}");
+            return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.PlayerId}");
         }
     }
 }

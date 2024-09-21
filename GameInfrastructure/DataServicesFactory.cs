@@ -17,7 +17,7 @@ namespace GameInfrastructure
 
         public IApiLogger Logger => _logger ??= new ApiLogger(_config);
         public GameContext DbContext => _dbContext ?? GetNewDbContext();
-        public ICacheService Cache => _cache ??= CacheServiceFactory.GetCacheService(_config);
+        public ICacheService Cache => _cache ??= CacheServiceFactory.GetCacheService(_config, Logger);
         public IPubSubService PubSub => _pubsub ??= PubSubServiceFactory.GetPubSubService(_config, Logger);
 
         public GameContext GetNewDbContext()

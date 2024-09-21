@@ -20,6 +20,7 @@ export interface IPlayerData {
 	statPointsGained: number;
 	statPointsUsed: number;
 	inventoryData: IInventoryData;
+	logPreferences: ILogPreference[];
 }
 
 export interface ILogPreference {

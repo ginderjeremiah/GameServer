@@ -1,0 +1,44 @@
+{#if label}
+	<label class="text-input-label" for="{id}"> {label} </label>
+{/if}
+<div class="text-input-wrapper round-border hover-glow">
+	{#if type === 'text'}
+		<input {id} class="round-border" bind:value type="text" {name} />
+	{:else if type === 'password'}
+		<input {id} class="round-border" bind:value type="password" {name} />
+	{:else}
+		<input {id} class="round-border" bind:value type="number" {name} />
+	{/if}
+</div>
+
+<script lang="ts" generics="T extends 'text' | 'password' | 'number'">
+export let value: T extends 'number' ? number : string;
+export let type: T;
+export let label: string = '';
+export let name: string = '';
+export let id: string = crypto.randomUUID();
+</script>
+
+<style lang="scss">
+.text-input-label {
+	display: block;
+	padding-bottom: 0.25rem;
+}
+
+.text-input-wrapper {
+	box-sizing: border-box;
+	width: 100%;
+	border: 1px solid black;
+	position: relative;
+	cursor: text;
+
+	input {
+		padding: 0.375rem 0.25rem;
+		box-sizing: border-box;
+		outline: none;
+		border: none;
+		height: 100%;
+		width: 100%;
+	}
+}
+</style>

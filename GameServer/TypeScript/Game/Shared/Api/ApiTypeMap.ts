@@ -40,7 +40,6 @@ export type ApiResponseTypes = {
 	'/api/Items/SlotsForItem': IItemSlot[]
 	'/api/Items/SlotTypes': ISlotType[]
 	'/api/Player': IPlayerData
-	'/api/Player/LogPreferences': ILogPreference[]
 	'/api/Player/SaveLogPreferences': undefined
 	'/api/Player/UpdateInventorySlots': undefined
 	'/api/Player/UpdatePlayerStats': IBattlerAttribute[]

@@ -39,10 +39,6 @@ export class DataManager {
         return ApiRequest.post('/api/Player/UpdateInventorySlots', updates);
     }
 
-    static async getLogPreferences() {
-        return ApiRequest.get('/api/Player/LogPreferences');
-    }
-
     static async saveLogPreferences(prefs: ILogPreference[]) {
         return ApiRequest.post('/api/Player/SaveLogPreferences', prefs)
     }

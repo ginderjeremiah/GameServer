@@ -1,5 +1,7 @@
 ﻿using GameCore.DataAccess;
+using GameCore.Entities;
 using GameCore.Sessions;
+using GameServer.Auth;
 
 namespace GameServer.Services
 {
@@ -7,10 +9,12 @@ namespace GameServer.Services
     /// A service for loading <see cref="Session"/> data for a request.
     /// </summary>
     /// <param name="repos">The <see cref="IRepositoryManager"/> which is used to load session data.</param>
-    public class SessionService(IRepositoryManager repos)
+    /// <param name="cookieService"></param>
+    public class SessionService(IRepositoryManager repos, CookieService cookieService)
     {
         private Session? _session;
         private readonly IRepositoryManager _repos = repos;
+        private readonly CookieService _cookieService = cookieService;
 
         /// <summary>
         /// Indicates whether a <see cref="Session"/> has been loaded into the <see cref="SessionService"/> or not.
@@ -28,24 +32,63 @@ namespace GameServer.Services
         }
 
         /// <summary>
+        /// Creates a new <see cref="Session"/> for the given <paramref name="player"/>.
+        /// </summary>
+        /// <param name="player"></param>
+        /// <returns></returns>
+        public async Task CreateSession(Player player)
+        {
+            var sessionData = await _repos.SessionStore.GetNewSessionDataAsync(player.Id);
+            _session = new Session(sessionData, player, _repos);
+            _cookieService.SetTokenCookie(CreateSessionToken());
+        }
+
+        /// <summary>
         /// 
         /// </summary>
-        /// <param name="sessionId"></param>
         /// <returns></returns>
-        public async Task<Session?> LoadSession(string sessionId)
+        public async Task LoadSession()
         {
-            var sessionData = await _repos.SessionStore.GetSessionAsync(sessionId);
+            var tokenString = _cookieService.GetTokenCookie();
+
+            if (AuthToken.TryParseToken(tokenString, out var token))
+            {
+                await LoadSessionData(token.Claims.Sub);
+                if (SessionAvailable && token.IsValid(GetSession().Player.Salt.ToString()))
+                {
+                    //Slide cookie if over halfway to expiration
+                    if (token.Claims.Exp < DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME / 2))
+                    {
+                        var newToken = CreateSessionToken();
+                        _cookieService.SetTokenCookie(newToken);
+                    }
+                }
+                else //clear session if invalid
+                {
+                    _session = null;
+                }
+            }
+        }
+
+        private async Task LoadSessionData(int playerId)
+        {
+            var sessionData = await _repos.SessionStore.GetSessionAsync(playerId);
             if (sessionData is not null)
             {
                 var playerData = await _repos.Players.GetPlayerAsync(sessionData.PlayerId);
                 if (playerData is not null)
                 {
                     _session = new Session(sessionData, playerData, _repos);
-                    return _session;
                 }
             }
+        }
 
-            return null;
+        private string CreateSessionToken()
+        {
+            var session = GetSession();
+            var claims = new AuthTokenClaims(session.Player.Id, DateTime.UtcNow + Constants.TOKEN_LIFETIME);
+            var token = new AuthToken(claims, session.Player.Salt.ToString());
+            return token.ToString();
         }
     }
 

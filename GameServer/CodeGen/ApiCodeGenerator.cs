@@ -123,7 +123,7 @@ namespace GameServer.CodeGen
             var currentDir = Directory.GetCurrentDirectory();
             var assemblyName = assembly.GetName().Name ?? "Unknown";
             var projectDir = currentDir[..(currentDir.LastIndexOf(assemblyName) + assemblyName.Length)];
-            var targetDir = $"{projectDir}\\TypeScript\\Game\\Shared\\Api";
+            var targetDir = $"{projectDir}\\TypeScript\\Game\\new-svelte\\src\\lib\\api";
             WriteApiMap([.. endpointMetadata.OrderBy(end => end.Endpoint)], targetDir);
             WriteApiSocketMap([.. socketMetaData.OrderBy(c => c.CommandName)], targetDir);
             WriteApiInterfaces(usedTypes, targetDir);
@@ -131,7 +131,7 @@ namespace GameServer.CodeGen
 
         private static void WriteApiMap(List<EndpointMetaData> endpointData, string baseDirectoryPath)
         {
-            var filePath = $"{baseDirectoryPath}\\ApiTypeMap.ts";
+            var filePath = $"{baseDirectoryPath}\\api-type-map.ts";
             var strBuilder = new StringBuilder();
             var allTypes = endpointData.SelectMany(e =>
                 e.Parameters
@@ -171,7 +171,7 @@ namespace GameServer.CodeGen
 
         private static void WriteApiSocketMap(List<SocketCommandMetadata> commandData, string baseDirectoryPath)
         {
-            var filePath = $"{baseDirectoryPath}\\ApiSocketTypeMap.ts";
+            var filePath = $"{baseDirectoryPath}\\api-socket-type-map.ts";
             var strBuilder = new StringBuilder();
             var allTypes = commandData
                 .SelectNotNull(c => c.ResponseType)
@@ -277,14 +277,14 @@ namespace GameServer.CodeGen
 
         private static void WriteApiInterfaces(HashSet<Type> types, string baseDirectoryPath)
         {
-            var interfacesPath = "Interfaces\\";
-            var enumPath = "Enums.ts";
-            var exportPath = "Types.ts";
+            var interfacesPath = "interfaces\\";
+            var enumPath = "enums.ts";
+            var exportPath = "index.ts";
 
             if (Directory.Exists(interfacesPath))
                 Directory.Delete(interfacesPath, true);
 
-            Directory.CreateDirectory(interfacesPath);
+            Directory.CreateDirectory($"{baseDirectoryPath}\\{interfacesPath}");
 
             //var fileBuilders = new Dictionary<string, StringBuilder>();
             var subTypes = types.Select(GetSubTypes).ToList();
@@ -298,7 +298,7 @@ namespace GameServer.CodeGen
             {
                 Type = t,
                 TypeText = GetTypeText(t),
-                FilePath = t.IsEnum ? enumPath : $"{interfacesPath}{t.Namespace[(t.Namespace.LastIndexOf('.') + 1)..]}.ts"
+                FilePath = t.IsEnum ? enumPath : $"{interfacesPath}{t.Namespace[(t.Namespace.LastIndexOf('.') + 1)..].SnakeCase()}.ts"
             })
             .GroupBy(data => data.FilePath);
 
@@ -313,7 +313,7 @@ namespace GameServer.CodeGen
 
                 if (importedTypes.Any())
                 {
-                    fileBuilder.AppendLine(GetImportText(importedTypes, "../Types"));
+                    fileBuilder.AppendLine(GetImportText(importedTypes, "../"));
                 }
 
                 foreach (var interfaceType in group)
@@ -333,7 +333,7 @@ namespace GameServer.CodeGen
                 File.WriteAllText($"{baseDirectoryPath}\\{group.Key}", fileBuilder.ToString().TrimEnd());
             }
 
-            File.WriteAllText($"{baseDirectoryPath}\\{exportPath}", string.Join("\n", interfaceDataGroups.Select(g => $"export * from \"./{g.Key.Replace("\\", "/").Replace(".ts", null)}\"")));
+            File.WriteAllText($"{baseDirectoryPath}\\{exportPath}", string.Join("\n", interfaceDataGroups.Select(g => $"export * from \"./{g.Key.Replace("\\", "/")}\"")));
         }
 
         private static void WriteEnumToBuilder(Type type, StringBuilder builder)
@@ -466,7 +466,7 @@ namespace GameServer.CodeGen
             }
         }
 
-        private static string GetImportText(IEnumerable<Type> types, string typesPath = "./Types")
+        private static string GetImportText(IEnumerable<Type> types, string typesPath = "./")
         {
             var test = types.ToList();
             var typeStrings = test.Select(t => GetTypeText(t, importMode: true)).Distinct().OrderBy(t => t);

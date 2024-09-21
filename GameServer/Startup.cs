@@ -30,11 +30,13 @@ namespace GameServer
             builder.Services.AddControllersWithViews();
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
+                .AddHttpContextAccessor()
                 .AddSingleton<IDataServicesConfiguration, Config>()
                 .AddTransient<IDataServicesFactory, DataServicesFactory>()
                 .AddTransient(services => services.GetRequiredService<IDataServicesFactory>().Logger)
                 .AddTransient<IRepositoryManager, RepositoryManager>()
                 .AddScoped<SessionService>()
+                .AddScoped<CookieService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>();
 
@@ -63,9 +65,17 @@ namespace GameServer
                 app.UseHsts();
             }
 
+            app.UseCors(builder =>
+            {
+                builder.WithOrigins("http://localhost:5173")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            });
+
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseSessionAuth();
+            app.UseTokenAuth();
             app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
             app.UseSocketInterceptor();
 

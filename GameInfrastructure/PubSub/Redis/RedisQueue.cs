@@ -50,7 +50,7 @@ namespace GameInfrastructure.PubSub.Redis
             return val.Deserialize<T>();
         }
 
-        public void AddToQueue(string value)
+        public void AddToQueue(string? value)
         {
             _logger.Log($"Adding value to RedisQueue: {QueueName}, value: {value}");
             Redis.ListRightPush(QueueName, value);
@@ -58,10 +58,10 @@ namespace GameInfrastructure.PubSub.Redis
 
         public void AddToQueue<T>(T value)
         {
-            AddToQueue(value.Serialize());
+            AddToQueue(value?.Serialize());
         }
 
-        public Task AddToQueueAsync(string value)
+        public Task AddToQueueAsync(string? value)
         {
             _logger.Log($"Adding value to RedisQueue: {QueueName}, value: {value}");
             return Redis.ListRightPushAsync(QueueName, value);
@@ -69,7 +69,7 @@ namespace GameInfrastructure.PubSub.Redis
 
         public Task AddToQueueAsync<T>(T value)
         {
-            return AddToQueueAsync(value.Serialize());
+            return AddToQueueAsync(value?.Serialize());
         }
     }
 }

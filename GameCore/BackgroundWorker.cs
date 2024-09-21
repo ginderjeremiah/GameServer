@@ -3,43 +3,47 @@
     public class BackgroundWorker
     {
         private readonly AutoResetEvent _resetEvent = new(false);
-        private readonly CancellationTokenSource _cancelSource = new();
         private readonly IApiLogger _logger;
-        private readonly CancellationToken _cancelToken;
         private readonly string _uniqueId = Guid.NewGuid().ToString();
+        private readonly RegisteredWaitHandle _workerHandle;
 
-        public string Name { get; set; } = "Unknown";
+        private bool Killed { get; set; } = false;
+
+        public string Name { get; set; } = "Unset";
         public bool IsRunning { get; private set; } = false;
 
-        public BackgroundWorker(IApiLogger logger, Action<IApiLogger> action, CancellationToken? cancelToken = null)
+        private BackgroundWorker(IApiLogger logger)
         {
             _logger = logger;
-            _cancelToken = cancelToken ?? CancellationToken.None;
-            Task.Run(CreateWorkerLoop(() => action(logger)), _cancelToken);
         }
 
-        public BackgroundWorker(IApiLogger logger, Action action, CancellationToken? cancelToken = null)
+        public BackgroundWorker(IApiLogger logger, Action<IApiLogger> action) : this(logger)
         {
-            _logger = logger;
-            _cancelToken = cancelToken ?? CancellationToken.None;
-            Task.Run(CreateWorkerLoop(action), _cancelToken);
-        }
-        public BackgroundWorker(IApiLogger logger, Func<IApiLogger, Task> action, CancellationToken? cancelToken = null)
-        {
-            _logger = logger;
-            _cancelToken = cancelToken ?? CancellationToken.None;
-            Task.Run(CreateAsyncWorkerLoop(async () => await action(logger)), _cancelToken);
+            _workerHandle = RegisterWorker(CreateWorkerLoop(() => action(logger)));
         }
 
-        public BackgroundWorker(IApiLogger logger, Func<Task> action, CancellationToken? cancelToken = null)
+        public BackgroundWorker(IApiLogger logger, Action action) : this(logger)
         {
-            _logger = logger;
-            _cancelToken = cancelToken ?? CancellationToken.None;
-            Task.Run(CreateAsyncWorkerLoop(action), _cancelToken);
+            _workerHandle = RegisterWorker(CreateWorkerLoop(action));
+        }
+        public BackgroundWorker(IApiLogger logger, Func<IApiLogger, Task> action) : this(logger)
+        {
+            _workerHandle = RegisterWorker(CreateAsyncWorkerLoop(async () => await action(logger)));
+        }
+
+        public BackgroundWorker(IApiLogger logger, Func<Task> action) : this(logger)
+        {
+            _workerHandle = RegisterWorker(CreateAsyncWorkerLoop(action));
         }
 
         public void Start()
         {
+            if (Killed)
+            {
+                _logger.LogError($"The background worker '{Name}' ({_uniqueId}) has been killed and cannot be started.");
+                throw new InvalidOperationException("The background worker has been killed and cannot be started.");
+            }
+
             if (_resetEvent.Set())
             {
                 IsRunning = true;
@@ -53,59 +57,48 @@
 
         public void Kill()
         {
-            _cancelSource.Cancel();
+            Killed = true;
+            _workerHandle.Unregister(_resetEvent);
         }
 
-        private Action CreateWorkerLoop(Action loopAction)
+        private RegisteredWaitHandle RegisterWorker(WaitOrTimerCallback callback)
         {
-            return () =>
-            {
-                using var source = CancellationTokenSource.CreateLinkedTokenSource(_cancelToken, _cancelSource.Token);
-                do
-                {
-                    if (_resetEvent.WaitOne(5000))
-                    {
-                        try
-                        {
-                            loopAction();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex);
-                        }
+            return ThreadPool.RegisterWaitForSingleObject(_resetEvent, callback, null, -1, false);
+        }
 
-                        IsRunning = false;
-                        _logger.Log($"Sleeping background worker '{Name}' ({_uniqueId}).");
-                    }
+        private WaitOrTimerCallback CreateWorkerLoop(Action loopAction)
+        {
+            return (object? state, bool timedOut) =>
+            {
+                try
+                {
+                    loopAction();
                 }
-                while (!source.Token.IsCancellationRequested);
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex);
+                }
+
+                IsRunning = false;
+                _logger.Log($"Sleeping background worker '{Name}' ({_uniqueId}).");
             };
         }
 
-        private Func<Task> CreateAsyncWorkerLoop(Func<Task> loopAction)
+        private WaitOrTimerCallback CreateAsyncWorkerLoop(Func<Task> loopAction)
         {
-            return async () =>
+            return async (object? state, bool timedOut) =>
             {
-                using var source = CancellationTokenSource.CreateLinkedTokenSource(_cancelToken, _cancelSource.Token);
-                do
+                try
                 {
-                    if (_resetEvent.WaitOne(5000))
-                    {
-                        IsRunning = true;
-                        try
-                        {
-                            await loopAction();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex);
-                        }
-
-                        IsRunning = false;
-                        _logger.Log($"Sleeping background worker '{Name}' ( {_uniqueId} ).");
-                    }
+                    await loopAction();
                 }
-                while (!source.IsCancellationRequested);
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex);
+                }
+
+                IsRunning = false;
+                _logger.Log($"Sleeping background worker '{Name}' ( {_uniqueId} ).");
             };
         }
     }

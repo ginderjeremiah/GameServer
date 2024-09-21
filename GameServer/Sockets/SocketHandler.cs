@@ -11,7 +11,8 @@ namespace GameServer.Sockets
 {
     public class SocketHandler
     {
-        private readonly byte[] _buffer = new byte[1024 * 4];
+        private const short MAX_MESSAGE_SIZE = 1024 * 4;
+        private readonly byte[] _buffer = new byte[MAX_MESSAGE_SIZE];
         private readonly WebSocket _socket;
         private readonly SocketCommandFactory _commandFactory;
         private readonly IApiLogger _logger;
@@ -45,8 +46,19 @@ namespace GameServer.Sockets
             var dataBytes = Encoding.UTF8.GetBytes(data);
             try
             {
-                await _socket.SendAsync(new ArraySegment<byte>(dataBytes, 0, dataBytes.Length), WebSocketMessageType.Text, true, CancellationToken.None);
-                _lastSend = DateTime.UtcNow;
+                for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
+                {
+                    if (dataBytes.Length - i <= MAX_MESSAGE_SIZE)
+                    {
+                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                    else
+                    {
+                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
+                    }
+
+                    _lastSend = DateTime.UtcNow;
+                }
             }
             catch (Exception ex)
             {
@@ -83,32 +95,14 @@ namespace GameServer.Sockets
             SocketFinished.TrySetResult(closeReason);
         }
 
-        private void ClearBuffer()
+        private void ClearBuffer(int end = -1)
         {
-            for (var i = 0; i < _buffer.Length; i++)
-            {
-                if (_buffer[i] != 0)
-                {
-                    _buffer[i] = 0;
-                }
-                else
-                {
-                    return;
-                }
-            }
-        }
+            var last = end > 0 ? end : _buffer.Length - 1;
 
-        private int LastNonZeroBufferByte()
-        {
-            for (var i = 0; i < _buffer.Length; i++)
+            for (var i = 0; i <= last; i++)
             {
-                if (_buffer[i] == 0)
-                {
-                    return i;
-                }
+                _buffer[i] = 0;
             }
-
-            return _buffer.Length - 1;
         }
 
         private async Task PingLoop()
@@ -142,18 +136,24 @@ namespace GameServer.Sockets
             {
                 try
                 {
-                    ClearBuffer();
-                    await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
-                    var data = Encoding.UTF8.GetString(_buffer, 0, LastNonZeroBufferByte());
-                    if (!string.IsNullOrWhiteSpace(data))
+                    string? msg = null;
+                    WebSocketReceiveResult result;
+                    do
                     {
-                        _logger.LogDebug($"Received data from playerId ({PlayerId}) on socket ({Id}): {data}");
+                        result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
+                        msg = $"{msg}{ReadBuffer()}";
+                    }
+                    while (!result.EndOfMessage);
+
+                    if (!string.IsNullOrWhiteSpace(msg))
+                    {
+                        _logger.LogDebug($"Received msg from playerId ({PlayerId}) on socket ({Id}): {msg}");
                         _lastResponse = DateTime.UtcNow;
-                        if (data != "pong")
+                        if (msg != "pong")
                         {
                             try
                             {
-                                var commandInfo = data.Deserialize<SocketCommandInfo>();
+                                var commandInfo = msg.Deserialize<SocketCommandInfo>();
                                 if (commandInfo is not null)
                                 {
                                     await ExecuteCommand(commandInfo);
@@ -161,7 +161,7 @@ namespace GameServer.Sockets
                             }
                             catch (JsonException)
                             {
-                                _logger.LogWarning($"Failed to deserialize socket command: {data}");
+                                _logger.LogWarning($"Failed to deserialize socket command: {msg}");
                             }
                         }
                     }
@@ -177,6 +177,22 @@ namespace GameServer.Sockets
             {
                 Close(ESocketCloseReason.Finished);
             }
+        }
+
+        private string ReadBuffer()
+        {
+            var lastNonZeroByte = -1;
+            for (var i = _buffer.Length - 1; i >= 0 && lastNonZeroByte == -1; i--)
+            {
+                if (_buffer[i] != 0)
+                {
+                    lastNonZeroByte = i;
+                }
+            }
+
+            var str = Encoding.UTF8.GetString(_buffer, 0, lastNonZeroByte + 1);
+            ClearBuffer(lastNonZeroByte);
+            return str;
         }
     }
 }

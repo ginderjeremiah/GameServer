@@ -16,18 +16,11 @@ namespace GameServer.Controllers
         private string? _route;
         private readonly SessionService _sessionService;
 
-        //Session can only be null if (AllowAll = true) is specified in the SessionAuthorize attribute;
         protected Session Session => _sessionService.GetSession();
         protected bool SessionAvailable => _sessionService.SessionAvailable;
         protected int PlayerId => Session.Player.Id;
         protected IRepositoryManager Repositories { get; }
         protected IApiLogger Logger { get; }
-        protected CookieOptions DefaultCookieOptions => new()
-        {
-            Secure = true,
-            HttpOnly = true,
-            Expires = DateTime.UtcNow.AddDays(1)
-        };
 
         public BaseController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
         {

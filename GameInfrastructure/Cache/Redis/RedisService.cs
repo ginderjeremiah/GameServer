@@ -6,12 +6,14 @@ namespace GameInfrastructure.Cache.Redis
 {
     internal class RedisService : ICacheService
     {
+        private readonly IApiLogger _logger;
         private ConnectionMultiplexer Multiplexer { get; }
         public IDatabase Redis => Multiplexer.GetDatabase();
 
-        public RedisService(ConnectionMultiplexer multiplexer)
+        public RedisService(ConnectionMultiplexer multiplexer, IApiLogger logger)
         {
             Multiplexer = multiplexer;
+            _logger = logger;
         }
 
         public string? Get(string key)
@@ -56,65 +58,65 @@ namespace GameInfrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
-        public string? GetSet(string key, string value)
+        public string? GetSet(string key, string? value)
         {
             return Redis.StringGetSet(key, value);
         }
 
         public T? GetSet<T>(string key, T value)
         {
-            return GetSet(key, value.Serialize()).Deserialize<T>();
+            return GetSet(key, value?.Serialize()).Deserialize<T>();
         }
 
-        public async Task<string?> GetSetAsync(string key, string value)
+        public async Task<string?> GetSetAsync(string key, string? value)
         {
             return await Redis.StringGetSetAsync(key, value);
         }
 
         public async Task<T?> GetSetAsync<T>(string key, T value)
         {
-            var val = await GetSetAsync(key, value.Serialize());
+            var val = await GetSetAsync(key, value?.Serialize());
             return val.Deserialize<T>();
         }
 
-        public void Set(string key, string value)
+        public void Set(string key, string? value)
         {
             StringSet(key, value);
         }
 
         public void Set<T>(string key, T value)
         {
-            Set(key, value.Serialize());
+            Set(key, value?.Serialize());
         }
 
-        public async Task SetAsync(string key, string value)
+        public async Task SetAsync(string key, string? value)
         {
             await StringSetAsync(key, value);
         }
 
         public async Task SetAsync<T>(string key, T value)
         {
-            await SetAsync(key, value.Serialize());
+            await SetAsync(key, value?.Serialize());
         }
 
-        public void SetAndForget(string key, string value)
+        public void SetAndForget(string key, string? value)
         {
             StringSet(key, value, CommandFlags.FireAndForget);
         }
 
         public void SetAndForget<T>(string key, T value)
         {
-            SetAndForget(key, value.Serialize());
+            SetAndForget(key, value?.Serialize());
         }
 
-        public async Task SetAndForgetAsync(string key, string value)
+        public async Task SetAndForgetAsync(string key, string? value)
         {
             await StringSetAsync(key, value, CommandFlags.FireAndForget);
         }
 
         public async Task SetAndForgetAsync<T>(string key, T value)
         {
-            await SetAndForgetAsync(key, value.Serialize());
+            await SetAndForgetAsync(key, value?.Serialize());
         }
 
         public void SetNotExists(string key, string value)
@@ -147,12 +149,12 @@ namespace GameInfrastructure.Cache.Redis
             await Redis.KeyDeleteAsync(key);
         }
 
-        private void StringSet(string key, string value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        private void StringSet(string key, string? value, CommandFlags flags = CommandFlags.None, When when = When.Always)
         {
             Redis.StringSet(key, value, flags: flags, when: when);
         }
 
-        private async Task StringSetAsync(string key, string value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        private async Task StringSetAsync(string key, string? value, CommandFlags flags = CommandFlags.None, When when = When.Always)
         {
             await Redis.StringSetAsync(key, value, flags: flags, when: when);
         }

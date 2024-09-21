@@ -26,7 +26,7 @@ namespace GameInfrastructure.PubSub.Redis
             await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget);
         }
 
-        public async Task Publish(string channel, string queueName, string queueData)
+        public async Task Publish(string channel, string queueName, string? queueData)
         {
             var queue = new RedisQueue(Redis, queueName, Logger);
             await queue.AddToQueueAsync(queueData);
@@ -35,7 +35,7 @@ namespace GameInfrastructure.PubSub.Redis
 
         public async Task Publish<T>(string channel, string queueName, T queueData)
         {
-            var data = queueData.Serialize();
+            var data = queueData?.Serialize();
             await Publish(channel, queueName, data);
         }
 

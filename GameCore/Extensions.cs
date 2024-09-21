@@ -129,6 +129,11 @@ namespace GameCore
             return WordBreakRegex().Replace(str, "$1 $2");
         }
 
+        public static string SnakeCase(this string str)
+        {
+            return WordBreakRegex().Replace(str, "$1-$2").ToLower();
+        }
+
         public static string GetDetails(this Exception exception)
         {
             return $"{exception.GetType()}: {exception.Message}\nStack Trace: {exception.StackTrace}";

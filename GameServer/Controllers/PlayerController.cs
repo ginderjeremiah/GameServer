@@ -1,7 +1,6 @@
 ﻿using GameCore;
 using GameCore.DataAccess;
 using GameCore.Sessions;
-using GameServer.Auth;
 using GameServer.Models.Attributes;
 using GameServer.Models.Common;
 using GameServer.Models.InventoryItems;
@@ -18,29 +17,19 @@ namespace GameServer.Controllers
         public PlayerController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
             : base(repositoryManager, logger, sessionService) { }
 
-        [SessionAuthorize]
         [HttpGet("/api/[controller]")]
         public ApiResponse<PlayerData> Player()
         {
             return Success(Session.GetPlayerData());
         }
 
-        [SessionAuthorize]
-        [HttpGet]
-        public ApiListResponse<LogPreference> LogPreferences()
-        {
-            return Success(Session.Player.LogPreferences.Select(lp => new LogPreference(lp)));
-        }
-
-        [SessionAuthorize]
         [HttpPost]
         public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
         {
-            //TODO get LogPreferences from session player
+            //TODO save LogPreferences to session player and propogate to db
             throw new NotImplementedException();
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
@@ -49,7 +38,6 @@ namespace GameServer.Controllers
                 : Error("Unable to set inventory items.");
         }
 
-        [SessionAuthorize]
         [HttpPost]
         public ApiListResponse<BattlerAttribute> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
         {
