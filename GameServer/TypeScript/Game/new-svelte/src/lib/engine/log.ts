@@ -14,16 +14,15 @@ let id = 0;
 export const logMessage = (logType: ELogSetting, message: string) => {
    console.log(message);
    if (player.value.logPreferences.find(pref => pref.id === logType)?.enabled ?? true) {
-      const newLogs = logs.value.slice();
-      if (newLogs.length >= 40) {
-         newLogs.shift();
+      if (logs.value.length >= 40) {
+         logs.value.pop();
       }
       id++;
-      newLogs.push({
+      logs.value.unshift({
          id,
          logType,
          message
       });
-      logs.set(newLogs);
+      logs.refresh();
    }
 }

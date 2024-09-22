@@ -27,12 +27,19 @@ export let id: string = crypto.randomUUID();
 
 .text-input-wrapper {
 	box-sizing: border-box;
+	height: 1.5rem;
 	width: 100%;
 	border: 1px solid black;
 	position: relative;
 	cursor: text;
+	pointer-events: all;
+	user-select: text;
 
 	input {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 6;
 		padding: 0.375rem 0.25rem;
 		box-sizing: border-box;
 		outline: none;

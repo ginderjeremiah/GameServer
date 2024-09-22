@@ -4,7 +4,7 @@
 		<svelte:component this="{currentScreen}" />
 	</div>
 	<div class="log-container round-border">
-		{#each $logs.slice().reverse() as log (log.id)}
+		{#each $logs as log (log.id)}
 			<div class="log-message">
 				<span>{log.message}</span>
 			</div>

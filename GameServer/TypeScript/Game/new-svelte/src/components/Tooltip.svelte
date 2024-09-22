@@ -52,5 +52,6 @@ const getPositionStyle = (tooltip: TooltipData) => {
 	display: none;
 	background-color: var(--default-title-color);
 	padding: 0.1rem;
+	z-index: 15;
 }
 </style>
