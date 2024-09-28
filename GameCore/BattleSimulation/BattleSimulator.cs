@@ -1,5 +1,4 @@
-﻿using GameCore.DataAccess;
-using GameCore.Entities;
+﻿using GameCore.Entities;
 using GameCore.Sessions;
 
 namespace GameCore.BattleSimulation
@@ -10,9 +9,10 @@ namespace GameCore.BattleSimulation
         private BattlePlayer Player { get; set; }
         private BattleEnemy Enemy { get; set; }
 
-        private const int msPerTick = 6;
+        private const int msPerTick = 40;
+        private const int maxMs = msPerTick * 10000;
 
-        public BattleSimulator(Session session, Enemy enemy, EnemyInstance enemyInstance, IRepositoryManager repositories)
+        public BattleSimulator(Session session, Enemy enemy, EnemyInstance enemyInstance)
         {
             Rng = new Mulberry32(enemyInstance.Seed);
             Player = new BattlePlayer(session);
@@ -21,7 +21,6 @@ namespace GameCore.BattleSimulation
 
         public bool Simulate(out int totalMs)
         {
-            var maxMs = msPerTick * 10000;
             for (totalMs = msPerTick; totalMs <= maxMs; totalMs += msPerTick)
             {
                 foreach (var skill in Player.AdvancedCooldowns(msPerTick))
@@ -44,6 +43,7 @@ namespace GameCore.BattleSimulation
                     return false;
                 }
             }
+
             return false;
         }
     }

@@ -52,7 +52,7 @@ const handleClickRight = () => changeZone(1);
 	margin: 0 auto;
 	padding: 0.2em;
 	border: var(--default-border);
-	background-color: var(--default-title-color);
+	background-color: var(--container-background-color);
 	display: flex;
 	justify-content: space-between;
 	margin-bottom: 1em;

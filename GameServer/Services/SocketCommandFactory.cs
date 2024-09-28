@@ -28,7 +28,7 @@ namespace GameServer.Services
             }
             else
             {
-                throw new ArgumentOutOfRangeException(nameof(commandInfo.Name));
+                throw new InvalidOperationException($"No socket command generator found for: {commandInfo.Name}");
             }
         }
 
@@ -39,7 +39,7 @@ namespace GameServer.Services
             var serviceExtensions = typeof(ServiceProviderServiceExtensions);
             foreach (var type in types.Where(t => t.IsAssignableTo(typeof(AbstractSocketCommand)) && !t.IsAbstract))
             {
-                var constructor = type.GetConstructors()[0];
+                var constructor = type.GetConstructors().First();
                 var parameters = constructor.GetParameters();
                 var serviceCollection = Expression.Parameter(typeof(IServiceProvider));
                 var serviceRetrievers = parameters.Select(p => Expression.Call(serviceExtensions, "GetRequiredService", [p.ParameterType], serviceCollection));

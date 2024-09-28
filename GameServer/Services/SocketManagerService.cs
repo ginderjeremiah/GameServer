@@ -63,9 +63,10 @@ namespace GameServer.Services
 
         private async Task RegisterSocketCommandListener(SocketHandler socket)
         {
+            var channel = SocketChannel(socket.Id);
+            var queueName = SocketQueueName(socket.Id);
             var processor = GetSocketCommandProcessor(socket);
-            await _pubSub.Subscribe(SocketChannel(socket.Id), SocketQueueName(socket.Id), async args => await processor(args.queue), socket.Id);
-            await _pubSub.Publish(SocketChannel(socket.Id), "");
+            await _pubSub.Subscribe(channel, queueName, async args => await processor(args.queue), socket.Id);
         }
 
         private Func<IPubSubQueue, Task> GetSocketCommandProcessor(SocketHandler socket)
@@ -77,7 +78,7 @@ namespace GameServer.Services
                 {
                     try
                     {
-                        _logger.Log($"Recieved command on socket: {socket.Id}, playerId: {socket.PlayerId}, command: {nextCommandInfo}.");
+                        _logger.Log($"Received command on socket: {socket.Id}, playerId: {socket.PlayerId}, command: {nextCommandInfo}.");
                         await socket.ExecuteCommand(nextCommandInfo);
                         nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
                     }

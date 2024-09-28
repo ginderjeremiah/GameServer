@@ -5,7 +5,16 @@ namespace GameServer.Sockets.Commands
 {
     public abstract class AbstractSocketCommand
     {
-        public abstract Task<ApiSocketResponse> Execute();
+        public virtual Task<ApiSocketResponse> ExecuteAsync()
+        {
+            var result = Execute();
+            return Task.FromResult(result);
+        }
+
+        public virtual ApiSocketResponse Execute()
+        {
+            throw new NotImplementedException();
+        }
 
         public virtual void SetParameters(string? parameters) { }
 
@@ -31,13 +40,47 @@ namespace GameServer.Sockets.Commands
         }
     }
 
-    public abstract class AbstractSocketCommand<T> : AbstractSocketCommand
+    public abstract class AbstractSocketCommand<TReturn, TParams> : AbstractSocketCommandWithResponseData<TReturn>
+    {
+        public TParams Parameters { get; set; }
+
+        public override void SetParameters(string? parameters)
+        {
+            Parameters = parameters.Deserialize<TParams>() ?? throw new ArgumentNullException(nameof(parameters));
+        }
+    }
+
+    public abstract class AbstractSocketCommandWithParams<T> : AbstractSocketCommand
     {
         public T Parameters { get; set; }
 
         public override void SetParameters(string? parameters)
         {
             Parameters = parameters.Deserialize<T>() ?? throw new ArgumentNullException(nameof(parameters));
+        }
+    }
+
+    public abstract class AbstractSocketCommandWithResponseData<T> : AbstractSocketCommand
+    {
+        public sealed override async Task<ApiSocketResponse> ExecuteAsync()
+        {
+            return await HandleExecuteAsync();
+        }
+
+        public sealed override ApiSocketResponse Execute()
+        {
+            return base.Execute();
+        }
+
+        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync()
+        {
+            var result = HandleExecute();
+            return Task.FromResult(result);
+        }
+
+        public virtual ApiSocketResponse<T> HandleExecute()
+        {
+            throw new NotImplementedException();
         }
     }
 

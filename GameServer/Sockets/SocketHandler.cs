@@ -78,7 +78,7 @@ namespace GameServer.Sockets
         {
             _logger.Log($"Executing command: {commandInfo} on socket: {Id}");
             var command = _commandFactory.CreateCommand(commandInfo);
-            var response = await command.Execute();
+            var response = await command.ExecuteAsync();
             if (response.CloseReason is not null)
             {
                 Close(response.CloseReason.Value);
@@ -147,7 +147,7 @@ namespace GameServer.Sockets
 
                     if (!string.IsNullOrWhiteSpace(msg))
                     {
-                        _logger.LogDebug($"Received msg from playerId ({PlayerId}) on socket ({Id}): {msg}");
+                        _logger.LogDebug($"Received socket data from playerId ({PlayerId}) on socket ({Id}): {msg}");
                         _lastResponse = DateTime.UtcNow;
                         if (msg != "pong")
                         {

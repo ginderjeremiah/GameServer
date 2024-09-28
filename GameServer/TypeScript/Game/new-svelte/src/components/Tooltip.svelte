@@ -8,7 +8,6 @@
 <script lang="ts">
 import type { ReadableEx } from '$lib/common';
 import type { TooltipData } from '$stores/tooltip';
-import { onMount } from 'svelte';
 
 export let tooltip: ReadableEx<TooltipData>;
 
@@ -30,11 +29,13 @@ const getPositionStyle = (tooltip: TooltipData) => {
 
 	let vertical = '';
 	let horizontal = '';
+
 	if (container.offsetWidth + mouseX + 15 < window.innerWidth) {
 		horizontal = `left: ${mouseX + 15}px`;
 	} else {
 		horizontal = `right: ${window.innerWidth - mouseX + 15}px`;
 	}
+
 	if (container.offsetHeight + mouseY + 15 < window.innerHeight) {
 		vertical = `top: ${mouseY + 15}px`;
 	} else {
@@ -50,8 +51,9 @@ const getPositionStyle = (tooltip: TooltipData) => {
 	position: absolute;
 	border: var(--default-border);
 	display: none;
-	background-color: var(--default-title-color);
+	background-color: var(--container-background-color);
 	padding: 0.1rem;
 	z-index: 15;
+	box-shadow: var(--default-shadow);
 }
 </style>

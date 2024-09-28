@@ -3,18 +3,15 @@
 		<ZoneNav />
 	</div>
 	<div class="battlers-container">
-		<BattlerCard battlerStore="{player}" />
-		<BattlerCard battlerStore="{enemy}" />
+		<BattlerCard battler="{$battlePlayer}" />
+		<BattlerCard battler="{$battleEnemy}" />
 	</div>
 </div>
 
 <script lang="ts">
 import ZoneNav from './ZoneNav.svelte';
 import BattlerCard from './BattlerCard.svelte';
-import { getEnemy, getPlayer } from '$lib/engine';
-
-const player = getPlayer();
-const enemy = getEnemy();
+import { battlePlayer, battleEnemy } from '$lib/engine';
 </script>
 
 <style lang="scss">

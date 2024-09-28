@@ -89,17 +89,20 @@ namespace GameServer.CodeGen
                 Type? responseType = null;
                 if (socketCommand.BaseType is Type baseType && baseType.IsGenericType)
                 {
-                    parameterType = baseType.GetGenericArguments()[0];
-                }
-
-                var execute = socketCommand.GetMethod("ExecuteInternal", BindingFlags.NonPublic | BindingFlags.Instance) ?? socketCommand.GetMethod("Execute");
-                if (execute is not null)
-                {
-                    var unwrappedResponseType = execute.ReturnType.IsAssignableTo(typeof(Task))
-                        ? execute.ReturnType.GetGenericArguments()[0] : execute.ReturnType;
-
-                    responseType = unwrappedResponseType.IsConstructedGenericType
-                        ? unwrappedResponseType.GetGenericArguments()[0] : null;
+                    var genericArgs = baseType.GetGenericArguments();
+                    if (genericArgs.Length > 1)
+                    {
+                        responseType = genericArgs[0];
+                        parameterType = genericArgs[1];
+                    }
+                    else if (baseType.GetGenericTypeDefinition() == typeof(AbstractSocketCommandWithResponseData<>))
+                    {
+                        responseType = genericArgs[0];
+                    }
+                    else
+                    {
+                        parameterType = genericArgs[0];
+                    }
                 }
 
                 if (responseType != null && NeedsInterface(responseType))

@@ -11,7 +11,7 @@
 			<span>{healthText}</span>
 		</div>
 	</div>
-	<Skills {battlerStore} />
+	<Skills {battler} />
 </div>
 
 <script lang="ts">
@@ -20,9 +20,8 @@ import { Battler } from '$lib/battle';
 import { formatNum, type WritableEx } from '$lib/common';
 import Skills from './Skills.svelte';
 
-export let battlerStore: WritableEx<Battler | undefined>;
+export let battler: Battler | undefined;
 
-$: battler = $battlerStore;
 $: currentHealth = battler?.currentHealth ?? 0;
 $: maxHealth = battler?.attributes.getValue(EAttribute.MaxHealth);
 $: healthText = `${formatNum(currentHealth)}/${maxHealth ?? 0}`;
@@ -34,7 +33,7 @@ const healthId = crypto.randomUUID();
 <style lang="scss">
 .battler-card {
 	width: 30vw;
-	background-color: var(--default-title-color);
+	background-color: var(--container-background-color);
 	font-size: 1.25rem;
 	padding: 0.5rem;
 	border: var(--default-border);

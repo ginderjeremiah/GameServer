@@ -10,7 +10,7 @@ using EnemyInstanceModel = GameServer.Models.Enemies.EnemyInstance;
 
 namespace GameServer.Sockets.Commands
 {
-    public class NewEnemy : AbstractSocketCommand<NewEnemyRequest>
+    public class NewEnemy : AbstractSocketCommand<NewEnemyModel, NewEnemyRequest>
     {
         private Session Session { get; }
         private IApiLogger Logger { get; }
@@ -23,12 +23,7 @@ namespace GameServer.Sockets.Commands
             Repositories = repos;
         }
 
-        public override async Task<ApiSocketResponse> Execute()
-        {
-            return ExecuteInternal();
-        }
-
-        private ApiSocketResponse<NewEnemyModel> ExecuteInternal()
+        public override ApiSocketResponse<NewEnemyModel> HandleExecute()
         {
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)
@@ -60,7 +55,7 @@ namespace GameServer.Sockets.Commands
                 enemySkill.Skill = Repositories.Skills.GetSkill(enemySkill.SkillId);
             }
 
-            var simulator = new BattleSimulator(Session, enemy, enemyInstance, Repositories);
+            var simulator = new BattleSimulator(Session, enemy, enemyInstance);
             var victory = simulator.Simulate(out var totalMs);
             var earliestDefeat = now.AddMilliseconds(totalMs);
 

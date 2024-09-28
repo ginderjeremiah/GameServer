@@ -1,97 +1,89 @@
-import { get, writable } from "svelte/store";
-import { registerHook, triggerHook } from "./hooks";
 import { Battler } from "$lib/battle";
 import { enemies, equipmentStats, player } from "$stores";
 import { ELogSetting, IEnemyInstance } from "$lib/api";
 import { logMessage } from "./log";
-import { formatNum, WritableEx, writableEx } from "$lib/common";
+import { formatNum, writableEx, createHook } from "$lib/common";
+import { onLogicalUpdate } from "./game-engine";
 
-export enum BattleState {
+export enum BattleStage {
    Idle,
    Active,
    Victorious,
    Defeated,
 }
 
-const Idle = BattleState.Idle;
-const Active = BattleState.Active;
-const Victorious = BattleState.Victorious;
-const Defeated = BattleState.Defeated;
+const { Idle, Active, Victorious, Defeated } = BattleStage
 
-export const battleState = writableEx(Idle);
+const battleStartHook = createHook();
+const notifyBattleStart = battleStartHook.notify;
 
-export class BattleEngine {
-   private timeStore = 0;
-   private tickSize = 6;
+export const onBattleStart = battleStartHook.onNotified;
+export const battleStage = writableEx(Idle);
+export const battlePlayer = writableEx(new Battler(player.value, equipmentStats.value));
+export const battleEnemy = writableEx<Battler | undefined>();
+export let battleTimeElapsed = 0;
 
-   player: WritableEx<Battler>;
-   enemy: WritableEx<Battler | undefined>;
-   timeElapsed = 0;
+let initialized = false;
 
-   constructor() {
-      this.player = writableEx(new Battler(player.value, equipmentStats.value));
-      this.enemy = writableEx();
-      registerHook('update', this.update.bind(this))
+export const initBattleEngine = () => {
+   if (!initialized) {
+      initialized = true;
+      onLogicalUpdate(logicalUpdate);
    }
+}
 
-   update(timeDelta: number) {
-      const enemy = this.enemy.value;
-      if (enemy && battleState.value === Active) {
-         this.timeStore += timeDelta;
-         while (this.timeStore >= this.tickSize) {
-            this.timeStore -= this.tickSize;
-            this.timeElapsed += this.tickSize;
-            const playerSkillsFired = this.player.value.advanceCooldown(this.tickSize);
-            playerSkillsFired.forEach(skill => {
-               const dmg = skill.calculateDamage();
-               let finalDmg = enemy.takeDamage(dmg);
-               logMessage(ELogSetting.Damage, `You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
-            });
-            if (!enemy.isDead) {
-               const enemySkillsFired = enemy.advanceCooldown(this.tickSize);
-               enemySkillsFired.forEach(skill => {
-                  const dmg = skill.calculateDamage();
-                  let finalDmg = this.player.value.takeDamage(dmg);
-                  logMessage(ELogSetting.Damage, `${enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
-               });
-            }
-            if (enemy.isDead) {
-               battleState.set(Victorious);
-            } else if (this.player.value.isDead) {
-               battleState.set(Defeated);
-            }
-         }
-         this.player.refresh();
-         this.enemy.refresh();
+export const pauseBattle = () => {
+   battleStage.set(Idle);
+}
+
+export const resumeBattle = () => {
+   if (!battlePlayer.value.isDead && !battleEnemy.value?.isDead) {
+      battleStage.set(Active);
+      notifyBattleStart();
+   }
+}
+
+export const resetBattle = (enemyInstance: IEnemyInstance) => {
+   const enemyData = enemies.value;
+   battleTimeElapsed = 0;
+   battlePlayer.value.reset(player.value, equipmentStats.value);
+   battlePlayer.update(p => p);
+   battleEnemy.set(new Battler({ ...enemyInstance, ...enemyData[enemyInstance.id] }));
+   resumeBattle();
+}
+
+export const getPlayerAttributes = () => {
+   return battlePlayer.value.attributes;
+}
+
+export const getOpponent = (battler: Battler) => {
+   return battler === battlePlayer.value ? battleEnemy.value : battlePlayer.value;
+}
+
+const logicalUpdate = (timeDelta: number) => {
+   const enemy = battleEnemy.value;
+   if (enemy && battleStage.value === Active) {
+      const playerSkillsFired = battlePlayer.value.advanceCooldown(timeDelta);
+      playerSkillsFired.forEach(skill => {
+         const dmg = skill.calculateDamage();
+         let finalDmg = enemy.takeDamage(dmg);
+         logMessage(ELogSetting.Damage, `You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
+      });
+      if (!enemy.isDead) {
+         const enemySkillsFired = enemy.advanceCooldown(timeDelta);
+         enemySkillsFired.forEach(skill => {
+            const dmg = skill.calculateDamage();
+            let finalDmg = battlePlayer.value.takeDamage(dmg);
+            logMessage(ELogSetting.Damage, `${enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
+         });
+      }
+      if (enemy.isDead) {
+         battleStage.set(Victorious);
+      } else if (battlePlayer.value.isDead) {
+         battleStage.set(Defeated);
       }
    }
-
-   pause() {
-      battleState.set(Idle);
-   }
-
-   resume() {
-      if (!this.player.value.isDead && !this.enemy.value?.isDead) {
-         battleState.set(Active);
-         triggerHook('battle-start');
-      }
-   }
-
-   reset(enemyInstance: IEnemyInstance) {
-      const enemyData = enemies.value;
-      this.timeStore = 0;
-      this.timeElapsed = 0;
-      this.player.value.reset(player.value, equipmentStats.value);
-      this.player.update(p => p);
-      this.enemy.set(new Battler({ ...enemyInstance, ...enemyData[enemyInstance.id] }));
-      this.resume();
-   }
-
-   getPlayerAttributes() {
-      return this.player.value.attributes;
-   }
-
-   getOpponent(battler: Battler) {
-      return battler === this.player.value ? this.enemy.value : this.player.value;
-   }
+   battlePlayer.refresh();
+   battleEnemy.refresh();
+   battleTimeElapsed += timeDelta;
 }

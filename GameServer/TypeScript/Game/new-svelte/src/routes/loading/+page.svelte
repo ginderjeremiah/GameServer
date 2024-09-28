@@ -81,12 +81,12 @@ onMount(() => {
 .loading-title {
 	text-align: center;
 	margin-bottom: 2.5 rem;
-	color: var(--default-title-color);
+	color: var(--title-color);
 	text-shadow: var(--default-shadow);
 }
 
 .loading-container {
-	background-color: var(--default-title-color);
+	background-color: var(--container-background-color);
 	border: var(--default-border);
 	padding: 2rem;
 	width: 10rem;

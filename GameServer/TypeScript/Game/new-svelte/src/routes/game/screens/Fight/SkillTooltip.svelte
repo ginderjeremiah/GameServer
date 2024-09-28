@@ -26,12 +26,10 @@
 import { EAttribute, type IAttributeMultiplier } from '$lib/api';
 import { Skill } from '$lib/battle';
 import { formatNum } from '$lib/common';
-import { getOpponent } from '$lib/engine';
+import { renderDelta, getOpponent } from '$lib/engine';
 import { attributes } from '$stores';
 
-export const getBaseNode = () => {
-	return container;
-};
+export const getBaseNode = () => container;
 
 export let skill: Skill | undefined;
 
@@ -46,9 +44,10 @@ $: adjustedTotal = Math.max(
 	totalDamage - (opponent?.attributes.getValue(EAttribute.Defense) ?? 0),
 	0
 );
-$: ownerCDR = skill?.owner.attributes.getValue(EAttribute.CooldownRecovery) ?? 0;
-$: adjustedCd = (skill?.cooldownMS ?? 0) / 1000 / (1 + ownerCDR / 100);
-$: remainingCd = adjustedCd - (skill?.chargeTime ?? 0) / 1000 / (1 + ownerCDR / 100);
+$: cdMultiplier = skill?.owner.cdMultiplier ?? 1;
+$: adjustedCd = (skill?.cooldownMS ?? 0) / 1000 / cdMultiplier;
+$: remainingCd =
+	adjustedCd - ($renderDelta * cdMultiplier + (skill?.chargeTime ?? 0)) / 1000 / cdMultiplier;
 
 const getMultiplier = (mult: IAttributeMultiplier) => {
 	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;

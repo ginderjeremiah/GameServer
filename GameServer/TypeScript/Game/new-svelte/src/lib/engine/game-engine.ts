@@ -1,32 +1,62 @@
 import { onDestroy } from "svelte";
-import { BattleEngine, BattleState, battleState } from "./battle-engine";
-import { triggerHook } from "./hooks";
+import { BattleStage, battleStage, initBattleEngine, resetBattle } from "./battle-engine";
 import { ELogSetting, IEnemyInstance, IPlayerData } from "$lib/api";
-import { get } from "svelte/store";
 import { enemies, player } from "$stores";
 import { Inventory } from "$lib/inventory";
-import { delay, formatNum } from "$lib/common";
+import { delay, formatNum, writableEx, createHook, getEventCounter } from "$lib/common";
 import { ApiSocket, IApiSocketResponse } from "$lib/api/api-socket";
 import { logMessage } from "./log";
-import { Battler } from "$lib/battle";
+import { startRenderEngine } from "./render-engine";
 
-let battleEngine: BattleEngine;
+export const tickSize = 40; //ms
+export let logicalTime: DOMHighResTimeStamp;
+export let logicalTickRate = writableEx(0);
+
+const logicalUpdateHook = createHook<number>();
+const notifyLogicalUpdate = logicalUpdateHook.notify;
+export const onLogicalUpdate = logicalUpdateHook.onNotified;
+
 const inventory = new Inventory();
 const apiSocket = new ApiSocket();
 let currentEnemy: IEnemyInstance | undefined;
-let lastTime: number;
 let newEnemyPromise: Promise<IApiSocketResponse<"NewEnemy">> | undefined;
+let timeBank = 0;
+let lastTime: DOMHighResTimeStamp;
+let countTick = getEventCounter(t => logicalTickRate.set(Math.round(t)));
 
-const update = (ts: DOMHighResTimeStamp) => {
-   const timeDelta = ts - lastTime;
-   lastTime = ts;
-   triggerHook('update', Math.min(timeDelta, 1000));
-}
+export const startGame = () => {
+   if (!lastTime) {
+      lastTime = performance.now();
+      logicalTime = lastTime;
+      initBattleEngine();
+      const unwatch = watchBattleState();
+      const handle = window.setInterval(logicLoop, 10);
+      startRenderEngine();
+      onDestroy(() => {
+         unwatch();
+         window.clearInterval(handle);
+         lastTime = 0;
+      })
+   }
+};
 
-const gameLoop = (ts: DOMHighResTimeStamp) => {
+const logicLoop = () => {
+   const now = performance.now()
+   const ts = now - lastTime;
+   lastTime = now;
    update(ts);
-   window.requestAnimationFrame(gameLoop);
 }
+
+const update = (timeDelta: number) => {
+   timeBank += timeDelta;
+   while (timeBank >= tickSize) {
+      countTick();
+      timeBank -= tickSize;
+      logicalTime += tickSize;
+      notifyLogicalUpdate(tickSize);
+   }
+}
+
 
 const levelUp = (playerData: IPlayerData) => {
    playerData.exp -= playerData.level * 100;
@@ -63,8 +93,8 @@ const getNewEnemy = async () => {
 }
 
 const watchBattleState = () => {
-   const unsub = battleState.subscribe(async (state) => {
-      if (state === BattleState.Victorious && currentEnemy) {
+   return battleStage.subscribe(async (state) => {
+      if (state === BattleStage.Victorious && currentEnemy) {
          const defeatResponse = await apiSocket.sendSocketCommand("DefeatEnemy", currentEnemy);
          if (!defeatResponse.error && defeatResponse.data.rewards) {
             const rewards = defeatResponse.data.rewards
@@ -75,33 +105,13 @@ const watchBattleState = () => {
             logMessage(ELogSetting.Debug, "There was an error defeating the enemy: " + defeatResponse.error);
          }
          await delay(defeatResponse.data.cooldown);
-      } else if (state === BattleState.Defeated) {
+      } else if (state === BattleStage.Defeated) {
          logMessage(ELogSetting.EnemyDefeated, "You've been defeated!");
       }
 
-      if (state !== BattleState.Active) {
+      if (state !== BattleStage.Active) {
          currentEnemy = await getNewEnemy();
-         battleEngine.reset(currentEnemy);
+         resetBattle(currentEnemy);
       }
    });
-
-   onDestroy(unsub);
 }
-
-export const getPlayer = () => {
-   return battleEngine.player;
-}
-
-export const getEnemy = () => {
-   return battleEngine.enemy;
-}
-
-export const getOpponent = (battler: Battler) => {
-   return battleEngine.getOpponent(battler);
-};
-
-export const startGame = async () => {
-   battleEngine = new BattleEngine();
-   watchBattleState();
-   window.requestAnimationFrame(gameLoop);
-};

@@ -35,7 +35,7 @@ onDestroy(unsubscribe);
 		--btn-background: #{$light-blue};
 		--spinner-color: gray;
 		--overlay-color: #{$light-gray};
-		--default-title-color: #{$off-white};
+		--title-color: #{$off-white};
 		--default-shadow: 0 0 0.25rem #{$black};
 		--default-border: 1px solid #{$black};
 		--error-color: #{$red};
@@ -43,6 +43,8 @@ onDestroy(unsubscribe);
 		--health-missing-color: #{$red};
 		--health-remaining-color: #{$green};
 		--health-disappearing-color: #{$red-orange};
+		--container-background-color: #{$off-white};
+		--slot-background-color: #{$white};
 	}
 }
 </style>

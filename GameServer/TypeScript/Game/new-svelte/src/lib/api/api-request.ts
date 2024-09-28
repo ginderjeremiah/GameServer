@@ -13,7 +13,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 
     public get<U extends ApiEndpointNoRequest>(): Promise<ApiResponse<ApiResponseTypes[U]>>;
     public get<U extends ApiEndpointWithRequest>(urlParams: ApiRequestTypes[U]): Promise<ApiResponse<ApiResponseTypes[U]>>;
-    public get(urlParams?: any) {
+    public get(urlParams?: Record<string, any>) {
         const params = this.encodeParams(urlParams)
         const endpoint = params
             ? this.endpoint + '?' + params
@@ -24,7 +24,7 @@ export class ApiRequest<U extends ApiEndpoint> {
         r.open('GET', finalEndpoint, true);
         return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
             r.onload = () => resolved(new ApiResponse(r));
-            r.onerror = () => resolved(new ApiResponse(r));
+            r.onerror = r.onload;
             r.onabort = r.onerror;
             try {
                 r.send();
@@ -51,7 +51,7 @@ export class ApiRequest<U extends ApiEndpoint> {
         const p = payload;
         return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
             r.onload = () => resolved(new ApiResponse(r));
-            r.onerror = () => resolved(new ApiResponse(r));
+            r.onerror = r.onload;
             r.onabort = r.onerror;
             try {
                 r.send(JSON.stringify(p));
@@ -67,10 +67,10 @@ export class ApiRequest<U extends ApiEndpoint> {
         return result.data;
     }
 
-    private encodeParams(urlParams: any) {
+    private encodeParams(urlParams?: Record<string, any>) {
         return keys(urlParams)
-            .filter(key => urlParams[key] !== undefined)
-            .map(key => key + '=' + window.encodeURIComponent(urlParams[key]))
+            .filter(key => urlParams?.[key] !== undefined)
+            .map(key => key + '=' + window.encodeURIComponent(urlParams?.[key]))
             .join('&');
     }
 }

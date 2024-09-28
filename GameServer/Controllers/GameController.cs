@@ -61,7 +61,7 @@ namespace GameServer.Controllers
             var passHash = creds.Password.Hash(player.Salt.ToString());
 
             if (passHash != player.PassHash)
-                return Error<PlayerData>("Incorrect password");
+                return Error<PlayerData>("Username or password is incorrect");
 
             await _sessionService.CreateSession(player);
 

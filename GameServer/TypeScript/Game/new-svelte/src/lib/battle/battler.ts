@@ -18,6 +18,10 @@ export class Battler {
     skills!: (Skill | undefined)[];
     maxSkills = 4;
 
+    get cdMultiplier() {
+        return 1 + (this.attributes.getValue(EAttribute.CooldownRecovery) / 100);
+    }
+
     constructor(battlerData: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
         this.level = battlerData.level;
         this.name = battlerData.name;
@@ -27,10 +31,9 @@ export class Battler {
     //returns skills which fired
     advanceCooldown(timeDelta: number): Skill[] {
         let firedSkills: Skill[] = [];
-        let cdMultiplier = (1 + this.attributes.getValue(EAttribute.CooldownRecovery) / 100);
         this.skills.forEach((skill) => {
             if (skill) {
-                skill.chargeTime += timeDelta * cdMultiplier;
+                skill.chargeTime += timeDelta * this.cdMultiplier;
                 if (skill.chargeTime >= skill.cooldownMS) {
                     firedSkills.push(skill);
                     skill.chargeTime = 0;

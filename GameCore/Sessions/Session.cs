@@ -42,7 +42,7 @@ namespace GameCore.Sessions
 
         public bool DefeatEnemy(EnemyInstance defeatedEnemy)
         {
-            if (Victory && EarliestDefeat - TimeSpan.FromMilliseconds(5) <= DateTime.UtcNow)
+            if (Victory && EarliestDefeat - TimeSpan.FromMilliseconds(50) <= DateTime.UtcNow)
             {
                 var activeEnemyHash = _repos.SessionStore.GetAndDeleteActiveEnemyHash(_sessionData);
                 return defeatedEnemy.Hash() == activeEnemyHash;

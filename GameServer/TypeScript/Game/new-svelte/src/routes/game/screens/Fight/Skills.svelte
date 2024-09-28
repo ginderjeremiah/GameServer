@@ -1,13 +1,13 @@
 <div class="skills-container round-border" role="grid">
 	{#each skills as skill, index}
 		<div
-			class="skill-box"
-			style="{`--skill-perc: ${skillPercent(skill)}%`}"
+			class="skill-slot"
+			style="{`--skill-perc: ${skillPercent(skill, $renderDelta)}%`}"
 			role="gridcell"
 			tabindex="-1"
 			on:mousemove="{handleMouseMove}"
 			on:mouseenter="{(ev) => handleMouseEnter(ev, index)}"
-			on:mouseleave="{handleMouseLeave}"
+			on:mouseleave="{(ev) => handleMouseLeave(ev, index)}"
 		>
 			{#if skill}
 				<img class="skill" src="{skill.iconPath}" alt="{skill.name}" />
@@ -21,15 +21,17 @@
 import { Battler, Skill } from '$lib/battle';
 import { formatNum, writableEx, type WritableEx } from '$lib/common';
 import { registerTooltipComponent } from '$stores/tooltip';
+import { renderDelta } from '$lib/engine/render-engine';
 import SkillTooltip from './SkillTooltip.svelte';
 
-export let battlerStore: WritableEx<Battler | undefined>;
+export let battler: Battler | undefined;
 
 let tooltip = writableEx<SkillTooltip>();
 let tooltipSkillIndex: number = -1;
 
-$: skills = $battlerStore?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]);
+$: skills = battler?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]);
 $: tooltipSkill = skills[tooltipSkillIndex];
+$: cdr = battler?.cdMultiplier ?? 1;
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(tooltip);
 
@@ -45,32 +47,40 @@ const handleMouseEnter = (ev: MouseEvent, index: number) => {
 	}
 };
 
-const handleMouseLeave = (ev: MouseEvent) => {
-	tooltipSkillIndex = -1;
-	hideTooltip();
+const handleMouseLeave = (ev: MouseEvent, index: number) => {
+	if (tooltipSkillIndex == index) {
+		tooltipSkillIndex = -1;
+		hideTooltip();
+	}
 };
 
-const skillPercent = (skill?: Skill) =>
-	skill ? formatNum((100 * skill.chargeTime) / skill.cooldownMS) : 0;
+const skillPercent = (skill: Skill | undefined, delta: number) => {
+	if (skill) {
+		return formatNum((100 * (skill.chargeTime + delta * cdr)) / skill.cooldownMS);
+	} else {
+		return 0;
+	}
+};
 </script>
 
 <style lang="scss">
 .skills-container {
-	background-color: var(--default-title-color);
+	background-color: var(--container-background-color);
 	display: flex;
 	aspect-ratio: 4;
 	flex-wrap: wrap;
 	overflow: hidden;
 	border: var(--default-border);
 
-	.skill-box {
+	.skill-slot {
 		height: 100%;
 		aspect-ratio: 1;
 		box-sizing: border-box;
 		position: relative;
+		background-color: var(--slot-background-color);
 	}
 
-	.skill-box + .skill-box {
+	.skill-slot + .skill-slot {
 		border-left: var(--default-border);
 	}
 
@@ -79,7 +89,7 @@ const skillPercent = (skill?: Skill) =>
 		height: 100%;
 	}
 
-	.skill-box::after {
+	.skill-slot::after {
 		content: '';
 		position: absolute;
 		top: 0;

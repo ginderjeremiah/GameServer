@@ -2,11 +2,11 @@ import { ApiSocketCommand, ApiSocketResponseTypes, ApiSocketCommandNoRequest, Ap
 import { ApiSocketRequest } from "./api-socket-request";
 import { Action } from "../common/types";
 
-export interface IApiSocketResponse<T extends ApiSocketCommand> {
+export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
     id: string,
     name: T,
     error?: string,
-    data: ApiSocketResponseTypes[T];
+    data: T extends ApiSocketCommand ? ApiSocketResponseTypes[T] : never;
 }
 
 let socket: WebSocket;
@@ -49,7 +49,7 @@ export class ApiSocket {
     private processCommandQueue() {
         this.ensureSocket();
         if (socket.readyState === socket.OPEN) {
-            let request: ApiSocketRequest<any> | undefined;
+            let request: ApiSocketRequest | undefined;
             while (request = this.socketCommandQueue.shift()) {
                 this.inFlightCommands.push(request);
                 socket.send(JSON.stringify(request.getCommandInfo()));

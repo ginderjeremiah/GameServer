@@ -23,7 +23,8 @@
                 Secure = true,
                 HttpOnly = true,
                 SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME)
+                Expires = DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME),
+                IsEssential = true,
             });
         }
     }

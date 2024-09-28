@@ -6,8 +6,10 @@ namespace GameInfrastructure.Redis
 {
     internal class RedisMultiplexerFactory
     {
-        private static ConnectionMultiplexer? _instance;
-        private static readonly object _instanceLock = new();
+        private static ConnectionMultiplexer? _cacheInstance;
+        private static ConnectionMultiplexer? _pubsubInstance;
+        private static readonly object _cacheLock = new();
+        private static readonly object _pubsubLock = new();
 
         private readonly ICacheConfiguration _config;
 
@@ -18,38 +20,63 @@ namespace GameInfrastructure.Redis
 
         public ConnectionMultiplexer GetMultiplexer()
         {
-            if (_instance == null)
+            if (_cacheInstance is not null)
             {
-                lock (_instanceLock)
-                {
-                    _instance ??= ConnectionMultiplexer.Connect(_config.CacheConnectionString);
-                }
+                return _cacheInstance;
             }
-            return _instance;
+            else if (_pubsubInstance is not null)
+            {
+                return _pubsubInstance;
+            }
+            else
+            {
+                lock (_cacheLock)
+                {
+                    _cacheInstance ??= ConnectionMultiplexer.Connect(_config.CacheConnectionString);
+                }
+
+                return _cacheInstance;
+            }
         }
 
         public static ConnectionMultiplexer GetMultiplexer(ICacheConfiguration config)
         {
-            if (_instance == null)
+            if (_cacheInstance is null)
             {
-                lock (_instanceLock)
+                lock (_cacheLock)
                 {
-                    _instance ??= ConnectionMultiplexer.Connect(config.CacheConnectionString);
+                    if (_pubsubInstance is not null && _pubsubInstance.Configuration == config.CacheConnectionString)
+                    {
+                        _cacheInstance = _pubsubInstance;
+                    }
+                    else
+                    {
+                        _cacheInstance ??= ConnectionMultiplexer.Connect(config.CacheConnectionString);
+                    }
                 }
             }
-            return _instance;
+
+            return _cacheInstance;
         }
 
         public static ConnectionMultiplexer GetMultiplexer(IPubSubConfiguration config)
         {
-            if (_instance == null)
+            if (_pubsubInstance is null)
             {
-                lock (_instanceLock)
+                lock (_cacheLock)
                 {
-                    _instance ??= ConnectionMultiplexer.Connect(config.PubSubConnectionString);
+                    if (_cacheInstance is not null && _cacheInstance.Configuration == config.PubSubConnectionString)
+                    {
+                        _pubsubInstance = _cacheInstance;
+                    }
+                    else
+                    {
+                        _pubsubInstance ??= ConnectionMultiplexer.Connect(config.PubSubConnectionString);
+                    }
                 }
             }
-            return _instance;
+
+            return _pubsubInstance;
         }
     }
 }

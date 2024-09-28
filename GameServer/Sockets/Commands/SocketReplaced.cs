@@ -4,7 +4,7 @@ namespace GameServer.Sockets.Commands
 {
     public class SocketReplaced : AbstractSocketCommand
     {
-        public override async Task<ApiSocketResponse> Execute()
+        public override ApiSocketResponse Execute()
         {
             return Close(ESocketCloseReason.SocketReplaced);
         }

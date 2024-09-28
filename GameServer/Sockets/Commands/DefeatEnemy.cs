@@ -9,7 +9,7 @@ using EnemyInstanceModel = GameServer.Models.Enemies.EnemyInstance;
 
 namespace GameServer.Sockets.Commands
 {
-    public class DefeatEnemy : AbstractSocketCommand<EnemyInstanceModel>
+    public class DefeatEnemy : AbstractSocketCommand<DefeatEnemyResponse, EnemyInstanceModel>
     {
         private Session Session { get; }
         private IApiLogger Logger { get; }
@@ -20,12 +20,7 @@ namespace GameServer.Sockets.Commands
             Logger = logger;
         }
 
-        public override async Task<ApiSocketResponse> Execute()
-        {
-            return await ExecuteInternal();
-        }
-
-        private async Task<ApiSocketResponse<DefeatEnemyResponse>> ExecuteInternal()
+        public override ApiSocketResponse<DefeatEnemyResponse> HandleExecute()
         {
             var now = DateTime.UtcNow;
             var instance = new EnemyInstance

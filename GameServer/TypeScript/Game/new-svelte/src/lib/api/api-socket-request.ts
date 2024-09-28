@@ -1,14 +1,14 @@
 import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketResponseTypes } from "./api-socket-type-map";
 import { IApiSocketResponse } from "./api-socket";
 
-export class ApiSocketRequest<T extends ApiSocketCommand> {
+export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
     private dataPromise: Promise<IApiSocketResponse<T>>;
     private promiseResolver!: (value: IApiSocketResponse<T>) => void;
     id: string;
     commandName: T;
-    parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : undefined;
+    parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never;
 
-    constructor(id: string, commandName: T, parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : undefined) {
+    constructor(id: string, commandName: T, parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never) {
         this.id = id;
         this.commandName = commandName;
         this.parameters = parameters;
