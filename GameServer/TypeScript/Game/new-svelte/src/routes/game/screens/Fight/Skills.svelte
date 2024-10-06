@@ -2,38 +2,40 @@
 	{#each skills as skill, index}
 		<div
 			class="skill-slot"
-			style="{`--skill-perc: ${skillPercent(skill, $renderDelta)}%`}"
+			style={`--skill-perc: ${skillPercent(skill)}%`}
 			role="gridcell"
 			tabindex="-1"
-			on:mousemove="{handleMouseMove}"
-			on:mouseenter="{(ev) => handleMouseEnter(ev, index)}"
-			on:mouseleave="{(ev) => handleMouseLeave(ev, index)}"
+			onmousemove={handleMouseMove}
+			onmouseenter={(ev) => handleMouseEnter(ev, index)}
+			onmouseleave={(ev) => handleMouseLeave(ev, index)}
 		>
 			{#if skill}
-				<img class="skill" src="{skill.iconPath}" alt="{skill.name}" />
+				<img class="skill" src={skill.iconPath} alt={skill.name} />
 			{/if}
 		</div>
 	{/each}
-	<SkillTooltip bind:this="{$tooltip}" skill="{tooltipSkill}" />
+	<SkillTooltip bind:this={tooltip} skill={tooltipSkill} />
 </div>
 
 <script lang="ts">
-import { Battler, Skill } from '$lib/battle';
-import { formatNum, writableEx, type WritableEx } from '$lib/common';
-import { registerTooltipComponent } from '$stores/tooltip';
-import { renderDelta } from '$lib/engine/render-engine';
+import type { Battler, Skill } from '$lib/battle';
+import { formatNum } from '$lib/common';
+import { registerTooltipComponent, type TooltipComponent } from '$stores/tooltip.svelte';
 import SkillTooltip from './SkillTooltip.svelte';
 
-export let battler: Battler | undefined;
+type Props = {
+	battler: Battler | undefined;
+};
+let { battler }: Props = $props();
 
-let tooltip = writableEx<SkillTooltip>();
-let tooltipSkillIndex: number = -1;
+let tooltip = $state<TooltipComponent>();
+let tooltipSkillIndex = $state(-1);
 
-$: skills = battler?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]);
-$: tooltipSkill = skills[tooltipSkillIndex];
-$: cdr = battler?.cdMultiplier ?? 1;
+const skills = $derived(battler?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]));
+const tooltipSkill = $derived(skills[tooltipSkillIndex]);
+const cdr = $derived(battler?.cdMultiplier ?? 1);
 
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(tooltip);
+const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 const handleMouseMove = (ev: MouseEvent) => {
 	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
@@ -54,9 +56,9 @@ const handleMouseLeave = (ev: MouseEvent, index: number) => {
 	}
 };
 
-const skillPercent = (skill: Skill | undefined, delta: number) => {
+const skillPercent = (skill: Skill | undefined) => {
 	if (skill) {
-		return formatNum((100 * (skill.chargeTime + delta * cdr)) / skill.cooldownMS);
+		return formatNum((100 * skill.renderChargeTime) / skill.cooldownMS);
 	} else {
 		return 0;
 	}

@@ -1,31 +1,25 @@
-<div
-	role="tooltip"
-	class="tooltip-container round-border"
-	style="{getPositionStyle($tooltip)}"
-	bind:this="{container}"
-></div>
+<div role="tooltip" class="tooltip-container round-border" {style} bind:this={container}></div>
 
 <script lang="ts">
-import type { ReadableEx } from '$lib/common';
-import type { TooltipData } from '$stores/tooltip';
+import type { TooltipData } from '$stores/tooltip.svelte';
 
-export let tooltip: ReadableEx<TooltipData>;
+let { component, position, visible }: TooltipData = $props();
 
 let container: HTMLDivElement;
 
-const component = $tooltip.component;
+$effect(() => {
+	if (component()) {
+		container.appendChild(component().getBaseNode());
+	}
+});
 
-$: if ($component) {
-	container.appendChild($component.getBaseNode());
-}
+const style = $derived.by(() => {
+	const mouseX = position?.x ?? 0;
+	const mouseY = position?.y ?? 0;
 
-const getPositionStyle = (tooltip: TooltipData) => {
-	if (!container || !tooltip.visible) {
+	if (!container || !visible) {
 		return;
 	}
-
-	const mouseX = tooltip.position?.x ?? 0;
-	const mouseY = tooltip.position?.y ?? 0;
 
 	let vertical = '';
 	let horizontal = '';
@@ -43,7 +37,7 @@ const getPositionStyle = (tooltip: TooltipData) => {
 	}
 
 	return `${vertical}; ${horizontal}; display: block;`;
-};
+});
 </script>
 
 <style lang="scss">

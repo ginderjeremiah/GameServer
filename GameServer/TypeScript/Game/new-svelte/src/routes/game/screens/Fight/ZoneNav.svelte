@@ -1,9 +1,9 @@
 <div class="zone-nav round-border">
 	<button
 		class="hover-glow"
-		disabled="{leftDisabled}"
+		disabled={leftDisabled}
 		id="zone-button-left"
-		on:click="{handleClickLeft}"
+		onclick={handleClickLeft}
 	>
 		&lt;
 	</button>
@@ -13,29 +13,30 @@
 	</div>
 	<button
 		class="hover-glow"
-		disabled="{rightDisabled}"
+		disabled={rightDisabled}
 		id="zone-button-right"
-		on:click="{handleClickRight}"
+		onclick={handleClickRight}
 	>
 		&gt;
 	</button>
 </div>
 
 <script lang="ts">
-import { zones, player } from '$stores';
+import { staticData, player } from '$stores';
 
-$: orderedZones = $zones.slice().sort((a, b) => a.order - b.order);
-$: current = orderedZones.find((z) => z.id === $player.currentZone) ?? orderedZones[0];
-$: zoneNum = orderedZones.indexOf(current) + 1;
-$: leftDisabled = zoneNum === 1;
-$: rightDisabled = zoneNum === orderedZones.length;
+const orderedZones = $derived(staticData.zones.slice().sort((a, b) => a.order - b.order));
+const current = $derived(
+	orderedZones.find((z) => z.id === player.data.currentZone) ?? orderedZones[0]
+);
+const zoneNum = $derived(orderedZones.indexOf(current) + 1);
+const leftDisabled = $derived(zoneNum === 1);
+const rightDisabled = $derived(zoneNum === orderedZones.length);
 
 const changeZone = (amount: number) => {
 	const newZone = zoneNum + amount;
 	if (newZone >= 1 && newZone <= orderedZones.length) {
 		const zoneData = orderedZones[newZone - 1];
-		$player.currentZone = zoneData.id;
-		$player = $player;
+		player.data.currentZone = zoneData.id;
 		return true;
 	}
 	return false;

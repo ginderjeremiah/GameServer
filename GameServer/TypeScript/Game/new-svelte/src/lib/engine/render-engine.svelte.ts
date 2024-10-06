@@ -1,14 +1,23 @@
-import { writableEx, createHook, getEventCounter } from "$lib/common";
-import { logicalTime } from "./game-engine";
+import { createHook, getEventCounter } from "$lib/common";
+import { logicalState } from "./game-engine.svelte";
 
-export let renderDelta = writableEx(0);
-export let renderTickRate = writableEx(0);
+let renderDelta = $state(0);
+let renderTickRate = $state(0);
+
+export const renderState = {
+   get delta() {
+      return renderDelta;
+   },
+   get tickRate() {
+      return renderTickRate;
+   }
+}
 
 const renderUpdateHook = createHook<number>();
 const notifyRenderUpdate = renderUpdateHook.notify;
 export const onRenderUpdate = renderUpdateHook.onNotified;
 
-let countTick = getEventCounter(t => renderTickRate.set(Math.round(t)));
+let countTick = getEventCounter(t => renderTickRate = Math.round(t));
 let initialized = false;
 
 export const startRenderEngine = () => {
@@ -27,7 +36,7 @@ const renderLoop = () => {
 
 const update = (ts: DOMHighResTimeStamp) => {
    countTick();
-   const delta = ts - logicalTime;
-   renderDelta.set(delta);
+   const delta = ts - logicalState.time;
+   renderDelta = delta;
    notifyRenderUpdate(delta);
 }

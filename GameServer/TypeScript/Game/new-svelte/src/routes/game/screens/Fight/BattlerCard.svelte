@@ -4,8 +4,8 @@
 		<span>{`Level: ${battler?.level ?? 1}`}</span>
 	</div>
 	<div class="health-display">
-		<label for="{healthId}">Health: </label>
-		<div class="health-meter round-border" style="{`--health-perc: ${healthPerc}%;`}">
+		<label for={healthId}>Health: </label>
+		<div class="health-meter round-border" style={`--health-perc: ${healthPerc}%;`}>
 			<div class="health-layer health-remaining"></div>
 			<div class="health-layer health-disappearing"></div>
 			<span>{healthText}</span>
@@ -16,17 +16,22 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { Battler } from '$lib/battle';
-import { formatNum, type WritableEx } from '$lib/common';
+import { type Battler } from '$lib/battle';
+import { formatNum } from '$lib/common';
 import Skills from './Skills.svelte';
 
-export let battler: Battler | undefined;
+type Props = {
+	battler: Battler | undefined;
+};
 
-$: currentHealth = battler?.currentHealth ?? 0;
-$: maxHealth = battler?.attributes.getValue(EAttribute.MaxHealth);
-$: healthText = `${formatNum(currentHealth)}/${maxHealth ?? 0}`;
-$: healthPerc = maxHealth ? formatNum(Math.max((currentHealth * 100) / maxHealth, 0)) : 100;
+let { battler }: Props = $props();
 
+const currentHealth = $derived(battler?.currentHealth ?? 0);
+const maxHealth = $derived(battler?.attributes.getValue(EAttribute.MaxHealth));
+const healthText = $derived(`${formatNum(currentHealth)}/${maxHealth ?? 0}`);
+const healthPerc = $derived(
+	maxHealth ? formatNum(Math.max((currentHealth * 100) / maxHealth, 0)) : 100
+);
 const healthId = crypto.randomUUID();
 </script>
 

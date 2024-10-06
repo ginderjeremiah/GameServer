@@ -11,8 +11,13 @@
 
 <script lang="ts">
 import Loading from '$components/Loading.svelte';
-export let title: string;
-export let loading: boolean;
+
+type Props = {
+	title: string;
+	loading: boolean;
+};
+
+let { title, loading }: Props = $props();
 </script>
 
 <style lang="scss">

@@ -1,7 +1,7 @@
 ﻿import { Tooltippable } from "$lib/tooltips";
 import { IItem, IBattlerAttribute, IItemMod, IInventoryItem } from "$lib/api";
 import { ItemMod } from "./item-mod";
-import { BattleAttributes } from "./battle-attributes";
+import { BattleAttributes, newBattleAttributes } from "./battle-attributes";
 
 export class Item extends Tooltippable implements IItem {
     id: number;
@@ -31,7 +31,7 @@ export class Item extends Tooltippable implements IItem {
         this.inventorySlotNumber = invItem.inventorySlotNumber;
         this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
         const itemModAttributes = this.itemMods.flatMap(mod => mod.attributes);
-        this.totalAttributes = new BattleAttributes([...this.attributes, ...itemModAttributes], false);
+        this.totalAttributes = newBattleAttributes([...this.attributes, ...itemModAttributes], false);
     }
 
     updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {

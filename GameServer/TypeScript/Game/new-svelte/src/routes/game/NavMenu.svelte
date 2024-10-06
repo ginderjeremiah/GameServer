@@ -1,21 +1,21 @@
 <div class="nav-menu">
 	<div class="nav-menu-buttons">
-		<button class="hover-glow" on:click="{() => changeScreen('Fight')}">Fight</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Inventory')}">Inventory</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Attributes')}">Attributes</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Stats')}">Stats</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Help')}">Help</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Options')}">Options</button>
-		<button class="hover-glow" on:click="{() => changeScreen('CardGame')}">Card Game</button>
-		<button class="hover-glow" on:click="{() => changeScreen('Quit')}">Quit</button>
+		<button class="hover-glow" onclick={() => changeScreen('Fight')}>Fight</button>
+		<button class="hover-glow" onclick={() => changeScreen('Inventory')}>Inventory</button>
+		<button class="hover-glow" onclick={() => changeScreen('Attributes')}>Attributes</button>
+		<button class="hover-glow" onclick={() => changeScreen('Stats')}>Stats</button>
+		<button class="hover-glow" onclick={() => changeScreen('Help')}>Help</button>
+		<button class="hover-glow" onclick={() => changeScreen('Options')}>Options</button>
+		<button class="hover-glow" onclick={() => changeScreen('CardGame')}>Card Game</button>
+		<button class="hover-glow" onclick={() => changeScreen('Quit')}>Quit</button>
 	</div>
 	<div>
-		<span class="tick-counter">{$logicalTickRate}</span>
-		<span class="tick-counter">{$renderTickRate}</span>
+		<span class="tick-counter">{logicalState.tickRate}</span>
+		<span class="tick-counter">{renderState.tickRate}</span>
 	</div>
 </div>
 
-<script lang="ts" context="module">
+<script lang="ts" module>
 export type GameScreen =
 	| 'Fight'
 	| 'Inventory'
@@ -29,7 +29,7 @@ export type GameScreen =
 
 <script lang="ts">
 import { createEventDispatcher } from 'svelte';
-import { logicalTickRate, renderTickRate } from '$lib/engine';
+import { logicalState, renderState } from '$lib/engine';
 
 const emit = createEventDispatcher<{
 	'change-screen': GameScreen;

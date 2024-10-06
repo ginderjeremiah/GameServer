@@ -1,4 +1,4 @@
-<div class="skill-tooltip" bind:this="{container}" style="{skill ? '' : 'display: none;'}">
+<div class="skill-tooltip" bind:this={container} style={skill ? '' : 'display: none;'}>
 	<div class="tooltip-title">{`${skill?.name} (${remainingCd.toFixed(2)}s)`}</div>
 	<div class="tooltip-content">
 		<div class="tooltip-header">Damage:</div>
@@ -6,7 +6,7 @@
 			<li>Base: {baseDamage}</li>
 			{#each multipliers as mult}
 				<li>
-					{$attributes[mult.attributeId].name}: {formatNum(getMultiplier(mult))} ({mult.multiplier}x)
+					{staticData.attributes[mult.attributeId].name}: {formatNum(getMultiplier(mult))} ({mult.multiplier}x)
 				</li>
 			{/each}
 			<li>Total: {formatNum(totalDamage)}</li>
@@ -24,30 +24,35 @@
 
 <script lang="ts">
 import { EAttribute, type IAttributeMultiplier } from '$lib/api';
-import { Skill } from '$lib/battle';
+import { type Skill } from '$lib/battle';
 import { formatNum } from '$lib/common';
-import { renderDelta, getOpponent } from '$lib/engine';
-import { attributes } from '$stores';
+import { getOpponent } from '$lib/engine';
+import { staticData } from '$stores';
 
 export const getBaseNode = () => container;
 
-export let skill: Skill | undefined;
+type Props = {
+	skill: Skill | undefined;
+};
+
+let { skill }: Props = $props();
 
 let container: HTMLDivElement;
 
-$: opponent = skill?.owner ? getOpponent(skill.owner) : undefined;
+const opponent = $derived(skill?.owner ? getOpponent(skill.owner) : undefined);
 
-$: baseDamage = skill?.baseDamage ?? 0;
-$: multipliers = skill?.damageMultipliers ?? [];
-$: totalDamage = baseDamage + multipliers.reduce((a, b) => a + getMultiplier(b), 0);
-$: adjustedTotal = Math.max(
-	totalDamage - (opponent?.attributes.getValue(EAttribute.Defense) ?? 0),
-	0
+const baseDamage = $derived(skill?.baseDamage ?? 0);
+const multipliers = $derived(skill?.damageMultipliers ?? []);
+const totalDamage = $derived(baseDamage + multipliers.reduce((a, b) => a + getMultiplier(b), 0));
+const adjustedTotal = $derived(
+	Math.max(totalDamage - (opponent?.attributes.getValue(EAttribute.Defense) ?? 0), 0)
 );
-$: cdMultiplier = skill?.owner.cdMultiplier ?? 1;
-$: adjustedCd = (skill?.cooldownMS ?? 0) / 1000 / cdMultiplier;
-$: remainingCd =
-	adjustedCd - ($renderDelta * cdMultiplier + (skill?.chargeTime ?? 0)) / 1000 / cdMultiplier;
+const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
+const adjustedCd = $derived((skill?.cooldownMS ?? 0) / 1000 / cdMultiplier);
+// prettier-ignore
+const remainingCd = $derived(
+	Math.abs(adjustedCd - (cdMultiplier + (skill?.renderChargeTime ?? 0)) / 1000 / cdMultiplier)
+);
 
 const getMultiplier = (mult: IAttributeMultiplier) => {
 	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;

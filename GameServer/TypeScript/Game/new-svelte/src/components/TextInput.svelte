@@ -1,5 +1,5 @@
 {#if label}
-	<label class="text-input-label" for="{id}"> {label} </label>
+	<label class="text-input-label" for={id}> {label} </label>
 {/if}
 <div class="text-input-wrapper round-border hover-glow">
 	{#if type === 'text'}
@@ -12,11 +12,21 @@
 </div>
 
 <script lang="ts" generics="T extends 'text' | 'password' | 'number'">
-export let value: T extends 'number' ? number : string;
-export let type: T;
-export let label: string = '';
-export let name: string = '';
-export let id: string = crypto.randomUUID();
+type Props = {
+	value: (T extends 'number' ? number : string) | undefined;
+	type: T;
+	label?: string;
+	name?: string;
+	id?: string;
+};
+
+let {
+	value = $bindable(),
+	type,
+	label = '',
+	name = '',
+	id = crypto.randomUUID()
+}: Props = $props();
 </script>
 
 <style lang="scss">

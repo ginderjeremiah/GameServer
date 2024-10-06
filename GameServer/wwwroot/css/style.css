@@ -380,7 +380,7 @@ html {
 }
 
 #legSlot {
-    position: absolute;
+    position: absolute;  
     left: calc(50% - var(--width)/2);
     top: calc(var(--width)*2 + 6.6%);
 }

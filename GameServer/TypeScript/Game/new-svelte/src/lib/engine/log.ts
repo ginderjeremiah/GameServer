@@ -1,7 +1,6 @@
 import { ELogSetting } from "$lib/api"
 import { player } from "$stores";
-import { logs } from "$stores/logs";
-import { get } from "svelte/store";
+import { logs } from "$stores";
 
 export interface LogMessage {
    id: number
@@ -13,16 +12,15 @@ let id = 0;
 
 export const logMessage = (logType: ELogSetting, message: string) => {
    console.log(message);
-   if (player.value.logPreferences.find(pref => pref.id === logType)?.enabled ?? true) {
-      if (logs.value.length >= 40) {
-         logs.value.pop();
+   if (player.data.logPreferences.find(pref => pref.id === logType)?.enabled ?? true) {
+      if (logs().length >= 40) {
+         logs().pop();
       }
       id++;
-      logs.value.unshift({
+      logs().unshift({
          id,
          logType,
          message
       });
-      logs.refresh();
    }
 }

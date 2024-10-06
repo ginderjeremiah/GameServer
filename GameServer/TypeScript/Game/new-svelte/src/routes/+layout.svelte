@@ -1,25 +1,24 @@
 <div class="page-base {colorScheme}">
-	<slot></slot>
+	{@render children()}
 	<TooltipBase />
 </div>
 
 <script lang="ts">
 import { player } from '$stores';
-import { onDestroy } from 'svelte';
 import { page } from '$app/stores';
 import { routeTo } from '$lib/common';
 import TooltipBase from '$components/TooltipBase.svelte';
 import '$styles/common.scss';
 
-let colorScheme = 'default';
+let { children } = $props();
 
-const unsubscribe = player.subscribe((val) => {
-	if (!val && $page.url.pathname !== '/') {
+let colorScheme = $state('default');
+
+$effect(() => {
+	if (!player.data && $page.url.pathname !== '/') {
 		routeTo('/');
 	}
 });
-
-onDestroy(unsubscribe);
 </script>
 
 <style lang="scss">

@@ -1,10 +1,10 @@
 <div class="game-container">
-	<NavMenu on:change-screen="{handleChangeScreen}" />
+	<NavMenu on:change-screen={handleChangeScreen} />
 	<div class="screen-container">
-		<svelte:component this="{currentScreen}" />
+		<CurrentScreen />
 	</div>
 	<div class="log-container round-border">
-		{#each $logs as log (log.id)}
+		{#each logs() as log (log.id)}
 			<div class="log-message">
 				<span>{log.message}</span>
 			</div>
@@ -18,40 +18,40 @@ import type { GameScreen } from './NavMenu.svelte';
 import { Fight, Inventory, Attributes, Stats, Help, Options, CardGame, Quit } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
-import { logs } from '$stores/logs';
+import { logs } from '$stores/logs.svelte';
 
 if (browser) {
 	startGame();
 }
 
-let currentScreen = Fight;
+let CurrentScreen = $state(Fight);
 
 const handleChangeScreen = (event: CustomEvent<GameScreen>) => {
 	switch (event.detail) {
 		default:
 		case 'Fight':
-			currentScreen = Fight;
+			CurrentScreen = Fight;
 			break;
 		case 'Inventory':
-			currentScreen = Inventory;
+			CurrentScreen = Inventory;
 			break;
 		case 'Attributes':
-			currentScreen = Attributes;
+			CurrentScreen = Attributes;
 			break;
 		case 'Stats':
-			currentScreen = Stats;
+			CurrentScreen = Stats;
 			break;
 		case 'Help':
-			currentScreen = Help;
+			CurrentScreen = Help;
 			break;
 		case 'Options':
-			currentScreen = Options;
+			CurrentScreen = Options;
 			break;
 		case 'CardGame':
-			currentScreen = CardGame;
+			CurrentScreen = CardGame;
 			break;
 		case 'Quit':
-			currentScreen = Quit;
+			CurrentScreen = Quit;
 	}
 };
 </script>

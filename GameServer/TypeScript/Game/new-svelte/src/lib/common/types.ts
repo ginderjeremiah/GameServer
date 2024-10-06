@@ -1,6 +1,6 @@
 ﻿export type Comparator<Type> = (currData: Type, objData: Type) => boolean;
 
-export type Action<Type> = (data: Type) => void;
+export type Action<Type = void> = (data: Type) => void;
 
 export type Converter<Type, Type2> = (data: Type) => Type2;
 

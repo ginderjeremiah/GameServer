@@ -2,39 +2,40 @@
 <div class="center-content">
 	<div class="loading-container round-border">
 		<div>
-			<LoadingSection title="Zones" loading="{zonesLoading}" />
-			<LoadingSection title="Enemies" loading="{enemiesLoading}" />
-			<LoadingSection title="Items" loading="{itemsLoading}" />
-			<LoadingSection title="Skills" loading="{skillsLoading}" />
-			<LoadingSection title="Item Mods" loading="{itemModsLoading}" />
-			<LoadingSection title="Attributes" loading="{attributesLoading}" />
+			<LoadingSection title="Zones" loading={zonesLoading} />
+			<LoadingSection title="Enemies" loading={enemiesLoading} />
+			<LoadingSection title="Items" loading={itemsLoading} />
+			<LoadingSection title="Skills" loading={skillsLoading} />
+			<LoadingSection title="Item Mods" loading={itemModsLoading} />
+			<LoadingSection title="Attributes" loading={attributesLoading} />
 		</div>
-		<Button loading="{anyLoading}" text="Start Game" on:click="{tryStartGame}" />
+		<Button loading={anyLoading} text="Start Game" onClick={tryStartGame} />
 	</div>
 </div>
 
 <script lang="ts">
 import { ApiRequest } from '$lib/api/api-request';
 import { routeTo } from '$lib/common';
-import { zones, enemies, items, skills, itemMods, attributes } from '$stores';
+import { staticData } from '$stores';
 import Button from '$components/Button.svelte';
 import LoadingSection from './LoadingSection.svelte';
 import { onMount } from 'svelte';
 
-$: zonesLoading = !$zones;
-$: enemiesLoading = !$enemies;
-$: itemsLoading = !$items;
-$: skillsLoading = !$skills;
-$: itemModsLoading = !$itemMods;
-$: attributesLoading = !$attributes;
+const zonesLoading = $derived(!staticData.zones);
+const enemiesLoading = $derived(!staticData.enemies);
+const itemsLoading = $derived(!staticData.items);
+const skillsLoading = $derived(!staticData.skills);
+const itemModsLoading = $derived(!staticData.itemMods);
+const attributesLoading = $derived(!staticData.attributes);
 
-$: anyLoading =
+const anyLoading = $derived(
 	zonesLoading ||
-	enemiesLoading ||
-	itemsLoading ||
-	skillsLoading ||
-	itemModsLoading ||
-	attributesLoading;
+		enemiesLoading ||
+		itemsLoading ||
+		skillsLoading ||
+		itemModsLoading ||
+		attributesLoading
+);
 
 const tryStartGame = () => {
 	if (!anyLoading) {
@@ -43,27 +44,27 @@ const tryStartGame = () => {
 };
 
 const fetchZones = async () => {
-	$zones ??= await ApiRequest.get('/api/Zones');
+	staticData.zones ??= await ApiRequest.get('/api/Zones');
 };
 
 const fetchEnemies = async () => {
-	$enemies ??= await ApiRequest.get('/api/Enemies');
+	staticData.enemies ??= await ApiRequest.get('/api/Enemies');
 };
 
 const fetchItems = async () => {
-	$items ??= await ApiRequest.get('/api/Items');
+	staticData.items ??= await ApiRequest.get('/api/Items');
 };
 
 const fetchSkills = async () => {
-	$skills ??= await ApiRequest.get('/api/Skills');
+	staticData.skills ??= await ApiRequest.get('/api/Skills');
 };
 
 const fetchItemMods = async () => {
-	$itemMods ??= await ApiRequest.get('/api/ItemMods');
+	staticData.itemMods ??= await ApiRequest.get('/api/ItemMods');
 };
 
 const fetchAttributes = async () => {
-	$attributes ??= await ApiRequest.get('/api/Attributes');
+	staticData.attributes ??= await ApiRequest.get('/api/Attributes');
 };
 
 onMount(() => {

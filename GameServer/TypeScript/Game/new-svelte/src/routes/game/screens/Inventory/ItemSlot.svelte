@@ -5,11 +5,10 @@
 
 <style lang="scss">
 .item-slot {
-	--width: calc((74vw - 6px) / 12);
 	background-color: var(--slot-background-color);
 	box-sizing: border-box;
 	border: var(--default-border);
-	width: var(--width);
-	height: var(--width);
+	width: var(--slot-width);
+	height: var(--slot-width);
 }
 </style>

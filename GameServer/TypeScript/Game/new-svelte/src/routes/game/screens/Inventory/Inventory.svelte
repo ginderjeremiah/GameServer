@@ -1,17 +1,22 @@
 <div class="inventory-screen">
-	Inventory...
 	<div class="equipped-panel">
 		<EquippedItems />
-		<!--
-      <EquippedStats/>
-      -->
+		<InventoryItems />
 	</div>
-	<!--InventoryItems/-->
 </div>
 
 <script lang="ts">
 import EquippedItems from './EquippedItems.svelte';
+import InventoryItems from './InventoryItems.svelte';
 </script>
 
 <style lang="scss">
+.inventory-screen {
+	--slot-width: calc((74vw - 6px) / 12);
+
+	.equipped-panel {
+		margin-top: 2vh;
+		display: flex;
+	}
+}
 </style>

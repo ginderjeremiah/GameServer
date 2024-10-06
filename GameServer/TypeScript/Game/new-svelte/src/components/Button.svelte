@@ -1,4 +1,4 @@
-<button class="btn round-border hover-glow" disabled="{loading}" on:click>
+<button class="btn round-border hover-glow" disabled={loading} onclick={onClick}>
 	{#if loading}
 		<Loading></Loading>
 	{/if}
@@ -7,9 +7,13 @@
 
 <script lang="ts">
 import Loading from './Loading.svelte';
+type Props = {
+	text?: string;
+	loading?: boolean;
+	onClick: (event: MouseEvent) => void;
+};
 
-export let text: string;
-export let loading = false;
+let { text, loading = false, onClick }: Props = $props();
 </script>
 
 <style lang="scss">

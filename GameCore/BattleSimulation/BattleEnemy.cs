@@ -13,7 +13,7 @@ namespace GameCore.BattleSimulation
         public BattleEnemy(Enemy enemy, EnemyInstance enemyInstance)
         {
             var rng = new Random();
-            var selectedSkills = enemy.EnemySkills.OrderBy(es => rng.Next()).Take(4).Select(es => es.Skill).ToList();
+            var selectedSkills = enemy.EnemySkills.OrderBy(es => rng.Next()).Take(4).Select(es => es.Skill).OrderBy(s => s.Id).ToList();
             var attributes = enemy.AttributeDistributions.Select(dist => new BattlerAttribute(dist, enemyInstance.Level)).ToList();
             Level = enemyInstance.Level;
             Attributes = new BattleAttributes(attributes);

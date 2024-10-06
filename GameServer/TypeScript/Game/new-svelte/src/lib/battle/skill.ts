@@ -1,37 +1,27 @@
-﻿import { Tooltippable } from "$lib/tooltips";
-import { ISkill, IAttributeMultiplier } from "$lib/api";
-import { Battler } from "./battler";
+﻿import { ISkill } from "$lib/api";
+import { Battler } from "./battler.svelte";
 
-export class Skill implements ISkill {
-    id: number
-    name: string;
+export interface Skill extends ISkill {
     chargeTime: number;
-    baseDamage: number;
-    damageMultipliers: IAttributeMultiplier[];
-    description: string;
-    cooldownMS: number;
-    iconPath: string;
+    renderChargeTime: number;
     owner: Battler;
-    ownerStatsVersion = -1;
-    target?: Battler;
-
-    constructor(data: ISkill, owner: Battler) {
-        this.id = data.id
-        this.name = data.name;
-        this.baseDamage = data.baseDamage;
-        this.damageMultipliers = data.damageMultipliers;
-        this.description = data.description;
-        this.cooldownMS = data.cooldownMS;
-        this.chargeTime = 0;
-        this.iconPath = data.iconPath;
-        this.owner = owner;
-    }
-
-    calculateDamage() {
-        let dmg = this.baseDamage;
-        this.damageMultipliers.forEach((dmgType) => {
-            dmg += this.owner.attributes.getValue(dmgType.attributeId) * dmgType.multiplier;
-        })
-        return dmg
-    }
+    calculateDamage: () => number;
 }
+
+export const newSkill = (data: ISkill, owner: Battler) => {
+    const skill = {
+        ...data,
+        chargeTime: 0,
+        renderChargeTime: 0,
+        owner,
+    } as Skill;
+    skill.calculateDamage = () => {
+        let dmg = skill.baseDamage;
+        skill.damageMultipliers.forEach((dmgType) => {
+            dmg += owner.attributes.getValue(dmgType.attributeId) * dmgType.multiplier;
+        })
+        return dmg;
+    }
+
+    return skill;
+};

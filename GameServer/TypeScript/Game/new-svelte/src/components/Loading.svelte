@@ -22,7 +22,7 @@
 </div>
 
 <script lang="ts">
-export let hideOverlay = false;
+let { hideOverlay = false } = $props();
 </script>
 
 <style lang="scss">
