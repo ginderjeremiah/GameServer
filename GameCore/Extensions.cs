@@ -20,38 +20,6 @@ namespace GameCore
             };
         }
 
-        public static int AsInt(this object? obj, int defaultVal = default)
-        {
-            return obj is int intObj ? intObj : int.TryParse(obj.AsString(), out var val) ? val : defaultVal;
-        }
-
-        public static DateTime AsDate(this object? obj, DateTime? defaultVal = null)
-        {
-            return obj is DateTime dtObj ? dtObj : DateTime.TryParse(obj.AsString(), out var dt) ? dt : defaultVal ?? DateTime.MinValue;
-        }
-
-        public static bool AsBool(this object? obj, bool defaultVal = false)
-        {
-            if (obj is bool boolObj)
-                return boolObj;
-            else return obj is int intObj ? !(intObj == 0) : bool.TryParse(obj.AsString(), out var b) ? b : defaultVal;
-        }
-
-        public static short AsShort(this object? obj, short defaultVal = default)
-        {
-            return obj is short intObj ? intObj : short.TryParse(obj.AsString(), out var val) ? val : defaultVal;
-        }
-
-        public static float AsFloat(this object? obj, float defaultVal = default)
-        {
-            return obj is float intObj ? intObj : float.TryParse(obj.AsString(), out var val) ? val : defaultVal;
-        }
-
-        public static decimal AsDecimal(this object? obj, decimal defaultVal = default)
-        {
-            return obj is decimal decObj ? decObj : decimal.TryParse(obj.AsString(), out var dec) ? dec : defaultVal;
-        }
-
         public static T[] AppendAll<T>(this T[] first, T[] second)
         {
             T[] output = new T[first.Length + second.Length];

@@ -23,7 +23,7 @@ namespace GameServer.Sockets.Commands
             Repositories = repos;
         }
 
-        public override ApiSocketResponse<NewEnemyModel> HandleExecute()
+        public override ApiSocketResponse<NewEnemyModel> HandleExecute(SocketContext context)
         {
             var now = DateTime.UtcNow;
             if (Session.EnemyCooldown > now)

@@ -1,8 +1,10 @@
 ﻿using GameCore;
 using GameCore.Infrastructure;
+using GameCore.Sessions;
 using GameInfrastructure;
 using GameServer.Sockets;
 using GameServer.Sockets.Commands;
+using System.Net.WebSockets;
 
 namespace GameServer.Services
 {
@@ -11,31 +13,37 @@ namespace GameServer.Services
         private readonly IPubSubService _pubSub;
         private readonly ICacheService _cache;
         private readonly IApiLogger _logger;
+        private readonly SocketCommandFactory _commandFactory;
 
-        public SocketManagerService(IDataServicesFactory dataServices)
+        public SocketManagerService(IDataServicesFactory dataServices, SocketCommandFactory commandFactory)
         {
             _pubSub = dataServices.PubSub;
             _cache = dataServices.Cache;
             _logger = dataServices.Logger;
+            _commandFactory = commandFactory;
         }
 
-        public async Task RegisterSocket(SocketHandler socket)
+        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionPlayer player)
         {
-            var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(socket.PlayerId), socket.Id);
+            var socketContext = new SocketContext(socket, player.Id);
+            var socketHandler = new SocketHandler(socketContext, _commandFactory, _logger);
+            var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(player.Id), socketContext.SocketId);
             if (oldSocketId is not null)
             {
                 var command = new SocketReplacedInfo(oldSocketId);
                 await EmitSocketCommand(command, oldSocketId);
             }
 
-            await RegisterSocketCommandListener(socket);
-            socket.Listen();
+            await RegisterSocketCommandListener(socketHandler);
+            socketHandler.Listen();
+            _logger.LogDebug($"Initiated socket for player: {player.UserName} ({player.Id}), with Id: {socketContext.SocketId}");
+            return socketContext;
         }
 
-        public async Task UnRegisterSocket(SocketHandler socket)
+        public async Task UnRegisterSocket(SocketContext context)
         {
-            await UnRegisterSocketCommandListener(socket.Id);
-            await _cache.CompareAndDeleteAsync(CurrentSocketKey(socket.PlayerId), socket.Id);
+            await UnRegisterSocketCommandListener(context.SocketId);
+            await _cache.CompareAndDeleteAsync(CurrentSocketKey(context.PlayerId), context.SocketId);
         }
 
         public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
@@ -61,12 +69,12 @@ namespace GameServer.Services
             await _pubSub.UnSubscribe(SocketChannel(socketId), socketId);
         }
 
-        private async Task RegisterSocketCommandListener(SocketHandler socket)
+        private async Task RegisterSocketCommandListener(SocketHandler handler)
         {
-            var channel = SocketChannel(socket.Id);
-            var queueName = SocketQueueName(socket.Id);
-            var processor = GetSocketCommandProcessor(socket);
-            await _pubSub.Subscribe(channel, queueName, async args => await processor(args.queue), socket.Id);
+            var channel = SocketChannel(handler.Id);
+            var queueName = SocketQueueName(handler.Id);
+            var processor = GetSocketCommandProcessor(handler);
+            await _pubSub.Subscribe(channel, queueName, async args => await processor(args.queue), handler.Id);
         }
 
         private Func<IPubSubQueue, Task> GetSocketCommandProcessor(SocketHandler socket)

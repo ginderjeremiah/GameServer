@@ -20,7 +20,7 @@ namespace GameServer.Sockets.Commands
             Logger = logger;
         }
 
-        public override ApiSocketResponse<DefeatEnemyResponse> HandleExecute()
+        public override ApiSocketResponse<DefeatEnemyResponse> HandleExecute(SocketContext context)
         {
             var now = DateTime.UtcNow;
             var instance = new EnemyInstance

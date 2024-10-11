@@ -1,7 +1,4 @@
-﻿using GameCore;
-using GameServer.Services;
-using GameServer.Sockets;
-using System.Net.WebSockets;
+﻿using GameServer.Services;
 
 namespace GameServer.Middleware
 {
@@ -13,48 +10,30 @@ namespace GameServer.Middleware
         /// The application request pipeline hook.
         /// </summary>
         /// <param name="context"></param>
-        /// <param name="logger"></param>
         /// <param name="sessionService"></param>
         /// <param name="socketManager"></param>
-        /// <param name="commandFactory"></param>
         /// <returns></returns>
-        public async Task InvokeAsync(HttpContext context, IApiLogger logger, SessionService sessionService, SocketManagerService socketManager, SocketCommandFactory commandFactory)
+        public async Task InvokeAsync(HttpContext context, SessionService sessionService, SocketManagerService socketManager)
         {
-            if (context.Request.Path == "/EstablishSocket")
+            if (context.Request.Path != "/EstablishSocket")
             {
-                if (sessionService.SessionAvailable)
-                {
-                    if (context.WebSockets.IsWebSocketRequest)
-                    {
-                        var player = sessionService.GetSession().Player;
-                        using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                        var socketHandler = new SocketHandler(webSocket, commandFactory, logger, player.Id);
-                        await socketManager.RegisterSocket(socketHandler);
-                        logger.LogDebug($"Initiated socket for player: {player.UserName} ({player.Id}), with Id: {socketHandler.Id}");
-
-                        var closeReason = await socketHandler.SocketFinished.Task;
-                        await socketManager.UnRegisterSocket(socketHandler);
-                        if (webSocket.State is WebSocketState.Open)
-                        {
-                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
-                            logger.LogDebug($"Closing socket for player: {player.UserName}, {player.Id}, with Id: {socketHandler.Id}");
-                        }
-
-                        logger.LogDebug($"{nameof(SocketInterceptorMiddleware)} complete for: {player.UserName}, {player.Id}");
-                    }
-                    else
-                    {
-                        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-                    }
-                }
-                else
-                {
-                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                }
+                await _next(context);
+            }
+            else if (!sessionService.SessionAvailable)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            }
+            else if (!context.WebSockets.IsWebSocketRequest)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
             }
             else
             {
-                await _next(context);
+                var player = sessionService.GetSession().Player;
+                using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                var socketContext = await socketManager.RegisterSocket(webSocket, player);
+                await socketContext.WaitSocketClosed();
+                await socketManager.UnRegisterSocket(socketContext);
             }
         }
     }

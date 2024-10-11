@@ -24,6 +24,7 @@ namespace GameServer.Services
             {
                 var command = generator(_serviceProvider);
                 command.SetParameters(commandInfo.Parameters);
+                command.Id = commandInfo.Id;
                 return command;
             }
             else

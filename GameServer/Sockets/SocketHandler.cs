@@ -13,25 +13,25 @@ namespace GameServer.Sockets
     {
         private const short MAX_MESSAGE_SIZE = 1024 * 4;
         private readonly byte[] _buffer = new byte[MAX_MESSAGE_SIZE];
-        private readonly WebSocket _socket;
+
         private readonly SocketCommandFactory _commandFactory;
         private readonly IApiLogger _logger;
+        private readonly SocketContext _context;
+
         private DateTime _lastSend = DateTime.UtcNow;
         private DateTime _lastResponse = DateTime.UtcNow;
 
         private DateTime LastAction => _lastResponse > _lastSend ? _lastResponse : _lastSend;
 
-        public string Id { get; }
-        public TaskCompletionSource<ESocketCloseReason> SocketFinished { get; } = new();
-        public int PlayerId { get; }
+        private WebSocket Socket => _context.Socket;
+        public string Id => _context.SocketId;
+        public int PlayerId => _context.PlayerId;
 
-        public SocketHandler(WebSocket socket, SocketCommandFactory commandFactory, IApiLogger logger, int playerId)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IApiLogger logger)
         {
-            Id = Guid.NewGuid().ToString();
-            PlayerId = playerId;
-            _socket = socket;
             _commandFactory = commandFactory;
             _logger = logger;
+            _context = context;
         }
 
         public void Listen()
@@ -42,6 +42,9 @@ namespace GameServer.Sockets
 
         public async Task<bool> SendData(string data)
         {
+            if (Socket.State is not Open)
+                return false;
+
             _logger.LogDebug($"Sending data to playerId ({PlayerId}) from socket ({Id}): {data}");
             var dataBytes = Encoding.UTF8.GetBytes(data);
             try
@@ -50,11 +53,11 @@ namespace GameServer.Sockets
                 {
                     if (dataBytes.Length - i <= MAX_MESSAGE_SIZE)
                     {
-                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
+                        await Socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
                     else
                     {
-                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
+                        await Socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
                     }
 
                     _lastSend = DateTime.UtcNow;
@@ -78,21 +81,8 @@ namespace GameServer.Sockets
         {
             _logger.Log($"Executing command: {commandInfo} on socket: {Id}");
             var command = _commandFactory.CreateCommand(commandInfo);
-            var response = await command.ExecuteAsync();
-            if (response.CloseReason is not null)
-            {
-                Close(response.CloseReason.Value);
-            }
-            else
-            {
-                response.Id = commandInfo.Id;
-                await SendData(response);
-            }
-        }
-
-        public void Close(ESocketCloseReason closeReason = ESocketCloseReason.Finished)
-        {
-            SocketFinished.TrySetResult(closeReason);
+            var response = await command.ExecuteAsync(_context);
+            await SendData(response);
         }
 
         private void ClearBuffer(int end = -1)
@@ -107,7 +97,7 @@ namespace GameServer.Sockets
 
         private async Task PingLoop()
         {
-            while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && _socket.State is Open)
+            while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && Socket.State is Open)
             {
                 await Task.Delay(5000);
                 if (DateTime.UtcNow - LastAction > TimeSpan.FromSeconds(20))
@@ -124,9 +114,9 @@ namespace GameServer.Sockets
                 }
             }
 
-            if (_socket.State is Open)
+            if (Socket.State is Open)
             {
-                Close(ESocketCloseReason.Inactivity);
+                await _context.Close(ESocketCloseReason.Inactivity);
             }
         }
 
@@ -140,7 +130,7 @@ namespace GameServer.Sockets
                     WebSocketReceiveResult result;
                     do
                     {
-                        result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
+                        result = await Socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
                         msg = $"{msg}{ReadBuffer()}";
                     }
                     while (!result.EndOfMessage);
@@ -171,11 +161,11 @@ namespace GameServer.Sockets
                     _logger.LogError(ex);
                 }
             }
-            while (_socket.State is Open);
+            while (Socket.State is Open);
 
-            if (_socket.State is CloseReceived)
+            if (Socket.State is CloseReceived)
             {
-                Close(ESocketCloseReason.Finished);
+                await _context.Close(ESocketCloseReason.Finished);
             }
         }
 

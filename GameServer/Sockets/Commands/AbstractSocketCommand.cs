@@ -5,13 +5,15 @@ namespace GameServer.Sockets.Commands
 {
     public abstract class AbstractSocketCommand
     {
-        public virtual Task<ApiSocketResponse> ExecuteAsync()
+        public string? Id { get; set; }
+
+        public virtual Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
         {
-            var result = Execute();
+            var result = Execute(context);
             return Task.FromResult(result);
         }
 
-        public virtual ApiSocketResponse Execute()
+        public virtual ApiSocketResponse Execute(SocketContext context)
         {
             throw new NotImplementedException();
         }
@@ -20,23 +22,15 @@ namespace GameServer.Sockets.Commands
 
         public ApiSocketResponse<T> Success<T>(T data)
         {
-            return new ApiSocketResponse<T> { Data = data };
+            return new ApiSocketResponse<T> { Id = Id, Data = data };
         }
         public ApiSocketResponse Error(string errorMessage)
         {
-            return new ApiSocketResponse { Error = errorMessage };
+            return new ApiSocketResponse { Id = Id, Error = errorMessage };
         }
         public ApiSocketResponse<T> ErrorWithData<T>(string errorMessage, T data)
         {
-            return new ApiSocketResponse<T> { Error = errorMessage, Data = data };
-        }
-
-        public ApiSocketResponse Close(ESocketCloseReason? reason)
-        {
-            return new ApiSocketResponse
-            {
-                CloseReason = reason,
-            };
+            return new ApiSocketResponse<T> { Id = Id, Error = errorMessage, Data = data };
         }
     }
 
@@ -62,23 +56,23 @@ namespace GameServer.Sockets.Commands
 
     public abstract class AbstractSocketCommandWithResponseData<T> : AbstractSocketCommand
     {
-        public sealed override async Task<ApiSocketResponse> ExecuteAsync()
+        public sealed override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
         {
-            return await HandleExecuteAsync();
+            return await HandleExecuteAsync(context);
         }
 
-        public sealed override ApiSocketResponse Execute()
+        public sealed override ApiSocketResponse Execute(SocketContext context)
         {
-            return base.Execute();
+            return base.Execute(context);
         }
 
-        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync()
+        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync(SocketContext context)
         {
-            var result = HandleExecute();
+            var result = HandleExecute(context);
             return Task.FromResult(result);
         }
 
-        public virtual ApiSocketResponse<T> HandleExecute()
+        public virtual ApiSocketResponse<T> HandleExecute(SocketContext context)
         {
             throw new NotImplementedException();
         }
