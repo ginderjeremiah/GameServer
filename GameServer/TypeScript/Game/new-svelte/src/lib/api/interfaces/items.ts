@@ -32,8 +32,13 @@ export interface IItemSlot {
 	id: number;
 	itemId: number;
 	slotTypeId: number;
-	guaranteedItemModId?: number;
+	guaranteedItemModId: number;
 	probability: number;
+}
+
+export interface IItemDrop {
+	itemId: number;
+	dropRate: number;
 }
 
 export interface IItemCategory {
@@ -44,9 +49,4 @@ export interface IItemCategory {
 export interface ISlotType {
 	id: number;
 	name: string;
-}
-
-export interface IItemDrop {
-	itemId: number;
-	dropRate: number;
 }

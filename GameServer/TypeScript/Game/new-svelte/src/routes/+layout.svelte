@@ -26,6 +26,7 @@ $effect(() => {
 
 .page-base {
 	height: 100vh;
+	user-select: none;
 
 	&.default {
 		background: $dark-light-gray-grad;

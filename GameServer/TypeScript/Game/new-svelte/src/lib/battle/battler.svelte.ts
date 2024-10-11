@@ -11,6 +11,7 @@ interface BattlerData {
 }
 
 export interface Battler {
+    id: number;
     name: string;
     level: number;
     currentHealth: number;
@@ -26,6 +27,7 @@ export interface Battler {
 }
 
 const maxSkills = 4;
+let id = 0;
 
 const fillSelectedSkills = (battlerData: BattlerData, battler: Battler) => {
     const skillData = staticData.skills;
@@ -74,6 +76,7 @@ export const newBattler = (battlerData: BattlerData, additionalAtttributes?: IBa
         return damage;
     };
     const battler = {
+        id,
         get level() {
             return level;
         },
@@ -100,6 +103,8 @@ export const newBattler = (battlerData: BattlerData, additionalAtttributes?: IBa
         updateRenderCooldowns,
         takeDamage
     } as Battler;
+
+    id++;
     skills = fillSelectedSkills(battlerData, battler);
     battler.reset = (battlerData: BattlerData, additionalAtttributes?: IBattlerAttribute[]) => {
         const atts = additionalAtttributes ? [...battlerData.attributes, ...additionalAtttributes] : battlerData.attributes;

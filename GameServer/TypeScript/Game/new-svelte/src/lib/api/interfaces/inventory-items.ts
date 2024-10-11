@@ -1,12 +1,8 @@
-export interface IInventoryUpdate {
-	id: number;
-	inventorySlotNumber: number;
-	equipped: boolean;
-}
+import {  } from "../"
 
-export interface IInventoryData {
-	inventory: IInventoryItem[];
-	equipped: IInventoryItem[];
+export interface IInventoryItemMod {
+	itemModId: number;
+	itemSlotId: number;
 }
 
 export interface IInventoryItem {
@@ -18,7 +14,13 @@ export interface IInventoryItem {
 	itemMods: IInventoryItemMod[];
 }
 
-export interface IInventoryItemMod {
-	itemModId: number;
-	itemSlotId: number;
+export interface IInventoryData {
+	inventory: IInventoryItem[];
+	equipped: IInventoryItem[];
+}
+
+export interface IInventoryUpdate {
+	id: number;
+	inventorySlotNumber: number;
+	equipped: boolean;
 }

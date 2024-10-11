@@ -73,7 +73,7 @@ export const getPlayerAttributes = () => {
 }
 
 export const getOpponent = (battler: Battler) => {
-   return battler === battlePlayer ? battleEnemy : battlePlayer;
+   return battler.id === battlePlayer.id ? battleEnemy : battlePlayer;
 }
 
 const logicalUpdate = (timeDelta: number) => {

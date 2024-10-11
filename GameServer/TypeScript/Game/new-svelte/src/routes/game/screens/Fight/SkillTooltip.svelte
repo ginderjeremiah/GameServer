@@ -35,7 +35,7 @@ type Props = {
 	skill: Skill | undefined;
 };
 
-let { skill }: Props = $props();
+const { skill }: Props = $props();
 
 let container: HTMLDivElement;
 

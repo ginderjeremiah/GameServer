@@ -1,6 +1,6 @@
 import { EChangeType } from "../"
 
-export interface IChange<T1> {
-	item: T1;
+export interface IChange<T> {
+	item: T;
 	changeType: EChangeType;
 }

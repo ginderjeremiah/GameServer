@@ -13,11 +13,6 @@ export interface IEnemy {
 	skillPool: number[];
 }
 
-export interface IDefeatEnemyResponse {
-	cooldown: number;
-	rewards?: IDefeatRewards;
-}
-
 export interface IEnemyInstance {
 	id: number;
 	level: number;
@@ -26,16 +21,21 @@ export interface IEnemyInstance {
 	selectedSkills: number[];
 }
 
-export interface INewEnemyModel {
-	cooldown?: number;
-	enemyInstance?: IEnemyInstance;
-}
-
 export interface INewEnemyRequest {
-	newZoneId?: number;
+	newZoneId: number;
 }
 
 export interface IDefeatRewards {
 	expReward: number;
 	drops: IInventoryItem[];
+}
+
+export interface IDefeatEnemyResponse {
+	cooldown: number;
+	rewards: IDefeatRewards;
+}
+
+export interface INewEnemyModel {
+	cooldown: number;
+	enemyInstance: IEnemyInstance;
 }

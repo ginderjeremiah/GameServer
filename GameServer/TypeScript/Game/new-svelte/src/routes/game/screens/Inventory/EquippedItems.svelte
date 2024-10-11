@@ -1,26 +1,29 @@
 <div class="equipped-slots-container">
 	<div class="equipped-helm-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
 	<div class="equipped-chest-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
 	<div class="equipped-leg-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
 	<div class="equipped-boot-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
 	<div class="equipped-weapon-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
 	<div class="equipped-accessory-container">
-		<ItemContainer />
+		<ItemSlot item={u} />
 	</div>
+	<!-- ItemTooltip -->
 </div>
 
 <script lang="ts">
-import ItemContainer from './ItemSlot.svelte';
+import ItemSlot from './ItemSlot.svelte';
+
+const u = undefined;
 </script>
 
 <style lang="scss">
@@ -33,7 +36,7 @@ import ItemContainer from './ItemSlot.svelte';
 	border-radius: 1vw;
 	background-color: var(--container-background-color);
 	position: relative;
-	height: calc((74vw - 6px) * 3 / 8);
+	height: 30vw;
 
 	.equipped-helm-container {
 		position: absolute;

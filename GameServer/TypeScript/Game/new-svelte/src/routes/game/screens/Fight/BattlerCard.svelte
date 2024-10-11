@@ -24,7 +24,7 @@ type Props = {
 	battler: Battler | undefined;
 };
 
-let { battler }: Props = $props();
+const { battler }: Props = $props();
 
 const currentHealth = $derived(battler?.currentHealth ?? 0);
 const maxHealth = $derived(battler?.attributes.getValue(EAttribute.MaxHealth));
@@ -48,42 +48,47 @@ const healthId = crypto.randomUUID();
 	}
 
 	.battler-info {
+		user-select: text;
 		display: flex;
 		justify-content: space-between;
 		font-size: 1.5rem;
 	}
 
-	.health-meter {
-		position: relative;
-		border: var(--default-border);
-		background-color: var(--health-missing-color);
-		padding: 0.25rem;
-		z-index: 1;
-		overflow: hidden;
+	.health-display {
+		user-select: text;
 
-		.health-layer {
-			position: absolute;
-			top: 0;
-			left: 0;
-			height: 100%;
-			width: var(--health-perc);
-
-			&.health-remaining {
-				z-index: 3;
-				background-color: var(--health-remaining-color);
-				transition: width 0.1s ease-out;
-			}
-
-			&.health-disappearing {
-				z-index: 2;
-				background-color: var(--health-disappearing-color);
-				transition: width 1s ease-out;
-			}
-		}
-
-		span {
+		.health-meter {
 			position: relative;
-			z-index: 10;
+			border: var(--default-border);
+			background-color: var(--health-missing-color);
+			padding: 0.25rem;
+			z-index: 1;
+			overflow: hidden;
+
+			span {
+				position: relative;
+				z-index: 10;
+			}
+
+			.health-layer {
+				position: absolute;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: var(--health-perc);
+
+				&.health-remaining {
+					z-index: 3;
+					background-color: var(--health-remaining-color);
+					transition: width 0.1s ease-out;
+				}
+
+				&.health-disappearing {
+					z-index: 2;
+					background-color: var(--health-disappearing-color);
+					transition: width 1s ease-out;
+				}
+			}
 		}
 	}
 }

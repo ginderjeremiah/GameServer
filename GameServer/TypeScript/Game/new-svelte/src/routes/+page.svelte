@@ -20,7 +20,7 @@
 </div>
 
 <script lang="ts">
-import { player } from '$stores';
+import { loadPlayerData, player } from '$stores';
 import { ApiRequest } from '$lib/api/api-request';
 import { routeTo } from '$lib/common';
 import Button from '$components/Button.svelte';
@@ -40,7 +40,7 @@ const attemptLogin = async () => {
 	const response = await new ApiRequest('/Login').post({ username, password });
 	loginLoading = false;
 	if (response.status === 200) {
-		player.data = response.data;
+		loadPlayerData(response.data);
 		routeTo('/loading');
 	} else {
 		loginFailedReason = response.error;

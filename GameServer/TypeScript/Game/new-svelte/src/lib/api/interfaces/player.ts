@@ -1,5 +1,16 @@
 import { ELogSetting, IBattlerAttribute, IInventoryData } from "../"
 
+export interface ILoginCredentials {
+	username: string;
+	password: string;
+}
+
+export interface ILogPreference {
+	id: ELogSetting;
+	name: string;
+	enabled: boolean;
+}
+
 export interface IPlayerData {
 	userName: string;
 	name: string;
@@ -12,15 +23,4 @@ export interface IPlayerData {
 	statPointsUsed: number;
 	inventoryData: IInventoryData;
 	logPreferences: ILogPreference[];
-}
-
-export interface ILoginCredentials {
-	username: string;
-	password: string;
-}
-
-export interface ILogPreference {
-	id: ELogSetting;
-	name: string;
-	enabled: boolean;
 }

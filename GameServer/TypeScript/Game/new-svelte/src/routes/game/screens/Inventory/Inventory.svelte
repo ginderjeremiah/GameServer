@@ -12,11 +12,12 @@ import InventoryItems from './InventoryItems.svelte';
 
 <style lang="scss">
 .inventory-screen {
-	--slot-width: calc((74vw - 6px) / 12);
+	--slot-width: calc(6.5vw);
 
 	.equipped-panel {
 		margin-top: 2vh;
 		display: flex;
+		justify-content: space-between;
 	}
 }
 </style>

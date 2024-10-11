@@ -61,9 +61,9 @@ export type ApiRequestTypes = {
 	'/api/AdminTools/AddEditTags': IChange<ITag>[]
 	'/api/AdminTools/SetTagsForItem': ISetTagsData
 	'/api/AdminTools/SetTagsForItemMod': ISetTagsData
-	'/api/ItemMods': { refreshCache: boolean | undefined }
-	'/api/Items': { refreshCache: boolean | undefined }
-	'/api/Items/SlotsForItem': { itemId: number, refreshCache: boolean | undefined }
+	'/api/ItemMods': { refreshCache?: boolean }
+	'/api/Items': { refreshCache?: boolean }
+	'/api/Items/SlotsForItem': { itemId: number, refreshCache?: boolean }
 	'/api/Player/SaveLogPreferences': ILogPreference[]
 	'/api/Player/UpdateInventorySlots': IInventoryUpdate[]
 	'/api/Player/UpdatePlayerStats': IAttributeUpdate[]

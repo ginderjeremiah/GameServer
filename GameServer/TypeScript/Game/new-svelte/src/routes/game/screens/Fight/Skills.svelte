@@ -26,7 +26,8 @@ import SkillTooltip from './SkillTooltip.svelte';
 type Props = {
 	battler: Battler | undefined;
 };
-let { battler }: Props = $props();
+
+const { battler }: Props = $props();
 
 let tooltip = $state<TooltipComponent>();
 let tooltipSkillIndex = $state(-1);

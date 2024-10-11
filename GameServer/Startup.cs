@@ -56,7 +56,7 @@ namespace GameServer
 
                 app.UseSwagger();
                 app.UseSwaggerUI();
-                ApiCodeGenerator.GenerateResponseInterfaces();
+                ApiCodeGenerator.GenerateApiCode();
             }
             else
             {

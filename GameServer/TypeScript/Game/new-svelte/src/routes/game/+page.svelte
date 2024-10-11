@@ -71,9 +71,10 @@ const handleChangeScreen = (event: CustomEvent<GameScreen>) => {
 	.log-container {
 		background-color: var(--container-background-color);
 		box-sizing: border-box;
-		margin: 1% 5% 5% 5%;
+		margin: 1% 5% 2.5% 5%;
 		height: 60%;
 		overflow: auto;
+		user-select: text;
 
 		.log-message {
 			border: var(--default-border);

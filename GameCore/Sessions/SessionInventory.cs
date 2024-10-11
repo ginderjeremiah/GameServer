@@ -4,7 +4,7 @@ namespace GameCore.Sessions
 {
     public class SessionInventory
     {
-        private const int INV_SLOTS = 23;
+        private const int INV_SLOTS = 27;
         private const int EQUIP_SLOTS = 6;
         private readonly List<InventoryItem> _sessionInventory;
         public List<InventoryItem?> Inventory { get; set; }
@@ -80,6 +80,7 @@ namespace GameCore.Sessions
                         _sessionInventory.Remove(match.inv);
                     }
                 }
+
                 Initialize(_sessionInventory);
             }
 
@@ -90,8 +91,8 @@ namespace GameCore.Sessions
         {
             return _sessionInventory.Any(inv => inv.Id == item.Id)
                 && item.InventorySlotNumber is >= 0
-                && (item.Equipped && item.InventorySlotNumber is < EQUIP_SLOTS
-                    || !item.Equipped && item.InventorySlotNumber is < INV_SLOTS);
+                && ((item.Equipped && item.InventorySlotNumber is < EQUIP_SLOTS)
+                    || (!item.Equipped && item.InventorySlotNumber is < INV_SLOTS));
         }
 
         private static List<InventoryItem?> NewEquippedList()
