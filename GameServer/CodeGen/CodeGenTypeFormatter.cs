@@ -67,7 +67,9 @@ namespace GameServer.CodeGen
             }
             else if (type.IsListType())
             {
-                return $"{GetTypeText(descriptor.GenericArgumentDescriptors[0])}[]";
+                var genericParameter = descriptor.GenericArgumentDescriptors[0];
+                var typeText = genericParameter.IsNullable ? $"({GetTypeText(genericParameter)} | undefined)" : GetTypeText(genericParameter);
+                return $"{typeText}[]";
             }
             else
             {
@@ -96,7 +98,7 @@ namespace GameServer.CodeGen
         {
             useGenericParameters &= descriptor.GenericParameterPosition >= 0;
             var parameterName = useGenericParameters ? ((char)('T' + descriptor.GenericParameterPosition)).ToString() : GetTypeText(descriptor);
-            return $"{descriptor.Name?.Decapitalize()}{(descriptor.HasDefault ? "?" : "")}: {parameterName}";
+            return $"{descriptor.Name?.Decapitalize()}{(descriptor.HasDefault || descriptor.IsNullable ? "?" : "")}: {parameterName}";
         }
 
         public string GetInterfaceName(CodeGenTypeDescriptor descriptor, bool useGenericParameters = false)

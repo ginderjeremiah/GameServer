@@ -22,7 +22,7 @@ export interface IEnemyInstance {
 }
 
 export interface INewEnemyRequest {
-	newZoneId: number;
+	newZoneId?: number;
 }
 
 export interface IDefeatRewards {
@@ -32,10 +32,10 @@ export interface IDefeatRewards {
 
 export interface IDefeatEnemyResponse {
 	cooldown: number;
-	rewards: IDefeatRewards;
+	rewards?: IDefeatRewards;
 }
 
 export interface INewEnemyModel {
-	cooldown: number;
-	enemyInstance: IEnemyInstance;
+	cooldown?: number;
+	enemyInstance?: IEnemyInstance;
 }

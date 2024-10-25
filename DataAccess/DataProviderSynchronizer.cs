@@ -2,6 +2,7 @@
 using GameCore.Infrastructure;
 using GameInfrastructure;
 using GameInfrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
 {
@@ -71,6 +72,10 @@ namespace DataAccess
                 player.PlayerSkills = null;
                 player.PlayerAttributes = null;
                 database.Update(player);
+
+                var inventoryItemIds = player.InventoryItems.Select(ii => ii.Id).ToList();
+                await database.InventoryItems.Where(ii => ii.PlayerId == player.Id && !inventoryItemIds.Contains(ii.Id)).ExecuteDeleteAsync();
+
                 await database.SaveChangesAsync();
             });
 

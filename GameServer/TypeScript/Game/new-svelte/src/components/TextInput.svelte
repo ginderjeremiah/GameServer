@@ -33,6 +33,7 @@ let {
 .text-input-label {
 	display: block;
 	padding-bottom: 0.25rem;
+	font-size: 0.8rem;
 }
 
 .text-input-wrapper {

@@ -34,7 +34,6 @@ let tooltipSkillIndex = $state(-1);
 
 const skills = $derived(battler?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]));
 const tooltipSkill = $derived(skills[tooltipSkillIndex]);
-const cdr = $derived(battler?.cdMultiplier ?? 1);
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -51,7 +50,7 @@ const handleMouseEnter = (ev: MouseEvent, index: number) => {
 };
 
 const handleMouseLeave = (ev: MouseEvent, index: number) => {
-	if (tooltipSkillIndex == index) {
+	if (tooltipSkillIndex === index) {
 		tooltipSkillIndex = -1;
 		hideTooltip();
 	}

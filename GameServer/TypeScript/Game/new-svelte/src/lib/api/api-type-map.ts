@@ -10,13 +10,13 @@ import {
 	IItem,
 	IItemCategory,
 	IItemMod,
-	IItemSlot,
+	IItemModSlot,
+	IItemModSlotType,
 	ILoginCredentials,
 	ILogPreference,
 	IPlayerData,
 	ISetTagsData,
 	ISkill,
-	ISlotType,
 	ITag,
 	ITagCategory,
 	IZone
@@ -26,8 +26,8 @@ export type ApiResponseTypes = {
 	'/api/AdminTools/AddEditItemAttributes': undefined
 	'/api/AdminTools/AddEditItemModAttributes': undefined
 	'/api/AdminTools/AddEditItemMods': undefined
+	'/api/AdminTools/AddEditItemModSlots': undefined
 	'/api/AdminTools/AddEditItems': undefined
-	'/api/AdminTools/AddEditItemSlots': undefined
 	'/api/AdminTools/AddEditTags': undefined
 	'/api/AdminTools/SetTagsForItem': undefined
 	'/api/AdminTools/SetTagsForItemMod': undefined
@@ -36,8 +36,8 @@ export type ApiResponseTypes = {
 	'/api/ItemCategories': IItemCategory[]
 	'/api/ItemMods': IItemMod[]
 	'/api/Items': IItem[]
-	'/api/Items/SlotsForItem': IItemSlot[]
-	'/api/Items/SlotTypes': ISlotType[]
+	'/api/Items/ItemModSlotTypes': IItemModSlotType[]
+	'/api/Items/SlotsForItem': IItemModSlot[]
 	'/api/Player': IPlayerData
 	'/api/Player/SaveLogPreferences': undefined
 	'/api/Player/UpdateInventorySlots': undefined
@@ -56,8 +56,8 @@ export type ApiRequestTypes = {
 	'/api/AdminTools/AddEditItemAttributes': IAddEditItemAttributesData
 	'/api/AdminTools/AddEditItemModAttributes': IAddEditItemModAttributesData
 	'/api/AdminTools/AddEditItemMods': IChange<IItemMod>[]
+	'/api/AdminTools/AddEditItemModSlots': IChange<IItemModSlot>[]
 	'/api/AdminTools/AddEditItems': IChange<IItem>[]
-	'/api/AdminTools/AddEditItemSlots': IChange<IItemSlot>[]
 	'/api/AdminTools/AddEditTags': IChange<ITag>[]
 	'/api/AdminTools/SetTagsForItem': ISetTagsData
 	'/api/AdminTools/SetTagsForItemMod': ISetTagsData

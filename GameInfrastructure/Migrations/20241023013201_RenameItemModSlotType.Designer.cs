@@ -4,6 +4,7 @@ using GameInfrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameInfrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20241023013201_RenameItemModSlotType")]
+    partial class RenameItemModSlotType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -301,8 +304,7 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ItemId");
 
-                    b.HasIndex("PlayerId", "Equipped", "InventorySlotNumber")
-                        .IsUnique();
+                    b.HasIndex("PlayerId");
 
                     b.ToTable("InventoryItems");
                 });

@@ -1,4 +1,9 @@
-import { IBattlerAttribute, IChange } from "../"
+import {
+	EItemCategory,
+	EItemModSlotType,
+	IBattlerAttribute,
+	IChange
+} from "../"
 
 export interface IAddEditItemAttributesData {
 	itemId: number;
@@ -23,16 +28,16 @@ export interface IItem {
 	id: number;
 	name: string;
 	description: string;
-	itemCategoryId: number;
+	itemCategoryId: EItemCategory;
 	iconPath: string;
-	attributes: IBattlerAttribute[];
+	attributes: IIEnumerable<IBattlerAttribute>;
 }
 
-export interface IItemSlot {
+export interface IItemModSlot {
 	id: number;
 	itemId: number;
-	slotTypeId: number;
-	guaranteedItemModId: number;
+	itemModSlotTypeId: EItemModSlotType;
+	guaranteedItemModId?: number;
 	probability: number;
 }
 
@@ -46,7 +51,7 @@ export interface IItemCategory {
 	name: string;
 }
 
-export interface ISlotType {
+export interface IItemModSlotType {
 	id: number;
 	name: string;
 }

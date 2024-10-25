@@ -2,7 +2,7 @@
 
 namespace GameCore.Entities
 {
-    public class SlotType
+    public class ItemModSlotType
     {
         public int Id { get; set; }
         public string Name { get; set; }
@@ -10,6 +10,6 @@ namespace GameCore.Entities
         [JsonIgnore]
         public virtual List<ItemMod> ItemMods { get; set; }
         [JsonIgnore]
-        public virtual List<ItemSlot> ItemSlots { get; set; }
+        public virtual List<ItemModSlot> ItemModSlots { get; set; }
     }
 }

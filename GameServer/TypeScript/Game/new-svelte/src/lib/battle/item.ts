@@ -1,90 +1,36 @@
-﻿import { Tooltippable } from "$lib/tooltips";
-import { IItem, IBattlerAttribute, IItemMod, IInventoryItem } from "$lib/api";
-import { ItemMod } from "./item-mod";
+﻿import { IItem, IInventoryItem } from "$lib/api";
+import { ItemMod, newItemMod } from "./item-mod";
 import { BattleAttributes, newBattleAttributes } from "./battle-attributes";
+import { staticData } from "$stores";
 
-export class Item extends Tooltippable implements IItem {
-    id: number;
-    rating: number;
-    itemId: number;
-    name: string;
-    description: string;
-    itemCategoryId: number;
-    iconPath: string;
-    equipped: boolean;
-    inventorySlotNumber: number;
+export interface Item extends Omit<IInventoryItem, "itemMods">, IItem {
     itemMods: ItemMod[];
-    attributes: IBattlerAttribute[];
     totalAttributes: BattleAttributes;
+}
 
-    constructor(invItem: IInventoryItem, itemData: IItem, itemModsData: IItemMod[]) {
-        super();
-        this.id = invItem.id;
-        this.rating = invItem.rating;
-        this.itemId = invItem.itemId;
-        this.name = itemData.name;
-        this.description = itemData.description;
-        this.itemCategoryId = itemData.itemCategoryId;
-        this.attributes = itemData.attributes;
-        this.iconPath = itemData.iconPath;
-        this.equipped = invItem.equipped;
-        this.inventorySlotNumber = invItem.inventorySlotNumber;
-        this.itemMods = invItem.itemMods.map(invMod => new ItemMod(invMod, itemModsData[invMod.itemModId]));
-        const itemModAttributes = this.itemMods.flatMap(mod => mod.attributes);
-        this.totalAttributes = newBattleAttributes([...this.attributes, ...itemModAttributes], false);
-    }
+export const newItem = (invItem: IInventoryItem): Item => {
+    const itemData = staticData.items[invItem.itemId];
+    const itemMods = invItem.itemMods.map(invMod => newItemMod(invMod))
+    const allAttributes = [...itemData.attributes, ...itemMods.flatMap(mod => mod.attributes)];
+    const totalAttributes = newBattleAttributes(allAttributes, false);
+    return {
+        ...itemData,
+        ...invItem,
+        itemMods,
+        totalAttributes
+    } satisfies Item;
+}
 
-    updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number {
-        if (this.toolTipId !== prevId) {
-            tooltipTitle.textContent = this.name; //set title to item name (key)
-            tooltipContent.replaceChildren(); //clear current content
-
-            const statsHeader = document.createElement("h3");
-            statsHeader.className = "tooltipHeader";
-            statsHeader.textContent = "Stats:";
-            tooltipContent.appendChild(statsHeader);
-
-            const statsList = document.createElement("ul");
-            statsList.className = "tooltipList";
-            this.totalAttributes.getAttributeMap().forEach((att) => {
-                const listItem = document.createElement("li");
-                listItem.textContent = att.name + " +" + att.value;
-                statsList.appendChild(listItem);
-            });
-            tooltipContent.appendChild(statsList);
-
-            if (this.itemMods.length > 0) {
-                const modsHeader = document.createElement("h3");
-                modsHeader.className = "tooltipHeader";
-                modsHeader.textContent = "Mods:";
-                tooltipContent.appendChild(modsHeader);
-
-                const modsList = document.createElement("ul");
-                modsList.className = "tooltipList";
-                this.itemMods.forEach((mod) => {
-                    const listItem = document.createElement("li");
-                    const nameSpan = document.createElement('span');
-                    nameSpan.style.fontWeight = "bold";
-                    nameSpan.textContent = mod.name;
-                    const descSpan = document.createElement('span');
-                    descSpan.textContent = ": " + mod.description;
-                    listItem.appendChild(nameSpan);
-                    listItem.appendChild(descSpan);
-                    modsList.appendChild(listItem);
-                });
-                tooltipContent.appendChild(modsList);
-            }
-
-            const descHeader = document.createElement("h3");
-            descHeader.className = "tooltipHeader";
-            descHeader.textContent = "Description:";
-            tooltipContent.appendChild(descHeader);
-
-            const desc = document.createElement("p");
-            desc.className = "tooltipText";
-            desc.textContent = this.description;
-            tooltipContent.appendChild(desc);
-        }
-        return this.toolTipId;
-    }
+export const getTrashItem = (): Item => {
+    const itemData = staticData.items[0];
+    return {
+        ...itemData,
+        itemMods: [],
+        id: -1,
+        itemId: 0,
+        totalAttributes: newBattleAttributes([], false),
+        rating: 0,
+        equipped: false,
+        inventorySlotNumber: -1
+    } satisfies Item;
 }

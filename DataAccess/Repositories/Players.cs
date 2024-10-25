@@ -21,15 +21,7 @@ namespace DataAccess.Repositories
 
         public async Task<Player?> GetPlayerByUserNameAsync(string userName)
         {
-            var player = await Database.Players
-                .AsNoTracking()
-                .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.InventoryItemMods)
-                .Include(p => p.PlayerAttributes)
-                .Include(p => p.PlayerSkills)
-                .Include(p => p.LogPreferences)
-                .FirstOrDefaultAsync(p => p.UserName == userName);
-
+            var player = await PlayersWithRelatedData().FirstOrDefaultAsync(p => p.UserName == userName);
             if (player is not null)
             {
                 _cache.SetAndForget($"{PlayerPrefix}_{player.Id}", player);
@@ -44,15 +36,7 @@ namespace DataAccess.Repositories
             var player = await _cache.GetAsync<Player>(playerKey);
             if (player is null)
             {
-                player = await Database.Players
-                    .AsNoTracking()
-                    .Include(p => p.InventoryItems)
-                        .ThenInclude(ii => ii.InventoryItemMods)
-                    .Include(p => p.PlayerAttributes)
-                    .Include(p => p.PlayerSkills)
-                    .Include(p => p.LogPreferences)
-                    .FirstOrDefaultAsync(p => p.Id == playerId);
-
+                player = await PlayersWithRelatedData().FirstOrDefaultAsync(p => p.Id == playerId);
                 if (player is not null)
                 {
                     _cache.SetAndForget(playerKey, player);
@@ -78,6 +62,17 @@ namespace DataAccess.Repositories
             {
                 await _synchronizer.SynchronizeSkills(playerKey);
             }
+        }
+
+        private IQueryable<Player> PlayersWithRelatedData()
+        {
+            return Database.Players
+                .AsNoTracking()
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.InventoryItemMods)
+                .Include(p => p.PlayerAttributes)
+                .Include(p => p.PlayerSkills)
+                .Include(p => p.LogPreferences);
         }
     }
 }

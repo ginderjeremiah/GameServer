@@ -22,15 +22,22 @@ namespace GameServer.Models.Attributes
             Amount = itemModAttribute.Amount;
         }
 
-        public BattlerAttribute(ItemAttribute itemAttribute)
-        {
-            AttributeId = (EAttribute)itemAttribute.AttributeId;
-            Amount = itemAttribute.Amount;
-        }
         public BattlerAttribute(PlayerAttribute playerAttribute)
         {
             AttributeId = (EAttribute)playerAttribute.AttributeId;
             Amount = playerAttribute.Amount;
+        }
+    }
+
+    internal static partial class ModelExtensions
+    {
+        public static BattlerAttribute ToModel(this ItemAttribute itemAttribute)
+        {
+            return new BattlerAttribute
+            {
+                AttributeId = (EAttribute)itemAttribute.AttributeId,
+                Amount = itemAttribute.Amount,
+            };
         }
     }
 }

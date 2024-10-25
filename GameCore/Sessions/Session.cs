@@ -51,7 +51,7 @@ namespace GameCore.Sessions
             return false;
         }
 
-        public DefeatRewards GrantRewards(EnemyInstance enemy)
+        public async Task<DefeatRewards> GrantRewards(EnemyInstance enemy)
         {
 
             var expReward = GetExpReward(enemy);
@@ -77,7 +77,12 @@ namespace GameCore.Sessions
                 _repos.Insert(d);
                 InventoryData.Inventory[slotNumber] = d;
                 _player.InventoryItems.Add(d);
-                _sessionDirty = true;
+            }
+
+            if (drops.Count > 0)
+            {
+                _inventoryDirty = true;
+                await _repos.SaveChangesAsync();
             }
 
             return new DefeatRewards
@@ -194,7 +199,7 @@ namespace GameCore.Sessions
         {
             var item = _repos.Items.GetItem(itemId);
             var allMods = _repos.ItemMods.AllItemMods();
-            var slots = item?.ItemSlots ?? [];
+            var slots = item?.ItemModSlots ?? [];
             var itemMods = new List<int>();
             var inventoryItemMods = new List<InventoryItemMod>();
 
@@ -204,7 +209,7 @@ namespace GameCore.Sessions
                 if (slot.GuaranteedItemModId is null)
                 {
                     var mods = _repos.ItemMods.GetModsForItemBySlot(slot.ItemId);
-                    if (mods.TryGetValue(slot.SlotTypeId, out var modsForSlot))
+                    if (mods.TryGetValue(slot.ItemModSlotTypeId, out var modsForSlot))
                     {
                         //TODO Add weights for item mods
                         var actualMods = modsForSlot.Where(mod => !itemMods.Contains(mod.Id)).ToList();
@@ -225,7 +230,7 @@ namespace GameCore.Sessions
                     inventoryItemMods.Add(new InventoryItemMod
                     {
                         ItemModId = modId.Value,
-                        ItemSlotId = slot.Id,
+                        ItemModSlotId = slot.Id,
                     });
                 }
             }

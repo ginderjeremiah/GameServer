@@ -45,6 +45,7 @@ $effect(() => {
 		--health-disappearing-color: #{$red-orange};
 		--container-background-color: #{$off-white};
 		--slot-background-color: #{$white};
+		--slot-highlight-color: #{$red};
 	}
 }
 </style>

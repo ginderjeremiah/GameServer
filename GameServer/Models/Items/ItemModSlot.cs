@@ -1,20 +1,22 @@
-﻿namespace GameServer.Models.Items
+﻿using GameCore;
+
+namespace GameServer.Models.Items
 {
-    public class ItemSlot : IModel
+    public class ItemModSlot : IModel
     {
         public int Id { get; set; }
         public int ItemId { get; set; }
-        public int SlotTypeId { get; set; }
+        public EItemModSlotType ItemModSlotTypeId { get; set; }
         public int? GuaranteedItemModId { get; set; }
         public decimal Probability { get; set; }
 
-        public ItemSlot() { }
+        public ItemModSlot() { }
 
-        public ItemSlot(GameCore.Entities.ItemSlot itemSlot)
+        public ItemModSlot(GameCore.Entities.ItemModSlot itemSlot)
         {
             Id = itemSlot.Id;
             ItemId = itemSlot.ItemId;
-            SlotTypeId = itemSlot.SlotTypeId;
+            ItemModSlotTypeId = (EItemModSlotType)itemSlot.ItemModSlotTypeId;
             GuaranteedItemModId = itemSlot.GuaranteedItemModId;
             Probability = itemSlot.Probability;
         }

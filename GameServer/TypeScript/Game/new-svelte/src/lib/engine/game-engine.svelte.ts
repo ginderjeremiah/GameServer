@@ -1,10 +1,9 @@
 import { onDestroy } from "svelte";
 import { BattleStage, battleState, initBattleEngine, resetBattle } from "./battle-engine.svelte";
 import { ELogSetting, IEnemyInstance, IPlayerData } from "$lib/api";
-import { staticData, player } from "$stores";
-import { Inventory } from "$lib/inventory";
+import { staticData, player, inventory, addInventoryItems } from "$stores";
 import { delay, formatNum, createHook, getEventCounter } from "$lib/common";
-import { ApiSocket, IApiSocketResponse } from "$lib/api/api-socket";
+import { apiSocket, ApiSocket, IApiSocketResponse } from "$lib/api/api-socket";
 import { logMessage } from "./log";
 import { startRenderEngine } from "./render-engine.svelte";
 
@@ -25,8 +24,6 @@ const logicalUpdateHook = createHook<number>();
 const notifyLogicalUpdate = logicalUpdateHook.notify;
 export const onLogicalUpdate = logicalUpdateHook.onNotified;
 
-const inventory = new Inventory();
-const apiSocket = new ApiSocket();
 let currentEnemy: IEnemyInstance | undefined;
 let newEnemyPromise: Promise<IApiSocketResponse<"NewEnemy">> | undefined;
 let timeBank = 0;
@@ -107,12 +104,14 @@ const watchBattleState = () => {
             if (!defeatResponse.error && defeatResponse.data.rewards) {
                const rewards = defeatResponse.data.rewards
                grantExp(rewards.expReward);
-               inventory.addItems(rewards.drops);
+               addInventoryItems(rewards.drops);
                logMessage(ELogSetting.EnemyDefeated, staticData.enemies[currentEnemy.id].name + " was defeated!");
             } else {
                logMessage(ELogSetting.Debug, "There was an error defeating the enemy: " + defeatResponse.error);
             }
-            await delay(defeatResponse.data.cooldown);
+            if (defeatResponse.data.cooldown > 0) {
+               await delay(defeatResponse.data.cooldown);
+            }
          } else if (battleState.stage === BattleStage.Defeated) {
             logMessage(ELogSetting.EnemyDefeated, "You've been defeated!");
          }

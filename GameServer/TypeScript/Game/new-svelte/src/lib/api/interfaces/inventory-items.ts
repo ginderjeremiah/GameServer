@@ -2,7 +2,7 @@ import {  } from "../"
 
 export interface IInventoryItemMod {
 	itemModId: number;
-	itemSlotId: number;
+	itemModSlotId: number;
 }
 
 export interface IInventoryItem {
@@ -15,8 +15,8 @@ export interface IInventoryItem {
 }
 
 export interface IInventoryData {
-	inventory: IInventoryItem[];
-	equipped: IInventoryItem[];
+	inventory: (IInventoryItem | undefined)[];
+	equipped: (IInventoryItem | undefined)[];
 }
 
 export interface IInventoryUpdate {

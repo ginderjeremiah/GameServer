@@ -20,14 +20,21 @@ namespace GameServer.Sockets.Commands
 
         public virtual void SetParameters(string? parameters) { }
 
+        public ApiSocketResponse Success()
+        {
+            return new ApiSocketResponse { Id = Id };
+        }
+
         public ApiSocketResponse<T> Success<T>(T data)
         {
             return new ApiSocketResponse<T> { Id = Id, Data = data };
         }
+
         public ApiSocketResponse Error(string errorMessage)
         {
             return new ApiSocketResponse { Id = Id, Error = errorMessage };
         }
+
         public ApiSocketResponse<T> ErrorWithData<T>(string errorMessage, T data)
         {
             return new ApiSocketResponse<T> { Id = Id, Error = errorMessage, Data = data };

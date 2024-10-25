@@ -22,6 +22,21 @@ export enum EChangeType {
 	Delete = 2,
 }
 
+export enum EItemCategory {
+	Helm = 1,
+	Chest = 2,
+	Leg = 3,
+	Boot = 4,
+	Weapon = 5,
+	Accessory = 6,
+}
+
+export enum EItemModSlotType {
+	Component = 1,
+	Prefix = 2,
+	Suffix = 3,
+}
+
 export enum ELogSetting {
 	Damage = 1,
 	Debug = 2,

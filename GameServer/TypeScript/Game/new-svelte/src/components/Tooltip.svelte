@@ -8,8 +8,10 @@ let { component, position, visible }: TooltipData = $props();
 let container: HTMLDivElement;
 
 $effect(() => {
-	if (component()) {
-		container.appendChild(component().getBaseNode());
+	const comp = component();
+	if (comp) {
+		container.replaceChildren();
+		container.appendChild(comp.getBaseNode());
 	}
 });
 

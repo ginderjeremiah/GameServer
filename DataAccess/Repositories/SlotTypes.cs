@@ -8,7 +8,7 @@ namespace DataAccess.Repositories
     {
         public SlotTypes(GameContext database) : base(database) { }
 
-        public IQueryable<SlotType> AllSlotTypes()
+        public IQueryable<ItemModSlotType> AllItemModSlotTypes()
         {
             return Database.SlotTypes;
         }

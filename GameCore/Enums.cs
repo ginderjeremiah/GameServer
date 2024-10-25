@@ -104,7 +104,7 @@ namespace GameCore
         EnemyDefeated = 6
     }
 
-    public enum ESlotType
+    public enum EItemModSlotType
     {
         Component = 1,
         Prefix = 2,

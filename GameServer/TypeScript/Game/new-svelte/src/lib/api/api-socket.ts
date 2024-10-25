@@ -27,7 +27,7 @@ export class ApiSocket {
     }
 
     public async sendSocketCommand<T extends ApiSocketCommandNoRequest>(commandName: T): Promise<IApiSocketResponse<T>>
-    public async sendSocketCommand<T extends ApiSocketCommandWithRequest>(commandName: T, urlParams: ApiSocketRequestTypes[T]): Promise<IApiSocketResponse<T>>
+    public async sendSocketCommand<T extends ApiSocketCommandWithRequest>(commandName: T, params: ApiSocketRequestTypes[T]): Promise<IApiSocketResponse<T>>
     public async sendSocketCommand<T extends ApiSocketCommand>(commandName: T, params?: any) {
         const id = (this.commandCounter++).toString();
         const request = new ApiSocketRequest(id, commandName, params);
@@ -78,3 +78,5 @@ export class ApiSocket {
         console.log(ev);
     }
 }
+
+export const apiSocket = new ApiSocket();

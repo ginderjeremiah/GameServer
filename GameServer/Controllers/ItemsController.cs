@@ -18,21 +18,21 @@ namespace GameServer.Controllers
         public ApiListResponse<Item> Items(bool refreshCache = false)
         {
             var items = Repositories.Items.AllItems(refreshCache);
-            return Success(items.Select(item => new Item(item)));
+            return Success(items.Select(i => i.ToModel()));
         }
 
         [HttpGet]
-        public ApiListResponse<ItemSlot> SlotsForItem(int itemId, bool refreshCache = false)
+        public ApiListResponse<ItemModSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
             var items = Repositories.Items.AllItems(refreshCache);
 
-            return Success(items.Select(item => item.ItemSlots.Select(slot => new ItemSlot(slot))).FirstOrDefault() ?? []);
+            return Success(items.Select(item => item.ItemModSlots.Select(slot => new ItemModSlot(slot))).FirstOrDefault() ?? []);
         }
 
         [HttpGet]
-        public ApiListResponse<SlotType> SlotTypes()
+        public ApiListResponse<ItemModSlotType> ItemModSlotTypes()
         {
-            return Success(Repositories.SlotTypes.AllSlotTypes().Select(type => new SlotType(type)));
+            return Success(Repositories.SlotTypes.AllItemModSlotTypes().Select(type => new ItemModSlotType(type)));
         }
     }
 }

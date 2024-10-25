@@ -20,7 +20,7 @@ namespace GameServer.Sockets.Commands
             Logger = logger;
         }
 
-        public override ApiSocketResponse<DefeatEnemyResponse> HandleExecute(SocketContext context)
+        public override async Task<ApiSocketResponse<DefeatEnemyResponse>> HandleExecuteAsync(SocketContext context)
         {
             var now = DateTime.UtcNow;
             var instance = new EnemyInstance
@@ -36,7 +36,8 @@ namespace GameServer.Sockets.Commands
             {
                 Logger.LogDebug($"DefeatEnemy: {{currentTime: {now:O}, earliestDefeat: {Session.EarliestDefeat:O}, difference: {(now - Session.EarliestDefeat).TotalMilliseconds} ms}}");
                 Session.EnemyCooldown = now.AddSeconds(5);
-                var rewards = Session.GrantRewards(instance);
+                var rewards = await Session.GrantRewards(instance);
+                await Session.Save();
                 return Success(new DefeatEnemyResponse
                 {
                     Cooldown = 5000,

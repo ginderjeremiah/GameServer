@@ -3,12 +3,12 @@
     public class InventoryItemMod
     {
         public int ItemModId { get; set; }
-        public int ItemSlotId { get; set; }
+        public int ItemModSlotId { get; set; }
 
         public InventoryItemMod(GameCore.Entities.InventoryItemMod itemMod)
         {
             ItemModId = itemMod.ItemModId;
-            ItemSlotId = itemMod.ItemSlotId;
+            ItemModSlotId = itemMod.ItemModSlotId;
         }
     }
 }

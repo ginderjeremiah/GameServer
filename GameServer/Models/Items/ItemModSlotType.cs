@@ -1,13 +1,13 @@
 ﻿namespace GameServer.Models.Items
 {
-    public class SlotType : IModel
+    public class ItemModSlotType : IModel
     {
         public int Id { get; set; }
         public string Name { get; set; }
 
-        public SlotType() { }
+        public ItemModSlotType() { }
 
-        public SlotType(GameCore.Entities.SlotType slotType)
+        public ItemModSlotType(GameCore.Entities.ItemModSlotType slotType)
         {
             Id = slotType.Id;
             Name = slotType.Name;

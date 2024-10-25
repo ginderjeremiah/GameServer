@@ -1,33 +1,71 @@
 <div class="inventory-items-container">
 	<div class="inventory-items-inner">
 		<div class="inventory-slots-subcontainer">
-			{#each test as item, index}
+			{#each inventoryItems as slot, index}
 				<ItemSlot
-					{item}
+					{slot}
 					hideBottomBorder={index < 18}
 					hideRightBorder={index % 9 !== 8}
-					onDragStart={() => console.log(item, index)}
-					onDragEnd={() => console.log(item, index)}
-					onClick={() => console.log(item, index)}
+					onDragStart={hideTooltip}
+					onDrop={hideTooltip}
+					onClick={() => console.log(slot, index)}
+					onMouseMove={handleMouseMove}
+					onMouseEnter={(ev) => handleMouseEnter(ev, slot)}
+					onMouseLeave={(ev) => handleMouseLeave(ev, slot)}
 				/>
 			{/each}
 		</div>
 		<div class="inventory-bottom">
 			<ItemSlot
-				item={trashItem}
+				slot={inventory.trashSlot}
 				undraggable
-				onDragEnd={() => console.log('trash drag end')}
+				onDrop={hideTooltip}
 				onClick={() => console.log('trash click')}
+				onMouseMove={handleMouseMove}
+				onMouseEnter={(ev) => handleMouseEnter(ev, inventory.trashSlot)}
+				onMouseLeave={(ev) => handleMouseLeave(ev, inventory.trashSlot)}
 			/>
 		</div>
 	</div>
-	<!-- ItemTooltip -->
+	<ItemTooltip bind:this={tooltip} slot={tooltipSlot} />
 </div>
 
 <script lang="ts">
-import { staticData } from '$stores';
+import {
+	inventory,
+	registerTooltipComponent,
+	type TooltipComponent,
+	type InventorySlot
+} from '$stores';
 import ItemSlot from './ItemSlot.svelte';
-const trashItem = staticData.items[0];
+import ItemTooltip from './ItemTooltip.svelte';
+
+let tooltip = $state<TooltipComponent>();
+let tooltipSlot = $state<InventorySlot>();
+
+const inventoryItems = $derived(inventory.slots);
+
+const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+
+const handleMouseMove = (ev: MouseEvent) => {
+	showTooltip();
+	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+};
+
+const handleMouseEnter = (ev: MouseEvent, slot: InventorySlot) => {
+	tooltipSlot = slot;
+	if (slot.item) {
+		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+		showTooltip();
+	}
+};
+
+const handleMouseLeave = (ev: MouseEvent, slot: InventorySlot) => {
+	if (tooltipSlot === slot) {
+		tooltipSlot = undefined;
+		hideTooltip();
+	}
+};
 </script>
 
 <style lang="scss">

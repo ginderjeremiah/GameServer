@@ -12,7 +12,7 @@ namespace GameCore.Entities
 
         public virtual List<ItemAttribute> ItemAttributes { get; set; }
         public virtual ItemCategory ItemCategory { get; set; }
-        public virtual List<ItemSlot> ItemSlots { get; set; }
+        public virtual List<ItemModSlot> ItemModSlots { get; set; }
         public virtual List<Tag> Tags { get; set; }
         [JsonIgnore]
         public virtual List<EnemyDrop> EnemyDrops { get; set; }

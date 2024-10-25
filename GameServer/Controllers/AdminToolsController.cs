@@ -153,7 +153,7 @@ namespace GameServer.Controllers
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
-                        ItemCategoryId = change.Item.ItemCategoryId,
+                        ItemCategoryId = (int)change.Item.ItemCategoryId,
                         IconPath = change.Item.IconPath,
                     });
                 }
@@ -164,7 +164,7 @@ namespace GameServer.Controllers
                     {
                         item.Name = change.Item.Name;
                         item.Description = change.Item.Description;
-                        item.ItemCategoryId = change.Item.ItemCategoryId;
+                        item.ItemCategoryId = (int)change.Item.ItemCategoryId;
                         item.IconPath = change.Item.IconPath;
                         Repositories.Update(item);
                     }
@@ -184,34 +184,34 @@ namespace GameServer.Controllers
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItemSlots([FromBody] List<Change<ItemSlot>> changes)
+        public async Task<ApiResponse> AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
         {
             foreach (var change in changes)
             {
                 if (change.ChangeType == Add)
                 {
-                    Repositories.Insert(new GameCore.Entities.ItemSlot
+                    Repositories.Insert(new GameCore.Entities.ItemModSlot
                     {
                         ItemId = change.Item.ItemId,
-                        SlotTypeId = change.Item.SlotTypeId,
+                        ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
                         GuaranteedItemModId = change.Item.GuaranteedItemModId,
                         Probability = change.Item.Probability,
                     });
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    Repositories.Update(new GameCore.Entities.ItemSlot
+                    Repositories.Update(new GameCore.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                         ItemId = change.Item.ItemId,
-                        SlotTypeId = change.Item.SlotTypeId,
+                        ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
                         GuaranteedItemModId = change.Item.GuaranteedItemModId,
                         Probability = change.Item.Probability,
                     });
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    Repositories.Delete(new GameCore.Entities.ItemSlot
+                    Repositories.Delete(new GameCore.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                     });
@@ -283,7 +283,6 @@ namespace GameServer.Controllers
 
             await Repositories.SaveChangesAsync();
             return Success();
-
         }
     }
 }

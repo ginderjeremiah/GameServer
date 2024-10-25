@@ -22,6 +22,7 @@ namespace GameServer.Services
         {
             if (_socketCommandGenerators.TryGetValue(commandInfo.Name, out var generator))
             {
+                _serviceProvider.CreateScope();
                 var command = generator(_serviceProvider);
                 command.SetParameters(commandInfo.Parameters);
                 command.Id = commandInfo.Id;

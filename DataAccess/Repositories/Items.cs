@@ -17,7 +17,7 @@ namespace DataAccess.Repositories
             {
                 _allItems = [.. Database.Items
                     .AsNoTracking()
-                    .Include(i => i.ItemSlots)
+                    .Include(i => i.ItemModSlots)
                     .Include(i => i.ItemAttributes)
                     .Include(i => i.ItemCategory)
                     .Include(i => i.Tags)];

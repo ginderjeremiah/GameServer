@@ -1,5 +1,5 @@
 import { Battler, newBattler } from "$lib/battle";
-import { staticData, player } from "$stores";
+import { staticData, player, inventory } from "$stores";
 import { ELogSetting, IEnemyInstance } from "$lib/api";
 import { logMessage } from "./log";
 import { formatNum, createHook } from "$lib/common";
@@ -20,7 +20,7 @@ const notifyBattleStart = battleStartHook.notify;
 
 export const onBattleStart = battleStartHook.onNotified;
 let battleStage = $state(Idle);
-let battlePlayer = $state(newBattler(player.data, player.equipmentStats));
+let battlePlayer = $state(newBattler(player.data, inventory.equipmentStats));
 let battleEnemy = $state<Battler>();
 let battleTimeElapsed = $state(0);
 
@@ -63,7 +63,7 @@ export const resumeBattle = () => {
 export const resetBattle = (enemyInstance: IEnemyInstance) => {
    const enemyData = staticData.enemies;
    battleTimeElapsed = 0;
-   battlePlayer.reset(player.data, player.equipmentStats);
+   battlePlayer.reset(player.data, inventory.equipmentStats);
    battleEnemy = newBattler({ ...enemyInstance, ...enemyData[enemyInstance.id] });
    resumeBattle();
 }

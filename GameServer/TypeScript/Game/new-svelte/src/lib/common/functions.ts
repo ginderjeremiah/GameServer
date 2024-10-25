@@ -20,7 +20,6 @@ export async function delay(delay: number) {
     return new Promise<void>(res => {
         setTimeout(res, delay);
     });
-
 }
 
 export function keys(obj?: {}) {

@@ -24,7 +24,7 @@ namespace GameInfrastructure.Database
         public DbSet<ItemModAttribute> ItemModAttributes { get; set; }
         public DbSet<ItemMod> ItemMods { get; set; }
         public DbSet<Item> Items { get; set; }
-        public DbSet<ItemSlot> ItemSlots { get; set; }
+        public DbSet<ItemModSlot> ItemModSlots { get; set; }
         public DbSet<LogPreference> LogPreferences { get; set; }
         public DbSet<LogSetting> LogSettings { get; set; }
         public DbSet<Player> Players { get; set; }
@@ -32,7 +32,7 @@ namespace GameInfrastructure.Database
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
-        public DbSet<SlotType> SlotTypes { get; set; }
+        public DbSet<ItemModSlotType> SlotTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
         public DbSet<Tag> Tags { get; set; }
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
@@ -96,9 +96,13 @@ namespace GameInfrastructure.Database
 
             //Fix to prevent double cascading delete on SlotType => ItemSlot/ItemMod
             modelBuilder.Entity<InventoryItemMod>()
-                .HasOne(iim => iim.ItemSlot)
+                .HasOne(iim => iim.ItemModSlot)
                 .WithMany(isl => isl.InventoryItemMods)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<InventoryItem>()
+                .HasIndex(ii => new { ii.PlayerId, ii.Equipped, ii.InventorySlotNumber })
+                .IsUnique();
 
             modelBuilder.Entity<Item>()
                 .Property(i => i.Id)
@@ -155,16 +159,16 @@ namespace GameInfrastructure.Database
                 .Property(ima => ima.Amount)
                 .HasPrecision(18, 3);
 
-            modelBuilder.Entity<ItemSlot>()
+            modelBuilder.Entity<ItemModSlot>()
                 .Property(isl => isl.Probability)
                 .HasPrecision(9, 8);
 
-            modelBuilder.Entity<ItemSlot>()
+            modelBuilder.Entity<ItemModSlot>()
                 .Property(isl => isl.GuaranteedItemModId)
                 .IsRequired(false);
 
             //Fix to prevent "possible" circular constraint when SlotType is deleted.
-            modelBuilder.Entity<ItemSlot>()
+            modelBuilder.Entity<ItemModSlot>()
                 .HasOne(isl => isl.GuaranteedItemMod)
                 .WithMany(im => im.GuaranteedSlots)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -228,14 +232,14 @@ namespace GameInfrastructure.Database
                 .Property(sdm => sdm.Multiplier)
                 .HasPrecision(18, 3);
 
-            modelBuilder.Entity<SlotType>()
+            modelBuilder.Entity<ItemModSlotType>()
                 .Property(st => st.Id)
                 .ValueGeneratedNever();
 
-            modelBuilder.Entity<SlotType>()
-                .HasEnumValues<SlotType, ESlotType>();
+            modelBuilder.Entity<ItemModSlotType>()
+                .HasEnumValues<ItemModSlotType, EItemModSlotType>();
 
-            modelBuilder.Entity<SlotType>()
+            modelBuilder.Entity<ItemModSlotType>()
                 .Property(st => st.Name)
                 .HasMaxLength(50);
 
