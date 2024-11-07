@@ -26,6 +26,9 @@ namespace GameServer
             var config = new Config(builder.Configuration);
             Hashing.SetPepper(config.HashPepper);
 
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+
             // Add services to the container.
             builder.Services.AddControllersWithViews();
             builder.Services.AddEndpointsApiExplorer()
@@ -33,7 +36,6 @@ namespace GameServer
                 .AddHttpContextAccessor()
                 .AddSingleton<IDataServicesConfiguration, Config>()
                 .AddTransient<IDataServicesFactory, DataServicesFactory>()
-                .AddTransient(services => services.GetRequiredService<IDataServicesFactory>().Logger)
                 .AddTransient<IRepositoryManager, RepositoryManager>()
                 .AddScoped<SessionService>()
                 .AddScoped<CookieService>()
@@ -45,8 +47,9 @@ namespace GameServer
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                var dataServices = new DataServicesFactory(config);
-                var logger = dataServices.Logger;
+                var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+                var dataServices = new DataServicesFactory(config, loggerFactory);
+                var logger = loggerFactory.CreateLogger<Startup>();
                 var start = Stopwatch.GetTimestamp();
                 logger.LogDebug($"Beginning migration.");
 

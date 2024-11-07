@@ -1,18 +1,18 @@
 import { onDestroy } from "svelte";
 import { Action } from "./types";
 
-interface HookTracker<T> {
+interface HookTracker<T extends any[]> {
    id: number;
    callback: Action<T>;
 }
 
-export const createHook = <T = void>() => {
+export const createHook = <T extends any[] = []>() => {
    let currentId = 0;
    const trackers: HookTracker<T>[] = [];
 
-   const notify = (data: T) => {
+   const notify = (...data: T) => {
       for (const tracker of trackers) {
-         tracker.callback(data);
+         tracker.callback(...data);
       }
    }
 

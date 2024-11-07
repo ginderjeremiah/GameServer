@@ -1,0 +1,6 @@
+@GameApi_HostAddress = https://localhost:7054
+
+GET {{GameApi_HostAddress}}/enemies/
+Accept: application/json
+
+###

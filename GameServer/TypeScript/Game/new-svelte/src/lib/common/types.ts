@@ -1,6 +1,6 @@
 ﻿export type Comparator<Type> = (currData: Type, objData: Type) => boolean;
 
-export type Action<Type = void> = (data: Type) => void;
+export type Action<T extends any[]> = (...args: T) => void;
 
 export type Converter<Type, Type2> = (data: Type) => Type2;
 

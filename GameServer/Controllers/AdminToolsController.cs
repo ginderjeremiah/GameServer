@@ -1,5 +1,4 @@
-﻿using GameCore;
-using GameCore.DataAccess;
+﻿using GameCore.DataAccess;
 using GameServer.Models.Common;
 using GameServer.Models.Items;
 using GameServer.Models.Tags;
@@ -12,9 +11,9 @@ namespace GameServer.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class AdminToolsController : BaseController
+    public class AdminToolsController : Controller
     {
-        public AdminToolsController(IRepositoryManager repositoryManager, IApiLogger logger, SessionService sessionService)
+        public AdminToolsController(IRepositoryManager repositoryManager, ILogger logger, SessionService sessionService)
             : base(repositoryManager, logger, sessionService) { }
 
         [HttpPost]

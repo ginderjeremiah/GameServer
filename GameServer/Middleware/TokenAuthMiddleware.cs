@@ -20,9 +20,8 @@ namespace GameServer.Middleware
         /// <param name="context"></param>
         /// <param name="logger"></param>
         /// <param name="sessionService"></param>
-        /// <param name="cookieService"></param>
         /// <returns></returns>
-        public async Task InvokeAsync(HttpContext context, IApiLogger logger, SessionService sessionService, CookieService cookieService)
+        public async Task InvokeAsync(HttpContext context, IApiLogger logger, SessionService sessionService)
         {
             long startTime = Stopwatch.GetTimestamp();
             logger.LogDebug("Starting TokenAuth.");
@@ -43,7 +42,7 @@ namespace GameServer.Middleware
                     var actionDescriptor = endpoint.Metadata.GetMetadata<ControllerActionDescriptor>();
                     if (actionDescriptor is not null)
                     {
-                        allowAnonymous = actionDescriptor.MethodInfo.GetCustomAttributes(true).Any(f => f is AllowAnonymousAttribute);
+                        allowAnonymous = actionDescriptor.MethodInfo.GetCustomAttributes(inherit: true).Any(f => f is AllowAnonymousAttribute);
                     }
                 }
 

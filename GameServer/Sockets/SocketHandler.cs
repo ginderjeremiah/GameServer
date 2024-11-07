@@ -81,8 +81,19 @@ namespace GameServer.Sockets
         {
             _logger.Log($"Executing command: {commandInfo} on socket: {Id}");
             var command = _commandFactory.CreateCommand(commandInfo);
-            var response = await command.ExecuteAsync(_context);
-            await SendData(response);
+            try
+            {
+                var response = await command.ExecuteAsync(_context);
+                await SendData(response);
+            }
+            catch
+            {
+                await SendData(new ApiSocketResponse
+                {
+                    Id = commandInfo.Id,
+                    Error = "Internal Server Error"
+                });
+            }
         }
 
         private void ClearBuffer(int end = -1)

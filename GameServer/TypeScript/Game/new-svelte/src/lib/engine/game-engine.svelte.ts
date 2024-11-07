@@ -20,7 +20,7 @@ export const logicalState = {
    }
 }
 
-const logicalUpdateHook = createHook<number>();
+const logicalUpdateHook = createHook<[number]>();
 const notifyLogicalUpdate = logicalUpdateHook.notify;
 export const onLogicalUpdate = logicalUpdateHook.onNotified;
 

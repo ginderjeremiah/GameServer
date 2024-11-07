@@ -13,7 +13,7 @@ export const renderState = {
    }
 }
 
-const renderUpdateHook = createHook<number>();
+const renderUpdateHook = createHook<[number]>();
 const notifyRenderUpdate = renderUpdateHook.notify;
 export const onRenderUpdate = renderUpdateHook.onNotified;
 
