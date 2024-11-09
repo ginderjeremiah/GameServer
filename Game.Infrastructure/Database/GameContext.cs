@@ -5,42 +5,76 @@ using Attribute = Game.Core.Entities.Attribute;
 
 namespace Game.Infrastructure.Database
 {
+    /// <summary>
+    /// <para>An extension of <see cref="DbContext"/> containing a <see cref="DbSet{TEntity}"/> for each entity used by the game.</para>
+    /// <inheritdoc/>
+    /// </summary>
+    /// <inheritdoc/>
     public class GameContext : DbContext
     {
-        public GameContext() { }
-
+        /// <inheritdoc cref="DbContext(DbContextOptions)"/>
         public GameContext(DbContextOptions<GameContext> options) : base(options) { }
 
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<AttributeDistribution> AttributeDistributions { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Attribute> Attributes { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Enemy> Enemies { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<EnemyDrop> EnemyDrops { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<EnemySkill> EnemySkills { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<EquipmentSlot> EquipmentSlots { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<InventoryItemMod> InventoryItemMods { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<InventoryItem> InventoryItems { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemAttribute> ItemAttributes { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemCategory> ItemCategories { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModAttribute> ItemModAttributes { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemMod> ItemMods { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Item> Items { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<LogPreference> LogPreferences { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<LogSetting> LogSettings { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Player> Players { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Skill> Skills { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModSlotType> ItemModSlotTypes { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<TagCategory> TagCategories { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Tag> Tags { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemyAlias> ZoneEnemyAliases { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemyProbability> ZoneEnemyProbabilities { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Zone> Zones { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneDrop> ZoneDrops { get; set; }
 
+        /// <inheritdoc/>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Attribute>()

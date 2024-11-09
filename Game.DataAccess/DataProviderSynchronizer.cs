@@ -59,6 +59,7 @@ namespace Game.DataAccess
 
             var inventoryProcessor = GetPlayerQueueProcessor(async (dbContext, player) =>
             {
+#nullable disable
                 foreach (var item in player.InventoryItems)
                 {
                     item.InventoryItemMods = null;
@@ -67,6 +68,8 @@ namespace Game.DataAccess
                 player.LogPreferences = null;
                 player.PlayerSkills = null;
                 player.PlayerAttributes = null;
+#nullable enable
+
                 dbContext.Update(player);
 
                 var inventoryItemIds = player.InventoryItems.Select(ii => ii.Id).ToList();
@@ -85,10 +88,13 @@ namespace Game.DataAccess
 
             var playerProcessor = GetPlayerQueueProcessor(async (dbContext, player) =>
             {
+#nullable disable
                 player.InventoryItems = null;
                 player.LogPreferences = null;
                 player.PlayerSkills = null;
                 player.PlayerAttributes = null;
+#nullable enable
+
                 dbContext.Update(player);
                 await dbContext.SaveChangesAsync();
             });

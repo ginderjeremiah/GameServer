@@ -1,5 +1,4 @@
-﻿using Game.Core;
-using Game.Core.Entities;
+﻿using Game.Core.Entities;
 
 namespace Game.Core.BattleSimulation
 {

@@ -57,7 +57,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
             void handle(RedisChannel _, RedisValue message)
             {
-                action((message.AsString(), channel));
+                action((message.ToString(), channel));
             }
         }
 

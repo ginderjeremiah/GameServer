@@ -1,5 +1,4 @@
-﻿using Game.Core;
-using static Game.Core.EAttribute;
+﻿using static Game.Core.EAttribute;
 
 namespace Game.Core.BattleSimulation
 {
@@ -21,6 +20,7 @@ namespace Game.Core.BattleSimulation
             {
                 _attributes[(int)att.AttributeId] += att.Amount;
             }
+
             CalculateDerivedValues();
         }
 
@@ -31,9 +31,9 @@ namespace Game.Core.BattleSimulation
 
         private void CalculateDerivedValues()
         {
-            this[MaxHealth] += 50.0 + 20.0 * this[Endurance] + 5 * this[Strength];
-            this[Defense] += 2.0 + this[Endurance] + 0.5 * this[Agility];
-            this[CooldownRecovery] += 0.4 * this[Agility] + 0.1 * this[Dexterity];
+            this[MaxHealth] += 50.0 + (20.0 * this[Endurance]) + (5 * this[Strength]);
+            this[Defense] += 2.0 + this[Endurance] + (0.5 * this[Agility]);
+            this[CooldownRecovery] += (0.4 * this[Agility]) + (0.1 * this[Dexterity]);
             this[DropBonus] += this[Luck] > 0.0 ? Math.Log10(this[Luck]) : 0.0;
             //this[CriticalChance] = 0.0;
             //this[CriticalDamage] = 0.0;

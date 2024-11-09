@@ -38,7 +38,7 @@ namespace Game.Api.Services
         /// <returns></returns>
         public async Task CreateSession(Player player)
         {
-            var sessionData = await _repos.SessionStore.GetNewSessionDataAsync(player.Id);
+            var sessionData = _repos.SessionStore.GetNewSessionData(player.Id);
             _session = new Session(sessionData, player, _repos);
             _cookieService.SetTokenCookie(CreateSessionToken());
         }
@@ -72,7 +72,7 @@ namespace Game.Api.Services
 
         private async Task LoadSessionData(int playerId)
         {
-            var sessionData = await _repos.SessionStore.GetSessionAsync(playerId);
+            var sessionData = await _repos.SessionStore.GetSession(playerId);
             if (sessionData is not null)
             {
                 var playerData = await _repos.Players.GetPlayer(sessionData.PlayerId);

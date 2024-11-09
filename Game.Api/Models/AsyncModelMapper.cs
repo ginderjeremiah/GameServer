@@ -9,7 +9,7 @@
             _source = source;
         }
 
-        public async IAsyncEnumerable<TModel> Model<TModel>() where TModel : IModelFromSource<TModel, TSource>, new()
+        public async IAsyncEnumerable<TModel> Model<TModel>() where TModel : IModelFromSource<TModel, TSource>
         {
             if (_source is null)
             {

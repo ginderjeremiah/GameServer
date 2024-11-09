@@ -14,7 +14,7 @@ namespace Game.DataAccess.Repositories
 
         private readonly GameContext _context = context;
 
-        public List<Enemy> AllEnemies(bool refreshCache = false)
+        public List<Enemy> All(bool refreshCache = false)
         {
             if (_enemyList is null || refreshCache)
             {
@@ -31,7 +31,7 @@ namespace Game.DataAccess.Repositories
 
         public Enemy? GetEnemy(int enemyId)
         {
-            var enemies = AllEnemies();
+            var enemies = All();
             return enemies.Count <= enemyId ? null : enemies[enemyId];
         }
 
@@ -53,7 +53,7 @@ namespace Game.DataAccess.Repositories
                 }
             }
 
-            var enemies = AllEnemies();
+            var enemies = All();
 
             return enemies[zoneEnemiesTable.GetRandomValue(zoneId)];
         }

@@ -8,7 +8,7 @@ namespace Game.Core.Entities
         public string Name { get; set; }
         public decimal BaseDamage { get; set; }
         public string Description { get; set; }
-        public int CooldownMS { get; set; }
+        public int CooldownMs { get; set; }
         public string IconPath { get; set; }
 
         public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }

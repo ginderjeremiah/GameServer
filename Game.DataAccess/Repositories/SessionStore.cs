@@ -18,12 +18,12 @@ namespace Game.DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<SessionData?> GetSessionAsync(int playerId)
+        public async Task<SessionData?> GetSession(int playerId)
         {
             return await _cache.GetAsync<SessionData>($"{SessionPrefix}_{playerId}");
         }
 
-        public async Task<SessionData> GetNewSessionDataAsync(int playerId)
+        public SessionData GetNewSessionData(int playerId)
         {
             var sessionData = new SessionData(Guid.NewGuid().ToString())
             {

@@ -19,7 +19,7 @@ namespace Game.Api.Controllers
         [HttpGet("/api/[controller]")]
         public ApiEnumerableResponse<Enemy> Enemies()
         {
-            var enemies = _repositoryManager.Enemies.AllEnemies().To().Model<Enemy>();
+            var enemies = _repositoryManager.Enemies.All().To().Model<Enemy>();
             return ApiResponse.Success(enemies);
         }
     }

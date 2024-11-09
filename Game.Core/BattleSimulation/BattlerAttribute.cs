@@ -1,8 +1,10 @@
-﻿using Game.Core;
-using Game.Core.Entities;
+﻿using Game.Core.Entities;
 
 namespace Game.Core.BattleSimulation
 {
+    /// <summary>
+    /// A class used 
+    /// </summary>
     public class BattlerAttribute
     {
         public EAttribute AttributeId { get; set; }
@@ -17,7 +19,7 @@ namespace Game.Core.BattleSimulation
         public BattlerAttribute(AttributeDistribution distribution, int level)
         {
             AttributeId = (EAttribute)distribution.AttributeId;
-            Amount = distribution.BaseAmount + distribution.AmountPerLevel * level;
+            Amount = distribution.BaseAmount + (distribution.AmountPerLevel * level);
         }
 
         public BattlerAttribute(ItemAttribute itemAttribute)

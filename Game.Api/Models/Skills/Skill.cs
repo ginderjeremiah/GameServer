@@ -22,7 +22,7 @@ namespace Game.Api.Models.Skills
                 BaseDamage = skill.BaseDamage,
                 DamageMultipliers = skill.SkillDamageMultipliers.To().Model<AttributeMultiplier>(),
                 Description = skill.Description,
-                CooldownMS = skill.CooldownMS,
+                CooldownMS = skill.CooldownMs,
                 IconPath = skill.IconPath,
             };
         }

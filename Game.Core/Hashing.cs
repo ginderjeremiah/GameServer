@@ -1,5 +1,4 @@
-﻿using Game.Core;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 namespace Game.Core
@@ -7,12 +6,12 @@ namespace Game.Core
     public static class Hashing
     {
         private const int ITERATIONS = 10000;
-        private static byte[] _pepper = Array.Empty<byte>();
+        private static byte[] _pepper = [];
 
         public static string Hash(this string input, string salt, int? iterations = ITERATIONS)
         {
-            var saltAndPepper = Encoding.UTF8.GetBytes(salt).AppendAll(_pepper);
-            var hashedBytes = SHA512.HashData(Encoding.UTF8.GetBytes(input).AppendAll(saltAndPepper));
+            var saltAndPepper = AppendAll(Encoding.UTF8.GetBytes(salt), _pepper);
+            var hashedBytes = SHA512.HashData(AppendAll(Encoding.UTF8.GetBytes(input), saltAndPepper));
 
             if (iterations > 1)
             {
@@ -59,6 +58,22 @@ namespace Game.Core
             {
                 original[dif + i] = replace[i];
             }
+        }
+
+        private static T[] AppendAll<T>(T[] first, T[] second)
+        {
+            T[] output = new T[first.Length + second.Length];
+            for (int i = 0; i < first.Length; i++)
+            {
+                output[i] = first[i];
+            }
+
+            for (int i = 0; i < second.Length; i++)
+            {
+                output[first.Length + i] = second[i];
+            }
+
+            return output;
         }
     }
 }
