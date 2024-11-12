@@ -23,7 +23,7 @@ namespace Game.Infrastructure
                 var valueName = enumValue.ToString();
                 idProp?.SetValue(entity, enumValue);
                 nameProp?.SetValue(entity, valueName.Capitalize().SpaceWords());
-                var metaData = enumType.GetField(valueName)?.GetCustomAttributes<MetadataAttribute>();
+                var metaData = enumType.GetField(valueName)?.GetCustomAttributes<EntityPropertyAttribute>();
                 if (metaData is not null)
                 {
                     foreach (var data in metaData)

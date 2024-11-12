@@ -87,7 +87,7 @@ namespace Game.Core.Sessions
 
             return new DefeatRewards
             {
-                Drops = drops.ToList(),
+                Drops = [.. drops],
                 ExpReward = expReward,
             };
         }
@@ -174,19 +174,19 @@ namespace Game.Core.Sessions
         {
             return InventoryData.Equipped
                 .SelectNotNull(item => item)
-                .SelectMany(item => _repos.Items.GetItem(item.ItemId).ItemAttributes
+                .SelectMany(item => _repos.Items.GetItem(item.ItemId)?.ItemAttributes?
                     .Select(att => new BattlerAttribute(att))
                     .Concat(item.InventoryItemMods
-                        .SelectMany(mod => _repos.ItemMods.GetItemMod(mod.ItemModId).ItemModAttributes.
-                            Select(att => new BattlerAttribute(att))
+                        .SelectMany(mod => _repos.ItemMods.GetItemMod(mod.ItemModId)?.ItemModAttributes?.
+                            Select(att => new BattlerAttribute(att)) ?? []
                         )
-                    )
+                    ) ?? []
                 );
         }
 
         public IEnumerable<Skill> GetSelectedSkills()
         {
-            return Player.SelectedSkills.Select(s => _repos.Skills.GetSkill(s.SkillId));
+            return Player.SelectedSkills.SelectNotNull(s => _repos.Skills.GetSkill(s.SkillId));
         }
 
         private T SetSessionDirty<T>(T data)
@@ -208,7 +208,7 @@ namespace Game.Core.Sessions
                 int? modId = null;
                 if (slot.GuaranteedItemModId is null)
                 {
-                    var mods = _repos.ItemMods.GetModsForItemBySlot(slot.ItemId);
+                    var mods = _repos.ItemMods.GetModsForItemByType(slot.ItemId);
                     if (mods.TryGetValue(slot.ItemModSlotTypeId, out var modsForSlot))
                     {
                         //TODO Add weights for item mods

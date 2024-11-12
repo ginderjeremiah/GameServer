@@ -114,7 +114,7 @@ namespace Game.Api.Controllers
                         Name = change.Item.Name,
                         Removable = change.Item.Removable,
                         Description = change.Item.Description,
-                        SlotTypeId = change.Item.SlotTypeId,
+                        ItemModTypeId = change.Item.ItemModTypeId,
                     });
                 }
                 else if (change.ChangeType == Edit)
@@ -125,7 +125,7 @@ namespace Game.Api.Controllers
                         itemMod.Name = change.Item.Name;
                         itemMod.Removable = change.Item.Removable;
                         itemMod.Description = change.Item.Description;
-                        itemMod.SlotTypeId = change.Item.SlotTypeId;
+                        itemMod.ItemModTypeId = change.Item.ItemModTypeId;
                         _repositoryManager.Update(itemMod);
                     }
                 }

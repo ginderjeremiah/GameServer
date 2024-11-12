@@ -2,7 +2,7 @@
 
 namespace Game.Core.Entities
 {
-    public partial class ItemModSlotType
+    public partial class ItemModType
     {
         public int Id { get; set; }
         public string Name { get; set; }

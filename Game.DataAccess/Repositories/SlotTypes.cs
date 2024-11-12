@@ -4,18 +4,18 @@ using Game.Infrastructure.Database;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class ItemModSlotTypes : IItemModSlotTypes
+    internal class ItemModTypes : IItemModTypes
     {
         private readonly GameContext _context;
 
-        public ItemModSlotTypes(GameContext context)
+        public ItemModTypes(GameContext context)
         {
             _context = context;
         }
 
-        public IAsyncEnumerable<ItemModSlotType> All()
+        public IAsyncEnumerable<ItemModType> All()
         {
-            return _context.ItemModSlotTypes.AsAsyncEnumerable();
+            return _context.ItemModTypes.AsAsyncEnumerable();
         }
     }
 }

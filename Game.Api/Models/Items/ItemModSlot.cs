@@ -7,7 +7,7 @@ namespace Game.Api.Models.Items
     {
         public int Id { get; set; }
         public int ItemId { get; set; }
-        public EItemModSlotType ItemModSlotTypeId { get; set; }
+        public EItemModType ItemModSlotTypeId { get; set; }
         public int? GuaranteedItemModId { get; set; }
         public decimal Probability { get; set; }
 
@@ -17,7 +17,7 @@ namespace Game.Api.Models.Items
             {
                 Id = itemSlot.Id,
                 ItemId = itemSlot.ItemId,
-                ItemModSlotTypeId = (EItemModSlotType)itemSlot.ItemModSlotTypeId,
+                ItemModSlotTypeId = (EItemModType)itemSlot.ItemModSlotTypeId,
                 GuaranteedItemModId = itemSlot.GuaranteedItemModId,
                 Probability = itemSlot.Probability,
             };

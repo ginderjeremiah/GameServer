@@ -8,7 +8,7 @@ namespace Game.Core.BattleSimulation
     /// </summary>
     public abstract class Battler
     {
-        /// <inheritdoc />
+        /// <inheritdoc cref="BattleAttributes" />
         public abstract BattleAttributes Attributes { get; set; }
 
         /// <summary>

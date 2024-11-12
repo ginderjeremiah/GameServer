@@ -22,7 +22,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.Infrastructure", "Game
 		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Api", "Game.Api\Game.Api.csproj", "{4C61D186-7350-4BE0-A59A-28168BDDAA55}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.Api", "Game.Api\Game.Api.csproj", "{4C61D186-7350-4BE0-A59A-28168BDDAA55}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Core.Tests", "Game.Core.Tests\Game.Core.Tests.csproj", "{3E20FE5C-A416-4ADA-832D-00C77F2200B5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -50,6 +52,10 @@ Global
 		{4C61D186-7350-4BE0-A59A-28168BDDAA55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C61D186-7350-4BE0-A59A-28168BDDAA55}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C61D186-7350-4BE0-A59A-28168BDDAA55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -12,7 +12,7 @@ namespace Game.Core.Entities
 
         [JsonIgnore]
         public virtual Item Item { get; set; }
-        public virtual ItemModSlotType ItemModSlotType { get; set; }
+        public virtual ItemModType ItemModSlotType { get; set; }
         public virtual ItemMod? GuaranteedItemMod { get; set; }
         public virtual List<InventoryItemMod> InventoryItemMods { get; set; }
     }

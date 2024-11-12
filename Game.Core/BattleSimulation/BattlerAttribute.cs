@@ -3,7 +3,7 @@
 namespace Game.Core.BattleSimulation
 {
     /// <summary>
-    /// A class used 
+    /// A class used distill the various kinds of attribute entities into one logical representation.
     /// </summary>
     public class BattlerAttribute
     {

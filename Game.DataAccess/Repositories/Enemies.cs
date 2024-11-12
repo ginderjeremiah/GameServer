@@ -1,6 +1,6 @@
-﻿using Game.Core;
-using Game.Core.DataAccess;
+﻿using Game.Core.DataAccess;
 using Game.Core.Entities;
+using Game.Core.Probability;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +8,7 @@ namespace Game.DataAccess.Repositories
 {
     internal class Enemies(GameContext context) : IEnemies
     {
-        private static readonly SharedProbabilityTable zoneEnemiesTable = new();
+        private static readonly List<ProbabilityTable<int>?> zoneEnemiesTables = [];
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
@@ -37,45 +37,39 @@ namespace Game.DataAccess.Repositories
 
         public Enemy GetRandomEnemy(int zoneId)
         {
-            if (!zoneEnemiesTable.HasProbabilities(zoneId))
-            {
-                lock (_lock)
-                {
-                    if (!zoneEnemiesTable.HasProbabilities(zoneId))
-                    {
-                        var data = GetProbabilitiesAndAliases(zoneId);
-                        var probData = data.Item1;
-                        var aliases = data.Item2;
+            var enemies = All();
 
-                        zoneEnemiesTable.AddProbabilities(probData, zoneId);
-                        zoneEnemiesTable.AddAliases(aliases);
-                    }
+            if (zoneEnemiesTables.Count > zoneId)
+            {
+                var table = zoneEnemiesTables[zoneId];
+                if (table is not null)
+                {
+                    return enemies[table.GetRandomValue()];
                 }
             }
 
-            var enemies = All();
+            //TODO: Refactor to use async queries and also not require a lock
+            lock (_lock)
+            {
+                //TODO: Make this not allow adding an insane amount of values to the list if someone passes in a big id.
+                for (int i = zoneEnemiesTables.Count - 1; i < zoneId; i++)
+                {
+                    zoneEnemiesTables.Add(null);
+                }
 
-            return enemies[zoneEnemiesTable.GetRandomValue(zoneId)];
-        }
+                var table = zoneEnemiesTables[zoneId];
+                if (table is null)
+                {
+                    var weightedZoneEnemies = _context.ZoneEnemies
+                        .Where(ze => ze.ZoneId == zoneId)
+                        .Select(ze => new WeightedValue<int>(ze.EnemyId, ze.Weight));
 
-        private (List<ProbabilityData>, List<AliasData>) GetProbabilitiesAndAliases(int zoneId)
-        {
-            var probabilities = _context.ZoneEnemyProbabilities
-                .AsNoTracking()
-                .Include(zep => zep.ZoneEnemy)
-                .Where(zep => zep.ZoneEnemy.ZoneId == zoneId)
-                .OrderBy(zep => zep.ZoneOrder)
-                .Select(zep => new ProbabilityData { Alias = zep.ZoneEnemyId, Value = zep.ZoneEnemy.EnemyId, Probability = zep.Probability })
-                .ToList();
+                    table = new ProbabilityTable<int>(weightedZoneEnemies);
+                    zoneEnemiesTables[zoneId] = table;
+                }
 
-            var aliases = _context.ZoneEnemyAliases
-                .AsNoTracking()
-                .Include(zea => zea.ZoneEnemy)
-                .Where(zea => zea.ZoneEnemy.ZoneId == zoneId)
-                .Select(zea => new AliasData { Alias = zea.ZoneEnemyId, Value = zea.ZoneEnemy.EnemyId })
-                .ToList();
-
-            return (probabilities, aliases);
+                return enemies[table.GetRandomValue()];
+            }
         }
     }
 }

@@ -22,5 +22,12 @@ namespace Game.Api.Controllers
             var itemMods = _repositoryManager.ItemMods.All(refreshCache).To().Model<ItemMod>();
             return ApiResponse.Success(itemMods);
         }
+
+        [HttpGet]
+        public ApiAsyncEnumerableResponse<ItemModType> ItemModTypes()
+        {
+            var itemModSlotTypes = _repositoryManager.ItemModTypes.All().To().Model<ItemModType>();
+            return ApiResponse.Success(itemModSlotTypes);
+        }
     }
 }

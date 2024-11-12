@@ -41,7 +41,7 @@ namespace Game.Api.Controllers
             if (passHash != player.PassHash)
                 return ApiResponse.Error<PlayerData>("Username or password is incorrect");
 
-            await _sessionService.CreateSession(player);
+            _sessionService.CreateSession(player);
 
             return ApiResponse.Success(Session.GetPlayerData());
         }

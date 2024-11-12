@@ -22,15 +22,8 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<DefeatEnemyResponse>> HandleExecuteAsync(SocketContext context)
         {
             var now = DateTime.UtcNow;
-            var instance = new EnemyInstance
-            {
-                Id = Parameters.Id,
-                Level = Parameters.Level,
-                Seed = Parameters.Seed,
-                SelectedSkills = Parameters.SelectedSkills,
-                Attributes = Parameters.Attributes.Select(att => new BattlerAttribute { AttributeId = att.AttributeId, Amount = att.Amount }).ToList()
-            };
-
+            var attributes = Parameters.Attributes.Select(att => new BattlerAttribute { AttributeId = att.AttributeId, Amount = att.Amount }).ToList();
+            var instance = new EnemyInstance(Parameters.Id, Parameters.Level, attributes, Parameters.Seed, Parameters.SelectedSkills);
             if (Session.DefeatEnemy(instance))
             {
                 Logger.LogDebug("DefeatEnemy: (currentTime: {CurrentTime}, earliestDefeat: {EarliestDefeatTime}, difference: {TimeDifference} ms)", now.ToString("O"), Session.EarliestDefeat.ToString("O"), (now - Session.EarliestDefeat).TotalMilliseconds);

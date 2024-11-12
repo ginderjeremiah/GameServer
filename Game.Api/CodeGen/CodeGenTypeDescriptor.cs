@@ -15,7 +15,7 @@ namespace Game.Api.CodeGen
 
         public bool NeedsInterface => UnderlyingType.NeedsInterface();
         public string TypeName => IsGeneric ? UnderlyingType.Name[..UnderlyingType.Name.IndexOf('`')] : UnderlyingType.Name;
-        public string LastNamespacePart => UnderlyingType.Namespace[(UnderlyingType.Namespace.LastIndexOf('.') + 1)..].SnakeCase();
+        public string LastNamespacePart => UnderlyingType.Namespace is null ? "Unknown" : UnderlyingType.Namespace[(UnderlyingType.Namespace.LastIndexOf('.') + 1)..].SnakeCase();
         public bool IsGeneric => GenericArgumentDescriptors.Count > 0;
         public bool IsEnum => UnderlyingType.IsEnum;
 

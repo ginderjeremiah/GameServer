@@ -28,12 +28,12 @@ namespace Game.Core.Sessions
         public bool UpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             var availablePoints = StatPointsGained - StatPointsUsed;
-            var matchedAtts = Attributes.Where(att => att.IsCoreAttribute()).Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.AttributeId == att.AttributeId)));
-            var changedPoints = matchedAtts.Sum(match => match.upd?.Amount ?? 0);
-            if (availablePoints - changedPoints >= 0 && matchedAtts.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
+            var matchedAttributes = Attributes.Where(att => att.IsCoreAttribute()).Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.AttributeId == att.AttributeId)));
+            var changedPoints = matchedAttributes.Sum(match => match.upd?.Amount ?? 0);
+            if (availablePoints - changedPoints >= 0 && matchedAttributes.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
             {
                 StatPointsUsed += availablePoints - changedPoints;
-                foreach (var (att, upd) in matchedAtts)
+                foreach (var (att, upd) in matchedAttributes)
                 {
                     if (upd is not null)
                     {

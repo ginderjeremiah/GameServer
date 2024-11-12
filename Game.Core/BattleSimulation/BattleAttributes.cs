@@ -2,31 +2,48 @@
 
 namespace Game.Core.BattleSimulation
 {
+    /// <summary>
+    /// Represents an aggregated collection of <see cref="BattlerAttribute"/>s.
+    /// </summary>
     public class BattleAttributes
     {
-        private static readonly int _attributesMaxId = (int)Enum.GetValues(typeof(EAttribute)).GetValue(Enum.GetValues(typeof(EAttribute)).Length - 1);
-        private readonly List<decimal> _attributes;
+        private static readonly int _attributesMaxId = GetMaxAttribute();
+        private readonly List<double> _attributes = GetEmptyAttributeList();
 
+        /// <summary>
+        /// Gets the associated value of an attribute by its <see cref="EAttribute"/> representation.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns>The value of the attribute.</returns>
         public double this[EAttribute index]
         {
-            get => (double)_attributes[(int)index];
-            set => _attributes[(int)index] = (decimal)value;
+            get => _attributes[(int)index];
+            set => _attributes[(int)index] = value;
         }
 
-        public BattleAttributes(IEnumerable<BattlerAttribute> atts)
+        /// <summary>
+        /// Creates a new aggregate from an <see cref="IEnumerable{T}"/> of <see cref="BattlerAttribute"/>.
+        /// </summary>
+        /// <param name="attributes"></param>
+        public BattleAttributes(IEnumerable<BattlerAttribute> attributes)
         {
-            _attributes = GetEmptyAttributeList();
-            foreach (var att in atts)
+            foreach (var att in attributes)
             {
-                _attributes[(int)att.AttributeId] += att.Amount;
+                this[att.AttributeId] += (double)att.Amount;
             }
 
             CalculateDerivedValues();
         }
 
-        private static List<decimal> GetEmptyAttributeList()
+        private static List<double> GetEmptyAttributeList()
         {
-            return Enumerable.Repeat(0m, _attributesMaxId + 1).ToList();
+            return Enumerable.Repeat(0.0, _attributesMaxId + 1).ToList();
+        }
+
+        private static int GetMaxAttribute()
+        {
+            var attributeValues = Enum.GetValues<EAttribute>();
+            return (int)attributeValues.Max();
         }
 
         private void CalculateDerivedValues()

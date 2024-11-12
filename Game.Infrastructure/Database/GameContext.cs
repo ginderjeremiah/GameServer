@@ -58,17 +58,13 @@ namespace Game.Infrastructure.Database
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<ItemModSlotType> ItemModSlotTypes { get; set; }
+        public DbSet<ItemModType> ItemModTypes { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<TagCategory> TagCategories { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Tag> Tags { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<ZoneEnemyAlias> ZoneEnemyAliases { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<ZoneEnemyProbability> ZoneEnemyProbabilities { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Zone> Zones { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
@@ -267,14 +263,14 @@ namespace Game.Infrastructure.Database
                 .Property(sdm => sdm.Multiplier)
                 .HasPrecision(18, 3);
 
-            modelBuilder.Entity<ItemModSlotType>()
+            modelBuilder.Entity<ItemModType>()
                 .Property(st => st.Id)
                 .ValueGeneratedNever();
 
-            modelBuilder.Entity<ItemModSlotType>()
-                .HasEnumValues<ItemModSlotType, EItemModSlotType>();
+            modelBuilder.Entity<ItemModType>()
+                .HasEnumValues<ItemModType, EItemModType>();
 
-            modelBuilder.Entity<ItemModSlotType>()
+            modelBuilder.Entity<ItemModType>()
                 .Property(st => st.Name)
                 .HasMaxLength(50);
 
@@ -304,19 +300,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<ZoneDrop>()
                 .Property(zd => zd.DropRate)
                 .HasPrecision(9, 8);
-
-            modelBuilder.Entity<ZoneEnemy>()
-                .ToTable(tb => tb.HasTrigger("trig_ZoneEnemies_ProbabilityRecalc"));
-
-            modelBuilder.Entity<ZoneEnemyAlias>()
-                .HasKey(zea => zea.ZoneEnemyId);
-
-            modelBuilder.Entity<ZoneEnemyProbability>()
-                .HasKey(zep => zep.ZoneEnemyId);
-
-            modelBuilder.Entity<ZoneEnemyProbability>()
-                .Property(zep => zep.Probability)
-                .HasPrecision(18, 3);
         }
     }
 }

@@ -12,11 +12,11 @@ namespace Game.Core.BattleSimulation
         private const int msPerTick = 40;
         private const int maxMs = msPerTick * 10000;
 
-        public BattleSimulator(Session session, Enemy enemy, EnemyInstance enemyInstance)
+        public BattleSimulator(Session session, EnemyInstance enemyInstance, IEnumerable<Skill> enemySkills)
         {
             Rng = new Mulberry32(enemyInstance.Seed);
             Player = new BattlePlayer(session);
-            Enemy = new BattleEnemy(enemy, enemyInstance);
+            Enemy = new BattleEnemy(enemyInstance, enemySkills);
         }
 
         public bool Simulate(out int totalMs)

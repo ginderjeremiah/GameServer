@@ -9,7 +9,7 @@ namespace Game.Api.Models.Items
         public string Name { get; set; }
         public bool Removable { get; set; }
         public string Description { get; set; }
-        public int SlotTypeId { get; set; }
+        public int ItemModTypeId { get; set; }
         public IEnumerable<BattlerAttribute> Attributes { get; set; }
 
         public static ItemMod FromSource(ItemModEntity itemMod)
@@ -20,7 +20,7 @@ namespace Game.Api.Models.Items
                 Name = itemMod.Name,
                 Removable = itemMod.Removable,
                 Description = itemMod.Description,
-                SlotTypeId = itemMod.SlotTypeId,
+                ItemModTypeId = itemMod.ItemModTypeId,
                 Attributes = itemMod.ItemModAttributes.To().Model<BattlerAttribute>(),
             };
         }

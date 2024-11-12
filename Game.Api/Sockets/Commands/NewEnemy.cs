@@ -1,6 +1,7 @@
 ﻿using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Services;
+using Game.Core;
 using Game.Core.BattleSimulation;
 using Game.Core.DataAccess;
 using Game.Core.Sessions;
@@ -38,23 +39,18 @@ namespace Game.Api.Sockets.Commands
                 Session.CurrentZone = Parameters.NewZoneId.Value;
             }
 
-            var zone = Repositories.Zones.GetZone(Session.CurrentZone);
+            var zone = Repositories.Zones.GetZone(Session.CurrentZone) ?? throw new InvalidOperationException("Failed to load zone");
             var level = (int)new Random().NextInt64(zone.LevelMin, zone.LevelMax);
             var enemy = Repositories.Enemies.GetRandomEnemy(zone.Id);
             var seed = (uint)(now.Ticks % uint.MaxValue);
-            var enemyInstance = new EnemyInstance()
-            {
-                Id = enemy.Id,
-                Level = level,
-                Seed = seed
-            };
 
-            foreach (var enemySkill in enemy.EnemySkills)
-            {
-                enemySkill.Skill = Repositories.Skills.GetSkill(enemySkill.SkillId);
-            }
+            var rng = new Random();
+            var selectedSkills = enemy.EnemySkills.OrderBy(es => rng.Next()).Take(4).Select(es => es.SkillId).OrderBy(id => id).ToList();
+            var attributes = enemy.AttributeDistributions.Select(distribution => new BattlerAttribute(distribution, level)).ToList();
+            var enemyInstance = new EnemyInstance(enemy.Id, level, attributes, seed, selectedSkills);
+            var enemySkills = enemyInstance.SelectedSkills.SelectNotNull(Repositories.Skills.GetSkill);
 
-            var simulator = new BattleSimulator(Session, enemy, enemyInstance);
+            var simulator = new BattleSimulator(Session, enemyInstance, enemySkills);
             var victory = simulator.Simulate(out var totalMs);
             var earliestDefeat = now.AddMilliseconds(totalMs);
 

@@ -8,7 +8,7 @@ namespace Game.DataAccess.Repositories
     internal class ItemMods : IItemMods
     {
         private static List<ItemMod>? _allMods;
-        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsBySlot = [];
+        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsByType = [];
         private static readonly object _lockForItem = new();
 
         private readonly GameContext _context;
@@ -27,23 +27,23 @@ namespace Game.DataAccess.Repositories
             return _allMods;
         }
 
-        public Dictionary<int, IEnumerable<ItemMod>> GetModsForItemBySlot(int itemId)
+        public Dictionary<int, IEnumerable<ItemMod>> GetModsForItemByType(int itemId)
         {
-            var mods = itemId >= _itemModsBySlot.Count ? null : _itemModsBySlot[itemId];
+            var mods = itemId >= _itemModsByType.Count ? null : _itemModsByType[itemId];
             if (mods is null)
             {
                 lock (_lockForItem)
                 {
-                    for (int i = _itemModsBySlot.Count; i <= itemId + 1; i++)
+                    for (int i = _itemModsByType.Count; i <= itemId + 1; i++)
                     {
-                        _itemModsBySlot.Add(null);
+                        _itemModsByType.Add(null);
                     }
 
-                    mods = _itemModsBySlot[itemId];
+                    mods = _itemModsByType[itemId];
                     if (mods is null)
                     {
-                        mods = ModsForItemBySlot(itemId);
-                        _itemModsBySlot[itemId] = mods;
+                        mods = ModsForItemByType(itemId);
+                        _itemModsByType[itemId] = mods;
                         return mods;
                     }
                 }
@@ -58,7 +58,7 @@ namespace Game.DataAccess.Repositories
             return itemMods.Count <= itemModId ? null : itemMods[itemModId];
         }
 
-        private Dictionary<int, IEnumerable<ItemMod>> ModsForItemBySlot(int itemId)
+        private Dictionary<int, IEnumerable<ItemMod>> ModsForItemByType(int itemId)
         {
             return _context.Items
                 .Where(i => i.Id == itemId)
@@ -66,7 +66,7 @@ namespace Game.DataAccess.Repositories
                     .ThenInclude(t => t.ItemMods)
                 .SelectMany(i => i.Tags.SelectMany(t => t.ItemMods))
                 .Distinct()
-                .GroupBy(im => im.SlotTypeId)
+                .GroupBy(im => im.ItemModTypeId)
                 .ToDictionary(grp => grp.Key, grp => grp.AsEnumerable());
         }
     }

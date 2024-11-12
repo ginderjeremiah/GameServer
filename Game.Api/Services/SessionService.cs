@@ -36,7 +36,7 @@ namespace Game.Api.Services
         /// </summary>
         /// <param name="player"></param>
         /// <returns></returns>
-        public async Task CreateSession(Player player)
+        public void CreateSession(Player player)
         {
             var sessionData = _repos.SessionStore.GetNewSessionData(player.Id);
             _session = new Session(sessionData, player, _repos);
@@ -100,6 +100,6 @@ namespace Game.Api.Services
         /// <summary>
         /// Initializes a new instance of the <see cref="SessionNotInitializedException"/> class with the default error message.
         /// </summary>
-        public SessionNotInitializedException() : base("The session was not intialized.") { }
+        public SessionNotInitializedException() : base("The session was not initialized.") { }
     }
 }

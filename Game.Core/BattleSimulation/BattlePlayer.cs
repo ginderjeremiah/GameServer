@@ -20,6 +20,10 @@ namespace Game.Core.BattleSimulation
         /// <inheritdoc/>
         public override int Level { get; set; }
 
+        /// <summary>
+        /// Create a battle player from an active <see cref="Session"/>.
+        /// </summary>
+        /// <param name="session"></param>
         public BattlePlayer(Session session)
         {
             Attributes = new BattleAttributes(session.BattlerAttributes.Concat(session.GetInventoryAttributes()));

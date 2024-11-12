@@ -17,7 +17,7 @@ namespace Game.DataAccess
         private ItemMods? _itemMods;
         private Items? _items;
         private ItemCategories? _itemCategories;
-        private ItemModSlotTypes? _itemModSlotTypes;
+        private ItemModTypes? _itemModSlotTypes;
         private Enemies? _enemies;
         private Zones? _zones;
         private Skills? _skills;
@@ -31,7 +31,7 @@ namespace Game.DataAccess
         public IItemMods ItemMods => _itemMods ??= new ItemMods(_context);
         public IItems Items => _items ??= new Items(_context);
         public IItemCategories ItemCategories => _itemCategories ??= new ItemCategories(_context);
-        public IItemModSlotTypes ItemModSlotTypes => _itemModSlotTypes ??= new ItemModSlotTypes(_context);
+        public IItemModTypes ItemModTypes => _itemModSlotTypes ??= new ItemModTypes(_context);
         public IEnemies Enemies => _enemies ??= new Enemies(_context);
         public IZones Zones => _zones ??= new Zones(_context);
         public ISkills Skills => _skills ??= new Skills(_context);

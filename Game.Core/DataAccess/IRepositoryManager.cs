@@ -9,7 +9,7 @@
         public IItemMods ItemMods { get; }
         public IItems Items { get; }
         public IItemCategories ItemCategories { get; }
-        public IItemModSlotTypes ItemModSlotTypes { get; }
+        public IItemModTypes ItemModTypes { get; }
         public IEnemies Enemies { get; }
         public IZones Zones { get; }
         public ISkills Skills { get; }

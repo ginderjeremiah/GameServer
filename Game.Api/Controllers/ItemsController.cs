@@ -35,12 +35,5 @@ namespace Game.Api.Controllers
 
             return ApiResponse.Success((item?.ItemModSlots).To().Model<ItemModSlot>());
         }
-
-        [HttpGet]
-        public ApiAsyncEnumerableResponse<ItemModSlotType> ItemModSlotTypes()
-        {
-            var itemModSlotTypes = _repositoryManager.ItemModSlotTypes.All().To().Model<ItemModSlotType>();
-            return ApiResponse.Success(itemModSlotTypes);
-        }
     }
 }
