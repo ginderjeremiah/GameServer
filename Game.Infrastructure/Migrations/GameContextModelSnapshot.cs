@@ -5,10 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace GameInfrastructure.Migrations
+namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
     partial class GameContextModelSnapshot : ModelSnapshot
@@ -17,28 +18,28 @@ namespace GameInfrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.6")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Game.Core.Entities.Attribute", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Attributes", (string)null);
+                    b.ToTable("Attributes");
 
                     b.HasData(
                         new
@@ -136,61 +137,64 @@ namespace GameInfrastructure.Migrations
             modelBuilder.Entity("Game.Core.Entities.AttributeDistribution", b =>
                 {
                     b.Property<int>("EnemyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("AttributeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("AmountPerLevel")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<decimal>("BaseAmount")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("EnemyId", "AttributeId");
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("AttributeDistributions", (string)null);
+                    b.ToTable("AttributeDistributions");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.Enemy", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 0L);
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Enemies", (string)null);
+                    b.ToTable("Enemies");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.EnemyDrop", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("DropRate")
                         .HasPrecision(9, 8)
-                        .HasColumnType("decimal(9,8)");
+                        .HasColumnType("numeric(9,8)");
 
                     b.Property<int>("EnemyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -198,42 +202,42 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ItemId");
 
-                    b.ToTable("EnemyDrops", (string)null);
+                    b.ToTable("EnemyDrops");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.EnemySkill", b =>
                 {
                     b.Property<int>("EnemyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("SkillId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("EnemyId", "SkillId");
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("EnemySkills", (string)null);
+                    b.ToTable("EnemySkills");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.EquipmentSlot", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemCategoryId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ItemCategoryId");
 
-                    b.ToTable("EquipmentSlots", (string)null);
+                    b.ToTable("EquipmentSlots");
 
                     b.HasData(
                         new
@@ -278,24 +282,24 @@ namespace GameInfrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Equipped")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<int>("InventorySlotNumber")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("PlayerId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("Rating")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -303,19 +307,19 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("PlayerId");
 
-                    b.ToTable("InventoryItems", (string)null);
+                    b.ToTable("InventoryItems");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.InventoryItemMod", b =>
                 {
                     b.Property<int>("InventoryItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemModId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemModSlotId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("InventoryItemId", "ItemModId");
 
@@ -323,73 +327,76 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ItemModSlotId");
 
-                    b.ToTable("InventoryItemMods", (string)null);
+                    b.ToTable("InventoryItemMods");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.Item", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 0L);
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("IconPath")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("ItemCategoryId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ItemCategoryId");
 
-                    b.ToTable("Items", (string)null);
+                    b.ToTable("Items");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ItemAttribute", b =>
                 {
                     b.Property<int>("ItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("AttributeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("ItemId", "AttributeId");
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("ItemAttributes", (string)null);
+                    b.ToTable("ItemAttributes");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ItemCategory", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("ItemCategories", (string)null);
+                    b.ToTable("ItemCategories");
 
                     b.HasData(
                         new
@@ -428,71 +435,74 @@ namespace GameInfrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 0L);
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
+
+                    b.Property<int>("ItemModTypeId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<bool>("Removable")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("SlotTypeId")
-                        .HasColumnType("int");
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SlotTypeId");
+                    b.HasIndex("ItemModTypeId");
 
-                    b.ToTable("ItemMods", (string)null);
+                    b.ToTable("ItemMods");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ItemModAttribute", b =>
                 {
                     b.Property<int>("ItemModId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("AttributeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("ItemModId", "AttributeId");
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("ItemModAttributes", (string)null);
+                    b.ToTable("ItemModAttributes");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ItemModSlot", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("GuaranteedItemModId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ItemModSlotTypeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Probability")
                         .HasPrecision(9, 8)
-                        .HasColumnType("decimal(9,8)");
+                        .HasColumnType("numeric(9,8)");
 
                     b.HasKey("Id");
 
@@ -502,22 +512,22 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ItemModSlotTypeId");
 
-                    b.ToTable("ItemModSlots", (string)null);
+                    b.ToTable("ItemModSlots");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemModSlotType", b =>
+            modelBuilder.Entity("Game.Core.Entities.ItemModType", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("SlotTypes", (string)null);
+                    b.ToTable("ItemModTypes");
 
                     b.HasData(
                         new
@@ -540,37 +550,37 @@ namespace GameInfrastructure.Migrations
             modelBuilder.Entity("Game.Core.Entities.LogPreference", b =>
                 {
                     b.Property<int>("PlayerId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("LogSettingId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.HasKey("PlayerId", "LogSettingId");
 
                     b.HasIndex("LogSettingId");
 
-                    b.ToTable("LogPreferences", (string)null);
+                    b.ToTable("LogPreferences");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.LogSetting", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("DefaultValue")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("LogSettings", (string)null);
+                    b.ToTable("LogSettings");
 
                     b.HasData(
                         new
@@ -615,177 +625,180 @@ namespace GameInfrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("Exp")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("Level")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PassHash")
                         .IsRequired()
                         .HasMaxLength(88)
-                        .HasColumnType("nvarchar(88)");
+                        .HasColumnType("character varying(88)");
 
                     b.Property<Guid>("Salt")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("StatPointsGained")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("StatPointsUsed")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Players", (string)null);
+                    b.ToTable("Players");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.PlayerAttribute", b =>
                 {
                     b.Property<int>("PlayerId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("AttributeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("PlayerId", "AttributeId");
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("PlayerAttributes", (string)null);
+                    b.ToTable("PlayerAttributes");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.PlayerSkill", b =>
                 {
                     b.Property<int>("PlayerId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("SkillId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("Selected")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.HasKey("PlayerId", "SkillId");
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("PlayerSkills", (string)null);
+                    b.ToTable("PlayerSkills");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.Skill", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 0L);
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("BaseDamage")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
-                    b.Property<int>("CooldownMS")
-                        .HasColumnType("int");
+                    b.Property<int>("CooldownMs")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("IconPath")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Skills", (string)null);
+                    b.ToTable("Skills");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.SkillDamageMultiplier", b =>
                 {
                     b.Property<int>("SkillId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("AttributeId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Multiplier")
                         .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
+                        .HasColumnType("numeric(18,3)");
 
                     b.HasKey("SkillId", "AttributeId");
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("SkillDamageMultipliers", (string)null);
+                    b.ToTable("SkillDamageMultipliers");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.Tag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("TagCategoryId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("TagCategoryId");
 
-                    b.ToTable("Tags", (string)null);
+                    b.ToTable("Tags");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.TagCategory", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("TagCategories", (string)null);
+                    b.ToTable("TagCategories");
 
                     b.HasData(
                         new
                         {
                             Id = 1,
-                            Name = "Acessory"
+                            Name = "Accessory"
                         },
                         new
                         {
@@ -823,50 +836,53 @@ namespace GameInfrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 0L);
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<int>("LevelMax")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("LevelMin")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("Order")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Zones", (string)null);
+                    b.ToTable("Zones");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ZoneDrop", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("DropRate")
                         .HasPrecision(9, 8)
-                        .HasColumnType("decimal(9,8)");
+                        .HasColumnType("numeric(9,8)");
 
                     b.Property<int>("ItemId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ZoneId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -874,25 +890,25 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ZoneId");
 
-                    b.ToTable("ZoneDrops", (string)null);
+                    b.ToTable("ZoneDrops");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ZoneEnemy", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("EnemyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("Weight")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ZoneId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -900,51 +916,16 @@ namespace GameInfrastructure.Migrations
 
                     b.HasIndex("ZoneId");
 
-                    b.ToTable("ZoneEnemies", null, t =>
-                        {
-                            t.HasTrigger("trig_ZoneEnemies_ProbabilityRecalc");
-                        });
-
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemyAlias", b =>
-                {
-                    b.Property<int>("ZoneEnemyId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("AliasZoneEnemyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ZoneEnemyId");
-
-                    b.ToTable("ZoneEnemyAliases", (string)null);
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemyProbability", b =>
-                {
-                    b.Property<int>("ZoneEnemyId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Probability")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
-
-                    b.Property<int>("ZoneOrder")
-                        .HasColumnType("int");
-
-                    b.HasKey("ZoneEnemyId");
-
-                    b.ToTable("ZoneEnemyProbabilities", (string)null);
+                    b.ToTable("ZoneEnemies");
                 });
 
             modelBuilder.Entity("ItemModTag", b =>
                 {
                     b.Property<int>("ItemModsId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("TagsId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("ItemModsId", "TagsId");
 
@@ -956,10 +937,10 @@ namespace GameInfrastructure.Migrations
             modelBuilder.Entity("ItemTag", b =>
                 {
                     b.Property<int>("ItemsId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("TagsId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("ItemsId", "TagsId");
 
@@ -1114,13 +1095,13 @@ namespace GameInfrastructure.Migrations
 
             modelBuilder.Entity("Game.Core.Entities.ItemMod", b =>
                 {
-                    b.HasOne("Game.Core.Entities.ItemModSlotType", "SlotType")
+                    b.HasOne("Game.Core.Entities.ItemModType", "ItemModType")
                         .WithMany("ItemMods")
-                        .HasForeignKey("SlotTypeId")
+                        .HasForeignKey("ItemModTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("SlotType");
+                    b.Navigation("ItemModType");
                 });
 
             modelBuilder.Entity("Game.Core.Entities.ItemModAttribute", b =>
@@ -1155,7 +1136,7 @@ namespace GameInfrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.ItemModSlotType", "ItemModSlotType")
+                    b.HasOne("Game.Core.Entities.ItemModType", "ItemModSlotType")
                         .WithMany("ItemModSlots")
                         .HasForeignKey("ItemModSlotTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1293,28 +1274,6 @@ namespace GameInfrastructure.Migrations
                     b.Navigation("Zone");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemyAlias", b =>
-                {
-                    b.HasOne("Game.Core.Entities.ZoneEnemy", "ZoneEnemy")
-                        .WithOne("ZoneEnemyAlias")
-                        .HasForeignKey("Game.Core.Entities.ZoneEnemyAlias", "ZoneEnemyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ZoneEnemy");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemyProbability", b =>
-                {
-                    b.HasOne("Game.Core.Entities.ZoneEnemy", "ZoneEnemy")
-                        .WithOne("ZoneEnemyProbability")
-                        .HasForeignKey("Game.Core.Entities.ZoneEnemyProbability", "ZoneEnemyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ZoneEnemy");
-                });
-
             modelBuilder.Entity("ItemModTag", b =>
                 {
                     b.HasOne("Game.Core.Entities.ItemMod", null)
@@ -1408,7 +1367,7 @@ namespace GameInfrastructure.Migrations
                     b.Navigation("InventoryItemMods");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemModSlotType", b =>
+            modelBuilder.Entity("Game.Core.Entities.ItemModType", b =>
                 {
                     b.Navigation("ItemModSlots");
 
@@ -1450,15 +1409,6 @@ namespace GameInfrastructure.Migrations
                     b.Navigation("ZoneDrops");
 
                     b.Navigation("ZoneEnemies");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemy", b =>
-                {
-                    b.Navigation("ZoneEnemyAlias")
-                        .IsRequired();
-
-                    b.Navigation("ZoneEnemyProbability")
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -31,7 +31,7 @@ export enum EItemCategory {
 	Accessory = 6,
 }
 
-export enum EItemModSlotType {
+export enum EItemModType {
 	Component = 1,
 	Prefix = 2,
 	Suffix = 3,

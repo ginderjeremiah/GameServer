@@ -15,9 +15,10 @@ namespace Game.Api.CodeGen.Writers
 
         public void WriteApiMap(IEnumerable<EndpointMetadata> endpointData)
         {
+            var orderedData = endpointData.OrderBy(end => end.Endpoint).ToList();
             var filePath = $"{TargetDir}\\api-type-map.ts";
             var strBuilder = new StringBuilder();
-            var allTypes = endpointData
+            var allTypes = orderedData
                 .SelectMany(e => e.ParameterDescriptors.Append(e.ResponseDescriptor))
                 .SelectNotNull()
                 .Where(t => t.NeedsInterface);
@@ -31,7 +32,7 @@ namespace Game.Api.CodeGen.Writers
             var formatter = new CodeGenTypeFormatter();
 
             strBuilder.AppendLine("export type ApiResponseTypes = {");
-            foreach (var endpoint in endpointData)
+            foreach (var endpoint in orderedData)
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {formatter.GetTypeText(endpoint.ResponseDescriptor)}");
             }
@@ -39,7 +40,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.AppendLine("}\n");
 
             strBuilder.AppendLine("export type ApiRequestTypes = {");
-            foreach (var endpoint in endpointData.Where(endp => endp.ParameterDescriptors.Count > 0))
+            foreach (var endpoint in orderedData.Where(endp => endp.ParameterDescriptors.Count > 0))
             {
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {formatter.GetParametersTypeText(endpoint)}");
             }

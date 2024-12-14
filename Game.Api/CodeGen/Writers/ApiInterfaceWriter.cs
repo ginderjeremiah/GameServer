@@ -15,14 +15,16 @@ namespace Game.Api.CodeGen.Writers
 
         public void WriteApiInterfaces(IEnumerable<CodeGenTypeDescriptor> descriptors)
         {
-            var interfacesPath = "interfaces";
+            var interfacesFolder = "interfaces";
             var enumPath = "enums.ts";
             var exportPath = "index.ts";
 
-            if (Directory.Exists($"{TargetDir}\\{interfacesPath}"))
-                Directory.Delete($"{TargetDir}\\{interfacesPath}", true);
-
-            Directory.CreateDirectory($"{TargetDir}\\{interfacesPath}");
+            var interfacesExist = Directory.Exists($"{TargetDir}\\{interfacesFolder}");
+            var existingFiles = interfacesExist ? Directory.GetFiles($"{TargetDir}\\{interfacesFolder}").ToList() : [];
+            if (!interfacesExist)
+            {
+                Directory.CreateDirectory($"{TargetDir}\\{interfacesFolder}");
+            }
 
             var formatter = new CodeGenTypeFormatter();
 
@@ -34,7 +36,7 @@ namespace Game.Api.CodeGen.Writers
             var interfaceDataGroups = allDescriptors.Select(d => new InterfaceDescriptorData
             {
                 Descriptor = d,
-                FilePath = d.IsEnum ? enumPath : $"{interfacesPath}\\{d.LastNamespacePart}.ts"
+                FilePath = d.IsEnum ? enumPath : $"{interfacesFolder}\\{d.LastNamespacePart}.ts"
             })
             .GroupBy(data => data.FilePath);
 
@@ -44,7 +46,7 @@ namespace Game.Api.CodeGen.Writers
                 var currentExports = group.SelectNotNull(d => formatter.GetImportText(d.Descriptor));
                 var importedDescriptors = group
                     .SelectMany(data => data.Descriptor.PropertyDescriptors)
-                    .Where(d => d.GenericParameterPosition < 0)
+                    .Where(d => d.GenericParameterPosition < 0 && d.NeedsInterface)
                     .ExceptBy(currentExports, formatter.GetImportText);
 
                 var importWriter = new ImportWriter("../");
@@ -68,10 +70,16 @@ namespace Game.Api.CodeGen.Writers
                     fileBuilder.AppendLine("\n");
                 }
 
-                File.WriteAllText($"{TargetDir}\\{group.Key}", fileBuilder.ToString().TrimEnd());
+                OverwriteFileIfTextDiffers($"{TargetDir}\\{group.Key}", fileBuilder.ToString().TrimEnd());
+                existingFiles.Remove($"{TargetDir}\\{group.Key}");
             }
 
-            File.WriteAllText($"{TargetDir}\\{exportPath}", string.Join("\n", interfaceDataGroups.Select(g => $"export * from \"./{g.Key.Replace("\\", "/")}\"")));
+            OverwriteFileIfTextDiffers($"{TargetDir}\\{exportPath}", string.Join("\n", interfaceDataGroups.Select(g => $"export * from \"./{g.Key.Replace("\\", "/")}\"")));
+
+            foreach (var file in existingFiles)
+            {
+                File.Delete(file);
+            }
         }
 
         private static void WriteEnumToBuilder(CodeGenTypeDescriptor descriptor, StringBuilder builder)
@@ -107,6 +115,14 @@ namespace Game.Api.CodeGen.Writers
             return childTypes
                 .SelectMany(GetAllUsedDescriptors)
                 .Append(type);
+        }
+
+        private static void OverwriteFileIfTextDiffers(string filePath, string text)
+        {
+            if(!File.Exists(filePath) || File.ReadAllText(filePath) != text)
+            {
+                File.WriteAllText(filePath, text);
+            }
         }
     }
 }

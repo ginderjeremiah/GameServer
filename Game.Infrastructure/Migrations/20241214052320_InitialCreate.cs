@@ -1,11 +1,12 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace GameInfrastructure.Migrations
+namespace Game.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -17,9 +18,9 @@ namespace GameInfrastructure.Migrations
                 name: "Attributes",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -30,9 +31,9 @@ namespace GameInfrastructure.Migrations
                 name: "Enemies",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "0, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -43,8 +44,8 @@ namespace GameInfrastructure.Migrations
                 name: "ItemCategories",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -52,12 +53,24 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ItemModTypes",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ItemModTypes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "LogSettings",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    DefaultValue = table.Column<bool>(type: "bit", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    DefaultValue = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -68,16 +81,16 @@ namespace GameInfrastructure.Migrations
                 name: "Players",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserName = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Salt = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PassHash = table.Column<string>(type: "nvarchar(88)", maxLength: 88, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Level = table.Column<int>(type: "int", nullable: false),
-                    Exp = table.Column<int>(type: "int", nullable: false),
-                    StatPointsGained = table.Column<int>(type: "int", nullable: false),
-                    StatPointsUsed = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    UserName = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Salt = table.Column<Guid>(type: "uuid", nullable: false),
+                    PassHash = table.Column<string>(type: "character varying(88)", maxLength: 88, nullable: false),
+                    Name = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Level = table.Column<int>(type: "integer", nullable: false),
+                    Exp = table.Column<int>(type: "integer", nullable: false),
+                    StatPointsGained = table.Column<int>(type: "integer", nullable: false),
+                    StatPointsUsed = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -88,13 +101,13 @@ namespace GameInfrastructure.Migrations
                 name: "Skills",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "0, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    BaseDamage = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CooldownMS = table.Column<int>(type: "int", nullable: false),
-                    IconPath = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    BaseDamage = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false),
+                    CooldownMs = table.Column<int>(type: "integer", nullable: false),
+                    IconPath = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -102,23 +115,11 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SlotTypes",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SlotTypes", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "TagCategories",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -129,13 +130,13 @@ namespace GameInfrastructure.Migrations
                 name: "Zones",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "0, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Order = table.Column<int>(type: "int", nullable: false),
-                    LevelMin = table.Column<int>(type: "int", nullable: false),
-                    LevelMax = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    LevelMin = table.Column<int>(type: "integer", nullable: false),
+                    LevelMax = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -146,10 +147,10 @@ namespace GameInfrastructure.Migrations
                 name: "AttributeDistributions",
                 columns: table => new
                 {
-                    EnemyId = table.Column<int>(type: "int", nullable: false),
-                    AttributeId = table.Column<int>(type: "int", nullable: false),
-                    BaseAmount = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
-                    AmountPerLevel = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false)
+                    EnemyId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeId = table.Column<int>(type: "integer", nullable: false),
+                    BaseAmount = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false),
+                    AmountPerLevel = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -172,9 +173,9 @@ namespace GameInfrastructure.Migrations
                 name: "EquipmentSlots",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    ItemCategoryId = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ItemCategoryId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -191,12 +192,12 @@ namespace GameInfrastructure.Migrations
                 name: "Items",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "0, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ItemCategoryId = table.Column<int>(type: "int", nullable: false),
-                    IconPath = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false),
+                    ItemCategoryId = table.Column<int>(type: "integer", nullable: false),
+                    IconPath = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -210,12 +211,34 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ItemMods",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Removable = table.Column<bool>(type: "boolean", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false),
+                    ItemModTypeId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ItemMods", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ItemMods_ItemModTypes_ItemModTypeId",
+                        column: x => x.ItemModTypeId,
+                        principalTable: "ItemModTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "LogPreferences",
                 columns: table => new
                 {
-                    PlayerId = table.Column<int>(type: "int", nullable: false),
-                    LogSettingId = table.Column<int>(type: "int", nullable: false),
-                    Enabled = table.Column<bool>(type: "bit", nullable: false)
+                    PlayerId = table.Column<int>(type: "integer", nullable: false),
+                    LogSettingId = table.Column<int>(type: "integer", nullable: false),
+                    Enabled = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -238,9 +261,9 @@ namespace GameInfrastructure.Migrations
                 name: "PlayerAttributes",
                 columns: table => new
                 {
-                    PlayerId = table.Column<int>(type: "int", nullable: false),
-                    AttributeId = table.Column<int>(type: "int", nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false)
+                    PlayerId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeId = table.Column<int>(type: "integer", nullable: false),
+                    Amount = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -263,8 +286,8 @@ namespace GameInfrastructure.Migrations
                 name: "EnemySkills",
                 columns: table => new
                 {
-                    EnemyId = table.Column<int>(type: "int", nullable: false),
-                    SkillId = table.Column<int>(type: "int", nullable: false)
+                    EnemyId = table.Column<int>(type: "integer", nullable: false),
+                    SkillId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -287,9 +310,9 @@ namespace GameInfrastructure.Migrations
                 name: "PlayerSkills",
                 columns: table => new
                 {
-                    PlayerId = table.Column<int>(type: "int", nullable: false),
-                    SkillId = table.Column<int>(type: "int", nullable: false),
-                    Selected = table.Column<bool>(type: "bit", nullable: false)
+                    PlayerId = table.Column<int>(type: "integer", nullable: false),
+                    SkillId = table.Column<int>(type: "integer", nullable: false),
+                    Selected = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -312,9 +335,9 @@ namespace GameInfrastructure.Migrations
                 name: "SkillDamageMultipliers",
                 columns: table => new
                 {
-                    SkillId = table.Column<int>(type: "int", nullable: false),
-                    AttributeId = table.Column<int>(type: "int", nullable: false),
-                    Multiplier = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false)
+                    SkillId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeId = table.Column<int>(type: "integer", nullable: false),
+                    Multiplier = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -334,35 +357,13 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ItemMods",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "0, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Removable = table.Column<bool>(type: "bit", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SlotTypeId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ItemMods", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ItemMods_SlotTypes_SlotTypeId",
-                        column: x => x.SlotTypeId,
-                        principalTable: "SlotTypes",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Tags",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    TagCategoryId = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    TagCategoryId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -379,11 +380,11 @@ namespace GameInfrastructure.Migrations
                 name: "ZoneEnemies",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ZoneId = table.Column<int>(type: "int", nullable: false),
-                    EnemyId = table.Column<int>(type: "int", nullable: false),
-                    Weight = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ZoneId = table.Column<int>(type: "integer", nullable: false),
+                    EnemyId = table.Column<int>(type: "integer", nullable: false),
+                    Weight = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -406,11 +407,11 @@ namespace GameInfrastructure.Migrations
                 name: "EnemyDrops",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    EnemyId = table.Column<int>(type: "int", nullable: false),
-                    ItemId = table.Column<int>(type: "int", nullable: false),
-                    DropRate = table.Column<decimal>(type: "decimal(9,8)", precision: 9, scale: 8, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    EnemyId = table.Column<int>(type: "integer", nullable: false),
+                    ItemId = table.Column<int>(type: "integer", nullable: false),
+                    DropRate = table.Column<decimal>(type: "numeric(9,8)", precision: 9, scale: 8, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -433,13 +434,13 @@ namespace GameInfrastructure.Migrations
                 name: "InventoryItems",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PlayerId = table.Column<int>(type: "int", nullable: false),
-                    ItemId = table.Column<int>(type: "int", nullable: false),
-                    Rating = table.Column<int>(type: "int", nullable: false),
-                    Equipped = table.Column<bool>(type: "bit", nullable: false),
-                    InventorySlotNumber = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    PlayerId = table.Column<int>(type: "integer", nullable: false),
+                    ItemId = table.Column<int>(type: "integer", nullable: false),
+                    Rating = table.Column<int>(type: "integer", nullable: false),
+                    Equipped = table.Column<bool>(type: "boolean", nullable: false),
+                    InventorySlotNumber = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -462,9 +463,9 @@ namespace GameInfrastructure.Migrations
                 name: "ItemAttributes",
                 columns: table => new
                 {
-                    ItemId = table.Column<int>(type: "int", nullable: false),
-                    AttributeId = table.Column<int>(type: "int", nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false)
+                    ItemId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeId = table.Column<int>(type: "integer", nullable: false),
+                    Amount = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -487,11 +488,11 @@ namespace GameInfrastructure.Migrations
                 name: "ZoneDrops",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ZoneId = table.Column<int>(type: "int", nullable: false),
-                    ItemId = table.Column<int>(type: "int", nullable: false),
-                    DropRate = table.Column<decimal>(type: "decimal(9,8)", precision: 9, scale: 8, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ZoneId = table.Column<int>(type: "integer", nullable: false),
+                    ItemId = table.Column<int>(type: "integer", nullable: false),
+                    DropRate = table.Column<decimal>(type: "numeric(9,8)", precision: 9, scale: 8, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -514,9 +515,9 @@ namespace GameInfrastructure.Migrations
                 name: "ItemModAttributes",
                 columns: table => new
                 {
-                    ItemModId = table.Column<int>(type: "int", nullable: false),
-                    AttributeId = table.Column<int>(type: "int", nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false)
+                    ItemModId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeId = table.Column<int>(type: "integer", nullable: false),
+                    Amount = table.Column<decimal>(type: "numeric(18,3)", precision: 18, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -536,35 +537,35 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ItemSlots",
+                name: "ItemModSlots",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ItemId = table.Column<int>(type: "int", nullable: false),
-                    SlotTypeId = table.Column<int>(type: "int", nullable: false),
-                    GuaranteedItemModId = table.Column<int>(type: "int", nullable: true),
-                    Probability = table.Column<decimal>(type: "decimal(9,8)", precision: 9, scale: 8, nullable: false)
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ItemId = table.Column<int>(type: "integer", nullable: false),
+                    ItemModSlotTypeId = table.Column<int>(type: "integer", nullable: false),
+                    GuaranteedItemModId = table.Column<int>(type: "integer", nullable: true),
+                    Probability = table.Column<decimal>(type: "numeric(9,8)", precision: 9, scale: 8, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ItemSlots", x => x.Id);
+                    table.PrimaryKey("PK_ItemModSlots", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_ItemSlots_ItemMods_GuaranteedItemModId",
+                        name: "FK_ItemModSlots_ItemModTypes_ItemModSlotTypeId",
+                        column: x => x.ItemModSlotTypeId,
+                        principalTable: "ItemModTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ItemModSlots_ItemMods_GuaranteedItemModId",
                         column: x => x.GuaranteedItemModId,
                         principalTable: "ItemMods",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_ItemSlots_Items_ItemId",
+                        name: "FK_ItemModSlots_Items_ItemId",
                         column: x => x.ItemId,
                         principalTable: "Items",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ItemSlots_SlotTypes_SlotTypeId",
-                        column: x => x.SlotTypeId,
-                        principalTable: "SlotTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -573,8 +574,8 @@ namespace GameInfrastructure.Migrations
                 name: "ItemModTags",
                 columns: table => new
                 {
-                    ItemModsId = table.Column<int>(type: "int", nullable: false),
-                    TagsId = table.Column<int>(type: "int", nullable: false)
+                    ItemModsId = table.Column<int>(type: "integer", nullable: false),
+                    TagsId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -597,8 +598,8 @@ namespace GameInfrastructure.Migrations
                 name: "ItemTags",
                 columns: table => new
                 {
-                    ItemsId = table.Column<int>(type: "int", nullable: false),
-                    TagsId = table.Column<int>(type: "int", nullable: false)
+                    ItemsId = table.Column<int>(type: "integer", nullable: false),
+                    TagsId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -618,49 +619,12 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ZoneEnemyAliases",
-                columns: table => new
-                {
-                    ZoneEnemyId = table.Column<int>(type: "int", nullable: false),
-                    AliasZoneEnemyId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ZoneEnemyAliases", x => x.ZoneEnemyId);
-                    table.ForeignKey(
-                        name: "FK_ZoneEnemyAliases_ZoneEnemies_ZoneEnemyId",
-                        column: x => x.ZoneEnemyId,
-                        principalTable: "ZoneEnemies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ZoneEnemyProbabilities",
-                columns: table => new
-                {
-                    ZoneEnemyId = table.Column<int>(type: "int", nullable: false),
-                    Probability = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
-                    ZoneOrder = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ZoneEnemyProbabilities", x => x.ZoneEnemyId);
-                    table.ForeignKey(
-                        name: "FK_ZoneEnemyProbabilities_ZoneEnemies_ZoneEnemyId",
-                        column: x => x.ZoneEnemyId,
-                        principalTable: "ZoneEnemies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "InventoryItemMods",
                 columns: table => new
                 {
-                    InventoryItemId = table.Column<int>(type: "int", nullable: false),
-                    ItemModId = table.Column<int>(type: "int", nullable: false),
-                    ItemSlotId = table.Column<int>(type: "int", nullable: false)
+                    InventoryItemId = table.Column<int>(type: "integer", nullable: false),
+                    ItemModId = table.Column<int>(type: "integer", nullable: false),
+                    ItemModSlotId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -672,16 +636,16 @@ namespace GameInfrastructure.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
+                        name: "FK_InventoryItemMods_ItemModSlots_ItemModSlotId",
+                        column: x => x.ItemModSlotId,
+                        principalTable: "ItemModSlots",
+                        principalColumn: "Id");
+                    table.ForeignKey(
                         name: "FK_InventoryItemMods_ItemMods_ItemModId",
                         column: x => x.ItemModId,
                         principalTable: "ItemMods",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_InventoryItemMods_ItemSlots_ItemSlotId",
-                        column: x => x.ItemSlotId,
-                        principalTable: "ItemSlots",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.InsertData(
@@ -720,6 +684,16 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "ItemModTypes",
+                columns: new[] { "Id", "Name" },
+                values: new object[,]
+                {
+                    { 1, "Component" },
+                    { 2, "Prefix" },
+                    { 3, "Suffix" }
+                });
+
+            migrationBuilder.InsertData(
                 table: "LogSettings",
                 columns: new[] { "Id", "DefaultValue", "Name" },
                 values: new object[,]
@@ -733,21 +707,11 @@ namespace GameInfrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "SlotTypes",
-                columns: new[] { "Id", "Name" },
-                values: new object[,]
-                {
-                    { 1, "Component" },
-                    { 2, "Prefix" },
-                    { 3, "Suffix" }
-                });
-
-            migrationBuilder.InsertData(
                 table: "TagCategories",
                 columns: new[] { "Id", "Name" },
                 values: new object[,]
                 {
-                    { 1, "Acessory" },
+                    { 1, "Accessory" },
                     { 2, "Armor" },
                     { 3, "Magical" },
                     { 4, "Material" },
@@ -800,9 +764,9 @@ namespace GameInfrastructure.Migrations
                 column: "ItemModId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_InventoryItemMods_ItemSlotId",
+                name: "IX_InventoryItemMods_ItemModSlotId",
                 table: "InventoryItemMods",
-                column: "ItemSlotId");
+                column: "ItemModSlotId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_InventoryItems_ItemId",
@@ -825,9 +789,24 @@ namespace GameInfrastructure.Migrations
                 column: "AttributeId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ItemMods_SlotTypeId",
+                name: "IX_ItemMods_ItemModTypeId",
                 table: "ItemMods",
-                column: "SlotTypeId");
+                column: "ItemModTypeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemModSlots_GuaranteedItemModId",
+                table: "ItemModSlots",
+                column: "GuaranteedItemModId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemModSlots_ItemId",
+                table: "ItemModSlots",
+                column: "ItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemModSlots_ItemModSlotTypeId",
+                table: "ItemModSlots",
+                column: "ItemModSlotTypeId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ItemModTags_TagsId",
@@ -838,21 +817,6 @@ namespace GameInfrastructure.Migrations
                 name: "IX_Items_ItemCategoryId",
                 table: "Items",
                 column: "ItemCategoryId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ItemSlots_GuaranteedItemModId",
-                table: "ItemSlots",
-                column: "GuaranteedItemModId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ItemSlots_ItemId",
-                table: "ItemSlots",
-                column: "ItemId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ItemSlots_SlotTypeId",
-                table: "ItemSlots",
-                column: "SlotTypeId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ItemTags_TagsId",
@@ -951,16 +915,13 @@ namespace GameInfrastructure.Migrations
                 name: "ZoneDrops");
 
             migrationBuilder.DropTable(
-                name: "ZoneEnemyAliases");
-
-            migrationBuilder.DropTable(
-                name: "ZoneEnemyProbabilities");
+                name: "ZoneEnemies");
 
             migrationBuilder.DropTable(
                 name: "InventoryItems");
 
             migrationBuilder.DropTable(
-                name: "ItemSlots");
+                name: "ItemModSlots");
 
             migrationBuilder.DropTable(
                 name: "Tags");
@@ -975,7 +936,10 @@ namespace GameInfrastructure.Migrations
                 name: "Skills");
 
             migrationBuilder.DropTable(
-                name: "ZoneEnemies");
+                name: "Enemies");
+
+            migrationBuilder.DropTable(
+                name: "Zones");
 
             migrationBuilder.DropTable(
                 name: "Players");
@@ -990,13 +954,7 @@ namespace GameInfrastructure.Migrations
                 name: "TagCategories");
 
             migrationBuilder.DropTable(
-                name: "Enemies");
-
-            migrationBuilder.DropTable(
-                name: "Zones");
-
-            migrationBuilder.DropTable(
-                name: "SlotTypes");
+                name: "ItemModTypes");
 
             migrationBuilder.DropTable(
                 name: "ItemCategories");

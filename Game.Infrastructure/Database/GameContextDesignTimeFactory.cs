@@ -8,8 +8,7 @@ namespace Game.Infrastructure.Database
         public GameContext CreateDbContext(string[] args)
         {
             var optionsBuilder = new DbContextOptionsBuilder<GameContext>();
-            optionsBuilder.UseSqlServer("Data Source=JEREMIAH-PC;Database=GameNew;Integrated Security=true;TrustServerCertificate=true");
-
+            optionsBuilder.UseNpgsql("Server=localhost;User Id=postgres;Database=Game");
             return new GameContext(optionsBuilder.Options);
         }
     }

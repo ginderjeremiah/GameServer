@@ -8,7 +8,7 @@
     public enum DatabaseSystem
     {
         SqlServer = 0,
-        Test = 1
+        Postgres = 1
     }
 
     public enum PubSubSystem

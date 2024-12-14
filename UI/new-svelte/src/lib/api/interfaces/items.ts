@@ -1,6 +1,6 @@
 import {
 	EItemCategory,
-	EItemModSlotType,
+	EItemModType,
 	IBattlerAttribute,
 	IChange
 } from "../"
@@ -20,7 +20,7 @@ export interface IItemMod {
 	name: string;
 	removable: boolean;
 	description: string;
-	slotTypeId: number;
+	itemModTypeId: number;
 	attributes: IBattlerAttribute[];
 }
 
@@ -36,7 +36,7 @@ export interface IItem {
 export interface IItemModSlot {
 	id: number;
 	itemId: number;
-	itemModSlotTypeId: EItemModSlotType;
+	itemModSlotTypeId: EItemModType;
 	guaranteedItemModId?: number;
 	probability: number;
 }
@@ -51,7 +51,7 @@ export interface IItemCategory {
 	name: string;
 }
 
-export interface IItemModSlotType {
+export interface IItemModType {
 	id: number;
 	name: string;
 }

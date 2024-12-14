@@ -28,6 +28,7 @@ namespace Game.Api
                 {
                     options.TimestampFormat = "HH:mm:ss.fff";
                 });
+
             //.AddConsole(options => options.FormatterName = nameof(LogFormatter))
             //.AddConsoleFormatter<LogFormatter, LogFormatterOptions>();
 
@@ -60,7 +61,10 @@ namespace Game.Api
 
                 app.UseSwagger();
                 app.UseSwaggerUI();
-                ApiCodeGenerator.GenerateApiCode();
+
+                var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
+                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api";
+                ApiCodeGenerator.GenerateApiCode(typeof(Startup).Assembly, targetDir);
             }
             else
             {

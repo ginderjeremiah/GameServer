@@ -15,11 +15,12 @@ namespace Game.Api.CodeGen.Writers
 
         public void WriteSocketMap(List<SocketCommandMetadata> commandData)
         {
+            var orderedData = commandData.OrderBy(c => c.CommandName).ToList();
             var filePath = $"{TargetDir}\\api-socket-type-map.ts";
             var strBuilder = new StringBuilder();
-            var allTypes = commandData
+            var allTypes = orderedData
                 .SelectNotNull(c => c.ResponseDescriptor)
-                .Concat(commandData.SelectNotNull(c => c.ParameterDescriptor))
+                .Concat(orderedData.SelectNotNull(c => c.ParameterDescriptor))
                 .Where(d => d.NeedsInterface);
 
             if (allTypes.Any())
@@ -31,7 +32,7 @@ namespace Game.Api.CodeGen.Writers
             var formatter = new CodeGenTypeFormatter();
 
             strBuilder.AppendLine("export type ApiSocketResponseTypes = {");
-            foreach (var command in commandData)
+            foreach (var command in orderedData)
             {
                 strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ResponseDescriptor)}");
             }
@@ -39,7 +40,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.AppendLine("}\n");
 
             strBuilder.AppendLine("export type ApiSocketRequestTypes = {");
-            foreach (var command in commandData.Where(c => c.ParameterDescriptor is not null))
+            foreach (var command in orderedData.Where(c => c.ParameterDescriptor is not null))
             {
                 strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ParameterDescriptor)}");
             }

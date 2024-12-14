@@ -11,7 +11,7 @@ import {
 	IItemCategory,
 	IItemMod,
 	IItemModSlot,
-	IItemModSlotType,
+	IItemModType,
 	ILoginCredentials,
 	ILogPreference,
 	IPlayerData,
@@ -35,8 +35,8 @@ export type ApiResponseTypes = {
 	'Enemies': IEnemy[]
 	'ItemCategories': IItemCategory[]
 	'ItemMods': IItemMod[]
+	'ItemMods/ItemModTypes': IItemModType[]
 	'Items': IItem[]
-	'Items/ItemModSlotTypes': IItemModSlotType[]
 	'Items/SlotsForItem': IItemModSlot[]
 	'Login': IPlayerData
 	'Login/Status': undefined

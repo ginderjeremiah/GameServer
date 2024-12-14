@@ -10,6 +10,9 @@ namespace Game.Infrastructure.Database
             var optionsBuilder = new DbContextOptionsBuilder<GameContext>();
             switch (config.DatabaseSystem)
             {
+                case Postgres:
+                    optionsBuilder.UseNpgsql(config.DbConnectionString);
+                    break;
                 case SqlServer:
                 default:
                     optionsBuilder.UseSqlServer(config.DbConnectionString);

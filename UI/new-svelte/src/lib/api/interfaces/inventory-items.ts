@@ -1,5 +1,3 @@
-import {  } from "../"
-
 export interface IInventoryItemMod {
 	itemModId: number;
 	itemModSlotId: number;
