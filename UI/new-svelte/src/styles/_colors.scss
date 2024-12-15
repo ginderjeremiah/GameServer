@@ -9,7 +9,8 @@ $gray-blue: #56587a;
 $green: green;
 $red-orange: tomato;
 
-$dark-light-gray-grad: linear-gradient(0deg,
-      rgba(0, 0, 0, 1) 0%,
-      rgba(102, 102, 102, 1) 100%,
-      rgba(85, 85, 85, 1) 100%);
+$dark-light-gray-grad: linear-gradient(
+	0deg,
+	rgba(0, 0, 0, 1) 0%,
+	rgba(60, 60, 60, 1) 100%,
+);

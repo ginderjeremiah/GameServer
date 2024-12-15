@@ -1,4 +1,5 @@
 using Game.Api.CodeGen;
+using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
 using Game.Core;
@@ -36,7 +37,7 @@ namespace Game.Api
                 .BindConfiguration(nameof(DataAccessOptions));
 
             // Add services to the container.
-            builder.Services.AddControllers();
+            builder.Services.AddControllers(options => options.Filters.Add<ErrorStatusFilter>());
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()

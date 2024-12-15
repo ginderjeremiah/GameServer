@@ -1,28 +1,28 @@
-import { delay } from "./functions";
-import { Action } from "./types";
+import { delay } from './functions';
+import { Action } from './types';
 
 export class DelayedAction {
-   #action: Action<[]>
-   #delayLength: number
-   #triggerStartTime: number
+	#action: Action<[]>;
+	#delayLength: number;
+	#triggerStartTime: number;
 
-   constructor(delayInMs: number, action: Action<[]>) {
-      this.#delayLength = delayInMs;
-      this.#action = action;
-      this.#triggerStartTime = 0;
-   }
+	constructor(delayInMs: number, action: Action<[]>) {
+		this.#delayLength = delayInMs;
+		this.#action = action;
+		this.#triggerStartTime = 0;
+	}
 
-   async start() {
-      this.#triggerStartTime = performance.now();
-      await delay(this.#delayLength);
-      const now = performance.now();
-      if (now - this.#triggerStartTime >= this.#delayLength * 0.95) {
-         this.#triggerStartTime = now;
-         this.#action();
-      }
-   }
+	async start() {
+		this.#triggerStartTime = performance.now();
+		await delay(this.#delayLength);
+		const now = performance.now();
+		if (now - this.#triggerStartTime >= this.#delayLength * 0.95) {
+			this.#triggerStartTime = now;
+			this.#action();
+		}
+	}
 
-   cancel() {
-      this.#triggerStartTime = performance.now() + this.#delayLength;
-   }
+	cancel() {
+		this.#triggerStartTime = performance.now() + this.#delayLength;
+	}
 }

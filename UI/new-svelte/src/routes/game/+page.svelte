@@ -13,12 +13,11 @@
 </div>
 
 <script lang="ts">
-import NavMenu from './NavMenu.svelte';
-import type { GameScreen } from './NavMenu.svelte';
+import NavMenu, { type GameScreen } from './NavMenu.svelte';
 import { Fight, Inventory, Attributes, Stats, Help, Options, CardGame, Quit } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
-import { logs } from '$stores/logs.svelte';
+import { logs } from '$stores';
 
 if (browser) {
 	startGame();

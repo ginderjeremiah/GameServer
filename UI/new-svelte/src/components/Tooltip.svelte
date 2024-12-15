@@ -1,7 +1,7 @@
 <div role="tooltip" class="tooltip-container round-border" {style} bind:this={container}></div>
 
 <script lang="ts">
-import type { TooltipData } from '$stores/tooltip.svelte';
+import type { TooltipData } from '$stores';
 
 let { component, position, visible }: TooltipData = $props();
 

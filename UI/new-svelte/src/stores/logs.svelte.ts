@@ -1,4 +1,4 @@
-import { LogMessage } from "$lib/engine/log";
+import { LogMessage } from '$lib/engine/log';
 
 const logsData = $state<LogMessage[]>([]);
 

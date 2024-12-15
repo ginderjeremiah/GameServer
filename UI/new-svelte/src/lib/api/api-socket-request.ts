@@ -1,34 +1,42 @@
-import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketResponseTypes } from "./api-socket-type-map";
-import { IApiSocketResponse } from "./api-socket";
+import {
+	ApiSocketCommand,
+	ApiSocketCommandWithRequest,
+	ApiSocketResponseTypes
+} from './api-socket-type-map';
+import { IApiSocketResponse } from './api-socket';
 
 export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
-    private dataPromise: Promise<IApiSocketResponse<T>>;
-    private promiseResolver!: (value: IApiSocketResponse<T>) => void;
-    id: string;
-    commandName: T;
-    parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never;
+	private dataPromise: Promise<IApiSocketResponse<T>>;
+	private promiseResolver!: (value: IApiSocketResponse<T>) => void;
+	id: string;
+	commandName: T;
+	parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never;
 
-    constructor(id: string, commandName: T, parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never) {
-        this.id = id;
-        this.commandName = commandName;
-        this.parameters = parameters;
-        this.dataPromise = new Promise(resolve => this.promiseResolver = resolve);
-    }
+	constructor(
+		id: string,
+		commandName: T,
+		parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never
+	) {
+		this.id = id;
+		this.commandName = commandName;
+		this.parameters = parameters;
+		this.dataPromise = new Promise((resolve) => (this.promiseResolver = resolve));
+	}
 
-    public getCommandInfo() {
-        const params = JSON.stringify(this.parameters);
-        return {
-            id: this.id,
-            name: this.commandName,
-            parameters: params
-        };
-    }
+	public getCommandInfo() {
+		const params = JSON.stringify(this.parameters);
+		return {
+			id: this.id,
+			name: this.commandName,
+			parameters: params
+		};
+	}
 
-    public resolve(data: IApiSocketResponse<T>) {
-        this.promiseResolver(data);
-    }
+	public resolve(data: IApiSocketResponse<T>) {
+		this.promiseResolver(data);
+	}
 
-    public async getResponse() {
-        return await this.dataPromise;
-    }
+	public async getResponse() {
+		return await this.dataPromise;
+	}
 }

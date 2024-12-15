@@ -3,11 +3,11 @@
 {/if}
 <div class="text-input-wrapper round-border hover-glow">
 	{#if type === 'text'}
-		<input {id} class="round-border" bind:value type="text" {name} />
+		<input {id} class="round-border" bind:value {type} {name} />
 	{:else if type === 'password'}
-		<input {id} class="round-border" bind:value type="password" {name} />
+		<input {id} class="round-border" bind:value {type} {name} />
 	{:else}
-		<input {id} class="round-border" bind:value type="number" {name} />
+		<input {id} class="round-border" bind:value {type} {name} />
 	{/if}
 </div>
 

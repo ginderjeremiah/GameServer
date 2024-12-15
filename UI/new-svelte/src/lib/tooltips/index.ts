@@ -1,2 +1,2 @@
-export * from "./tooltip-factory"
-export * from "./tooltippable"
+export * from './tooltip-factory';
+export * from './tooltippable';

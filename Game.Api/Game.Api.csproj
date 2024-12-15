@@ -6,7 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>6324a056-d62e-4577-8793-e15f9e33e1a9</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-	<DisableTransitiveProjectReferences>True</DisableTransitiveProjectReferences>
+    <DisableTransitiveProjectReferences>True</DisableTransitiveProjectReferences>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
