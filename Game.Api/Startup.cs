@@ -58,13 +58,13 @@ namespace Game.Api
             if (app.Environment.IsDevelopment())
             {
                 var migrator = app.Services.GetRequiredService<IDatabaseMigrator>();
-                await migrator.Migrate();
+                await migrator.Migrate(true);
 
                 app.UseSwagger();
                 app.UseSwaggerUI();
 
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
-                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api";
+                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
                 ApiCodeGenerator.GenerateApiCode(typeof(Startup).Assembly, targetDir);
             }
             else
@@ -76,13 +76,13 @@ namespace Game.Api
 
             app.UseCors(builder =>
             {
-                builder.WithOrigins("http://localhost:5173")
+                builder.WithOrigins("http://localhost:5174")
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
             });
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
             app.UseTokenAuth();
             app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
             app.UseSocketInterceptor();

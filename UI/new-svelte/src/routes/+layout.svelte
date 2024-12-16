@@ -7,7 +7,7 @@
 import { player } from '$stores';
 import { page } from '$app/stores';
 import { routeTo } from '$lib/common';
-import TooltipBase from '$components/TooltipBase.svelte';
+import { TooltipBase } from '$components';
 import '$styles/common.scss';
 
 let { children } = $props();

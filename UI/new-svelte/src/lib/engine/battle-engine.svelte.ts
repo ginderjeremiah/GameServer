@@ -21,7 +21,7 @@ const notifyBattleStageChanged = battleStageChangedHook.notify;
 export const onBattleStageChanged = battleStageChangedHook.onNotified;
 
 let battleStage = $state(Idle);
-let battlePlayer = $state(newBattler(player.data, inventory.equipmentStats));
+let battlePlayer = $state<Battler>() as Battler;
 let battleEnemy = $state<Battler>();
 let battleTimeElapsed = $state(0);
 let battleLoadingTime = $state(0);
@@ -46,6 +46,7 @@ let initialized = false;
 export const initBattleEngine = () => {
 	if (!initialized) {
 		initialized = true;
+		battlePlayer = newBattler(player.data, inventory.equipmentStats);
 		onLogicalUpdate(logicalUpdate);
 		onRenderUpdate(renderUpdate);
 	}

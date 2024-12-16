@@ -7,7 +7,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"allowImportingTsExtensions": true,
 		"resolveJsonModule": true,
-		"skipLibCheck": true,
+		"skipLibCheck": false,
 		"verbatimModuleSyntax": false,
 		"sourceMap": true,
 		"strict": true,

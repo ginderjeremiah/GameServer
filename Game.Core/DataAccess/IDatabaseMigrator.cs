@@ -2,6 +2,6 @@
 {
     public interface IDatabaseMigrator
     {
-        public Task Migrate();
+        public Task Migrate(bool resetDatabase = false);
     }
 }

@@ -2,13 +2,14 @@
 	<label class="text-input-label" for={id}> {label} </label>
 {/if}
 <div class="text-input-wrapper round-border hover-glow">
-	{#if type === 'text'}
+	<!-- {#if type === 'text'}
 		<input {id} class="round-border" bind:value {type} {name} />
 	{:else if type === 'password'}
 		<input {id} class="round-border" bind:value {type} {name} />
 	{:else}
 		<input {id} class="round-border" bind:value {type} {name} />
-	{/if}
+	{/if} -->
+	<input {id} class="round-border" bind:value {type} {name} {disabled} />
 </div>
 
 <script lang="ts" generics="T extends 'text' | 'password' | 'number'">
@@ -18,6 +19,7 @@ type Props = {
 	label?: string;
 	name?: string;
 	id?: string;
+	disabled?: boolean;
 };
 
 let {
@@ -25,7 +27,8 @@ let {
 	type,
 	label = '',
 	name = '',
-	id = crypto.randomUUID()
+	id = crypto.randomUUID(),
+	disabled
 }: Props = $props();
 </script>
 
@@ -40,8 +43,7 @@ let {
 	box-sizing: border-box;
 	height: 1.5rem;
 	width: 100%;
-	border: 1px solid black;
-	position: relative;
+	border: var(--default-border);
 	cursor: text;
 	pointer-events: all;
 	user-select: text;

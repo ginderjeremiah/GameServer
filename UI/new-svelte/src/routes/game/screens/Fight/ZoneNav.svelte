@@ -24,9 +24,9 @@
 <script lang="ts">
 import { staticData, player } from '$stores';
 
-const orderedZones = $derived(staticData.zones.slice().sort((a, b) => a.order - b.order));
+const orderedZones = $derived(staticData.zones?.slice().sort((a, b) => a.order - b.order));
 const current = $derived(
-	orderedZones.find((z) => z.id === player.data.currentZone) ?? orderedZones[0]
+	orderedZones?.find((z) => z.id === player.data.currentZone) ?? orderedZones[0]
 );
 const zoneNum = $derived(orderedZones.indexOf(current) + 1);
 const leftDisabled = $derived(zoneNum === 1);

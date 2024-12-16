@@ -55,7 +55,7 @@ namespace Game.DataAccess
 
         public void Update<Entity>(Entity entity) where Entity : class
         {
-            _context.Update(entity);
+            var state = _context.Update(entity);
         }
     }
 }

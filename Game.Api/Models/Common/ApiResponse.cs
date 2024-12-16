@@ -1,21 +1,47 @@
-﻿namespace Game.Api.Models.Common
+﻿using Microsoft.AspNetCore.Mvc;
+
+namespace Game.Api.Models.Common
 {
     public class ApiResponse<T> : IApiResponse where T : IModel
     {
         public T? Data { get; set; }
         public string? ErrorMessage { get; set; }
+
+        public static implicit operator ApiResponse<T>(ApiResponse result)
+        {
+            return new()
+            {
+                ErrorMessage = result.ErrorMessage,
+            };
+        }
     }
 
     public class ApiEnumerableResponse<T> : IApiEnumerableResponse<T> where T : IModel
     {
         public IEnumerable<T>? Data { get; set; }
         public string? ErrorMessage { get; set; }
+
+        public static implicit operator ApiEnumerableResponse<T>(ApiResponse result)
+        {
+            return new()
+            {
+                ErrorMessage = result.ErrorMessage,
+            };
+        }
     }
 
     public class ApiAsyncEnumerableResponse<T> : IApiAsyncEnumerableResponse<T> where T : IModel
     {
         public IAsyncEnumerable<T>? Data { get; set; }
         public string? ErrorMessage { get; set; }
+
+        public static implicit operator ApiAsyncEnumerableResponse<T>(ApiResponse result)
+        {
+            return new()
+            {
+                ErrorMessage = result.ErrorMessage,
+            };
+        }
     }
 
     public class ApiResponse : IApiResponse
@@ -51,14 +77,6 @@
         public static ApiResponse Error(string message)
         {
             return new ApiResponse
-            {
-                ErrorMessage = message
-            };
-        }
-
-        public static ApiResponse<T> Error<T>(string message) where T : IModel
-        {
-            return new ApiResponse<T>
             {
                 ErrorMessage = message
             };

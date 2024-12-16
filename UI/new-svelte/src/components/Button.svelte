@@ -2,7 +2,7 @@
 	{#if loading}
 		<Loading></Loading>
 	{/if}
-	<div class="btn-text">{text}</div>
+	<div class={textPadding}>{text}</div>
 </button>
 
 <script lang="ts">
@@ -11,9 +11,10 @@ type Props = {
 	text?: string;
 	loading?: boolean;
 	onClick: (event: MouseEvent) => void;
+	textPadding?: 'comfortable' | 'minimal' | 'none';
 };
 
-let { text, loading = false, onClick }: Props = $props();
+let { text, loading = false, onClick, textPadding = 'comfortable' }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -21,7 +22,7 @@ let { text, loading = false, onClick }: Props = $props();
 	background-color: var(--btn-background);
 	width: 100%;
 	border-width: 1px;
-	font-size: 1rem;
+	font-size: 1em;
 	margin: auto;
 	user-select: none;
 	padding: 0;
@@ -38,8 +39,12 @@ let { text, loading = false, onClick }: Props = $props();
 		cursor: not-allowed;
 	}
 
-	.btn-text {
-		padding: 0.2rem 0.5rem;
+	.comfortable {
+		padding: 0.2em 0.5em;
+	}
+
+	.minimal {
+		padding: 0.1em 0.25em;
 	}
 }
 </style>

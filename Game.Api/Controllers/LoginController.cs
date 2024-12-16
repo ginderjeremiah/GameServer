@@ -3,6 +3,7 @@ using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Core;
 using Game.Core.DataAccess;
+using Game.Core.Entities;
 using Game.Core.Sessions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,21 +30,51 @@ namespace Game.Api.Controllers
         public async Task<ApiResponse<PlayerData>> Login([FromBody] LoginCredentials creds)
         {
             if (_sessionService.SessionAvailable)
+            {
                 return ApiResponse.Success(Session.GetPlayerData());
+            }
 
             var player = await _repositoryManager.Players.GetPlayer(creds.Username);
-
             if (player is null)
-                return ApiResponse.Error<PlayerData>("Username not found");
+            {
+                return ApiResponse.Error("Username not found");
+            }
 
             var passHash = creds.Password.Hash(player.Salt.ToString());
-
             if (passHash != player.PassHash)
-                return ApiResponse.Error<PlayerData>("Username or password is incorrect");
+            {
+                return ApiResponse.Error("Username or password is incorrect");
+            }
 
             _sessionService.CreateSession(player);
 
             return ApiResponse.Success(Session.GetPlayerData());
+        }
+
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
+        {
+            var usernameTaken = await _repositoryManager.Players.CheckIfUsernameExists(creds.Username);
+            if (usernameTaken)
+            {
+                return ApiResponse.Error("There is already an account with this username.");
+            }
+
+            var salt = Guid.NewGuid();
+            var passHash = creds.Password.Hash(salt.ToString());
+            var player = new Player
+            {
+                UserName = creds.Username,
+                Salt = salt,
+                PassHash = passHash,
+                Level = 1,
+                Name = creds.Username,
+            };
+
+            _repositoryManager.Insert(player);
+            await _repositoryManager.SaveChangesAsync();
+            return ApiResponse.Success();
         }
 
         [HttpGet]

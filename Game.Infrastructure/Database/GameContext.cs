@@ -98,7 +98,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Enemy>(entity =>
             {
                 entity.Property(e => e.Id)
-                    .UseIdentityColumn(0, 1);
+                    .UseIdentityColumn(0, 1) //SQL Server
+                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
 
                 entity.Property(e => e.Name)
                     .HasMaxLength(50);
@@ -110,7 +111,6 @@ namespace Game.Infrastructure.Database
 
             modelBuilder.Entity<EnemySkill>()
                 .HasKey(es => new { es.EnemyId, es.SkillId });
-
 
             modelBuilder.Entity<EquipmentSlot>(entity =>
             {
@@ -141,7 +141,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Item>(entity =>
             {
                 entity.Property(i => i.Id)
-                    .UseIdentityColumn(0, 1);
+                    .UseIdentityColumn(0, 1) //SQL Server
+                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
 
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
@@ -176,7 +177,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<ItemMod>(entity =>
             {
                 entity.Property(im => im.Id)
-                    .UseIdentityColumn(0, 1);
+                    .UseIdentityColumn(0, 1) //SQL Server
+                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
 
                 entity.Property(im => im.Name)
                     .HasMaxLength(50);
@@ -227,7 +229,7 @@ namespace Game.Infrastructure.Database
                 entity.Property(p => p.UserName)
                     .HasMaxLength(20);
 
-                entity .Property(p => p.Name)
+                entity.Property(p => p.Name)
                     .HasMaxLength(20);
 
                 entity.Property(p => p.PassHash)
@@ -248,7 +250,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Skill>(entity =>
             {
                 entity.Property(s => s.Id)
-                    .UseIdentityColumn(0, 1);
+                    .UseIdentityColumn(0, 1) //SQL Server
+                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
 
                 entity.Property(s => s.BaseDamage)
                     .HasPrecision(18, 3);
@@ -297,7 +300,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Zone>(entity =>
             {
                 entity.Property(z => z.Id)
-                    .UseIdentityColumn(0, 1);
+                    .UseIdentityColumn(0, 1) //SQL Server
+                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
 
                 entity.Property(z => z.Name)
                     .HasMaxLength(50);

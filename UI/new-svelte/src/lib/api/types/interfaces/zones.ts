@@ -1,4 +1,4 @@
-import { IItemDrop } from "../"
+import type { IItemDrop } from "../"
 
 export interface IZone {
 	id: number;

@@ -7,28 +7,37 @@
 		<div class="login-subcontainer">
 			<TextInput bind:value={password} type="password" name="password" label="Password" />
 		</div>
-		{#if loginFailedReason}
+		{#if errorReason}
 			<div class="login-subcontainer">
-				<span class="error-message">An error occured while attempting to login.</span>
-				<span class="error-message">{loginFailedReason}</span>
+				{#if errorType === 'login'}
+					<span class="error-message">An error occured while attempting to login.</span>
+				{:else}
+					<span class="error-message">Could not create account.</span>
+				{/if}
+				<span class="error-message">{errorReason}</span>
 			</div>
 		{/if}
 		<div class="login-subcontainer">
 			<Button onClick={attemptLogin} text="Login" loading={loginLoading} />
+		</div>
+		<div class="login-subcontainer">
+			<Button onClick={createAccount} text="Create Account" loading={loginLoading} />
 		</div>
 	</div>
 </div>
 
 <script lang="ts">
 import { loadPlayerData } from '$stores';
-import { ApiRequest } from '$lib/api/api-request';
+import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
-import Button from '$components/Button.svelte';
-import TextInput from '$components/TextInput.svelte';
+import { Button, TextInput } from '$components';
+
+type ErrorType = 'login' | 'create-account';
 
 let username = $state<string>();
 let password = $state<string>();
-let loginFailedReason = $state<string>();
+let errorReason = $state<string>();
+let errorType = $state<ErrorType>();
 let loginLoading = $state(false);
 
 const attemptLogin = async () => {
@@ -43,7 +52,24 @@ const attemptLogin = async () => {
 		loadPlayerData(response.data);
 		routeTo('/loading');
 	} else {
-		loginFailedReason = response.error;
+		errorType = 'login';
+		errorReason = response.error;
+	}
+};
+
+const createAccount = async () => {
+	if (!username || !password) {
+		return;
+	}
+
+	loginLoading = true;
+	const response = await new ApiRequest('Login/CreateAccount').post({ username, password });
+	if (response.status === 200) {
+		await attemptLogin();
+	} else {
+		errorType = 'create-account';
+		errorReason = response.error;
+		loginLoading = false;
 	}
 };
 </script>

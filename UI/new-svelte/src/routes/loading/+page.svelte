@@ -14,10 +14,10 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest } from '$lib/api/api-request';
+import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
 import { initializeInventoryItems, staticData } from '$stores';
-import Button from '$components/Button.svelte';
+import { Button } from '$components';
 import LoadingSection from './LoadingSection.svelte';
 import { onMount } from 'svelte';
 

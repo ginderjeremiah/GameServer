@@ -2,14 +2,13 @@
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using System.Diagnostics;
 
 namespace Game.DataAccess
 {
     internal class DatabaseMigrator(GameContext context, ILogger<DatabaseMigrator> logger) : IDatabaseMigrator
     {
-        public async Task Migrate()
+        public async Task Migrate(bool resetDatabase = false)
         {
             var start = Stopwatch.GetTimestamp();
             logger.LogDebug($"Beginning migration.");

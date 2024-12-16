@@ -67,6 +67,11 @@ namespace Game.DataAccess.Repositories
             }
         }
 
+        public async Task<bool> CheckIfUsernameExists(string username)
+        {
+            return await _context.Players.AnyAsync(p => p.UserName == username);
+        }
+
         private IQueryable<Player> PlayersWithRelatedData()
         {
             return _context.Players

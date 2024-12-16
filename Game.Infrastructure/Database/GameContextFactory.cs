@@ -17,7 +17,6 @@ namespace Game.Infrastructure.Database
                 default:
                     optionsBuilder.UseSqlServer(config.DbConnectionString);
                     break;
-
             }
 
             return new GameContext(optionsBuilder.Options);

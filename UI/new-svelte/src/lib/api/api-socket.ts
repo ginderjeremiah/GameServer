@@ -26,7 +26,7 @@ export class ApiSocket {
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
-			socket = new WebSocket('https://localhost:7054/EstablishSocket');
+			socket = new WebSocket('/EstablishSocket');
 			socket.onopen = this.processCommandQueue.bind(this);
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
@@ -52,13 +52,9 @@ export class ApiSocket {
 		commandName: T,
 		action: Action<[IApiSocketResponse<T>]>
 	) {
-		const listeners = this.listeners[commandName];
-		if (listeners) {
-			listeners.push(action);
-		} else {
-			this.listeners[commandName] = [];
-			this.listeners[commandName].push(action);
-		}
+		//TODO update to use $lib/common/hooks
+		this.listeners[commandName] ??= [];
+		this.listeners[commandName].push(action);
 	}
 
 	private processCommandQueue() {
@@ -76,21 +72,29 @@ export class ApiSocket {
 		if (ev.data === 'ping') {
 			socket.send('pong');
 		} else {
-			const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
-			const listeners = this.listeners[data.name] ?? [];
-			for (const listener of listeners) {
-				(listener as Action<[IApiSocketResponse<typeof data.name>]>)(data);
-			}
-
-			if (data.id) {
-				const response = this.inFlightCommands.find((c) => c.id === data.id);
-				response?.resolve(data);
+			try {
+				const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
+				const listeners = this.listeners[data.name] ?? [];
+				for (const listener of listeners) {
+					try {
+						(listener as Action<[IApiSocketResponse<typeof data.name>]>)(data);
+					} catch (ex) {
+						console.error('An error occured while executing a socket listener callback', ex);
+					}
+				}
+	
+				if (data.id) {
+					const response = this.inFlightCommands.find((c) => c.id === data.id);
+					response?.resolve(data);
+				}
+			} catch (ex) {
+				console.error('Failed to handle socket response', ex);
 			}
 		}
 	}
 
 	private handleError(ev: Event) {
-		console.log(ev);
+		console.error('A socket error occured', ev);
 	}
 }
 

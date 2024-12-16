@@ -24,7 +24,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 	public get(urlParams?: Record<string, any>) {
 		const params = this.encodeParams(urlParams);
 		const endpoint = params ? this.endpoint + '?' + params : this.endpoint;
-		const finalEndpoint = `https://localhost:7054/api/${endpoint}`;
+		const finalEndpoint = `/api/${endpoint}`;
 		const r = this.r;
 		r.withCredentials = true;
 		r.open('GET', finalEndpoint, true);
@@ -53,7 +53,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 
 	public post<T extends U & ApiEndpointWithRequest>(payload: ApiRequestTypes[T]) {
 		const r = this.r;
-		const endpoint = `https://localhost:7054/api/${this.endpoint}`;
+		const endpoint = `/api/${this.endpoint}`;
 		r.open('POST', endpoint, true);
 		r.setRequestHeader('content-type', 'application/json');
 		r.withCredentials = true;

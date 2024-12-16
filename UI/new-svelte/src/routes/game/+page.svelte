@@ -1,5 +1,5 @@
 <div class="game-container">
-	<NavMenu on:change-screen={handleChangeScreen} />
+	<NavMenu {navMenuItems} />
 	<div class="screen-container">
 		<CurrentScreen />
 	</div>
@@ -13,46 +13,28 @@
 </div>
 
 <script lang="ts">
-import NavMenu, { type GameScreen } from './NavMenu.svelte';
-import { Fight, Inventory, Attributes, Stats, Help, Options, CardGame, Quit } from './screens';
+import { NavMenu, type INavMenuItem } from '$components';
+import { screenMap } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
 import { logs } from '$stores';
+import { normalizeText, routeTo } from '$lib/common';
 
 if (browser) {
 	startGame();
 }
 
-let CurrentScreen = $state(Fight);
+let CurrentScreen = $state(screenMap.Fight);
 
-const handleChangeScreen = (event: CustomEvent<GameScreen>) => {
-	switch (event.detail) {
-		default:
-		case 'Fight':
-			CurrentScreen = Fight;
-			break;
-		case 'Inventory':
-			CurrentScreen = Inventory;
-			break;
-		case 'Attributes':
-			CurrentScreen = Attributes;
-			break;
-		case 'Stats':
-			CurrentScreen = Stats;
-			break;
-		case 'Help':
-			CurrentScreen = Help;
-			break;
-		case 'Options':
-			CurrentScreen = Options;
-			break;
-		case 'CardGame':
-			CurrentScreen = CardGame;
-			break;
-		case 'Quit':
-			CurrentScreen = Quit;
-	}
-};
+const navMenuItems: INavMenuItem[] = Object.entries(screenMap).map(([text, screen]) => ({
+	text: normalizeText(text),
+	onClick: () => (CurrentScreen = screen)
+}));
+
+navMenuItems.push({
+	text: 'Admin',
+	onClick: () => routeTo('/admin')
+});
 </script>
 
 <style lang="scss">

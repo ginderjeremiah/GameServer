@@ -7,7 +7,7 @@ import { IApiSocketResponse } from './api-socket';
 
 export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
 	private dataPromise: Promise<IApiSocketResponse<T>>;
-	private promiseResolver!: (value: IApiSocketResponse<T>) => void;
+	private promiseResolver: (value: IApiSocketResponse<T>) => void;
 	id: string;
 	commandName: T;
 	parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never;
@@ -20,7 +20,9 @@ export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
 		this.id = id;
 		this.commandName = commandName;
 		this.parameters = parameters;
-		this.dataPromise = new Promise((resolve) => (this.promiseResolver = resolve));
+		const { promise, resolve } = Promise.withResolvers<IApiSocketResponse<T>>();
+		this.dataPromise = promise;
+		this.promiseResolver = resolve;
 	}
 
 	public getCommandInfo() {

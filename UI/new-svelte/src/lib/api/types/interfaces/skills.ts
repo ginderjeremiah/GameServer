@@ -1,4 +1,4 @@
-import { IAttributeMultiplier } from "../"
+import type { IAttributeMultiplier } from "../"
 
 export interface ISkill {
 	id: number;

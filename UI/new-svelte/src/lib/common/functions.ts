@@ -22,15 +22,15 @@ export async function delay(delay: number) {
 	});
 }
 
-export function keys(obj?: {}) {
-	return obj ? Object.keys(obj) : [];
+export function keys<T>(obj?: T) {
+	return obj ? Object.keys(obj) as (keyof T)[] : [];
 }
 
 export function enumPairs(obj?: any) {
 	const allKeys = keys(obj);
 	return allKeys
 		.slice(0, allKeys.length / 2)
-		.map((key) => ({ id: key as unknown as number, name: obj[key] as string }));
+		.map((key) => ({ id: key as number, name: obj[key] as string }));
 }
 
 export function capitalize(str: string) {

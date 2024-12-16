@@ -12,9 +12,9 @@
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
 
-        public virtual List<PlayerAttribute> PlayerAttributes { get; set; }
-        public virtual List<InventoryItem> InventoryItems { get; set; }
-        public virtual List<LogPreference> LogPreferences { get; set; }
-        public virtual List<PlayerSkill> PlayerSkills { get; set; }
+        public virtual List<PlayerAttribute> PlayerAttributes { get; set; } = [];
+        public virtual List<InventoryItem> InventoryItems { get; set; } = [];
+        public virtual List<LogPreference> LogPreferences { get; set; } = [];
+        public virtual List<PlayerSkill> PlayerSkills { get; set; } = [];
     }
 }

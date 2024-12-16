@@ -1,4 +1,4 @@
-import { EAttribute } from "../"
+import type { EAttribute } from "../"
 
 export interface IBattlerAttribute {
 	attributeId: EAttribute;

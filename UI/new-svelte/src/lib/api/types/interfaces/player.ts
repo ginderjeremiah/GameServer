@@ -1,4 +1,4 @@
-import { ELogSetting, IBattlerAttribute, IInventoryData } from "../"
+import type { ELogSetting, IBattlerAttribute, IInventoryData } from "../"
 
 export interface ILoginCredentials {
 	username: string;

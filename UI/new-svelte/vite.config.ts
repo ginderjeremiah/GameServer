@@ -5,5 +5,21 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}']
+	},
+	css: {
+		preprocessorOptions: {
+			scss: {
+				api: 'modern'
+			}
+		}
+	},
+	server: {
+		proxy: {
+			'/api': 'http://localhost:5008',
+			'/EstablishSocket': {
+				target: 'ws://localhost:5008',
+				ws: true
+			}
+		}
 	}
 });
