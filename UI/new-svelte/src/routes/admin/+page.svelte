@@ -1,10 +1,11 @@
 <div class="admin-container">
 	<NavMenu {navMenuItems} />
 	<div class="tool-container round-border">
-		<CurrentTool bind:this={toolInstance} />
-		<div class="save-button-container">
-			<Button text="Save" onClick={saveChanges} />
-		</div>
+		<CurrentTool bind:this={toolInstance}>
+			<div class="save-button-container">
+				<Button text="Save" onClick={saveChanges} />
+			</div>
+		</CurrentTool>
 	</div>
 </div>
 
@@ -13,13 +14,25 @@ import { Button, NavMenu, type INavMenuItem } from '$components';
 import { normalizeText, routeTo } from '$lib/common';
 import { toolMap } from './tools';
 
-let CurrentTool = $state(toolMap.AddEditItems);
+let CurrentTool = $state(toolMap['Items']['Add/Edit Items']);
 let toolInstance = $state<{ saveChanges: () => Promise<void> }>();
 
-const navMenuItems: INavMenuItem[] = Object.entries(toolMap).map(([text, tool]) => ({
-	text: normalizeText(text),
-	onClick: () => (CurrentTool = tool)
-}));
+const navMenuItems: INavMenuItem[] = Object.entries(toolMap).map(([text, item]) => {
+	const baseItem: INavMenuItem = {
+		text: normalizeText(text)
+	};
+
+	if (typeof item === 'object') {
+		baseItem.children = Object.entries(item).map(([itemText, component]) => ({
+			text: itemText,
+			onClick: () => (CurrentTool = component)
+		}));
+	} else {
+		baseItem.onClick = () => (CurrentTool = item);
+	}
+
+	return baseItem;
+});
 
 navMenuItems.push({
 	text: 'Game',
@@ -47,6 +60,7 @@ const saveChanges = () => {
 		border-radius: 1vw;
 		background-color: var(--container-background-color);
 		user-select: text;
+		position: relative;
 
 		.save-button-container {
 			width: 6rem;

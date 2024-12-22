@@ -62,7 +62,7 @@ export const newBattler = (
 		for (const skill of skills) {
 			if (skill) {
 				skill.chargeTime += timeDelta * cdMultiplier;
-				if (skill.chargeTime >= skill.cooldownMS) {
+				if (skill.chargeTime >= skill.cooldownMs) {
 					firedSkills.push(skill);
 					skill.chargeTime = 0;
 				}
@@ -75,7 +75,7 @@ export const newBattler = (
 			if (skill) {
 				skill.renderChargeTime = Math.min(
 					skill.chargeTime + renderDelta * cdMultiplier,
-					skill.cooldownMS
+					skill.cooldownMs
 				);
 			}
 		}

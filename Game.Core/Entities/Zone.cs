@@ -1,6 +1,6 @@
 ﻿namespace Game.Core.Entities
 {
-    public partial class Zone
+    public partial class Zone : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public string Name { get; set; }

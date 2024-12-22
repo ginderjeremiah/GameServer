@@ -17,9 +17,9 @@ namespace Game.Api.Controllers
         }
 
         [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<Enemy> Enemies()
+        public ApiEnumerableResponse<Enemy> Enemies(bool refreshCache = false)
         {
-            var enemies = _repositoryManager.Enemies.All().To().Model<Enemy>();
+            var enemies = _repositoryManager.Enemies.All(refreshCache).To().Model<Enemy>();
             return ApiResponse.Success(enemies);
         }
     }

@@ -4,7 +4,7 @@
 	ApiEndpointNoRequest,
 	ApiRequestTypes,
 	ApiResponseTypes
-} from './api-type-map';
+} from './types/api-type-map';
 import { ApiResponse } from './api-response';
 import { keys } from '../common/functions';
 
@@ -17,9 +17,9 @@ export class ApiRequest<U extends ApiEndpoint> {
 		this.endpoint = endpoint;
 	}
 
-	public get<U extends ApiEndpointNoRequest>(): Promise<ApiResponse<ApiResponseTypes[U]>>;
-	public get<U extends ApiEndpointWithRequest>(
-		urlParams: ApiRequestTypes[U]
+	public get(): U extends ApiEndpointNoRequest ? Promise<ApiResponse<ApiResponseTypes[U]>> : never;
+	public get(
+		urlParams: U extends ApiEndpointWithRequest ? ApiRequestTypes[U] : never
 	): Promise<ApiResponse<ApiResponseTypes[U]>>;
 	public get(urlParams?: Record<string, any>) {
 		const params = this.encodeParams(urlParams);
@@ -43,7 +43,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 	public static get<U extends ApiEndpointNoRequest>(endpoint: U): Promise<ApiResponseTypes[U]>;
 	public static get<U extends ApiEndpointWithRequest>(
 		endpoint: U,
-		urlParams?: ApiRequestTypes[U]
+		urlParams: ApiRequestTypes[U]
 	): Promise<ApiResponseTypes[U]>;
 	public static async get<U extends ApiEndpoint>(endpoint: U, urlParams?: any) {
 		const request = new ApiRequest(endpoint);

@@ -1,31 +1,51 @@
-{#if !hideOverlay}
-	<div class="gray-overlay"></div>
-{/if}
-<div class="loading-spinner-container" {style}>
-	<div class="loading-spinner">
-		<div class="spinner-dot-container">
-			<div class="loading-spinner-dot"></div>
-		</div>
-		<div class="spinner-dot-container">
-			<div class="loading-spinner-dot"></div>
-		</div>
-		<div class="spinner-dot-container">
-			<div class="loading-spinner-dot"></div>
-		</div>
-		<div class="spinner-dot-container">
-			<div class="loading-spinner-dot"></div>
-		</div>
-		<div class="spinner-dot-container">
-			<div class="loading-spinner-dot"></div>
+{#if showSpinner}
+	{#if !hideOverlay}
+		<div class="gray-overlay"></div>
+	{/if}
+	<div class="loading-spinner-container" {style}>
+		<div class="loading-spinner">
+			<div class="spinner-dot-container">
+				<div class="loading-spinner-dot"></div>
+			</div>
+			<div class="spinner-dot-container">
+				<div class="loading-spinner-dot"></div>
+			</div>
+			<div class="spinner-dot-container">
+				<div class="loading-spinner-dot"></div>
+			</div>
+			<div class="spinner-dot-container">
+				<div class="loading-spinner-dot"></div>
+			</div>
+			<div class="spinner-dot-container">
+				<div class="loading-spinner-dot"></div>
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
 
 <script lang="ts">
-const { hideOverlay = false } = $props();
+import { untrack } from 'svelte';
+
+const { hideOverlay = false, loading = true, minimumLoadMs = 0 } = $props();
+
+let lockSpinner = performance.now();
+let showSpinner = $state(loading);
 
 const offset = Math.floor(Math.random() * 360);
 const style = `--spinner-start-offset: ${offset}deg`;
+
+$effect(() => {
+	if (loading) {
+		lockSpinner = performance.now() + minimumLoadMs;
+		showSpinner = true;
+	} else if (minimumLoadMs) {
+		setTimeout(() => {
+			showSpinner = false;
+		}, lockSpinner - performance.now());
+	} else {
+		showSpinner = false;
+	}
+});
 </script>
 
 <style lang="scss">
@@ -38,10 +58,13 @@ $outer-rotation-count: 3;
 	position: absolute;
 	width: 100%;
 	height: 100%;
+	top: 0;
+	left: 0;
+	border-radius: inherit;
 	background-color: var(--overlay-color);
-	opacity: 30%;
-	pointer-events: none;
+	opacity: 60%;
 	cursor: not-allowed;
+	z-index: 10;
 }
 
 .loading-spinner-container {
@@ -50,7 +73,10 @@ $outer-rotation-count: 3;
 	left: 50%;
 	transform: translate(-50%, -50%);
 	height: 100%;
+	max-height: 10em;
 	aspect-ratio: 1;
+	z-index: 11;
+	cursor: not-allowed;
 }
 
 .loading-spinner {

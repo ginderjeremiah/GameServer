@@ -22,7 +22,10 @@ namespace Game.DataAccess.Repositories
         {
             if (_allMods is null || refreshCache)
             {
-                _allMods = _context.ItemMods.Include(im => im.ItemModAttributes).ToList();
+                _allMods = _context.ItemMods
+                    .Include(im => im.ItemModAttributes)
+                    .AsNoTracking()
+                    .ToList();
             }
             return _allMods;
         }
@@ -67,6 +70,7 @@ namespace Game.DataAccess.Repositories
                 .SelectMany(i => i.Tags.SelectMany(t => t.ItemMods))
                 .Distinct()
                 .GroupBy(im => im.ItemModTypeId)
+                .AsNoTracking()
                 .ToDictionary(grp => grp.Key, grp => grp.AsEnumerable());
         }
     }

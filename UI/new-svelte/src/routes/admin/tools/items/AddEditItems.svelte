@@ -6,26 +6,31 @@
 		{selectOptions}
 		{sampleItem}
 		primaryKey="id"
+		title="Add/Edit Items"
 	/>
-{:else}
-	<Loading />
+	{@render children()}
 {/if}
+<Loading loading={!initialized} />
 
 <script lang="ts">
 import { TableEditor, Loading } from '$components';
 import { ApiRequest, EItemCategory, type IChange, type IItem, type IItemCategory } from '$lib/api';
 import { staticData } from '$stores';
-import { onMount } from 'svelte';
+import { onMount, type Snippet } from 'svelte';
+
+const { children }: { children: Snippet } = $props();
 
 export const saveChanges = async () => {
 	const changes = editor?.getChanges();
 	if (changes?.length) {
 		await new ApiRequest('AdminTools/AddEditItems').post(changes);
-		staticData.items = await ApiRequest.get('Items', { refreshCache: true });
+		data = await ApiRequest.get('Items', { refreshCache: true });
+		staticData.items = data;
 	}
 };
 
 let itemCategories = $state<IItemCategory[]>([]);
+let data = $state<IItem[]>([]);
 let initialized = $state(false);
 let editor = $state<{ getChanges: () => IChange<IItem>[] }>();
 
@@ -40,10 +45,11 @@ const sampleItem = {
 	attributes: []
 } satisfies IItem;
 
-const data = $derived(staticData.items);
-
 onMount(async () => {
-	itemCategories = await ApiRequest.get('ItemCategories');
+	[itemCategories, data] = await Promise.all([
+		ApiRequest.get('ItemCategories'),
+		ApiRequest.get('Items', { refreshCache: true })
+	]);
 	initialized = true;
 });
 

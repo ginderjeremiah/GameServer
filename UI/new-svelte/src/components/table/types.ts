@@ -7,6 +7,7 @@ export interface EditorOptions<T extends {}> {
 	disabledColumns?: (keyof T)[];
 	selectOptions?: Partial<{ [key in keyof T]: (t: T) => SelectOptions }>;
 	sampleItem?: T;
+	title?: string;
 }
 
 export interface RowData<T extends {}> {

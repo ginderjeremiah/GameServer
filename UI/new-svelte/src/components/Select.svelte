@@ -1,6 +1,9 @@
+{#if label}
+	<label class="select-label" for={id}> {label} </label>
+{/if}
 <div class="select-wrapper round-border hover-glow">
 	<div class="overflow-boundary round-border">
-		<select bind:value>
+		<select {id} bind:value>
 			{#each selectOptions as option (option.value)}
 				<option value={option.value} selected={option.selected}>{option.text}</option>
 			{/each}
@@ -16,8 +19,12 @@ export interface SelectOptions {
 </script>
 
 <script lang="ts">
+import { untrack } from 'svelte';
+
 interface Props extends SelectOptions {
 	value: number;
+	label?: string;
+	id?: string;
 }
 
 interface OptionData {
@@ -26,7 +33,13 @@ interface OptionData {
 	selected: boolean;
 }
 
-let { value = $bindable(), disableBlanks, options }: Props = $props();
+let {
+	value = $bindable(),
+	label,
+	id = crypto.randomUUID(),
+	disableBlanks,
+	options
+}: Props = $props();
 
 let selectOptions = $state<OptionData[]>([]);
 let selected = $state<OptionData>();
@@ -53,20 +66,23 @@ $effect(() => {
 });
 
 $effect(() => {
-	if (value !== selected?.value) {
-		if (selected) {
-			selected.selected = false;
-		}
+	if (value !== untrack(() => selected?.value)) {
+		untrack(() => {
+			if (selected) {
+				selected.selected = false;
+			}
+		});
 
-		const newSelected = selectOptions.find((o) => o.value === value);
+		let newSelected = selectOptions.find((o) => o.value === value);
 		if (newSelected) {
-			selected = newSelected;
 			newSelected.selected = true;
+			selected = newSelected;
 		} else if (allowBlanks) {
 			value = -1;
-			selected = selectOptions?.[0];
-			if (selected) {
-				selected.selected = true;
+			newSelected = selectOptions?.[0];
+			if (newSelected) {
+				newSelected.selected = true;
+				selected = newSelected;
 			}
 		}
 	}
@@ -74,6 +90,12 @@ $effect(() => {
 </script>
 
 <style lang="scss">
+.select-label {
+	display: block;
+	padding-bottom: 0.25rem;
+	font-size: 0.8rem;
+}
+
 .select-wrapper {
 	box-sizing: border-box;
 	height: 1.5rem;

@@ -10,7 +10,7 @@ namespace Game.Api.Models.Skills
         public decimal BaseDamage { get; set; }
         public IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
         public string Description { get; set; }
-        public int CooldownMS { get; set; }
+        public int CooldownMs { get; set; }
         public string IconPath { get; set; }
 
         public static Skill FromSource(SkillEntity skill)
@@ -22,7 +22,7 @@ namespace Game.Api.Models.Skills
                 BaseDamage = skill.BaseDamage,
                 DamageMultipliers = skill.SkillDamageMultipliers.To().Model<AttributeMultiplier>(),
                 Description = skill.Description,
-                CooldownMS = skill.CooldownMs,
+                CooldownMs = skill.CooldownMs,
                 IconPath = skill.IconPath,
             };
         }

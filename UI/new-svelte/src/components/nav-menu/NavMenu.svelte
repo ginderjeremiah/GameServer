@@ -1,5 +1,5 @@
 <div class="nav-menu">
-	<div class="nav-menu-buttons">
+	<div class="nav-menu-items">
 		{#each navMenuItems as item}
 			<NavMenuItem {...item} />
 		{/each}
@@ -33,9 +33,9 @@ const { navMenuItems, showTickCounter = true }: Props = $props();
 	display: flex;
 	justify-content: space-between;
 
-	.nav-menu-buttons {
+	.nav-menu-items {
 		height: fit-content;
-		background-color: var(--nav-bar-color);
+		background-color: inherit;
 		display: flex;
 	}
 

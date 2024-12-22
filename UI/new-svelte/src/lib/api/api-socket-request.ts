@@ -2,7 +2,7 @@ import {
 	ApiSocketCommand,
 	ApiSocketCommandWithRequest,
 	ApiSocketResponseTypes
-} from './api-socket-type-map';
+} from './types/api-socket-type-map';
 import { IApiSocketResponse } from './api-socket';
 
 export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {

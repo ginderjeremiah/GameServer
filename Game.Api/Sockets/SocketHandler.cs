@@ -43,7 +43,9 @@ namespace Game.Api.Sockets
         public async Task<bool> SendData(string data)
         {
             if (Socket.State is not Open)
+            {
                 return false;
+            }
 
             _logger.LogDebug("Sending data to playerId ({PlayerId}) from socket ({Id}): {Data}", PlayerId, Id, data);
             var dataBytes = Encoding.UTF8.GetBytes(data);
@@ -74,7 +76,7 @@ namespace Game.Api.Sockets
 
         public async Task<bool> SendData<T>(T data) where T : ApiSocketResponse
         {
-            return await SendData(data.Serialize());
+            return await SendData(data.Serialize<object>());
         }
 
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
@@ -137,39 +139,17 @@ namespace Game.Api.Sockets
             {
                 try
                 {
-                    string? msg = null;
-                    WebSocketReceiveResult result;
-                    do
+                    var message = await ReadMessage();
+                    if (!string.IsNullOrWhiteSpace(message))
                     {
-                        result = await Socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
-                        msg = $"{msg}{ReadBuffer()}";
-                    }
-                    while (!result.EndOfMessage);
-
-                    if (!string.IsNullOrWhiteSpace(msg))
-                    {
-                        _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Msg}", PlayerId, Id, msg);
+                        _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Message}", PlayerId, Id, message);
                         _lastResponse = DateTime.UtcNow;
-                        if (msg != "pong")
-                        {
-                            try
-                            {
-                                var commandInfo = msg.Deserialize<SocketCommandInfo>();
-                                if (commandInfo is not null)
-                                {
-                                    await ExecuteCommand(commandInfo);
-                                }
-                            }
-                            catch (JsonException)
-                            {
-                                _logger.LogWarning("Failed to deserialize socket command: {Msg}", msg);
-                            }
-                        }
+                        await HandleMessage(message);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occured while reading a socket message");
+                    _logger.LogError(ex, "An error occured while reading a socket message.");
                 }
             }
             while (Socket.State is Open);
@@ -178,6 +158,20 @@ namespace Game.Api.Sockets
             {
                 await _context.Close(ESocketCloseReason.Finished);
             }
+        }
+
+        private async Task<string> ReadMessage()
+        {
+            var message = new StringBuilder();
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await Socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
+                message.Append(ReadBuffer());
+            }
+            while (!result.EndOfMessage);
+
+            return message.ToString();
         }
 
         private string ReadBuffer()
@@ -194,6 +188,25 @@ namespace Game.Api.Sockets
             var str = Encoding.UTF8.GetString(_buffer, 0, lastNonZeroByte + 1);
             ClearBuffer(lastNonZeroByte);
             return str;
+        }
+
+        private async Task HandleMessage(string message)
+        {
+            if (message != "pong")
+            {
+                try
+                {
+                    var commandInfo = message.Deserialize<SocketCommandInfo>();
+                    if (commandInfo is not null)
+                    {
+                        await ExecuteCommand(commandInfo);
+                    }
+                }
+                catch (JsonException)
+                {
+                    _logger.LogWarning("Failed to deserialize socket command: {Message}", message);
+                }
+            }
         }
     }
 }

@@ -900,11 +900,8 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("Game.Core.Entities.ZoneEnemy", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<int>("ZoneId")
                         .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("EnemyId")
                         .HasColumnType("integer");
@@ -912,14 +909,9 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("Weight")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ZoneId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
+                    b.HasKey("ZoneId", "EnemyId");
 
                     b.HasIndex("EnemyId");
-
-                    b.HasIndex("ZoneId");
 
                     b.ToTable("ZoneEnemies");
                 });

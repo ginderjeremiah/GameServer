@@ -2,13 +2,6 @@
 	<label class="text-input-label" for={id}> {label} </label>
 {/if}
 <div class="text-input-wrapper round-border hover-glow">
-	<!-- {#if type === 'text'}
-		<input {id} class="round-border" bind:value {type} {name} />
-	{:else if type === 'password'}
-		<input {id} class="round-border" bind:value {type} {name} />
-	{:else}
-		<input {id} class="round-border" bind:value {type} {name} />
-	{/if} -->
 	<input {id} class="round-border" bind:value {type} {name} {disabled} />
 </div>
 

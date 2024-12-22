@@ -18,11 +18,13 @@ namespace Game.DataAccess.Repositories
 
         public List<Skill> AllSkills(bool refreshCache = false)
         {
-            if (_skillDataList == null || refreshCache)
+            if (_skillDataList is null || refreshCache)
             {
-                _skillDataList ??= [.. _context.Skills
+                _skillDataList = _context.Skills
                     .AsNoTracking()
-                    .Include(s => s.SkillDamageMultipliers)];
+                    .Include(s => s.SkillDamageMultipliers)
+                    .OrderBy(s => s.Id)
+                    .ToList();
             }
             return _skillDataList;
         }

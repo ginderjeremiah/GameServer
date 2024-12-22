@@ -1,5 +1,6 @@
 :root {
 	font-size: 24px;
+	font-family: Arial, Helvetica, sans-serif;
 }
 
 body {
@@ -34,11 +35,6 @@ body {
 	&.round-border::after {
 		border-radius: var(--border-radius);
 	}
-}
-
-button {
-	outline: none;
-	cursor: pointer;
 }
 
 .round-border {

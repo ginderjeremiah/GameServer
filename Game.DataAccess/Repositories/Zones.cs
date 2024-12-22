@@ -20,9 +20,12 @@ namespace Game.DataAccess.Repositories
         {
             if (_zoneList is null || refreshCache)
             {
-                _zoneList ??= [.. _context.Zones
+                _zoneList = _context.Zones
                    .AsNoTracking()
-                   .Include(z => z.ZoneDrops)];
+                   .Include(z => z.ZoneDrops)
+                   .Include(z => z.ZoneEnemies)
+                   .OrderBy(z => z.Id)
+                   .ToList();
             }
             return _zoneList;
         }
@@ -37,6 +40,13 @@ namespace Game.DataAccess.Repositories
         public bool ValidateZoneId(int zoneId)
         {
             return zoneId >= 0 && zoneId < All().Count;
+        }
+
+        public IAsyncEnumerable<ZoneEnemy> ZoneEnemies(int zoneId)
+        {
+            return _context.ZoneEnemies
+                .Where(ze => ze.ZoneId == zoneId)
+                .AsAsyncEnumerable();
         }
     }
 }

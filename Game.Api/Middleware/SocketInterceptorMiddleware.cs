@@ -15,7 +15,7 @@ namespace Game.Api.Middleware
         /// <returns></returns>
         public async Task InvokeAsync(HttpContext context, SessionService sessionService, SocketManagerService socketManager)
         {
-            if (context.Request.Path != "/EstablishSocket")
+            if (context.Request.Path != "/socket")
             {
                 await _next(context);
             }

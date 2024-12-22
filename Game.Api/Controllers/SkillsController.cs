@@ -17,9 +17,9 @@ namespace Game.Api.Controllers
         }
 
         [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<Skill> Skills()
+        public ApiEnumerableResponse<Skill> Skills(bool refreshCache = false)
         {
-            var skills = _repositoryManager.Skills.AllSkills();
+            var skills = _repositoryManager.Skills.AllSkills(refreshCache);
             return ApiResponse.Success(skills.To().Model<Skill>());
         }
     }

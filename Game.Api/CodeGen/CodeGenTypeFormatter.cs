@@ -26,7 +26,9 @@ namespace Game.Api.CodeGen
         public string GetTypeText(CodeGenTypeDescriptor? descriptor)
         {
             if (descriptor is null)
+            {
                 return "undefined";
+            }
 
             var type = descriptor.UnderlyingType;
             if (type == typeof(int)
@@ -83,14 +85,15 @@ namespace Game.Api.CodeGen
             {
                 return "void";
             }
-            else if (endpoint.ParameterDescriptors.Count == 1 && !endpoint.IsGet)
+            else if (endpoint.ParameterDescriptors.Count == 1 && endpoint.ParameterDescriptors[0].UnderlyingType.IsClass && endpoint.ParameterDescriptors[0].UnderlyingType != typeof(string))
             {
                 var desc = endpoint.ParameterDescriptors[0];
-                return desc.HasDefault ? GetTypeText(desc) + " | undefined" : GetTypeText(desc);
+                return desc.HasDefault || desc.IsNullable ? $"{GetTypeText(desc)} | undefined" : GetTypeText(desc);
             }
             else //Construct anonymous json object type
             {
-                return $"{{ {string.Join(", ", endpoint.ParameterDescriptors.Select(d => GetParameterText(d)))} }}";
+                var text = $"{{ {string.Join(", ", endpoint.ParameterDescriptors.Select(d => GetParameterText(d)))} }}";
+                return endpoint.ParameterDescriptors.All(d => d.IsNullable || d.HasDefault) ? $"{text} | undefined" : text;
             }
         }
 

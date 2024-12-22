@@ -14,13 +14,13 @@ export enum EAttribute {
 	DodgeChance = 12,
 	BlockChance = 13,
 	BlockReduction = 14,
-}
+};
 
 export enum EChangeType {
 	Add = 0,
 	Edit = 1,
 	Delete = 2,
-}
+};
 
 export enum EItemCategory {
 	Helm = 1,
@@ -29,13 +29,13 @@ export enum EItemCategory {
 	Boot = 4,
 	Weapon = 5,
 	Accessory = 6,
-}
+};
 
 export enum EItemModType {
 	Component = 1,
 	Prefix = 2,
 	Suffix = 3,
-}
+};
 
 export enum ELogSetting {
 	Damage = 1,
@@ -44,4 +44,4 @@ export enum ELogSetting {
 	LevelUp = 4,
 	Inventory = 5,
 	EnemyDefeated = 6,
-}
+};

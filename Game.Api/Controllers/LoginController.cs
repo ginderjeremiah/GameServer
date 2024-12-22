@@ -70,17 +70,43 @@ namespace Game.Api.Controllers
                 PassHash = passHash,
                 Level = 1,
                 Name = creds.Username,
+                StatPointsGained = 0,
+                StatPointsUsed = 0,
             };
-
             _repositoryManager.Insert(player);
             await _repositoryManager.SaveChangesAsync();
+
+            player.PlayerSkills = Enumerable.Range(0, 3).Select(id => new PlayerSkill
+            {
+                PlayerId = player.Id,
+                Selected = true,
+                SkillId = id,
+            }).ToList();
+            player.PlayerAttributes = Enumerable.Range(0, 6).Select(id => new PlayerAttribute
+            {
+                PlayerId = player.Id,
+                AttributeId = id,
+                Amount = 5m
+            }).ToList();
+            player.LogPreferences = [
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Damage, Enabled = false, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Debug, Enabled = false, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Exp, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.LevelUp, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Inventory, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.EnemyDefeated, Enabled = true, },
+            ];
+
+            _repositoryManager.Update(player);
+            await _repositoryManager.SaveChangesAsync();
+
             return ApiResponse.Success();
         }
 
         [HttpGet]
-        public ApiResponse Status()
+        public ApiResponse<PlayerData> Status()
         {
-            return _sessionService.SessionAvailable ? ApiResponse.Success() : ApiResponse.Error("Not logged in");
+            return _sessionService.SessionAvailable ? ApiResponse.Success(Session.GetPlayerData()) : ApiResponse.Error("Not logged in");
         }
     }
 }

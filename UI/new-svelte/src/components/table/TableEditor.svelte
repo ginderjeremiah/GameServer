@@ -1,4 +1,7 @@
 <div class="table-editor-toolbar round-border">
+	{#if title}
+		<span class="table-editor-title">{title}</span>
+	{/if}
 	<div class="add-row-button-container">
 		<Button text="Add Row" onClick={addNewRow} />
 	</div>
@@ -13,7 +16,7 @@
 				{#each columns as column}
 					<th>{column.name}</th>
 				{/each}
-				<th>Delete</th>
+				<th>Actions</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -39,6 +42,7 @@ import TableRow from './TableRow.svelte';
 import { EChangeType, type IChange } from '$lib/api';
 
 export const getChanges = getRowChanges;
+export const getRowData = getModifiedRowData;
 
 const {
 	data,
@@ -46,7 +50,8 @@ const {
 	hiddenColumns,
 	disabledColumns,
 	selectOptions,
-	sampleItem
+	sampleItem,
+	title
 }: EditorOptions<T> = $props();
 
 const options = {
@@ -130,23 +135,28 @@ function getRowChanges() {
 	return changes;
 }
 
+function getModifiedRowData() {
+	return visibleRows.map((r) => r.data);
+}
+
 $effect(() => {
-	const validData = data.length > 0 && !data[0] ? data.splice(1) : data;
-	rows = validData.map((d, i) => {
-		const data = $state(Object.assign({}, d));
-		let state = $state(RowState.Unmodified);
-		return {
-			originalData: d,
-			data,
-			index: i,
-			get state() {
-				return state;
-			},
-			set state(value) {
-				state = value;
-			}
-		};
-	});
+	const validData = data?.length && !data[0] ? data.splice(1) : data;
+	rows =
+		validData?.map((d, i) => {
+			const data = $state(Object.assign({}, d));
+			let state = $state(RowState.Unmodified);
+			return {
+				originalData: d,
+				data,
+				index: i,
+				get state() {
+					return state;
+				},
+				set state(value) {
+					state = value;
+				}
+			};
+		}) ?? [];
 });
 </script>
 
@@ -156,6 +166,13 @@ $effect(() => {
 	border: var(--default-border);
 	border-bottom-right-radius: 0;
 	border-bottom-left-radius: 0;
+	display: flex;
+
+	.table-editor-title {
+		font-size: 1.5rem;
+		vertical-align: middle;
+		padding-right: 1em;
+	}
 
 	.add-row-button-container {
 		width: 8rem;
@@ -178,6 +195,8 @@ $effect(() => {
 		min-width: 3em;
 		padding: 0.125em 0.25em;
 		border: var(--default-border);
+		font-weight: normal;
+		font-size: 1.25em;
 	}
 }
 </style>

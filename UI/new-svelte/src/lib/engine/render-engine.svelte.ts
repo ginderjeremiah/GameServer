@@ -27,8 +27,8 @@ export const initRenderEngine = () => {
 	}
 };
 
-//use performace.now instead of animation frame ts, because frame ts is before some amount of processing.
-//using frame ts can cause render loop to be behind logical loop
+//use performace.now instead of animation frame timestamp, because frame stamp is before some amount of processing.
+//using frame timestamp can cause render loop to be behind logical loop
 const renderLoop = () => {
 	update(performance.now());
 	window.requestAnimationFrame(renderLoop);

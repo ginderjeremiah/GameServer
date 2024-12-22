@@ -4,7 +4,7 @@ import {
 	ApiSocketCommandNoRequest,
 	ApiSocketCommandWithRequest,
 	ApiSocketRequestTypes
-} from './api-socket-type-map';
+} from './types/api-socket-type-map';
 import { ApiSocketRequest } from './api-socket-request';
 import { Action } from '../common/types';
 
@@ -26,7 +26,7 @@ export class ApiSocket {
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
-			socket = new WebSocket('/EstablishSocket');
+			socket = new WebSocket('/socket');
 			socket.onopen = this.processCommandQueue.bind(this);
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
@@ -82,7 +82,7 @@ export class ApiSocket {
 						console.error('An error occured while executing a socket listener callback', ex);
 					}
 				}
-	
+
 				if (data.id) {
 					const response = this.inFlightCommands.find((c) => c.id === data.id);
 					response?.resolve(data);

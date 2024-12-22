@@ -6,6 +6,6 @@ export interface ISkill {
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
 	description: string;
-	cooldownMS: number;
+	cooldownMs: number;
 	iconPath: string;
-}
+};

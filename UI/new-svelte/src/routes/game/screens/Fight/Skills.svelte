@@ -58,7 +58,7 @@ const handleMouseLeave = (ev: MouseEvent, index: number) => {
 
 const skillPercent = (skill: Skill | undefined) => {
 	if (skill) {
-		return formatNum((100 * skill.renderChargeTime) / skill.cooldownMS);
+		return formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
 	} else {
 		return 0;
 	}

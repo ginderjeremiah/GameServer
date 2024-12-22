@@ -11,8 +11,10 @@
 		/>
 	{/each}
 	<td>
-		<div class="delete-button-container">
-			<Button text="X" onClick={onDelete} textPadding="minimal" />
+		<div class="center-content">
+			<div class="delete-button-container">
+				<Button text="Delete" onClick={onDelete} textPadding="minimal" />
+			</div>
 		</div>
 	</td>
 </tr>
@@ -21,6 +23,7 @@
 import type { ColumnData, EditorOptions, RowData } from './';
 import TableCell from './TableCell.svelte';
 import { Button, RowState } from '$components';
+import { untrack } from 'svelte';
 
 interface Props extends RowData<T> {
 	options: EditorOptions<T>;
@@ -36,8 +39,6 @@ let {
 	columns
 }: Props = $props();
 
-//const reactiveData = $derived(data);
-
 const onDelete = () => {
 	if (state === RowState.Added) {
 		state = RowState.AddedDeleted;
@@ -47,12 +48,8 @@ const onDelete = () => {
 };
 
 $effect(() => {
-	if (state !== RowState.Deleted && state !== RowState.Added && state !== RowState.AddedDeleted) {
-		let isModified = false;
-		for (const { key } of columns) {
-			isModified ||= data[key] !== originalData[key];
-		}
-
+	if (untrack(() => state === RowState.Modified || state === RowState.Unmodified)) {
+		let isModified = columns.some(({ key }) => data[key] !== originalData[key]);
 		state = isModified ? RowState.Modified : RowState.Unmodified;
 	}
 });
@@ -60,8 +57,7 @@ $effect(() => {
 
 <style lang="scss">
 .delete-button-container {
-	width: 1.5rem;
-	margin: 0 auto;
+	width: fit-content;
 }
 
 td {

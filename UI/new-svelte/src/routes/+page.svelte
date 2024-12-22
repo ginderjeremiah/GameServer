@@ -31,6 +31,7 @@ import { loadPlayerData } from '$stores';
 import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
 import { Button, TextInput } from '$components';
+import { onMount } from 'svelte';
 
 type ErrorType = 'login' | 'create-account';
 
@@ -39,6 +40,19 @@ let password = $state<string>();
 let errorReason = $state<string>();
 let errorType = $state<ErrorType>();
 let loginLoading = $state(false);
+
+onMount(async () => {
+	try {
+		loginLoading = false;
+		const response = await new ApiRequest('Login/Status').get();
+		if (response.status === 200) {
+			loadPlayerData(response.data);
+			routeTo('/loading');
+		}
+	} finally {
+		loginLoading = false;
+	}
+});
 
 const attemptLogin = async () => {
 	if (!username || !password) {

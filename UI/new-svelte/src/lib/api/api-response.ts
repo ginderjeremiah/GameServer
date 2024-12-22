@@ -1,8 +1,13 @@
-﻿import { ApiResponseType } from './api-type-map';
+﻿import { ApiResponseType } from './types/api-type-map';
+
+interface ApiResponseJson<T> {
+	data: T;
+	errorMessage?: string;
+}
 
 export class ApiResponse<T extends ApiResponseType> {
 	#r: XMLHttpRequest;
-	#responseJson?: { data: T; errorMessage: string };
+	#responseJson?: ApiResponseJson<T>;
 
 	constructor(r: XMLHttpRequest) {
 		this.#r = r;
@@ -13,10 +18,10 @@ export class ApiResponse<T extends ApiResponseType> {
 	}
 
 	public get data(): T {
-		if (this.responseJson?.data) {
-			return this.responseJson.data;
-		} else {
+		if (!this.responseJson.data && this.responseJson.errorMessage) {
 			throw new Error(this.error);
+		} else {
+			return this.responseJson.data;
 		}
 	}
 
@@ -36,9 +41,9 @@ export class ApiResponse<T extends ApiResponseType> {
 
 	private parseJson() {
 		if (this.#r.responseText) {
-			return JSON.parse(this.#r.responseText) as { data: T; errorMessage: string };
+			return JSON.parse(this.#r.responseText) as ApiResponseJson<T>;
 		} else {
-			return undefined;
+			return { data: undefined } as ApiResponseJson<T>;
 		}
 	}
 }

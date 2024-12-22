@@ -18,6 +18,7 @@
 
         public Task SaveChangesAsync();
         public void Insert<Entity>(Entity entity) where Entity : class;
+        public void InsertAll<Entity>(IEnumerable<Entity> entities) where Entity : class;
         public void Delete<Entity>(Entity entity) where Entity : class;
         public void Update<Entity>(Entity entity) where Entity : class;
     }

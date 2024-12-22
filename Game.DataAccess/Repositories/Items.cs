@@ -24,7 +24,8 @@ namespace Game.DataAccess.Repositories
                     .AsNoTracking()
                     .Include(i => i.ItemModSlots)
                     .Include(i => i.ItemAttributes)
-                    .Include(i => i.Tags)];
+                    .Include(i => i.Tags)
+                    .OrderBy(i => i.Id)];
             }
             return _allItems;
         }

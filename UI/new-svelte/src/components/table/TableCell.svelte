@@ -28,7 +28,7 @@ interface Props {
 
 let { data = $bindable(), disabled, selectOptions, noEditor }: Props = $props();
 
-const dataType = $derived(typeof data);
+const dataType = typeof data;
 
 const isString = (data: T | string): data is string => dataType === 'string';
 const isBool = (data: T | boolean): data is boolean => dataType === 'boolean';
@@ -38,7 +38,7 @@ const isNumber = (data: T | number): data is number => dataType === 'number';
 <style lang="scss">
 td {
 	text-align: center;
-	padding: 0.125em;
+	padding: 0.125em 0.25em;
 	border: var(--default-border);
 }
 </style>

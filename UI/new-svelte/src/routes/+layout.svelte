@@ -40,6 +40,8 @@ $effect(() => {
 		--default-border: 1px solid #{colors.$black};
 		--error-color: #{colors.$red};
 		--nav-bar-color: #{colors.$gray-blue};
+		--nav-bar-hover-color: #{colors.$gray-blue-light};
+		--nav-bar-active-color: #{colors.$gray-blue-dark};
 		--health-missing-color: #{colors.$red};
 		--health-remaining-color: #{colors.$green};
 		--health-disappearing-color: #{colors.$red-orange};

@@ -2,7 +2,6 @@
 {
     public partial class ZoneEnemy
     {
-        public int Id { get; set; }
         public int ZoneId { get; set; }
         public int EnemyId { get; set; }
         public int Weight { get; set; }

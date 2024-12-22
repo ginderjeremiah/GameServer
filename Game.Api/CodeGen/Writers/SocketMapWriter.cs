@@ -34,22 +34,22 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.AppendLine("export type ApiSocketResponseTypes = {");
             foreach (var command in orderedData)
             {
-                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ResponseDescriptor)}");
+                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ResponseDescriptor)};");
             }
 
-            strBuilder.AppendLine("}\n");
+            strBuilder.AppendLine("};\n");
 
             strBuilder.AppendLine("export type ApiSocketRequestTypes = {");
             foreach (var command in orderedData.Where(c => c.ParameterDescriptor is not null))
             {
-                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ParameterDescriptor)}");
+                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ParameterDescriptor)};");
             }
 
-            strBuilder.AppendLine("}\n");
-            strBuilder.AppendLine("export type ApiSocketCommand = keyof ApiSocketResponseTypes\n");
-            strBuilder.AppendLine("export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes\n");
-            strBuilder.AppendLine("export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>\n");
-            strBuilder.Append("export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]");
+            strBuilder.AppendLine("};\n");
+            strBuilder.AppendLine("export type ApiSocketCommand = keyof ApiSocketResponseTypes;\n");
+            strBuilder.AppendLine("export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes;\n");
+            strBuilder.AppendLine("export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>;\n");
+            strBuilder.Append("export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand];");
 
             Directory.CreateDirectory(TargetDir);
             File.WriteAllText(filePath, strBuilder.ToString());

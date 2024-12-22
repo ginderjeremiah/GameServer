@@ -8,4 +8,14 @@ export interface IZone {
 	levelMin: number;
 	levelMax: number;
 	zoneDrops: IItemDrop[];
-}
+};
+
+export interface IZoneEnemy {
+	enemyId: number;
+	weight: number;
+};
+
+export interface ISetZoneEnemiesData {
+	zoneId: number;
+	zoneEnemies: IZoneEnemy[];
+};

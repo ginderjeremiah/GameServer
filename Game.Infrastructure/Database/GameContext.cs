@@ -310,6 +310,9 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<ZoneDrop>()
                 .Property(zd => zd.DropRate)
                 .HasPrecision(9, 8);
+
+            modelBuilder.Entity<ZoneEnemy>()
+                .HasKey(ze => new { ze.ZoneId, ze.EnemyId });
         }
     }
 }

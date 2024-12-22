@@ -1,7 +1,9 @@
 ﻿using Game.Core.DataAccess;
+using Game.Core.Entities;
 using Game.Core.Infrastructure;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess
 {
@@ -40,6 +42,27 @@ namespace Game.DataAccess
 
         public Task SaveChangesAsync()
         {
+            foreach (var entry in _context.ChangeTracker.Entries())
+            {
+                var tempProps = entry.Properties.Where(p => p.IsTemporary);
+                if (entry.State is not EntityState.Added)
+                {
+                    var idProp = tempProps.FirstOrDefault(p => p.Metadata.IsPrimaryKey());
+                    if (idProp is not null && entry.Entity is IZeroBasedIdentityEntity zeroBasedIdentityEntity && zeroBasedIdentityEntity.Id == 0)
+                    {
+                        idProp.IsTemporary = false;
+                        idProp.CurrentValue = 0;
+                    }
+                }
+
+                var foreignKeyProps = tempProps.Where(p => p.Metadata.IsForeignKey() && p.Metadata.ClrType == typeof(int));
+                foreach (var foreignKeyProp in foreignKeyProps)
+                {
+                    foreignKeyProp.IsTemporary = false;
+                    foreignKeyProp.CurrentValue = 0;
+                }
+            }
+
             return _context.SaveChangesAsync();
         }
 
@@ -48,14 +71,35 @@ namespace Game.DataAccess
             _context.Add(entity);
         }
 
+        public void InsertAll<Entity>(IEnumerable<Entity> entities) where Entity : class
+        {
+            _context.AddRange(entities);
+        }
+
         public void Delete<Entity>(Entity entity) where Entity : class
         {
+            var entry = _context.Entry(entity);
+            if (entry.State is EntityState.Detached)
+            {
+                entry.State = EntityState.Unchanged;
+            }
+
             _context.Remove(entity);
         }
 
         public void Update<Entity>(Entity entity) where Entity : class
         {
-            var state = _context.Update(entity);
+            var entry = _context.Update(entity);
+            if (entry.State is not EntityState.Added)
+            {
+                var idProp = entry.Properties.FirstOrDefault(p => p.IsTemporary && p.Metadata.IsPrimaryKey());
+                if (idProp is not null)
+                {
+                    idProp.IsTemporary = false;
+                    idProp.CurrentValue = 0;
+                    entry.State = EntityState.Modified;
+                }
+            }
         }
     }
 }

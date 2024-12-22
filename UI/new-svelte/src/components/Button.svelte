@@ -26,6 +26,7 @@ let { text, loading = false, onClick, textPadding = 'comfortable' }: Props = $pr
 	margin: auto;
 	user-select: none;
 	padding: 0;
+	cursor: pointer;
 
 	&:active:not(:disabled) {
 		filter: brightness(0.8) !important;

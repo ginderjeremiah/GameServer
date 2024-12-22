@@ -1,19 +1,9 @@
-import type {
-	EItemCategory,
-	EItemModType,
-	IBattlerAttribute,
-	IChange
-} from "../"
+import type { EItemCategory, EItemModType, IBattlerAttribute } from "../"
 
-export interface IAddEditItemAttributesData {
+export interface IItemDrop {
 	itemId: number;
-	changes: IChange<IBattlerAttribute>[];
-}
-
-export interface IAddEditItemModAttributesData {
-	itemModId: number;
-	changes: IChange<IBattlerAttribute>[];
-}
+	dropRate: number;
+};
 
 export interface IItemMod {
 	id: number;
@@ -22,7 +12,7 @@ export interface IItemMod {
 	description: string;
 	itemModTypeId: number;
 	attributes: IBattlerAttribute[];
-}
+};
 
 export interface IItem {
 	id: number;
@@ -31,7 +21,7 @@ export interface IItem {
 	itemCategoryId: EItemCategory;
 	iconPath: string;
 	attributes: IBattlerAttribute[];
-}
+};
 
 export interface IItemModSlot {
 	id: number;
@@ -39,19 +29,14 @@ export interface IItemModSlot {
 	itemModSlotTypeId: EItemModType;
 	guaranteedItemModId?: number;
 	probability: number;
-}
-
-export interface IItemDrop {
-	itemId: number;
-	dropRate: number;
-}
+};
 
 export interface IItemCategory {
 	id: number;
 	name: string;
-}
+};
 
 export interface IItemModType {
 	id: number;
 	name: string;
-}
+};

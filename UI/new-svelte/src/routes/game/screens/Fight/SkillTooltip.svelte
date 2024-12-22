@@ -9,15 +9,12 @@
 					{staticData.attributes[mult.attributeId].name}: {formatNum(getMultiplier(mult))} ({mult.multiplier}x)
 				</li>
 			{/each}
-			<li>Total: {formatNum(totalDamage)}</li>
 			{#if opponent}
-				<li>Adjusted Total: {formatNum(adjustedTotal)}</li>
+				<li>Enemy Defense: {formatNum(enemyDefense)}</li>
 			{/if}
+			<li>Total: {formatNum(total)}</li>
 			<li>Cooldown: {formatNum(adjustedCd)}s</li>
-			<li>DPS: {formatNum(totalDamage / adjustedCd)}</li>
-			{#if opponent}
-				<li>Adjusted DPS: {formatNum(adjustedTotal / adjustedCd)}</li>
-			{/if}
+			<li>DPS: {formatNum(total / adjustedCd)}</li>
 		</ul>
 	</div>
 </div>
@@ -44,11 +41,10 @@ const opponent = $derived(skill?.owner ? getOpponent(skill.owner) : undefined);
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(skill?.damageMultipliers ?? []);
 const totalDamage = $derived(baseDamage + multipliers.reduce((a, b) => a + getMultiplier(b), 0));
-const adjustedTotal = $derived(
-	Math.max(totalDamage - (opponent?.attributes.getValue(EAttribute.Defense) ?? 0), 0)
-);
+const enemyDefense = $derived(opponent?.attributes.getValue(EAttribute.Defense) ?? 0);
+const total = $derived(Math.max(totalDamage - enemyDefense, 0));
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
-const adjustedCd = $derived((skill?.cooldownMS ?? 0) / 1000 / cdMultiplier);
+const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
 // prettier-ignore
 const remainingCd = $derived(
 	Math.abs(adjustedCd - (cdMultiplier + (skill?.renderChargeTime ?? 0)) / 1000 / cdMultiplier)

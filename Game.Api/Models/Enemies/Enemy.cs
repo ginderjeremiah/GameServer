@@ -7,7 +7,7 @@ namespace Game.Api.Models.Enemies
 {
     public class Enemy : IModelFromSource<Enemy, EnemyEntity>
     {
-        public int EnemyId { get; set; }
+        public int Id { get; set; }
         public string Name { get; set; }
         public IEnumerable<ItemDrop> Drops { get; set; }
         public IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
@@ -20,7 +20,7 @@ namespace Game.Api.Models.Enemies
                 Drops = entity.EnemyDrops.To().Model<ItemDrop>(),
                 AttributeDistribution = entity.AttributeDistributions.To().Model<AttributeDistribution>(),
                 Name = entity.Name,
-                EnemyId = entity.Id,
+                Id = entity.Id,
                 SkillPool = entity.EnemySkills.Select(s => s.SkillId),
             };
         }

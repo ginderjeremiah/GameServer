@@ -7,22 +7,22 @@ import type {
 } from "./"
 
 export type ApiSocketResponseTypes = {
-	'DefeatEnemy': IDefeatEnemyResponse
-	'NewEnemy': INewEnemyModel
-	'SocketReplaced': undefined
-	'UpdateInventorySlots': undefined
-}
+	'DefeatEnemy': IDefeatEnemyResponse;
+	'NewEnemy': INewEnemyModel;
+	'SocketReplaced': undefined;
+	'UpdateInventorySlots': undefined;
+};
 
 export type ApiSocketRequestTypes = {
-	'DefeatEnemy': IEnemyInstance
-	'NewEnemy': INewEnemyRequest
-	'UpdateInventorySlots': IInventoryUpdate[]
-}
+	'DefeatEnemy': IEnemyInstance;
+	'NewEnemy': INewEnemyRequest;
+	'UpdateInventorySlots': IInventoryUpdate[];
+};
 
-export type ApiSocketCommand = keyof ApiSocketResponseTypes
+export type ApiSocketCommand = keyof ApiSocketResponseTypes;
 
-export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes
+export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes;
 
-export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>
+export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>;
 
-export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand]
+export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand];

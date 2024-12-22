@@ -92,7 +92,7 @@ namespace Game.Api.CodeGen.Writers
                 builder.AppendLine($"\t{value.ToString()} = {(int)value},");
             }
 
-            builder.Append('}');
+            builder.Append("};");
         }
 
         private static void WriteInterfaceToBuilder(CodeGenTypeDescriptor descriptor, StringBuilder builder)
@@ -104,7 +104,7 @@ namespace Game.Api.CodeGen.Writers
                 builder.AppendLine($"\t{formatter.GetParameterText(prop, true)};");
             }
 
-            builder.Append('}');
+            builder.Append("};");
         }
 
         private static IEnumerable<CodeGenTypeDescriptor> GetAllUsedDescriptors(CodeGenTypeDescriptor type)
@@ -119,7 +119,7 @@ namespace Game.Api.CodeGen.Writers
 
         private static void OverwriteFileIfTextDiffers(string filePath, string text)
         {
-            if(!File.Exists(filePath) || File.ReadAllText(filePath) != text)
+            if (!File.Exists(filePath) || File.ReadAllText(filePath) != text)
             {
                 File.WriteAllText(filePath, text);
             }

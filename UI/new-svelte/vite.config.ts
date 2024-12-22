@@ -16,7 +16,7 @@ export default defineConfig({
 	server: {
 		proxy: {
 			'/api': 'http://localhost:5008',
-			'/EstablishSocket': {
+			'/socket': {
 				target: 'ws://localhost:5008',
 				ws: true
 			}

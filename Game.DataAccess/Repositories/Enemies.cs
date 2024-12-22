@@ -18,7 +18,7 @@ namespace Game.DataAccess.Repositories
         {
             if (_enemyList is null || refreshCache)
             {
-                _enemyList ??= [.. _context.Enemies
+                _enemyList = [.. _context.Enemies
                     .AsNoTracking()
                     .Include(e => e.AttributeDistributions)
                     .Include(e => e.EnemyDrops)

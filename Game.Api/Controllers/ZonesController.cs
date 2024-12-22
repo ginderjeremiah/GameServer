@@ -17,10 +17,17 @@ namespace Game.Api.Controllers
         }
 
         [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<Zone> Zones()
+        public ApiEnumerableResponse<Zone> Zones(bool refreshCache = false)
         {
-            var zones = _repositoryManager.Zones.All().To().Model<Zone>();
+            var zones = _repositoryManager.Zones.All(refreshCache).To().Model<Zone>();
             return ApiResponse.Success(zones);
+        }
+
+        [HttpGet]
+        public ApiAsyncEnumerableResponse<ZoneEnemy> ZoneEnemies(int zoneId)
+        {
+            var zoneEnemies = _repositoryManager.Zones.ZoneEnemies(zoneId).To().Model<ZoneEnemy>();
+            return ApiResponse.Success(zoneEnemies);
         }
     }
 }

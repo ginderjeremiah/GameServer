@@ -1,6 +1,6 @@
 ﻿namespace Game.Core.Entities
 {
-    public partial class Enemy
+    public partial class Enemy : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public string Name { get; set; }

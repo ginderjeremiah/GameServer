@@ -2,7 +2,7 @@
 
 namespace Game.Core.Entities
 {
-    public partial class ItemMod
+    public partial class ItemMod : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public string Name { get; set; }
