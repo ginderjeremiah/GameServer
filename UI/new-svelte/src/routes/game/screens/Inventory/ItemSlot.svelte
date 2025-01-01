@@ -26,7 +26,7 @@
 
 <script lang="ts">
 import type { Action } from '$lib/common';
-import { inventory, swapSlots, type InventorySlot } from '$stores';
+import { inventoryManager, type InventorySlot } from '$lib/engine';
 
 type Props = {
 	hideBottomBorder?: boolean;
@@ -85,28 +85,28 @@ const slotClass = $derived.by(() => {
 
 const handleDragStart = (ev: DragEvent) => {
 	beingDragged = true;
-	inventory.draggedSlot = slot;
+	inventoryManager.draggedSlot = slot;
 	onDragStart?.(ev, slot);
 };
 
 const handleDrop = (ev: DragEvent) => {
 	ev.preventDefault();
 	draggedOver = false;
-	if (inventory.draggedSlot) {
-		swapSlots(inventory.draggedSlot, slot);
+	if (inventoryManager.draggedSlot) {
+		inventoryManager.swapSlots(inventoryManager.draggedSlot, slot);
 	}
 	onDrop?.(ev, slot);
 };
 
 const handleDragEnd = (ev: DragEvent) => {
-	if (inventory.draggedSlot === slot) {
-		inventory.draggedSlot = undefined;
+	if (inventoryManager.draggedSlot === slot) {
+		inventoryManager.draggedSlot = undefined;
 	}
 	beingDragged = false;
 };
 
 const handleDragOver = (ev: DragEvent) => {
-	if (inventory.draggedSlot && slot.canHold(inventory.draggedSlot.item)) {
+	if (inventoryManager.draggedSlot && slot.canHold(inventoryManager.draggedSlot.item)) {
 		ev.preventDefault();
 		draggedOver = !beingDragged;
 	}

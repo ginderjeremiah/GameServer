@@ -13,6 +13,8 @@ namespace Game.Api.Sockets.Commands
         private Session Session { get; }
         private ILogger<DefeatEnemy> Logger { get; }
 
+        public override string Name { get; set; } = nameof(DefeatEnemy);
+
         public DefeatEnemy(ILogger<DefeatEnemy> logger, SessionService sessionService)
         {
             Session = sessionService.GetSession();

@@ -64,19 +64,14 @@
 
 <script lang="ts">
 import ItemSlot from './ItemSlot.svelte';
-import {
-	registerTooltipComponent,
-	EEquipmentSlot,
-	inventory,
-	type TooltipComponent,
-	type InventorySlot
-} from '$stores';
+import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import ItemTooltip from './ItemTooltip.svelte';
+import { EEquipmentSlot, inventoryManager, type InventorySlot } from '$lib/engine';
 
 let tooltip = $state<TooltipComponent>();
 let tooltipSlot = $state<InventorySlot>();
 
-const equippedItems = $derived(inventory.equippedSlots);
+const equippedItems = $derived(inventoryManager.equippedSlots);
 const helmSlot = $derived(equippedItems[EEquipmentSlot.HelmSlot]);
 const chestSlot = $derived(equippedItems[EEquipmentSlot.ChestSlot]);
 const legSlot = $derived(equippedItems[EEquipmentSlot.LegSlot]);

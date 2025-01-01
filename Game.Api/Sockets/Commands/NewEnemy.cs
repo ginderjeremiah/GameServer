@@ -16,6 +16,8 @@ namespace Game.Api.Sockets.Commands
         private ILogger<NewEnemy> Logger { get; }
         private IRepositoryManager Repositories { get; }
 
+        public override string Name { get; set; } = nameof(NewEnemy);
+
         public NewEnemy(IRepositoryManager repos, ILogger<NewEnemy> logger, SessionService sessionService)
         {
             Session = sessionService.GetSession();

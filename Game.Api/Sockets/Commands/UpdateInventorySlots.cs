@@ -9,6 +9,8 @@ namespace Game.Api.Sockets.Commands
     {
         private Session Session { get; }
 
+        public override string Name { get; set; } = nameof(UpdateInventorySlots);
+
         public UpdateInventorySlots(SessionService sessionService)
         {
             Session = sessionService.GetSession();

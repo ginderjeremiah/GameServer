@@ -43,5 +43,8 @@ export const staticData = {
 	},
 	set attributes(value) {
 		attributes = value;
+	},
+	get loaded() {
+		return zones && enemies && items && skills && itemMods && attributes;
 	}
 };

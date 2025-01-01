@@ -4,10 +4,10 @@
 </div>
 
 <script lang="ts">
-import { player } from '$stores';
 import { page } from '$app/stores';
 import { routeTo } from '$lib/common';
 import { TooltipBase } from '$components';
+import { playerManager } from '$lib/engine';
 import '$styles/common.scss';
 
 let { children } = $props();
@@ -15,7 +15,7 @@ let { children } = $props();
 let colorScheme = $state('default');
 
 $effect(() => {
-	if (!player.data && $page.url.pathname !== '/') {
+	if (!playerManager.name && $page.url.pathname !== '/') {
 		routeTo('/');
 	}
 });

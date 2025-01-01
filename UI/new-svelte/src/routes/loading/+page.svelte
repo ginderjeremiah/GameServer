@@ -16,7 +16,7 @@
 <script lang="ts">
 import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
-import { initializeInventoryItems, staticData } from '$stores';
+import { staticData } from '$stores';
 import { Button } from '$components';
 import LoadingSection from './LoadingSection.svelte';
 import { onMount } from 'svelte';
@@ -39,7 +39,6 @@ const anyLoading = $derived(
 
 const tryStartGame = () => {
 	if (!anyLoading) {
-		initializeInventoryItems();
 		routeTo('/game');
 	}
 };

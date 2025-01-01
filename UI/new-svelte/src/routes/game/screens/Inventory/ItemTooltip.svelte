@@ -25,7 +25,7 @@
 </div>
 
 <script lang="ts">
-import { type InventorySlot } from '$stores';
+import { type InventorySlot } from '$lib/engine';
 
 export const getBaseNode = () => container;
 

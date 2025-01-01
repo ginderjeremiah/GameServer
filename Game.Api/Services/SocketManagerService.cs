@@ -25,13 +25,12 @@ namespace Game.Api.Services
 
         public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionPlayer player)
         {
-            var socketContext = new SocketContext(socket, player.Id);
+            var socketContext = new SocketContext(socket, player.Id, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _loggerFactory.CreateLogger<SocketHandler>());
             var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(player.Id), socketContext.SocketId);
             if (oldSocketId is not null)
             {
-                var command = new SocketReplacedInfo(oldSocketId);
-                await EmitSocketCommand(command, oldSocketId);
+                await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
             }
 
             await RegisterSocketCommandListener(socketHandler);
@@ -60,7 +59,7 @@ namespace Game.Api.Services
             }
             else
             {
-                _logger.LogWarning($"Attempted to emit command: {commandInfo} to player with no active socket: {playerId}");
+                _logger.LogWarning("Attempted to emit command: {CommandInfo} to player with no active socket: {PlayerId}", commandInfo, playerId);
             }
         }
 

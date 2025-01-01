@@ -1,5 +1,5 @@
 import { ELogSetting } from '$lib/api';
-import { player } from '$stores';
+import { playerManager } from './engine';
 import { logs } from '$stores';
 
 export interface LogMessage {
@@ -8,10 +8,10 @@ export interface LogMessage {
 	message: string;
 }
 
-let id = 0;
+let id = (logs()?.[0]?.id ?? -1) + 1;
 
 export const logMessage = (logType: ELogSetting, message: string) => {
-	if (player.data.logPreferences.find((pref) => pref.id === logType)?.enabled ?? true) {
+	if (playerManager.logPreferences.find((pref) => pref.id === logType)?.enabled ?? true) {
 		if (logs().length >= 40) {
 			logs().pop();
 		}

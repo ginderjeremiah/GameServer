@@ -1,5 +1,5 @@
 <div class="skills-container round-border" role="grid">
-	{#each skills as skill, index}
+	{#each battler.skills as skill, index}
 		<div
 			class="skill-slot"
 			style={`--skill-perc: ${skillPercent(skill)}%`}
@@ -24,7 +24,7 @@ import { registerTooltipComponent, type TooltipComponent } from '$stores/tooltip
 import SkillTooltip from './SkillTooltip.svelte';
 
 type Props = {
-	battler: Battler | undefined;
+	battler: Battler;
 };
 
 const { battler }: Props = $props();
@@ -32,8 +32,7 @@ const { battler }: Props = $props();
 let tooltip = $state<TooltipComponent>();
 let tooltipSkillIndex = $state(-1);
 
-const skills = $derived(battler?.skills ?? (Array(4).fill(undefined) as (Skill | undefined)[]));
-const tooltipSkill = $derived(skills[tooltipSkillIndex]);
+const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -43,7 +42,7 @@ const handleMouseMove = (ev: MouseEvent) => {
 
 const handleMouseEnter = (ev: MouseEvent, index: number) => {
 	tooltipSkillIndex = index;
-	if (skills[index]) {
+	if (battler.skills[index]) {
 		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
 		showTooltip();
 	}

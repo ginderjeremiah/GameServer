@@ -17,12 +17,12 @@
 		</div>
 		<div class="inventory-bottom">
 			<ItemSlot
-				slot={inventory.trashSlot}
+				slot={inventoryManager.trashSlot}
 				undraggable
 				onDrop={hideTooltip}
 				onMouseMove={handleMouseMove}
-				onMouseEnter={(ev) => handleMouseEnter(ev, inventory.trashSlot)}
-				onMouseLeave={(ev) => handleMouseLeave(ev, inventory.trashSlot)}
+				onMouseEnter={(ev) => handleMouseEnter(ev, inventoryManager.trashSlot)}
+				onMouseLeave={(ev) => handleMouseLeave(ev, inventoryManager.trashSlot)}
 			/>
 		</div>
 	</div>
@@ -30,20 +30,15 @@
 </div>
 
 <script lang="ts">
-import {
-	inventory,
-	registerTooltipComponent,
-	type TooltipComponent,
-	type InventorySlot,
-	swapSlots
-} from '$stores';
+import { inventoryManager, type InventorySlot } from '$lib/engine';
+import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import ItemSlot from './ItemSlot.svelte';
 import ItemTooltip from './ItemTooltip.svelte';
 
 let tooltip = $state<TooltipComponent>();
 let tooltipSlot = $state<InventorySlot>();
 
-const inventoryItems = $derived(inventory.slots);
+const inventoryItems = $derived(inventoryManager.slots);
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -77,15 +72,15 @@ const handleClick = (ev: MouseEvent, slot: InventorySlot) => {
 
 const equipItemInSlot = (slot: InventorySlot) => {
 	if (slot.item) {
-		const newSlot = inventory.equippedSlots.find((s) => s.canHold(slot.item));
+		const newSlot = inventoryManager.equippedSlots.find((s) => s.canHold(slot.item));
 		if (newSlot) {
-			swapSlots(slot, newSlot);
+			inventoryManager.swapSlots(slot, newSlot);
 		}
 	}
 };
 
 const deleteItemInSlot = (slot: InventorySlot) => {
-	swapSlots(slot, inventory.trashSlot);
+	inventoryManager.swapSlots(slot, inventoryManager.trashSlot);
 	hideTooltip();
 };
 </script>

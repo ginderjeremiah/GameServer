@@ -1,7 +1,7 @@
 <div class="battler-card round-border">
 	<div class="battler-info">
-		<span>{battler?.name ?? ''}</span>
-		<span>{`Level: ${battler?.level ?? 1}`}</span>
+		<span>{battler.name}</span>
+		<span>{`Level: ${battler.level}`}</span>
 	</div>
 	<div class="health-display">
 		<label for={healthId}>Health: </label>
@@ -21,16 +21,15 @@ import { formatNum } from '$lib/common';
 import Skills from './Skills.svelte';
 
 type Props = {
-	battler: Battler | undefined;
+	battler: Battler;
 };
 
 const { battler }: Props = $props();
 
-const currentHealth = $derived(battler?.currentHealth ?? 0);
-const maxHealth = $derived(battler?.attributes.getValue(EAttribute.MaxHealth));
-const healthText = $derived(`${formatNum(currentHealth)}/${maxHealth ?? 0}`);
+const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
+const healthText = $derived(`${formatNum(battler.currentHealth)}/${maxHealth}`);
 const healthPerc = $derived(
-	maxHealth ? formatNum(Math.max((currentHealth * 100) / maxHealth, 0)) : 100
+	maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100
 );
 const healthId = crypto.randomUUID();
 </script>

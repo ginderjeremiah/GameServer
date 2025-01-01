@@ -1,5 +1,4 @@
 ﻿using Game.Api.Models.Common;
-using Game.Api.Sockets;
 using Game.Core;
 
 namespace Game.Api.Sockets.Commands
@@ -7,6 +6,7 @@ namespace Game.Api.Sockets.Commands
     public abstract class AbstractSocketCommand
     {
         public string? Id { get; set; }
+        public abstract string Name { get; set; }
 
         public virtual Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
         {
@@ -23,22 +23,22 @@ namespace Game.Api.Sockets.Commands
 
         public ApiSocketResponse Success()
         {
-            return new ApiSocketResponse { Id = Id };
+            return new ApiSocketResponse { Id = Id, Name = Name };
         }
 
         public ApiSocketResponse<T> Success<T>(T data)
         {
-            return new ApiSocketResponse<T> { Id = Id, Data = data };
+            return new ApiSocketResponse<T> { Id = Id, Name = Name, Data = data };
         }
 
         public ApiSocketResponse Error(string errorMessage)
         {
-            return new ApiSocketResponse { Id = Id, Error = errorMessage };
+            return new ApiSocketResponse { Id = Id, Name = Name, Error = errorMessage };
         }
 
         public ApiSocketResponse<T> ErrorWithData<T>(string errorMessage, T data)
         {
-            return new ApiSocketResponse<T> { Id = Id, Error = errorMessage, Data = data };
+            return new ApiSocketResponse<T> { Id = Id, Name = Name, Error = errorMessage, Data = data };
         }
     }
 
@@ -88,11 +88,14 @@ namespace Game.Api.Sockets.Commands
 
     public class SocketCommandInfo
     {
-        public string Id { get; set; }
+        public string? Id { get; set; }
         public string Name { get; set; }
         public string? Parameters { get; set; }
 
-        public SocketCommandInfo() { }
+        public SocketCommandInfo(string name)
+        {
+            Name = name;
+        }
 
         public override string ToString()
         {

@@ -23,7 +23,7 @@
 import { EAttribute, type IAttributeMultiplier } from '$lib/api';
 import { type Skill } from '$lib/battle';
 import { formatNum } from '$lib/common';
-import { getOpponent } from '$lib/engine';
+import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 
 export const getBaseNode = () => container;
@@ -36,7 +36,7 @@ const { skill }: Props = $props();
 
 let container: HTMLDivElement;
 
-const opponent = $derived(skill?.owner ? getOpponent(skill.owner) : undefined);
+const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) : undefined);
 
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(skill?.damageMultipliers ?? []);
@@ -49,6 +49,12 @@ const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
 const remainingCd = $derived(
 	Math.abs(adjustedCd - (cdMultiplier + (skill?.renderChargeTime ?? 0)) / 1000 / cdMultiplier)
 );
+
+window.setInterval(() => {
+	if (skill) {
+		console.log($state.snapshot(skill.chargeTime), $state.snapshot(skill.renderChargeTime));
+	}
+}, 500);
 
 const getMultiplier = (mult: IAttributeMultiplier) => {
 	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;

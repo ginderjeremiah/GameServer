@@ -3,6 +3,7 @@
     public class ApiSocketResponse
     {
         public string? Id { get; set; }
+        public string? Name { get; set; }
         public string? Error { get; set; }
     }
 

@@ -22,21 +22,22 @@
 </div>
 
 <script lang="ts">
-import { staticData, player } from '$stores';
+import { staticData } from '$stores';
+import { playerManager } from '$lib/engine';
 
 const orderedZones = $derived(staticData.zones?.slice().sort((a, b) => a.order - b.order));
 const current = $derived(
-	orderedZones?.find((z) => z.id === player.data.currentZone) ?? orderedZones[0]
+	orderedZones?.find((z) => z.id === playerManager.currentZone) ?? orderedZones?.[0]
 );
-const zoneNum = $derived(orderedZones.indexOf(current) + 1);
+const zoneNum = $derived((orderedZones?.indexOf(current) ?? -1) + 1);
 const leftDisabled = $derived(zoneNum === 1);
-const rightDisabled = $derived(zoneNum === orderedZones.length);
+const rightDisabled = $derived(zoneNum === orderedZones?.length);
 
 const changeZone = (amount: number) => {
 	const newZone = zoneNum + amount;
 	if (newZone >= 1 && newZone <= orderedZones.length) {
 		const zoneData = orderedZones[newZone - 1];
-		player.data.currentZone = zoneData.id;
+		playerManager.currentZone = zoneData.id;
 		return true;
 	}
 	return false;

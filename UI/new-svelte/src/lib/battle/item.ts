@@ -1,6 +1,6 @@
 ﻿import { IItem, IInventoryItem } from '$lib/api';
 import { ItemMod, newItemMod } from './item-mod';
-import { BattleAttributes, newBattleAttributes } from './battle-attributes';
+import { BattleAttributes } from './battle-attributes';
 import { staticData } from '$stores';
 
 export interface Item extends Omit<IInventoryItem, 'itemMods'>, IItem {
@@ -12,7 +12,7 @@ export const newItem = (invItem: IInventoryItem): Item => {
 	const itemData = staticData.items[invItem.itemId];
 	const itemMods = invItem.itemMods.map((invMod) => newItemMod(invMod));
 	const allAttributes = [...itemData.attributes, ...itemMods.flatMap((mod) => mod.attributes)];
-	const totalAttributes = newBattleAttributes(allAttributes, false);
+	const totalAttributes = new BattleAttributes(allAttributes, false);
 	return {
 		...itemData,
 		...invItem,
@@ -28,7 +28,7 @@ export const getTrashItem = (): Item => {
 		itemMods: [],
 		id: -1,
 		itemId: 0,
-		totalAttributes: newBattleAttributes([], false),
+		totalAttributes: new BattleAttributes(),
 		rating: 0,
 		equipped: false,
 		inventorySlotNumber: -1

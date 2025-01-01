@@ -6,14 +6,14 @@
 	</div>
 	{#if showTickCounter}
 		<div>
-			<span class="tick-counter">{logicalState.tickRate}</span>
-			<span class="tick-counter">{renderState.tickRate}</span>
+			<span class="tick-counter">{logicEngine.tickRate}</span>
+			<span class="tick-counter">{renderEngine.tickRate}</span>
 		</div>
 	{/if}
 </div>
 
 <script lang="ts">
-import { logicalState, renderState } from '$lib/engine';
+import { logicEngine, renderEngine } from '$lib/engine';
 import type { INavMenuItem } from './types';
 import NavMenuItem from './NavMenuItem.svelte';
 

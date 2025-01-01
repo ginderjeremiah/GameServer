@@ -27,11 +27,11 @@
 </div>
 
 <script lang="ts">
-import { loadPlayerData } from '$stores';
 import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
 import { Button, TextInput } from '$components';
 import { onMount } from 'svelte';
+import { playerManager } from '$lib/engine';
 
 type ErrorType = 'login' | 'create-account';
 
@@ -46,7 +46,7 @@ onMount(async () => {
 		loginLoading = false;
 		const response = await new ApiRequest('Login/Status').get();
 		if (response.status === 200) {
-			loadPlayerData(response.data);
+			playerManager.initialize(response.data);
 			routeTo('/loading');
 		}
 	} finally {
@@ -63,7 +63,7 @@ const attemptLogin = async () => {
 	const response = await new ApiRequest('Login').post({ username, password });
 	loginLoading = false;
 	if (response.status === 200) {
-		loadPlayerData(response.data);
+		playerManager.initialize(response.data);
 		routeTo('/loading');
 	} else {
 		errorType = 'login';
