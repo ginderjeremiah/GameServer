@@ -23,7 +23,7 @@ export const statify = <T extends {}>(state: T) => {
 			if (isClass(dataType, data)) {
 				data = statify(data);
 				statifyType = StatifyType.Class;
-			} else if (isArray(data)) {
+			} else if (Array.isArray(data)) {
 				data = statifyArray(data);
 				statifyType = StatifyType.Array;
 			}
@@ -53,12 +53,8 @@ const isClass = (dataType: string, data: any): data is {} => {
 		dataType === 'object' &&
 		data?.constructor?.name !== undefined &&
 		data.constructor.name !== 'Object' &&
-		data.constructor.name !== 'Array'
+		!Array.isArray(data)
 	);
-};
-
-const isArray = (data: any): data is any[] => {
-	return data?.constructor?.name === 'Array';
 };
 
 const statifyArray = (data: any) => {

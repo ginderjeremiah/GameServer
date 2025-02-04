@@ -12,7 +12,7 @@ namespace Game.Api.Models.Enemies
 
         public EnemyInstance() { }
 
-        public EnemyInstance(Core.BattleSimulation.EnemyInstance enemyInstance)
+        public EnemyInstance(Core.Battle.EnemyInstance enemyInstance)
         {
             Id = enemyInstance.Id;
             Level = enemyInstance.Level;

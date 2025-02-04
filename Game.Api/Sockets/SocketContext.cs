@@ -13,14 +13,15 @@ namespace Game.Api.Sockets
 
         private readonly TaskCompletionSource<ESocketCloseReason> _socketClosedSource = new();
         private readonly ILogger<SocketContext> _logger;
+        private readonly WebSocket _socket;
 
-        public WebSocket Socket { get; }
         public string SocketId { get; }
         public int PlayerId { get; }
+        public WebSocketState State => _socket.State;
 
         public SocketContext(WebSocket socket, int playerId, ILogger<SocketContext> logger)
         {
-            Socket = socket;
+            _socket = socket;
             SocketId = Guid.NewGuid().ToString();
             PlayerId = playerId;
             _logger = logger;
@@ -28,7 +29,7 @@ namespace Game.Api.Sockets
 
         public async Task<bool> SendData(string data)
         {
-            if (Socket.State is not Open)
+            if (_socket.State is not Open)
             {
                 return false;
             }
@@ -41,11 +42,11 @@ namespace Game.Api.Sockets
                 {
                     if (dataBytes.Length - i <= MAX_MESSAGE_SIZE)
                     {
-                        await Socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
+                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
                     else
                     {
-                        await Socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
+                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
                     }
                 }
             }
@@ -67,12 +68,20 @@ namespace Game.Api.Sockets
         {
             var message = new StringBuilder();
             WebSocketReceiveResult result;
+            var buffersRead = 0;
             do
             {
-                result = await Socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
+                result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
                 message.Append(ReadBuffer());
+                buffersRead++;
             }
-            while (!result.EndOfMessage);
+            while (!result.EndOfMessage && buffersRead < 1024);
+
+            if (buffersRead >= 1024)
+            {
+                await Close(ESocketCloseReason.MessageTooBig);
+                throw new Exception("Socket message exceeded maximum allowed size.");
+            }
 
             return message.ToString();
         }
@@ -85,9 +94,9 @@ namespace Game.Api.Sockets
         public async Task Close(ESocketCloseReason closeReason = ESocketCloseReason.Finished)
         {
             _socketClosedSource.TrySetResult(closeReason);
-            if (Socket.State is WebSocketState.Open)
+            if (_socket.State is WebSocketState.Open)
             {
-                await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
             }
         }
 

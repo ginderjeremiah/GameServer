@@ -2,12 +2,12 @@
 {
     internal class Constants
     {
-        //Cache Keys
+        // Cache Keys
         internal const string CACHE_SESSION_PREFIX = "Session";
-        internal const string CACHE_ACTIVE_ENEMY_PREFIX = "ActiveEnemy";
+        internal const string CACHE_BATTLE_DATA_PREFIX = "BattleData";
         internal const string CACHE_PLAYER_PREFIX = "Player";
 
-        //Pub/Sub Channels/Queues
+        // Pub/Sub Channels/Queues
         internal const string PUBSUB_PLAYER_CHANNEL = "player";
         internal const string PUBSUB_PLAYER_QUEUE = "PlayerUpdateQueue";
         internal const string PUBSUB_SKILLS_CHANNEL = "skills";

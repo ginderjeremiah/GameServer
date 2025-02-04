@@ -1,6 +1,6 @@
-﻿using Game.Core.DataAccess;
-using Game.Core.Entities;
-using Game.Core.Infrastructure;
+﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
+using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,24 +22,13 @@ namespace Game.DataAccess.Repositories
             _synchronizer = synchronizer;
         }
 
-        public async Task<Player?> GetPlayer(string userName)
-        {
-            var player = await PlayersWithRelatedData().FirstOrDefaultAsync(p => p.UserName == userName);
-            if (player is not null)
-            {
-                _cache.SetAndForget($"{PlayerPrefix}_{player.Id}", player);
-            }
-
-            return player;
-        }
-
         public async Task<Player?> GetPlayer(int playerId)
         {
             var playerKey = $"{PlayerPrefix}_{playerId}";
             var player = await _cache.GetAsync<Player>(playerKey);
             if (player is null)
             {
-                player = await PlayersWithRelatedData().FirstOrDefaultAsync(p => p.Id == playerId);
+                var playerEntity = await GetPlayerFromDb(playerId);
                 if (player is not null)
                 {
                     _cache.SetAndForget(playerKey, player);
@@ -67,20 +56,55 @@ namespace Game.DataAccess.Repositories
             }
         }
 
-        public async Task<bool> CheckIfUsernameExists(string username)
+        private async Task<Player?> GetPlayerFromDb(int playerId)
         {
-            return await _context.Players.AnyAsync(p => p.UserName == username);
-        }
-
-        private IQueryable<Player> PlayersWithRelatedData()
-        {
-            return _context.Players
-                .AsNoTracking()
-                .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.InventoryItemMods)
+            var player = _context.Players
                 .Include(p => p.PlayerAttributes)
+                .Include(p => p.LogPreferences)
                 .Include(p => p.PlayerSkills)
-                .Include(p => p.LogPreferences);
-        }
+                .Include(p => p.InventoryItems)
+                .AsSplitQuery()
+                .FirstOrDefault(p => p.Id == playerId);
+
+            return new Player
+            {
+                Id = player.Id,
+                Name = player.Name,
+                UserName = player.UserName,
+                Level = player.Level,
+                Exp = player.Exp,
+                Salt = player.Salt,
+                PassHash = player.PassHash,
+                StatPointsGained = player.StatPointsGained,
+                StatPointsUsed = player.StatPointsUsed,
+                PlayerAttributes = player.PlayerAttributes.Select(pa => new Core.Players.PlayerAttribute
+                {
+                    Id = pa.Id,
+                    PlayerId = pa.PlayerId,
+                    AttributeId = pa.AttributeId,
+                    Amount = pa.Amount
+                }).ToList(),
+                LogPreferences = player.LogPreferences.Select(lp => new Core.Players.LogPreference
+                {
+                    Id = lp.Id,
+                    PlayerId = lp.PlayerId,
+                    LogSettingId = lp.LogSettingId,
+                    Enabled = lp.Enabled
+                }).ToList(),
+                PlayerSkills = player.PlayerSkills.Select(ps => new Core.Players.PlayerSkill
+                {
+                    Id = ps.Id,
+                    PlayerId = ps.PlayerId,
+                    SkillId = ps.SkillId,
+                    Selected = ps.Selected
+                }).ToList(),
+                InventoryItems = player.InventoryItems.Select(i => new Core.Items.InventoryItem
+                {
+                    Id = i.Id,
+                    PlayerId = i.PlayerId,
+                    ItemId = i.ItemId,
+                    Amount = i.Amount
+                }).ToList()
+            }
     }
-}
+    }

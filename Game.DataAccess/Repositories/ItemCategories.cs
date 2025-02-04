@@ -1,5 +1,5 @@
-﻿using Game.Core.DataAccess;
-using Game.Core.Entities;
+﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.Entities;
 using Game.Infrastructure.Database;
 
 namespace Game.DataAccess.Repositories

@@ -3,9 +3,17 @@ using Game.Core;
 
 namespace Game.Api.CodeGen
 {
-    internal class CodeGenTypeFormatter
+    internal static class CodeGenTypeFormatter
     {
-        public string? GetImportText(CodeGenTypeDescriptor descriptor)
+        public static string GetImportText(IEnumerable<CodeGenTypeDescriptor> typeDescriptors, string importPath = "./")
+        {
+            var typeStrings = typeDescriptors.SelectNotNull(GetImportText).Distinct().OrderBy(t => t);
+            return typeStrings.Count() > 3
+                ? $"import type {{\n\t{string.Join(",\n\t", typeStrings)}\n}} from \"{importPath}\"\n"
+                : $"import type {{ {string.Join(", ", typeStrings)} }} from \"{importPath}\"\n";
+        }
+
+        public static string? GetImportText(CodeGenTypeDescriptor descriptor)
         {
             if (descriptor.UnderlyingType.IsEnumerable())
             {
@@ -23,7 +31,7 @@ namespace Game.Api.CodeGen
             return null;
         }
 
-        public string GetTypeText(CodeGenTypeDescriptor? descriptor)
+        public static string GetTypeText(CodeGenTypeDescriptor? descriptor)
         {
             if (descriptor is null)
             {
@@ -62,7 +70,7 @@ namespace Game.Api.CodeGen
             else if (type == typeof(string))
             {
                 return "string";
-            }
+            } 
             else if (type.IsEnum)
             {
                 return type.Name;
@@ -79,7 +87,7 @@ namespace Game.Api.CodeGen
             }
         }
 
-        public string GetParametersTypeText(EndpointMetadata endpoint)
+        public static string GetParametersTypeText(EndpointMetadata endpoint)
         {
             if (endpoint.ParameterDescriptors.Count == 0)
             {
@@ -97,14 +105,14 @@ namespace Game.Api.CodeGen
             }
         }
 
-        public string GetParameterText(CodeGenTypeDescriptor descriptor, bool useGenericParameters = false)
+        public static string GetParameterText(CodeGenTypeDescriptor descriptor, bool useGenericParameters = false)
         {
             useGenericParameters &= descriptor.GenericParameterPosition >= 0;
             var parameterName = useGenericParameters ? ((char)('T' + descriptor.GenericParameterPosition)).ToString() : GetTypeText(descriptor);
             return $"{descriptor.Name?.Decapitalize()}{(descriptor.HasDefault || descriptor.IsNullable ? "?" : "")}: {parameterName}";
         }
 
-        public string GetInterfaceName(CodeGenTypeDescriptor descriptor, bool useGenericParameters = false)
+        public static string GetInterfaceName(CodeGenTypeDescriptor descriptor, bool useGenericParameters = false)
         {
             if (descriptor.GenericArgumentDescriptors.Count > 0)
             {

@@ -1,6 +1,7 @@
-﻿using Game.Core.Entities;
-using Game.Core.Infrastructure;
+﻿using Game.Abstractions.Entities;
+using Game.Abstractions.Infrastructure;
 using Game.Infrastructure.Database;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

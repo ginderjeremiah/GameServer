@@ -1,9 +1,8 @@
-﻿using Game.Api.Models.Common;
+﻿using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Core;
-using Game.Core.DataAccess;
-using Game.Core.Entities;
 using Game.Core.Sessions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,13 +15,15 @@ namespace Game.Api.Controllers
     {
         private readonly IRepositoryManager _repositoryManager;
         private readonly SessionService _sessionService;
+        private readonly CookieService _cookieService;
 
         private Session Session => _sessionService.GetSession();
 
-        public LoginController(IRepositoryManager repositoryManager, SessionService sessionService)
+        public LoginController(IRepositoryManager repositoryManager, SessionService sessionService, CookieService cookieService)
         {
             _repositoryManager = repositoryManager;
             _sessionService = sessionService;
+            _cookieService = cookieService;
         }
 
         [AllowAnonymous]
@@ -34,8 +35,8 @@ namespace Game.Api.Controllers
                 return ApiResponse.Success(Session.GetPlayerData());
             }
 
-            var player = await _repositoryManager.Players.GetPlayer(creds.Username);
-            if (player is null)
+            var user = await _repositoryManager.Users.GetUser(creds.Username);
+            if (user is null)
             {
                 return ApiResponse.Error("Username not found");
             }
@@ -47,6 +48,7 @@ namespace Game.Api.Controllers
             }
 
             _sessionService.CreateSession(player);
+            _cookieService.SetTokenCookie(CreateSessionToken());
 
             return ApiResponse.Success(Session.GetPlayerData());
         }
@@ -55,7 +57,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {
-            var usernameTaken = await _repositoryManager.Players.CheckIfUsernameExists(creds.Username);
+            var usernameTaken = await _repositoryManager.Users.CheckIfUsernameExists(creds.Username);
             if (usernameTaken)
             {
                 return ApiResponse.Error("There is already an account with this username.");
@@ -89,12 +91,12 @@ namespace Game.Api.Controllers
                 Amount = 5m
             }).ToList();
             player.LogPreferences = [
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Damage, Enabled = false, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Debug, Enabled = false, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Exp, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.LevelUp, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.Inventory, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogSetting.EnemyDefeated, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Damage, Enabled = false, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Debug, Enabled = false, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Exp, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Inventory, Enabled = true, },
+                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
             ];
 
             _repositoryManager.Update(player);

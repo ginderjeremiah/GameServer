@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using static Game.Core.Infrastructure.DatabaseSystem;
+using static Game.Abstractions.Infrastructure.DatabaseSystem;
 
 namespace Game.Infrastructure.Database
 {

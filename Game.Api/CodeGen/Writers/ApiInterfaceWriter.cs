@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Game.Api.CodeGen.Writers
 {
-    internal class ApiInterfaceWriter
+    internal class ApiInterfaceWriter : FileWriter
     {
         public string TargetDir { get; set; }
 
@@ -26,12 +26,10 @@ namespace Game.Api.CodeGen.Writers
                 Directory.CreateDirectory($"{TargetDir}\\{interfacesFolder}");
             }
 
-            var formatter = new CodeGenTypeFormatter();
-
             var allDescriptors = descriptors
                 .SelectMany(GetAllUsedDescriptors)
                 .Where(d => d.NeedsInterface)
-                .DistinctBy(formatter.GetImportText);
+                .DistinctBy(CodeGenTypeFormatter.GetImportText);
 
             var interfaceDataGroups = allDescriptors.Select(d => new InterfaceDescriptorData
             {
@@ -43,17 +41,15 @@ namespace Game.Api.CodeGen.Writers
             foreach (var group in interfaceDataGroups)
             {
                 var fileBuilder = new StringBuilder();
-                var currentExports = group.SelectNotNull(d => formatter.GetImportText(d.Descriptor));
+                var currentExports = group.SelectNotNull(d => CodeGenTypeFormatter.GetImportText(d.Descriptor));
                 var importedDescriptors = group
                     .SelectMany(data => data.Descriptor.PropertyDescriptors)
                     .Where(d => d.GenericParameterPosition < 0 && d.NeedsInterface)
-                    .ExceptBy(currentExports, formatter.GetImportText);
-
-                var importWriter = new ImportWriter("../");
+                    .ExceptBy(currentExports, CodeGenTypeFormatter.GetImportText);
 
                 if (importedDescriptors.Any())
                 {
-                    fileBuilder.AppendLine(importWriter.GetImportText(importedDescriptors));
+                    fileBuilder.AppendLine(CodeGenTypeFormatter.GetImportText(importedDescriptors, "../"));
                 }
 
                 foreach (var interfaceType in group)
@@ -84,8 +80,8 @@ namespace Game.Api.CodeGen.Writers
 
         private static void WriteEnumToBuilder(CodeGenTypeDescriptor descriptor, StringBuilder builder)
         {
-            var formatter = new CodeGenTypeFormatter();
-            builder.AppendLine($"export enum {formatter.GetTypeText(descriptor)} {{");
+            ;
+            builder.AppendLine($"export enum {CodeGenTypeFormatter.GetTypeText(descriptor)} {{");
             var values = descriptor.UnderlyingType.GetEnumValues();
             foreach (var value in values)
             {
@@ -97,11 +93,10 @@ namespace Game.Api.CodeGen.Writers
 
         private static void WriteInterfaceToBuilder(CodeGenTypeDescriptor descriptor, StringBuilder builder)
         {
-            var formatter = new CodeGenTypeFormatter();
-            builder.AppendLine($"export interface {formatter.GetInterfaceName(descriptor, true)} {{");
+            builder.AppendLine($"export interface {CodeGenTypeFormatter.GetInterfaceName(descriptor, true)} {{");
             foreach (var prop in descriptor.PropertyDescriptors)
             {
-                builder.AppendLine($"\t{formatter.GetParameterText(prop, true)};");
+                builder.AppendLine($"\t{CodeGenTypeFormatter.GetParameterText(prop, true)};");
             }
 
             builder.Append("};");
@@ -115,14 +110,6 @@ namespace Game.Api.CodeGen.Writers
             return childTypes
                 .SelectMany(GetAllUsedDescriptors)
                 .Append(type);
-        }
-
-        private static void OverwriteFileIfTextDiffers(string filePath, string text)
-        {
-            if (!File.Exists(filePath) || File.ReadAllText(filePath) != text)
-            {
-                File.WriteAllText(filePath, text);
-            }
         }
     }
 }

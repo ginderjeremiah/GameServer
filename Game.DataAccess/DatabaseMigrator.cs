@@ -1,4 +1,4 @@
-﻿using Game.Core.DataAccess;
+﻿using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

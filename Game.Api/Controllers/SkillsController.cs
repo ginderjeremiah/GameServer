@@ -1,6 +1,6 @@
-﻿using Game.Api.Models.Common;
+﻿using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Game.Api.Models.Skills;
-using Game.Core.DataAccess;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers

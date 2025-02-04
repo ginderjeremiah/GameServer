@@ -1,9 +1,9 @@
-﻿using Game.Api.Models.Attributes;
+﻿using Game.Abstractions.DataAccess;
+using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
 using Game.Api.Models.Player;
 using Game.Api.Services;
-using Game.Core.DataAccess;
 using Game.Core.Sessions;
 using Microsoft.AspNetCore.Mvc;
 

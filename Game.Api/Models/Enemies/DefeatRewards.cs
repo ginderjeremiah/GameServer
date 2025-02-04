@@ -9,7 +9,7 @@ namespace Game.Api.Models.Enemies
 
         public DefeatRewards() { }
 
-        public DefeatRewards(Core.BattleSimulation.DefeatRewards rewards)
+        public DefeatRewards(Core.Battle.DefeatRewards rewards)
         {
             ExpReward = rewards.ExpReward;
             Drops = rewards.Drops.Select(item => new InventoryItem(item)).ToList();

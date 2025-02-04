@@ -1,6 +1,6 @@
-﻿using Game.Core.DataAccess;
-using Game.Core.Entities;
-using Game.Core.Infrastructure;
+﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.Entities;
+using Game.Abstractions.Infrastructure;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -12,33 +12,36 @@ namespace Game.DataAccess
         private readonly GameContext _context = context;
         private readonly ICacheService _cache = cache;
         private readonly DataProviderSynchronizer _synchronizer = synchronizer;
-        private SessionStore? _sessionStore;
-        private InventoryItems? _inventoryItems;
-        private Players? _players;
-        private Tags? _itemTags;
-        private ItemMods? _itemMods;
-        private Items? _items;
-        private ItemCategories? _itemCategories;
-        private ItemModTypes? _itemModSlotTypes;
-        private Enemies? _enemies;
-        private Zones? _zones;
-        private Skills? _skills;
-        private Attributes? _attributes;
-        private TagCategories? _tagCategories;
 
-        public IInventoryItems InventoryItems => _inventoryItems ??= new InventoryItems(_context);
-        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_context, _cache);
-        public IPlayers Players => _players ??= new Players(_context, _cache, _synchronizer);
-        public ITags Tags => _itemTags ??= new Tags(_context);
-        public IItemMods ItemMods => _itemMods ??= new ItemMods(_context);
-        public IItems Items => _items ??= new Items(_context);
-        public IItemCategories ItemCategories => _itemCategories ??= new ItemCategories(_context);
-        public IItemModTypes ItemModTypes => _itemModSlotTypes ??= new ItemModTypes(_context);
-        public IEnemies Enemies => _enemies ??= new Enemies(_context);
-        public IZones Zones => _zones ??= new Zones(_context);
-        public ISkills Skills => _skills ??= new Skills(_context);
+        private Attributes? _attributes;
+        private Enemies? _enemies;
+        private Inventories? _inventoryItems;
+        private ItemCategories? _itemCategories;
+        private ItemMods? _itemMods;
+        private ItemModTypes? _itemModSlotTypes;
+        private Items? _items;
+        private Players? _players;
+        private SessionStore? _sessionStore;
+        private Skills? _skills;
+        private TagCategories? _tagCategories;
+        private Tags? _itemTags;
+        private Users? _users;
+        private Zones? _zones;
+
         public IAttributes Attributes => _attributes ??= new Attributes(_context);
+        public IEnemies Enemies => _enemies ??= new Enemies(_context);
+        public IInventories InventoryItems => _inventoryItems ??= new InventoryItems(_context);
+        public IItemCategories ItemCategories => _itemCategories ??= new ItemCategories(_context);
+        public IItemMods ItemMods => _itemMods ??= new ItemMods(_context);
+        public IItemModTypes ItemModTypes => _itemModSlotTypes ??= new ItemModTypes(_context);
+        public IItems Items => _items ??= new Items(_context);
+        public IPlayers Players => _players ??= new Players(_context, _cache, _synchronizer);
+        public ISessionStore SessionStore => _sessionStore ??= new SessionStore(_context, _cache);
+        public ISkills Skills => _skills ??= new Skills(_context);
         public ITagCategories TagCategories => _tagCategories ??= new TagCategories(_context);
+        public ITags Tags => _itemTags ??= new Tags(_context);
+        public IUsers Users => _users ??= new Users(_context);
+        public IZones Zones => _zones ??= new Zones(_context);
 
         public Task SaveChangesAsync()
         {

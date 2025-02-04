@@ -1,7 +1,8 @@
-﻿using Game.Core.DataAccess;
-using Game.Core.Entities;
-using Game.Core.Infrastructure;
+﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
+using Game.Core.Players;
 using Game.Infrastructure.Database;
+
 
 namespace Game.DataAccess.Repositories
 {
@@ -9,49 +10,31 @@ namespace Game.DataAccess.Repositories
     {
         private static string SessionPrefix => Constants.CACHE_SESSION_PREFIX;
 
-        private readonly GameContext _context;
         private readonly ICacheService _cache;
 
         public SessionStore(GameContext context, ICacheService cache)
         {
-            _context = context;
             _cache = cache;
         }
 
-        public async Task<SessionData?> GetSession(int playerId)
+        public async Task<PlayerState?> GetSession(string sessionId)
         {
-            return await _cache.GetAsync<SessionData>($"{SessionPrefix}_{playerId}");
+            return await _cache.GetAsync<PlayerState>($"{SessionPrefix}_{sessionId}");
         }
 
-        public SessionData GetNewSessionData(int playerId)
+        public void Update(PlayerState playerState, int playerId)
         {
-            var sessionData = new SessionData(Guid.NewGuid().ToString())
-            {
-                LastUsed = DateTime.UtcNow,
-                CurrentZone = 0,
-                EnemyCooldown = DateTime.UnixEpoch,
-                EarliestDefeat = DateTime.UnixEpoch,
-                Victory = false,
-                PlayerId = playerId
-            };
-
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.PlayerId}", sessionData);
-            return sessionData;
+            _cache.SetAndForget($"{SessionPrefix}_{playerId}", playerState);
         }
 
-        public void Update(SessionData sessionData)
+        public void SetBattleDataHash(int playerId, string activeEnemyHash)
         {
-            _cache.SetAndForget($"{SessionPrefix}_{sessionData.PlayerId}", sessionData);
+            _cache.SetAndForget($"{Constants.CACHE_BATTLE_DATA_PREFIX}_{playerId}", activeEnemyHash);
         }
 
-        public void SetActiveEnemyHash(SessionData sessionData, string activeEnemyHash)
+        public async Task<string?> GetAndDeleteBattleDataHash(int playerId)
         {
-            _cache.SetAndForget($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.PlayerId}", activeEnemyHash);
-        }
-
-        public string? GetAndDeleteActiveEnemyHash(SessionData sessionData)
-        {
-            return _cache.GetDelete($"{Constants.CACHE_ACTIVE_ENEMY_PREFIX}_{sessionData.PlayerId}");
+            return await _cache.GetDeleteAsync($"{Constants.CACHE_BATTLE_DATA_PREFIX}_{playerId}");
         }
     }
 }

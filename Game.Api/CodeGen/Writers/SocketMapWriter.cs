@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Game.Api.CodeGen.Writers
 {
-    internal class SocketMapWriter
+    internal class SocketMapWriter : FileWriter
     {
         public string TargetDir { get; set; }
 
@@ -25,16 +25,13 @@ namespace Game.Api.CodeGen.Writers
 
             if (allTypes.Any())
             {
-                var importWriter = new ImportWriter();
-                strBuilder.AppendLine(importWriter.GetImportText(allTypes));
+                strBuilder.AppendLine(CodeGenTypeFormatter.GetImportText(allTypes));
             }
-
-            var formatter = new CodeGenTypeFormatter();
 
             strBuilder.AppendLine("export type ApiSocketResponseTypes = {");
             foreach (var command in orderedData)
             {
-                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ResponseDescriptor)};");
+                strBuilder.AppendLine($"\t'{command.CommandName}': {CodeGenTypeFormatter.GetTypeText(command.ResponseDescriptor)};");
             }
 
             strBuilder.AppendLine("};\n");
@@ -42,7 +39,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.AppendLine("export type ApiSocketRequestTypes = {");
             foreach (var command in orderedData.Where(c => c.ParameterDescriptor is not null))
             {
-                strBuilder.AppendLine($"\t'{command.CommandName}': {formatter.GetTypeText(command.ParameterDescriptor)};");
+                strBuilder.AppendLine($"\t'{command.CommandName}': {CodeGenTypeFormatter.GetTypeText(command.ParameterDescriptor)};");
             }
 
             strBuilder.AppendLine("};\n");
@@ -52,7 +49,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.Append("export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand];");
 
             Directory.CreateDirectory(TargetDir);
-            File.WriteAllText(filePath, strBuilder.ToString());
+            OverwriteFileIfTextDiffers(filePath, strBuilder.ToString());
         }
     }
 }

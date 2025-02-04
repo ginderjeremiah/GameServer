@@ -1,5 +1,5 @@
 ﻿using Game.Core;
-using Game.Core.Infrastructure;
+using Game.Abstractions.Infrastructure;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 

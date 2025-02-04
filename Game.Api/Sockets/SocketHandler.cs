@@ -2,7 +2,6 @@
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
 using Game.Core;
-using System.Net.WebSockets;
 using System.Text.Json;
 using static System.Net.WebSockets.WebSocketState;
 
@@ -19,7 +18,6 @@ namespace Game.Api.Sockets
 
         private DateTime LastAction => _lastResponse > _lastSend ? _lastResponse : _lastSend;
 
-        private WebSocket Socket => _context.Socket;
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
 
@@ -59,7 +57,7 @@ namespace Game.Api.Sockets
 
         private async Task PingLoop()
         {
-            while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && Socket.State is Open)
+            while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && _context.State is Open)
             {
                 await Task.Delay(5000);
                 if (DateTime.UtcNow - LastAction > TimeSpan.FromSeconds(20))
@@ -76,7 +74,7 @@ namespace Game.Api.Sockets
                 }
             }
 
-            if (Socket.State is Open)
+            if (_context.State is Open)
             {
                 await _context.Close(ESocketCloseReason.Inactivity);
             }
@@ -98,12 +96,12 @@ namespace Game.Api.Sockets
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occured while reading a socket message.");
+                    _logger.LogError(ex, "An error occurred while reading a socket message.");
                 }
             }
-            while (Socket.State is Open);
+            while (_context.State is Open);
 
-            if (Socket.State is CloseReceived)
+            if (_context.State is CloseReceived)
             {
                 await _context.Close(ESocketCloseReason.Finished);
             }

@@ -12,5 +12,6 @@
         Finished = 0,
         Inactivity = 1,
         SocketReplaced = 2,
+        MessageTooBig = 3
     }
 }

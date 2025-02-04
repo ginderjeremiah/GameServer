@@ -1,6 +1,6 @@
 ﻿using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
-using Game.Core.Infrastructure;
+using Game.Abstractions.Infrastructure;
 using Game.Core.Sessions;
 using System.Net.WebSockets;
 

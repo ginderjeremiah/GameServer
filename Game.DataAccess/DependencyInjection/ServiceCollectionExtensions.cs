@@ -1,4 +1,4 @@
-﻿using Game.Core.DataAccess;
+﻿using Game.Abstractions.DataAccess;
 using Game.Infrastructure;
 using Game.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;

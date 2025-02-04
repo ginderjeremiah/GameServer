@@ -1,6 +1,6 @@
 ﻿using Game.Core;
 using Game.Core.Entities;
-using CoreBattlerAttribute = Game.Core.BattleSimulation.BattlerAttribute;
+using CoreBattlerAttribute = Game.Core.Attributes.Attribute;
 
 namespace Game.Api.Models.Attributes
 {

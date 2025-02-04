@@ -105,8 +105,8 @@
         /// <returns>A random <typeparamref name="T"/>.</returns>
         public T GetRandomValue()
         {
-            var rand = _random.NextSingle() * _values.Length;
-            var randInt = (int)float.Floor(rand);
+            var rand = _random.NextDouble() * _values.Length;
+            var randInt = (int)double.Floor(rand);
             var remainder = rand - randInt;
             var data = _values[randInt];
 

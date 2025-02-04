@@ -23,6 +23,7 @@ export const startGame = () => {
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
+		//TODO: pause game, alert user of another game instance, return to login page when alert is dismissed
 		apiSocket.listenCommand('SocketReplaced', () => {
 			window.location.href = '/';
 		});

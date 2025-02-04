@@ -1,4 +1,4 @@
-﻿using Game.Core.Infrastructure;
+﻿using Game.Abstractions.Infrastructure;
 using Game.Infrastructure.Cache.Redis;
 using Game.Infrastructure.Redis;
 using Microsoft.Extensions.Logging;

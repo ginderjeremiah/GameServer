@@ -1,4 +1,4 @@
-﻿using Game.Core.Infrastructure;
+﻿using Game.Abstractions.Infrastructure;
 
 namespace Game.Infrastructure.PubSub
 {

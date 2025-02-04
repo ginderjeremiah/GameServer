@@ -29,7 +29,7 @@ namespace Game.Api.Services
             }
             else
             {
-                throw new InvalidOperationException($"No socket command generator found for: {commandInfo.Name}");
+                throw new InvalidOperationException($"No socket command generator found for: {commandInfo.Name}.");
             }
         }
 

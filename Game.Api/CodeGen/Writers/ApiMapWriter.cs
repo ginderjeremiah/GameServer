@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Game.Api.CodeGen.Writers
 {
-    internal class ApiMapWriter
+    internal class ApiMapWriter : FileWriter
     {
         public string TargetDir { get; }
 
@@ -25,16 +25,13 @@ namespace Game.Api.CodeGen.Writers
 
             if (allTypes.Any())
             {
-                var importWriter = new ImportWriter();
-                strBuilder.AppendLine(importWriter.GetImportText(allTypes));
+                strBuilder.AppendLine(CodeGenTypeFormatter.GetImportText(allTypes));
             }
-
-            var formatter = new CodeGenTypeFormatter();
 
             strBuilder.AppendLine("export type ApiResponseTypes = {");
             foreach (var endpoint in orderedData)
             {
-                strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {formatter.GetTypeText(endpoint.ResponseDescriptor)};");
+                strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {CodeGenTypeFormatter.GetTypeText(endpoint.ResponseDescriptor)};");
             }
 
             strBuilder.AppendLine("};\n");
@@ -42,7 +39,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.AppendLine("export type ApiRequestTypes = {");
             foreach (var endpoint in orderedData.Where(endp => endp.ParameterDescriptors.Count > 0))
             {
-                strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {formatter.GetParametersTypeText(endpoint)};");
+                strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {CodeGenTypeFormatter.GetParametersTypeText(endpoint)};");
             }
 
             strBuilder.AppendLine("};\n");
@@ -55,7 +52,7 @@ namespace Game.Api.CodeGen.Writers
             strBuilder.Append("export type ApiResponseType = ApiResponseTypes[ApiEndpoint];");
 
             Directory.CreateDirectory(TargetDir);
-            File.WriteAllText(filePath, strBuilder.ToString());
+            OverwriteFileIfTextDiffers(filePath, strBuilder.ToString());
         }
     }
 }

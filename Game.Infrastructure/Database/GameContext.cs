@@ -1,7 +1,7 @@
-﻿using Game.Core;
-using Game.Core.Entities;
+﻿using Game.Abstractions.Entities;
+using Game.Core;
 using Microsoft.EntityFrameworkCore;
-using Attribute = Game.Core.Entities.Attribute;
+using Attribute = Game.Abstractions.Entities.Attribute;
 
 namespace Game.Infrastructure.Database
 {
@@ -64,6 +64,8 @@ namespace Game.Infrastructure.Database
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Tag> Tags { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<User> Users { get; set; }
+        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
         /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Zone> Zones { get; set; }
@@ -73,7 +75,7 @@ namespace Game.Infrastructure.Database
         /// <inheritdoc/>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<Attribute>(entity =>
+            modelBuilder.Entity<Core.Attributes.Attribute>(entity =>
             {
                 entity.Property(a => a.Id)
                     .ValueGeneratedNever();
@@ -81,7 +83,7 @@ namespace Game.Infrastructure.Database
                 entity.Property(a => a.Name)
                     .HasMaxLength(50);
 
-                entity.HasEnumValues<Attribute, EAttribute>();
+                entity.HasData(Enum.GetValues<EAttribute>().Select(a => new Core.Attributes.Attribute(a)));
             });
 
             modelBuilder.Entity<AttributeDistribution>(entity =>
@@ -120,7 +122,16 @@ namespace Game.Infrastructure.Database
                 entity.Property(es => es.Name)
                     .HasMaxLength(50);
 
-                entity.HasEnumValues<EquipmentSlot, EEquipmentSlot>();
+                entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
+                {
+                    var attribute = new Core.Items.EquipmentSlot(a);
+                    return new EquipmentSlot
+                    {
+                        Id = (int)a,
+                        Name = attribute.Name,
+                        ItemCategoryId = (int)attribute.ItemCategory,
+                    };
+                }));
             });
 
             modelBuilder.Entity<InventoryItemMod>(entity =>
@@ -147,9 +158,6 @@ namespace Game.Infrastructure.Database
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
 
-                entity.Property(i => i.IconPath)
-                    .HasMaxLength(50);
-
                 entity.HasMany(i => i.Tags)
                     .WithMany(t => t.Items)
                     .UsingEntity(join => join.ToTable("ItemTags"));
@@ -171,7 +179,14 @@ namespace Game.Infrastructure.Database
                 entity.Property(ic => ic.Name)
                     .HasMaxLength(50);
 
-                entity.HasEnumValues<ItemCategory, EItemCategory>();
+                entity.HasData(Enum.GetValues<EItemCategory>().Select(a =>
+                {
+                    return new ItemCategory
+                    {
+                        Id = (int)a,
+                        Name = a.ToString().Capitalize().SpaceWords(),
+                    };
+                }));
             });
 
             modelBuilder.Entity<ItemMod>(entity =>
@@ -221,19 +236,22 @@ namespace Game.Infrastructure.Database
                 entity.Property(ls => ls.Name)
                     .HasMaxLength(20);
 
-                entity.HasEnumValues<LogSetting, ELogSetting>();
+                entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
+                {
+                    var attribute = new Core.Items.EquipmentSlot(a);
+                    return new EquipmentSlot
+                    {
+                        Id = (int)a,
+                        Name = attribute.Name,
+                        ItemCategoryId = (int)attribute.ItemCategory,
+                    };
+                }));
             });
 
             modelBuilder.Entity<Player>(entity =>
             {
-                entity.Property(p => p.UserName)
-                    .HasMaxLength(20);
-
                 entity.Property(p => p.Name)
                     .HasMaxLength(20);
-
-                entity.Property(p => p.PassHash)
-                    .HasMaxLength(88);
             });
 
             modelBuilder.Entity<PlayerSkill>()
@@ -279,7 +297,14 @@ namespace Game.Infrastructure.Database
                 entity.Property(st => st.Name)
                     .HasMaxLength(50);
 
-                entity.HasEnumValues<ItemModType, EItemModType>();
+                entity.HasData(Enum.GetValues<EItemModType>().Select(a =>
+                {
+                    return new ItemModType
+                    {
+                        Id = (int)a,
+                        Name = a.ToString().Capitalize().SpaceWords(),
+                    };
+                }));
             });
 
             modelBuilder.Entity<Tag>()
@@ -294,7 +319,23 @@ namespace Game.Infrastructure.Database
                 entity.Property(tc => tc.Name)
                 .HasMaxLength(50);
 
-                entity.HasEnumValues<TagCategory, ETagCategory>();
+                entity.HasData(Enum.GetValues<ETagCategory>().Select(a =>
+                {
+                    return new TagCategory
+                    {
+                        Id = (int)a,
+                        Name = a.ToString().Capitalize().SpaceWords(),
+                    };
+                }));
+            });
+
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.Property(u => u.Username)
+                    .HasMaxLength(20);
+
+                entity.Property(u => u.PassHash)
+                    .HasMaxLength(88);
             });
 
             modelBuilder.Entity<Zone>(entity =>

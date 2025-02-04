@@ -8,6 +8,7 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.DataAccess", "Game.DataAccess\Game.DataAccess.csproj", "{8F2F5F1B-72AB-401E-9828-BE082C5C0089}"
 	ProjectSection(ProjectDependencies) = postProject
 		{2551BFA2-5CA0-4193-9E53-F9176279E88D} = {2551BFA2-5CA0-4193-9E53-F9176279E88D}
+		{94B555D5-F004-4C41-8423-B13921AAB821} = {94B555D5-F004-4C41-8423-B13921AAB821}
 		{CF430B48-0EEC-41D9-B308-0370CD43F666} = {CF430B48-0EEC-41D9-B308-0370CD43F666}
 	EndProjectSection
 EndProject
@@ -25,6 +26,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.Api", "Game.Api\Game.Api.csproj", "{4C61D186-7350-4BE0-A59A-28168BDDAA55}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Core.Tests", "Game.Core.Tests\Game.Core.Tests.csproj", "{3E20FE5C-A416-4ADA-832D-00C77F2200B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Abstractions", "Game.Abstractions\Game.Abstractions.csproj", "{94B555D5-F004-4C41-8423-B13921AAB821}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -56,6 +59,10 @@ Global
 		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3E20FE5C-A416-4ADA-832D-00C77F2200B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94B555D5-F004-4C41-8423-B13921AAB821}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94B555D5-F004-4C41-8423-B13921AAB821}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94B555D5-F004-4C41-8423-B13921AAB821}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94B555D5-F004-4C41-8423-B13921AAB821}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

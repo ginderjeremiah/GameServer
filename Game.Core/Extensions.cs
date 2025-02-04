@@ -1,5 +1,4 @@
-﻿using Game.Core.Entities;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using static Game.Core.EAttribute;
@@ -70,7 +69,9 @@ namespace Game.Core
             foreach (var item in source)
             {
                 if (item is not null)
+                {
                     yield return item;
+                }
             }
         }
 
@@ -126,17 +127,6 @@ namespace Game.Core
         public static string SnakeCase(this string str)
         {
             return WordBreakRegex().Replace(str, "$1-$2").ToLower();
-        }
-
-        /// <summary>
-        /// Returns true if this attribute corresponds to one of the core attributes: <see cref="Strength"/>, <see cref="Endurance"/>, <see cref="Intellect"/>,
-        /// <see cref="Agility"/>, <see cref="Dexterity"/>, or <see cref="Luck"/>.
-        /// </summary>
-        /// <param name="att"></param>
-        /// <returns></returns>
-        public static bool IsCoreAttribute(this PlayerAttribute att)
-        {
-            return ((EAttribute)att.AttributeId).IsCoreAttribute();
         }
 
         /// <summary>

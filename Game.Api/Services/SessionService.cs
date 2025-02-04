@@ -1,7 +1,6 @@
-﻿using Game.Api.Auth;
-using Game.Core.DataAccess;
-using Game.Core.Entities;
-using Game.Core.Sessions;
+﻿using Game.Abstractions.DataAccess;
+using Game.Core.Battle;
+using Game.Core.Players;
 
 namespace Game.Api.Services
 {
@@ -9,97 +8,92 @@ namespace Game.Api.Services
     /// A service for loading <see cref="Session"/> data for a request.
     /// </summary>
     /// <param name="repos">The <see cref="IRepositoryManager"/> which is used to load session data.</param>
-    /// <param name="cookieService"></param>
-    public class SessionService(IRepositoryManager repos, CookieService cookieService)
+    public class SessionService(IRepositoryManager repos)
     {
-        private Session? _session;
         private readonly IRepositoryManager _repos = repos;
-        private readonly CookieService _cookieService = cookieService;
+        private Player? _player;
 
         /// <summary>
-        /// Indicates whether a <see cref="Session"/> has been loaded into the <see cref="SessionService"/> or not.
+        /// The id of the currently loaded session.
         /// </summary>
-        public bool SessionAvailable => _session is not null;
+        public string SessionId { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets the currently loaded <see cref="Session"/>.
+        /// The id of the currently loaded user. 
         /// </summary>
+        public int UserId { get; private set; }
+
+        /// <summary>
+        /// The id of the currently selected player.
+        /// </summary>
+        public int SelectedPlayerId => PlayerState.PlayerId;
+
+        /// <inheritdoc cref="PlayerState"/>
+        public PlayerState PlayerState { get; private set; } = new();
+
+        /// <summary>
+        /// Indicates whether session data has been loaded into the <see cref="SessionService"/> or not.
+        /// </summary>
+        public bool Authenticated => UserId > 0;
+
+        /// <summary>
+        /// Loads the <see cref="PlayerState"/> data for the given <paramref name="sessionId"/>.
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="sessionId"></param>
         /// <returns></returns>
-        /// <exception cref="SessionNotInitializedException"></exception>
-        public Session GetSession()
+        public async Task LoadSession(int userId, string sessionId)
         {
-            return _session ?? throw new SessionNotInitializedException();
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="Session"/> for the given <paramref name="player"/>.
-        /// </summary>
-        /// <param name="player"></param>
-        /// <returns></returns>
-        public void CreateSession(Player player)
-        {
-            var sessionData = _repos.SessionStore.GetNewSessionData(player.Id);
-            _session = new Session(sessionData, player, _repos);
-            _cookieService.SetTokenCookie(CreateSessionToken());
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public async Task LoadSession()
-        {
-            var tokenString = _cookieService.GetTokenCookie();
-
-            if (AuthToken.TryParseToken(tokenString, out var token))
-            {
-                await LoadSessionData(token.Claims.Sub);
-                if (SessionAvailable && token.IsValid(GetSession().Player.Salt.ToString()))
-                {
-                    //Slide cookie if over halfway to expiration
-                    if (token.Claims.Exp < DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME / 2))
-                    {
-                        var newToken = CreateSessionToken();
-                        _cookieService.SetTokenCookie(newToken);
-                    }
-                }
-                else //clear session if invalid
-                {
-                    _session = null;
-                }
-            }
-        }
-
-        private async Task LoadSessionData(int playerId)
-        {
-            var sessionData = await _repos.SessionStore.GetSession(playerId);
+            UserId = userId;
+            var sessionData = await _repos.SessionStore.GetSession(sessionId);
             if (sessionData is not null)
             {
-                var playerData = await _repos.Players.GetPlayer(sessionData.PlayerId);
-                if (playerData is not null)
-                {
-                    _session = new Session(sessionData, playerData, _repos);
-                }
+                PlayerState = sessionData;
             }
         }
 
-        private string CreateSessionToken()
-        {
-            var session = GetSession();
-            var claims = new AuthTokenClaims(session.Player.Id, DateTime.UtcNow + Constants.TOKEN_LIFETIME);
-            var token = new AuthToken(claims, session.Player.Salt.ToString());
-            return token.ToString();
-        }
-    }
-
-    /// <summary>
-    /// An <see cref="Exception"/> which is generated when a <see cref="SessionService"/> does not have a <see cref="Session"/> loaded.
-    /// </summary>
-    public class SessionNotInitializedException : Exception
-    {
         /// <summary>
-        /// Initializes a new instance of the <see cref="SessionNotInitializedException"/> class with the default error message.
+        /// Loads the <see cref="Player"/> data for the currently selected player.
         /// </summary>
-        public SessionNotInitializedException() : base("The session was not initialized.") { }
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public async Task<Player> LoadPlayer()
+        {
+            return _player ??= await _repos.Players.GetPlayer(SelectedPlayerId) ?? throw new InvalidOperationException("Player data not loaded.");
+        }
+
+        /// <summary>
+        /// Clears the current session data.
+        /// </summary>
+        public void ClearSession()
+        {
+            PlayerState = new();
+            SelectedPlayerId = 0;
+            UserId = 0;
+            // TODO: Clear session data from repository
+        }
+
+        /// <summary>
+        /// Sets the active enemy for the current player session.
+        /// </summary>
+        /// <param name="battleData"></param>
+        /// <param name="enemyCooldown"></param>
+        public void SetActiveBattleData(BattleData battleData, DateTime enemyCooldown)
+        {
+            PlayerState.EnemyCooldown = enemyCooldown;
+            _repos.SessionStore.Update(PlayerState, SelectedPlayerId);
+            _repos.SessionStore.SetBattleDataHash(SelectedPlayerId, battleData.Hash());
+        }
+
+        /// <summary>
+        /// Validates the given <paramref name="battleData"/> against the current player session.
+        /// </summary>
+        /// <param name="battleData"></param>
+        /// <returns></returns>
+        public async Task<bool> ValidateBattleData(BattleData battleData)
+        {
+            var battleDataHash = await _repos.SessionStore.GetAndDeleteBattleDataHash(SelectedPlayerId);
+            return battleData.Hash() == battleDataHash;
+        }
     }
 }

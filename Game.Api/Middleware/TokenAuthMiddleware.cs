@@ -1,4 +1,5 @@
-﻿using Game.Api.Services;
+﻿using Game.Api.Auth;
+using Game.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Diagnostics;
@@ -20,14 +21,33 @@ namespace Game.Api.Middleware
         /// <param name="logger"></param>
         /// <param name="sessionService"></param>
         /// <returns></returns>
-        public async Task InvokeAsync(HttpContext context, ILogger<TokenAuthMiddleware> logger, SessionService sessionService)
+        public async Task InvokeAsync(HttpContext context, ILogger<TokenAuthMiddleware> logger, SessionService sessionService, CookieService cookieService)
         {
             long startTime = Stopwatch.GetTimestamp();
             logger.LogDebug("Starting TokenAuth.");
 
-            await sessionService.LoadSession();
+            var tokenString = cookieService.GetTokenCookie();
 
-            if (sessionService.SessionAvailable)
+            if (AuthToken.TryParseToken(tokenString, out var token))
+            {
+                await sessionService.LoadPlayerState(token.Claims.Sub);
+                if (sessionService.Authenticated)
+                {
+                    //Slide cookie if over halfway to expiration
+                    if (token.Claims.Exp < DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME / 2))
+                    {
+                        token.SlideExpiration(DateTime.UtcNow + Constants.TOKEN_LIFETIME);
+                        cookieService.SetTokenCookie(token.ToString());
+                    }
+                }
+                else //clear session if invalid
+                {
+                    sessionService.ClearSession();
+                    cookieService.SetTokenCookie("");
+                }
+            }
+
+            if (sessionService.Authenticated)
             {
                 logger.LogDebug("Succeeded TokenAuth: {ElapsedTime} ms", Stopwatch.GetElapsedTime(startTime).TotalMilliseconds);
             }
@@ -58,11 +78,6 @@ namespace Game.Api.Middleware
             }
 
             await _next(context);
-
-            if (sessionService.SessionAvailable)
-            {
-                await sessionService.GetSession().Save(); //TODO: move this to a different middleware or rename this one
-            }
         }
     }
 

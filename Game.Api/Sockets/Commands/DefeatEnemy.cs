@@ -1,9 +1,8 @@
 ﻿using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Services;
-using Game.Core.BattleSimulation;
 using Game.Core.Sessions;
-using EnemyInstance = Game.Core.BattleSimulation.EnemyInstance;
+using EnemyInstance = Game.Core.Battle.EnemyInstance;
 using EnemyInstanceModel = Game.Api.Models.Enemies.EnemyInstance;
 
 namespace Game.Api.Sockets.Commands
