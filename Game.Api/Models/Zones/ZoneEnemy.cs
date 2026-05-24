@@ -1,4 +1,4 @@
-﻿using ZoneEnemyEntity = Game.Core.Entities.ZoneEnemy;
+﻿using ZoneEnemyEntity = Game.Abstractions.Entities.ZoneEnemy;
 
 namespace Game.Api.Models.Zones
 {

@@ -18,7 +18,7 @@ namespace Game.Infrastructure.DependencyInjection
         /// <param name="services"> The dependency injection container to configure.</param>
         public static IServiceCollection AddGameContext(this IServiceCollection services)
         {
-            return services.AddTransient(sp =>
+            return services.AddScoped(sp =>
             {
                 var options = sp.GetRequiredService<InfrastructureOptions>();
                 return GameContextFactory.GetGameContext(options);

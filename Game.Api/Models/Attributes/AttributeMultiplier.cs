@@ -1,5 +1,5 @@
 ﻿using Game.Core;
-using Game.Core.Entities;
+using Game.Abstractions.Entities;
 
 namespace Game.Api.Models.Attributes
 {

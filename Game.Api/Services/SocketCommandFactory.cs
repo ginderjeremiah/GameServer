@@ -1,4 +1,4 @@
-﻿using Game.Api.Sockets.Commands;
+using Game.Api.Sockets.Commands;
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 
@@ -9,23 +9,29 @@ namespace Game.Api.Services
         private static readonly ConcurrentDictionary<string, Func<IServiceProvider, AbstractSocketCommand>> _socketCommandGenerators = [];
         private static readonly Task _registerCommandGeneratorsTask = Task.Run(RegisterSocketCommandGenerators);
 
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public SocketCommandFactory(IServiceProvider serviceProvider)
+        public SocketCommandFactory(IServiceScopeFactory scopeFactory)
         {
-            _serviceProvider = serviceProvider;
+            _scopeFactory = scopeFactory;
         }
 
-        public async Task<AbstractSocketCommand> CreateCommand(SocketCommandInfo commandInfo)
+        /// <summary>
+        /// Creates the requested socket command inside a fresh DI scope.
+        /// The caller is responsible for disposing the returned <see cref="IServiceScope"/>
+        /// after the command has executed (and after any post-execution work such as UoW commit).
+        /// TODO: Make the scope a parameter of the method to make the ownership more explicit and to allow for more flexible scope management.
+        /// </summary>
+        public async Task<(AbstractSocketCommand Command, IServiceScope Scope)> CreateCommand(SocketCommandInfo commandInfo)
         {
             await _registerCommandGeneratorsTask;
             if (_socketCommandGenerators.TryGetValue(commandInfo.Name, out var generator))
             {
-                _serviceProvider.CreateScope();
-                var command = generator(_serviceProvider);
+                var scope = _scopeFactory.CreateScope();
+                var command = generator(scope.ServiceProvider);
                 command.SetParameters(commandInfo.Parameters);
                 command.Id = commandInfo.Id;
-                return command;
+                return (command, scope);
             }
             else
             {

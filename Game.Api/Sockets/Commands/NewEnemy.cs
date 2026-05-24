@@ -1,61 +1,68 @@
-﻿using Game.Abstractions.DataAccess;
+﻿using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Services;
-using Game.Core.Battle;
-using EnemyInstanceModel = Game.Api.Models.Enemies.EnemyInstance;
+using Game.Application.Services;
 
 namespace Game.Api.Sockets.Commands
 {
     public class NewEnemy : AbstractSocketCommand<NewEnemyModel, NewEnemyRequest>
     {
-        private SessionService SessionService { get; }
-        private ILogger<NewEnemy> Logger { get; }
-        private IRepositoryManager Repositories { get; }
+        private readonly SessionService _sessionService;
+        private readonly BattleService _battleService;
+        private readonly ILogger<NewEnemy> _logger;
 
         public override string Name { get; set; } = nameof(NewEnemy);
 
-        public NewEnemy(IRepositoryManager repos, ILogger<NewEnemy> logger, SessionService sessionService)
+        public NewEnemy(ILogger<NewEnemy> logger, SessionService sessionService, BattleService battleService)
         {
-            SessionService = sessionService;
-            Logger = logger;
-            Repositories = repos;
+            _sessionService = sessionService;
+            _battleService = battleService;
+            _logger = logger;
         }
 
-        public override ApiSocketResponse<NewEnemyModel> HandleExecute(SocketContext context)
+        public override async Task<ApiSocketResponse<NewEnemyModel>> HandleExecuteAsync(SocketContext context)
         {
             var now = DateTime.UtcNow;
-            if (SessionService.PlayerState.EnemyCooldown > now)
+            var state = _sessionService.PlayerState;
+
+            if (state.IsOnCooldown(now))
             {
                 return Success(new NewEnemyModel
                 {
-                    Cooldown = (SessionService.PlayerState.EnemyCooldown - now).TotalMilliseconds
+                    Cooldown = (state.EnemyCooldown - now).TotalMilliseconds
                 });
             }
 
+            var player = await _sessionService.LoadPlayer();
+
             if (Parameters.NewZoneId.HasValue)
             {
-                var newZone = Repositories.Zones.GetZone(Parameters.NewZoneId.Value) ?? throw new InvalidOperationException("Failed to load zone");
-                SessionService.Player.CurrentZone = newZone;
+                player.CurrentZoneId = Parameters.NewZoneId.Value;
             }
 
-            var rng = new Random();
-            var zone = SessionService.Player.CurrentZone;
-            var level = rng.Next(zone.LevelMin, zone.LevelMax);
-            var enemy = zone.EnemyTable.GetRandomValue().CloneWithRandomSkills(rng);
-            var seed = (uint)(now.Ticks % uint.MaxValue);
+            var result = _battleService.StartBattle(player, state, player.CurrentZoneId);
 
-            var simulator = new BattleSimulator(SessionService.Player, enemy, seed);
-            var victory = simulator.Simulate(out var totalMs);
-            var earliestDefeat = now.AddMilliseconds(totalMs);
+            _sessionService.SavePlayerState();
 
-            Session.SetActiveEnemy(enemy, earliestDefeat, victory);
-
-            Logger.LogDebug("NewEnemy: (victory: {Victory}, battleTime: {BattleTime} ms, currentTime: {CurrentTime}, earliestDefeat: {EarliestDefeat})", victory, totalMs, now.ToString("O"), earliestDefeat.ToString("O"));
+            _logger.LogDebug("NewEnemy: (enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
+                result.Enemy.Id, result.Enemy.Level, result.Seed);
 
             return Success(new NewEnemyModel
             {
-                EnemyInstance = new EnemyInstanceModel(enemy)
+                EnemyInstance = new EnemyInstance
+                {
+                    Id = result.Enemy.Id,
+                    Level = result.Enemy.Level,
+                    Seed = result.Seed,
+                    SelectedSkills = result.Enemy.Skills.Select(s => s.Id).ToList(),
+                    Attributes = result.Enemy.GetAttributeModifiers()
+                        .Select(m => new BattlerAttribute
+                        {
+                            AttributeId = m.Attribute,
+                            Amount = (decimal)m.Amount,
+                        }),
+                }
             });
         }
     }

@@ -1,4 +1,4 @@
-﻿using TagEntity = Game.Core.Entities.Tag;
+﻿using TagEntity = Game.Abstractions.Entities.Tag;
 
 namespace Game.Api.Models.Tags
 {

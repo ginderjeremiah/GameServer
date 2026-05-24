@@ -1,5 +1,5 @@
-﻿using Game.Core;
-using AttributeDistributionEntity = Game.Core.Attributes.AttributeDistribution;
+using Game.Core;
+using AttributeDistributionEntity = Game.Abstractions.Entities.AttributeDistribution;
 
 namespace Game.Api.Models.Attributes
 {
@@ -13,7 +13,7 @@ namespace Game.Api.Models.Attributes
         {
             return new AttributeDistribution
             {
-                AttributeId = entity.Attribute,
+                AttributeId = (EAttribute)entity.AttributeId,
                 BaseAmount = entity.BaseAmount,
                 AmountPerLevel = entity.AmountPerLevel,
             };

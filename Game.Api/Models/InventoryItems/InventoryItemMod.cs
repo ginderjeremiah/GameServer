@@ -5,7 +5,7 @@
         public int ItemModId { get; set; }
         public int ItemModSlotId { get; set; }
 
-        public InventoryItemMod(Core.Entities.InventoryItemMod itemMod)
+        public InventoryItemMod(Abstractions.Entities.InventoryItemMod itemMod)
         {
             ItemModId = itemMod.ItemModId;
             ItemModSlotId = itemMod.ItemModSlotId;

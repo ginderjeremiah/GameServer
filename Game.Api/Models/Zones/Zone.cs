@@ -1,5 +1,5 @@
 ﻿using Game.Api.Models.Items;
-using ZoneEntity = Game.Core.Entities.Zone;
+using ZoneEntity = Game.Abstractions.Entities.Zone;
 
 namespace Game.Api.Models.Zones
 {

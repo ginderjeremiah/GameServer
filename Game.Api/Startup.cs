@@ -2,8 +2,10 @@ using Game.Api.CodeGen;
 using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
+using Game.Application;
+using Game.Application.Services;
 using Game.Core;
-using Game.Core.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
 
@@ -37,7 +39,11 @@ namespace Game.Api
                 .BindConfiguration(nameof(DataAccessOptions));
 
             // Add services to the container.
-            builder.Services.AddControllers(options => options.Filters.Add<ErrorStatusFilter>());
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add<ErrorStatusFilter>();
+                options.Filters.Add<CommitFilter>();
+            });
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
@@ -45,7 +51,12 @@ namespace Game.Api
                 .AddScoped<SessionService>()
                 .AddScoped<CookieService>()
                 .AddTransient<SocketManagerService>()
-                .AddTransient<SocketCommandFactory>();
+                .AddTransient<SocketCommandFactory>()
+                // Application services
+                .AddScoped<BattleService>()
+                .AddScoped<PlayerService>()
+                // Domain event infrastructure
+                .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
             if (builder.Environment.IsDevelopment())
             {
@@ -57,7 +68,9 @@ namespace Game.Api
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                var migrator = app.Services.GetRequiredService<IDatabaseMigrator>();
+                // GameContext is Scoped, so the migrator must be resolved from a scope.
+                using var migrationScope = app.Services.CreateScope();
+                var migrator = migrationScope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
                 await migrator.Migrate(true);
 
                 app.UseSwagger();

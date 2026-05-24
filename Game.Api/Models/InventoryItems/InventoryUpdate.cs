@@ -1,5 +1,4 @@
-﻿using Game.Api.Models;
-using Game.Core.Sessions;
+﻿using Game.Core.Players.Inventories;
 
 namespace Game.Api.Models.InventoryItems
 {
@@ -8,5 +7,8 @@ namespace Game.Api.Models.InventoryItems
         public int Id { get; set; }
         public int InventorySlotNumber { get; set; }
         public bool Equipped { get; set; }
+
+        // Explicit implementation maps InventorySlotNumber → IInventoryUpdate.SlotNumber
+        int IInventoryUpdate.SlotNumber => InventorySlotNumber;
     }
 }

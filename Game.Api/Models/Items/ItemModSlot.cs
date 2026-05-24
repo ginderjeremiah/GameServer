@@ -1,5 +1,5 @@
 ﻿using Game.Core;
-using ItemModSlotEntity = Game.Core.Entities.ItemModSlot;
+using ItemModSlotEntity = Game.Abstractions.Entities.ItemModSlot;
 
 namespace Game.Api.Models.Items
 {

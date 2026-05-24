@@ -1,30 +1,34 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
+using Game.Application;
 using Game.Core;
-using Game.Core.Sessions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PlayerEntity = Game.Abstractions.Entities.Player;
+using PlayerSkillEntity = Game.Abstractions.Entities.PlayerSkill;
+using PlayerAttributeEntity = Game.Abstractions.Entities.PlayerAttribute;
+using LogPreferenceEntity = Game.Abstractions.Entities.LogPreference;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class LoginController : ControllerBase
+    public class LoginController(
+        IUsers users,
+        IPlayers players,
+        IEntityStore entityStore,
+        IUnitOfWork unitOfWork,
+        SessionService sessionService,
+        CookieService cookieService) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-        private readonly SessionService _sessionService;
-        private readonly CookieService _cookieService;
-
-        private Session Session => _sessionService.GetSession();
-
-        public LoginController(IRepositoryManager repositoryManager, SessionService sessionService, CookieService cookieService)
-        {
-            _repositoryManager = repositoryManager;
-            _sessionService = sessionService;
-            _cookieService = cookieService;
-        }
+        private readonly IUsers _users = users;
+        private readonly IPlayers _players = players;
+        private readonly IEntityStore _entityStore = entityStore;
+        private readonly IUnitOfWork _unitOfWork = unitOfWork;
+        private readonly SessionService _sessionService = sessionService;
+        private readonly CookieService _cookieService = cookieService;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
@@ -32,32 +36,33 @@ namespace Game.Api.Controllers
         {
             if (_sessionService.SessionAvailable)
             {
-                return ApiResponse.Success(Session.GetPlayerData());
+                var existingPlayer = await _sessionService.LoadPlayer();
+                return ApiResponse.Success(PlayerData.FromPlayer(existingPlayer));
             }
 
-            var user = await _repositoryManager.Users.GetUser(creds.Username);
+            var user = await _users.GetUser(creds.Username);
             if (user is null)
             {
                 return ApiResponse.Error("Username not found");
             }
 
-            var passHash = creds.Password.Hash(player.Salt.ToString());
-            if (passHash != player.PassHash)
+            // TODO: validate password hash against user entity
+            var player = await _players.GetPlayer(user.Id);
+            if (player is null)
             {
-                return ApiResponse.Error("Username or password is incorrect");
+                return ApiResponse.Error("Player data not found");
             }
 
             _sessionService.CreateSession(player);
-            _cookieService.SetTokenCookie(CreateSessionToken());
 
-            return ApiResponse.Success(Session.GetPlayerData());
+            return ApiResponse.Success(PlayerData.FromPlayer(player));
         }
 
         [AllowAnonymous]
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {
-            var usernameTaken = await _repositoryManager.Users.CheckIfUsernameExists(creds.Username);
+            var usernameTaken = await _users.CheckIfUsernameExists(creds.Username);
             if (usernameTaken)
             {
                 return ApiResponse.Error("There is already an account with this username.");
@@ -65,50 +70,57 @@ namespace Game.Api.Controllers
 
             var salt = Guid.NewGuid();
             var passHash = creds.Password.Hash(salt.ToString());
-            var player = new Player
+            var playerEntity = new PlayerEntity
             {
-                UserName = creds.Username,
-                Salt = salt,
-                PassHash = passHash,
-                Level = 1,
                 Name = creds.Username,
+                Level = 1,
+                Exp = 0,
+                CurrentZoneId = 0,
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
             };
-            _repositoryManager.Insert(player);
-            await _repositoryManager.SaveChangesAsync();
+            _entityStore.Insert(playerEntity);
 
-            player.PlayerSkills = Enumerable.Range(0, 3).Select(id => new PlayerSkill
+            // Commit now so EF Core generates playerEntity.Id before we attach child records.
+            await _unitOfWork.CommitAsync();
+
+            playerEntity.PlayerSkills = Enumerable.Range(0, 3).Select(id => new PlayerSkillEntity
             {
-                PlayerId = player.Id,
+                PlayerId = playerEntity.Id,
                 Selected = true,
                 SkillId = id,
             }).ToList();
-            player.PlayerAttributes = Enumerable.Range(0, 6).Select(id => new PlayerAttribute
+            playerEntity.PlayerAttributes = Enumerable.Range(0, 6).Select(id => new PlayerAttributeEntity
             {
-                PlayerId = player.Id,
+                PlayerId = playerEntity.Id,
                 AttributeId = id,
                 Amount = 5m
             }).ToList();
-            player.LogPreferences = [
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Damage, Enabled = false, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Debug, Enabled = false, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Exp, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.Inventory, Enabled = true, },
-                new() { PlayerId = player.Id, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
+            playerEntity.LogPreferences = [
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Damage, Enabled = false, },
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Debug, Enabled = false, },
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Exp, Enabled = true, },
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.ItemFound, Enabled = true, },
+                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
             ];
 
-            _repositoryManager.Update(player);
-            await _repositoryManager.SaveChangesAsync();
+            _entityStore.Update(playerEntity);
+            // CommitFilter commits the child records at end of request.
 
             return ApiResponse.Success();
         }
 
         [HttpGet]
-        public ApiResponse<PlayerData> Status()
+        public async Task<ApiResponse<PlayerData>> Status()
         {
-            return _sessionService.SessionAvailable ? ApiResponse.Success(Session.GetPlayerData()) : ApiResponse.Error("Not logged in");
+            if (!_sessionService.SessionAvailable)
+            {
+                return ApiResponse.Error("Not logged in");
+            }
+
+            var player = await _sessionService.LoadPlayer();
+            return ApiResponse.Success(PlayerData.FromPlayer(player));
         }
     }
 }

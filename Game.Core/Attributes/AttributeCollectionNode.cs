@@ -4,7 +4,7 @@ namespace Game.Core.Attributes
 {
     internal class AttributeCollectionNode
     {
-        public SortedList<EModifierType, AttributeModifier>? Modifiers { get; set; }
+        public List<AttributeModifier>? Modifiers { get; set; }
         public double? CachedValue { get; private set; }
         public List<AttributeCollectionNode>? DerivedNodes { get; set; }
 

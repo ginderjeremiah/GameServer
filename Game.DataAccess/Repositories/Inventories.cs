@@ -1,76 +1,51 @@
-﻿using Game.Abstractions.DataAccess;
-using Game.Core.Items;
+using Game.Abstractions.DataAccess;
+using Game.Abstractions.Entities;
+using Game.Core.Players.Inventories;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Inventories : IInventories
+    internal class Inventories(GameContext context) : IInventories
     {
-        private readonly GameContext _context;
-        private readonly ArrayDataCache<Item> _itemCache;
-        private readonly ArrayDataCache<ItemMod> _itemModCache;
+        private readonly GameContext _context = context;
 
-        public Inventories(GameContext context, ArrayDataCache<Item> itemCache, ArrayDataCache<ItemMod> itemModCache)
+        public async Task<int> AddInventoryItem(int playerId, int itemId, int slotNumber, int rating = 1)
         {
-            _context = context;
-            _itemCache = itemCache;
-            _itemModCache = itemModCache;
+            var entity = new InventoryItem
+            {
+                PlayerId = playerId,
+                ItemId = itemId,
+                InventorySlotNumber = slotNumber,
+                Rating = rating,
+                Equipped = false,
+            };
+            _context.InventoryItems.Add(entity);
+            await _context.SaveChangesAsync();
+            return entity.Id;
         }
 
-        //public async Task<Inventory> GetPlayerInventory(int playerId)
-        //{
-        //    var inventory = new Inventory();
-        //    var player = await _context.Players
-        //        .Include(p => p.InventoryItems)
-        //            .ThenInclude(ii => ii.InventoryItemMods)
-        //                .ThenInclude(iim => iim.ItemModSlot)
-        //        .FirstOrDefaultAsync(p => p.Id == playerId);
+        public async Task UpdateInventoryItemSlots(int playerId, IEnumerable<IInventoryUpdate> updates)
+        {
+            var existing = await _context.InventoryItems
+                .Where(ii => ii.PlayerId == playerId)
+                .ToListAsync();
 
-        //    if (player is not null)
-        //    {
-        //        foreach (var inventoryItem in player.InventoryItems)
-        //        {
-        //            var item = _itemCache.Data[inventoryItem.ItemId];
-        //            foreach (var inventoryItemMod in inventoryItem.InventoryItemMods)
-        //            {
-        //                var itemMod = _itemModCache.Data[inventoryItemMod.ItemModId];
-        //                var slot = item.ModSlots.FirstOrDefault(slot => slot.Index == inventoryItemMod.ItemModSlot.Index);
-        //                if (slot != null)
-        //                {
-        //                    slot.ItemMod = itemMod;
-        //                }
-        //            }
-        //        }
-        //    }
-
-        //    return inventory;
-        //}
-
-        //public async Task<int> AddInventoryItem(Item inventoryItem)
-        //{
-        //    _context.Add(inventoryItem);
-        //    await _context.SaveChangesAsync();
-        //    return inventoryItem.Id;
-        //}
-
-        //public async Task UpdateInventoryItemSlots(int playerId, IEnumerable<Item> inventoryItems)
-        //{
-        //    await _context.Players.Where(p => p.Id == playerId).SelectMany(p => p.InventoryItems).ForEachAsync(item =>
-        //    {
-        //        var match = inventoryItems.FirstOrDefault(i => i.Id == item.Id);
-        //        if (match is null)
-        //        {
-        //            _context.Remove(item);
-        //        }
-        //        else
-        //        {
-        //            item.InventorySlotNumber = match.InventorySlotNumber;
-        //            item.Equipped = match.Equipped;
-        //            _context.Update(item);
-        //        }
-        //    });
-
-        //    await _context.SaveChangesAsync();
-        //}
+            foreach (var item in existing)
+            {
+                var match = updates.FirstOrDefault(u => u.Id == item.Id);
+                if (match is null)
+                {
+                    _context.InventoryItems.Remove(item);
+                }
+                else
+                {
+                    item.InventorySlotNumber = match.SlotNumber;
+                    item.Equipped = match.Equipped;
+                }
+            }
+            // No explicit SaveChangesAsync here — IUnitOfWork.CommitAsync() handles the flush
+            // at the end of the request/command pipeline.
+        }
     }
 }

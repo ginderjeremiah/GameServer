@@ -1,4 +1,4 @@
-﻿using Game.Core.Zones;
+﻿using Game.Abstractions.Entities;
 
 namespace Game.Abstractions.DataAccess
 {
@@ -7,5 +7,6 @@ namespace Game.Abstractions.DataAccess
         public List<Zone> All(bool refreshCache = false);
         public Zone? GetZone(int zoneId);
         public bool ValidateZoneId(int zoneId);
+        public IAsyncEnumerable<ZoneEnemy> ZoneEnemies(int zoneId);
     }
 }

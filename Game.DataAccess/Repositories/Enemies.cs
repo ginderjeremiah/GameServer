@@ -1,19 +1,23 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.Core.Probability;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
+using CoreEnemy = Game.Core.Enemies.Enemy;
 
 using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(GameContext context) : IEnemies
+    internal class Enemies(GameContext context, ISkills skills, IItems items) : IEnemies
     {
         private static readonly List<ProbabilityTable<int>?> zoneEnemiesTables = [];
         private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
 
         private readonly GameContext _context = context;
+        private readonly ISkills _skills = skills;
+        private readonly IItems _items = items;
 
         public List<Enemy> All(bool refreshCache = false)
         {
@@ -71,6 +75,20 @@ namespace Game.DataAccess.Repositories
 
                 return enemies[table.GetRandomValue()];
             }
+        }
+
+        public CoreEnemy? GetDomainEnemy(int enemyId, int level)
+        {
+            var entity = GetEnemy(enemyId);
+            return entity is null
+                ? null
+                : EnemyMapper.ToCore(entity, level, _skills.AllSkills(), _items.All());
+        }
+
+        public CoreEnemy GetRandomDomainEnemy(int zoneId, int level)
+        {
+            var entity = GetRandomEnemy(zoneId);
+            return EnemyMapper.ToCore(entity, level, _skills.AllSkills(), _items.All());
         }
     }
 }

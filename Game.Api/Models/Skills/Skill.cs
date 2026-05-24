@@ -1,5 +1,5 @@
 ﻿using Game.Api.Models.Attributes;
-using SkillEntity = Game.Core.Entities.Skill;
+using SkillEntity = Game.Abstractions.Entities.Skill;
 
 namespace Game.Api.Models.Skills
 {

@@ -1,5 +1,4 @@
-﻿using Game.Core;
-using Game.Core.Attributes.Modifiers;
+﻿using Game.Core.Attributes.Modifiers;
 
 namespace Game.Core.Attributes
 {
@@ -55,7 +54,7 @@ namespace Game.Core.Attributes
             var modifiers = node.Modifiers;
             if (modifiers is not null)
             {
-                foreach (var modifier in modifiers.Values)
+                foreach (var modifier in modifiers)
                 {
                     amount = modifier.Apply(amount, this);
                 }
@@ -71,14 +70,20 @@ namespace Game.Core.Attributes
         /// <returns></returns>
         public IEnumerable<AttributeModifier> AllModifiers()
         {
-            return _attributeNodeList.SelectNotNull(n => n.Modifiers?.Values).SelectMany(v => v);
+            return _attributeNodeList.SelectNotNull(n => n.Modifiers).SelectMany(v => v);
         }
 
         private void AddModifierWithoutCacheInvalidation(AttributeModifier modifier)
         {
             var node = _attributeNodeList[(int)modifier.Attribute];
             node.Modifiers ??= [];
-            node.Modifiers.Add(modifier.Type, modifier);
+
+            // Insert in sorted order by Type so Additive always applies before Multiplicative.
+            var insertIndex = node.Modifiers.FindIndex(m => m.Type > modifier.Type);
+            if (insertIndex < 0)
+                node.Modifiers.Add(modifier);
+            else
+                node.Modifiers.Insert(insertIndex, modifier);
 
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
@@ -111,7 +116,10 @@ namespace Game.Core.Attributes
 
         private static List<AttributeCollectionNode> GetNodeList()
         {
-            return Enumerable.Repeat(new AttributeCollectionNode(), _attributesMaxId + 1).ToList();
+            // Enumerable.Repeat would share a single instance — each slot must be its own object.
+            return Enumerable.Range(0, _attributesMaxId + 1)
+                             .Select(_ => new AttributeCollectionNode())
+                             .ToList();
         }
 
         private static int GetMaxAttribute()

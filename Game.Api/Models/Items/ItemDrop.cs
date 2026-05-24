@@ -1,4 +1,4 @@
-﻿using Game.Core.Entities;
+﻿using Game.Abstractions.Entities;
 
 namespace Game.Api.Models.Items
 {

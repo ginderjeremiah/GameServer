@@ -1,4 +1,4 @@
-﻿using ItemModSlotTypeEntity = Game.Core.Entities.ItemModType;
+﻿using ItemModSlotTypeEntity = Game.Abstractions.Entities.ItemModType;
 
 namespace Game.Api.Models.Items
 {

@@ -1,7 +1,7 @@
 ﻿using Game.Api;
 using Game.Api.Models.Attributes;
 using Game.Api.Models.Items;
-using EnemyEntity = Game.Core.Entities.Enemy;
+using EnemyEntity = Game.Abstractions.Entities.Enemy;
 
 namespace Game.Api.Models.Enemies
 {

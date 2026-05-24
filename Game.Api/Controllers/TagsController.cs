@@ -1,43 +1,39 @@
 ﻿using Game.Api.Models.Common;
 using Game.Api.Models.Tags;
-using Game.Core.DataAccess;
+using Game.Abstractions.DataAccess;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class TagsController : ControllerBase
+    public class TagsController(ITags tags, ITagCategories tagCategories) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public TagsController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly ITags _tags = tags;
+        private readonly ITagCategories _tagCategories = tagCategories;
 
         [HttpGet("/api/[controller]")]
         public ApiAsyncEnumerableResponse<Tag> Tags()
         {
-            return ApiResponse.Success(_repositoryManager.Tags.All().To().Model<Tag>());
+            return ApiResponse.Success(_tags.All().To().Model<Tag>());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<TagCategory> TagCategories()
         {
-            return ApiResponse.Success(_repositoryManager.TagCategories.All().To().Model<TagCategory>());
+            return ApiResponse.Success(_tagCategories.All().To().Model<TagCategory>());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<Tag> TagsForItem(int itemId)
         {
-            return ApiResponse.Success(_repositoryManager.Tags.GetTagsForItem(itemId).To().Model<Tag>());
+            return ApiResponse.Success(_tags.GetTagsForItem(itemId).To().Model<Tag>());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<Tag> TagsForItemMod(int itemModId)
         {
-            return ApiResponse.Success(_repositoryManager.Tags.GetTagsForItemMod(itemModId).To().Model<Tag>());
+            return ApiResponse.Success(_tags.GetTagsForItemMod(itemModId).To().Model<Tag>());
         }
     }
 }

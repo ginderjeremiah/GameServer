@@ -1,5 +1,5 @@
 ﻿using Game.Core;
-using LogPreferenceEntity = Game.Core.Entities.LogPreference;
+using LogPreferenceEntity = Game.Abstractions.Entities.LogPreference;
 
 namespace Game.Api.Models.Player
 {

@@ -1,8 +1,11 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players;
+using Game.Core.Players.Inventories;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using EntityPlayerAttribute = Game.Abstractions.Entities.PlayerAttribute;
 
 namespace Game.DataAccess.Repositories
 {
@@ -13,7 +16,6 @@ namespace Game.DataAccess.Repositories
         private readonly GameContext _context;
         private readonly ICacheService _cache;
         private readonly DataProviderSynchronizer _synchronizer;
-
 
         public Players(GameContext context, ICacheService cache, DataProviderSynchronizer synchronizer)
         {
@@ -28,7 +30,7 @@ namespace Game.DataAccess.Repositories
             var player = await _cache.GetAsync<Player>(playerKey);
             if (player is null)
             {
-                var playerEntity = await GetPlayerFromDb(playerId);
+                player = await GetPlayerFromDb(playerId);
                 if (player is not null)
                 {
                     _cache.SetAndForget(playerKey, player);
@@ -38,73 +40,62 @@ namespace Game.DataAccess.Repositories
             return player;
         }
 
-        public async Task SavePlayer(Player player, bool playerDirty, bool inventoryDirty, bool skillsDirty)
+        public async Task SavePlayer(Player player)
         {
-            var playerKey = $"{PlayerPrefix}_{player.Id}";
-            _cache.SetAndForget(playerKey, player);
-            if (inventoryDirty)
+            var entity = await _context.Players
+                .Include(p => p.PlayerAttributes)
+                .FirstOrDefaultAsync(p => p.Id == player.Id);
+
+            if (entity is null) return;
+
+            // Sync scalar fields
+            entity.Level = player.Level;
+            entity.Exp = player.Exp;
+            entity.StatPointsGained = player.StatPoints.StatPointsGained;
+            entity.StatPointsUsed = player.StatPoints.StatPointsUsed;
+            entity.CurrentZoneId = player.CurrentZoneId;
+
+            // Sync stat allocations — remove old rows, add current
+            foreach (var attr in entity.PlayerAttributes.ToList())
             {
-                await _synchronizer.SynchronizeInventory(playerKey);
+                _context.Remove(attr);
             }
-            if (playerDirty)
+            foreach (var allocation in player.StatPoints.StatAllocations)
             {
-                await _synchronizer.SynchronizePlayerData(playerKey);
+                entity.PlayerAttributes.Add(new EntityPlayerAttribute
+                {
+                    PlayerId = player.Id,
+                    AttributeId = (int)allocation.Attribute,
+                    Amount = (decimal)allocation.Amount,
+                });
             }
-            if (skillsDirty)
-            {
-                await _synchronizer.SynchronizeSkills(playerKey);
-            }
+
+            // Keep Redis cache in sync
+            _cache.SetAndForget($"{PlayerPrefix}_{player.Id}", player);
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
         {
-            var player = _context.Players
+            var entity = await _context.Players
+                .AsNoTracking()
                 .Include(p => p.PlayerAttributes)
-                .Include(p => p.LogPreferences)
                 .Include(p => p.PlayerSkills)
+                    .ThenInclude(ps => ps.Skill)
+                        .ThenInclude(s => s.SkillDamageMultipliers)
                 .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.Item)
+                        .ThenInclude(i => i.ItemAttributes)
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.Item)
+                        .ThenInclude(i => i.ItemModSlots)
+                .Include(p => p.InventoryItems)
+                    .ThenInclude(ii => ii.InventoryItemMods)
+                        .ThenInclude(iim => iim.ItemMod)
+                            .ThenInclude(im => im!.ItemModAttributes)
                 .AsSplitQuery()
-                .FirstOrDefault(p => p.Id == playerId);
+                .FirstOrDefaultAsync(p => p.Id == playerId);
 
-            return new Player
-            {
-                Id = player.Id,
-                Name = player.Name,
-                UserName = player.UserName,
-                Level = player.Level,
-                Exp = player.Exp,
-                Salt = player.Salt,
-                PassHash = player.PassHash,
-                StatPointsGained = player.StatPointsGained,
-                StatPointsUsed = player.StatPointsUsed,
-                PlayerAttributes = player.PlayerAttributes.Select(pa => new Core.Players.PlayerAttribute
-                {
-                    Id = pa.Id,
-                    PlayerId = pa.PlayerId,
-                    AttributeId = pa.AttributeId,
-                    Amount = pa.Amount
-                }).ToList(),
-                LogPreferences = player.LogPreferences.Select(lp => new Core.Players.LogPreference
-                {
-                    Id = lp.Id,
-                    PlayerId = lp.PlayerId,
-                    LogSettingId = lp.LogSettingId,
-                    Enabled = lp.Enabled
-                }).ToList(),
-                PlayerSkills = player.PlayerSkills.Select(ps => new Core.Players.PlayerSkill
-                {
-                    Id = ps.Id,
-                    PlayerId = ps.PlayerId,
-                    SkillId = ps.SkillId,
-                    Selected = ps.Selected
-                }).ToList(),
-                InventoryItems = player.InventoryItems.Select(i => new Core.Items.InventoryItem
-                {
-                    Id = i.Id,
-                    PlayerId = i.PlayerId,
-                    ItemId = i.ItemId,
-                    Amount = i.Amount
-                }).ToList()
-            }
+            return entity is null ? null : PlayerMapper.ToCore(entity);
+        }
     }
-    }
+}

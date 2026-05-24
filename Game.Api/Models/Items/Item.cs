@@ -1,6 +1,6 @@
 ﻿using Game.Api.Models.Attributes;
 using Game.Core;
-using ItemEntity = Game.Core.Entities.Item;
+using ItemEntity = Game.Abstractions.Entities.Item;
 
 namespace Game.Api.Models.Items
 {

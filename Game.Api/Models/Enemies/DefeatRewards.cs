@@ -1,18 +1,23 @@
-﻿using Game.Api.Models.InventoryItems;
+using Game.Api.Models.InventoryItems;
+using Game.Application;
 
 namespace Game.Api.Models.Enemies
 {
     public class DefeatRewards
     {
         public int ExpReward { get; set; }
-        public List<InventoryItem> Drops { get; set; }
+
+        /// <summary>Items dropped and added to inventory, with their assigned slot numbers.</summary>
+        public List<InventoryItem> DroppedItems { get; set; } = [];
 
         public DefeatRewards() { }
 
-        public DefeatRewards(Core.Battle.DefeatRewards rewards)
+        public DefeatRewards(DefeatResult result)
         {
-            ExpReward = rewards.ExpReward;
-            Drops = rewards.Drops.Select(item => new InventoryItem(item)).ToList();
+            ExpReward = result.ExpReward;
+            DroppedItems = result.DroppedItems
+                .Select(d => new InventoryItem(d.InventoryItemId, d.SlotNumber, d.Item))
+                .ToList();
         }
     }
 }

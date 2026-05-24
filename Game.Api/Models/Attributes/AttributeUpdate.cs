@@ -1,4 +1,5 @@
-﻿using Game.Core.Sessions;
+﻿using Game.Core;
+using Game.Core.Players;
 
 namespace Game.Api.Models.Attributes
 {
@@ -6,5 +7,7 @@ namespace Game.Api.Models.Attributes
     {
         public int AttributeId { get; set; }
         public int Amount { get; set; }
+
+        EAttribute IAttributeUpdate.Attribute => (EAttribute)AttributeId;
     }
 }

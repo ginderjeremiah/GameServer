@@ -1,4 +1,4 @@
-﻿using ItemCategoryEntity = Game.Core.Entities.ItemCategory;
+﻿using ItemCategoryEntity = Game.Abstractions.Entities.ItemCategory;
 
 namespace Game.Api.Models.Items
 {

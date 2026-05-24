@@ -8,6 +8,11 @@ namespace Game.Core.Players.Inventories
     public class InventorySlot
     {
         /// <summary>
+        /// The <c>InventoryItem</c> database record ID for the item occupying this slot.
+        /// </summary>
+        public int InventoryItemId { get; set; }
+
+        /// <summary>
         /// The slot number of the inventory slot.
         /// </summary>
         public int SlotNumber { get; set; }

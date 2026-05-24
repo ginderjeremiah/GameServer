@@ -31,7 +31,7 @@ namespace Game.Core.Attributes
         {
             return new AttributeModifier
             {
-                Attribute = Attribute,
+                Attribute = AttributeId,
                 Amount = (double)(BaseAmount + (AmountPerLevel * level)),
                 Type = EModifierType.Additive,
                 Source = EAttributeModifierSource.AttributeDistribution,

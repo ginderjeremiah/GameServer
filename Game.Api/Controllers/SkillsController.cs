@@ -7,20 +7,14 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class SkillsController : ControllerBase
+    public class SkillsController(ISkills skills) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public SkillsController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly ISkills _skills = skills;
 
         [HttpGet("/api/[controller]")]
         public ApiEnumerableResponse<Skill> Skills(bool refreshCache = false)
         {
-            var skills = _repositoryManager.Skills.AllSkills(refreshCache);
-            return ApiResponse.Success(skills.To().Model<Skill>());
+            return ApiResponse.Success(_skills.AllSkills(refreshCache).To().Model<Skill>());
         }
     }
 }

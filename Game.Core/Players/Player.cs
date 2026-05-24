@@ -1,62 +1,44 @@
-﻿using Game.Core.Players.Inventories;
+using Game.Core.Attributes;
+using Game.Core.Attributes.Modifiers;
+using Game.Core.Events;
+using Game.Core.Items;
+using Game.Core.Players.Inventories;
 using Game.Core.Skills;
-using Game.Core.Zones;
 
 namespace Game.Core.Players
 {
     /// <summary>
     /// Represents a player character in the game.
     /// </summary>
-    public class Player
+    public class Player : AggregateRoot
     {
-        /// <summary>
-        /// The name of the player.
-        /// </summary>
+        public required int Id { get; set; }
+
         public required string Name { get; set; }
 
-        /// <summary>
-        /// The level of the player.
-        /// </summary>
         public required int Level { get; set; }
 
-        /// <summary>
-        /// How much EXP the player has towards their next level.
-        /// </summary>
         public required int Exp { get; set; }
 
-        /// <summary>
-        /// The <see cref="Zone"/> that the player is currently in.
-        /// </summary>
-        public required Zone CurrentZone { get; set; }
+        public required int CurrentZoneId { get; set; }
 
-        /// <inheritdoc cref="PlayerStatPoints"/>
         public required PlayerStatPoints StatPoints { get; set; }
 
-        /// <summary>
-        /// The player's inventory.
-        /// </summary>
         public required Inventory Inventory { get; set; }
 
-        /// <summary>
-        /// The list of skills that the player has selected for battle.
-        /// </summary>
         public required List<Skill> SelectedSkills { get; set; }
 
-        /// <summary>
-        /// The list of skills that the player has learned.
-        /// </summary>
         public required List<Skill> Skills { get; set; }
 
-        /// <inheritdoc cref="PlayerStatPoints.TryUpdateAttributes(IEnumerable{IAttributeUpdate})"/>
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             return StatPoints.TryUpdateAttributes(changedAttributes);
         }
 
         /// <summary>
-        /// Grants the player the given amount of EXP and levels up if necessary.
+        /// Awards experience to the player. Raises <see cref="PlayerLeveledUpEvent"/> if a
+        /// level-up occurs.
         /// </summary>
-        /// <param name="amount"></param>
         public void GrantExp(int amount)
         {
             Exp += amount;
@@ -65,7 +47,42 @@ namespace Game.Core.Players
                 Exp -= Level * 100;
                 Level++;
                 StatPoints.StatPointsGained += 6;
+                RaiseEvent(new PlayerLeveledUpEvent(Id, Level, StatPoints.StatPointsGained));
             }
+        }
+
+        /// <summary>
+        /// Adds <paramref name="item"/> to the inventory and raises an
+        /// <see cref="ItemAcquiredEvent"/>.
+        /// </summary>
+        /// <param name="item">The item to add.</param>
+        /// <param name="inventoryItemId">The database record ID of the persisted inventory item.</param>
+        public void AddInventoryItem(Item item, int inventoryItemId)
+        {
+            var slotNumber = Inventory.TryAddItem(item, inventoryItemId);
+            RaiseEvent(new ItemAcquiredEvent(Id, item, inventoryItemId, slotNumber));
+        }
+
+        /// <summary>
+        /// Records that an enemy has been defeated and raises an <see cref="EnemyDefeatedEvent"/>.
+        /// </summary>
+        /// <param name="enemyId">The defeated enemy's identifier.</param>
+        /// <param name="expReward">Experience awarded.</param>
+        /// <param name="drops">Items that dropped from the enemy.</param>
+        public void RecordEnemyDefeat(int enemyId, int expReward, IReadOnlyList<Item> drops)
+        {
+            RaiseEvent(new EnemyDefeatedEvent(Id, enemyId, expReward, drops));
+        }
+
+        public IEnumerable<AttributeModifier> GetAllModifiers()
+        {
+            return StatPoints.ToAttributeModifiers()
+                .Concat(Inventory.GetEquippedAttributeModifiers());
+        }
+
+        public AttributeCollection GetAttributes()
+        {
+            return new AttributeCollection(GetAllModifiers());
         }
     }
 }

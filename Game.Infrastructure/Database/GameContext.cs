@@ -124,7 +124,7 @@ namespace Game.Infrastructure.Database
 
                 entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
                 {
-                    var attribute = new Core.Items.EquipmentSlot(a);
+                    var attribute = new Core.Players.EquipmentSlot(a);
                     return new EquipmentSlot
                     {
                         Id = (int)a,
@@ -238,7 +238,7 @@ namespace Game.Infrastructure.Database
 
                 entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
                 {
-                    var attribute = new Core.Items.EquipmentSlot(a);
+                    var attribute = new Core.Players.EquipmentSlot(a);
                     return new EquipmentSlot
                     {
                         Id = (int)a,

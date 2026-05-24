@@ -1,9 +1,0 @@
-{
-  "scripts": {
-    "watch": "tsc -watch"
-  },
-  "devDependencies": {
-    "eslint": "^9.0.0",
-    "typescript": "^4.9.5"
-  }
-}

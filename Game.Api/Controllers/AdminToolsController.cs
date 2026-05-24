@@ -1,4 +1,4 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
@@ -12,54 +12,61 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class AdminToolsController : ControllerBase
+    public class AdminToolsController(
+        IEnemies enemies,
+        IItems items,
+        IItemMods itemMods,
+        ISkills skills,
+        ITags tags,
+        IZones zones,
+        IEntityStore entityStore) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public AdminToolsController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly IEnemies _enemies = enemies;
+        private readonly IItems _items = items;
+        private readonly IItemMods _itemMods = itemMods;
+        private readonly ISkills _skills = skills;
+        private readonly ITags _tags = tags;
+        private readonly IZones _zones = zones;
+        private readonly IEntityStore _entityStore = entityStore;
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditEnemies([FromBody] List<Change<Enemy>> changes)
+        public ApiResponse AddEditEnemies([FromBody] List<Change<Enemy>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.Enemy
+                    _entityStore.Insert(new Game.Abstractions.Entities.Enemy
                     {
                         Name = change.Item.Name
                     });
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var enemy = _repositoryManager.Enemies.GetEnemy(change.Item.Id);
+                    var enemy = _enemies.GetEnemy(change.Item.Id);
                     if (enemy is not null)
                     {
                         enemy.Name = change.Item.Name;
-                        _repositoryManager.Update(enemy);
+                        _entityStore.Update(enemy);
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var enemy = _repositoryManager.ItemMods.GetItemMod(change.Item.Id);
+                    var enemy = _enemies.GetEnemy(change.Item.Id);
                     if (enemy is not null)
                     {
-                        _repositoryManager.Delete(enemy);
+                        _entityStore.Delete(enemy);
                     }
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItemAttributes([FromBody] AddEditAttributesData changeData)
+        public ApiResponse AddEditItemAttributes([FromBody] AddEditAttributesData changeData)
         {
-            var item = _repositoryManager.Items.GetItem(changeData.Id);
+            var item = _items.GetItem(changeData.Id);
             if (item is null)
             {
                 return ApiResponse.Error("Item does not exist.");
@@ -69,7 +76,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    item.ItemAttributes.Add(new Core.Entities.ItemAttribute()
+                    item.ItemAttributes.Add(new Game.Abstractions.Entities.ItemAttribute()
                     {
                         ItemId = item.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -94,14 +101,13 @@ namespace Game.Api.Controllers
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItemModAttributes([FromBody] AddEditAttributesData changeData)
+        public ApiResponse AddEditItemModAttributes([FromBody] AddEditAttributesData changeData)
         {
-            var itemMod = _repositoryManager.ItemMods.GetItemMod(changeData.Id);
+            var itemMod = _itemMods.GetItemMod(changeData.Id);
             if (itemMod is null)
             {
                 return ApiResponse.Error("Item Mod does not exist.");
@@ -111,7 +117,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    itemMod.ItemModAttributes.Add(new Core.Entities.ItemModAttribute()
+                    itemMod.ItemModAttributes.Add(new Game.Abstractions.Entities.ItemModAttribute()
                     {
                         ItemModId = itemMod.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -136,18 +142,17 @@ namespace Game.Api.Controllers
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
+        public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new ItemMod
+                    _entityStore.Insert(new Game.Abstractions.Entities.ItemMod
                     {
                         Name = change.Item.Name,
                         Removable = change.Item.Removable,
@@ -157,38 +162,37 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var itemMod = _repositoryManager.ItemMods.GetItemMod(change.Item.Id);
+                    var itemMod = _itemMods.GetItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
                         itemMod.Name = change.Item.Name;
                         itemMod.Removable = change.Item.Removable;
                         itemMod.Description = change.Item.Description;
                         itemMod.ItemModTypeId = change.Item.ItemModTypeId;
-                        _repositoryManager.Update(itemMod);
+                        _entityStore.Update(itemMod);
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var itemMod = _repositoryManager.ItemMods.GetItemMod(change.Item.Id);
+                    var itemMod = _itemMods.GetItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
-                        _repositoryManager.Delete(itemMod);
+                        _entityStore.Delete(itemMod);
                     }
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItems([FromBody] List<Change<Item>> changes)
+        public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.Item
+                    _entityStore.Insert(new Game.Abstractions.Entities.Item
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
@@ -198,38 +202,37 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var item = _repositoryManager.Items.GetItem(change.Item.Id);
+                    var item = _items.GetItem(change.Item.Id);
                     if (item is not null)
                     {
                         item.Name = change.Item.Name;
                         item.Description = change.Item.Description;
                         item.ItemCategoryId = (int)change.Item.ItemCategoryId;
                         item.IconPath = change.Item.IconPath;
-                        _repositoryManager.Update(item);
+                        _entityStore.Update(item);
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var item = _repositoryManager.Items.GetItem(change.Item.Id);
+                    var item = _items.GetItem(change.Item.Id);
                     if (item is not null)
                     {
-                        _repositoryManager.Delete(item);
+                        _entityStore.Delete(item);
                     }
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
+        public ApiResponse AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.ItemModSlot
+                    _entityStore.Insert(new Game.Abstractions.Entities.ItemModSlot
                     {
                         ItemId = change.Item.ItemId,
                         ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
@@ -239,7 +242,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _repositoryManager.Update(new Core.Entities.ItemModSlot
+                    _entityStore.Update(new Game.Abstractions.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                         ItemId = change.Item.ItemId,
@@ -250,25 +253,24 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _repositoryManager.Delete(new Core.Entities.ItemModSlot
+                    _entityStore.Delete(new Game.Abstractions.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                     });
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditSkills([FromBody] List<Change<Skill>> changes)
+        public ApiResponse AddEditSkills([FromBody] List<Change<Skill>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.Skill
+                    _entityStore.Insert(new Game.Abstractions.Entities.Skill
                     {
                         Name = change.Item.Name,
                         BaseDamage = change.Item.BaseDamage,
@@ -279,7 +281,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _repositoryManager.Update(new Core.Entities.Skill
+                    _entityStore.Update(new Game.Abstractions.Entities.Skill
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -291,25 +293,24 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _repositoryManager.Delete(new Core.Entities.Skill
+                    _entityStore.Delete(new Game.Abstractions.Entities.Skill
                     {
                         Id = change.Item.Id,
                     });
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditTags([FromBody] List<Change<Tag>> changes)
+        public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.Tag
+                    _entityStore.Insert(new Game.Abstractions.Entities.Tag
                     {
                         Name = change.Item.Name,
                         TagCategoryId = change.Item.TagCategoryId,
@@ -317,7 +318,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _repositoryManager.Update(new Core.Entities.Tag
+                    _entityStore.Update(new Game.Abstractions.Entities.Tag
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -326,25 +327,24 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _repositoryManager.Delete(new Core.Entities.Tag
+                    _entityStore.Delete(new Game.Abstractions.Entities.Tag
                     {
                         Id = change.Item.Id,
                     });
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> AddEditZones([FromBody] List<Change<Zone>> changes)
+        public ApiResponse AddEditZones([FromBody] List<Change<Zone>> changes)
         {
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.Zone
+                    _entityStore.Insert(new Game.Abstractions.Entities.Zone
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
@@ -355,7 +355,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _repositoryManager.Update(new Core.Entities.Zone
+                    _entityStore.Update(new Game.Abstractions.Entities.Zone
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -367,33 +367,32 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _repositoryManager.Delete(new Core.Entities.Zone
+                    _entityStore.Delete(new Game.Abstractions.Entities.Zone
                     {
                         Id = change.Item.Id,
                     });
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
-        public async Task<ApiResponse> SetEnemyAttributeDistributions([FromBody] SetEnemyAttributeDistributions distributionsData)
+        public ApiResponse SetEnemyAttributeDistributions([FromBody] SetEnemyAttributeDistributions distributionsData)
         {
-            var enemy = _repositoryManager.Enemies.GetEnemy(distributionsData.EnemyId);
+            var enemy = _enemies.GetEnemy(distributionsData.EnemyId);
             if (enemy is not null)
             {
                 var newIds = distributionsData.AttributeDistributions.Select(ad => (int)ad.AttributeId).ToList();
                 foreach (var dist in enemy.AttributeDistributions.Where(ad => !newIds.Contains(ad.AttributeId)))
                 {
-                    _repositoryManager.Delete(enemy);
+                    _entityStore.Delete(dist);
                 }
 
                 foreach (var dist in enemy.AttributeDistributions.Where(ad => newIds.Contains(ad.AttributeId)))
                 {
                     var newData = distributionsData.AttributeDistributions.First(ad => (int)ad.AttributeId == dist.AttributeId);
-                    _repositoryManager.Update(new Core.Entities.AttributeDistribution
+                    _entityStore.Update(new Game.Abstractions.Entities.AttributeDistribution
                     {
                         EnemyId = enemy.Id,
                         AttributeId = dist.AttributeId,
@@ -403,9 +402,9 @@ namespace Game.Api.Controllers
                 }
 
                 var existingIds = enemy.AttributeDistributions.Select(ad => ad.AttributeId).ToList();
-                var zoneEnemies = distributionsData.AttributeDistributions
+                var newDistributions = distributionsData.AttributeDistributions
                     .Where(ad => !existingIds.Contains((int)ad.AttributeId))
-                    .Select(ad => new Core.Entities.AttributeDistribution
+                    .Select(ad => new Game.Abstractions.Entities.AttributeDistribution
                     {
                         EnemyId = enemy.Id,
                         AttributeId = (int)ad.AttributeId,
@@ -413,47 +412,45 @@ namespace Game.Api.Controllers
                         AmountPerLevel = ad.AmountPerLevel
                     }).ToList();
 
-                _repositoryManager.InsertAll(zoneEnemies);
-                await _repositoryManager.SaveChangesAsync();
+                _entityStore.InsertAll(newDistributions);
                 return ApiResponse.Success();
             }
 
-            return ApiResponse.Error("Zone not found.");
+            return ApiResponse.Error("Enemy not found.");
         }
 
         [HttpPost]
-        public async Task<ApiResponse> SetEnemySkills([FromBody] SetEnemySkillsData enemySkillsData)
+        public ApiResponse SetEnemySkills([FromBody] SetEnemySkillsData enemySkillsData)
         {
-            var enemy = _repositoryManager.Enemies.GetEnemy(enemySkillsData.EnemyId);
+            var enemy = _enemies.GetEnemy(enemySkillsData.EnemyId);
             if (enemy is not null)
             {
                 var newIds = enemySkillsData.SkillIds;
                 foreach (var skill in enemy.EnemySkills.Where(e => !newIds.Contains(e.SkillId)))
                 {
-                    _repositoryManager.Delete(skill);
+                    _entityStore.Delete(skill);
                 }
 
                 var existingIds = enemy.EnemySkills.Select(ze => ze.SkillId).ToList();
                 var enemySkills = enemySkillsData.SkillIds
                     .Where(id => !existingIds.Contains(id))
-                    .Select(id => new Core.Entities.EnemySkill
+                    .Select(id => new Game.Abstractions.Entities.EnemySkill
                     {
                         EnemyId = enemy.Id,
                         SkillId = id,
                     }).ToList();
 
-                _repositoryManager.InsertAll(enemySkills);
-                await _repositoryManager.SaveChangesAsync();
+                _entityStore.InsertAll(enemySkills);
                 return ApiResponse.Success();
             }
 
-            return ApiResponse.Error("Zone not found.");
+            return ApiResponse.Error("Enemy not found.");
         }
 
         [HttpPost]
-        public async Task<ApiResponse> SetSkillMultipliers([FromBody] AddEditAttributesData changeData)
+        public ApiResponse SetSkillMultipliers([FromBody] AddEditAttributesData changeData)
         {
-            var skill = _repositoryManager.Skills.GetSkill(changeData.Id);
+            var skill = _skills.GetSkill(changeData.Id);
             if (skill is null)
             {
                 return ApiResponse.Error("Skill does not exist.");
@@ -463,7 +460,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _repositoryManager.Insert(new Core.Entities.SkillDamageMultiplier
+                    _entityStore.Insert(new Game.Abstractions.Entities.SkillDamageMultiplier
                     {
                         SkillId = skill.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -476,7 +473,7 @@ namespace Game.Api.Controllers
                     if (att is not null)
                     {
                         att.Multiplier = change.Item.Amount;
-                        _repositoryManager.Update(att);
+                        _entityStore.Update(att);
                     }
                 }
                 else if (change.ChangeType == Delete)
@@ -485,29 +482,27 @@ namespace Game.Api.Controllers
                     if (att is not null)
                     {
                         skill.SkillDamageMultipliers.Remove(att);
-                        _repositoryManager.Delete(att);
+                        _entityStore.Delete(att);
                     }
                 }
             }
 
-            await _repositoryManager.SaveChangesAsync();
             return ApiResponse.Success();
         }
 
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItem([FromBody] SetTagsData setTagsData)
         {
-            var item = _repositoryManager.Items.GetItem(setTagsData.Id);
+            var item = _items.GetItem(setTagsData.Id);
             if (item is not null)
             {
                 item.Tags.Clear();
-                var tags = _repositoryManager.Tags.GetTags(setTagsData.TagIds);
+                var tags = _tags.GetTags(setTagsData.TagIds);
                 await foreach (var tag in tags)
                 {
                     item.Tags.Add(tag);
                 }
 
-                await _repositoryManager.SaveChangesAsync();
                 return ApiResponse.Success();
             }
 
@@ -517,17 +512,16 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {
-            var itemMod = _repositoryManager.ItemMods.GetItemMod(setTagsData.Id);
+            var itemMod = _itemMods.GetItemMod(setTagsData.Id);
             if (itemMod is not null)
             {
                 itemMod.Tags.Clear();
-                var tags = _repositoryManager.Tags.GetTags(setTagsData.TagIds);
+                var tags = _tags.GetTags(setTagsData.TagIds);
                 await foreach (var tag in tags)
                 {
                     itemMod.Tags.Add(tag);
                 }
 
-                await _repositoryManager.SaveChangesAsync();
                 return ApiResponse.Success();
             }
 
@@ -535,21 +529,21 @@ namespace Game.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ApiResponse> SetZoneEnemies([FromBody] SetZoneEnemiesData zoneEnemiesData)
+        public ApiResponse SetZoneEnemies([FromBody] SetZoneEnemiesData zoneEnemiesData)
         {
-            var zone = _repositoryManager.Zones.GetZone(zoneEnemiesData.ZoneId);
+            var zone = _zones.GetZone(zoneEnemiesData.ZoneId);
             if (zone is not null)
             {
                 var newIds = zoneEnemiesData.ZoneEnemies.Select(ze => ze.EnemyId).ToList();
                 foreach (var enemy in zone.ZoneEnemies.Where(e => !newIds.Contains(e.EnemyId)))
                 {
-                    _repositoryManager.Delete(enemy);
+                    _entityStore.Delete(enemy);
                 }
 
                 foreach (var enemy in zone.ZoneEnemies.Where(e => newIds.Contains(e.EnemyId)))
                 {
                     var newData = zoneEnemiesData.ZoneEnemies.First(ze => ze.EnemyId == enemy.EnemyId);
-                    _repositoryManager.Update(new Core.Entities.ZoneEnemy
+                    _entityStore.Update(new Game.Abstractions.Entities.ZoneEnemy
                     {
                         ZoneId = enemy.ZoneId,
                         EnemyId = enemy.EnemyId,
@@ -560,15 +554,14 @@ namespace Game.Api.Controllers
                 var existingIds = zone.ZoneEnemies.Select(ze => ze.EnemyId).ToList();
                 var zoneEnemies = zoneEnemiesData.ZoneEnemies
                     .Where(ze => !existingIds.Contains(ze.EnemyId))
-                    .Select(ze => new Core.Entities.ZoneEnemy
+                    .Select(ze => new Game.Abstractions.Entities.ZoneEnemy
                     {
                         ZoneId = zoneEnemiesData.ZoneId,
                         EnemyId = ze.EnemyId,
                         Weight = ze.Weight,
                     }).ToList();
 
-                _repositoryManager.InsertAll(zoneEnemies);
-                await _repositoryManager.SaveChangesAsync();
+                _entityStore.InsertAll(zoneEnemies);
                 return ApiResponse.Success();
             }
 

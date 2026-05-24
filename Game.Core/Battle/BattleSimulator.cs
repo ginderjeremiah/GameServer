@@ -1,62 +1,48 @@
 ﻿using Game.Core.Enemies;
-using Game.Core.Inventories;
 using Game.Core.Players;
 
 namespace Game.Core.Battle
 {
     public class BattleSimulator
     {
-        private Mulberry32 Rng { get; set; }
-        private Battler Player { get; set; }
-        private Battler Enemy { get; set; }
+        private Battler PlayerBattler { get; set; }
+        private Battler EnemyBattler { get; set; }
 
-        private const int msPerTick = 40;
-        private const int maxMs = msPerTick * 10000;
+        private const int MsPerTick = 40;
+        private const int MaxMs = MsPerTick * 10000;
 
-        public BattleSimulator(Player player, Inventory inventory, Enemy enemy, uint seed)
+        public BattleSimulator(Player player, Enemy enemy)
         {
-            Rng = new Mulberry32(seed);
-            Player = new Battler(player, inventory);
-            Enemy = new Battler(enemy);
+            PlayerBattler = new Battler(player);
+            EnemyBattler = new Battler(enemy);
         }
 
         public bool Simulate(out int totalMs)
         {
-            var context = InitializeContext();
-            for (totalMs = msPerTick; totalMs <= maxMs; totalMs += msPerTick)
-            {
-                Player.Update(context);
+            var context = new BattleContext(PlayerBattler, EnemyBattler, MsPerTick);
 
-                if (Enemy.IsDead)
+            for (totalMs = MsPerTick; totalMs <= MaxMs; totalMs += MsPerTick)
+            {
+                PlayerBattler.Update(context);
+
+                if (EnemyBattler.IsDead)
                 {
                     return true;
                 }
 
-                context.ActiveBattler = Enemy;
-                context.TargetBattler = Player;
+                context.SwapActiveAndTargetBattlers();
 
-                Enemy.Update(context);
+                EnemyBattler.Update(context);
 
-                if (Player.IsDead)
+                if (PlayerBattler.IsDead)
                 {
                     return false;
                 }
 
-                context.ActiveBattler = Player;
-                context.TargetBattler = Enemy;
+                context.SwapActiveAndTargetBattlers();
             }
 
             return false;
-        }
-
-        private BattleContext InitializeContext()
-        {
-            return new BattleContext
-            {
-                TimeDelta = msPerTick,
-                ActiveBattler = Player,
-                TargetBattler = Enemy,
-            };
         }
     }
 }

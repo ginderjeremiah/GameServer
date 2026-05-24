@@ -1,7 +1,6 @@
 ﻿using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Abstractions.Infrastructure;
-using Game.Core.Sessions;
 using System.Net.WebSockets;
 
 namespace Game.Api.Services
@@ -23,11 +22,11 @@ namespace Game.Api.Services
             _commandFactory = commandFactory;
         }
 
-        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionPlayer player)
+        public async Task<SocketContext> RegisterSocket(WebSocket socket, int playerId)
         {
-            var socketContext = new SocketContext(socket, player.Id, _loggerFactory.CreateLogger<SocketContext>());
+            var socketContext = new SocketContext(socket, playerId, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _loggerFactory.CreateLogger<SocketHandler>());
-            var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(player.Id), socketContext.SocketId);
+            var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(playerId), socketContext.SocketId);
             if (oldSocketId is not null)
             {
                 await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
@@ -35,7 +34,7 @@ namespace Game.Api.Services
 
             await RegisterSocketCommandListener(socketHandler);
             socketHandler.Listen();
-            _logger.LogDebug("Initiated socket for player: {UserName} ({Id}), with Id: {SocketId}", player.UserName, player.Id, socketContext.SocketId);
+            _logger.LogDebug("Initiated socket for player: ({Id}), with Id: {SocketId}", playerId, socketContext.SocketId);
             return socketContext;
         }
 

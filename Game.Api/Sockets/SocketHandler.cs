@@ -1,7 +1,9 @@
-﻿using Game.Api.Models.Common;
+using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
+using Game.Application;
 using Game.Core;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using static System.Net.WebSockets.WebSocketState;
 
@@ -37,19 +39,23 @@ namespace Game.Api.Sockets
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
-            var command = await _commandFactory.CreateCommand(commandInfo);
-            try
+            var (command, scope) = await _commandFactory.CreateCommand(commandInfo);
+            using (scope)
             {
-                var response = await command.ExecuteAsync(_context);
-                await _context.SendData(response);
-            }
-            catch
-            {
-                await _context.SendData(new ApiSocketResponse
+                try
                 {
-                    Id = commandInfo.Id,
-                    Error = "Internal Server Error"
-                });
+                    var response = await command.ExecuteAsync(_context);
+                    await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+                    await _context.SendData(response);
+                }
+                catch
+                {
+                    await _context.SendData(new ApiSocketResponse
+                    {
+                        Id = commandInfo.Id,
+                        Error = "Internal Server Error"
+                    });
+                }
             }
 
             _lastSend = DateTime.UtcNow;
@@ -127,4 +133,3 @@ namespace Game.Api.Sockets
         }
     }
 }
-

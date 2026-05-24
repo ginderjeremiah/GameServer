@@ -1,33 +1,27 @@
 ﻿using Game.Api.Models.Common;
 using Game.Api.Models.Items;
-using Game.Core.DataAccess;
+using Game.Abstractions.DataAccess;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ItemModsController : ControllerBase
+    public class ItemModsController(IItemMods itemMods, IItemModTypes itemModTypes) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public ItemModsController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly IItemMods _itemMods = itemMods;
+        private readonly IItemModTypes _itemModTypes = itemModTypes;
 
         [HttpGet("/api/[controller]")]
         public ApiEnumerableResponse<ItemMod> ItemMods(bool refreshCache = false)
         {
-            var itemMods = _repositoryManager.ItemMods.All(refreshCache).To().Model<ItemMod>();
-            return ApiResponse.Success(itemMods);
+            return ApiResponse.Success(_itemMods.All(refreshCache).To().Model<ItemMod>());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<ItemModType> ItemModTypes()
         {
-            var itemModSlotTypes = _repositoryManager.ItemModTypes.All().To().Model<ItemModType>();
-            return ApiResponse.Success(itemModSlotTypes);
+            return ApiResponse.Success(_itemModTypes.All().To().Model<ItemModType>());
         }
     }
 }

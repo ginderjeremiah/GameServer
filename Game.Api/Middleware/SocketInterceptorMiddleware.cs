@@ -29,9 +29,8 @@ namespace Game.Api.Middleware
             }
             else
             {
-                var player = sessionService.GetSession().Player;
                 using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                var socketContext = await socketManager.RegisterSocket(webSocket, player);
+                var socketContext = await socketManager.RegisterSocket(webSocket, sessionService.SelectedPlayerId);
                 await socketContext.WaitSocketClosed();
                 await socketManager.UnRegisterSocket(socketContext);
             }

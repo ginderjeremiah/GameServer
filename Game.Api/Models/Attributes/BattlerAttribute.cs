@@ -1,26 +1,16 @@
 ﻿using Game.Core;
-using Game.Core.Entities;
-using CoreBattlerAttribute = Game.Core.Attributes.Attribute;
+using Game.Abstractions.Entities;
 
 namespace Game.Api.Models.Attributes
 {
     public class BattlerAttribute
-        : IModelFromSource<BattlerAttribute, CoreBattlerAttribute>,
-          IModelFromSource<BattlerAttribute, ItemAttribute>,
+        : IModelFromSource<BattlerAttribute, ItemAttribute>,
           IModelFromSource<BattlerAttribute, ItemModAttribute>,
           IModelFromSource<BattlerAttribute, PlayerAttribute>
     {
         public EAttribute AttributeId { get; set; }
         public decimal Amount { get; set; }
 
-        public static BattlerAttribute FromSource(CoreBattlerAttribute battlerAttribute)
-        {
-            return new BattlerAttribute
-            {
-                AttributeId = battlerAttribute.AttributeId,
-                Amount = battlerAttribute.Amount,
-            };
-        }
         public static BattlerAttribute FromSource(ItemAttribute itemAttribute)
         {
             return new BattlerAttribute

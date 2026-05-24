@@ -1,33 +1,26 @@
-﻿using Game.Api.Models.Common;
+﻿using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Game.Api.Models.Zones;
-using Game.Core.DataAccess;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ZonesController : ControllerBase
+    public class ZonesController(IZones zones) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public ZonesController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly IZones _zones = zones;
 
         [HttpGet("/api/[controller]")]
         public ApiEnumerableResponse<Zone> Zones(bool refreshCache = false)
         {
-            var zones = _repositoryManager.Zones.All(refreshCache).To().Model<Zone>();
-            return ApiResponse.Success(zones);
+            return ApiResponse.Success(_zones.All(refreshCache).To().Model<Zone>());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<ZoneEnemy> ZoneEnemies(int zoneId)
         {
-            var zoneEnemies = _repositoryManager.Zones.ZoneEnemies(zoneId).To().Model<ZoneEnemy>();
-            return ApiResponse.Success(zoneEnemies);
+            return ApiResponse.Success(_zones.ZoneEnemies(zoneId).To().Model<ZoneEnemy>());
         }
     }
 }

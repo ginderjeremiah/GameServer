@@ -1,26 +1,20 @@
-﻿using Game.Api.Models.Common;
+﻿using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
-using Game.Core.DataAccess;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class EnemiesController : ControllerBase
+    public class EnemiesController(IEnemies enemies) : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
-
-        public EnemiesController(IRepositoryManager repositoryManager)
-        {
-            _repositoryManager = repositoryManager;
-        }
+        private readonly IEnemies _enemies = enemies;
 
         [HttpGet("/api/[controller]")]
         public ApiEnumerableResponse<Enemy> Enemies(bool refreshCache = false)
         {
-            var enemies = _repositoryManager.Enemies.All(refreshCache).To().Model<Enemy>();
-            return ApiResponse.Success(enemies);
+            return ApiResponse.Success(_enemies.All(refreshCache).To().Model<Enemy>());
         }
     }
 }

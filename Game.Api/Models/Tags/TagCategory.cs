@@ -1,4 +1,4 @@
-﻿using TagCategoryEntity = Game.Core.Entities.TagCategory;
+﻿using TagCategoryEntity = Game.Abstractions.Entities.TagCategory;
 
 namespace Game.Api.Models.Tags
 {

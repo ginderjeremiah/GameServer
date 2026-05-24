@@ -1,5 +1,5 @@
 ﻿using Game.Api.Models.Attributes;
-using ItemModEntity = Game.Core.Entities.ItemMod;
+using ItemModEntity = Game.Abstractions.Entities.ItemMod;
 
 namespace Game.Api.Models.Items
 {

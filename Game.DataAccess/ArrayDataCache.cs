@@ -1,16 +1,15 @@
-﻿using Game.Abstractions.DataAccess;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.DataAccess
 {
     /// <summary>
-    /// A cache for an array of data.
+    /// A cache for an array of data that is loaded via a scoped service provider.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">The type of item stored in the cache.</typeparam>
     public class ArrayDataCache<T>
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly Func<IRepositoryManager, Task<List<T>>> _getter;
+        private readonly Func<IServiceProvider, Task<List<T>>> _getter;
 
         /// <summary>
         /// The data loaded into the cache.
@@ -18,11 +17,11 @@ namespace Game.DataAccess
         public List<T> Data { get; set; } = [];
 
         /// <summary>
-        /// Default constructor. Automatically beings loading the data into the cache.
+        /// Default constructor. Automatically begins loading the data into the cache.
         /// </summary>
-        /// <param name="getter"></param>
-        /// <param name="serviceProvider"></param>
-        public ArrayDataCache(IServiceProvider serviceProvider, Func<IRepositoryManager, Task<List<T>>> getter)
+        /// <param name="serviceProvider">The root service provider used to create a scope for each reload.</param>
+        /// <param name="getter">Factory that resolves services from the scoped provider and returns data.</param>
+        public ArrayDataCache(IServiceProvider serviceProvider, Func<IServiceProvider, Task<List<T>>> getter)
         {
             _serviceProvider = serviceProvider;
             _getter = getter;
@@ -30,13 +29,12 @@ namespace Game.DataAccess
         }
 
         /// <summary>
-        /// Reloads the data in the cache.
+        /// Reloads the data in the cache using a fresh service scope.
         /// </summary>
-        /// <returns></returns>
         public async Task ReloadData()
         {
-            _serviceProvider.CreateScope();
-            Data = await _getter(_serviceProvider.GetRequiredService<IRepositoryManager>());
+            using var scope = _serviceProvider.CreateScope();
+            Data = await _getter(scope.ServiceProvider);
         }
     }
 }

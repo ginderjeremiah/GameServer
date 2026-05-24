@@ -1,10 +1,11 @@
-﻿using Game.Abstractions.DataAccess;
-using Game.Api.Models.Attributes;
+﻿using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
 using Game.Api.Models.Player;
 using Game.Api.Services;
-using Game.Core.Sessions;
+using Game.Application.Services;
+using Game.Core.Players;
+using Game.Core.Players.Inventories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -13,43 +14,60 @@ namespace Game.Api.Controllers
     [ApiController]
     public class PlayerController : ControllerBase
     {
-        private readonly IRepositoryManager _repositoryManager;
         private readonly SessionService _sessionService;
+        private readonly PlayerService _playerService;
 
-        private Session Session => _sessionService.GetSession();
-
-        public PlayerController(IRepositoryManager repositoryManager, SessionService sessionService)
+        public PlayerController(SessionService sessionService, PlayerService playerService)
         {
-            _repositoryManager = repositoryManager;
             _sessionService = sessionService;
+            _playerService = playerService;
         }
 
         [HttpGet("/api/[controller]")]
-        public ApiResponse<PlayerData> Player()
+        public async Task<ApiResponse<PlayerData>> Player()
         {
-            return ApiResponse.Success(Session.GetPlayerData());
+            var player = await _sessionService.LoadPlayer();
+            return ApiResponse.Success(PlayerData.FromPlayer(player));
         }
 
         [HttpPost]
         public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
         {
-            //TODO save LogPreferences to session player and propogate to db
             throw new NotImplementedException();
         }
 
         [HttpPost]
-        public ApiResponse UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
+        public async Task<ApiResponse> UpdateInventorySlots([FromBody] List<InventoryUpdate> inventory)
         {
-            return Session.TryUpdateInventoryItems(inventory.Cast<IInventoryUpdate>())
+            var player = await _sessionService.LoadPlayer();
+            var success = await _playerService.UpdateInventorySlots(
+                player, inventory.Cast<IInventoryUpdate>());
+
+            return success
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Unable to set inventory items.");
+                : ApiResponse.Error("Invalid inventory update.");
         }
 
         [HttpPost]
-        public ApiEnumerableResponse<BattlerAttribute> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
+        public async Task<ApiEnumerableResponse<BattlerAttribute>> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
         {
-            Session.UpdatePlayerAttributes(changedAttributes.Cast<IAttributeUpdate>());
-            return ApiResponse.Success(Session.BattlerAttributes.To().Model<BattlerAttribute>());
+            var player = await _sessionService.LoadPlayer();
+            var success = await _playerService.TryUpdateAttributes(player, changedAttributes.Cast<IAttributeUpdate>());
+            if (!success)
+            {
+                return ApiResponse.Error("Unable to update player stats.");
+            }
+
+            var attributes = player.GetAttributes();
+            var result = attributes.AllModifiers()
+                .GroupBy(m => m.Attribute)
+                .Select(g => new BattlerAttribute
+                {
+                    AttributeId = g.Key,
+                    Amount = (decimal)attributes[g.Key],
+                });
+
+            return ApiResponse.Success(result);
         }
     }
 }
