@@ -1,83 +1,40 @@
 <div class="equipped-slots-container">
-	<div class="equipped-helm-container">
-		<ItemSlot
-			slot={helmSlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, helmSlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, helmSlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<div class="equipped-chest-container">
-		<ItemSlot
-			slot={chestSlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, chestSlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, chestSlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<div class="equipped-leg-container">
-		<ItemSlot
-			slot={legSlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, legSlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, legSlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<div class="equipped-boot-container">
-		<ItemSlot
-			slot={bootSlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, bootSlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, bootSlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<div class="equipped-weapon-container">
-		<ItemSlot
-			slot={weaponSlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, weaponSlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, weaponSlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<div class="equipped-accessory-container">
-		<ItemSlot
-			slot={accessorySlot}
-			onMouseMove={handleMouseMove}
-			onMouseEnter={(ev) => handleMouseEnter(ev, accessorySlot)}
-			onMouseLeave={(ev) => handleMouseLeave(ev, accessorySlot)}
-			onDragStart={hideTooltip}
-			onDrop={hideTooltip}
-		/>
-	</div>
-	<ItemTooltip bind:this={tooltip} slot={tooltipSlot} />
+	{#each slotEntries as [slotId, label]}
+		<div class="equipped-slot">
+			<div class="slot-label">{label}</div>
+			<ItemSlot
+				item={equippedSlots[slotId]}
+				onClick={() => handleSlotClick(slotId)}
+				onMouseMove={handleMouseMove}
+				onMouseEnter={(ev) => handleMouseEnter(ev, slotId)}
+				onMouseLeave={() => handleMouseLeave(slotId)}
+			/>
+		</div>
+	{/each}
+	<ItemTooltip bind:this={tooltip} item={tooltipItem} />
 </div>
 
 <script lang="ts">
 import ItemSlot from './ItemSlot.svelte';
 import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import ItemTooltip from './ItemTooltip.svelte';
-import { EEquipmentSlot, inventoryManager, type InventorySlot } from '$lib/engine';
+import { EEquipmentSlot, inventoryManager } from '$lib/engine';
+import type { Item } from '$lib/battle';
 
 let tooltip = $state<TooltipComponent>();
-let tooltipSlot = $state<InventorySlot>();
+let tooltipItem = $state<Item>();
+let activeSlotId = $state<number>();
 
-const equippedItems = $derived(inventoryManager.equippedSlots);
-const helmSlot = $derived(equippedItems[EEquipmentSlot.HelmSlot]);
-const chestSlot = $derived(equippedItems[EEquipmentSlot.ChestSlot]);
-const legSlot = $derived(equippedItems[EEquipmentSlot.LegSlot]);
-const bootSlot = $derived(equippedItems[EEquipmentSlot.BootSlot]);
-const weaponSlot = $derived(equippedItems[EEquipmentSlot.WeaponSlot]);
-const accessorySlot = $derived(equippedItems[EEquipmentSlot.AccessorySlot]);
+const equippedSlots = $derived(inventoryManager.equippedSlots);
+
+const slotEntries: [EEquipmentSlot, string][] = [
+	[EEquipmentSlot.HelmSlot, 'Helm'],
+	[EEquipmentSlot.ChestSlot, 'Chest'],
+	[EEquipmentSlot.LegSlot, 'Legs'],
+	[EEquipmentSlot.BootSlot, 'Boots'],
+	[EEquipmentSlot.WeaponSlot, 'Weapon'],
+	[EEquipmentSlot.AccessorySlot, 'Accessory'],
+];
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -86,18 +43,29 @@ const handleMouseMove = (ev: MouseEvent) => {
 	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
 };
 
-const handleMouseEnter = (ev: MouseEvent, slot: InventorySlot) => {
-	tooltipSlot = slot;
-	if (slot.item) {
+const handleMouseEnter = (ev: MouseEvent, slotId: EEquipmentSlot) => {
+	activeSlotId = slotId;
+	const item = equippedSlots[slotId];
+	if (item) {
+		tooltipItem = item;
 		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
 		showTooltip();
 	}
 };
 
-const handleMouseLeave = (ev: MouseEvent, slot: InventorySlot) => {
-	if (tooltipSlot === slot) {
-		tooltipSlot = undefined;
+const handleMouseLeave = (slotId: EEquipmentSlot) => {
+	if (activeSlotId === slotId) {
+		activeSlotId = undefined;
+		tooltipItem = undefined;
 		hideTooltip();
+	}
+};
+
+const handleSlotClick = async (slotId: EEquipmentSlot) => {
+	const item = equippedSlots[slotId];
+	if (item) {
+		hideTooltip();
+		await inventoryManager.unequipItem(slotId);
 	}
 };
 </script>
@@ -105,49 +73,28 @@ const handleMouseLeave = (ev: MouseEvent, slot: InventorySlot) => {
 <style lang="scss">
 .equipped-slots-container {
 	margin: 0 0 1em 5%;
-	display: block;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
 	width: 25%;
 	border: var(--default-border);
 	border-width: 3px;
 	border-radius: 1vw;
 	background-color: var(--container-background-color);
+	padding: 1rem;
 	position: relative;
-	height: 30vw;
 
-	.equipped-helm-container {
-		position: absolute;
-		left: calc(50% - var(--slot-width) / 2);
-		top: 2.2%;
-	}
+	.equipped-slot {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
 
-	.equipped-chest-container {
-		position: absolute;
-		left: calc(50% - var(--slot-width) / 2);
-		top: calc(var(--slot-width) + 4.4%);
-	}
-
-	.equipped-leg-container {
-		position: absolute;
-		left: calc(50% - var(--slot-width) / 2);
-		top: calc(var(--slot-width) * 2 + 6.6%);
-	}
-
-	.equipped-boot-container {
-		position: absolute;
-		left: calc(50% - var(--slot-width) / 2);
-		top: calc(var(--slot-width) * 3 + 8.8%);
-	}
-
-	.equipped-weapon-container {
-		position: absolute;
-		left: calc(46% - var(--slot-width) * 1.5);
-		top: calc(var(--slot-width) * 1.5 + 5.5%);
-	}
-
-	.equipped-accessory-container {
-		position: absolute;
-		left: calc(54% + var(--slot-width) / 2);
-		top: calc(var(--slot-width) * 1.5 + 5.5%);
+		.slot-label {
+			width: 5em;
+			font-size: 0.8rem;
+			text-align: right;
+			color: var(--text-color);
+		}
 	}
 }
 </style>

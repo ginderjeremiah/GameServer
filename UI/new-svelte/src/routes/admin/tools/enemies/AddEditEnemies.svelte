@@ -32,12 +32,11 @@ let data = $state<IEnemy[]>([]);
 let initialized = $state(false);
 let editor = $state<{ getChanges: () => IChange<IEnemy>[] }>();
 
-const hiddenColumns: (keyof IEnemy)[] = ['attributeDistribution', 'drops', 'skillPool'];
+const hiddenColumns: (keyof IEnemy)[] = ['attributeDistribution', 'skillPool'];
 const sampleItem = {
 	id: -1,
 	name: '',
 	attributeDistribution: [],
-	drops: [],
 	skillPool: []
 } satisfies IEnemy;
 

@@ -6,14 +6,8 @@ namespace Game.DataAccess.Mapping
 {
     internal static class PlayerMapper
     {
-        /// <summary>
-        /// Maps an entity <see cref="EntityPlayer"/> (with navigation properties loaded) to a
-        /// domain <see cref="Player"/>.  Skills and items are mapped from the navigation
-        /// properties that must already be included in the EF Core query.
-        /// </summary>
         public static Player ToCore(EntityPlayer entity)
         {
-            // Stat point allocations
             var statAllocations = (entity.PlayerAttributes ?? [])
                 .Select(pa => new StatAllocation
                 {
@@ -21,34 +15,58 @@ namespace Game.DataAccess.Mapping
                     Amount = (double)pa.Amount,
                 }).ToList();
 
-            // Build inventory
             var inventory = new Inventory();
 
-            foreach (var ii in entity.InventoryItems ?? [])
+            // Map unlocked items with their applied mods
+            var appliedModsByItem = (entity.AppliedMods ?? [])
+                .GroupBy(am => am.ItemId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var ui in entity.UnlockedItems ?? [])
             {
-                if (ii.Item is null) continue;
+                if (ui.Item is null) continue;
 
-                var coreItem = ItemMapper.ToCore(ii.Item, ii.InventoryItemMods);
+                var coreItem = ItemMapper.ToCore(ui.Item);
+                var appliedMods = new List<AppliedModSlot>();
 
-                if (!ii.Equipped)
+                if (appliedModsByItem.TryGetValue(ui.ItemId, out var mods))
                 {
-                    inventory.InventorySlots.Add(new InventorySlot
+                    foreach (var am in mods)
                     {
-                        InventoryItemId = ii.Id,
-                        SlotNumber = ii.InventorySlotNumber,
-                        Item = coreItem,
-                    });
+                        if (am.ItemMod is null) continue;
+                        appliedMods.Add(new AppliedModSlot
+                        {
+                            ItemModSlotId = am.ItemModSlotId,
+                            ItemMod = ItemMapper.ModToCore(am.ItemMod),
+                        });
+                    }
                 }
-                else
+
+                var slot = new UnlockedItemSlot
+                {
+                    ItemId = ui.ItemId,
+                    Item = coreItem,
+                    AppliedMods = appliedMods,
+                };
+
+                inventory.UnlockedItems.Add(slot);
+
+                if (ui.EquipmentSlotId.HasValue)
                 {
                     var eSlot = inventory.EquipmentSlots
-                        .FirstOrDefault(s => (int)s.Value == ii.InventorySlotNumber);
+                        .FirstOrDefault(s => (int)s.Value == ui.EquipmentSlotId.Value);
                     if (eSlot is not null)
                     {
                         eSlot.Item = coreItem;
-                        eSlot.InventoryItemId = ii.Id;
+                        eSlot.ItemId = ui.ItemId;
                     }
                 }
+            }
+
+            // Map unlocked mods
+            foreach (var um in entity.UnlockedMods ?? [])
+            {
+                inventory.UnlockedMods.Add(um.ItemModId);
             }
 
             // Map player skills

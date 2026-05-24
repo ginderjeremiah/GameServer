@@ -1,44 +1,35 @@
 <div class="inventory-items-container">
 	<div class="inventory-items-inner">
-		<div class="inventory-slots-subcontainer">
-			{#each inventoryItems as slot, index}
+		<div class="inventory-grid">
+			{#each unlockedItems as item}
 				<ItemSlot
-					{slot}
-					hideBottomBorder={index < 18}
-					hideRightBorder={index % 9 !== 8}
-					onDragStart={hideTooltip}
-					onDrop={hideTooltip}
-					onClick={handleClick}
+					{item}
+					onClick={() => handleItemClick(item)}
 					onMouseMove={handleMouseMove}
-					onMouseEnter={(ev) => handleMouseEnter(ev, slot)}
-					onMouseLeave={(ev) => handleMouseLeave(ev, slot)}
+					onMouseEnter={(ev) => handleMouseEnter(ev, item)}
+					onMouseLeave={() => handleMouseLeave(item)}
 				/>
 			{/each}
 		</div>
-		<div class="inventory-bottom">
-			<ItemSlot
-				slot={inventoryManager.trashSlot}
-				undraggable
-				onDrop={hideTooltip}
-				onMouseMove={handleMouseMove}
-				onMouseEnter={(ev) => handleMouseEnter(ev, inventoryManager.trashSlot)}
-				onMouseLeave={(ev) => handleMouseLeave(ev, inventoryManager.trashSlot)}
-			/>
-		</div>
+		{#if unlockedItems.length === 0}
+			<div class="empty-message">No items unlocked yet. Complete challenges to unlock items!</div>
+		{/if}
 	</div>
-	<ItemTooltip bind:this={tooltip} slot={tooltipSlot} />
+	<ItemTooltip bind:this={tooltip} {item} />
 </div>
 
 <script lang="ts">
-import { inventoryManager, type InventorySlot } from '$lib/engine';
+import { inventoryManager, getEquipmentSlotForCategory } from '$lib/engine';
 import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import ItemSlot from './ItemSlot.svelte';
 import ItemTooltip from './ItemTooltip.svelte';
+import type { Item as ItemType } from '$lib/battle';
 
 let tooltip = $state<TooltipComponent>();
-let tooltipSlot = $state<InventorySlot>();
+let item = $state<ItemType>();
+let activeItem = $state<ItemType>();
 
-const inventoryItems = $derived(inventoryManager.slots);
+const unlockedItems = $derived(inventoryManager.unlockedItemList);
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -47,41 +38,33 @@ const handleMouseMove = (ev: MouseEvent) => {
 	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
 };
 
-const handleMouseEnter = (ev: MouseEvent, slot: InventorySlot) => {
-	tooltipSlot = slot;
-	if (slot.item) {
-		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-		showTooltip();
-	}
+const handleMouseEnter = (ev: MouseEvent, hoverItem: ItemType) => {
+	activeItem = hoverItem;
+	item = hoverItem;
+	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+	showTooltip();
 };
 
-const handleMouseLeave = (ev: MouseEvent, slot: InventorySlot) => {
-	if (tooltipSlot === slot) {
-		tooltipSlot = undefined;
+const handleMouseLeave = (hoverItem: ItemType) => {
+	if (activeItem === hoverItem) {
+		activeItem = undefined;
+		item = undefined;
 		hideTooltip();
 	}
 };
 
-const handleClick = (ev: MouseEvent, slot: InventorySlot) => {
-	if (ev.shiftKey) {
-		equipItemInSlot(slot);
-	} else if (ev.ctrlKey) {
-		deleteItemInSlot(slot);
-	}
-};
-
-const equipItemInSlot = (slot: InventorySlot) => {
-	if (slot.item) {
-		const newSlot = inventoryManager.equippedSlots.find((s) => s.canHold(slot.item));
-		if (newSlot) {
-			inventoryManager.swapSlots(slot, newSlot);
-		}
-	}
-};
-
-const deleteItemInSlot = (slot: InventorySlot) => {
-	inventoryManager.swapSlots(slot, inventoryManager.trashSlot);
+const handleItemClick = async (clickedItem: ItemType) => {
 	hideTooltip();
+	if (clickedItem.equipped) {
+		// Unequip if already equipped
+		if (clickedItem.equipmentSlotId != null) {
+			await inventoryManager.unequipItem(clickedItem.equipmentSlotId);
+		}
+	} else {
+		// Equip to the matching slot
+		const slotId = getEquipmentSlotForCategory(clickedItem.itemCategoryId);
+		await inventoryManager.equipItem(clickedItem.itemId, slotId);
+	}
 };
 </script>
 
@@ -100,20 +83,20 @@ const deleteItemInSlot = (slot: InventorySlot) => {
 	.inventory-items-inner {
 		margin: 0 auto;
 		height: 100%;
-		width: fit-content;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
+		width: 100%;
 
-		.inventory-slots-subcontainer {
-			width: calc(9 * var(--slot-width));
+		.inventory-grid {
 			display: flex;
 			flex-wrap: wrap;
+			gap: 2px;
 		}
 
-		.inventory-bottom {
-			display: flex;
-			justify-content: flex-end;
+		.empty-message {
+			text-align: center;
+			color: var(--text-color);
+			opacity: 0.6;
+			padding: 2rem;
+			font-size: 0.9rem;
 		}
 	}
 }

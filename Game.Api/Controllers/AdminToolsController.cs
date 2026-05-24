@@ -238,8 +238,6 @@ namespace Game.Api.Controllers
                     {
                         ItemId = change.Item.ItemId,
                         ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
-                        GuaranteedItemModId = change.Item.GuaranteedItemModId,
-                        Probability = change.Item.Probability,
                     });
                 }
                 else if (change.ChangeType == Edit)
@@ -249,8 +247,6 @@ namespace Game.Api.Controllers
                         Id = change.Item.Id,
                         ItemId = change.Item.ItemId,
                         ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
-                        GuaranteedItemModId = change.Item.GuaranteedItemModId,
-                        Probability = change.Item.Probability,
                     });
                 }
                 else if (change.ChangeType == Delete)

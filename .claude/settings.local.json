@@ -4,7 +4,15 @@
       "PowerShell(New-Item -ItemType Directory -Force Game.Application\\\\Services)",
       "Bash(dotnet build *)",
       "Bash(dotnet test *)",
-      "Bash(Select-String \"error\")"
+      "Bash(Select-String \"error\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\" -Directory -Force)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "PowerShell(Remove-Item \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\\\\Game.Api\\\\Models\\\\InventoryItems\\\\InventoryUpdate.cs\" -Confirm:$false)",
+      "PowerShell(Remove-Item \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\\\\Game.Api\\\\Models\\\\InventoryItems\\\\InventoryItemMod.cs\" -Confirm:$false)",
+      "PowerShell(Remove-Item \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\\\\Game.Api\\\\Models\\\\Items\\\\ItemDrop.cs\" -Confirm:$false)",
+      "PowerShell(Remove-Item \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\\\\Game.Api\\\\Models\\\\Drops\" -Recurse -Force -Confirm:$false)",
+      "Bash(npx svelte-check *)",
+      "Bash(dotnet ef *)"
     ]
   }
 }

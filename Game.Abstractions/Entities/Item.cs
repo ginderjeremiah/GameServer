@@ -12,8 +12,6 @@
         public virtual ItemCategory ItemCategory { get; set; }
         public virtual List<ItemModSlot> ItemModSlots { get; set; }
         public virtual List<Tag> Tags { get; set; }
-        public virtual List<EnemyDrop> EnemyDrops { get; set; }
-        public virtual List<ZoneDrop> ZoneDrops { get; set; }
-        public virtual List<InventoryItem> InventoryItems { get; set; }
+        public virtual List<UnlockedItem> UnlockedItems { get; set; }
     }
 }

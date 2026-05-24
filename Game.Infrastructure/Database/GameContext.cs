@@ -1,4 +1,4 @@
-﻿using Game.Abstractions.Entities;
+using Game.Abstractions.Entities;
 using Game.Core;
 using Microsoft.EntityFrameworkCore;
 using Attribute = Game.Abstractions.Entities.Attribute;
@@ -15,66 +15,45 @@ namespace Game.Infrastructure.Database
         /// <inheritdoc cref="DbContext(DbContextOptions)"/>
         public GameContext(DbContextOptions<GameContext> options) : base(options) { }
 
-        /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<AppliedMod> AppliedMods { get; set; }
         public DbSet<AttributeDistribution> AttributeDistributions { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Attribute> Attributes { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<Challenge> Challenges { get; set; }
         public DbSet<Enemy> Enemies { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<EnemyDrop> EnemyDrops { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<EnemySkill> EnemySkills { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<EquipmentSlot> EquipmentSlots { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<InventoryItemMod> InventoryItemMods { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<InventoryItem> InventoryItems { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemAttribute> ItemAttributes { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemCategory> ItemCategories { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModAttribute> ItemModAttributes { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemMod> ItemMods { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Item> Items { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<LogPreference> LogPreferences { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<LogSetting> LogSettings { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Player> Players { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
         public DbSet<Skill> Skills { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ItemModType> ItemModTypes { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<TagCategory> TagCategories { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Tag> Tags { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
+        public DbSet<UnlockedItem> UnlockedItems { get; set; }
+        public DbSet<UnlockedMod> UnlockedMods { get; set; }
         public DbSet<User> Users { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
         public DbSet<Zone> Zones { get; set; }
-        /// <inheritdoc cref="DbSet{TEntity}"/>
-        public DbSet<ZoneDrop> ZoneDrops { get; set; }
 
         /// <inheritdoc/>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<AppliedMod>(entity =>
+            {
+                entity.HasKey(am => new { am.PlayerId, am.ItemId, am.ItemModSlotId });
+            });
+
             modelBuilder.Entity<Core.Attributes.Attribute>(entity =>
             {
                 entity.Property(a => a.Id)
@@ -97,19 +76,28 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
             });
 
+            modelBuilder.Entity<Challenge>(entity =>
+            {
+                entity.Property(c => c.Id)
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(c => c.Name)
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.Description)
+                    .HasMaxLength(500);
+            });
+
             modelBuilder.Entity<Enemy>(entity =>
             {
                 entity.Property(e => e.Id)
-                    .UseIdentityColumn(0, 1) //SQL Server
-                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(e => e.Name)
                     .HasMaxLength(50);
             });
-
-            modelBuilder.Entity<EnemyDrop>()
-                .Property(ed => ed.DropRate)
-                .HasPrecision(9, 8);
 
             modelBuilder.Entity<EnemySkill>()
                 .HasKey(es => new { es.EnemyId, es.SkillId });
@@ -134,26 +122,11 @@ namespace Game.Infrastructure.Database
                 }));
             });
 
-            modelBuilder.Entity<InventoryItemMod>(entity =>
-            {
-                entity.HasKey(iim => new { iim.InventoryItemId, iim.ItemModId });
-
-                //Fix to prevent double cascading delete on SlotType => ItemSlot/ItemMod
-                entity.HasOne(iim => iim.ItemModSlot)
-                    .WithMany(isl => isl.InventoryItemMods)
-                    .OnDelete(DeleteBehavior.NoAction);
-            });
-
-            //Do not enforce this constraint as it makes it difficult to modify data.
-            //modelBuilder.Entity<InventoryItem>()
-            //    .HasIndex(ii => new { ii.PlayerId, ii.Equipped, ii.InventorySlotNumber })
-            //    .IsUnique();
-
             modelBuilder.Entity<Item>(entity =>
             {
                 entity.Property(i => i.Id)
-                    .UseIdentityColumn(0, 1) //SQL Server
-                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
@@ -192,8 +165,8 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<ItemMod>(entity =>
             {
                 entity.Property(im => im.Id)
-                    .UseIdentityColumn(0, 1) //SQL Server
-                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(im => im.Name)
                     .HasMaxLength(50);
@@ -211,20 +184,6 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
             });
 
-            modelBuilder.Entity<ItemModSlot>(entity =>
-            {
-                entity.Property(isl => isl.Probability)
-                    .HasPrecision(9, 8);
-
-                entity.Property(isl => isl.GuaranteedItemModId)
-                    .IsRequired(false);
-
-                //Fix to prevent "possible" circular constraint when SlotType is deleted.
-                entity.HasOne(isl => isl.GuaranteedItemMod)
-                .WithMany(im => im.GuaranteedSlots)
-                .OnDelete(DeleteBehavior.Restrict);
-            });
-
             modelBuilder.Entity<LogPreference>()
                 .HasKey(lp => new { lp.PlayerId, lp.LogSettingId });
 
@@ -236,14 +195,12 @@ namespace Game.Infrastructure.Database
                 entity.Property(ls => ls.Name)
                     .HasMaxLength(20);
 
-                entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
+                entity.HasData(Enum.GetValues<ELogType>().Select(a =>
                 {
-                    var attribute = new Core.Players.EquipmentSlot(a);
-                    return new EquipmentSlot
+                    return new LogSetting
                     {
                         Id = (int)a,
-                        Name = attribute.Name,
-                        ItemCategoryId = (int)attribute.ItemCategory,
+                        Name = a.ToString().Capitalize().SpaceWords(),
                     };
                 }));
             });
@@ -252,6 +209,11 @@ namespace Game.Infrastructure.Database
             {
                 entity.Property(p => p.Name)
                     .HasMaxLength(20);
+            });
+
+            modelBuilder.Entity<PlayerChallenge>(entity =>
+            {
+                entity.HasKey(pc => new { pc.PlayerId, pc.ChallengeId });
             });
 
             modelBuilder.Entity<PlayerSkill>()
@@ -265,11 +227,16 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
             });
 
+            modelBuilder.Entity<PlayerStatistic>(entity =>
+            {
+                entity.HasKey(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId });
+            });
+
             modelBuilder.Entity<Skill>(entity =>
             {
                 entity.Property(s => s.Id)
-                    .UseIdentityColumn(0, 1) //SQL Server
-                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(s => s.BaseDamage)
                     .HasPrecision(18, 3);
@@ -329,6 +296,16 @@ namespace Game.Infrastructure.Database
                 }));
             });
 
+            modelBuilder.Entity<UnlockedItem>(entity =>
+            {
+                entity.HasKey(ui => new { ui.PlayerId, ui.ItemId });
+            });
+
+            modelBuilder.Entity<UnlockedMod>(entity =>
+            {
+                entity.HasKey(um => new { um.PlayerId, um.ItemModId });
+            });
+
             modelBuilder.Entity<User>(entity =>
             {
                 entity.Property(u => u.Username)
@@ -341,16 +318,12 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Zone>(entity =>
             {
                 entity.Property(z => z.Id)
-                    .UseIdentityColumn(0, 1) //SQL Server
-                    .HasIdentityOptions(0, 1, 0); //PostgreSQL
+                    .UseIdentityColumn(0, 1)
+                    .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(z => z.Name)
                     .HasMaxLength(50);
             });
-
-            modelBuilder.Entity<ZoneDrop>()
-                .Property(zd => zd.DropRate)
-                .HasPrecision(9, 8);
 
             modelBuilder.Entity<ZoneEnemy>()
                 .HasKey(ze => new { ze.ZoneId, ze.EnemyId });

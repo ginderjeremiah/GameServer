@@ -25,7 +25,6 @@ namespace Game.DataAccess.Repositories
             {
                 _zoneList = _context.Zones
                    .AsNoTracking()
-                   .Include(z => z.ZoneDrops)
                    .Include(z => z.ZoneEnemies)
                    .OrderBy(z => z.Id)
                    .ToList();

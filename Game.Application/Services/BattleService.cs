@@ -59,31 +59,13 @@ namespace Game.Application.Services
             var enemy = _worldRepo.Enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
-            var rewards = new DefeatRewards(player, enemy, rng);
+            var rewards = new DefeatRewards(player, enemy);
 
             // GrantExp raises PlayerLeveledUpEvent internally if a level-up occurs.
             player.GrantExp(rewards.ExpReward);
 
-            var droppedItems = new List<DroppedItemInfo>();
-            foreach (var droppedItem in rewards.Drops)
-            {
-                var slotNumber = player.Inventory.GetNextFreeSlotNumber();
-                var inventoryItemId = await _playerRepo.AddInventoryItem(
-                    player.Id, droppedItem.Id, slotNumber);
-
-                // AddInventoryItem updates the in-memory inventory and raises ItemAcquiredEvent.
-                player.AddInventoryItem(droppedItem, inventoryItemId);
-
-                droppedItems.Add(new DroppedItemInfo
-                {
-                    InventoryItemId = inventoryItemId,
-                    SlotNumber = slotNumber,
-                    Item = droppedItem,
-                });
-            }
-
-            // RecordEnemyDefeat raises EnemyDefeatedEvent.
-            player.RecordEnemyDefeat(enemyId, rewards.ExpReward, droppedItems.Select(d => d.Item).ToList());
+            // RecordEnemyDefeat raises EnemyDefeatedEvent (which triggers stats + challenges via event handler).
+            player.RecordEnemyDefeat(enemyId, rewards.ExpReward);
 
             state.SetCooldown(now.AddSeconds(5));
             state.ClearBattle();
@@ -98,7 +80,6 @@ namespace Game.Application.Services
             return new DefeatResult
             {
                 ExpReward = rewards.ExpReward,
-                DroppedItems = droppedItems,
                 NewLevel = player.Level,
                 NewExp = player.Exp,
                 StatPointsGained = player.StatPoints.StatPointsGained,

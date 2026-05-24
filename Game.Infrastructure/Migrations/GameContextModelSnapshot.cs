@@ -18,12 +18,876 @@ namespace Game.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Game.Core.Entities.Attribute", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.AppliedMod", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemModSlotId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemModId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId", "ItemId", "ItemModSlotId");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("ItemModId");
+
+                    b.HasIndex("ItemModSlotId");
+
+                    b.ToTable("AppliedMods");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Attributes");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
+                {
+                    b.Property<int>("EnemyId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("AmountPerLevel")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("BaseAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("EnemyId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("AttributeDistributions");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Challenge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<int>("ChallengeTypeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("RewardItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RewardItemModId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TargetCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TargetEntityId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RewardItemId");
+
+                    b.HasIndex("RewardItemModId");
+
+                    b.ToTable("Challenges");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Enemies");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
+                {
+                    b.Property<int>("EnemyId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EnemyId", "SkillId");
+
+                    b.HasIndex("SkillId");
+
+                    b.ToTable("EnemySkills");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.EquipmentSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemCategoryId");
+
+                    b.ToTable("EquipmentSlots");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 0,
+                            ItemCategoryId = 1,
+                            Name = "Helm Slot"
+                        },
+                        new
+                        {
+                            Id = 1,
+                            ItemCategoryId = 2,
+                            Name = "Chest Slot"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            ItemCategoryId = 3,
+                            Name = "Leg Slot"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            ItemCategoryId = 4,
+                            Name = "Boot Slot"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            ItemCategoryId = 5,
+                            Name = "Weapon Slot"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            ItemCategoryId = 6,
+                            Name = "Accessory Slot"
+                        });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IconPath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ItemCategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemCategoryId");
+
+                    b.ToTable("Items");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
+                {
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("ItemId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("ItemAttributes");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ItemCategories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Helm"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Chest"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Leg"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Boot"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Weapon"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Accessory"
+                        });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ItemModTypeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("Removable")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemModTypeId");
+
+                    b.ToTable("ItemMods");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModAttribute", b =>
+                {
+                    b.Property<int>("ItemModId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("ItemModId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("ItemModAttributes");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Index")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemModSlotTypeId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("ItemModSlotTypeId");
+
+                    b.ToTable("ItemModSlots");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModType", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ItemModTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Component"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Prefix"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Suffix"
+                        });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.LogPreference", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LogSettingId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("PlayerId", "LogSettingId");
+
+                    b.HasIndex("LogSettingId");
+
+                    b.ToTable("LogPreferences");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.LogSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("DefaultValue")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LogSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            DefaultValue = false,
+                            Name = "Damage"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            DefaultValue = false,
+                            Name = "Debug"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            DefaultValue = false,
+                            Name = "Exp"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            DefaultValue = false,
+                            Name = "Level Up"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            DefaultValue = false,
+                            Name = "Item Found"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            DefaultValue = false,
+                            Name = "Enemy Defeated"
+                        });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CurrentZoneId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Exp")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("LastActivity")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("StatPointsGained")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StatPointsUsed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Players");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerAttribute", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("PlayerId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("PlayerAttributes");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerChallenge", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ChallengeId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId", "ChallengeId");
+
+                    b.HasIndex("ChallengeId");
+
+                    b.ToTable("PlayerChallenges");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerSkill", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Selected")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("PlayerId", "SkillId");
+
+                    b.HasIndex("SkillId");
+
+                    b.ToTable("PlayerSkills");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerStatistic", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StatisticTypeId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EntityId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("PlayerId", "StatisticTypeId", "EntityId");
+
+                    b.ToTable("PlayerStatistics");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<decimal>("BaseDamage")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<int>("CooldownMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IconPath")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Skills");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
+                {
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Multiplier")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("SkillId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("SkillDamageMultipliers");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("TagCategoryId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TagCategoryId");
+
+                    b.ToTable("Tags");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TagCategories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Accessory"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Armor"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Magical"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Material"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Modification"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Usage"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Weapon"
+                        });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedItem", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EquipmentSlotId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId", "ItemId");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("UnlockedItems");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedMod", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemModId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlayerId", "ItemModId");
+
+                    b.HasIndex("ItemModId");
+
+                    b.ToTable("UnlockedMods");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("LastLogin")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PassHash")
+                        .IsRequired()
+                        .HasMaxLength(88)
+                        .HasColumnType("character varying(88)");
+
+                    b.Property<Guid>("Salt")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Zone", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("LevelMax")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LevelMin")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Zones");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ZoneEnemy", b =>
+                {
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EnemyId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ZoneId", "EnemyId");
+
+                    b.HasIndex("EnemyId");
+
+                    b.ToTable("ZoneEnemies");
+                });
+
+            modelBuilder.Entity("Game.Core.Attributes.Attribute", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -39,7 +903,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Attributes");
+                    b.ToTable("Attribute");
 
                     b.HasData(
                         new
@@ -134,788 +998,6 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.AttributeDistribution", b =>
-                {
-                    b.Property<int>("EnemyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("AmountPerLevel")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.Property<decimal>("BaseAmount")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("EnemyId", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("AttributeDistributions");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Enemy", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
-                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Enemies");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.EnemyDrop", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("DropRate")
-                        .HasPrecision(9, 8)
-                        .HasColumnType("numeric(9,8)");
-
-                    b.Property<int>("EnemyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EnemyId");
-
-                    b.HasIndex("ItemId");
-
-                    b.ToTable("EnemyDrops");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.EnemySkill", b =>
-                {
-                    b.Property<int>("EnemyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SkillId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("EnemyId", "SkillId");
-
-                    b.HasIndex("SkillId");
-
-                    b.ToTable("EnemySkills");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.EquipmentSlot", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemCategoryId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemCategoryId");
-
-                    b.ToTable("EquipmentSlots");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 0,
-                            ItemCategoryId = 1,
-                            Name = "Helm Slot"
-                        },
-                        new
-                        {
-                            Id = 1,
-                            ItemCategoryId = 2,
-                            Name = "Chest Slot"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            ItemCategoryId = 3,
-                            Name = "Leg Slot"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            ItemCategoryId = 4,
-                            Name = "Boot Slot"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            ItemCategoryId = 5,
-                            Name = "Weapon Slot"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            ItemCategoryId = 6,
-                            Name = "Accessory Slot"
-                        });
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.InventoryItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("Equipped")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("InventorySlotNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemId");
-
-                    b.HasIndex("PlayerId");
-
-                    b.ToTable("InventoryItems");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.InventoryItemMod", b =>
-                {
-                    b.Property<int>("InventoryItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemModId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemModSlotId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("InventoryItemId", "ItemModId");
-
-                    b.HasIndex("ItemModId");
-
-                    b.HasIndex("ItemModSlotId");
-
-                    b.ToTable("InventoryItemMods");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Item", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
-                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("IconPath")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("ItemCategoryId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemCategoryId");
-
-                    b.ToTable("Items");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemAttribute", b =>
-                {
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("ItemId", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("ItemAttributes");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ItemCategories");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Name = "Helm"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Name = "Chest"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Name = "Leg"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Name = "Boot"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Name = "Weapon"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Name = "Accessory"
-                        });
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemMod", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
-                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ItemModTypeId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("Removable")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemModTypeId");
-
-                    b.ToTable("ItemMods");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemModAttribute", b =>
-                {
-                    b.Property<int>("ItemModId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("ItemModId", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("ItemModAttributes");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemModSlot", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("GuaranteedItemModId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ItemModSlotTypeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Probability")
-                        .HasPrecision(9, 8)
-                        .HasColumnType("numeric(9,8)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuaranteedItemModId");
-
-                    b.HasIndex("ItemId");
-
-                    b.HasIndex("ItemModSlotTypeId");
-
-                    b.ToTable("ItemModSlots");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemModType", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ItemModTypes");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Name = "Component"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Name = "Prefix"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Name = "Suffix"
-                        });
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.LogPreference", b =>
-                {
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LogSettingId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("PlayerId", "LogSettingId");
-
-                    b.HasIndex("LogSettingId");
-
-                    b.ToTable("LogPreferences");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.LogSetting", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("DefaultValue")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("LogSettings");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DefaultValue = false,
-                            Name = "Damage"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            DefaultValue = false,
-                            Name = "Debug"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            DefaultValue = true,
-                            Name = "Exp"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            DefaultValue = true,
-                            Name = "Level Up"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            DefaultValue = true,
-                            Name = "Inventory"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            DefaultValue = true,
-                            Name = "Enemy Defeated"
-                        });
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Player", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Exp")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("PassHash")
-                        .IsRequired()
-                        .HasMaxLength(88)
-                        .HasColumnType("character varying(88)");
-
-                    b.Property<Guid>("Salt")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("StatPointsGained")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StatPointsUsed")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("UserName")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Players");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.PlayerAttribute", b =>
-                {
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("PlayerId", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("PlayerAttributes");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.PlayerSkill", b =>
-                {
-                    b.Property<int>("PlayerId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SkillId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Selected")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("PlayerId", "SkillId");
-
-                    b.HasIndex("SkillId");
-
-                    b.ToTable("PlayerSkills");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Skill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
-                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<decimal>("BaseDamage")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.Property<int>("CooldownMs")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("IconPath")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Skills");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.SkillDamageMultiplier", b =>
-                {
-                    b.Property<int>("SkillId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Multiplier")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("SkillId", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("SkillDamageMultipliers");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Tag", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("TagCategoryId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TagCategoryId");
-
-                    b.ToTable("Tags");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.TagCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TagCategories");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Name = "Accessory"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Name = "Armor"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Name = "Magical"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Name = "Material"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Name = "Modification"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Name = "Usage"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Name = "Weapon"
-                        });
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Zone", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
-                        .HasAnnotation("SqlServer:IdentitySeed", 0L)
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("LevelMax")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LevelMin")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Zones");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneDrop", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("DropRate")
-                        .HasPrecision(9, 8)
-                        .HasColumnType("numeric(9,8)");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ZoneId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemId");
-
-                    b.HasIndex("ZoneId");
-
-                    b.ToTable("ZoneDrops");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemy", b =>
-                {
-                    b.Property<int>("ZoneId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("EnemyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Weight")
-                        .HasColumnType("integer");
-
-                    b.HasKey("ZoneId", "EnemyId");
-
-                    b.HasIndex("EnemyId");
-
-                    b.ToTable("ZoneEnemies");
-                });
-
             modelBuilder.Entity("ItemModTag", b =>
                 {
                     b.Property<int>("ItemModsId")
@@ -946,15 +1028,50 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemTags", (string)null);
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.AttributeDistribution", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.AppliedMod", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
+                        .WithMany()
+                        .HasForeignKey("ItemModId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Abstractions.Entities.ItemModSlot", "ItemModSlot")
+                        .WithMany()
+                        .HasForeignKey("ItemModSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                        .WithMany("AppliedMods")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("ItemMod");
+
+                    b.Navigation("ItemModSlot");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
                         .WithMany("AttributeDistributions")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
                         .WithMany("AttributeDistributions")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -965,34 +1082,30 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Enemy");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.EnemyDrop", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Challenge", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Enemy", "Enemy")
-                        .WithMany("EnemyDrops")
-                        .HasForeignKey("EnemyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.HasOne("Game.Abstractions.Entities.Item", "RewardItem")
+                        .WithMany()
+                        .HasForeignKey("RewardItemId");
 
-                    b.HasOne("Game.Core.Entities.Item", "Item")
-                        .WithMany("EnemyDrops")
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.HasOne("Game.Abstractions.Entities.ItemMod", "RewardItemMod")
+                        .WithMany()
+                        .HasForeignKey("RewardItemModId");
 
-                    b.Navigation("Enemy");
+                    b.Navigation("RewardItem");
 
-                    b.Navigation("Item");
+                    b.Navigation("RewardItemMod");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.EnemySkill", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
                         .WithMany("EnemySkills")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Skill", "Skill")
+                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
                         .WithMany("EnemySkills")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1003,9 +1116,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.EquipmentSlot", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.EquipmentSlot", b =>
                 {
-                    b.HasOne("Game.Core.Entities.ItemCategory", "ItemCategory")
+                    b.HasOne("Game.Abstractions.Entities.ItemCategory", "ItemCategory")
                         .WithMany("EquipmentSlots")
                         .HasForeignKey("ItemCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1014,55 +1127,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemCategory");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.InventoryItem", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Item", "Item")
-                        .WithMany("InventoryItems")
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Core.Entities.Player", "Player")
-                        .WithMany("InventoryItems")
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Item");
-
-                    b.Navigation("Player");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.InventoryItemMod", b =>
-                {
-                    b.HasOne("Game.Core.Entities.InventoryItem", "InventoryItem")
-                        .WithMany("InventoryItemMods")
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Core.Entities.ItemMod", "ItemMod")
-                        .WithMany("InventoryItemMods")
-                        .HasForeignKey("ItemModId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Core.Entities.ItemModSlot", "ItemModSlot")
-                        .WithMany("InventoryItemMods")
-                        .HasForeignKey("ItemModSlotId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("InventoryItem");
-
-                    b.Navigation("ItemMod");
-
-                    b.Navigation("ItemModSlot");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Item", b =>
-                {
-                    b.HasOne("Game.Core.Entities.ItemCategory", "ItemCategory")
+                    b.HasOne("Game.Abstractions.Entities.ItemCategory", "ItemCategory")
                         .WithMany("Items")
                         .HasForeignKey("ItemCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1071,15 +1138,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemCategory");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemAttribute", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
                         .WithMany("ItemAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Item", "Item")
+                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
                         .WithMany("ItemAttributes")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1090,9 +1157,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemMod", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
                 {
-                    b.HasOne("Game.Core.Entities.ItemModType", "ItemModType")
+                    b.HasOne("Game.Abstractions.Entities.ItemModType", "ItemModType")
                         .WithMany("ItemMods")
                         .HasForeignKey("ItemModTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1101,15 +1168,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemModType");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemModAttribute", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModAttribute", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
                         .WithMany("ItemModAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.ItemMod", "ItemMod")
+                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
                         .WithMany("ItemModAttributes")
                         .HasForeignKey("ItemModId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1120,41 +1187,34 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemMod");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemModSlot", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModSlot", b =>
                 {
-                    b.HasOne("Game.Core.Entities.ItemMod", "GuaranteedItemMod")
-                        .WithMany("GuaranteedSlots")
-                        .HasForeignKey("GuaranteedItemModId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Game.Core.Entities.Item", "Item")
+                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
                         .WithMany("ItemModSlots")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.ItemModType", "ItemModSlotType")
+                    b.HasOne("Game.Abstractions.Entities.ItemModType", "ItemModSlotType")
                         .WithMany("ItemModSlots")
                         .HasForeignKey("ItemModSlotTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("GuaranteedItemMod");
 
                     b.Navigation("Item");
 
                     b.Navigation("ItemModSlotType");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.LogPreference", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.LogPreference", b =>
                 {
-                    b.HasOne("Game.Core.Entities.LogSetting", "LogSetting")
+                    b.HasOne("Game.Abstractions.Entities.LogSetting", "LogSetting")
                         .WithMany("LogPreferences")
                         .HasForeignKey("LogSettingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Player", "Player")
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
                         .WithMany("LogPreferences")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1165,15 +1225,26 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.PlayerAttribute", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Abstractions.Entities.User", "User")
+                        .WithMany("Players")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerAttribute", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
                         .WithMany("PlayerAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Player", "Player")
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
                         .WithMany("PlayerAttributes")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1184,15 +1255,34 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.PlayerSkill", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerChallenge", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Player", "Player")
+                    b.HasOne("Game.Abstractions.Entities.Challenge", "Challenge")
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                        .WithMany("PlayerChallenges")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Challenge");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerSkill", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
                         .WithMany("PlayerSkills")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Skill", "Skill")
+                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
                         .WithMany("PlayerSkills")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1203,15 +1293,26 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.SkillDamageMultiplier", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.PlayerStatistic", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                        .WithMany("PlayerStatistics")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
                         .WithMany("SkillDamageMultipliers")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Skill", "Skill")
+                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
                         .WithMany("SkillDamageMultipliers")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1222,9 +1323,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Tag", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
                 {
-                    b.HasOne("Game.Core.Entities.TagCategory", "TagCategory")
+                    b.HasOne("Game.Abstractions.Entities.TagCategory", "TagCategory")
                         .WithMany("Tags")
                         .HasForeignKey("TagCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1233,34 +1334,53 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("TagCategory");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ZoneDrop", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedItem", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Item", "Item")
-                        .WithMany("ZoneDrops")
+                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                        .WithMany("UnlockedItems")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Zone", "Zone")
-                        .WithMany("ZoneDrops")
-                        .HasForeignKey("ZoneId")
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                        .WithMany("UnlockedItems")
+                        .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Item");
 
-                    b.Navigation("Zone");
+                    b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ZoneEnemy", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedMod", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
+                        .WithMany("UnlockedMods")
+                        .HasForeignKey("ItemModId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                        .WithMany("UnlockedMods")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ItemMod");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.ZoneEnemy", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
                         .WithMany("ZoneEnemies")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Zone", "Zone")
+                    b.HasOne("Game.Abstractions.Entities.Zone", "Zone")
                         .WithMany("ZoneEnemies")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1273,13 +1393,13 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("ItemModTag", b =>
                 {
-                    b.HasOne("Game.Core.Entities.ItemMod", null)
+                    b.HasOne("Game.Abstractions.Entities.ItemMod", null)
                         .WithMany()
                         .HasForeignKey("ItemModsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Tag", null)
+                    b.HasOne("Game.Abstractions.Entities.Tag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1288,20 +1408,20 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("ItemTag", b =>
                 {
-                    b.HasOne("Game.Core.Entities.Item", null)
+                    b.HasOne("Game.Abstractions.Entities.Item", null)
                         .WithMany()
                         .HasForeignKey("ItemsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Core.Entities.Tag", null)
+                    b.HasOne("Game.Abstractions.Entities.Tag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Attribute", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
                 {
                     b.Navigation("AttributeDistributions");
 
@@ -1314,80 +1434,70 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("SkillDamageMultipliers");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Enemy", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
                 {
                     b.Navigation("AttributeDistributions");
-
-                    b.Navigation("EnemyDrops");
 
                     b.Navigation("EnemySkills");
 
                     b.Navigation("ZoneEnemies");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.InventoryItem", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
                 {
-                    b.Navigation("InventoryItemMods");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.Item", b =>
-                {
-                    b.Navigation("EnemyDrops");
-
-                    b.Navigation("InventoryItems");
-
                     b.Navigation("ItemAttributes");
 
                     b.Navigation("ItemModSlots");
 
-                    b.Navigation("ZoneDrops");
+                    b.Navigation("UnlockedItems");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemCategory", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemCategory", b =>
                 {
                     b.Navigation("EquipmentSlots");
 
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemMod", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
                 {
-                    b.Navigation("GuaranteedSlots");
-
-                    b.Navigation("InventoryItemMods");
-
                     b.Navigation("ItemModAttributes");
+
+                    b.Navigation("UnlockedMods");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.ItemModSlot", b =>
-                {
-                    b.Navigation("InventoryItemMods");
-                });
-
-            modelBuilder.Entity("Game.Core.Entities.ItemModType", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.ItemModType", b =>
                 {
                     b.Navigation("ItemModSlots");
 
                     b.Navigation("ItemMods");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.LogSetting", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.LogSetting", b =>
                 {
                     b.Navigation("LogPreferences");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Player", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
                 {
-                    b.Navigation("InventoryItems");
+                    b.Navigation("AppliedMods");
 
                     b.Navigation("LogPreferences");
 
                     b.Navigation("PlayerAttributes");
 
+                    b.Navigation("PlayerChallenges");
+
                     b.Navigation("PlayerSkills");
+
+                    b.Navigation("PlayerStatistics");
+
+                    b.Navigation("UnlockedItems");
+
+                    b.Navigation("UnlockedMods");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Skill", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
                 {
                     b.Navigation("EnemySkills");
 
@@ -1396,15 +1506,18 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("SkillDamageMultipliers");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.TagCategory", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>
                 {
                     b.Navigation("Tags");
                 });
 
-            modelBuilder.Entity("Game.Core.Entities.Zone", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.User", b =>
                 {
-                    b.Navigation("ZoneDrops");
+                    b.Navigation("Players");
+                });
 
+            modelBuilder.Entity("Game.Abstractions.Entities.Zone", b =>
+                {
                     b.Navigation("ZoneEnemies");
                 });
 #pragma warning restore 612, 618

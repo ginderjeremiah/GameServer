@@ -1,11 +1,13 @@
 import type {
 	IAddEditAttributesData,
+	IApplyModRequest,
 	IAttribute,
 	IAttributeUpdate,
 	IBattlerAttribute,
+	IChallenge,
 	IChange,
 	IEnemy,
-	IInventoryUpdate,
+	IEquipRequest,
 	IItem,
 	IItemCategory,
 	IItemMod,
@@ -13,7 +15,10 @@ import type {
 	IItemModType,
 	ILoginCredentials,
 	ILogPreference,
+	IPlayerChallenge,
 	IPlayerData,
+	IPlayerStatistic,
+	IRemoveModRequest,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetTagsData,
@@ -42,6 +47,8 @@ export type ApiResponseTypes = {
 	'AdminTools/SetTagsForItemMod': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
 	'Attributes': IAttribute[];
+	'Challenges': IChallenge[];
+	'Challenges/Player': IPlayerChallenge[];
 	'Enemies': IEnemy[];
 	'ItemCategories': IItemCategory[];
 	'ItemMods': IItemMod[];
@@ -52,10 +59,14 @@ export type ApiResponseTypes = {
 	'Login/CreateAccount': undefined;
 	'Login/Status': IPlayerData;
 	'Player': IPlayerData;
+	'Player/ApplyMod': undefined;
+	'Player/EquipItem': undefined;
+	'Player/RemoveMod': undefined;
 	'Player/SaveLogPreferences': undefined;
-	'Player/UpdateInventorySlots': undefined;
+	'Player/UnequipItem': undefined;
 	'Player/UpdatePlayerStats': IBattlerAttribute[];
 	'Skills': ISkill[];
+	'Statistics': IPlayerStatistic[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 	'Tags/TagsForItem': ITag[];
@@ -86,8 +97,11 @@ export type ApiRequestTypes = {
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
+	'Player/ApplyMod': IApplyModRequest;
+	'Player/EquipItem': IEquipRequest;
+	'Player/RemoveMod': IRemoveModRequest;
 	'Player/SaveLogPreferences': ILogPreference[];
-	'Player/UpdateInventorySlots': IInventoryUpdate[];
+	'Player/UnequipItem': IEquipRequest;
 	'Player/UpdatePlayerStats': IAttributeUpdate[];
 	'Skills': { refreshCache?: boolean } | undefined;
 	'Tags/TagsForItem': { itemId: number };

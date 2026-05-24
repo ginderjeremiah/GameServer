@@ -23,9 +23,9 @@ namespace Game.Core.Players
         public EItemCategory ItemCategory { get; set; }
 
         /// <summary>
-        /// The <c>InventoryItem</c> database record ID for the equipped item (0 when empty).
+        /// The item ID of the equipped item, or null when the slot is empty.
         /// </summary>
-        public int InventoryItemId { get; set; }
+        public int? ItemId { get; set; }
 
         /// <summary>
         /// The item that is currently equipped in this slot.

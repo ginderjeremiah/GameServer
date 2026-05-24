@@ -55,10 +55,13 @@ namespace Game.Api
                 // Application services
                 .AddScoped<BattleService>()
                 .AddScoped<PlayerService>()
+                .AddScoped<StatisticsService>()
+                .AddScoped<ChallengeService>()
                 // Domain event infrastructure
                 .AddScoped<AdminCacheInvalidationFilter>()
                 .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>()
-                .AddScoped<IDomainEventHandler, LoggingEventHandler>();
+                .AddScoped<IDomainEventHandler, LoggingEventHandler>()
+                .AddScoped<IDomainEventHandler, StatisticsEventHandler>();
 
             if (builder.Environment.IsDevelopment())
             {
@@ -70,6 +73,10 @@ namespace Game.Api
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
+                var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
+                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
+                ApiCodeGenerator.GenerateApiCode(typeof(Startup).Assembly, targetDir);
+
                 // GameContext is Scoped, so the migrator must be resolved from a scope.
                 using var migrationScope = app.Services.CreateScope();
                 var migrator = migrationScope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
@@ -77,10 +84,6 @@ namespace Game.Api
 
                 app.UseSwagger();
                 app.UseSwaggerUI();
-
-                var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
-                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
-                ApiCodeGenerator.GenerateApiCode(typeof(Startup).Assembly, targetDir);
             }
             else
             {

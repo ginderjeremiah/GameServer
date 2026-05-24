@@ -1,12 +1,12 @@
-import { IInventoryItemMod, IItemMod } from '$lib/api';
+import { IAppliedMod, IItemMod } from '$lib/api';
 import { staticData } from '$stores';
 
-export interface ItemMod extends Omit<IInventoryItemMod, 'itemModId'>, IItemMod {}
+export interface ItemMod extends Omit<IAppliedMod, 'itemModId'>, IItemMod {}
 
-export const newItemMod = (itemMod: IInventoryItemMod) => {
-	const itemModData = staticData.itemMods[itemMod.itemModId];
+export const newItemMod = (appliedMod: IAppliedMod) => {
+	const itemModData = staticData.itemMods[appliedMod.itemModId];
 	return {
 		...itemModData,
-		itemModSlotId: itemMod.itemModSlotId
+		itemModSlotId: appliedMod.itemModSlotId
 	} satisfies ItemMod;
 };

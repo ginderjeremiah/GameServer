@@ -9,10 +9,10 @@
 				{/each}
 			</ul>
 		{/if}
-		{#if itemMods?.length}
-			<div class="tooltip-header">Mods:</div>
+		{#if appliedMods?.length}
+			<div class="tooltip-header">Applied Mods:</div>
 			<ul>
-				{#each itemMods as mod}
+				{#each appliedMods as mod}
 					<li>
 						<b>{mod.name}</b>: {mod.description}
 					</li>
@@ -21,25 +21,27 @@
 		{/if}
 		<div class="tooltip-header">Description:</div>
 		<p class="description-text">{item?.description}</p>
+		{#if item?.equipped}
+			<div class="equipped-badge">Equipped</div>
+		{/if}
 	</div>
 </div>
 
 <script lang="ts">
-import { type InventorySlot } from '$lib/engine';
+import type { Item } from '$lib/battle';
 
 export const getBaseNode = () => container;
 
 type Props = {
-	slot: InventorySlot | undefined;
+	item: Item | undefined;
 };
 
-const { slot }: Props = $props();
+const { item }: Props = $props();
 
 let container: HTMLDivElement;
 
-const item = $derived(slot?.item);
 const attributeMap = $derived(item?.totalAttributes?.getAttributeMap());
-const itemMods = $derived(item?.itemMods);
+const appliedMods = $derived(item?.appliedMods);
 </script>
 
 <style lang="scss">
@@ -71,6 +73,14 @@ const itemMods = $derived(item?.itemMods);
 
 	.description-text {
 		margin: 0 !important;
+	}
+
+	.equipped-badge {
+		margin-top: 0.5rem;
+		text-align: center;
+		color: gold;
+		font-weight: bold;
+		font-size: 0.8rem;
 	}
 }
 </style>

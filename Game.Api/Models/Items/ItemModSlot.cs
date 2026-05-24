@@ -1,4 +1,4 @@
-﻿using Game.Core;
+using Game.Core;
 using ItemModSlotEntity = Game.Abstractions.Entities.ItemModSlot;
 
 namespace Game.Api.Models.Items
@@ -8,8 +8,6 @@ namespace Game.Api.Models.Items
         public int Id { get; set; }
         public int ItemId { get; set; }
         public EItemModType ItemModSlotTypeId { get; set; }
-        public int? GuaranteedItemModId { get; set; }
-        public decimal Probability { get; set; }
 
         public static ItemModSlot FromSource(ItemModSlotEntity itemSlot)
         {
@@ -18,8 +16,6 @@ namespace Game.Api.Models.Items
                 Id = itemSlot.Id,
                 ItemId = itemSlot.ItemId,
                 ItemModSlotTypeId = (EItemModType)itemSlot.ItemModSlotTypeId,
-                GuaranteedItemModId = itemSlot.GuaranteedItemModId,
-                Probability = itemSlot.Probability,
             };
         }
     }

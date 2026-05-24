@@ -1,5 +1,3 @@
-import type { IItemDrop } from "../"
-
 export interface IZone {
 	id: number;
 	name: string;
@@ -7,7 +5,6 @@ export interface IZone {
 	order: number;
 	levelMin: number;
 	levelMax: number;
-	zoneDrops: IItemDrop[];
 };
 
 export interface IZoneEnemy {

@@ -1,36 +1,31 @@
 using Game.Core.Attributes.Modifiers;
-using Game.Core.Inventories;
 using Game.Core.Items;
 
 namespace Game.Core.Players.Inventories
 {
     /// <summary>
-    /// Represents an <see cref="Item"/> collection.  Some items may be equipped and have effect in battle, others are just in storage.
+    /// Represents a player's collection of unlocked items and modifiers.
     /// </summary>
     public class Inventory
     {
         private static readonly int EquipSlots = (int)Enum.GetValues<EEquipmentSlot>().Max();
 
-        /// <summary>All items currently in storage (not equipped).</summary>
-        public List<InventorySlot> InventorySlots { get; set; }
+        /// <summary>All items the player has unlocked.</summary>
+        public List<UnlockedItemSlot> UnlockedItems { get; set; }
 
-        /// <summary>
-        /// Slots containing the currently equipped items.
-        /// </summary>
+        /// <summary>IDs of all modifiers the player has unlocked.</summary>
+        public HashSet<int> UnlockedMods { get; set; }
+
+        /// <summary>The player's equipment slots.</summary>
         public List<EquipmentSlot> EquipmentSlots { get; set; }
 
-        /// <summary>
-        /// Creates a new <see cref="Inventory"/> instance.
-        /// </summary>
         public Inventory()
         {
-            InventorySlots = [];
+            UnlockedItems = [];
+            UnlockedMods = [];
             EquipmentSlots = NewEquippedList();
         }
 
-        /// <summary>
-        /// Gets an <see cref="AttributeModifier"/> collection based on the currently equipped items.
-        /// </summary>
         public IEnumerable<AttributeModifier> GetEquippedAttributeModifiers()
         {
             return EquipmentSlots.SelectNotNull(slot => slot.Item)
@@ -42,112 +37,111 @@ namespace Game.Core.Players.Inventories
                 );
         }
 
-        /// <summary>
-        /// Gets the slot numbers of each free storage slot in the inventory.
-        /// </summary>
-        public List<int> GetFreeSlotNumbers()
+        public bool TryEquipItem(int itemId, EEquipmentSlot slot)
         {
-            return InventorySlots.Where(slot => slot.Item is null).Select(slot => slot.SlotNumber).ToList();
-        }
-
-        /// <summary>
-        /// Returns the lowest non-negative storage slot number not currently in use.
-        /// </summary>
-        public int GetNextFreeSlotNumber()
-        {
-            var usedSlots = new HashSet<int>(InventorySlots.Select(s => s.SlotNumber));
-            var freeSlot = 0;
-            while (usedSlots.Contains(freeSlot)) freeSlot++;
-            return freeSlot;
-        }
-
-        /// <summary>
-        /// Attempts to apply a batch of slot reassignments atomically.
-        /// Validates that no two items share the same destination slot and that all
-        /// slot numbers are in range before applying any changes.
-        /// </summary>
-        /// <returns><c>true</c> if the update was valid and applied; <c>false</c> if any
-        /// validation rule was violated (inventory is unchanged in that case).</returns>
-        public bool TryUpdateSlots(IEnumerable<IInventoryUpdate> updates)
-        {
-            // Build a flat lookup of every item currently in inventory by InventoryItemId.
-            var allItems = InventorySlots
-                .ToDictionary(s => s.InventoryItemId, s => s.Item)
-                .Concat(EquipmentSlots
-                    .Where(s => s.Item is not null)
-                    .ToDictionary(s => s.InventoryItemId, s => s.Item))
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
-
-            var updateList = updates.ToList();
-
-            // All IDs must belong to items already in this inventory.
-            if (updateList.Any(u => !allItems.ContainsKey(u.Id)))
+            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            if (unlocked is null)
                 return false;
 
-            // No two updates may target the same (Equipped, SlotNumber) pair.
-            var usedSlots = new HashSet<(bool Equipped, int SlotNumber)>();
-            foreach (var update in updateList)
+            var equipSlot = EquipmentSlots.FirstOrDefault(s => s.Value == slot);
+            if (equipSlot is null)
+                return false;
+
+            if (equipSlot.ItemCategory != unlocked.Item.Category)
+                return false;
+
+            // Unequip from any other slot first
+            var currentSlot = EquipmentSlots.FirstOrDefault(s => s.ItemId == itemId);
+            if (currentSlot is not null)
             {
-                if (update.SlotNumber < 0)
-                    return false;
-
-                if (update.Equipped && !Enum.IsDefined(typeof(EEquipmentSlot), update.SlotNumber))
-                    return false;
-
-                if (!usedSlots.Add((update.Equipped, update.SlotNumber)))
-                    return false;
+                currentSlot.ItemId = null;
+                currentSlot.Item = null;
             }
 
-            // Validation passed — apply changes.
-            InventorySlots = updateList
-                .Where(u => !u.Equipped)
-                .Select(u => new InventorySlot
-                {
-                    InventoryItemId = u.Id,
-                    SlotNumber = u.SlotNumber,
-                    Item = allItems[u.Id],
-                }).ToList();
-
-            // Clear then re-populate equipment slots.
-            foreach (var slot in EquipmentSlots)
+            // Unequip whatever is in the target slot
+            if (equipSlot.ItemId.HasValue)
             {
-                slot.Item = null;
-                slot.InventoryItemId = 0;
+                equipSlot.ItemId = null;
+                equipSlot.Item = null;
             }
 
-            foreach (var update in updateList.Where(u => u.Equipped))
+            equipSlot.ItemId = itemId;
+            equipSlot.Item = unlocked.Item;
+            return true;
+        }
+
+        public bool TryUnequipItem(EEquipmentSlot slot)
+        {
+            var equipSlot = EquipmentSlots.FirstOrDefault(s => s.Value == slot);
+            if (equipSlot is null || !equipSlot.ItemId.HasValue)
+                return false;
+
+            equipSlot.ItemId = null;
+            equipSlot.Item = null;
+            return true;
+        }
+
+        public bool TryApplyMod(int itemId, int itemModId, int itemModSlotId, ItemMod mod)
+        {
+            if (!UnlockedMods.Contains(itemModId))
+                return false;
+
+            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            if (unlocked is null)
+                return false;
+
+            var modSlot = unlocked.Item.ModSlots.FirstOrDefault(s => s.Index == itemModSlotId);
+            if (modSlot is null)
+                return false;
+
+            // Verify mod type matches slot type
+            if (modSlot.Type != mod.Type)
+                return false;
+
+            // Replace any existing mod in the slot
+            var existing = unlocked.AppliedMods.FirstOrDefault(a => a.ItemModSlotId == itemModSlotId);
+            if (existing is not null)
+                unlocked.AppliedMods.Remove(existing);
+
+            unlocked.AppliedMods.Add(new AppliedModSlot
             {
-                var eSlot = EquipmentSlots.FirstOrDefault(s => (int)s.Value == update.SlotNumber);
-                if (eSlot is not null)
-                {
-                    eSlot.Item = allItems[update.Id];
-                    eSlot.InventoryItemId = update.Id;
-                }
-            }
+                ItemModSlotId = itemModSlotId,
+                ItemMod = mod,
+            });
 
             return true;
         }
 
-        /// <summary>
-        /// Adds <paramref name="item"/> to the first available storage slot.
-        /// </summary>
-        /// <param name="item">The domain item to add.</param>
-        /// <param name="inventoryItemId">The database record ID of the persisted <c>InventoryItem</c>.</param>
-        /// <returns>The storage slot number assigned to the item.</returns>
-        public int TryAddItem(Item item, int inventoryItemId)
+        public bool TryRemoveMod(int itemId, int itemModSlotId)
         {
-            var usedSlots = new HashSet<int>(InventorySlots.Select(s => s.SlotNumber));
-            var freeSlot = 0;
-            while (usedSlots.Contains(freeSlot)) freeSlot++;
+            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            if (unlocked is null)
+                return false;
 
-            InventorySlots.Add(new InventorySlot
+            var applied = unlocked.AppliedMods.FirstOrDefault(a => a.ItemModSlotId == itemModSlotId);
+            if (applied is null)
+                return false;
+
+            return unlocked.AppliedMods.Remove(applied);
+        }
+
+        public void UnlockItem(int itemId)
+        {
+            if (UnlockedItems.Any(u => u.ItemId == itemId))
+                return;
+
+            // Item reference will be set by the caller / mapper
+            UnlockedItems.Add(new UnlockedItemSlot
             {
-                InventoryItemId = inventoryItemId,
-                SlotNumber = freeSlot,
-                Item = item,
+                ItemId = itemId,
+                Item = null!,
+                AppliedMods = [],
             });
+        }
 
-            return freeSlot;
+        public void UnlockMod(int itemModId)
+        {
+            UnlockedMods.Add(itemModId);
         }
 
         private static List<EquipmentSlot> NewEquippedList()

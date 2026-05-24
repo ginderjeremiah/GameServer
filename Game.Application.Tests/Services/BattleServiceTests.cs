@@ -4,7 +4,6 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
-using Game.Core.Enemies;
 using Game.Core.Events;
 using Game.Core.Items;
 using Game.Core.Players;
@@ -193,45 +192,6 @@ namespace Game.Application.Tests.Services
                 () => service.StartBattle(player, state, zoneId: 999));
         }
 
-        // ── TryDefeatEnemy — drops ──────────────────────────────────────────
-
-        [TestMethod]
-        public async Task TryDefeatEnemy_WithDrops_AddsItemsToInventory()
-        {
-            var item1 = MakeItem(1, "Sword");
-            var item2 = MakeItem(2, "Shield");
-            var enemy = MakeEnemyWithDrops(id: 1, level: 1, drops: [item1, item2]);
-            var (service, _, _) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
-
-            var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
-
-            var result = await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
-
-            Assert.IsNotNull(result);
-            Assert.AreEqual(2, result.DroppedItems.Count);
-            Assert.AreEqual(0, result.DroppedItems[0].SlotNumber);
-            Assert.AreEqual(1, result.DroppedItems[1].SlotNumber);
-        }
-
-        [TestMethod]
-        public async Task TryDefeatEnemy_WithDrops_RaisesItemAcquiredEvents()
-        {
-            var item1 = MakeItem(1, "Sword");
-            var enemy = MakeEnemyWithDrops(id: 1, level: 1, drops: [item1]);
-            var (service, _, dispatcher) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
-
-            var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
-
-            await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
-
-            var acquiredEvents = dispatcher.DispatchedEvents.OfType<ItemAcquiredEvent>().ToList();
-            Assert.AreEqual(1, acquiredEvents.Count);
-        }
-
         // ── TryDefeatEnemy — progression data ───────────────────────────────
 
         [TestMethod]
@@ -317,7 +277,6 @@ namespace Game.Application.Tests.Services
             Level = level,
             AttributeDistributions = [],
             Skills = [],
-            Drops = [],
         };
 
         private static CoreEnemy MakeBattleReadyEnemy(int id, int level) => new()
@@ -344,32 +303,6 @@ namespace Game.Application.Tests.Services
                     CooldownMs = 1500, BaseDamage = 5, DamageMultipliers = [],
                 },
             ],
-            Drops = [],
-        };
-
-        private static CoreEnemy MakeEnemyWithDrops(int id, int level, List<Item> drops) => new()
-        {
-            Id = id,
-            Name = "Drop Enemy",
-            Level = level,
-            AttributeDistributions = [],
-            Skills = [],
-            Drops = drops.Select(item => new EnemyDrop
-            {
-                Item = item,
-                DropRate = decimal.MaxValue,
-            }).ToList(),
-        };
-
-        private static Item MakeItem(int id, string name) => new()
-        {
-            Id = id,
-            Name = name,
-            Description = "",
-            Category = EItemCategory.Weapon,
-            Attributes = [],
-            ModSlots = [],
-            Tags = [],
         };
 
         private static EntityZone MakeZone(int id, int levelMin, int levelMax) => new()
@@ -380,7 +313,6 @@ namespace Game.Application.Tests.Services
             Order = 0,
             LevelMin = levelMin,
             LevelMax = levelMax,
-            ZoneDrops = [],
             ZoneEnemies = [],
         };
     }

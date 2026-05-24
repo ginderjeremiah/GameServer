@@ -1,4 +1,3 @@
-﻿using Game.Api.Models.Items;
 using ZoneEntity = Game.Abstractions.Entities.Zone;
 
 namespace Game.Api.Models.Zones
@@ -11,7 +10,6 @@ namespace Game.Api.Models.Zones
         public int Order { get; set; }
         public int LevelMin { get; set; }
         public int LevelMax { get; set; }
-        public IEnumerable<ItemDrop> ZoneDrops { get; set; }
 
         public static Zone FromSource(ZoneEntity zone)
         {
@@ -23,7 +21,6 @@ namespace Game.Api.Models.Zones
                 Order = zone.Order,
                 LevelMin = zone.LevelMin,
                 LevelMax = zone.LevelMax,
-                ZoneDrops = zone.ZoneDrops.To().Model<ItemDrop>(),
             };
         }
     }

@@ -155,7 +155,6 @@ namespace Game.Core.Tests.Battle
                     },
                 ],
                 Skills = defaultSkills,
-                Drops = [],
             };
         }
     }

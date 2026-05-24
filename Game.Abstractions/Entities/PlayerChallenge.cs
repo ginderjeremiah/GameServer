@@ -1,0 +1,14 @@
+namespace Game.Abstractions.Entities
+{
+    public class PlayerChallenge
+    {
+        public int PlayerId { get; set; }
+        public int ChallengeId { get; set; }
+        public int Progress { get; set; }
+        public bool Completed { get; set; }
+        public DateTime? CompletedAt { get; set; }
+
+        public virtual Player Player { get; set; }
+        public virtual Challenge Challenge { get; set; }
+    }
+}

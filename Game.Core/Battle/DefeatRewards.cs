@@ -1,5 +1,4 @@
-﻿using Game.Core.Enemies;
-using Game.Core.Items;
+using Game.Core.Enemies;
 using Game.Core.Players;
 
 namespace Game.Core.Battle
@@ -11,12 +10,9 @@ namespace Game.Core.Battle
     {
         public int ExpReward { get; set; }
 
-        public IEnumerable<Item> Drops { get; set; }
-
-        public DefeatRewards(Player player, Enemy enemy, Mulberry32 rng)
+        public DefeatRewards(Player player, Enemy enemy)
         {
             ExpReward = GetExpReward(player, enemy);
-            Drops = enemy.RollDrops(rng).ToList();
         }
 
         private static int GetExpReward(Player player, Enemy enemy)

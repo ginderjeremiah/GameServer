@@ -37,11 +37,11 @@ export enum EItemModType {
 	Suffix = 3,
 };
 
-export enum ELogSetting {
+export enum ELogType {
 	Damage = 1,
 	Debug = 2,
 	Exp = 3,
 	LevelUp = 4,
-	Inventory = 5,
+	ItemFound = 5,
 	EnemyDefeated = 6,
 };

@@ -1,6 +1,5 @@
 using Game.Abstractions.DataAccess;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 
 namespace Game.Application.Tests.Fakes
 {
@@ -14,9 +13,6 @@ namespace Game.Application.Tests.Fakes
         /// <summary>Number of times <see cref="SavePlayer"/> was called.</summary>
         public int SavePlayerCallCount { get; private set; }
 
-        /// <summary>Counter that hands out unique IDs for simulated AddInventoryItem calls.</summary>
-        private int _nextInventoryItemId = 1;
-
         public void Seed(Player player) => _store[player.Id] = player;
 
         public Task<Player?> GetPlayer(int playerId)
@@ -29,10 +25,24 @@ namespace Game.Application.Tests.Fakes
             return Task.CompletedTask;
         }
 
-        public Task<int> AddInventoryItem(int playerId, int itemId, int slotNumber, int rating = 1)
-            => Task.FromResult(_nextInventoryItemId++);
+        // Unlocked items
+        public Task UnlockItem(int playerId, int itemId) => Task.CompletedTask;
+        public Task EquipItem(int playerId, int itemId, int equipmentSlotId) => Task.CompletedTask;
+        public Task UnequipItem(int playerId, int itemId) => Task.CompletedTask;
 
-        public Task UpdateInventoryItemSlots(int playerId, IEnumerable<IInventoryUpdate> updates)
-            => Task.CompletedTask;
+        // Unlocked mods
+        public Task UnlockMod(int playerId, int itemModId) => Task.CompletedTask;
+
+        // Applied mods
+        public Task ApplyMod(int playerId, int itemId, int itemModSlotId, int itemModId) => Task.CompletedTask;
+        public Task RemoveMod(int playerId, int itemId, int itemModSlotId) => Task.CompletedTask;
+
+        // Statistics
+        public Task<long> IncrementStatistic(int playerId, int statisticTypeId, int entityId, long amount)
+            => Task.FromResult(amount);
+
+        // Challenges
+        public Task UpdateChallengeProgress(int playerId, int challengeId, int progress) => Task.CompletedTask;
+        public Task CompleteChallenge(int playerId, int challengeId) => Task.CompletedTask;
     }
 }

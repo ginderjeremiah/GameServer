@@ -20,8 +20,8 @@ export class PlayerManager implements IPlayerData {
 	public selectedSkills: number[] = [];
 	public logPreferences: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
-		inventory: [],
-		equipped: []
+		unlockedItems: [],
+		unlockedMods: [],
 	};
 
 	public initialize(data: IPlayerData) {

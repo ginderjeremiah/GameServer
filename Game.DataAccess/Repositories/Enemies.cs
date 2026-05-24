@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(GameContext context, ISkills skills, IItems items) : IEnemies
+    internal class Enemies(GameContext context, ISkills skills) : IEnemies
     {
         private static readonly List<ProbabilityTable<int>?> zoneEnemiesTables = [];
         private static readonly object _lock = new();
@@ -17,7 +17,6 @@ namespace Game.DataAccess.Repositories
 
         private readonly GameContext _context = context;
         private readonly ISkills _skills = skills;
-        private readonly IItems _items = items;
 
         public void InvalidateCache()
         {
@@ -32,7 +31,6 @@ namespace Game.DataAccess.Repositories
                 _enemyList = [.. _context.Enemies
                     .AsNoTracking()
                     .Include(e => e.AttributeDistributions)
-                    .Include(e => e.EnemyDrops)
                     .Include(e => e.EnemySkills)
                     .OrderBy(e => e.Id)];
             }
@@ -88,13 +86,13 @@ namespace Game.DataAccess.Repositories
             var entity = GetEnemy(enemyId);
             return entity is null
                 ? null
-                : EnemyMapper.ToCore(entity, level, _skills.AllSkills(), _items.All());
+                : EnemyMapper.ToCore(entity, level, _skills.AllSkills());
         }
 
         public CoreEnemy GetRandomDomainEnemy(int zoneId, int level)
         {
             var entity = GetRandomEnemy(zoneId);
-            return EnemyMapper.ToCore(entity, level, _skills.AllSkills(), _items.All());
+            return EnemyMapper.ToCore(entity, level, _skills.AllSkills());
         }
     }
 }

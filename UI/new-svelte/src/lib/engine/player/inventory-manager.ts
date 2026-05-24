@@ -1,8 +1,13 @@
-import { IInventoryItem, IBattlerAttribute, ELogSetting, EItemCategory, apiSocket } from '$lib/api';
+import {
+	IInventoryItem,
+	IBattlerAttribute,
+	ELogSetting,
+	EItemCategory,
+	ApiRequest,
+} from '$lib/api';
 import { playerManager } from '$lib/engine';
-import { getTrashItem, Item, newItem } from '$lib/battle';
+import { Item, newItem } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
-import { DelayedAction } from '$lib/common';
 
 //Manually putting this here until codegen gets updated to load this
 export enum EEquipmentSlot {
@@ -14,157 +19,174 @@ export enum EEquipmentSlot {
 	AccessorySlot = 5
 }
 
-enum ExtraSlotType {
-	Trash = -1,
-	All = 0
-}
-
-export const ItemSlotType = { ...ExtraSlotType, ...EItemCategory };
-export type ItemSlotType = ExtraSlotType | EItemCategory;
-
-export interface InventorySlot {
-	item?: Item;
-	slotType: ItemSlotType;
-	slotNumber: number;
-	equippedSlot: boolean;
-	canHold: (item?: Item) => boolean;
-}
-
 export class InventoryManager {
-	public slots: InventorySlot[] = [];
-	public equippedSlots: InventorySlot[] = [];
-	public trashSlot: InventorySlot = {} as any;
-	public draggedSlot?: InventorySlot;
-	public equipmentStats: IBattlerAttribute[] = [];
+	/** All items the player has unlocked, keyed by itemId. */
+	public unlockedItems: Map<number, Item> = new Map();
 
-	private delayedSaveAction = new DelayedAction(5000, () => this.updateInventorySlots());
+	/** IDs of all modifiers the player has unlocked. */
+	public unlockedMods: Set<number> = new Set();
+
+	/** The 6 equipment slots — index matches EEquipmentSlot. */
+	public equippedSlots: (Item | undefined)[] = new Array(6).fill(undefined);
+
+	/** Currently selected item (for mod customization panel). */
+	public selectedItemId: number | undefined;
 
 	public initialize() {
-		let i = 0;
-		for (const item of playerManager.inventoryData.inventory) {
-			const slot = {
-				item: item ? newItem(item) : item,
-				slotType: ItemSlotType.All,
-				slotNumber: i++,
-				equippedSlot: false,
-				canHold: () => true
-			};
+		this.unlockedItems.clear();
+		this.unlockedMods.clear();
+		this.equippedSlots = new Array(6).fill(undefined);
 
-			this.slots.push(slot);
+		const data = playerManager.inventoryData;
+
+		// Load unlocked mods
+		for (const modId of data.unlockedMods) {
+			this.unlockedMods.add(modId);
 		}
 
-		i = 0;
-		for (const [index, item] of playerManager.inventoryData.equipped.entries()) {
-			const slot = {
-				item: item ? newItem(item) : item,
-				slotType: getEquippedSlotType(index),
-				slotNumber: i++,
-				equippedSlot: true,
-				canHold: (i?: Item) => !i || getEquippedSlotType(index) === i.itemCategoryId
-			};
-
-			this.equippedSlots.push(slot);
-		}
-
-		this.trashSlot = {
-			item: getTrashItem(),
-			slotType: ItemSlotType.Trash,
-			slotNumber: ItemSlotType.Trash,
-			equippedSlot: false,
-			canHold: () => true
-		};
-	}
-
-	public addInventoryItems(items: IInventoryItem[]) {
-		items.forEach((invItem) => {
+		// Load unlocked items
+		for (const invItem of data.unlockedItems) {
 			const item = newItem(invItem);
-			if (this.slots[invItem.inventorySlotNumber].item) {
-				const inventorySlotNumber = this.nextAvailableSlot();
-				this.slots[inventorySlotNumber].item = item;
-				item.inventorySlotNumber = inventorySlotNumber;
-				this.delayedSaveAction.start();
-			} else {
-				this.slots[invItem.inventorySlotNumber].item = item;
+			this.unlockedItems.set(invItem.itemId, item);
+
+			// Place equipped items into their equipment slots
+			if (invItem.equipped && invItem.equipmentSlotId != null) {
+				this.equippedSlots[invItem.equipmentSlotId] = item;
 			}
-			logMessage(ELogSetting.Inventory, 'You found a ' + item.name + '!');
-		});
+		}
 	}
 
-	public swapSlots(slot1: InventorySlot, slot2: InventorySlot) {
-		const item1 = slot1.item;
-		const item2 = slot2.item;
-		const isTrashDestination = slot2.slotType === ItemSlotType.Trash;
+	public get unlockedItemList(): Item[] {
+		return [...this.unlockedItems.values()];
+	}
 
-		if (item1 && slot2.canHold(item1) && (isTrashDestination || slot1.canHold(item2))) {
-			if (isTrashDestination) {
-				slot1.item = undefined;
-			} else if (slot1.canHold(item2)) {
-				item1.inventorySlotNumber = slot2.slotNumber;
-				item1.equipped = slot2.equippedSlot;
-				slot2.item = item1;
-
-				if (item2) {
-					item2.inventorySlotNumber = slot1.slotNumber;
-					item2.equipped = slot1.equippedSlot;
+	/** Computes combined attributes from all equipped items and their applied mods. */
+	public get equipmentStats(): IBattlerAttribute[] {
+		const stats: IBattlerAttribute[] = [];
+		for (const item of this.equippedSlots) {
+			if (item) {
+				stats.push(...item.attributes);
+				for (const mod of item.appliedMods) {
+					stats.push(...mod.attributes);
 				}
-
-				slot1.item = item2;
-			}
-
-			if (slot1.equippedSlot || slot2.equippedSlot) {
-				//this.updateEquipmentStats();
-				this.updateInventorySlots();
-			} else {
-				this.delayedSaveAction.start();
 			}
 		}
+		return stats;
 	}
 
-	private nextAvailableSlot() {
-		for (let i = 0; i < this.slots.length; i++) {
-			if (!this.slots[i]?.item) {
-				return i;
+	public get selectedItem(): Item | undefined {
+		return this.selectedItemId != null
+			? this.unlockedItems.get(this.selectedItemId)
+			: undefined;
+	}
+
+	public selectItem(itemId: number) {
+		this.selectedItemId = itemId;
+	}
+
+	public async equipItem(itemId: number, slotId: EEquipmentSlot) {
+		const item = this.unlockedItems.get(itemId);
+		if (!item) return false;
+
+		const req = new ApiRequest('Player/EquipItem');
+		const response = await req.post({ itemId, equipmentSlotId: slotId });
+		if (response.error) return false;
+
+		// Unequip from any current slot
+		for (let i = 0; i < this.equippedSlots.length; i++) {
+			if (this.equippedSlots[i]?.itemId === itemId) {
+				const old = this.equippedSlots[i]!;
+				old.equipped = false;
+				old.equipmentSlotId = undefined;
+				this.equippedSlots[i] = undefined;
 			}
 		}
-		return this.slots.length - 1;
+
+		// Unequip whatever is in the target slot
+		if (this.equippedSlots[slotId]) {
+			const displaced = this.equippedSlots[slotId]!;
+			displaced.equipped = false;
+			displaced.equipmentSlotId = undefined;
+		}
+
+		// Equip the new item
+		item.equipped = true;
+		item.equipmentSlotId = slotId;
+		this.equippedSlots[slotId] = item;
+
+		return true;
 	}
 
-	private updateInventorySlots() {
-		const inv = [
-			...this.slots.flatMap((slot) =>
-				slot.item
-					? {
-							id: slot.item.id,
-							inventorySlotNumber: slot.item.inventorySlotNumber,
-							equipped: false
-						}
-					: []
-			),
-			...this.equippedSlots.flatMap((slot) =>
-				slot.item
-					? { id: slot.item.id, inventorySlotNumber: slot.item.inventorySlotNumber, equipped: true }
-					: []
-			)
-		];
-		this.delayedSaveAction.cancel();
-		apiSocket.sendSocketCommand('UpdateInventorySlots', inv);
+	public async unequipItem(slotId: EEquipmentSlot) {
+		const item = this.equippedSlots[slotId];
+		if (!item) return false;
+
+		const req = new ApiRequest('Player/UnequipItem');
+		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
+		if (response.error) return false;
+
+		item.equipped = false;
+		item.equipmentSlotId = undefined;
+		this.equippedSlots[slotId] = undefined;
+
+		return true;
+	}
+
+	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
+		if (!this.unlockedMods.has(itemModId)) return false;
+		if (!this.unlockedItems.has(itemId)) return false;
+
+		const req = new ApiRequest('Player/ApplyMod');
+		const response = await req.post({ itemId, itemModId, itemModSlotId });
+		if (response.error) return false;
+
+		// Re-fetch player data to get updated item state
+		// (or update locally — for now just log success)
+		logMessage(ELogSetting.Inventory, 'Modifier applied.');
+
+		return true;
+	}
+
+	public async removeMod(itemId: number, itemModSlotId: number) {
+		if (!this.unlockedItems.has(itemId)) return false;
+
+		const req = new ApiRequest('Player/RemoveMod');
+		const response = await req.post({ itemId, itemModSlotId });
+		if (response.error) return false;
+
+		logMessage(ELogSetting.Inventory, 'Modifier removed.');
+
+		return true;
+	}
+
+	/** Called when the player unlocks a new item from a challenge reward. */
+	public addUnlockedItem(invItem: IInventoryItem) {
+		const item = newItem(invItem);
+		this.unlockedItems.set(invItem.itemId, item);
+		logMessage(ELogSetting.Inventory, `Unlocked: ${item.name}!`);
+	}
+
+	/** Called when the player unlocks a new mod from a challenge reward. */
+	public addUnlockedMod(modId: number) {
+		this.unlockedMods.add(modId);
+		logMessage(ELogSetting.Inventory, 'New modifier unlocked!');
 	}
 }
 
-const getEquippedSlotType = (index: number) => {
-	switch (index) {
-		case EEquipmentSlot.HelmSlot:
-			return ItemSlotType.Helm;
-		case EEquipmentSlot.ChestSlot:
-			return ItemSlotType.Chest;
-		case EEquipmentSlot.LegSlot:
-			return ItemSlotType.Leg;
-		case EEquipmentSlot.BootSlot:
-			return ItemSlotType.Boot;
-		case EEquipmentSlot.WeaponSlot:
-			return ItemSlotType.Weapon;
-		case EEquipmentSlot.AccessorySlot:
+export const getEquipmentSlotForCategory = (category: EItemCategory): EEquipmentSlot => {
+	switch (category) {
+		case EItemCategory.Helm:
+			return EEquipmentSlot.HelmSlot;
+		case EItemCategory.Chest:
+			return EEquipmentSlot.ChestSlot;
+		case EItemCategory.Leg:
+			return EEquipmentSlot.LegSlot;
+		case EItemCategory.Boot:
+			return EEquipmentSlot.BootSlot;
+		case EItemCategory.Weapon:
+			return EEquipmentSlot.WeaponSlot;
+		case EItemCategory.Accessory:
 		default:
-			return ItemSlotType.Accessory;
+			return EEquipmentSlot.AccessorySlot;
 	}
 };

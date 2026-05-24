@@ -49,28 +49,14 @@ namespace Game.Api.CodeGen
             {
                 return "number";
             }
-            else if (type == typeof(int?)
-                || type == typeof(decimal?)
-                || type == typeof(double?)
-                || type == typeof(float?)
-                || type == typeof(short?)
-                || type == typeof(long?)
-                || type == typeof(uint?))
-            {
-                return "number";
-            }
             else if (type == typeof(bool))
             {
                 return "boolean";
             }
-            else if (type == typeof(bool?))
-            {
-                return "boolean";
-            }
-            else if (type == typeof(string))
+            else if (type == typeof(string) || type == typeof(DateTime))
             {
                 return "string";
-            } 
+            }
             else if (type.IsEnum)
             {
                 return type.Name;

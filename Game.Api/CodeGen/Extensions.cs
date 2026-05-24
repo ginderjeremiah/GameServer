@@ -24,7 +24,7 @@ namespace Game.Api.CodeGen
             }
             else
             {
-                return type.IsEnum || type.IsClass && !type.IsGenericParameter && type != typeof(string);
+                return type.IsEnum || (type.IsClass && !type.IsGenericParameter && type != typeof(string));
             }
         }
 

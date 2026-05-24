@@ -9,7 +9,6 @@
         public int LevelMin { get; set; }
         public int LevelMax { get; set; }
 
-        public virtual List<ZoneDrop> ZoneDrops { get; set; }
         public virtual List<ZoneEnemy> ZoneEnemies { get; set; }
     }
 }

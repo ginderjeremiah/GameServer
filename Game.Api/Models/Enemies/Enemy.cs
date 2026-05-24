@@ -1,6 +1,4 @@
-﻿using Game.Api;
 using Game.Api.Models.Attributes;
-using Game.Api.Models.Items;
 using EnemyEntity = Game.Abstractions.Entities.Enemy;
 
 namespace Game.Api.Models.Enemies
@@ -9,7 +7,6 @@ namespace Game.Api.Models.Enemies
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public IEnumerable<ItemDrop> Drops { get; set; }
         public IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
         public IEnumerable<int> SkillPool { get; set; }
 
@@ -17,7 +14,6 @@ namespace Game.Api.Models.Enemies
         {
             return new Enemy
             {
-                Drops = entity.EnemyDrops.To().Model<ItemDrop>(),
                 AttributeDistribution = entity.AttributeDistributions.To().Model<AttributeDistribution>(),
                 Name = entity.Name,
                 Id = entity.Id,

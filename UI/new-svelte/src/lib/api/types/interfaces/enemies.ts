@@ -1,14 +1,8 @@
-import type {
-	IAttributeDistribution,
-	IBattlerAttribute,
-	IInventoryItem,
-	IItemDrop
-} from "../"
+import type { IAttributeDistribution, IBattlerAttribute } from "../"
 
 export interface IEnemy {
 	id: number;
 	name: string;
-	drops: IItemDrop[];
 	attributeDistribution: IAttributeDistribution[];
 	skillPool: number[];
 };
@@ -37,7 +31,10 @@ export interface INewEnemyRequest {
 
 export interface IDefeatRewards {
 	expReward: number;
-	drops: IInventoryItem[];
+	newLevel: number;
+	newExp: number;
+	statPointsGained: number;
+	statPointsUsed: number;
 };
 
 export interface IDefeatEnemyResponse {

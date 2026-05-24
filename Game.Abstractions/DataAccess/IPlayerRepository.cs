@@ -1,27 +1,32 @@
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 
 namespace Game.Abstractions.DataAccess
 {
     /// <summary>
-    /// Bounded-context repository for all player-scoped persistence: player data and inventory.
+    /// Bounded-context repository for all player-scoped persistence.
     /// </summary>
     public interface IPlayerRepository
     {
-        // ----- Player -----
-
-        /// <inheritdoc cref="IPlayers.GetPlayer"/>
         Task<Player?> GetPlayer(int playerId);
-
-        /// <inheritdoc cref="IPlayers.SavePlayer"/>
         Task SavePlayer(Player player);
 
-        // ----- Inventory -----
+        // Unlocked items
+        Task UnlockItem(int playerId, int itemId);
+        Task EquipItem(int playerId, int itemId, int equipmentSlotId);
+        Task UnequipItem(int playerId, int itemId);
 
-        /// <inheritdoc cref="IInventories.AddInventoryItem"/>
-        Task<int> AddInventoryItem(int playerId, int itemId, int slotNumber, int rating = 1);
+        // Unlocked mods
+        Task UnlockMod(int playerId, int itemModId);
 
-        /// <inheritdoc cref="IInventories.UpdateInventoryItemSlots"/>
-        Task UpdateInventoryItemSlots(int playerId, IEnumerable<IInventoryUpdate> updates);
+        // Applied mods
+        Task ApplyMod(int playerId, int itemId, int itemModSlotId, int itemModId);
+        Task RemoveMod(int playerId, int itemId, int itemModSlotId);
+
+        // Statistics
+        Task<long> IncrementStatistic(int playerId, int statisticTypeId, int entityId, long amount);
+
+        // Challenges
+        Task UpdateChallengeProgress(int playerId, int challengeId, int progress);
+        Task CompleteChallenge(int playerId, int challengeId);
     }
 }

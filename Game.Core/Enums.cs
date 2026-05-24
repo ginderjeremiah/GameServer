@@ -34,7 +34,7 @@ namespace Game.Core
         Dexterity = 4,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines a character's <see cref="DropBonus"/>.
+        /// One of the core game attributes. Will eventually impact various RNG-based calculations.
         /// </summary>
         Luck = 5,
 
@@ -54,8 +54,9 @@ namespace Game.Core
         CooldownRecovery = 8,
 
         /// <summary>
-        /// A derived game attribute. Represents a % multiplier to the rate at which items are dropped from enemies.
+        /// OBSOLETE. Previously represented a % multiplier to the rate at which items are dropped from enemies.
         /// </summary>
+        [Obsolete("Drop system has been replaced by challenge-based unlocks.")]
         DropBonus = 9,
 
         /// <summary>
@@ -269,6 +270,29 @@ namespace Game.Core
         /// The modifier amplifies the final value.
         /// </summary>
         Multiplicative = 2,
+    }
+
+    /// <summary>
+    /// Represents the type of challenge condition that must be met to unlock a reward.
+    /// </summary>
+    public enum EChallengeType
+    {
+        KillCount = 1,
+        BossDefeat = 2,
+        ZoneClear = 3,
+        TimeTrial = 4,
+        LevelReached = 5
+    }
+
+    /// <summary>
+    /// Represents a type of player statistic that is tracked over time.
+    /// </summary>
+    public enum EStatisticType
+    {
+        EnemiesKilled = 1,
+        BossesDefeated = 2,
+        ZonesCleared = 3,
+        TotalDamageDealt = 4
     }
 
     /// <summary>

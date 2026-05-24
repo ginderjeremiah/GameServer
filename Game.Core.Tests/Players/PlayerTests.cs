@@ -113,33 +113,55 @@ namespace Game.Core.Tests.Players
             Assert.AreEqual(100, player.Exp);
         }
 
-        // ── AddInventoryItem ─────────────────────────────────────────────────
+        // ── UnlockItem ──────────────────────────────────────────────────────
 
         [TestMethod]
-        public void AddInventoryItem_AddsItemToInventory()
+        public void UnlockItem_AddsItemToInventory()
         {
             var player = MakePlayer();
-            var item = MakeItem(id: 10, name: "Sword");
 
-            player.AddInventoryItem(item, inventoryItemId: 99);
+            player.UnlockItem(10);
 
-            Assert.AreEqual(1, player.Inventory.InventorySlots.Count);
-            Assert.AreEqual(item, player.Inventory.InventorySlots[0].Item);
+            Assert.AreEqual(1, player.Inventory.UnlockedItems.Count);
+            Assert.AreEqual(10, player.Inventory.UnlockedItems[0].ItemId);
         }
 
         [TestMethod]
-        public void AddInventoryItem_RaisesItemAcquiredEvent()
+        public void UnlockItem_RaisesItemUnlockedEvent()
         {
             var player = MakePlayer();
-            var item = MakeItem(id: 10, name: "Sword");
 
-            player.AddInventoryItem(item, inventoryItemId: 99);
+            player.UnlockItem(10);
 
-            var evt = player.DomainEvents.OfType<ItemAcquiredEvent>().SingleOrDefault();
+            var evt = player.DomainEvents.OfType<ItemUnlockedEvent>().SingleOrDefault();
             Assert.IsNotNull(evt);
             Assert.AreEqual(player.Id, evt.PlayerId);
-            Assert.AreEqual(99, evt.InventoryItemId);
-            Assert.AreEqual(item, evt.Item);
+            Assert.AreEqual(10, evt.ItemId);
+        }
+
+        // ── UnlockMod ───────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void UnlockMod_AddsModToInventory()
+        {
+            var player = MakePlayer();
+
+            player.UnlockMod(5);
+
+            Assert.IsTrue(player.Inventory.UnlockedMods.Contains(5));
+        }
+
+        [TestMethod]
+        public void UnlockMod_RaisesModUnlockedEvent()
+        {
+            var player = MakePlayer();
+
+            player.UnlockMod(5);
+
+            var evt = player.DomainEvents.OfType<ModUnlockedEvent>().SingleOrDefault();
+            Assert.IsNotNull(evt);
+            Assert.AreEqual(player.Id, evt.PlayerId);
+            Assert.AreEqual(5, evt.ItemModId);
         }
 
         // ── RecordEnemyDefeat ────────────────────────────────────────────────
@@ -148,16 +170,14 @@ namespace Game.Core.Tests.Players
         public void RecordEnemyDefeat_RaisesEnemyDefeatedEvent()
         {
             var player = MakePlayer();
-            var drops = new List<Item> { MakeItem(1, "Drop") };
 
-            player.RecordEnemyDefeat(enemyId: 5, expReward: 200, drops: drops);
+            player.RecordEnemyDefeat(enemyId: 5, expReward: 200);
 
             var evt = player.DomainEvents.OfType<EnemyDefeatedEvent>().SingleOrDefault();
             Assert.IsNotNull(evt);
             Assert.AreEqual(player.Id, evt.PlayerId);
             Assert.AreEqual(5, evt.EnemyId);
             Assert.AreEqual(200, evt.ExpReward);
-            Assert.AreEqual(1, evt.DroppedItems.Count);
         }
 
         // ── ClearEvents ──────────────────────────────────────────────────────
@@ -187,17 +207,6 @@ namespace Game.Core.Tests.Players
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
-        };
-
-        private static Item MakeItem(int id, string name) => new()
-        {
-            Id = id,
-            Name = name,
-            Description = string.Empty,
-            Category = EItemCategory.Accessory,
-            Attributes = [],
-            ModSlots = [],
-            Tags = [],
         };
     }
 }

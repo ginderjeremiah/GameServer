@@ -1,4 +1,4 @@
-﻿using Game.Abstractions.Entities;
+using Game.Abstractions.Entities;
 using Game.Abstractions.Infrastructure;
 using Game.Infrastructure.Database;
 
@@ -61,21 +61,15 @@ namespace Game.DataAccess
             var inventoryProcessor = GetPlayerQueueProcessor(async (dbContext, player) =>
             {
 #nullable disable
-                foreach (var item in player.InventoryItems)
-                {
-                    item.InventoryItemMods = null;
-                }
-
+                player.UnlockedItems = null;
+                player.UnlockedMods = null;
+                player.AppliedMods = null;
                 player.LogPreferences = null;
                 player.PlayerSkills = null;
                 player.PlayerAttributes = null;
 #nullable enable
 
                 dbContext.Update(player);
-
-                var inventoryItemIds = player.InventoryItems.Select(ii => ii.Id).ToList();
-                await dbContext.InventoryItems.Where(ii => ii.PlayerId == player.Id && !inventoryItemIds.Contains(ii.Id)).ExecuteDeleteAsync();
-
                 await dbContext.SaveChangesAsync();
             });
 
@@ -90,7 +84,9 @@ namespace Game.DataAccess
             var playerProcessor = GetPlayerQueueProcessor(async (dbContext, player) =>
             {
 #nullable disable
-                player.InventoryItems = null;
+                player.UnlockedItems = null;
+                player.UnlockedMods = null;
+                player.AppliedMods = null;
                 player.LogPreferences = null;
                 player.PlayerSkills = null;
                 player.PlayerAttributes = null;

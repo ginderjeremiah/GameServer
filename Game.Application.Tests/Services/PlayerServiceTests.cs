@@ -1,3 +1,4 @@
+using Game.Abstractions.DataAccess;
 using Game.Application.Services;
 using Game.Application.Tests.Fakes;
 using Game.Core;
@@ -15,8 +16,7 @@ namespace Game.Application.Tests.Services
         [TestMethod]
         public async Task TryUpdateAttributes_ValidUpdate_ReturnsTrue()
         {
-            var repo = new FakePlayerRepository();
-            var service = new PlayerService(repo);
+            var (service, repo) = MakeService();
 
             // Player has 6 unspent stat points (gained 6, used 0).
             var player = MakePlayer(statPointsGained: 6, statPointsUsed: 0);
@@ -37,8 +37,7 @@ namespace Game.Application.Tests.Services
         [TestMethod]
         public async Task TryUpdateAttributes_SpendMoreThanAvailable_ReturnsFalse()
         {
-            var repo = new FakePlayerRepository();
-            var service = new PlayerService(repo);
+            var (service, repo) = MakeService();
 
             // Player has only 2 unspent points.
             var player = MakePlayer(statPointsGained: 2, statPointsUsed: 0);
@@ -56,59 +55,72 @@ namespace Game.Application.Tests.Services
             Assert.AreEqual(0, repo.SavePlayerCallCount);
         }
 
-        // ── UpdateInventorySlots ─────────────────────────────────────────────
+        // ── EquipItem ───────────────────────────────────────────────────────
 
         [TestMethod]
-        public async Task UpdateInventorySlots_ValidReorder_ReturnsTrue()
+        public async Task EquipItem_UnlockedItem_ReturnsTrue()
         {
-            var repo = new FakePlayerRepository();
-            var service = new PlayerService(repo);
-
+            var (service, repo) = MakeService();
             var player = MakePlayer();
-            var item1 = MakeItem(1);
-            var item2 = MakeItem(2);
-            player.Inventory.TryAddItem(item1, inventoryItemId: 10); // slot 0
-            player.Inventory.TryAddItem(item2, inventoryItemId: 11); // slot 1
+            var item = MakeItem(1, EItemCategory.Accessory);
+            AddUnlockedItem(player.Inventory, item);
 
-            // Swap the two items.
-            var updates = new List<SimpleInventoryUpdate>
-            {
-                new(Id: 10, SlotNumber: 1, Equipped: false),
-                new(Id: 11, SlotNumber: 0, Equipped: false),
-            };
-
-            var result = await service.UpdateInventorySlots(player, updates);
+            var result = await service.EquipItem(player, 1, EEquipmentSlot.AccessorySlot);
 
             Assert.IsTrue(result);
-            var slot0Item = player.Inventory.InventorySlots.First(s => s.SlotNumber == 0).Item;
-            var slot1Item = player.Inventory.InventorySlots.First(s => s.SlotNumber == 1).Item;
-            Assert.AreEqual(item2, slot0Item);
-            Assert.AreEqual(item1, slot1Item);
+            Assert.AreEqual(1, repo.SavePlayerCallCount);
         }
 
         [TestMethod]
-        public async Task UpdateInventorySlots_DuplicateSlot_ReturnsFalse()
+        public async Task EquipItem_NotUnlocked_ReturnsFalse()
         {
-            var repo = new FakePlayerRepository();
-            var service = new PlayerService(repo);
-
+            var (service, repo) = MakeService();
             var player = MakePlayer();
-            player.Inventory.TryAddItem(MakeItem(1), inventoryItemId: 10);
-            player.Inventory.TryAddItem(MakeItem(2), inventoryItemId: 11);
 
-            // Both items targeting slot 0 — invalid.
-            var updates = new List<SimpleInventoryUpdate>
-            {
-                new(Id: 10, SlotNumber: 0, Equipped: false),
-                new(Id: 11, SlotNumber: 0, Equipped: false),
-            };
-
-            var result = await service.UpdateInventorySlots(player, updates);
+            var result = await service.EquipItem(player, 999, EEquipmentSlot.AccessorySlot);
 
             Assert.IsFalse(result);
+            Assert.AreEqual(0, repo.SavePlayerCallCount);
+        }
+
+        // ── UnequipItem ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task UnequipItem_EquippedItem_ReturnsTrue()
+        {
+            var (service, repo) = MakeService();
+            var player = MakePlayer();
+            var item = MakeItem(1, EItemCategory.Accessory);
+            AddUnlockedItem(player.Inventory, item);
+            player.Inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+
+            var result = await service.UnequipItem(player, EEquipmentSlot.AccessorySlot);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(1, repo.SavePlayerCallCount);
+        }
+
+        [TestMethod]
+        public async Task UnequipItem_EmptySlot_ReturnsFalse()
+        {
+            var (service, repo) = MakeService();
+            var player = MakePlayer();
+
+            var result = await service.UnequipItem(player, EEquipmentSlot.AccessorySlot);
+
+            Assert.IsFalse(result);
+            Assert.AreEqual(0, repo.SavePlayerCallCount);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static (PlayerService service, FakePlayerRepository repo) MakeService()
+        {
+            var repo = new FakePlayerRepository();
+            var itemMods = new FakeItemMods();
+            var service = new PlayerService(repo, itemMods);
+            return (service, repo);
+        }
 
         private static Player MakePlayer(int statPointsGained = 0, int statPointsUsed = 0)
         {
@@ -136,19 +148,36 @@ namespace Game.Application.Tests.Services
             };
         }
 
-        private static Item MakeItem(int id) => new()
+        private static Core.Items.Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory) => new()
         {
             Id = id,
             Name = $"Item {id}",
             Description = string.Empty,
-            Category = EItemCategory.Accessory,
+            Category = category,
             Attributes = [],
             ModSlots = [],
             Tags = [],
         };
 
+        private static void AddUnlockedItem(Inventory inventory, Core.Items.Item item)
+        {
+            inventory.UnlockedItems.Add(new UnlockedItemSlot
+            {
+                ItemId = item.Id,
+                Item = item,
+                AppliedMods = [],
+            });
+        }
+
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
 
-        private record SimpleInventoryUpdate(int Id, int SlotNumber, bool Equipped) : IInventoryUpdate;
+        /// <summary>Minimal fake for <see cref="IItemMods"/> in tests.</summary>
+        private class FakeItemMods : IItemMods
+        {
+            public void InvalidateCache() { }
+            public List<Game.Abstractions.Entities.ItemMod> All(bool refreshCache = false) => [];
+            public Dictionary<int, IEnumerable<Game.Abstractions.Entities.ItemMod>> GetModsForItemByType(int itemId) => [];
+            public Game.Abstractions.Entities.ItemMod? GetItemMod(int itemModId) => null;
+        }
     }
 }

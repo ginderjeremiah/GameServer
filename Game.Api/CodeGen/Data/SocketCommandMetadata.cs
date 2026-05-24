@@ -12,13 +12,13 @@ namespace Game.Api.CodeGen.Data
         {
             CommandName = socketCommand.Name;
 
-            var method = socketCommand.GetMethods().FirstOrDefault(m => m.Name == nameof(AbstractSocketCommandWithResponseData<object>.HandleExecute));
+            var method = socketCommand.GetMethods().FirstOrDefault(m => m.Name == nameof(AbstractSocketCommandWithResponseData<>.HandleExecute));
             if (method is not null)
             {
                 ResponseDescriptor = new CodeGenTypeDescriptor(method.ReturnParameter.GetNullabilityInfo().GenericTypeArguments[0]);
             }
 
-            var property = socketCommand.GetProperties().FirstOrDefault(p => p.Name == nameof(AbstractSocketCommandWithParams<object>.Parameters));
+            var property = socketCommand.GetProperties().FirstOrDefault(p => p.Name == nameof(AbstractSocketCommandWithParams<>.Parameters));
             if (property is not null)
             {
                 ParameterDescriptor = new CodeGenTypeDescriptor(property);

@@ -1,7 +1,6 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -48,14 +47,12 @@ namespace Game.DataAccess.Repositories
 
             if (entity is null) return;
 
-            // Sync scalar fields
             entity.Level = player.Level;
             entity.Exp = player.Exp;
             entity.StatPointsGained = player.StatPoints.StatPointsGained;
             entity.StatPointsUsed = player.StatPoints.StatPointsUsed;
             entity.CurrentZoneId = player.CurrentZoneId;
 
-            // Sync stat allocations — remove old rows, add current
             foreach (var attr in entity.PlayerAttributes.ToList())
             {
                 _context.Remove(attr);
@@ -70,7 +67,6 @@ namespace Game.DataAccess.Repositories
                 });
             }
 
-            // Keep Redis cache in sync
             _cache.SetAndForget($"{PlayerPrefix}_{player.Id}", player);
         }
 
@@ -82,16 +78,16 @@ namespace Game.DataAccess.Repositories
                 .Include(p => p.PlayerSkills)
                     .ThenInclude(ps => ps.Skill)
                         .ThenInclude(s => s.SkillDamageMultipliers)
-                .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.Item)
+                .Include(p => p.UnlockedItems)
+                    .ThenInclude(ui => ui.Item)
                         .ThenInclude(i => i.ItemAttributes)
-                .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.Item)
+                .Include(p => p.UnlockedItems)
+                    .ThenInclude(ui => ui.Item)
                         .ThenInclude(i => i.ItemModSlots)
-                .Include(p => p.InventoryItems)
-                    .ThenInclude(ii => ii.InventoryItemMods)
-                        .ThenInclude(iim => iim.ItemMod)
-                            .ThenInclude(im => im!.ItemModAttributes)
+                .Include(p => p.UnlockedMods)
+                .Include(p => p.AppliedMods)
+                    .ThenInclude(am => am.ItemMod)
+                        .ThenInclude(im => im.ItemModAttributes)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == playerId);
 

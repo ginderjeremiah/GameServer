@@ -8,6 +8,7 @@
 			<LoadingSection title="Skills" loading={skillsLoading} />
 			<LoadingSection title="Item Mods" loading={itemModsLoading} />
 			<LoadingSection title="Attributes" loading={attributesLoading} />
+			<LoadingSection title="Challenges" loading={challengesLoading} />
 		</div>
 		<Button loading={anyLoading} text="Start Game" onClick={tryStartGame} />
 	</div>
@@ -27,6 +28,7 @@ const itemsLoading = $derived(!staticData.items);
 const skillsLoading = $derived(!staticData.skills);
 const itemModsLoading = $derived(!staticData.itemMods);
 const attributesLoading = $derived(!staticData.attributes);
+const challengesLoading = $derived(!staticData.challenges);
 
 const anyLoading = $derived(
 	zonesLoading ||
@@ -34,7 +36,8 @@ const anyLoading = $derived(
 		itemsLoading ||
 		skillsLoading ||
 		itemModsLoading ||
-		attributesLoading
+		attributesLoading ||
+		challengesLoading
 );
 
 const tryStartGame = () => {
@@ -67,6 +70,10 @@ const fetchAttributes = async () => {
 	staticData.attributes ??= await ApiRequest.get('Attributes');
 };
 
+const fetchChallenges = async () => {
+	staticData.challenges ??= await ApiRequest.get('Challenges');
+};
+
 onMount(() => {
 	tryStartGame();
 	fetchZones();
@@ -75,6 +82,7 @@ onMount(() => {
 	fetchSkills();
 	fetchItemMods();
 	fetchAttributes();
+	fetchChallenges();
 });
 </script>
 

@@ -1,9 +1,10 @@
-import { Fight, Inventory, Attributes, Stats, Help, Options, CardGame, Quit } from "./";
+import { Fight, Inventory, Attributes, Challenges, Stats, Help, Options, CardGame, Quit } from "./";
 
 export const screenMap = {
   Fight,
   Inventory,
   Attributes,
+  Challenges,
   Stats,
   Help,
   Options,

@@ -33,7 +33,7 @@ namespace Game.Api.CodeGen
 
         public CodeGenTypeDescriptor(NullabilityInfo nullabilityInfo, Type? overrideType = null)
         {
-            UnderlyingType = overrideType ?? nullabilityInfo.Type;
+            UnderlyingType = overrideType ?? GetUnderlyingType(nullabilityInfo);
             IsNullable = nullabilityInfo.ReadState == NullabilityState.Nullable;
             GenericArgumentDescriptors = nullabilityInfo.GenericTypeArguments.Select(g => new CodeGenTypeDescriptor(g)).ToList();
             if (UnderlyingType.IsGenericType)
@@ -42,10 +42,24 @@ namespace Game.Api.CodeGen
                 var propertyPairs = UnderlyingType.GetProperties().Zip(genericDefinition.GetProperties());
                 PropertyDescriptors = propertyPairs.Select(p => new CodeGenTypeDescriptor(p.First, p.Second.PropertyType.IsGenericParameter ? p.Second.PropertyType.GenericParameterPosition : -1)).ToList();
             }
-            else
+            else if (UnderlyingType.NeedsInterface())
             {
                 PropertyDescriptors = UnderlyingType.GetProperties().Select(p => new CodeGenTypeDescriptor(p)).ToList();
             }
+            else
+            {
+                PropertyDescriptors = [];
+            }
+        }
+
+        private static Type GetUnderlyingType(NullabilityInfo nullabilityInfo)
+        {
+            if (nullabilityInfo.Type.IsGenericType && nullabilityInfo.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                return nullabilityInfo.Type.GenericTypeArguments[0];
+            }
+
+            return nullabilityInfo.Type;
         }
     }
 }

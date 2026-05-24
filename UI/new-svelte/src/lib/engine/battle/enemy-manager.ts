@@ -4,7 +4,6 @@ import { staticData } from '$stores';
 import {
 	battleEngine,
 	BattleStage,
-	inventoryManager,
 	onBattleStageChanged,
 	playerManager
 } from '../';
@@ -68,7 +67,6 @@ export class EnemyManager {
 			if (!defeatResponse.error && defeatResponse.data.rewards) {
 				const rewards = defeatResponse.data.rewards;
 				playerManager.grantExp(rewards.expReward);
-				inventoryManager.addInventoryItems(rewards.drops);
 			} else {
 				logMessage(
 					ELogSetting.Debug,

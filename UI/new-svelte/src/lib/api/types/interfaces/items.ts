@@ -1,10 +1,5 @@
 import type { EItemCategory, EItemModType, IBattlerAttribute } from "../"
 
-export interface IItemDrop {
-	itemId: number;
-	dropRate: number;
-};
-
 export interface IItemMod {
 	id: number;
 	name: string;
@@ -27,8 +22,6 @@ export interface IItemModSlot {
 	id: number;
 	itemId: number;
 	itemModSlotTypeId: EItemModType;
-	guaranteedItemModId?: number;
-	probability: number;
 };
 
 export interface IItemCategory {

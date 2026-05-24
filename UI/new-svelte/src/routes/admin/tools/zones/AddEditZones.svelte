@@ -2,7 +2,6 @@
 	<TableEditor
 		bind:this={editor}
 		{data}
-		{hiddenColumns}
 		{sampleItem}
 		primaryKey="id"
 		title="Add/Edit Zones"
@@ -32,7 +31,6 @@ let data = $state<IZone[]>([]);
 let initialized = $state(false);
 let editor = $state<{ getChanges: () => IChange<IZone>[] }>();
 
-const hiddenColumns: (keyof IZone)[] = ['zoneDrops'];
 const sampleItem = {
 	id: -1,
 	name: '',
@@ -40,7 +38,6 @@ const sampleItem = {
 	order: 0,
 	levelMin: 0,
 	levelMax: 0,
-	zoneDrops: []
 } satisfies IZone;
 
 onMount(async () => {

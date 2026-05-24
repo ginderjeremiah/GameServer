@@ -44,7 +44,11 @@ namespace Game.Abstractions.Entities
 
         public virtual User User { get; set; }
         public virtual List<PlayerAttribute> PlayerAttributes { get; set; } = [];
-        public virtual List<InventoryItem> InventoryItems { get; set; } = [];
+        public virtual List<UnlockedItem> UnlockedItems { get; set; } = [];
+        public virtual List<UnlockedMod> UnlockedMods { get; set; } = [];
+        public virtual List<AppliedMod> AppliedMods { get; set; } = [];
+        public virtual List<PlayerChallenge> PlayerChallenges { get; set; } = [];
+        public virtual List<PlayerStatistic> PlayerStatistics { get; set; } = [];
         public virtual List<LogPreference> LogPreferences { get; set; } = [];
         public virtual List<PlayerSkill> PlayerSkills { get; set; } = [];
     }

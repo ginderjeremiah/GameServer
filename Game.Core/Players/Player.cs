@@ -13,21 +13,13 @@ namespace Game.Core.Players
     public class Player : AggregateRoot
     {
         public required int Id { get; set; }
-
         public required string Name { get; set; }
-
         public required int Level { get; set; }
-
         public required int Exp { get; set; }
-
         public required int CurrentZoneId { get; set; }
-
         public required PlayerStatPoints StatPoints { get; set; }
-
         public required Inventory Inventory { get; set; }
-
         public required List<Skill> SelectedSkills { get; set; }
-
         public required List<Skill> Skills { get; set; }
 
         public void ChangeZone(int zoneId)
@@ -57,26 +49,29 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Adds <paramref name="item"/> to the inventory and raises an
-        /// <see cref="ItemAcquiredEvent"/>.
+        /// Unlocks an item for the player and raises an <see cref="ItemUnlockedEvent"/>.
         /// </summary>
-        /// <param name="item">The item to add.</param>
-        /// <param name="inventoryItemId">The database record ID of the persisted inventory item.</param>
-        public void AddInventoryItem(Item item, int inventoryItemId)
+        public void UnlockItem(int itemId)
         {
-            var slotNumber = Inventory.TryAddItem(item, inventoryItemId);
-            RaiseEvent(new ItemAcquiredEvent(Id, item, inventoryItemId, slotNumber));
+            Inventory.UnlockItem(itemId);
+            RaiseEvent(new ItemUnlockedEvent(Id, itemId));
+        }
+
+        /// <summary>
+        /// Unlocks a modifier for the player and raises a <see cref="ModUnlockedEvent"/>.
+        /// </summary>
+        public void UnlockMod(int itemModId)
+        {
+            Inventory.UnlockMod(itemModId);
+            RaiseEvent(new ModUnlockedEvent(Id, itemModId));
         }
 
         /// <summary>
         /// Records that an enemy has been defeated and raises an <see cref="EnemyDefeatedEvent"/>.
         /// </summary>
-        /// <param name="enemyId">The defeated enemy's identifier.</param>
-        /// <param name="expReward">Experience awarded.</param>
-        /// <param name="drops">Items that dropped from the enemy.</param>
-        public void RecordEnemyDefeat(int enemyId, int expReward, IReadOnlyList<Item> drops)
+        public void RecordEnemyDefeat(int enemyId, int expReward)
         {
-            RaiseEvent(new EnemyDefeatedEvent(Id, enemyId, expReward, drops));
+            RaiseEvent(new EnemyDefeatedEvent(Id, enemyId, expReward));
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()

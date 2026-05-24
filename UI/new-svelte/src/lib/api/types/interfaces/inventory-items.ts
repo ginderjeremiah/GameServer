@@ -1,24 +1,15 @@
-export interface IInventoryItemMod {
+export interface IEquipRequest {
+	itemId: number;
+	equipmentSlotId: number;
+};
+
+export interface IApplyModRequest {
+	itemId: number;
 	itemModId: number;
 	itemModSlotId: number;
 };
 
-export interface IInventoryItem {
-	id: number;
+export interface IRemoveModRequest {
 	itemId: number;
-	rating: number;
-	equipped: boolean;
-	inventorySlotNumber: number;
-	itemMods: IInventoryItemMod[];
-};
-
-export interface IInventoryData {
-	inventory: (IInventoryItem | undefined)[];
-	equipped: (IInventoryItem | undefined)[];
-};
-
-export interface IInventoryUpdate {
-	id: number;
-	inventorySlotNumber: number;
-	equipped: boolean;
+	itemModSlotId: number;
 };

@@ -1,5 +1,5 @@
 <div class="inventory-screen">
-	<div class="equipped-panel">
+	<div class="inventory-layout">
 		<EquippedItems />
 		<InventoryItems />
 	</div>
@@ -14,7 +14,7 @@ import InventoryItems from './InventoryItems.svelte';
 .inventory-screen {
 	--slot-width: calc(6.5vw);
 
-	.equipped-panel {
+	.inventory-layout {
 		margin-top: 2vh;
 		display: flex;
 		justify-content: space-between;

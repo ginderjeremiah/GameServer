@@ -10,8 +10,7 @@
 
         public virtual List<ItemModAttribute> ItemModAttributes { get; set; }
         public virtual ItemModType ItemModType { get; set; }
-        public virtual List<InventoryItemMod> InventoryItemMods { get; set; }
-        public virtual List<ItemModSlot> GuaranteedSlots { get; set; }
         public virtual List<Tag> Tags { get; set; }
+        public virtual List<UnlockedMod> UnlockedMods { get; set; }
     }
 }

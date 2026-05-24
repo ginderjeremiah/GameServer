@@ -44,6 +44,12 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IItemCategories>(sp => sp.GetRequiredService<RepositoryManager>().ItemCategories)
                 .AddScoped<ITags>(sp => sp.GetRequiredService<RepositoryManager>().Tags)
                 .AddScoped<ITagCategories>(sp => sp.GetRequiredService<RepositoryManager>().TagCategories)
+                .AddScoped<IChallenges>(sp => sp.GetRequiredService<RepositoryManager>().Challenges)
+                .AddScoped<IPlayerChallenges>(sp => sp.GetRequiredService<RepositoryManager>().PlayerChallenges)
+                .AddScoped<IPlayerStatistics>(sp => sp.GetRequiredService<RepositoryManager>().PlayerStatistics)
+                .AddScoped<IUnlockedItems>(sp => sp.GetRequiredService<RepositoryManager>().UnlockedItems)
+                .AddScoped<IUnlockedMods>(sp => sp.GetRequiredService<RepositoryManager>().UnlockedMods)
+                .AddScoped<IAppliedMods>(sp => sp.GetRequiredService<RepositoryManager>().AppliedMods)
                 .AddScoped<IUsers>(sp => sp.GetRequiredService<RepositoryManager>().Users)
                 .AddScoped<IUnitOfWork, UnitOfWork>();
         }
