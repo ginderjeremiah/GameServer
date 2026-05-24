@@ -76,14 +76,8 @@ namespace Game.Core.Attributes
         private void AddModifierWithoutCacheInvalidation(AttributeModifier modifier)
         {
             var node = _attributeNodeList[(int)modifier.Attribute];
-            node.Modifiers ??= [];
 
-            // Insert in sorted order by Type so Additive always applies before Multiplicative.
-            var insertIndex = node.Modifiers.FindIndex(m => m.Type > modifier.Type);
-            if (insertIndex < 0)
-                node.Modifiers.Add(modifier);
-            else
-                node.Modifiers.Insert(insertIndex, modifier);
+            node.GetModifiersOrNew().Add(modifier);
 
             if (modifier.Source is EAttributeModifierSource.Derived)
             {

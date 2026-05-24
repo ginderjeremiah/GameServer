@@ -189,7 +189,7 @@ namespace Game.Application.Tests.Services
             var player = MakeBattleReadyPlayer();
             var state = new PlayerState();
 
-            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            await Assert.ThrowsAsync<InvalidOperationException>(
                 () => service.StartBattle(player, state, zoneId: 999));
         }
 
@@ -274,7 +274,7 @@ namespace Game.Application.Tests.Services
             Exp = 0,
             CurrentZoneId = 0,
             StatPoints = new PlayerStatPoints([])
-                { StatPointsGained = 0, StatPointsUsed = 0 },
+            { StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
@@ -290,7 +290,8 @@ namespace Game.Application.Tests.Services
             StatPoints = new PlayerStatPoints([
                 new StatAllocation { Attribute = EAttribute.Strength, Amount = 50 },
                 new StatAllocation { Attribute = EAttribute.Endurance, Amount = 50 },
-            ]) { StatPointsGained = 100, StatPointsUsed = 100 },
+            ])
+            { StatPointsGained = 100, StatPointsUsed = 100 },
             Inventory = new Inventory(),
             SelectedSkills =
             [
@@ -362,15 +363,25 @@ namespace Game.Application.Tests.Services
 
         private static Item MakeItem(int id, string name) => new()
         {
-            Id = id, Name = name, Description = "",
-            Category = EItemCategory.Weapon, Attributes = [], ModSlots = [], Tags = [],
+            Id = id,
+            Name = name,
+            Description = "",
+            Category = EItemCategory.Weapon,
+            Attributes = [],
+            ModSlots = [],
+            Tags = [],
         };
 
         private static EntityZone MakeZone(int id, int levelMin, int levelMax) => new()
         {
-            Id = id, Name = "Test Zone", Description = "",
-            Order = 0, LevelMin = levelMin, LevelMax = levelMax,
-            ZoneDrops = [], ZoneEnemies = [],
+            Id = id,
+            Name = "Test Zone",
+            Description = "",
+            Order = 0,
+            LevelMin = levelMin,
+            LevelMax = levelMax,
+            ZoneDrops = [],
+            ZoneEnemies = [],
         };
     }
 }

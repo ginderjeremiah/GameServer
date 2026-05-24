@@ -32,7 +32,7 @@ namespace Game.Api.Filters
         {
             return result is ObjectResult objectResult
                 && objectResult.Value is IApiResponse response
-                && response.ErrorMessage is not null or "";
+                && response.ErrorMessage is not null and not "";
         }
     }
 }

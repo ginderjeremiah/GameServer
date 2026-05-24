@@ -157,7 +157,7 @@ namespace Game.Core
     }
 
     /// <summary>
-    /// Represents a kind of log which can be filtered out within the game.
+    /// Represents a kind of log which can be filtered out within the UI of the game.
     /// </summary>
     public enum ELogType
     {

@@ -104,7 +104,7 @@ namespace Game.Core.Tests.Attributes
                 },
             };
 
-            Assert.ThrowsException<AttributeCircularDerivedModifierException>(
+            Assert.Throws<AttributeCircularDerivedModifierException>(
                 () => new AttributeCollection(modifiers));
         }
 

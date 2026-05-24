@@ -8,14 +8,14 @@ namespace Game.Core.Tests.Probability
         [TestMethod]
         public void EmptyInitializationList_ThrowsException()
         {
-            Assert.ThrowsException<ArgumentException>(() => new ProbabilityTable<int>([]));
+            Assert.Throws<ArgumentException>(() => new ProbabilityTable<int>([]));
         }
 
         [TestMethod]
         public void InitializationListHasNegativeWeightElement_ThrowsException()
         {
             List<WeightedValue<int>> list = [new WeightedValue<int>(0, 1), new WeightedValue<int>(1, -1)];
-            Assert.ThrowsException<ArgumentException>(() => new ProbabilityTable<int>(list));
+            Assert.Throws<ArgumentException>(() => new ProbabilityTable<int>(list));
         }
 
         [TestMethod]

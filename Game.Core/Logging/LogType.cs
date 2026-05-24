@@ -11,7 +11,7 @@ namespace Game.Core.Logging
         public ELogType Value { get; set; }
 
         /// <summary>
-        /// The default value for whether the log type should be visible.
+        /// The default value for whether the log type should be visible in the UI.
         /// </summary>
         public bool DefaultValue { get; set; }
 

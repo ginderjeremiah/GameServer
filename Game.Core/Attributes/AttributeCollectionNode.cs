@@ -1,23 +1,34 @@
-﻿using Game.Core.Attributes.Modifiers;
+using Game.Core.Attributes.Modifiers;
+using Game.Core.Collections;
 
 namespace Game.Core.Attributes
 {
     internal class AttributeCollectionNode
     {
-        public List<AttributeModifier>? Modifiers { get; set; }
+        private HashSet<AttributeCollectionNode>? _derivedNodes;
+
+        public SortedLinkedList<AttributeModifier>? Modifiers { get; private set; }
         public double? CachedValue { get; private set; }
-        public List<AttributeCollectionNode> DerivedNodes { get; } = [];
+        public HashSet<AttributeCollectionNode> DerivedNodes => _derivedNodes ??= [];
 
         public void SetCachedValue(double? value)
         {
             CachedValue = value;
-            foreach (var derivedNode in DerivedNodes)
+            if (_derivedNodes is not null)
             {
-                if (derivedNode.CachedValue is not null)
+                foreach (var derivedNode in _derivedNodes)
                 {
-                    derivedNode.SetCachedValue(null);
+                    if (derivedNode.CachedValue is not null)
+                    {
+                        derivedNode.SetCachedValue(null);
+                    }
                 }
             }
+        }
+
+        public SortedLinkedList<AttributeModifier> GetModifiersOrNew()
+        {
+            return Modifiers ??= new SortedLinkedList<AttributeModifier>(new AttributeModifierNullUnsafeTypeComparer());
         }
     }
 }

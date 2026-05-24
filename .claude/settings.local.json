@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(New-Item -ItemType Directory -Force Game.Application\\\\Services)",
       "Bash(dotnet build *)",
-      "Bash(dotnet test *)"
+      "Bash(dotnet test *)",
+      "Bash(Select-String \"error\")"
     ]
   }
 }
