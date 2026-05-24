@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
@@ -12,6 +13,7 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
+    [ServiceFilter(typeof(AdminCacheInvalidationFilter))]
     public class AdminToolsController(
         IEnemies enemies,
         IItems items,

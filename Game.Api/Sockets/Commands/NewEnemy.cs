@@ -36,12 +36,7 @@ namespace Game.Api.Sockets.Commands
 
             var player = await _sessionService.LoadPlayer();
 
-            if (Parameters.NewZoneId.HasValue)
-            {
-                player.CurrentZoneId = Parameters.NewZoneId.Value;
-            }
-
-            var result = _battleService.StartBattle(player, state, player.CurrentZoneId);
+            var result = await _battleService.StartBattle(player, state, player.CurrentZoneId, Parameters.NewZoneId);
 
             _sessionService.SavePlayerState();
 

@@ -64,7 +64,7 @@ namespace Game.Core
         /// <typeparam name="T1"></typeparam>
         /// <param name="source"></param>
         /// <returns></returns>
-        public static IEnumerable<T1> SelectNotNull<T1>(this IEnumerable<T1?> source)
+        public static IEnumerable<T1> WhereNotNull<T1>(this IEnumerable<T1?> source)
         {
             foreach (var item in source)
             {
@@ -85,7 +85,7 @@ namespace Game.Core
         /// <returns></returns>
         public static IEnumerable<T2> SelectNotNull<T1, T2>(this IEnumerable<T1> source, Func<T1, T2?> selector)
         {
-            return source.Select(selector).SelectNotNull();
+            return source.Select(selector).WhereNotNull();
         }
 
         /// <summary>

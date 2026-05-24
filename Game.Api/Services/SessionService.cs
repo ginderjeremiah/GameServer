@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Application.Services;
 using Game.Core.Players;
 
 namespace Game.Api.Services
@@ -7,9 +8,9 @@ namespace Game.Api.Services
     /// Manages authentication state and player identity for the current request.
     /// This is a presentation-layer concern (cookies, tokens, session identity).
     /// </summary>
-    public class SessionService(IPlayers playerRepo, ISessionStore sessionStore)
+    public class SessionService(PlayerService playerService, ISessionStore sessionStore)
     {
-        private readonly IPlayers _playerRepo = playerRepo;
+        private readonly PlayerService _playerService = playerService;
         private readonly ISessionStore _sessionStore = sessionStore;
         private Player? _player;
 
@@ -64,7 +65,7 @@ namespace Game.Api.Services
 
         public async Task<Player> LoadPlayer()
         {
-            return _player ??= await _playerRepo.GetPlayer(SelectedPlayerId)
+            return _player ??= await _playerService.LoadPlayer(SelectedPlayerId)
                 ?? throw new InvalidOperationException("Player data not loaded.");
         }
 

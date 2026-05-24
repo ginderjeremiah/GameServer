@@ -66,6 +66,53 @@ namespace Game.Core.Tests.Players
             Assert.AreEqual(before + 6, player.StatPoints.StatPointsGained);
         }
 
+        // ── GrantExp — multi-level-up ────────────────────────────────────────
+
+        [TestMethod]
+        public void GrantExp_EnoughForTwoLevels_LevelsTwice()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            player.GrantExp(301); // threshold 100 (lvl1) + 200 (lvl2) = 300 to reach lvl3
+
+            Assert.AreEqual(3, player.Level);
+            Assert.AreEqual(1, player.Exp);
+        }
+
+        [TestMethod]
+        public void GrantExp_MultiLevelUp_RaisesOneEventPerLevel()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            player.GrantExp(301);
+
+            var events = player.DomainEvents.OfType<PlayerLeveledUpEvent>().ToList();
+            Assert.AreEqual(2, events.Count);
+            Assert.AreEqual(2, events[0].NewLevel);
+            Assert.AreEqual(3, events[1].NewLevel);
+        }
+
+        [TestMethod]
+        public void GrantExp_MultiLevelUp_AccumulatesStatPoints()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            player.GrantExp(301);
+
+            Assert.AreEqual(12, player.StatPoints.StatPointsGained); // 6 per level * 2
+        }
+
+        [TestMethod]
+        public void GrantExp_ExactlyAtThreshold_DoesNotLevelUp()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            player.GrantExp(100); // threshold is > 100, not >=
+
+            Assert.AreEqual(1, player.Level);
+            Assert.AreEqual(100, player.Exp);
+        }
+
         // ── AddInventoryItem ─────────────────────────────────────────────────
 
         [TestMethod]

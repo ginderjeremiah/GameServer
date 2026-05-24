@@ -17,6 +17,8 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
+        public void InvalidateCache() => _skillDataList = null;
+
         public List<Skill> AllSkills(bool refreshCache = false)
         {
             if (_skillDataList is null || refreshCache)

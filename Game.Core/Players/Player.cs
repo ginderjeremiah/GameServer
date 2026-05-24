@@ -30,6 +30,11 @@ namespace Game.Core.Players
 
         public required List<Skill> Skills { get; set; }
 
+        public void ChangeZone(int zoneId)
+        {
+            CurrentZoneId = zoneId;
+        }
+
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             return StatPoints.TryUpdateAttributes(changedAttributes);
@@ -42,7 +47,7 @@ namespace Game.Core.Players
         public void GrantExp(int amount)
         {
             Exp += amount;
-            if (Exp > Level * 100)
+            while (Exp > Level * 100)
             {
                 Exp -= Level * 100;
                 Level++;

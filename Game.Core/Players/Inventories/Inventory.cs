@@ -152,7 +152,7 @@ namespace Game.Core.Players.Inventories
 
         private static List<EquipmentSlot> NewEquippedList()
         {
-            return Enumerable.Range(1, EquipSlots)
+            return Enumerable.Range(0, EquipSlots + 1)
                 .Select(index => new EquipmentSlot((EEquipmentSlot)index)
                 {
                     Item = null,

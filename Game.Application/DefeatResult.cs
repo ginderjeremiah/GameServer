@@ -10,6 +10,10 @@ namespace Game.Application
     {
         public required int ExpReward { get; set; }
         public required IReadOnlyList<DroppedItemInfo> DroppedItems { get; set; }
+        public required int NewLevel { get; set; }
+        public required int NewExp { get; set; }
+        public required int StatPointsGained { get; set; }
+        public required int StatPointsUsed { get; set; }
     }
 
     /// <summary>

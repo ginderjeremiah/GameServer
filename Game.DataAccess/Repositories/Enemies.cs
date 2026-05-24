@@ -19,6 +19,12 @@ namespace Game.DataAccess.Repositories
         private readonly ISkills _skills = skills;
         private readonly IItems _items = items;
 
+        public void InvalidateCache()
+        {
+            _enemyList = null;
+            lock (_lock) { zoneEnemiesTables.Clear(); }
+        }
+
         public List<Enemy> All(bool refreshCache = false)
         {
             if (_enemyList is null || refreshCache)

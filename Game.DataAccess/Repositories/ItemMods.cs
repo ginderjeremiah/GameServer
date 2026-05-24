@@ -19,6 +19,12 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
+        public void InvalidateCache()
+        {
+            _allMods = null;
+            lock (_lockForItem) { _itemModsByType.Clear(); }
+        }
+
         public List<ItemMod> All(bool refreshCache = false)
         {
             if (_allMods is null || refreshCache)

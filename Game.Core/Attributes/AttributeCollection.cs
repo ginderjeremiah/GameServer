@@ -88,8 +88,7 @@ namespace Game.Core.Attributes
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
                 var sourceNode = _attributeNodeList[(int)modifier.DerivedSource];
-                sourceNode.DerivedNodes ??= [];
-                if (sourceNode.DerivedNodes.Contains(node))
+                if (node.DerivedNodes.Contains(sourceNode))
                 {
                     throw new AttributeCircularDerivedModifierException(modifier);
                 }

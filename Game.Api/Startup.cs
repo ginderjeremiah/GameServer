@@ -1,6 +1,7 @@
 using Game.Api.CodeGen;
 using Game.Api.Filters;
 using Game.Api.Middleware;
+using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Application;
 using Game.Application.Services;
@@ -56,7 +57,9 @@ namespace Game.Api
                 .AddScoped<BattleService>()
                 .AddScoped<PlayerService>()
                 // Domain event infrastructure
-                .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+                .AddScoped<AdminCacheInvalidationFilter>()
+                .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>()
+                .AddScoped<IDomainEventHandler, LoggingEventHandler>();
 
             if (builder.Environment.IsDevelopment())
             {

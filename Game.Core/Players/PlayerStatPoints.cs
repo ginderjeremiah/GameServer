@@ -41,7 +41,7 @@ namespace Game.Core.Players
             var changedPoints = matchedAttributes.Sum(match => match.upd?.Amount ?? 0);
             if (availablePoints - changedPoints >= 0 && matchedAttributes.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
             {
-                StatPointsUsed += availablePoints - changedPoints;
+                StatPointsUsed += changedPoints;
                 foreach (var (att, upd) in matchedAttributes)
                 {
                     if (upd is not null)

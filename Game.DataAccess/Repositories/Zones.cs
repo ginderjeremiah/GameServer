@@ -17,6 +17,8 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
+        public void InvalidateCache() => _zoneList = null;
+
         public List<Zone> All(bool refreshCache = false)
         {
             if (_zoneList is null || refreshCache)

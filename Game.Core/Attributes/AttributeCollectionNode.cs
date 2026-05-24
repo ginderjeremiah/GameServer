@@ -6,19 +6,16 @@ namespace Game.Core.Attributes
     {
         public List<AttributeModifier>? Modifiers { get; set; }
         public double? CachedValue { get; private set; }
-        public List<AttributeCollectionNode>? DerivedNodes { get; set; }
+        public List<AttributeCollectionNode> DerivedNodes { get; } = [];
 
         public void SetCachedValue(double? value)
         {
             CachedValue = value;
-            if (DerivedNodes is not null)
+            foreach (var derivedNode in DerivedNodes)
             {
-                foreach (var derivedNode in DerivedNodes)
+                if (derivedNode.CachedValue is not null)
                 {
-                    if (derivedNode.CachedValue is not null)
-                    {
-                        derivedNode.SetCachedValue(null);
-                    }
+                    derivedNode.SetCachedValue(null);
                 }
             }
         }

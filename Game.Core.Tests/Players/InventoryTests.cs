@@ -1,7 +1,7 @@
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
+using Game.Core.Players;
 using Game.Core.Players.Inventories;
-using Game.Core.Tags;
 
 namespace Game.Core.Tests.Players
 {
@@ -141,15 +141,90 @@ namespace Game.Core.Tests.Players
             Assert.IsFalse(inventory.TryUpdateSlots(updates));
         }
 
+        // ── Equip / Unequip ──────────────────────────────────────────────────
+
+        [TestMethod]
+        public void TryUpdateSlots_MoveStorageToEquipped_EquipsItem()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory);
+            inventory.TryAddItem(item, inventoryItemId: 10);
+
+            var updates = new List<SimpleInventoryUpdate>
+            {
+                new(Id: 10, SlotNumber: (int)EEquipmentSlot.AccessorySlot, Equipped: true),
+            };
+
+            var result = inventory.TryUpdateSlots(updates);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(0, inventory.InventorySlots.Count);
+            var equipped = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
+            Assert.AreEqual(item, equipped.Item);
+            Assert.AreEqual(10, equipped.InventoryItemId);
+        }
+
+        [TestMethod]
+        public void TryUpdateSlots_MoveEquippedToStorage_UnequipsItem()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory);
+            inventory.TryAddItem(item, inventoryItemId: 10);
+
+            // First equip it
+            inventory.TryUpdateSlots([
+                new SimpleInventoryUpdate(Id: 10, SlotNumber: (int)EEquipmentSlot.AccessorySlot, Equipped: true),
+            ]);
+
+            // Then move it back to storage
+            var result = inventory.TryUpdateSlots([
+                new SimpleInventoryUpdate(Id: 10, SlotNumber: 0, Equipped: false),
+            ]);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(1, inventory.InventorySlots.Count);
+            Assert.AreEqual(item, inventory.InventorySlots[0].Item);
+            var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
+            Assert.IsNull(slot.Item);
+        }
+
+        [TestMethod]
+        public void GetEquippedAttributeModifiers_ReturnsModifiersFromEquippedItems()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, attributes: [
+                new AttributeModifier
+                {
+                    Attribute = EAttribute.Strength,
+                    Amount = 5.0,
+                    Type = EModifierType.Additive,
+                    Source = EAttributeModifierSource.Item,
+                },
+            ]);
+            inventory.TryAddItem(item, inventoryItemId: 10);
+
+            // Equip it
+            inventory.TryUpdateSlots([
+                new SimpleInventoryUpdate(Id: 10, SlotNumber: (int)EEquipmentSlot.AccessorySlot, Equipped: true),
+            ]);
+
+            var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
+            Assert.AreEqual(1, modifiers.Count);
+            Assert.AreEqual(EAttribute.Strength, modifiers[0].Attribute);
+            Assert.AreEqual(5.0, modifiers[0].Amount);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        private static Item MakeItem(int id) => new()
+        private static Item MakeItem(int id) => MakeItem(id, EItemCategory.Accessory);
+
+        private static Item MakeItem(int id, EItemCategory category, List<AttributeModifier>? attributes = null) => new()
         {
             Id = id,
             Name = $"Item {id}",
             Description = string.Empty,
-            Category = EItemCategory.Accessory,
-            Attributes = [],
+            Category = category,
+            Attributes = attributes ?? [],
             ModSlots = [],
             Tags = [],
         };

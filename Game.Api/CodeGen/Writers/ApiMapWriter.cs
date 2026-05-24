@@ -20,7 +20,7 @@ namespace Game.Api.CodeGen.Writers
             var strBuilder = new StringBuilder();
             var allTypes = orderedData
                 .SelectMany(e => e.ParameterDescriptors.Append(e.ResponseDescriptor))
-                .SelectNotNull()
+                .WhereNotNull()
                 .Where(t => t.NeedsInterface);
 
             if (allTypes.Any())

@@ -27,14 +27,5 @@ namespace Game.DataAccess.Repositories
             _cache.SetAndForget($"{SessionPrefix}_{playerId}", playerState);
         }
 
-        public void SetBattleDataHash(int playerId, string activeEnemyHash)
-        {
-            _cache.SetAndForget($"{Constants.CACHE_BATTLE_DATA_PREFIX}_{playerId}", activeEnemyHash);
-        }
-
-        public async Task<string?> GetAndDeleteBattleDataHash(int playerId)
-        {
-            return await _cache.GetDeleteAsync($"{Constants.CACHE_BATTLE_DATA_PREFIX}_{playerId}");
-        }
     }
 }

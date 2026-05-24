@@ -4,7 +4,6 @@
     {
         // Cache Keys
         internal const string CACHE_SESSION_PREFIX = "Session";
-        internal const string CACHE_BATTLE_DATA_PREFIX = "BattleData";
         internal const string CACHE_PLAYER_PREFIX = "Player";
 
         // Pub/Sub Channels/Queues

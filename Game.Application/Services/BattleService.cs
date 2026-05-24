@@ -14,8 +14,15 @@ namespace Game.Application.Services
         private readonly IWorldRepository _worldRepo = worldRepo;
         private readonly IDomainEventDispatcher _dispatcher = dispatcher;
 
-        public BattleStartResult StartBattle(Player player, PlayerState state, int zoneId)
+        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
         {
+            if (newZoneId.HasValue)
+            {
+                player.ChangeZone(newZoneId.Value);
+                zoneId = newZoneId.Value;
+                await _playerRepo.SavePlayer(player);
+            }
+
             var zoneEntity = _worldRepo.Zones.GetZone(zoneId)
                 ?? throw new InvalidOperationException($"Zone {zoneId} not found");
 
@@ -92,6 +99,10 @@ namespace Game.Application.Services
             {
                 ExpReward = rewards.ExpReward,
                 DroppedItems = droppedItems,
+                NewLevel = player.Level,
+                NewExp = player.Exp,
+                StatPointsGained = player.StatPoints.StatPointsGained,
+                StatPointsUsed = player.StatPoints.StatPointsUsed,
             };
         }
     }

@@ -23,7 +23,7 @@ namespace Game.Api.CodeGen
             var socketMapWriter = new SocketMapWriter(targetDir);
             socketMapWriter.WriteSocketMap(socketMetadata);
 
-            var apiTypeDescriptors = endpointMetadata.SelectMany(e => e.ParameterDescriptors.Append(e.ResponseDescriptor)).SelectNotNull();
+            var apiTypeDescriptors = endpointMetadata.SelectMany(e => e.ParameterDescriptors.Append(e.ResponseDescriptor)).WhereNotNull();
             var socketTypeDescriptors = socketMetadata.SelectNotNull(s => s.ParameterDescriptor).Concat(socketMetadata.SelectNotNull(s => s.ResponseDescriptor));
 
             var apiInterfaceWriter = new ApiInterfaceWriter(targetDir);
