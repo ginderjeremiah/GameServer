@@ -16,3 +16,27 @@ $dark-light-gray-grad: linear-gradient(
 	rgba(0, 0, 0, 1) 0%,
 	rgba(60, 60, 60, 1) 100%,
 );
+
+// design system colors
+$accent: #a1c2f7;
+$accent-light: #c0d8ff;
+$surface: #14151b;
+$surface-alpha: rgba(20, 21, 27, 0.96);
+$text-primary: #f0f0f0;
+$text-secondary: rgba(240, 240, 240, 0.78);
+$text-tertiary: rgba(240, 240, 240, 0.55);
+$text-muted: rgba(240, 240, 240, 0.4);
+$border-subtle: rgba(255, 255, 255, 0.08);
+$border-light: rgba(255, 255, 255, 0.14);
+$border-medium: rgba(255, 255, 255, 0.18);
+$error: #f0a094;
+$success: #bde0b4;
+$warning: #f0d28a;
+$hp-green: #7fc28b;
+$hp-green-dark: #5da66a;
+$hp-red-bg: rgba(224, 138, 120, 0.18);
+$hp-red-disappearing: rgba(224, 138, 120, 0.55);
+$enemy-accent: #e08778;
+$mod-component: rgba(240, 240, 240, 0.55);
+$mod-prefix: #9bc7d9;
+$mod-suffix: #c0a8e6;

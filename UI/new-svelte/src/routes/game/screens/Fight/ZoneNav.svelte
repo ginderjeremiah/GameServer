@@ -1,24 +1,10 @@
-<div class="zone-nav round-border">
-	<button
-		class="hover-glow"
-		disabled={leftDisabled}
-		id="zone-button-left"
-		onclick={handleClickLeft}
-	>
-		&lt;
-	</button>
-	<div>
-		<span id="zone-num">Zone {zoneNum}:</span>
-		<span id="zone-title">{current?.name}</span>
+<div class="zone-nav">
+	<button class="zone-btn" disabled={leftDisabled} onclick={handleClickLeft}>&#8249;</button>
+	<div class="zone-info">
+		<span class="zone-num">Zone · {String(zoneNum).padStart(2, '0')}</span>
+		<span class="zone-name">{current?.name}</span>
 	</div>
-	<button
-		class="hover-glow"
-		disabled={rightDisabled}
-		id="zone-button-right"
-		onclick={handleClickRight}
-	>
-		&gt;
-	</button>
+	<button class="zone-btn" disabled={rightDisabled} onclick={handleClickRight}>&#8250;</button>
 </div>
 
 <script lang="ts">
@@ -49,24 +35,60 @@ const handleClickRight = () => changeZone(1);
 
 <style lang="scss">
 .zone-nav {
-	width: fit-content;
-	min-width: 25%;
-	margin: 0 auto;
-	padding: 0.2em;
-	border: var(--default-border);
-	background-color: var(--container-background-color);
+	display: inline-flex;
+	align-items: center;
+	gap: 12px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 3px;
+	padding: 6px 10px 6px 6px;
+}
+
+.zone-btn {
+	width: 24px;
+	height: 24px;
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	color: rgba(240, 240, 240, 0.85);
+	border-radius: 2px;
+	cursor: pointer;
 	display: flex;
-	justify-content: space-between;
-	margin-bottom: 1em;
+	align-items: center;
+	justify-content: center;
+	font-family: 'Geist Mono', monospace;
+	font-size: 12px;
+	transition: background 140ms;
 
-	button {
-		font-size: 1rem;
-		border: none;
-		cursor: pointer;
-
-		&:disabled {
-			cursor: not-allowed;
-		}
+	&:hover:not(:disabled) {
+		background: rgba(255, 255, 255, 0.08);
 	}
+
+	&:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+}
+
+.zone-info {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	min-width: 200px;
+	justify-content: center;
+}
+
+.zone-num {
+	font-family: 'Geist Mono', monospace;
+	font-size: 10.5px;
+	letter-spacing: 1.5px;
+	text-transform: uppercase;
+	color: rgba(192, 216, 255, 0.85);
+}
+
+.zone-name {
+	font-size: 16px;
+	color: #f0f0f0;
+	font-weight: 400;
+	letter-spacing: 0.1px;
 }
 </style>

@@ -14,8 +14,7 @@
 		{@render childItems()}
 	</button>
 {:else}
-	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-	<div class="nav-menu-item" tabindex="0" onclick={handleDivClick} role="presentation">
+	<div class="nav-menu-item" tabindex="0" onclick={handleDivClick} onkeydown={handleKeydown} role="menuitem" aria-haspopup={!!children?.length}>
 		{displayText}
 		{@render childItems()}
 	</div>
@@ -40,6 +39,12 @@ const handleButtonClick: MouseEventHandler<HTMLButtonElement> = (ev) => {
 const handleDivClick = (ev: MouseEvent) => {
 	blurEventTarget(ev);
 	ev.stopPropagation();
+};
+
+const handleKeydown = (ev: KeyboardEvent) => {
+	if (ev.key === 'Enter' || ev.key === ' ') {
+		ev.preventDefault();
+	}
 };
 
 const blurEventTarget = (ev: MouseEvent) => {

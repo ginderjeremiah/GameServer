@@ -1,4 +1,4 @@
-<div role="tooltip" class="tooltip-container round-border" {style} bind:this={container}></div>
+<div role="tooltip" class="tooltip-container" {style} bind:this={container}></div>
 
 <script lang="ts">
 import type { TooltipData } from '$stores';
@@ -45,11 +45,14 @@ const style = $derived.by(() => {
 <style lang="scss">
 .tooltip-container {
 	position: absolute;
-	border: var(--default-border);
 	display: none;
-	background-color: var(--container-background-color);
-	padding: 0.1rem;
+	background: rgba(20, 21, 27, 0.96);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 3px;
+	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+	backdrop-filter: blur(6px);
 	z-index: 15;
-	box-shadow: var(--default-shadow);
+	color: #f0f0f0;
+	overflow: hidden;
 }
 </style>

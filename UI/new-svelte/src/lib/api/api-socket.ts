@@ -6,6 +6,7 @@ import {
 	ApiSocketRequestTypes
 } from './types/api-socket-type-map';
 import { ApiSocketRequest } from './api-socket-request';
+import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
 
 export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
@@ -17,12 +18,16 @@ export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 
 let socket: WebSocket;
 
+const errorHook = createHook<[string]>();
+export const onSocketError = errorHook.onNotified;
+
 export class ApiSocket {
 	private socketCommandQueue: ApiSocketRequest<any>[] = [];
 	private inFlightCommands: ApiSocketRequest<any>[] = [];
 	private commandCounter = 0;
-	private listeners: Partial<{ [key in ApiSocketCommand]: Action<[IApiSocketResponse<key>]>[] }> =
-		{};
+	private commandHooks: Partial<{
+		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
+	}> = {};
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
@@ -50,11 +55,23 @@ export class ApiSocket {
 
 	public listenCommand<T extends ApiSocketCommand>(
 		commandName: T,
-		action: Action<[IApiSocketResponse<T>]>
+		action: Action<[IApiSocketResponse<T>]>,
+		cleanupOnDestroy: boolean = true
 	) {
-		//TODO update to use $lib/common/hooks
-		this.listeners[commandName] ??= [];
-		this.listeners[commandName].push(action);
+		const hook = this.getOrCreateHook(commandName);
+		return hook.onNotified(
+			(data: IApiSocketResponse<T>) => action(data),
+			cleanupOnDestroy
+		);
+	}
+
+	private getOrCreateHook<T extends ApiSocketCommand>(commandName: T) {
+		if (!this.commandHooks[commandName]) {
+			(this.commandHooks as any)[commandName] = createHook<[IApiSocketResponse<T>]>();
+		}
+		return this.commandHooks[commandName] as ReturnType<
+			typeof createHook<[IApiSocketResponse<T>]>
+		>;
 	}
 
 	private processCommandQueue() {
@@ -74,12 +91,12 @@ export class ApiSocket {
 		} else {
 			try {
 				const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
-				const listeners = this.listeners[data.name] ?? [];
-				for (const listener of listeners) {
+				const hook = this.commandHooks[data.name];
+				if (hook) {
 					try {
-						(listener as Action<[IApiSocketResponse<typeof data.name>]>)(data);
+						hook.notify(data as any);
 					} catch (ex) {
-						console.error('An error occured while executing a socket listener callback', ex);
+						console.error('An error occurred while executing a socket listener callback', ex);
 					}
 				}
 
@@ -94,7 +111,8 @@ export class ApiSocket {
 	}
 
 	private handleError(ev: Event) {
-		console.error('A socket error occured', ev);
+		console.error('A socket error occurred', ev);
+		errorHook.notify('WebSocket connection error');
 	}
 }
 

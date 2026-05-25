@@ -1,0 +1,213 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EAttribute } from '$lib/api';
+import type { ISkill } from '$lib/api';
+
+const mockSkills: ISkill[] = [];
+
+vi.mock('$stores', () => ({
+	staticData: {
+		get skills() {
+			return mockSkills;
+		}
+	}
+}));
+
+import { Battler } from './battler';
+
+const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill => ({
+	id,
+	name: `Skill ${id}`,
+	baseDamage,
+	damageMultipliers: [],
+	description: '',
+	cooldownMs,
+	iconPath: ''
+});
+
+const makeBattlerData = (overrides: Partial<Parameters<Battler['reset']>[0] & {}> = {}) => ({
+	name: 'TestBattler',
+	level: 5,
+	selectedSkills: [0],
+	attributes: [
+		{ attributeId: EAttribute.Strength, amount: 10 },
+		{ attributeId: EAttribute.Endurance, amount: 20 }
+	],
+	...overrides
+});
+
+describe('Battler', () => {
+	beforeEach(() => {
+		mockSkills.length = 0;
+		mockSkills[0] = makeSkillData(0, 10, 1000);
+		mockSkills[1] = makeSkillData(1, 20, 2000);
+	});
+
+	describe('reset', () => {
+		it('sets name and level from battler data', () => {
+			const battler = new Battler(makeBattlerData({ name: 'Hero', level: 10 }));
+
+			expect(battler.name).toBe('Hero');
+			expect(battler.level).toBe(10);
+		});
+
+		it('calculates currentHealth from derived MaxHealth', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [
+					{ attributeId: EAttribute.Strength, amount: 10 },
+					{ attributeId: EAttribute.Endurance, amount: 20 }
+				]
+			}));
+
+			const expectedMaxHealth = 50 + 20 * 20 + 5 * 10;
+			expect(battler.currentHealth).toBe(expectedMaxHealth);
+		});
+
+		it('calculates cdMultiplier from CooldownRecovery', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [
+					{ attributeId: EAttribute.Agility, amount: 20 },
+					{ attributeId: EAttribute.Dexterity, amount: 10 }
+				]
+			}));
+
+			const cdRecovery = 0.4 * 20 + 0.1 * 10;
+			expect(battler.cdMultiplier).toBeCloseTo(1 + cdRecovery / 100, 10);
+		});
+
+		it('sets isDead to false', () => {
+			const battler = new Battler(makeBattlerData());
+			expect(battler.isDead).toBe(false);
+		});
+
+		it('fills skill slots up to maxSkills (4)', () => {
+			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
+			expect(battler.skills).toHaveLength(4);
+			expect(battler.skills[0]).toBeDefined();
+			expect(battler.skills[1]).toBeUndefined();
+		});
+
+		it('merges additional attributes', () => {
+			const additionalAttrs = [{ attributeId: EAttribute.Strength, amount: 5 }];
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				additionalAttrs
+			);
+
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+		});
+	});
+
+	describe('advanceCooldowns', () => {
+		it('advances skill charge time by delta * cdMultiplier', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			battler.advanceCooldowns(500);
+			expect(battler.skills[0]!.chargeTime).toBe(500 * battler.cdMultiplier);
+		});
+
+		it('returns fired skills and resets their charge time', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			const fired = battler.advanceCooldowns(1000);
+			expect(fired).toHaveLength(1);
+			expect(fired[0].name).toBe('Skill 0');
+			expect(battler.skills[0]!.chargeTime).toBe(0);
+		});
+
+		it('returns empty array when no skills are ready', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			const fired = battler.advanceCooldowns(100);
+			expect(fired).toHaveLength(0);
+		});
+
+		it('skips undefined skill slots', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			expect(() => battler.advanceCooldowns(500)).not.toThrow();
+		});
+	});
+
+	describe('takeDamage', () => {
+		it('reduces health by damage minus defense', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }]
+			}));
+
+			const defense = battler.attributes.getValue(EAttribute.Defense);
+			const initialHealth = battler.currentHealth;
+			const rawDamage = 50;
+
+			const finalDmg = battler.takeDamage(rawDamage);
+
+			expect(finalDmg).toBe(rawDamage - defense);
+			expect(battler.currentHealth).toBe(initialHealth - finalDmg);
+		});
+
+		it('floors damage at 0 when defense exceeds raw damage', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }]
+			}));
+
+			const finalDmg = battler.takeDamage(5);
+			expect(finalDmg).toBe(0);
+			expect(battler.currentHealth).toBe(battler.attributes.getValue(EAttribute.MaxHealth));
+		});
+
+		it('sets isDead when health drops to 0', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: []
+			}));
+
+			battler.takeDamage(battler.currentHealth + battler.attributes.getValue(EAttribute.Defense));
+			expect(battler.isDead).toBe(true);
+		});
+
+		it('sets isDead when health drops below 0', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: []
+			}));
+
+			battler.takeDamage(99999);
+			expect(battler.isDead).toBe(true);
+			expect(battler.currentHealth).toBeLessThan(0);
+		});
+	});
+
+	describe('updateRenderCooldowns', () => {
+		it('updates renderChargeTime without exceeding cooldownMs', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			battler.skills[0]!.chargeTime = 500;
+			battler.updateRenderCooldowns(600);
+
+			expect(battler.skills[0]!.renderChargeTime).toBeLessThanOrEqual(
+				battler.skills[0]!.cooldownMs
+			);
+		});
+
+		it('skips undefined skill slots', () => {
+			const battler = new Battler(makeBattlerData({
+				attributes: [],
+				selectedSkills: [0]
+			}));
+
+			expect(() => battler.updateRenderCooldowns(100)).not.toThrow();
+		});
+	});
+});

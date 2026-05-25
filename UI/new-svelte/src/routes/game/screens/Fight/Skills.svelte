@@ -1,16 +1,27 @@
-<div class="skills-container round-border" role="grid">
+<div class="skills-row" class:reversed={side === 'enemy'} role="grid">
 	{#each battler.skills as skill, index}
-		<div
-			class="skill-slot"
-			style={`--skill-perc: ${skillPercent(skill)}%`}
-			role="gridcell"
-			tabindex="-1"
-			onmousemove={handleMouseMove}
-			onmouseenter={(ev) => handleMouseEnter(ev, index)}
-			onmouseleave={(ev) => handleMouseLeave(ev, index)}
-		>
+		<div class="skill-column">
+			<div
+				class="skill-slot"
+				class:ready={skill && isReady(skill)}
+				style:--skill-sweep="{skillSweep(skill)}deg"
+				style:--pulse-color={pulseColor}
+				role="gridcell"
+				tabindex="-1"
+				onmousemove={handleMouseMove}
+				onmouseenter={(ev) => handleMouseEnter(ev, index)}
+				onmouseleave={(ev) => handleMouseLeave(ev, index)}
+			>
+				{#if skill}
+					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
+					<div class="cooldown-overlay"></div>
+					{#if isReady(skill)}
+						<div class="ready-glow"></div>
+					{/if}
+				{/if}
+			</div>
 			{#if skill}
-				<img class="skill" src={skill.iconPath} alt={skill.name} />
+				<span class="skill-label" class:ready-label={isReady(skill)}>{skill.name}</span>
 			{/if}
 		</div>
 	{/each}
@@ -25,14 +36,16 @@ import SkillTooltip from './SkillTooltip.svelte';
 
 type Props = {
 	battler: Battler;
+	side: 'player' | 'enemy';
 };
 
-const { battler }: Props = $props();
+const { battler, side }: Props = $props();
 
 let tooltip = $state<TooltipComponent>();
 let tooltipSkillIndex = $state(-1);
 
 const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
+const pulseColor = $derived(side === 'player' ? 'rgba(161, 194, 247, 0.6)' : 'rgba(224, 135, 120, 0.6)');
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -57,52 +70,89 @@ const handleMouseLeave = (ev: MouseEvent, index: number) => {
 
 const skillPercent = (skill: Skill | undefined) => {
 	if (skill) {
-		return formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
-	} else {
-		return 0;
+		return +formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
 	}
+	return 0;
+};
+
+const skillSweep = (skill: Skill | undefined) => {
+	return (skillPercent(skill) / 100) * 360;
+};
+
+const isReady = (skill: Skill) => {
+	return skillPercent(skill) >= 99.9;
 };
 </script>
 
 <style lang="scss">
-.skills-container {
-	background-color: var(--container-background-color);
+.skills-row {
 	display: flex;
-	aspect-ratio: 4;
+	gap: 10px;
 	flex-wrap: wrap;
+
+	&.reversed {
+		justify-content: flex-end;
+	}
+}
+
+.skill-column {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	min-width: 46px;
+}
+
+.skill-slot {
+	width: 46px;
+	height: 46px;
+	position: relative;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 2px;
 	overflow: hidden;
-	border: var(--default-border);
+	cursor: default;
+	transition: border-color 140ms, box-shadow 140ms;
 
-	.skill-slot {
-		height: 100%;
-		aspect-ratio: 1;
-		box-sizing: border-box;
-		position: relative;
-		background-color: var(--slot-background-color);
+	&.ready {
+		border-color: rgba(161, 194, 247, 0.53);
+		box-shadow: inset 0 0 8px rgba(161, 194, 247, 0.35);
 	}
+}
 
-	.skill-slot + .skill-slot {
-		border-left: var(--default-border);
-	}
+.skill-icon {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0.92;
+}
 
-	.skill {
-		width: 100%;
-		height: 100%;
-	}
+.cooldown-overlay {
+	position: absolute;
+	inset: 0;
+	background: conic-gradient(transparent var(--skill-sweep), rgba(0, 0, 0, 0.65) var(--skill-sweep));
+	pointer-events: none;
+}
 
-	.skill-slot::after {
-		content: '';
-		position: absolute;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		left: 0;
-		background: conic-gradient(
-			rgb(65, 65, 65, 0),
-			rgb(65, 65, 65, 0) var(--skill-perc),
-			rgb(65, 65, 65, 0.7) var(--skill-perc),
-			rgb(65, 65, 65, 0.7)
-		);
+.ready-glow {
+	position: absolute;
+	inset: -1px;
+	border-radius: 2px;
+	animation: ready-pulse 1.2s ease-in-out infinite;
+	pointer-events: none;
+}
+
+.skill-label {
+	font-family: 'Geist Mono', monospace;
+	font-size: 9px;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+	color: rgba(240, 240, 240, 0.6);
+	white-space: nowrap;
+
+	&.ready-label {
+		color: var(--accent);
 	}
 }
 </style>

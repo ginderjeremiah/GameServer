@@ -25,8 +25,8 @@ export class RenderEngine {
 		this.running = false;
 	}
 
-	//use performace.now instead of animation frame timestamp, because frame stamp is before some amount of processing.
-	//using frame timestamp can cause render loop to be behind logical loop
+	//use performance.now instead of animation frame timestamp, because frame stamp is before some amount of processing.
+	//using frame timestamp can cause render loop to appear behind logical loop
 	private renderLoop() {
 		if (this.running) {
 			this.update();

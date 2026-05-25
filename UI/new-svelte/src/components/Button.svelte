@@ -11,7 +11,7 @@ type Props = {
 	text?: string;
 	loading?: boolean;
 	onClick: (event: MouseEvent) => void;
-  type: 'button' | 'submit' | 'reset';
+  type?: 'button' | 'submit' | 'reset';
 	textPadding?: 'comfortable' | 'minimal' | 'none';
 };
 

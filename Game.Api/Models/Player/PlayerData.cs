@@ -20,7 +20,6 @@ namespace Game.Api.Models.Player
 
         public static PlayerData FromPlayer(CorePlayer player)
         {
-            var attributes = player.GetAttributes();
             var inventory = player.Inventory;
 
             return new PlayerData
@@ -32,12 +31,11 @@ namespace Game.Api.Models.Player
                 StatPointsGained = player.StatPoints.StatPointsGained,
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
                 SelectedSkills = player.SelectedSkills.Select(s => s.Id).ToList(),
-                Attributes = attributes.AllModifiers()
-                    .GroupBy(m => m.Attribute)
-                    .Select(g => new BattlerAttribute
+                Attributes = player.StatPoints.StatAllocations
+                    .Select(a => new BattlerAttribute
                     {
-                        AttributeId = g.Key,
-                        Amount = (decimal)attributes[g.Key],
+                        AttributeId = a.Attribute,
+                        Amount = (decimal)a.Amount,
                     })
                     .ToList(),
                 LogPreferences = player.LogPreferences

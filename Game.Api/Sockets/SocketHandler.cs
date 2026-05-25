@@ -46,6 +46,7 @@ namespace Game.Api.Sockets
             {
                 var response = await command.ExecuteAsync(_context);
                 await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+                _context.Session.ClearPlayerDomainEvents();
                 await _context.SendData(response);
             }
             catch

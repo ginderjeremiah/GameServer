@@ -16,8 +16,12 @@ namespace Game.Application
         public async Task DispatchAsync(IEnumerable<IDomainEvent> events, CancellationToken cancellationToken = default)
         {
             foreach (var domainEvent in events)
+            {
                 foreach (var handler in _handlers)
+                {
                     await handler.HandleAsync(domainEvent, cancellationToken);
+                }
+            }
         }
     }
 }

@@ -6,5 +6,6 @@ export * from './Select.svelte';
 export { default as TextInput } from './TextInput.svelte';
 export { default as Tooltip } from './Tooltip.svelte';
 export { default as TooltipBase } from './TooltipBase.svelte';
+export { default as LogPanel } from './LogPanel.svelte';
 export * from './table';
 export * from './nav-menu';

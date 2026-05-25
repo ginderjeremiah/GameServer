@@ -94,13 +94,11 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Unable to update player stats.");
             }
 
-            var attributes = player.GetAttributes();
-            var result = attributes.AllModifiers()
-                .GroupBy(m => m.Attribute)
-                .Select(g => new BattlerAttribute
+            var result = player.StatPoints.StatAllocations
+                .Select(a => new BattlerAttribute
                 {
-                    AttributeId = g.Key,
-                    Amount = (decimal)attributes[g.Key],
+                    AttributeId = a.Attribute,
+                    Amount = (decimal)a.Amount,
                 });
 
             return ApiResponse.Success(result);

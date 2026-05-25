@@ -2,6 +2,9 @@ import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerDat
 import { formatNum } from '$lib/common';
 import { logMessage } from '../log';
 
+const expPerLevel = 100;
+const statPointsPerLevel = 6;
+
 export class PlayerManager implements IPlayerData {
 	public name = '';
 	public level = 0;
@@ -33,15 +36,15 @@ export class PlayerManager implements IPlayerData {
 	public grantExp(exp: number) {
 		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
-		if (this.exp >= this.level * 100) {
+		if (this.exp >= this.level * expPerLevel) {
 			this.levelUp();
 		}
 	}
 
 	public levelUp() {
-		this.exp -= this.level * 100;
+		this.exp -= this.level * expPerLevel;
 		this.level++;
-		this.statPointsGained += 6;
+		this.statPointsGained += statPointsPerLevel;
 		logMessage(ELogType.LevelUp, 'Congratulations, you leveled up!');
 		logMessage(ELogType.LevelUp, `You are now level ${this.level}.`);
 	}

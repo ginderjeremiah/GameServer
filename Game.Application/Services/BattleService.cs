@@ -56,7 +56,9 @@ namespace Game.Application.Services
         {
             var now = DateTime.UtcNow;
             if (!state.CanDefeatEnemy(now))
+            {
                 return null;
+            }
 
             var enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");

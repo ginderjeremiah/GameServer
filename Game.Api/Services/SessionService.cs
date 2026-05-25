@@ -81,5 +81,10 @@ namespace Game.Api.Services
         {
             _sessionStore.Update(PlayerState, UserId);
         }
+
+        public void ClearPlayerDomainEvents()
+        {
+            _player?.ClearEvents();
+        }
     }
 }

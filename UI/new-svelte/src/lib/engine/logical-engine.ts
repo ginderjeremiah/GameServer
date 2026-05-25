@@ -2,6 +2,7 @@ import { createHook, getEventCounter } from '$lib/common';
 
 export const tickSize = 40; //ms
 const tickSizeX5 = tickSize * 5;
+const pollingIntervalMs = 10;
 
 const logicalUpdateHook = createHook<[number]>();
 const notifyLogicalUpdate = logicalUpdateHook.notify;
@@ -25,7 +26,7 @@ export class LogicalEngine {
 		this.time = this.lastTime;
 
 		const that = this;
-		this.tickHandle = window.setInterval(() => that.logicLoop(), 10);
+		this.tickHandle = window.setInterval(() => that.logicLoop(), pollingIntervalMs);
 	}
 
 	public stop() {

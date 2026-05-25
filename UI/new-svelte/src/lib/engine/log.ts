@@ -8,11 +8,13 @@ export interface LogMessage {
 	message: string;
 }
 
+const maxLogEntries = 40;
+
 let id = (logs()?.[0]?.id ?? -1) + 1;
 
 export const logMessage = (logType: ELogType, message: string) => {
 	if (playerManager.logPreferences.find((pref) => pref.id === logType)?.enabled ?? true) {
-		if (logs().length >= 40) {
+		if (logs().length >= maxLogEntries) {
 			logs().pop();
 		}
 		id++;

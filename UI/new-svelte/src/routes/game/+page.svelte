@@ -1,40 +1,80 @@
 <div class="game-container">
-	<NavMenu {navMenuItems} />
-	<div class="screen-container">
-		<CurrentScreen />
+	<div class="sidebar-spacer"></div>
+
+	<div class="main-content">
+		<div class="screen-container">
+			<CurrentScreen />
+		</div>
+		<LogPanel />
 	</div>
-	<div class="log-container round-border">
-		{#each logs() as log (log.id)}
-			<div class="log-message">
-				<span>{log.message}</span>
-			</div>
-		{/each}
-	</div>
+
+	<NavSidebar {screens} active={currentScreen} onNavigate={handleNavigate} />
 </div>
 
 <script lang="ts">
-import { NavMenu, type INavMenuItem } from '$components';
-import { screenMap } from './screens';
+import { NavSidebar } from '$components';
+import LogPanel from '$components/LogPanel.svelte';
+import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
+import { screenMap, type GameScreen } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
-import { logs } from '$stores';
-import { normalizeText, routeTo } from '$lib/common';
+import { routeTo } from '$lib/common';
+import type { Component } from 'svelte';
 
 if (browser) {
-	startGame();
+	try {
+		startGame();
+	} catch (e) {
+		console.error('Failed to start game', e);
+	}
 }
 
-let CurrentScreen = $state(screenMap.Fight);
+let currentScreen = $state<string>('fight');
+let CurrentScreen: Component = $state(screenMap.Fight as Component);
 
-const navMenuItems: INavMenuItem[] = Object.entries(screenMap).map(([text, screen]) => ({
-	text: normalizeText(text),
-	onClick: () => (CurrentScreen = screen)
-}));
+interface ScreenDef {
+	key: string;
+	label: string;
+	group: string;
+	built: boolean;
+}
 
-navMenuItems.push({
-	text: 'Admin',
-	onClick: () => routeTo('/admin')
-});
+const screens: ScreenDef[] = [
+	{ key: 'fight', label: 'Fight', group: 'combat', built: true },
+	{ key: 'cardGame', label: 'Card Game', group: 'combat', built: false },
+	{ key: 'challenges', label: 'Challenges', group: 'combat', built: true },
+	{ key: 'inventory', label: 'Inventory', group: 'character', built: true },
+	{ key: 'attributes', label: 'Attributes', group: 'character', built: false },
+	{ key: 'stats', label: 'Stats', group: 'character', built: false },
+	{ key: 'options', label: 'Options', group: 'settings', built: false },
+	{ key: 'help', label: 'Help', group: 'settings', built: false },
+	{ key: 'quit', label: 'Quit', group: 'settings', built: false },
+	{ key: 'admin', label: 'Admin', group: 'admin', built: true },
+];
+
+const screenKeyMap: Record<string, GameScreen> = {
+	fight: 'Fight',
+	cardGame: 'CardGame',
+	challenges: 'Challenges',
+	inventory: 'Inventory',
+	attributes: 'Attributes',
+	stats: 'Stats',
+	options: 'Options',
+	help: 'Help',
+	quit: 'Quit',
+};
+
+const handleNavigate = (key: string) => {
+	if (key === 'admin') {
+		routeTo('/admin');
+		return;
+	}
+	currentScreen = key;
+	const mapped = screenKeyMap[key];
+	if (mapped && mapped in screenMap) {
+		CurrentScreen = screenMap[mapped] as Component;
+	}
+};
 </script>
 
 <style lang="scss">
@@ -42,28 +82,26 @@ navMenuItems.push({
 	width: 100%;
 	height: 100%;
 	display: flex;
+	position: relative;
+	overflow: hidden;
+}
+
+.sidebar-spacer {
+	width: 60px;
+	flex-shrink: 0;
+}
+
+.main-content {
+	flex: 1;
+	display: flex;
 	flex-direction: column;
+	min-height: 0;
+	min-width: 0;
+}
 
-	.screen-container {
-		height: 100%;
-		width: 100%;
-	}
-
-	.log-container {
-		background-color: var(--container-background-color);
-		box-sizing: border-box;
-		margin: 1% 5% 2.5% 5%;
-		height: 60%;
-		overflow: auto;
-		user-select: text;
-
-		.log-message {
-			border: var(--default-border);
-			border-top: none;
-			box-sizing: border-box;
-			padding: 0.1rem;
-			font-size: 0.75rem;
-		}
-	}
+.screen-container {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
 }
 </style>

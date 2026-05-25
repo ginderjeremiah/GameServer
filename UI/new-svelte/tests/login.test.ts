@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitForLoginReady } from './helpers';
 
 test.describe('Login page', () => {
 	test('renders login form with expected elements', async ({ page }) => {
@@ -27,11 +28,12 @@ test.describe('Login page', () => {
 
 	test('does not submit with empty credentials', async ({ page }) => {
 		await page.goto('/');
+		await waitForLoginReady(page);
 
 		const loginButton = page.locator('button', { hasText: 'Login' });
 		await loginButton.click();
 
-		// Should stay on the login page — no navigation
+		await page.waitForTimeout(500);
 		await expect(page).toHaveURL('/');
 		await expect(page.locator('h1')).toHaveText('Login');
 	});
@@ -58,6 +60,7 @@ test.describe('Login page', () => {
 
 	test('form can be submitted via Enter key', async ({ page }) => {
 		await page.goto('/');
+		await waitForLoginReady(page);
 
 		const usernameInput = page.locator('input[name="username"]');
 		await usernameInput.fill('testuser');
@@ -65,14 +68,9 @@ test.describe('Login page', () => {
 		const passwordInput = page.locator('input[name="password"]');
 		await passwordInput.fill('testpass');
 
-		// Pressing Enter submits the form
 		await passwordInput.press('Enter');
-
-		// Without a backend, we expect either an error or to stay on the page
-		// The form handler will attempt the API call and fail gracefully
 		await page.waitForTimeout(500);
 
-		// Should show either error or remain on login page
 		const isOnLogin = await page.locator('h1').textContent();
 		expect(['Login', 'Loading']).toContain(isOnLogin);
 	});

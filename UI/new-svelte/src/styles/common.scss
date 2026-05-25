@@ -1,10 +1,14 @@
 :root {
-	font-size: 24px;
-	font-family: Arial, Helvetica, sans-serif;
+	font-size: 16px;
+	font-family: Geist, Arial, Helvetica, sans-serif;
 }
 
 body {
 	margin: 0;
+}
+
+* {
+	box-sizing: border-box;
 }
 
 .hover-glow {
@@ -51,4 +55,35 @@ h1 {
 	justify-content: center;
 	flex-wrap: nowrap;
 	align-content: center;
+}
+
+input::placeholder {
+	color: rgba(240, 240, 240, 0.55);
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+	0%, 100% { box-shadow: 0 0 6px rgba(161, 194, 247, 0.35); }
+	50% { box-shadow: 0 0 14px rgba(161, 194, 247, 0.85); }
+}
+
+@keyframes dmg-rise {
+	0% { transform: translate(-50%, 8px) scale(0.85); opacity: 0; }
+	15% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
+	25% { transform: translate(-50%, -4px) scale(1); opacity: 1; }
+	85% { opacity: 1; }
+	100% { transform: translate(-50%, -64px); opacity: 0; }
+}
+
+@keyframes ready-pulse {
+	0%, 100% { box-shadow: 0 0 6px var(--pulse-color, rgba(161, 194, 247, 0.4)); }
+	50% { box-shadow: 0 0 14px var(--pulse-color, rgba(161, 194, 247, 0.8)); }
+}
+
+@keyframes pulse-dot {
+	0%, 100% { opacity: 0.6; box-shadow: 0 0 6px rgba(161, 194, 247, 0.5); }
+	50% { opacity: 1; box-shadow: 0 0 12px rgba(161, 194, 247, 0.95); }
 }

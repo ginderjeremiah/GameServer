@@ -41,7 +41,11 @@ export class ApiResponse<T extends ApiResponseType> {
 
 	private parseJson() {
 		if (this.#r.responseText) {
-			return JSON.parse(this.#r.responseText) as ApiResponseJson<T>;
+			try {
+				return JSON.parse(this.#r.responseText) as ApiResponseJson<T>;
+			} catch {
+				return { data: undefined, errorMessage: 'Invalid server response.' } as ApiResponseJson<T>;
+			}
 		} else {
 			return { data: undefined } as ApiResponseJson<T>;
 		}

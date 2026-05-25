@@ -1,4 +1,4 @@
-<input bind:value type="checkbox" {disabled} />
+<input bind:checked={value} type="checkbox" {disabled} />
 
 <script lang="ts">
 interface Props {
