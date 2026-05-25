@@ -50,12 +50,6 @@ const remainingCd = $derived(
 	Math.abs(adjustedCd - (cdMultiplier + (skill?.renderChargeTime ?? 0)) / 1000 / cdMultiplier)
 );
 
-window.setInterval(() => {
-	if (skill) {
-		console.log($state.snapshot(skill.chargeTime), $state.snapshot(skill.renderChargeTime));
-	}
-}, 500);
-
 const getMultiplier = (mult: IAttributeMultiplier) => {
 	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;
 };

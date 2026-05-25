@@ -1,27 +1,21 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Core.Events;
 using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using EntityPlayerAttribute = Game.Abstractions.Entities.PlayerAttribute;
+using System.Text.Json;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Players : IPlayers
+    internal class PlayerRepository(GameContext context, ICacheService cache, IPubSubService pubsub) : IPlayerRepository
     {
         private static string PlayerPrefix => Constants.CACHE_PLAYER_PREFIX;
 
-        private readonly GameContext _context;
-        private readonly ICacheService _cache;
-        private readonly DataProviderSynchronizer _synchronizer;
-
-        public Players(GameContext context, ICacheService cache, DataProviderSynchronizer synchronizer)
-        {
-            _context = context;
-            _cache = cache;
-            _synchronizer = synchronizer;
-        }
+        private readonly GameContext _context = context;
+        private readonly ICacheService _cache = cache;
+        private readonly IPubSubService _pubsub = pubsub;
 
         public async Task<Player?> GetPlayer(int playerId)
         {
@@ -41,33 +35,16 @@ namespace Game.DataAccess.Repositories
 
         public async Task SavePlayer(Player player)
         {
-            var entity = await _context.Players
-                .Include(p => p.PlayerAttributes)
-                .FirstOrDefaultAsync(p => p.Id == player.Id);
+            var playerKey = $"{PlayerPrefix}_{player.Id}";
+            _cache.SetAndForget(playerKey, player);
 
-            if (entity is null) return;
-
-            entity.Level = player.Level;
-            entity.Exp = player.Exp;
-            entity.StatPointsGained = player.StatPoints.StatPointsGained;
-            entity.StatPointsUsed = player.StatPoints.StatPointsUsed;
-            entity.CurrentZoneId = player.CurrentZoneId;
-
-            foreach (var attr in entity.PlayerAttributes.ToList())
+            foreach (var domainEvent in player.DomainEvents)
             {
-                _context.Remove(attr);
+                await _pubsub.Publish(
+                    Constants.PUBSUB_PLAYER_CHANNEL,
+                    Constants.PUBSUB_PLAYER_QUEUE,
+                    SerializeEvent(domainEvent));
             }
-            foreach (var allocation in player.StatPoints.StatAllocations)
-            {
-                entity.PlayerAttributes.Add(new EntityPlayerAttribute
-                {
-                    PlayerId = player.Id,
-                    AttributeId = (int)allocation.Attribute,
-                    Amount = (decimal)allocation.Amount,
-                });
-            }
-
-            _cache.SetAndForget($"{PlayerPrefix}_{player.Id}", player);
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
@@ -88,10 +65,28 @@ namespace Game.DataAccess.Repositories
                 .Include(p => p.AppliedMods)
                     .ThenInclude(am => am.ItemMod)
                         .ThenInclude(im => im.ItemModAttributes)
+                .Include(p => p.LogPreferences)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == playerId);
 
             return entity is null ? null : PlayerMapper.ToCore(entity);
         }
+
+        private static string SerializeEvent(IDomainEvent domainEvent)
+        {
+            var wrapper = new DomainEventEnvelope
+            {
+                Type = domainEvent.GetType().Name,
+                Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
+            };
+
+            return JsonSerializer.Serialize(wrapper);
+        }
+    }
+
+    internal class DomainEventEnvelope
+    {
+        public required string Type { get; set; }
+        public required string Payload { get; set; }
     }
 }

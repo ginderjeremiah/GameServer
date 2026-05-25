@@ -7,11 +7,13 @@ namespace Game.Application.Services
 {
     public class BattleService(
         IPlayerRepository playerRepo,
-        IWorldRepository worldRepo,
+        IEnemies enemies,
+        IZones zones,
         IDomainEventDispatcher dispatcher)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
-        private readonly IWorldRepository _worldRepo = worldRepo;
+        private readonly IEnemies _enemies = enemies;
+        private readonly IZones _zones = zones;
         private readonly IDomainEventDispatcher _dispatcher = dispatcher;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
@@ -23,13 +25,13 @@ namespace Game.Application.Services
                 await _playerRepo.SavePlayer(player);
             }
 
-            var zoneEntity = _worldRepo.Zones.GetZone(zoneId)
+            var zoneEntity = _zones.GetZone(zoneId)
                 ?? throw new InvalidOperationException($"Zone {zoneId} not found");
 
             var rng = new Random();
             var level = rng.Next(zoneEntity.LevelMin, zoneEntity.LevelMax + 1);
 
-            var enemy = _worldRepo.Enemies.GetRandomDomainEnemy(zoneId, level);
+            var enemy = _enemies.GetRandomDomainEnemy(zoneId, level);
 
             var battleRng = new Mulberry32((uint)rng.Next());
             enemy.Skills = enemy.GetRandomSkills(battleRng);
@@ -56,15 +58,12 @@ namespace Game.Application.Services
             if (!state.CanDefeatEnemy(now))
                 return null;
 
-            var enemy = _worldRepo.Enemies.GetDomainEnemy(enemyId, level)
+            var enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
             var rewards = new DefeatRewards(player, enemy);
 
-            // GrantExp raises PlayerLeveledUpEvent internally if a level-up occurs.
             player.GrantExp(rewards.ExpReward);
-
-            // RecordEnemyDefeat raises EnemyDefeatedEvent (which triggers stats + challenges via event handler).
             player.RecordEnemyDefeat(enemyId, rewards.ExpReward);
 
             state.SetCooldown(now.AddSeconds(5));
@@ -72,7 +71,6 @@ namespace Game.Application.Services
 
             await _playerRepo.SavePlayer(player);
 
-            // Dispatch all events collected during this operation, then clear.
             var events = player.DomainEvents.ToList();
             player.ClearEvents();
             await _dispatcher.DispatchAsync(events);

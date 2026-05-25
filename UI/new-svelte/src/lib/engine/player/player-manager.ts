@@ -3,7 +3,6 @@ import { formatNum } from '$lib/common';
 import { logMessage } from '../log';
 
 export class PlayerManager implements IPlayerData {
-	public userName = '';
 	public name = '';
 	public level = 0;
 	public exp = 0;
@@ -19,7 +18,6 @@ export class PlayerManager implements IPlayerData {
 	};
 
 	public initialize(data: IPlayerData) {
-		this.userName = data.userName;
 		this.name = data.name;
 		this.level = data.level;
 		this.exp = data.exp;

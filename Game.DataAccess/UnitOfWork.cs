@@ -9,8 +9,6 @@ namespace Game.DataAccess
     {
         public Task CommitAsync()
         {
-            // Mirror the temp-prop handling from RepositoryManager.SaveChangesAsync() so
-            // zero-based identity entities and FK placeholders are resolved before the write.
             foreach (var entry in context.ChangeTracker.Entries())
             {
                 var tempProps = entry.Properties.Where(p => p.IsTemporary);

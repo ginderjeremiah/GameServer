@@ -20,18 +20,16 @@ namespace Game.Api.Services
         /// Creates the requested socket command inside a fresh DI scope.
         /// The caller is responsible for disposing the returned <see cref="IServiceScope"/>
         /// after the command has executed (and after any post-execution work such as UoW commit).
-        /// TODO: Make the scope a parameter of the method to make the ownership more explicit and to allow for more flexible scope management.
         /// </summary>
-        public async Task<(AbstractSocketCommand Command, IServiceScope Scope)> CreateCommand(SocketCommandInfo commandInfo)
+        public async Task<AbstractSocketCommand> CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
         {
             await _registerCommandGeneratorsTask;
             if (_socketCommandGenerators.TryGetValue(commandInfo.Name, out var generator))
             {
-                var scope = _scopeFactory.CreateScope();
                 var command = generator(scope.ServiceProvider);
                 command.SetParameters(commandInfo.Parameters);
                 command.Id = commandInfo.Id;
-                return (command, scope);
+                return command;
             }
             else
             {

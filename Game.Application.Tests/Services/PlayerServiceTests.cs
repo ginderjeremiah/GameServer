@@ -145,6 +145,7 @@ namespace Game.Application.Tests.Services
                 Inventory = new Inventory(),
                 SelectedSkills = [],
                 Skills = [],
+                LogPreferences = [],
             };
         }
 

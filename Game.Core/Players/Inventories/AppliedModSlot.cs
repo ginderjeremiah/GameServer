@@ -7,6 +7,7 @@ namespace Game.Core.Players.Inventories
     /// </summary>
     public class AppliedModSlot
     {
+        public required int ItemModId { get; set; }
         public required int ItemModSlotId { get; set; }
         public required ItemMod ItemMod { get; set; }
     }

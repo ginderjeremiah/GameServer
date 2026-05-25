@@ -21,15 +21,24 @@ namespace Game.Core.Players
         public required Inventory Inventory { get; set; }
         public required List<Skill> SelectedSkills { get; set; }
         public required List<Skill> Skills { get; set; }
+        public required List<LogPreference> LogPreferences { get; set; }
 
         public void ChangeZone(int zoneId)
         {
             CurrentZoneId = zoneId;
+            RaiseCoreUpdated();
         }
 
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
-            return StatPoints.TryUpdateAttributes(changedAttributes);
+            if (!StatPoints.TryUpdateAttributes(changedAttributes))
+                return false;
+
+            RaiseCoreUpdated();
+            RaiseEvent(new AttributeAllocationsChangedEvent(
+                Id,
+                StatPoints.StatAllocations.Select(a => new AttributeAllocationEntry(a.Attribute, a.Amount)).ToList()));
+            return true;
         }
 
         /// <summary>
@@ -46,6 +55,8 @@ namespace Game.Core.Players
                 StatPoints.StatPointsGained += 6;
                 RaiseEvent(new PlayerLeveledUpEvent(Id, Level, StatPoints.StatPointsGained));
             }
+
+            RaiseCoreUpdated();
         }
 
         /// <summary>
@@ -66,6 +77,62 @@ namespace Game.Core.Players
             RaiseEvent(new ModUnlockedEvent(Id, itemModId));
         }
 
+        public bool TryEquipItem(int itemId, EEquipmentSlot slot)
+        {
+            if (!Inventory.TryEquipItem(itemId, slot))
+                return false;
+
+            RaiseEvent(new ItemEquippedEvent(Id, itemId, (int)slot));
+            return true;
+        }
+
+        public bool TryUnequipItem(EEquipmentSlot slot)
+        {
+            var equipSlot = Inventory.EquipmentSlots.FirstOrDefault(s => s.Value == slot);
+            if (equipSlot?.ItemId is null)
+                return false;
+
+            var itemId = equipSlot.ItemId.Value;
+            if (!Inventory.TryUnequipItem(slot))
+                return false;
+
+            RaiseEvent(new ItemUnequippedEvent(Id, itemId));
+            return true;
+        }
+
+        public bool TryApplyMod(int itemId, int itemModId, int itemModSlotId, ItemMod mod)
+        {
+            if (!Inventory.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
+                return false;
+
+            RaiseEvent(new ModAppliedEvent(Id, itemId, itemModSlotId, itemModId));
+            return true;
+        }
+
+        public bool TryRemoveMod(int itemId, int itemModSlotId)
+        {
+            if (!Inventory.TryRemoveMod(itemId, itemModSlotId))
+                return false;
+
+            RaiseEvent(new ModRemovedEvent(Id, itemId, itemModSlotId));
+            return true;
+        }
+
+        public void UpdateLogPreference(ELogType logType, bool enabled)
+        {
+            var pref = LogPreferences.FirstOrDefault(p => p.LogType == logType);
+            if (pref is not null)
+            {
+                pref.Enabled = enabled;
+            }
+            else
+            {
+                LogPreferences.Add(new LogPreference { LogType = logType, Enabled = enabled });
+            }
+
+            RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
+        }
+
         /// <summary>
         /// Records that an enemy has been defeated and raises an <see cref="EnemyDefeatedEvent"/>.
         /// </summary>
@@ -83,6 +150,13 @@ namespace Game.Core.Players
         public AttributeCollection GetAttributes()
         {
             return new AttributeCollection(GetAllModifiers());
+        }
+
+        private void RaiseCoreUpdated()
+        {
+            RaiseEvent(new PlayerCoreUpdatedEvent(
+                Id, Level, Exp, CurrentZoneId,
+                StatPoints.StatPointsGained, StatPoints.StatPointsUsed));
         }
     }
 }

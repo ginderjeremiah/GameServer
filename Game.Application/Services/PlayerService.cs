@@ -19,10 +19,11 @@ namespace Game.Application.Services
 
         public async Task<bool> TryUpdateAttributes(Player player, IEnumerable<IAttributeUpdate> updates)
         {
-            var success = player.TryUpdateAttributes(updates);
-            if (success)
-                await _playerRepo.SavePlayer(player);
-            return success;
+            if (!player.TryUpdateAttributes(updates))
+                return false;
+
+            await _playerRepo.SavePlayer(player);
+            return true;
         }
 
         public AttributeCollection GetPlayerAttributes(Player player)
@@ -37,25 +38,18 @@ namespace Game.Application.Services
 
         public async Task<bool> EquipItem(Player player, int itemId, EEquipmentSlot slot)
         {
-            if (!player.Inventory.TryEquipItem(itemId, slot))
+            if (!player.TryEquipItem(itemId, slot))
                 return false;
 
-            await _playerRepo.EquipItem(player.Id, itemId, (int)slot);
             await _playerRepo.SavePlayer(player);
             return true;
         }
 
         public async Task<bool> UnequipItem(Player player, EEquipmentSlot slot)
         {
-            var equipSlot = player.Inventory.EquipmentSlots.FirstOrDefault(s => s.Value == slot);
-            if (equipSlot?.ItemId is null)
+            if (!player.TryUnequipItem(slot))
                 return false;
 
-            var itemId = equipSlot.ItemId.Value;
-            if (!player.Inventory.TryUnequipItem(slot))
-                return false;
-
-            await _playerRepo.UnequipItem(player.Id, itemId);
             await _playerRepo.SavePlayer(player);
             return true;
         }
@@ -76,20 +70,18 @@ namespace Game.Application.Services
                 Tags = [],
             };
 
-            if (!player.Inventory.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
+            if (!player.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
                 return false;
 
-            await _playerRepo.ApplyMod(player.Id, itemId, itemModSlotId, itemModId);
             await _playerRepo.SavePlayer(player);
             return true;
         }
 
         public async Task<bool> RemoveMod(Player player, int itemId, int itemModSlotId)
         {
-            if (!player.Inventory.TryRemoveMod(itemId, itemModSlotId))
+            if (!player.TryRemoveMod(itemId, itemModSlotId))
                 return false;
 
-            await _playerRepo.RemoveMod(player.Id, itemId, itemModSlotId);
             await _playerRepo.SavePlayer(player);
             return true;
         }

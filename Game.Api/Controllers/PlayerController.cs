@@ -31,7 +31,7 @@ namespace Game.Api.Controllers
         }
 
         [HttpPost]
-        public ApiResponse SaveLogPreferences([FromBody] List<LogPreference> prefs)
+        public ApiResponse SaveLogPreferences([FromBody] List<Models.Player.LogPreference> prefs)
         {
             throw new NotImplementedException();
         }

@@ -3,16 +3,16 @@ using Game.Core;
 
 namespace Game.Application.Services
 {
-    public class StatisticsService(IPlayerRepository playerRepo)
+    public class StatisticsService(IPlayerStatistics playerStatistics)
     {
-        private readonly IPlayerRepository _playerRepo = playerRepo;
+        private readonly IPlayerStatistics _playerStatistics = playerStatistics;
 
         /// <summary>
         /// Increments a player statistic and returns the new value.
         /// </summary>
         public async Task<long> RecordStatistic(int playerId, EStatisticType type, int entityId, long amount)
         {
-            return await _playerRepo.IncrementStatistic(playerId, (int)type, entityId, amount);
+            return await _playerStatistics.IncrementStatistic(playerId, (int)type, entityId, amount);
         }
     }
 }

@@ -36,6 +36,7 @@ namespace Game.DataAccess.Mapping
                         if (am.ItemMod is null) continue;
                         appliedMods.Add(new AppliedModSlot
                         {
+                            ItemModId = am.ItemModId,
                             ItemModSlotId = am.ItemModSlotId,
                             ItemMod = ItemMapper.ModToCore(am.ItemMod),
                         });
@@ -83,6 +84,13 @@ namespace Game.DataAccess.Mapping
                 .Select(ps => SkillMapper.ToCore(ps.Skill))
                 .ToList();
 
+            var logPreferences = (entity.LogPreferences ?? [])
+                .Select(lp => new Core.Players.LogPreference
+                {
+                    LogType = (Core.ELogType)lp.LogSettingId,
+                    Enabled = lp.Enabled,
+                }).ToList();
+
             return new Player
             {
                 Id = entity.Id,
@@ -98,6 +106,7 @@ namespace Game.DataAccess.Mapping
                 Inventory = inventory,
                 Skills = skills,
                 SelectedSkills = selectedSkills,
+                LogPreferences = logPreferences,
             };
         }
     }

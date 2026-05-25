@@ -1,4 +1,5 @@
 ﻿using Game.Api.Models.Common;
+using Game.Api.Services;
 using Game.Core;
 using System.Net.WebSockets;
 using System.Text;
@@ -17,13 +18,15 @@ namespace Game.Api.Sockets
 
         public string SocketId { get; }
         public int PlayerId { get; }
+        public SessionService Session { get; }
         public WebSocketState State => _socket.State;
 
-        public SocketContext(WebSocket socket, int playerId, ILogger<SocketContext> logger)
+        public SocketContext(WebSocket socket, int playerId, SessionService session, ILogger<SocketContext> logger)
         {
             _socket = socket;
             SocketId = Guid.NewGuid().ToString();
             PlayerId = playerId;
+            Session = session;
             _logger = logger;
         }
 

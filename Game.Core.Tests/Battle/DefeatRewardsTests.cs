@@ -81,6 +81,7 @@ namespace Game.Core.Tests.Battle
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
+            LogPreferences = [],
         };
 
         private static Enemy MakeEnemy(double strength, double endurance) => new()

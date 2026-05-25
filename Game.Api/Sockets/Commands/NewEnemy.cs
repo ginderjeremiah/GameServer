@@ -1,22 +1,19 @@
 ﻿using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
-using Game.Api.Services;
 using Game.Application.Services;
 
 namespace Game.Api.Sockets.Commands
 {
     public class NewEnemy : AbstractSocketCommand<NewEnemyModel, NewEnemyRequest>
     {
-        private readonly SessionService _sessionService;
         private readonly BattleService _battleService;
         private readonly ILogger<NewEnemy> _logger;
 
         public override string Name { get; set; } = nameof(NewEnemy);
 
-        public NewEnemy(ILogger<NewEnemy> logger, SessionService sessionService, BattleService battleService)
+        public NewEnemy(ILogger<NewEnemy> logger, BattleService battleService)
         {
-            _sessionService = sessionService;
             _battleService = battleService;
             _logger = logger;
         }
@@ -24,7 +21,7 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<NewEnemyModel>> HandleExecuteAsync(SocketContext context)
         {
             var now = DateTime.UtcNow;
-            var state = _sessionService.PlayerState;
+            var state = context.Session.PlayerState;
 
             if (state.IsOnCooldown(now))
             {
@@ -34,11 +31,11 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
-            var player = await _sessionService.LoadPlayer();
+            var player = await context.Session.LoadPlayer();
 
             var result = await _battleService.StartBattle(player, state, player.CurrentZoneId, Parameters.NewZoneId);
 
-            _sessionService.SavePlayerState();
+            context.Session.SavePlayerState();
 
             _logger.LogDebug("NewEnemy: (enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
                 result.Enemy.Id, result.Enemy.Level, result.Seed);

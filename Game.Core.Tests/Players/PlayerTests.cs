@@ -46,13 +46,14 @@ namespace Game.Core.Tests.Players
         }
 
         [TestMethod]
-        public void GrantExp_NoLevelUp_NoDomainEvents()
+        public void GrantExp_NoLevelUp_OnlyCoreUpdatedEvent()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(50);
 
-            Assert.AreEqual(0, player.DomainEvents.Count);
+            Assert.AreEqual(1, player.DomainEvents.Count);
+            Assert.IsInstanceOfType<PlayerCoreUpdatedEvent>(player.DomainEvents[0]);
         }
 
         [TestMethod]
@@ -207,6 +208,7 @@ namespace Game.Core.Tests.Players
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
+            LogPreferences = [],
         };
     }
 }

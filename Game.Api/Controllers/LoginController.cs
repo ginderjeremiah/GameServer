@@ -1,9 +1,9 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
+using Game.Api.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
-using Game.Application;
 using Game.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,16 +17,14 @@ namespace Game.Api.Controllers
     [ApiController]
     public class LoginController(
         IUsers users,
-        IPlayers players,
+        IPlayerRepository playerRepo,
         IEntityStore entityStore,
-        IUnitOfWork unitOfWork,
         SessionService sessionService,
         CookieService cookieService) : ControllerBase
     {
         private readonly IUsers _users = users;
-        private readonly IPlayers _players = players;
+        private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEntityStore _entityStore = entityStore;
-        private readonly IUnitOfWork _unitOfWork = unitOfWork;
         private readonly SessionService _sessionService = sessionService;
         private readonly CookieService _cookieService = cookieService;
 
@@ -55,13 +53,16 @@ namespace Game.Api.Controllers
             }
 
             var playerId = player.Id;
-            var playerData = await _players.GetPlayer(playerId);
+            var playerData = await _playerRepo.GetPlayer(playerId);
             if (playerData is null)
             {
                 return ApiResponse.Error("Player data not found");
             }
 
-            _sessionService.CreateSession(playerData);
+            _sessionService.CreateSession(user.Id, playerData);
+
+            var token = new AuthToken(new AuthTokenClaims(user.Id, DateTime.UtcNow + Constants.TOKEN_LIFETIME));
+            _cookieService.SetTokenCookie(token.ToString());
 
             return ApiResponse.Success(PlayerData.FromPlayer(playerData));
         }

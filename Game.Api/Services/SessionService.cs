@@ -69,15 +69,17 @@ namespace Game.Api.Services
                 ?? throw new InvalidOperationException("Player data not loaded.");
         }
 
-        public void CreateSession(Player player)
+        public void CreateSession(int userId, Player player)
         {
+            UserId = userId;
             _player = player;
             PlayerState = new PlayerState { PlayerId = player.Id };
+            _sessionStore.Update(PlayerState, UserId);
         }
 
         public void SavePlayerState()
         {
-            _sessionStore.Update(PlayerState, SelectedPlayerId);
+            _sessionStore.Update(PlayerState, UserId);
         }
     }
 }

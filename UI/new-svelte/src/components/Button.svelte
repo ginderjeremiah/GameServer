@@ -1,4 +1,4 @@
-<button class="btn round-border hover-glow" disabled={loading} onclick={onClick}>
+<button class="btn round-border hover-glow" disabled={loading} onclick={onClick} type={type}>
 	{#if loading}
 		<Loading></Loading>
 	{/if}
@@ -11,10 +11,11 @@ type Props = {
 	text?: string;
 	loading?: boolean;
 	onClick: (event: MouseEvent) => void;
+  type: 'button' | 'submit' | 'reset';
 	textPadding?: 'comfortable' | 'minimal' | 'none';
 };
 
-let { text, loading = false, onClick, textPadding = 'comfortable' }: Props = $props();
+let { text, loading = false, onClick, type = 'button', textPadding = 'comfortable' }: Props = $props();
 </script>
 
 <style lang="scss">

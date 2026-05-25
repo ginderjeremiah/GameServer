@@ -1,6 +1,6 @@
-﻿using Game.Api.Sockets;
+﻿using Game.Abstractions.Infrastructure;
+using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
-using Game.Abstractions.Infrastructure;
 using System.Net.WebSockets;
 
 namespace Game.Api.Services
@@ -9,23 +9,26 @@ namespace Game.Api.Services
     {
         private readonly IPubSubService _pubSub;
         private readonly ICacheService _cache;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<SocketManagerService> _logger;
         private readonly SocketCommandFactory _commandFactory;
 
-        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, ILoggerFactory loggerFactory)
+        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory)
         {
             _pubSub = pubSub;
             _cache = cache;
+            _scopeFactory = scopeFactory;
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<SocketManagerService>();
             _commandFactory = commandFactory;
         }
 
-        public async Task<SocketContext> RegisterSocket(WebSocket socket, int playerId)
+        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService)
         {
-            var socketContext = new SocketContext(socket, playerId, _loggerFactory.CreateLogger<SocketContext>());
-            var socketHandler = new SocketHandler(socketContext, _commandFactory, _loggerFactory.CreateLogger<SocketHandler>());
+            var playerId = sessionService.SelectedPlayerId;
+            var socketContext = new SocketContext(socket, playerId, sessionService, _loggerFactory.CreateLogger<SocketContext>());
+            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>());
             var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(playerId), socketContext.SocketId);
             if (oldSocketId is not null)
             {

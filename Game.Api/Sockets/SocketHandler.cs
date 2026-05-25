@@ -3,7 +3,6 @@ using Game.Api.Services;
 using Game.Api.Sockets.Commands;
 using Game.Application;
 using Game.Core;
-using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using static System.Net.WebSockets.WebSocketState;
 
@@ -11,9 +10,10 @@ namespace Game.Api.Sockets
 {
     public class SocketHandler
     {
-        private readonly SocketCommandFactory _commandFactory;
-        private readonly ILogger<SocketHandler> _logger;
         private readonly SocketContext _context;
+        private readonly SocketCommandFactory _commandFactory;
+        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ILogger<SocketHandler> _logger;
 
         private DateTime _lastSend = DateTime.UtcNow;
         private DateTime _lastResponse = DateTime.UtcNow;
@@ -23,11 +23,12 @@ namespace Game.Api.Sockets
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, ILogger<SocketHandler> logger)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger)
         {
-            _commandFactory = commandFactory;
-            _logger = logger;
             _context = context;
+            _commandFactory = commandFactory;
+            _scopeFactory = scopeFactory;
+            _logger = logger;
         }
 
         public void Listen()
@@ -39,23 +40,21 @@ namespace Game.Api.Sockets
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
-            var (command, scope) = await _commandFactory.CreateCommand(commandInfo);
-            using (scope)
+            using var scope = _scopeFactory.CreateScope();
+            var command = await _commandFactory.CreateCommand(commandInfo, scope);
+            try
             {
-                try
+                var response = await command.ExecuteAsync(_context);
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+                await _context.SendData(response);
+            }
+            catch
+            {
+                await _context.SendData(new ApiSocketResponse
                 {
-                    var response = await command.ExecuteAsync(_context);
-                    await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-                    await _context.SendData(response);
-                }
-                catch
-                {
-                    await _context.SendData(new ApiSocketResponse
-                    {
-                        Id = commandInfo.Id,
-                        Error = "Internal Server Error"
-                    });
-                }
+                    Id = commandInfo.Id,
+                    Error = "Internal Server Error"
+                });
             }
 
             _lastSend = DateTime.UtcNow;
@@ -115,20 +114,22 @@ namespace Game.Api.Sockets
 
         private async Task HandleMessage(string message)
         {
-            if (message != "pong")
+            if (message == "pong")
             {
-                try
+                return;
+            }
+
+            try
+            {
+                var commandInfo = message.Deserialize<SocketCommandInfo>();
+                if (commandInfo is not null)
                 {
-                    var commandInfo = message.Deserialize<SocketCommandInfo>();
-                    if (commandInfo is not null)
-                    {
-                        await ExecuteCommand(commandInfo);
-                    }
+                    await ExecuteCommand(commandInfo);
                 }
-                catch (JsonException)
-                {
-                    _logger.LogWarning("Failed to deserialize socket command: {Message}", message);
-                }
+            }
+            catch (JsonException)
+            {
+                _logger.LogWarning("Failed to deserialize socket command: {Message}", message);
             }
         }
     }

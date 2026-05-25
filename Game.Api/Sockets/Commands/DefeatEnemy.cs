@@ -1,6 +1,5 @@
 ﻿using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
-using Game.Api.Services;
 using Game.Application.Services;
 using Game.Core.Battle;
 using EnemyInstanceModel = Game.Api.Models.Enemies.EnemyInstance;
@@ -9,15 +8,13 @@ namespace Game.Api.Sockets.Commands
 {
     public class DefeatEnemy : AbstractSocketCommand<DefeatEnemyResponse, EnemyInstanceModel>
     {
-        private readonly SessionService _sessionService;
         private readonly BattleService _battleService;
         private readonly ILogger<DefeatEnemy> _logger;
 
         public override string Name { get; set; } = nameof(DefeatEnemy);
 
-        public DefeatEnemy(ILogger<DefeatEnemy> logger, SessionService sessionService, BattleService battleService)
+        public DefeatEnemy(ILogger<DefeatEnemy> logger, BattleService battleService)
         {
-            _sessionService = sessionService;
             _battleService = battleService;
             _logger = logger;
         }
@@ -25,8 +22,8 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<DefeatEnemyResponse>> HandleExecuteAsync(SocketContext context)
         {
             var now = DateTime.UtcNow;
-            var state = _sessionService.PlayerState;
-            var player = await _sessionService.LoadPlayer();
+            var state = context.Session.PlayerState;
+            var player = await context.Session.LoadPlayer();
 
             if (!state.ActiveEnemyId.HasValue)
             {
@@ -48,7 +45,7 @@ namespace Game.Api.Sockets.Commands
                 _logger.LogDebug("DefeatEnemy: (currentTime: {CurrentTime}, exp: {Exp})",
                     now.ToString("O"), rewards.ExpReward);
 
-                _sessionService.SavePlayerState();
+                context.Session.SavePlayerState();
 
                 return Success(new DefeatEnemyResponse
                 {

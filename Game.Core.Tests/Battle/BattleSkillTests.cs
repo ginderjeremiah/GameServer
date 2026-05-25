@@ -141,6 +141,7 @@ namespace Game.Core.Tests.Battle
                 Inventory = new Inventory(),
                 SelectedSkills = [],
                 Skills = [],
+                LogPreferences = [],
             };
             return new Battler(player);
         }

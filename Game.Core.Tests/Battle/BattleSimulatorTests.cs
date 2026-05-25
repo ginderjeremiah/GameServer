@@ -117,6 +117,7 @@ namespace Game.Core.Tests.Battle
                 Inventory = new Inventory(),
                 SelectedSkills = defaultSkills,
                 Skills = defaultSkills,
+                LogPreferences = [],
             };
         }
 

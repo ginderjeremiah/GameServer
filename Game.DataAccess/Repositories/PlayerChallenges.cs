@@ -37,7 +37,6 @@ namespace Game.DataAccess.Repositories
                 entity.Progress = progress;
             }
 
-            await _context.SaveChangesAsync();
         }
 
         public async Task CompleteChallenge(int playerId, int challengeId)
@@ -63,7 +62,6 @@ namespace Game.DataAccess.Repositories
                 entity.CompletedAt = DateTime.UtcNow;
             }
 
-            await _context.SaveChangesAsync();
         }
     }
 }

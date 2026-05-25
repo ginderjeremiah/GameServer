@@ -134,7 +134,7 @@ export class InventoryManager {
 
 		// Re-fetch player data to get updated item state
 		// (or update locally — for now just log success)
-		logMessage(ELogType.Inventory, 'Modifier applied.');
+		logMessage(ELogType.ItemFound, 'Modifier applied.');
 
 		return true;
 	}
@@ -146,7 +146,7 @@ export class InventoryManager {
 		const response = await req.post({ itemId, itemModSlotId });
 		if (response.error) return false;
 
-		logMessage(ELogType.Inventory, 'Modifier removed.');
+		logMessage(ELogType.ItemFound, 'Modifier removed.');
 
 		return true;
 	}
@@ -155,13 +155,13 @@ export class InventoryManager {
 	public addUnlockedItem(invItem: IInventoryItem) {
 		const item = newItem(invItem);
 		this.unlockedItems.set(invItem.itemId, item);
-		logMessage(ELogType.Inventory, `Unlocked: ${item.name}!`);
+		logMessage(ELogType.ItemFound, `Unlocked: ${item.name}!`);
 	}
 
 	/** Called when the player unlocks a new mod from a challenge reward. */
 	public addUnlockedMod(modId: number) {
 		this.unlockedMods.add(modId);
-		logMessage(ELogType.Inventory, 'New modifier unlocked!');
+		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
 	}
 }
 

@@ -220,9 +220,10 @@ namespace Game.Application.Tests.Services
             MakeService(CoreEnemy? domainEnemy = null, EntityZone? zone = null)
         {
             var repo = new FakePlayerRepository();
-            var world = new FakeWorldRepository(domainEnemy, zone);
+            var enemies = new FakeEnemies(domainEnemy);
+            var zones = new FakeZones(zone);
             var dispatcher = new FakeDispatcher();
-            var service = new BattleService(repo, world, dispatcher);
+            var service = new BattleService(repo, enemies, zones, dispatcher);
             return (service, repo, dispatcher);
         }
 
@@ -238,6 +239,7 @@ namespace Game.Application.Tests.Services
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
+            LogPreferences = [],
         };
 
         private static Player MakeBattleReadyPlayer() => new()
@@ -268,6 +270,7 @@ namespace Game.Application.Tests.Services
                 },
             ],
             Skills = [],
+            LogPreferences = [],
         };
 
         private static CoreEnemy MakeEnemy(int id, int level) => new()

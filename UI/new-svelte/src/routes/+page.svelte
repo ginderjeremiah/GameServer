@@ -1,28 +1,30 @@
 <h1 class="login-title">Login</h1>
 <div class="center-content">
 	<div class="login-container round-border">
-		<div class="login-subcontainer">
-			<TextInput bind:value={username} type="text" name="username" label="Username" />
-		</div>
-		<div class="login-subcontainer">
-			<TextInput bind:value={password} type="password" name="password" label="Password" />
-		</div>
-		{#if errorReason}
-			<div class="login-subcontainer">
-				{#if errorType === 'login'}
-					<span class="error-message">An error occured while attempting to login.</span>
-				{:else}
-					<span class="error-message">Could not create account.</span>
-				{/if}
-				<span class="error-message">{errorReason}</span>
-			</div>
-		{/if}
-		<div class="login-subcontainer">
-			<Button onClick={attemptLogin} text="Login" loading={loginLoading} />
-		</div>
-		<div class="login-subcontainer">
-			<Button onClick={createAccount} text="Create Account" loading={loginLoading} />
-		</div>
+    <form onsubmit={preventDefault(attemptLogin)}>
+      <div class="login-subcontainer">
+        <TextInput bind:value={username} type="text" name="username" label="Username" />
+      </div>
+      <div class="login-subcontainer">
+        <TextInput bind:value={password} type="password" name="password" label="Password" />
+      </div>
+      {#if errorReason}
+        <div class="login-subcontainer">
+          {#if errorType === 'login'}
+            <span class="error-message">An error occurred while attempting to login.</span>
+          {:else}
+            <span class="error-message">Could not create account.</span>
+          {/if}
+          <span class="error-message">{errorReason}</span>
+        </div>
+      {/if}
+      <div class="login-subcontainer">
+        <Button onClick={attemptLogin} type="submit" text="Login" loading={loginLoading} />
+      </div>
+      <div class="login-subcontainer">
+        <Button onClick={createAccount} type="button" text="Create Account" loading={loginLoading} />
+      </div>
+    </form>
 	</div>
 </div>
 
@@ -32,6 +34,7 @@ import { routeTo } from '$lib/common';
 import { Button, TextInput } from '$components';
 import { onMount } from 'svelte';
 import { playerManager } from '$lib/engine';
+import { preventDefault } from '$lib/common/prevent-default';
 
 type ErrorType = 'login' | 'create-account';
 

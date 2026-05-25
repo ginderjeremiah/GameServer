@@ -4,24 +4,6 @@ using CoreEnemy = Game.Core.Enemies.Enemy;
 
 namespace Game.Application.Tests.Fakes
 {
-    /// <summary>
-    /// In-memory fake for <see cref="IWorldRepository"/> used in unit tests.
-    /// </summary>
-    internal class FakeWorldRepository : IWorldRepository
-    {
-        private readonly FakeEnemies _enemies;
-        private readonly FakeZones _zones;
-
-        public FakeWorldRepository(CoreEnemy? domainEnemy = null, Zone? zone = null)
-        {
-            _enemies = new FakeEnemies(domainEnemy);
-            _zones = new FakeZones(zone);
-        }
-
-        public IEnemies Enemies => _enemies;
-        public IZones Zones => _zones;
-    }
-
     internal class FakeEnemies(CoreEnemy? domainEnemy) : IEnemies
     {
         private readonly CoreEnemy? _domainEnemy = domainEnemy;

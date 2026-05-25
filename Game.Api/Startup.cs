@@ -47,7 +47,7 @@ namespace Game.Api
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
-                .AddRepositoryManager()
+                .AddDataAccess()
                 .AddScoped<SessionService>()
                 .AddScoped<CookieService>()
                 .AddTransient<SocketManagerService>()

@@ -6,17 +6,15 @@ using Game.Core.Players;
 namespace Game.Application.Services
 {
     public class ChallengeService(
-        IPlayerRepository playerRepo,
         IChallenges challengeRepo,
         IPlayerChallenges playerChallengeRepo)
     {
-        private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IChallenges _challengeRepo = challengeRepo;
         private readonly IPlayerChallenges _playerChallengeRepo = playerChallengeRepo;
 
         /// <summary>
         /// Checks all challenges of the given type and updates progress for the player.
-        /// Returns a list of challenge IDs that were newly completed.
+        /// Unlocks rewards on the domain object (caller is responsible for SavePlayer).
         /// </summary>
         public async Task<List<CompletedChallengeInfo>> CheckAndUpdateProgress(
             Player player,
@@ -48,7 +46,6 @@ namespace Game.Application.Services
                 if (completedSet.Contains(challenge.Id))
                     continue;
 
-                // Check if this challenge matches the entity (or is a global challenge with no target)
                 if (challenge.TargetEntityId.HasValue && challenge.TargetEntityId.Value != entityId)
                     continue;
 
@@ -59,17 +56,14 @@ namespace Game.Application.Services
                 {
                     await _playerChallengeRepo.CompleteChallenge(player.Id, challenge.Id);
 
-                    // Unlock the rewards
                     if (challenge.RewardItemId.HasValue)
                     {
                         player.UnlockItem(challenge.RewardItemId.Value);
-                        await _playerRepo.UnlockItem(player.Id, challenge.RewardItemId.Value);
                     }
 
                     if (challenge.RewardItemModId.HasValue)
                     {
                         player.UnlockMod(challenge.RewardItemModId.Value);
-                        await _playerRepo.UnlockMod(player.Id, challenge.RewardItemModId.Value);
                     }
 
                     completed.Add(new CompletedChallengeInfo

@@ -105,6 +105,7 @@ namespace Game.Core.Players.Inventories
 
             unlocked.AppliedMods.Add(new AppliedModSlot
             {
+                ItemModId = itemModId,
                 ItemModSlotId = itemModSlotId,
                 ItemMod = mod,
             });

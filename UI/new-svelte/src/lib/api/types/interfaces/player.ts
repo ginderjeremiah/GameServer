@@ -1,8 +1,13 @@
-import type { ELogType, IBattlerAttribute } from "../"
+import type { ELogType, IBattlerAttribute, IInventoryData } from "../"
 
 export interface ILoginCredentials {
 	username: string;
 	password: string;
+};
+
+export interface ILogPreference {
+	id: ELogType;
+	enabled: boolean;
 };
 
 export interface IPlayerData {
@@ -14,9 +19,6 @@ export interface IPlayerData {
 	currentZone: number;
 	statPointsGained: number;
 	statPointsUsed: number;
-};
-
-export interface ILogPreference {
-	id: ELogType;
-	enabled: boolean;
+	logPreferences: ILogPreference[];
+	inventoryData: IInventoryData;
 };

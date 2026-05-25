@@ -40,7 +40,6 @@ namespace Game.DataAccess.Repositories
                 entity.Value += amount;
             }
 
-            await _context.SaveChangesAsync();
             return entity.Value;
         }
     }

@@ -24,8 +24,6 @@
 {/if}
 
 <script lang="ts">
-import { untrack } from 'svelte';
-
 const { hideOverlay = false, loading = true, minimumLoadMs = 0 } = $props();
 
 let lockSpinner = performance.now();
