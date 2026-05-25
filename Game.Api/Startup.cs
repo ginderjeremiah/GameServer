@@ -52,6 +52,7 @@ namespace Game.Api
                 .AddScoped<CookieService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
+                .AddSingleton<ApiCodeGenerator>()
                 // Application services
                 .AddScoped<BattleService>()
                 .AddScoped<PlayerService>()
@@ -75,7 +76,8 @@ namespace Game.Api
             {
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
                 var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
-                ApiCodeGenerator.GenerateApiCode(typeof(Startup).Assembly, targetDir);
+                var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
+                codeGen.GenerateCode(typeof(Startup).Assembly, targetDir);
 
                 // GameContext is Scoped, so the migrator must be resolved from a scope.
                 using var migrationScope = app.Services.CreateScope();

@@ -1,12 +1,7 @@
-import { apiSocket, ELogSetting, IApiSocketResponse, IEnemyInstance } from '$lib/api';
+import { apiSocket, ELogType, IApiSocketResponse, IEnemyInstance } from '$lib/api';
 import { Action, createHook, delay } from '$lib/common';
 import { staticData } from '$stores';
-import {
-	battleEngine,
-	BattleStage,
-	onBattleStageChanged,
-	playerManager
-} from '../';
+import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
 import { logMessage } from '../log';
 
 const newEnemyLoadedHook = createHook<[IEnemyInstance]>();
@@ -59,7 +54,7 @@ export class EnemyManager {
 	private async watchBattleStage(stage: BattleStage) {
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
 			logMessage(
-				ELogSetting.EnemyDefeated,
+				ELogType.EnemyDefeated,
 				staticData.enemies[this.currentEnemy.id].name + ' was defeated!'
 			);
 
@@ -69,7 +64,7 @@ export class EnemyManager {
 				playerManager.grantExp(rewards.expReward);
 			} else {
 				logMessage(
-					ELogSetting.Debug,
+					ELogType.Debug,
 					'There was an error defeating the enemy: ' + defeatResponse.error
 				);
 			}

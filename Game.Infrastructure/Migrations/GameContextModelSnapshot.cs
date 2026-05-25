@@ -45,7 +45,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemModSlotId");
 
-                    b.ToTable("AppliedMods");
+                    b.ToTable("AppliedMods", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
@@ -66,7 +66,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Attributes");
+                    b.ToTable("Attributes", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
@@ -89,7 +89,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("AttributeDistributions");
+                    b.ToTable("AttributeDistributions", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Challenge", b =>
@@ -135,7 +135,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("RewardItemModId");
 
-                    b.ToTable("Challenges");
+                    b.ToTable("Challenges", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
@@ -157,7 +157,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Enemies");
+                    b.ToTable("Enemies", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
@@ -172,7 +172,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("EnemySkills");
+                    b.ToTable("EnemySkills", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.EquipmentSlot", b =>
@@ -192,7 +192,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemCategoryId");
 
-                    b.ToTable("EquipmentSlots");
+                    b.ToTable("EquipmentSlots", (string)null);
 
                     b.HasData(
                         new
@@ -265,7 +265,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemCategoryId");
 
-                    b.ToTable("Items");
+                    b.ToTable("Items", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
@@ -284,7 +284,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("ItemAttributes");
+                    b.ToTable("ItemAttributes", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemCategory", b =>
@@ -299,7 +299,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ItemCategories");
+                    b.ToTable("ItemCategories", (string)null);
 
                     b.HasData(
                         new
@@ -365,7 +365,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemModTypeId");
 
-                    b.ToTable("ItemMods");
+                    b.ToTable("ItemMods", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemModAttribute", b =>
@@ -384,7 +384,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("ItemModAttributes");
+                    b.ToTable("ItemModAttributes", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemModSlot", b =>
@@ -410,7 +410,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemModSlotTypeId");
 
-                    b.ToTable("ItemModSlots");
+                    b.ToTable("ItemModSlots", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemModType", b =>
@@ -425,7 +425,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ItemModTypes");
+                    b.ToTable("ItemModTypes", (string)null);
 
                     b.HasData(
                         new
@@ -460,7 +460,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("LogSettingId");
 
-                    b.ToTable("LogPreferences");
+                    b.ToTable("LogPreferences", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.LogSetting", b =>
@@ -478,7 +478,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LogSettings");
+                    b.ToTable("LogSettings", (string)null);
 
                     b.HasData(
                         new
@@ -557,7 +557,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Players");
+                    b.ToTable("Players", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.PlayerAttribute", b =>
@@ -576,7 +576,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("PlayerAttributes");
+                    b.ToTable("PlayerAttributes", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.PlayerChallenge", b =>
@@ -600,7 +600,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ChallengeId");
 
-                    b.ToTable("PlayerChallenges");
+                    b.ToTable("PlayerChallenges", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.PlayerSkill", b =>
@@ -618,7 +618,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("PlayerSkills");
+                    b.ToTable("PlayerSkills", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.PlayerStatistic", b =>
@@ -637,7 +637,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("PlayerId", "StatisticTypeId", "EntityId");
 
-                    b.ToTable("PlayerStatistics");
+                    b.ToTable("PlayerStatistics", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
@@ -675,7 +675,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Skills");
+                    b.ToTable("Skills", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
@@ -694,7 +694,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("AttributeId");
 
-                    b.ToTable("SkillDamageMultipliers");
+                    b.ToTable("SkillDamageMultipliers", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
@@ -717,7 +717,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("TagCategoryId");
 
-                    b.ToTable("Tags");
+                    b.ToTable("Tags", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>
@@ -732,7 +732,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TagCategories");
+                    b.ToTable("TagCategories", (string)null);
 
                     b.HasData(
                         new
@@ -787,7 +787,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemId");
 
-                    b.ToTable("UnlockedItems");
+                    b.ToTable("UnlockedItems", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.UnlockedMod", b =>
@@ -802,7 +802,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("ItemModId");
 
-                    b.ToTable("UnlockedMods");
+                    b.ToTable("UnlockedMods", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.User", b =>
@@ -831,7 +831,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Zone", b =>
@@ -866,7 +866,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Zones");
+                    b.ToTable("Zones", (string)null);
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ZoneEnemy", b =>
@@ -884,7 +884,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasIndex("EnemyId");
 
-                    b.ToTable("ZoneEnemies");
+                    b.ToTable("ZoneEnemies", (string)null);
                 });
 
             modelBuilder.Entity("Game.Core.Attributes.Attribute", b =>
@@ -903,7 +903,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Attribute");
+                    b.ToTable("Attribute", (string)null);
 
                     b.HasData(
                         new

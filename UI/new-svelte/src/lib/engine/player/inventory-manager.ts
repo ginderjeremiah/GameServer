@@ -1,10 +1,4 @@
-import {
-	IInventoryItem,
-	IBattlerAttribute,
-	ELogSetting,
-	EItemCategory,
-	ApiRequest,
-} from '$lib/api';
+import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, ApiRequest } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { Item, newItem } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
@@ -75,9 +69,7 @@ export class InventoryManager {
 	}
 
 	public get selectedItem(): Item | undefined {
-		return this.selectedItemId != null
-			? this.unlockedItems.get(this.selectedItemId)
-			: undefined;
+		return this.selectedItemId != null ? this.unlockedItems.get(this.selectedItemId) : undefined;
 	}
 
 	public selectItem(itemId: number) {
@@ -142,7 +134,7 @@ export class InventoryManager {
 
 		// Re-fetch player data to get updated item state
 		// (or update locally — for now just log success)
-		logMessage(ELogSetting.Inventory, 'Modifier applied.');
+		logMessage(ELogType.Inventory, 'Modifier applied.');
 
 		return true;
 	}
@@ -154,7 +146,7 @@ export class InventoryManager {
 		const response = await req.post({ itemId, itemModSlotId });
 		if (response.error) return false;
 
-		logMessage(ELogSetting.Inventory, 'Modifier removed.');
+		logMessage(ELogType.Inventory, 'Modifier removed.');
 
 		return true;
 	}
@@ -163,13 +155,13 @@ export class InventoryManager {
 	public addUnlockedItem(invItem: IInventoryItem) {
 		const item = newItem(invItem);
 		this.unlockedItems.set(invItem.itemId, item);
-		logMessage(ELogSetting.Inventory, `Unlocked: ${item.name}!`);
+		logMessage(ELogType.Inventory, `Unlocked: ${item.name}!`);
 	}
 
 	/** Called when the player unlocks a new mod from a challenge reward. */
 	public addUnlockedMod(modId: number) {
 		this.unlockedMods.add(modId);
-		logMessage(ELogSetting.Inventory, 'New modifier unlocked!');
+		logMessage(ELogType.Inventory, 'New modifier unlocked!');
 	}
 }
 

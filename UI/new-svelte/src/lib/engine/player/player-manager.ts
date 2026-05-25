@@ -1,10 +1,4 @@
-import {
-	ELogSetting,
-	IBattlerAttribute,
-	IInventoryData,
-	ILogPreference,
-	IPlayerData
-} from '$lib/api';
+import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData } from '$lib/api';
 import { formatNum } from '$lib/common';
 import { logMessage } from '../log';
 
@@ -21,7 +15,7 @@ export class PlayerManager implements IPlayerData {
 	public logPreferences: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
-		unlockedMods: [],
+		unlockedMods: []
 	};
 
 	public initialize(data: IPlayerData) {
@@ -39,7 +33,7 @@ export class PlayerManager implements IPlayerData {
 	}
 
 	public grantExp(exp: number) {
-		logMessage(ELogSetting.Exp, `Earned ${formatNum(exp)} exp.`);
+		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
 		if (this.exp >= this.level * 100) {
 			this.levelUp();
@@ -50,7 +44,7 @@ export class PlayerManager implements IPlayerData {
 		this.exp -= this.level * 100;
 		this.level++;
 		this.statPointsGained += 6;
-		logMessage(ELogSetting.LevelUp, 'Congratulations, you leveled up!');
-		logMessage(ELogSetting.LevelUp, `You are now level ${this.level}.`);
+		logMessage(ELogType.LevelUp, 'Congratulations, you leveled up!');
+		logMessage(ELogType.LevelUp, `You are now level ${this.level}.`);
 	}
 }

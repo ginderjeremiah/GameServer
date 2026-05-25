@@ -18,7 +18,7 @@ namespace Game.Api.CodeGen.Data
             Endpoints = GetEndpointMethodsInfo(controller).Select(GenerateEndpointMetadata).ToList();
         }
 
-        private IEnumerable<MethodInfo> GetEndpointMethodsInfo(Type controller)
+        private static IEnumerable<MethodInfo> GetEndpointMethodsInfo(Type controller)
         {
             var endpointMethods = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance);
             return endpointMethods

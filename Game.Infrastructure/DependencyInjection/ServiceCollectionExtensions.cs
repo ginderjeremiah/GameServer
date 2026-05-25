@@ -21,7 +21,8 @@ namespace Game.Infrastructure.DependencyInjection
             return services.AddScoped(sp =>
             {
                 var options = sp.GetRequiredService<InfrastructureOptions>();
-                return GameContextFactory.GetGameContext(options);
+                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                return GameContextFactory.GetGameContext(options, loggerFactory);
             });
         }
 

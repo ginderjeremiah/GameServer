@@ -3,19 +3,32 @@ using Game.Api.CodeGen.Writers;
 using Game.Api.Sockets.Commands;
 using Game.Core;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace Game.Api.CodeGen
 {
-    public static class ApiCodeGenerator
+    public class ApiCodeGenerator
     {
-        public static void GenerateApiCode(Assembly assembly, string targetDir)
+        private readonly ILogger<ApiCodeGenerator> _logger;
+
+        public ApiCodeGenerator(ILogger<ApiCodeGenerator> logger)
         {
+            _logger = logger;
+        }
+
+        public void GenerateCode(Assembly assembly, string targetDir)
+        {
+            var start = Stopwatch.GetTimestamp();
+            _logger.LogDebug($"Beginning code generation.");
+
             var controllerTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(ControllerBase)));
             var endpointMetadata = controllerTypes.SelectMany(c => new ControllerMetadataExtractor(c).Endpoints).ToList();
 
             var socketCommandTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(AbstractSocketCommand)) && !type.IsAbstract);
             var socketMetadata = socketCommandTypes.Select(sc => new SocketCommandMetadata(sc)).ToList();
+
+            _logger.LogDebug("Finished analyzing types. Elapsed time {ElapsedTime}", Stopwatch.GetElapsedTime(start));
 
             var apiMapWriter = new ApiMapWriter(targetDir);
             apiMapWriter.WriteApiMap(endpointMetadata);
@@ -28,6 +41,8 @@ namespace Game.Api.CodeGen
 
             var apiInterfaceWriter = new ApiInterfaceWriter(targetDir);
             apiInterfaceWriter.WriteApiInterfaces(apiTypeDescriptors.Concat(socketTypeDescriptors));
+
+            _logger.LogDebug("Finished generating typescript interfaces. Elapsed time {ElapsedTime}", Stopwatch.GetElapsedTime(start));
         }
     }
 }

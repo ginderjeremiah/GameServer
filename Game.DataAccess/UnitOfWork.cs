@@ -24,11 +24,20 @@ namespace Game.DataAccess
                     }
                 }
 
-                var fkProps = tempProps.Where(p => p.Metadata.IsForeignKey() && p.Metadata.ClrType == typeof(int));
-                foreach (var fkProp in fkProps)
+                var fkProps = tempProps.Where(p => p.Metadata.IsForeignKey() && p.Metadata.ClrType == typeof(int)).ToList();
+                if (fkProps.Count != 0)
                 {
-                    fkProp.IsTemporary = false;
-                    fkProp.CurrentValue = 0;
+                    foreach (var fkProp in fkProps)
+                    {
+                        var navigation = fkProp.Metadata.GetContainingForeignKeys()
+                            .FirstOrDefault(fk => fk.DeclaringEntityType == fkProp.Metadata.DeclaringType);
+
+                        if (navigation is not null && navigation.PrincipalEntityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
+                        {
+                            fkProp.IsTemporary = false;
+                            fkProp.CurrentValue = 0;
+                        }
+                    }
                 }
             }
 

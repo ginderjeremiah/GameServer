@@ -5,13 +5,13 @@ namespace Game.Api.CodeGen
 {
     public class CodeGenTypeDescriptor
     {
-        public string? Name { get; set; }
-        public Type UnderlyingType { get; set; }
-        public bool HasDefault { get; set; } = false;
-        public bool IsNullable { get; set; }
-        public List<CodeGenTypeDescriptor> GenericArgumentDescriptors { get; set; }
-        public List<CodeGenTypeDescriptor> PropertyDescriptors { get; set; }
-        public int GenericParameterPosition { get; set; } = -1;
+        public string? Name { get; }
+        public Type UnderlyingType { get; }
+        public bool HasDefault { get; } = false;
+        public bool IsNullable { get; }
+        public List<CodeGenTypeDescriptor> GenericArgumentDescriptors { get; }
+        public List<CodeGenTypeDescriptor> PropertyDescriptors { get; }
+        public int GenericParameterPosition { get; } = -1;
 
         public bool NeedsInterface => UnderlyingType.NeedsInterface();
         public string TypeName => IsGeneric ? UnderlyingType.Name[..UnderlyingType.Name.IndexOf('`')] : UnderlyingType.Name;

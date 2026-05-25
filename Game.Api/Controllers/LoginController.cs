@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Entities;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
@@ -6,10 +7,9 @@ using Game.Application;
 using Game.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PlayerAttributeEntity = Game.Abstractions.Entities.PlayerAttribute;
 using PlayerEntity = Game.Abstractions.Entities.Player;
 using PlayerSkillEntity = Game.Abstractions.Entities.PlayerSkill;
-using PlayerAttributeEntity = Game.Abstractions.Entities.PlayerAttribute;
-using LogPreferenceEntity = Game.Abstractions.Entities.LogPreference;
 
 namespace Game.Api.Controllers
 {
@@ -47,15 +47,23 @@ namespace Game.Api.Controllers
             }
 
             // TODO: validate password hash against user entity
-            var player = await _players.GetPlayer(user.Id);
+
+            var player = user.Players.FirstOrDefault();
             if (player is null)
+            {
+                return ApiResponse.Error("User has no player characters");
+            }
+
+            var playerId = player.Id;
+            var playerData = await _players.GetPlayer(playerId);
+            if (playerData is null)
             {
                 return ApiResponse.Error("Player data not found");
             }
 
-            _sessionService.CreateSession(player);
+            _sessionService.CreateSession(playerData);
 
-            return ApiResponse.Success(PlayerData.FromPlayer(player));
+            return ApiResponse.Success(PlayerData.FromPlayer(playerData));
         }
 
         [AllowAnonymous]
@@ -70,8 +78,19 @@ namespace Game.Api.Controllers
 
             var salt = Guid.NewGuid();
             var passHash = creds.Password.Hash(salt.ToString());
+            var user = new User
+            {
+                Username = creds.Username,
+                PassHash = passHash,
+                Salt = salt,
+                LastLogin = DateTime.UtcNow,
+            };
+
+            _entityStore.Insert(user);
+
             var playerEntity = new PlayerEntity
             {
+                User = user,
                 Name = creds.Username,
                 Level = 1,
                 Exp = 0,
@@ -79,34 +98,31 @@ namespace Game.Api.Controllers
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
             };
-            _entityStore.Insert(playerEntity);
-
-            // Commit now so EF Core generates playerEntity.Id before we attach child records.
-            await _unitOfWork.CommitAsync();
 
             playerEntity.PlayerSkills = Enumerable.Range(0, 3).Select(id => new PlayerSkillEntity
             {
-                PlayerId = playerEntity.Id,
+                Player = playerEntity,
                 Selected = true,
                 SkillId = id,
             }).ToList();
+
             playerEntity.PlayerAttributes = Enumerable.Range(0, 6).Select(id => new PlayerAttributeEntity
             {
-                PlayerId = playerEntity.Id,
+                Player = playerEntity,
                 AttributeId = id,
                 Amount = 5m
             }).ToList();
+
             playerEntity.LogPreferences = [
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Damage, Enabled = false, },
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Debug, Enabled = false, },
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.Exp, Enabled = true, },
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.ItemFound, Enabled = true, },
-                new() { PlayerId = playerEntity.Id, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.Damage, Enabled = false, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.Debug, Enabled = false, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.Exp, Enabled = true, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.ItemFound, Enabled = true, },
+                new() { Player = playerEntity, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
             ];
 
-            _entityStore.Update(playerEntity);
-            // CommitFilter commits the child records at end of request.
+            _entityStore.Insert(playerEntity);
 
             return ApiResponse.Success();
         }

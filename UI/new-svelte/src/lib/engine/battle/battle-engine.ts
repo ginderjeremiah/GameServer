@@ -1,6 +1,6 @@
 import { Battler } from '$lib/battle';
 import { staticData } from '$stores';
-import { ELogSetting, IEnemyInstance } from '$lib/api';
+import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
 import { formatNum, createHook, Action } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
@@ -100,7 +100,7 @@ export class BattleEngine {
 				const dmg = skill.calculateDamage();
 				let finalDmg = this.enemy.takeDamage(dmg);
 				logMessage(
-					ELogSetting.Damage,
+					ELogType.Damage,
 					`You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`
 				);
 			});
@@ -110,7 +110,7 @@ export class BattleEngine {
 					const dmg = skill.calculateDamage();
 					let finalDmg = this.player.takeDamage(dmg);
 					logMessage(
-						ELogSetting.Damage,
+						ELogType.Damage,
 						`${this.enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`
 					);
 				});
@@ -119,7 +119,7 @@ export class BattleEngine {
 				this.setBattleStage(Victorious);
 			} else if (this.player.isDead) {
 				this.setBattleStage(Defeated);
-				logMessage(ELogSetting.EnemyDefeated, "You've been defeated!");
+				logMessage(ELogType.EnemyDefeated, "You've been defeated!");
 			}
 		}
 		this.timeElapsed += timeDelta;

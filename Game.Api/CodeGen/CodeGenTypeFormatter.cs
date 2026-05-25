@@ -17,6 +17,11 @@ namespace Game.Api.CodeGen
         {
             if (descriptor.UnderlyingType.IsEnumerable())
             {
+                if (descriptor.UnderlyingType.IsDictionary())
+                {
+                    return GetImportText(descriptor.GenericArgumentDescriptors[1]);
+                }
+
                 return GetImportText(descriptor.GenericArgumentDescriptors[0]);
             }
             else if (descriptor.IsEnum)
@@ -63,6 +68,15 @@ namespace Game.Api.CodeGen
             }
             else if (type.IsEnumerable())
             {
+                if (type.IsDictionary())
+                {
+                    var keyParameter = descriptor.GenericArgumentDescriptors[0];
+                    var valueParameter = descriptor.GenericArgumentDescriptors[1];
+                    var keyText = GetTypeText(keyParameter);
+                    var valueText = valueParameter.IsNullable ? $"{GetTypeText(valueParameter)} | undefined" : GetTypeText(valueParameter);
+                    return $"Record<{keyText}, {valueText}>";
+                }
+
                 var genericParameter = descriptor.GenericArgumentDescriptors[0];
                 var typeText = genericParameter.IsNullable ? $"({GetTypeText(genericParameter)} | undefined)" : GetTypeText(genericParameter);
                 return $"{typeText}[]";

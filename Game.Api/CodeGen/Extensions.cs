@@ -20,12 +20,30 @@ namespace Game.Api.CodeGen
         {
             if (type.IsEnumerable())
             {
+                if (type.IsDictionary())
+                {
+                    return type.GetGenericArguments()[1].NeedsInterface();
+                }
+
                 return type.GetGenericArguments()[0].NeedsInterface();
             }
             else
             {
-                return type.IsEnum || (type.IsClass && !type.IsGenericParameter && type != typeof(string));
+                return type.IsEnum || IsClassThatNeedsInterface(type) || IsStructThatNeedsInterface(type);
             }
+        }
+
+        internal static bool IsDictionary(this Type type)
+        {
+            if (type.IsGenericType && type.GenericTypeArguments.Length == 2)
+            {
+                var genericDef = type.GetGenericTypeDefinition();
+                return genericDef == typeof(Dictionary<,>)
+                    || genericDef == typeof(IDictionary<,>)
+                    || genericDef == typeof(IReadOnlyDictionary<,>);
+            }
+
+            return false;
         }
 
         internal static bool IsEnumerable(this Type type)
@@ -44,6 +62,16 @@ namespace Game.Api.CodeGen
             }
 
             return false;
+        }
+
+        private static bool IsClassThatNeedsInterface(Type type)
+        {
+            return type.IsClass && !type.IsGenericParameter && type != typeof(string);
+        }
+
+        private static bool IsStructThatNeedsInterface(Type type)
+        {
+            return type.IsValueType && !type.IsPrimitive && type != typeof(DateTime) && type != typeof(decimal);
         }
     }
 }

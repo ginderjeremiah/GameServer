@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class Attribute
+    public partial class Attribute : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public string Name { get; set; }

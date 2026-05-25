@@ -16,7 +16,7 @@ namespace Game.DataAccess.Repositories
 
         public async Task<User?> GetUser(string username)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            return await _context.Users.Include(u => u.Players).FirstOrDefaultAsync(u => u.Username == username);
         }
 
         public async Task<bool> CheckIfUsernameExists(string username)
