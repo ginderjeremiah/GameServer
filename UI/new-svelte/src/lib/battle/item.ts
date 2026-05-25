@@ -1,4 +1,4 @@
-import { IItem, IInventoryItem, IAppliedMod } from '$lib/api';
+import { IItem, IInventoryItem } from '$lib/api';
 import { ItemMod, newItemMod } from './item-mod';
 import { BattleAttributes } from './battle-attributes';
 import { staticData } from '$stores';
@@ -22,6 +22,6 @@ export const newItem = (invItem: IInventoryItem): Item => {
 		equipped: invItem.equipped,
 		equipmentSlotId: invItem.equipmentSlotId,
 		appliedMods,
-		totalAttributes,
+		totalAttributes
 	} satisfies Item;
 };

@@ -1,6 +1,7 @@
 <div
 	class="sidebar"
 	class:expanded
+  role="complementary"
 	onmouseenter={() => hovering = true}
 	onmouseleave={() => hovering = false}
 >

@@ -46,10 +46,10 @@
 					</div>
 					<div class="tt-mods-list">
 						{#each appliedMods as mod}
-							<div class="tt-mod-tile" style:border-left-color={modTypeAccent(mod.modType)}>
+							<div class="tt-mod-tile" style:border-left-color={modTypeAccent(mod.itemModTypeId)}>
 								<div class="tt-mod-header">
 									<span class="tt-mod-name">{mod.name}</span>
-									<span class="tt-mod-type" style:color={modTypeAccent(mod.modType)}>{modTypeLabel(mod.modType)}</span>
+									<span class="tt-mod-type" style:color={modTypeAccent(mod.itemModTypeId)}>{modTypeLabel(mod.itemModTypeId)}</span>
 								</div>
 								<div class="tt-mod-desc">{mod.description}</div>
 							</div>

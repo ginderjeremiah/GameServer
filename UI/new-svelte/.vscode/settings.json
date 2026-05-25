@@ -2,6 +2,10 @@
   "cSpell.words": [
     "Cooldown",
     "Statified",
-    "statify"
-  ]
+    "statify",
+    "Unequip"
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "dotnet test": true
+  }
 }

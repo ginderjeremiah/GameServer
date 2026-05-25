@@ -81,9 +81,7 @@ describe('InventoryManager', () => {
 		it('loads unlocked items from player inventory data', () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
-			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: false, equipmentSlotId: null, appliedMods: [] }
-			];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
 			mockInventoryData.unlockedMods = [10];
 
 			manager.initialize();
@@ -107,9 +105,7 @@ describe('InventoryManager', () => {
 
 		it('clears previous state on re-initialize', () => {
 			mockItems[1] = makeItem(1);
-			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: false, equipmentSlotId: null, appliedMods: [] }
-			];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
 			manager.initialize();
 
 			mockInventoryData.unlockedItems = [];
@@ -126,8 +122,8 @@ describe('InventoryManager', () => {
 			mockItems[1] = makeItem(1);
 			mockItems[2] = makeItem(2);
 			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: false, equipmentSlotId: null, appliedMods: [] },
-				{ itemId: 2, equipped: false, equipmentSlotId: null, appliedMods: [] }
+				{ itemId: 1, equipped: false, appliedMods: [] },
+				{ itemId: 2, equipped: false, appliedMods: [] }
 			];
 
 			manager.initialize();
@@ -162,9 +158,7 @@ describe('InventoryManager', () => {
 
 		it('returns the selected item', () => {
 			mockItems[1] = makeItem(1);
-			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: false, equipmentSlotId: null, appliedMods: [] }
-			];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
 			manager.initialize();
 
 			manager.selectItem(1);
@@ -180,12 +174,14 @@ describe('InventoryManager', () => {
 			manager.addUnlockedItem({
 				itemId: 3,
 				equipped: false,
-				equipmentSlotId: null,
 				appliedMods: []
 			});
 
 			expect(manager.unlockedItems.has(3)).toBe(true);
-			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, expect.stringContaining('Item 3'));
+			expect(logMessage).toHaveBeenCalledWith(
+				ELogType.ItemFound,
+				expect.stringContaining('Item 3')
+			);
 		});
 	});
 

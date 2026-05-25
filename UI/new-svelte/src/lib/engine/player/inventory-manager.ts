@@ -78,11 +78,15 @@ export class InventoryManager {
 
 	public async equipItem(itemId: number, slotId: EEquipmentSlot) {
 		const item = this.unlockedItems.get(itemId);
-		if (!item) return false;
+		if (!item) {
+			return false;
+		}
 
 		const req = new ApiRequest('Player/EquipItem');
 		const response = await req.post({ itemId, equipmentSlotId: slotId });
-		if (response.error) return false;
+		if (response.error) {
+			return false;
+		}
 
 		// Unequip from any current slot
 		for (let i = 0; i < this.equippedSlots.length; i++) {
@@ -115,7 +119,9 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/UnequipItem');
 		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
-		if (response.error) return false;
+		if (response.error) {
+			return false;
+		}
 
 		item.equipped = false;
 		item.equipmentSlotId = undefined;
@@ -125,12 +131,18 @@ export class InventoryManager {
 	}
 
 	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
-		if (!this.unlockedMods.has(itemModId)) return false;
-		if (!this.unlockedItems.has(itemId)) return false;
+		if (!this.unlockedMods.has(itemModId)) {
+			return false;
+		}
+		if (!this.unlockedItems.has(itemId)) {
+			return false;
+		}
 
 		const req = new ApiRequest('Player/ApplyMod');
 		const response = await req.post({ itemId, itemModId, itemModSlotId });
-		if (response.error) return false;
+		if (response.error) {
+			return false;
+		}
 
 		// Re-fetch player data to get updated item state
 		// (or update locally — for now just log success)
@@ -144,7 +156,9 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/RemoveMod');
 		const response = await req.post({ itemId, itemModSlotId });
-		if (response.error) return false;
+		if (response.error) {
+			return false;
+		}
 
 		logMessage(ELogType.ItemFound, 'Modifier removed.');
 

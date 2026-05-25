@@ -36,7 +36,6 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 			{
 				itemId: 2,
 				equipped: false,
-				equipmentSlotId: null,
 				appliedMods: []
 			}
 		],

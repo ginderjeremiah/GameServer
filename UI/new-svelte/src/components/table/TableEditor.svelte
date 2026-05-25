@@ -54,14 +54,14 @@ const {
 	title
 }: EditorOptions<T> = $props();
 
-const options = {
+const options = $derived({
 	data,
 	primaryKey,
 	hiddenColumns,
 	disabledColumns,
 	selectOptions,
 	sampleItem
-};
+});
 
 let rows = $state<RowData<T>[]>([]);
 const visibleRows = $derived(

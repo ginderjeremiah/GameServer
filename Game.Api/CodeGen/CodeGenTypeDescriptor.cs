@@ -52,6 +52,30 @@ namespace Game.Api.CodeGen
             }
         }
 
+        public IEnumerable<CodeGenTypeDescriptor> GetDirectlyReferencedDescriptorsForProperties()
+        {
+            foreach (var property in PropertyDescriptors)
+            {
+                yield return property;
+                foreach (var reference in property.GetGenericArgumentReferences())
+                {
+                    yield return reference;
+                }
+            }
+        }
+
+        private IEnumerable<CodeGenTypeDescriptor> GetGenericArgumentReferences()
+        {
+            foreach (var genericArg in GenericArgumentDescriptors)
+            {
+                yield return genericArg;
+                foreach (var reference in genericArg.GetGenericArgumentReferences())
+                {
+                    yield return reference;
+                }
+            }
+        }
+
         private static Type GetUnderlyingType(NullabilityInfo nullabilityInfo)
         {
             if (nullabilityInfo.Type.IsGenericType && nullabilityInfo.Type.GetGenericTypeDefinition() == typeof(Nullable<>))

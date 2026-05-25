@@ -2,7 +2,7 @@
  * Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 */
 
-import type { EChangeType } from "../"
+import type { EChangeType, IBattlerAttribute } from "../"
 
 export interface IChange<T> {
 	item: T;

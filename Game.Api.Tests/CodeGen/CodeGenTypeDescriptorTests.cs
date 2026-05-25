@@ -175,5 +175,141 @@ namespace Game.Api.Tests.CodeGen
 
             Assert.IsTrue(descriptor.NeedsInterface);
         }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_NonGenericType_ReturnsOnlyProperties()
+        {
+            var prop = typeof(SimpleModel).GetProperty("Id")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            Assert.AreEqual(0, references.Count);
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_SimpleClass_ReturnsAllProperties()
+        {
+            var prop = typeof(NestedModel).GetProperty("Child")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            Assert.AreEqual(3, references.Count);
+            Assert.IsTrue(references.Any(r => r.Name == "Id"));
+            Assert.IsTrue(references.Any(r => r.Name == "Name"));
+            Assert.IsTrue(references.Any(r => r.Name == "IsActive"));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_GenericType_IncludesGenericArguments()
+        {
+            var prop = typeof(ModelWithList).GetProperty("Items")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // Should include the List<SimpleModel> descriptor and its generic argument SimpleModel
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_ComplexModel_ReturnsAllReferences()
+        {
+            var prop = typeof(ModelWithNestedGenerics).GetProperty("NestedGeneric")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // GenericModel<SimpleModel> has two properties: Value (T) and Description (string)
+            // The generic argument references should include SimpleModel (from Value property)
+            Assert.IsTrue(references.Count > 0);
+            Assert.IsTrue(references.Any(r => r.Name == "Value"));
+            Assert.IsTrue(references.Any(r => r.Name == "Description"));
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_ModelWithMultipleGenericProperties_IncludesAllGenericArguments()
+        {
+            var prop = typeof(ModelWithNestedGenerics).GetProperty("DictWithClass")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // Dictionary<string, SimpleModel> should include string and SimpleModel as generic arguments
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(string)));
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_DeeplyNestedGenerics_ReturnsAllNestedReferences()
+        {
+            var prop = typeof(ModelWithDeeplyNestedGenerics).GetProperty("DeepList")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // List<List<SimpleModel>> should include:
+            // - List (from generic argument)
+            // - SimpleModel (from nested generic)
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(List<SimpleModel>)));
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_DictOfLists_ReturnsComplexNestedReferences()
+        {
+            var prop = typeof(ModelWithDeeplyNestedGenerics).GetProperty("DictOfLists")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // Dictionary<string, List<SimpleModel>> should include:
+            // - string (key)
+            // - List<SimpleModel> (value)
+            // - SimpleModel (nested in list)
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(string)));
+            Assert.IsTrue(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_NoDuplicates()
+        {
+            var prop = typeof(ModelWithNestedGenerics).GetProperty("SimpleList")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            var simpleModelRefs = references.Where(r => r.UnderlyingType == typeof(SimpleModel)).ToList();
+            
+            // Should have at least one SimpleModel reference from the List<SimpleModel>
+            Assert.IsTrue(simpleModelRefs.Count > 0);
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_EmptyForPrimitiveTypes()
+        {
+            var prop = typeof(ModelWithDecimal).GetProperty("Amount")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            Assert.AreEqual(0, references.Count);
+        }
+
+        [TestMethod]
+        public void GetDirectlyReferencedDescriptorsForProperties_WithGenericTypeParameter_IncludesReferences()
+        {
+            var prop = typeof(ModelWithNestedGenerics).GetProperty("NestedGeneric")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
+
+            // Should include GenericModel's properties (Value and Description)
+            // and the generic argument SimpleModel
+            Assert.IsTrue(references.Any(r => r.Name == "Value"));
+            Assert.IsTrue(references.Any(r => r.Name == "Description"));
+        }
     }
 }

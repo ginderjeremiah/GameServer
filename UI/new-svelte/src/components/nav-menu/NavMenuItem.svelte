@@ -27,7 +27,7 @@ import type { MouseEventHandler } from 'svelte/elements';
 import { normalizeText } from '$lib/common';
 
 const props: INavMenuItem = $props();
-const { text, children, onClick } = props;
+const { text, children, onClick } = $derived(props);
 
 const displayText = $derived(normalizeText(text));
 

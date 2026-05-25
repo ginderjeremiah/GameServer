@@ -170,4 +170,24 @@ namespace Game.Api.Tests.CodeGen
             return 42;
         }
     }
+
+    public class GenericModelWithGenericProperty<T> : IModel
+    {
+        public List<T> Items { get; set; } = [];
+        public T Value { get; set; } = default!;
+    }
+
+    public class ModelWithNestedGenerics : IModel
+    {
+        public List<SimpleModel> SimpleList { get; set; } = [];
+        public Dictionary<string, SimpleModel> DictWithClass { get; set; } = [];
+        public GenericModel<SimpleModel> NestedGeneric { get; set; } = new();
+        public string NonGenericProperty { get; set; } = "";
+    }
+
+    public class ModelWithDeeplyNestedGenerics : IModel
+    {
+        public List<List<SimpleModel>> DeepList { get; set; } = [];
+        public Dictionary<string, List<SimpleModel>> DictOfLists { get; set; } = [];
+    }
 }
