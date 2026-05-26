@@ -19,7 +19,7 @@ namespace Game.Application.Services
         public async Task<List<CompletedChallengeInfo>> CheckAndUpdateProgress(
             Player player,
             EStatisticType statType,
-            int entityId,
+            int? entityId,
             long newValue)
         {
             var completed = new List<CompletedChallengeInfo>();

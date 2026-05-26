@@ -6,7 +6,7 @@
         public int SkillId { get; set; }
         public bool Selected { get; set; }
 
-        public virtual Player Player { get; set; }
-        public virtual Skill Skill { get; set; }
+        public virtual Player Player { get => field ?? throw new NavigationNotLoadedException(nameof(Player)); set; }
+        public virtual Skill Skill { get => field ?? throw new NavigationNotLoadedException(nameof(Skill)); set; }
     }
 }

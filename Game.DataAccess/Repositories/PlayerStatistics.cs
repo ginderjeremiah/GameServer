@@ -16,13 +16,9 @@ namespace Game.DataAccess.Repositories
                 .ToListAsync();
         }
 
-        public async Task<long> IncrementStatistic(int playerId, int statisticTypeId, int entityId, long amount)
+        public async Task<long> IncrementStatistic(int playerId, int statisticTypeId, int? entityId, long amount)
         {
-            var entity = await _context.PlayerStatistics
-                .FirstOrDefaultAsync(ps =>
-                    ps.PlayerId == playerId &&
-                    ps.StatisticTypeId == statisticTypeId &&
-                    ps.EntityId == entityId);
+            var entity = await FindStatistic(playerId, statisticTypeId, entityId);
 
             if (entity is null)
             {
@@ -41,6 +37,61 @@ namespace Game.DataAccess.Repositories
             }
 
             return entity.Value;
+        }
+
+        public async Task<long> SetMaxStatistic(int playerId, int statisticTypeId, int? entityId, long value)
+        {
+            var entity = await FindStatistic(playerId, statisticTypeId, entityId);
+
+            if (entity is null)
+            {
+                entity = new PlayerStatistic
+                {
+                    PlayerId = playerId,
+                    StatisticTypeId = statisticTypeId,
+                    EntityId = entityId,
+                    Value = value,
+                };
+                _context.PlayerStatistics.Add(entity);
+            }
+            else if (value > entity.Value)
+            {
+                entity.Value = value;
+            }
+
+            return entity.Value;
+        }
+
+        public async Task<long> SetMinStatistic(int playerId, int statisticTypeId, int? entityId, long value)
+        {
+            var entity = await FindStatistic(playerId, statisticTypeId, entityId);
+
+            if (entity is null)
+            {
+                entity = new PlayerStatistic
+                {
+                    PlayerId = playerId,
+                    StatisticTypeId = statisticTypeId,
+                    EntityId = entityId,
+                    Value = value,
+                };
+                _context.PlayerStatistics.Add(entity);
+            }
+            else if (value < entity.Value)
+            {
+                entity.Value = value;
+            }
+
+            return entity.Value;
+        }
+
+        private async Task<PlayerStatistic?> FindStatistic(int playerId, int statisticTypeId, int? entityId)
+        {
+            return await _context.PlayerStatistics
+                .FirstOrDefaultAsync(ps =>
+                    ps.PlayerId == playerId &&
+                    ps.StatisticTypeId == statisticTypeId &&
+                    ps.EntityId == entityId);
         }
     }
 }

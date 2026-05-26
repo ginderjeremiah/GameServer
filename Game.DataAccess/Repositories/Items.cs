@@ -33,10 +33,16 @@ namespace Game.DataAccess.Repositories
             return _allItems;
         }
 
-        public Item? GetItem(int itemId)
+        public Item? LookupItem(int itemId)
         {
             var items = All();
-            return items.Count <= itemId ? null : items[itemId];
+            return items.Count <= itemId || itemId < 0 ? null : items[itemId];
+        }
+
+        public Item GetItem(int itemId)
+        {
+            var items = All();
+            return items[itemId];
         }
     }
 }

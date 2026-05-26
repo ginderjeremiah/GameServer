@@ -1,4 +1,4 @@
-<div class="loading-screen">
+<div class="loading-screen" data-testid="loading-screen">
 	<div class="loading-form">
 		<!-- Diamond mark -->
 		<div class="diamond-container">
@@ -9,7 +9,7 @@
 
 		<!-- Header -->
 		<div class="heading">
-			<h1 class:error-text={phase === 'error'}>{title}</h1>
+			<h1 data-testid="loading-heading" class:error-text={phase === 'error'}>{title}</h1>
 			<p class="subtitle">
 				{#if phase === 'checking'}
 					Verifying cached reference data…
@@ -26,7 +26,7 @@
 		</div>
 
 		<!-- Progress bar -->
-		<div class="progress-track">
+		<div class="progress-track" data-testid="progress-bar">
 			<div
 				class="progress-fill"
 				class:error-fill={phase === 'error'}
@@ -40,7 +40,7 @@
 		</div>
 
 		<!-- Sliding manifest window -->
-		<div class="manifest-window">
+		<div class="manifest-window" data-testid="manifest-window">
 			<div class="manifest-track" style:transform="translateY({cursorY}px)">
 				{#each items as item, i}
 					<div class="manifest-row" style:opacity={rowOpacity(i)}>
@@ -94,12 +94,13 @@
 		{#if phase === 'error' && currentItem}
 			<div class="error-banner">
 				<div class="error-message">{currentItem.error}</div>
-				<button class="retry-button" onclick={retryFailed}>Retry</button>
+				<button class="retry-button" data-testid="retry-button" onclick={retryFailed}>Retry</button>
 			</div>
 		{/if}
 
 		<!-- Enter Realm button -->
 		<button
+			data-testid="enter-button"
 			class="enter-button"
 			class:ready={phase === 'done'}
 			disabled={phase !== 'done'}

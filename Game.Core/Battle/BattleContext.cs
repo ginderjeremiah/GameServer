@@ -1,72 +1,62 @@
-﻿namespace Game.Core.Battle
+namespace Game.Core.Battle
 {
-    /// <summary>
-    /// Used to store context information during the battle.
-    /// </summary>
     public class BattleContext
     {
-        /// <summary>
-        /// The battler that is currently active.
-        /// </summary>
         private Battler _activeBattler;
-
-        /// <summary>
-        /// The battler that is the target of any non-self targeting effects.
-        /// </summary>
         private Battler _targetBattler;
+        private bool _isPlayerActive;
 
-        /// <summary>
-        /// The time delta for the current logical tick.
-        /// </summary>
         public int TimeDelta { get; set; }
+        public BattleStats Stats { get; } = new();
 
-        /// <summary>
-        /// Creates a new instance of <see cref="BattleContext"/>.
-        /// </summary>
-        /// <param name="activeBattler"></param>
-        /// <param name="targetBattler"></param>
-        /// <param name="timeDelta"></param>
-        public BattleContext(Battler activeBattler, Battler targetBattler, int timeDelta)
+        public BattleContext(Battler playerBattler, Battler enemyBattler, int timeDelta)
         {
-            _activeBattler = activeBattler;
-            _targetBattler = targetBattler;
+            _activeBattler = playerBattler;
+            _targetBattler = enemyBattler;
+            _isPlayerActive = true;
             TimeDelta = timeDelta;
         }
 
-        /// <summary>
-        /// Swaps the active and target battlers.
-        /// </summary>
         public void SwapActiveAndTargetBattlers()
         {
             (_targetBattler, _activeBattler) = (_activeBattler, _targetBattler);
+            _isPlayerActive = !_isPlayerActive;
         }
 
-        /// <summary>
-        /// Gets the value of the given <see cref="EAttribute"/> for the active battler.
-        /// </summary>
-        /// <param name="attribute"></param>
-        /// <returns></returns>
         public double GetActiveBattlerAttribute(EAttribute attribute)
         {
             return _activeBattler.GetAttributeValue(attribute);
         }
 
-        /// <summary>
-        /// Gets the active battler's cooldown multiplier.
-        /// </summary>
-        /// <returns></returns>
         public double GetActiveBattlerCooldownMultiplier()
         {
             return _activeBattler.GetCooldownMultiplier();
         }
 
-        /// <summary>
-        /// Damages the target battler.
-        /// </summary>
-        /// <param name="damage"></param>
         public void DamageTarget(double damage)
         {
-            _targetBattler.TakeDamage(damage);
+            var actualDamage = _targetBattler.TakeDamage(damage);
+
+            if (_isPlayerActive)
+            {
+                Stats.PlayerDamageDealt += (long)actualDamage;
+                if ((long)actualDamage > Stats.HighestPlayerAttack)
+                {
+                    Stats.HighestPlayerAttack = (long)actualDamage;
+                }
+            }
+            else
+            {
+                Stats.PlayerDamageTaken += (long)actualDamage;
+            }
+        }
+
+        public void RecordSkillUse()
+        {
+            if (_isPlayerActive)
+            {
+                Stats.PlayerSkillsUsed++;
+            }
         }
     }
 }

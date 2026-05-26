@@ -6,7 +6,8 @@ namespace Game.Abstractions.DataAccess
     {
         public void InvalidateCache();
         public List<Skill> AllSkills(bool refreshCache = false);
-        public Skill? GetSkill(int skillId);
+        public Skill? LookupSkill(int skillId);
+        public Skill GetSkill(int skillId);
         public Task SaveSkillsAsync(List<int> skillIds);
     }
 }

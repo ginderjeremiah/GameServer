@@ -1,4 +1,4 @@
-<div class="log-panel">
+<div class="log-panel" data-testid="log-panel">
 	<div class="log-header">
 		<span class="log-title">Combat Log</span>
 		<div class="log-divider"></div>

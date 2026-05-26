@@ -6,7 +6,7 @@
         public int AttributeId { get; set; }
         public decimal Multiplier { get; set; }
 
-        public virtual Skill Skill { get; set; }
-        public virtual Attribute Attribute { get; set; }
+        public virtual Skill Skill { get => field ?? throw new NavigationNotLoadedException(nameof(Skill)); set; }
+        public virtual Attribute Attribute { get => field ?? throw new NavigationNotLoadedException(nameof(Attribute)); set; }
     }
 }

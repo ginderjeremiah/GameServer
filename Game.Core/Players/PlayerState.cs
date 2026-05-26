@@ -1,17 +1,14 @@
-﻿namespace Game.Core.Players
+using Game.Core.Battle;
+
+namespace Game.Core.Players
 {
-    /// <summary>
-    /// Represents the transient state of a player's current session, including active battle data.
-    /// </summary>
     public class PlayerState
     {
         public int PlayerId { get; set; }
 
         public DateTime EnemyCooldown { get; set; } = DateTime.UnixEpoch;
 
-        public DateTime EarliestDefeat { get; set; } = DateTime.UnixEpoch;
-
-        public bool Victory { get; set; }
+        public DateTime BattleStartTime { get; set; } = DateTime.UnixEpoch;
 
         public int? ActiveEnemyId { get; set; }
 
@@ -19,18 +16,22 @@
 
         public uint? BattleSeed { get; set; }
 
-        public void SetActiveBattle(int enemyId, int level, uint seed, DateTime earliestDefeat, bool victory)
+        /// <summary>
+        /// Snapshot of the player's battle-relevant state captured at battle start.
+        /// Used to reconstruct the player's <see cref="Battler"/> at simulation time,
+        /// ensuring mid-battle mutations don't affect the outcome.
+        /// </summary>
+        public BattleSnapshot? Snapshot { get; set; }
+
+        public bool HasActiveBattle => ActiveEnemyId.HasValue;
+
+        public void SetActiveBattle(int enemyId, int level, uint seed, DateTime startTime, BattleSnapshot snapshot)
         {
             ActiveEnemyId = enemyId;
             ActiveEnemyLevel = level;
             BattleSeed = seed;
-            EarliestDefeat = earliestDefeat;
-            Victory = victory;
-        }
-
-        public bool CanDefeatEnemy(DateTime now)
-        {
-            return Victory && ActiveEnemyId.HasValue && now >= EarliestDefeat;
+            BattleStartTime = startTime;
+            Snapshot = snapshot;
         }
 
         public void SetCooldown(DateTime cooldownUntil)
@@ -48,8 +49,8 @@
             ActiveEnemyId = null;
             ActiveEnemyLevel = null;
             BattleSeed = null;
-            EarliestDefeat = DateTime.UnixEpoch;
-            Victory = false;
+            BattleStartTime = DateTime.UnixEpoch;
+            Snapshot = null;
         }
     }
 }

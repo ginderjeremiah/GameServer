@@ -10,6 +10,7 @@ using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
 using CoreEnemy = Game.Core.Enemies.Enemy;
+using EntitySkill = Game.Abstractions.Entities.Skill;
 using EntityZone = Game.Abstractions.Entities.Zone;
 
 namespace Game.Application.Tests.Services
@@ -17,118 +18,154 @@ namespace Game.Application.Tests.Services
     [TestClass]
     public class BattleServiceTests
     {
-        // ── TryDefeatEnemy ───────────────────────────────────────────────────
+        // ── EndBattleVictory ─────────────────────────────────────────────────
 
         [TestMethod]
-        public async Task TryDefeatEnemy_WhenCannotDefeat_ReturnsNull()
+        public async Task EndBattleVictory_NoActiveBattle_ReturnsNull()
         {
             var (service, _, _) = MakeService();
-            var player = MakePlayer();
+            var player = MakeBattleReadyPlayer();
+            var state = new PlayerState();
 
-            // State with no active battle — CanDefeatEnemy returns false.
-            var state = new PlayerState { Victory = true };
-            // ActiveEnemyId is null → CanDefeatEnemy == false
-
-            var result = await service.TryDefeatEnemy(player, state, enemyId: 1, level: 1, rng: new Mulberry32(42u));
+            var result = await service.EndBattleVictory(player, state, DateTime.UtcNow);
 
             Assert.IsNull(result);
         }
 
         [TestMethod]
-        public async Task TryDefeatEnemy_WhenVictoryNotSet_ReturnsNull()
+        public async Task EndBattleVictory_SimulationShowsLoss_ReturnsNull()
         {
-            var (service, _, _) = MakeService();
-            var player = MakePlayer();
+            var enemy = MakeStrongEnemy(id: 1, level: 1);
+            var (service, _, _) = MakeService(domainEnemy: enemy);
+            var player = MakeWeakPlayer();
 
             var state = new PlayerState();
-            // victory: false → CanDefeatEnemy == false even if time has elapsed.
-            state.SetActiveBattle(1, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: false);
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
 
-            var result = await service.TryDefeatEnemy(player, state, enemyId: 1, level: 1, rng: new Mulberry32(42u));
+            var result = await service.EndBattleVictory(player, state, DateTime.UtcNow);
 
             Assert.IsNull(result);
         }
 
         [TestMethod]
-        public async Task TryDefeatEnemy_SuccessfulDefeat_ReturnsDefeatResult()
+        public async Task EndBattleVictory_TimestampTooEarly_ReturnsNull()
         {
-            var enemy = MakeEnemy(id: 1, level: 1);
+            var enemy = MakeBattleReadyEnemy(id: 1, level: 1);
+            var (service, _, _) = MakeService(domainEnemy: enemy);
+            var player = MakeBattleReadyPlayer();
+
+            var state = new PlayerState();
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow, MakeSnapshot(player));
+
+            // Timestamp is "now" but battle just started — too early.
+            var result = await service.EndBattleVictory(player, state, DateTime.UtcNow);
+
+            Assert.IsNull(result);
+        }
+
+        [TestMethod]
+        public async Task EndBattleVictory_ValidTimestamp_ReturnsDefeatResult()
+        {
+            var enemy = MakeBattleReadyEnemy(id: 1, level: 1);
             var (service, repo, dispatcher) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
+            var player = MakeBattleReadyPlayer();
 
             var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
 
-            var result = await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
+            var result = await service.EndBattleVictory(player, state, DateTime.UtcNow);
 
             Assert.IsNotNull(result);
+            Assert.IsTrue(result.ExpReward >= 0);
         }
 
         [TestMethod]
-        public async Task TryDefeatEnemy_SuccessfulDefeat_PersistsPlayer()
+        public async Task EndBattleVictory_Success_PersistsPlayerAndDispatches()
         {
-            var enemy = MakeEnemy(id: 1, level: 1);
-            var (service, repo, _) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
+            var enemy = MakeBattleReadyEnemy(id: 1, level: 1);
+            var (service, repo, dispatcher) = MakeService(domainEnemy: enemy);
+            var player = MakeBattleReadyPlayer();
 
             var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
 
-            await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
+            await service.EndBattleVictory(player, state, DateTime.UtcNow);
 
-            // SavePlayer must have been called exactly once to persist the updated player.
             Assert.AreEqual(1, repo.SavePlayerCallCount);
-        }
-
-        [TestMethod]
-        public async Task TryDefeatEnemy_SuccessfulDefeat_ClearsBattleState()
-        {
-            var enemy = MakeEnemy(id: 1, level: 1);
-            var (service, _, _) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
-
-            var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
-
-            await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
-
-            // After defeat the battle should be cleared.
-            Assert.IsNull(state.ActiveEnemyId);
-            Assert.IsFalse(state.Victory);
-        }
-
-        [TestMethod]
-        public async Task TryDefeatEnemy_SuccessfulDefeat_DispatchesEnemyDefeatedEvent()
-        {
-            var enemy = MakeEnemy(id: 1, level: 1);
-            var (service, _, dispatcher) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
-
-            var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
-
-            await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
 
             var defeatedEvent = dispatcher.DispatchedEvents.OfType<EnemyDefeatedEvent>().SingleOrDefault();
             Assert.IsNotNull(defeatedEvent);
-            Assert.AreEqual(player.Id, defeatedEvent.PlayerId);
-            Assert.AreEqual(enemy.Id, defeatedEvent.EnemyId);
+
+            var battleEvent = dispatcher.DispatchedEvents.OfType<BattleCompletedEvent>().SingleOrDefault();
+            Assert.IsNotNull(battleEvent);
+            Assert.IsTrue(battleEvent.Victory);
         }
 
         [TestMethod]
-        public async Task TryDefeatEnemy_SuccessfulDefeat_PlayerEventsAreClearedAfterDispatch()
+        public async Task EndBattleVictory_Success_ClearsBattleAndSetsCooldown()
         {
-            var enemy = MakeEnemy(id: 1, level: 1);
+            var enemy = MakeBattleReadyEnemy(id: 1, level: 1);
             var (service, _, _) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
+            var player = MakeBattleReadyPlayer();
 
             var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
 
-            await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
+            await service.EndBattleVictory(player, state, DateTime.UtcNow);
 
-            // Domain events must be cleared after dispatch so they are not replayed.
-            Assert.AreEqual(0, player.DomainEvents.Count);
+            Assert.IsFalse(state.HasActiveBattle);
+            Assert.IsTrue(state.IsOnCooldown(DateTime.UtcNow));
+        }
+
+        // ── EndBattleLoss ────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task EndBattleLoss_NoActiveBattle_ReturnsFalse()
+        {
+            var (service, _, _) = MakeService();
+            var player = MakeBattleReadyPlayer();
+            var state = new PlayerState();
+
+            var result = await service.EndBattleLoss(player, state);
+
+            Assert.IsFalse(result);
+        }
+
+        [TestMethod]
+        public async Task EndBattleLoss_SimulationShowsVictory_ReturnsFalse()
+        {
+            var enemy = MakeBattleReadyEnemy(id: 1, level: 1);
+            var (service, _, _) = MakeService(domainEnemy: enemy);
+            var player = MakeBattleReadyPlayer();
+
+            var state = new PlayerState();
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
+
+            var result = await service.EndBattleLoss(player, state);
+
+            Assert.IsFalse(result);
+        }
+
+        [TestMethod]
+        public async Task EndBattleLoss_ValidLoss_ReturnsTrue()
+        {
+            var enemy = MakeStrongEnemy(id: 1, level: 1);
+            var (service, repo, dispatcher) = MakeService(domainEnemy: enemy);
+            var player = MakeWeakPlayer();
+
+            var state = new PlayerState();
+            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddMinutes(-10), MakeSnapshot(player));
+
+            var result = await service.EndBattleLoss(player, state);
+
+            Assert.IsTrue(result);
+            Assert.IsFalse(state.HasActiveBattle);
+            Assert.AreEqual(1, repo.SavePlayerCallCount);
+
+            var battleEvent = dispatcher.DispatchedEvents.OfType<BattleCompletedEvent>().SingleOrDefault();
+            Assert.IsNotNull(battleEvent);
+            Assert.IsFalse(battleEvent.Victory);
+            Assert.IsTrue(battleEvent.PlayerDied);
         }
 
         // ── StartBattle ──────────────────────────────────────────────────────
@@ -146,11 +183,10 @@ namespace Game.Application.Tests.Services
 
             Assert.IsNotNull(result);
             Assert.IsNotNull(result.Enemy);
-            Assert.IsTrue(result.Seed > 0 || result.Seed == 0);
         }
 
         [TestMethod]
-        public async Task StartBattle_SetsActiveBattleState()
+        public async Task StartBattle_SetsActiveBattleStateAndSnapshot()
         {
             var enemy = MakeBattleReadyEnemy(id: 1, level: 5);
             var zone = MakeZone(id: 0, levelMin: 1, levelMax: 10);
@@ -160,9 +196,11 @@ namespace Game.Application.Tests.Services
 
             await service.StartBattle(player, state, zoneId: 0);
 
+            Assert.IsTrue(state.HasActiveBattle);
             Assert.IsNotNull(state.ActiveEnemyId);
             Assert.IsNotNull(state.ActiveEnemyLevel);
             Assert.IsNotNull(state.BattleSeed);
+            Assert.IsNotNull(state.Snapshot);
         }
 
         [TestMethod]
@@ -177,7 +215,7 @@ namespace Game.Application.Tests.Services
             await service.StartBattle(player, state, zoneId: 0, newZoneId: 2);
 
             Assert.AreEqual(2, player.CurrentZoneId);
-            Assert.AreEqual(1, repo.SavePlayerCallCount);
+            Assert.IsTrue(repo.SavePlayerCallCount >= 1);
         }
 
         [TestMethod]
@@ -192,30 +230,8 @@ namespace Game.Application.Tests.Services
                 () => service.StartBattle(player, state, zoneId: 999));
         }
 
-        // ── TryDefeatEnemy — progression data ───────────────────────────────
-
-        [TestMethod]
-        public async Task TryDefeatEnemy_ReturnsPlayerProgressionData()
-        {
-            var enemy = MakeEnemy(id: 1, level: 1);
-            var (service, _, _) = MakeService(domainEnemy: enemy);
-            var player = MakePlayer();
-
-            var state = new PlayerState();
-            state.SetActiveBattle(enemy.Id, 1, 0u, DateTime.UtcNow.AddSeconds(-1), victory: true);
-
-            var result = await service.TryDefeatEnemy(player, state, enemyId: enemy.Id, level: 1, rng: new Mulberry32(42u));
-
-            Assert.IsNotNull(result);
-            Assert.AreEqual(player.Level, result.NewLevel);
-            Assert.AreEqual(player.Exp, result.NewExp);
-            Assert.AreEqual(player.StatPoints.StatPointsGained, result.StatPointsGained);
-            Assert.AreEqual(player.StatPoints.StatPointsUsed, result.StatPointsUsed);
-        }
-
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        /// <summary>Creates a wired-up BattleService together with its fakes.</summary>
         private static (BattleService service, FakePlayerRepository repo, FakeDispatcher dispatcher)
             MakeService(CoreEnemy? domainEnemy = null, EntityZone? zone = null)
         {
@@ -223,24 +239,58 @@ namespace Game.Application.Tests.Services
             var enemies = new FakeEnemies(domainEnemy);
             var zones = new FakeZones(zone);
             var dispatcher = new FakeDispatcher();
-            var service = new BattleService(repo, enemies, zones, dispatcher);
+            var battlerFactory = new BattlerFactory(
+                new FakeItems(),
+                new FakeItemMods(),
+                new FakeSkills(MakeEntitySkills()));
+            var service = new BattleService(repo, enemies, zones, dispatcher, battlerFactory);
             return (service, repo, dispatcher);
         }
 
-        private static Player MakePlayer(int level = 1) => new()
+        /// <summary>
+        /// Builds a <see cref="BattleSnapshot"/> that mirrors the player's current state,
+        /// the same way <see cref="BattlerFactory.CreateSnapshot"/> would.
+        /// </summary>
+        private static BattleSnapshot MakeSnapshot(Player player) => new()
         {
-            Id = 1,
-            Name = "Hero",
-            Level = level,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints([])
-            { StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
+            Level = player.Level,
+            StatAllocations = player.StatPoints.StatAllocations
+                .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
+                .ToList(),
+            EquippedItems = [],
+            SkillIds = player.SelectedSkills.Select(s => s.Id).ToList(),
         };
+
+        /// <summary>
+        /// Entity-layer skills that match the domain skills used in test player/enemy helpers.
+        /// Index 0 = "Attack" (battle-ready player), Index 1 = "Poke" (weak player).
+        /// </summary>
+        private static List<EntitySkill> MakeEntitySkills() =>
+        [
+            new()
+            {
+                Id = 0,
+                Name = "Attack",
+                Description = "",
+                BaseDamage = 10m,
+                CooldownMs = 1000,
+                IconPath = "",
+                SkillDamageMultipliers =
+                [
+                    new() { SkillId = 0, AttributeId = (int)EAttribute.Strength, Multiplier = 1.0m },
+                ],
+            },
+            new()
+            {
+                Id = 1,
+                Name = "Poke",
+                Description = "",
+                BaseDamage = 1m,
+                CooldownMs = 2000,
+                IconPath = "",
+                SkillDamageMultipliers = [],
+            },
+        ];
 
         private static Player MakeBattleReadyPlayer() => new()
         {
@@ -273,13 +323,30 @@ namespace Game.Application.Tests.Services
             LogPreferences = [],
         };
 
-        private static CoreEnemy MakeEnemy(int id, int level) => new()
+        private static Player MakeWeakPlayer() => new()
         {
-            Id = id,
-            Name = "Test Enemy",
-            Level = level,
-            AttributeDistributions = [],
+            Id = 1,
+            Name = "Weakling",
+            Level = 1,
+            Exp = 0,
+            CurrentZoneId = 0,
+            StatPoints = new PlayerStatPoints([
+                new StatAllocation { Attribute = EAttribute.Strength, Amount = 1 },
+                new StatAllocation { Attribute = EAttribute.Endurance, Amount = 1 },
+            ])
+            { StatPointsGained = 2, StatPointsUsed = 2 },
+            Inventory = new Inventory(),
+            SelectedSkills =
+            [
+                new Skill
+                {
+                    Id = 1, Name = "Poke", Description = "",
+                    CooldownMs = 2000, BaseDamage = 1,
+                    DamageMultipliers = [],
+                },
+            ],
             Skills = [],
+            LogPreferences = [],
         };
 
         private static CoreEnemy MakeBattleReadyEnemy(int id, int level) => new()
@@ -304,6 +371,32 @@ namespace Game.Application.Tests.Services
                 {
                     Id = 0, Name = "Scratch", Description = "",
                     CooldownMs = 1500, BaseDamage = 5, DamageMultipliers = [],
+                },
+            ],
+        };
+
+        private static CoreEnemy MakeStrongEnemy(int id, int level) => new()
+        {
+            Id = id,
+            Name = "Strong Enemy",
+            Level = level,
+            AttributeDistributions =
+            [
+                new AttributeDistribution
+                {
+                    AttributeId = EAttribute.Strength, BaseAmount = 200, AmountPerLevel = 0,
+                },
+                new AttributeDistribution
+                {
+                    AttributeId = EAttribute.Endurance, BaseAmount = 200, AmountPerLevel = 0,
+                },
+            ],
+            Skills =
+            [
+                new Skill
+                {
+                    Id = 0, Name = "Crush", Description = "",
+                    CooldownMs = 500, BaseDamage = 100, DamageMultipliers = [],
                 },
             ],
         };

@@ -23,7 +23,7 @@ namespace Game.Api.Controllers
             if (refreshCache)
                 _items.All(refreshCache);
 
-            var item = _items.GetItem(itemId);
+            var item = _items.LookupItem(itemId);
             return ApiResponse.Success((item?.ItemModSlots).To().Model<ItemModSlot>());
         }
     }

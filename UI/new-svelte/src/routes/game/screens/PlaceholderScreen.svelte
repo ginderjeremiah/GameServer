@@ -1,4 +1,4 @@
-<div class="placeholder-screen">
+<div class="placeholder-screen" data-testid="placeholder-screen">
 	<div class="placeholder-icon">
 		<div class="placeholder-diamond">
 			<div class="placeholder-diamond-inner"></div>

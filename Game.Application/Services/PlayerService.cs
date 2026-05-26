@@ -56,7 +56,7 @@ namespace Game.Application.Services
 
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
-            var modEntity = _itemMods.GetItemMod(itemModId);
+            var modEntity = _itemMods.LookupItemMod(itemModId);
             if (modEntity is null)
                 return false;
 

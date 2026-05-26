@@ -32,7 +32,7 @@ namespace Game.Core.Battle
         {
         }
 
-        private Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level)
+        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level)
         {
             _attributes = attributes;
             CurrentHealth = _attributes[MaxHealth];
@@ -58,11 +58,12 @@ namespace Game.Core.Battle
             return _attributes[attribute];
         }
 
-        public void TakeDamage(double rawDamage)
+        public double TakeDamage(double rawDamage)
         {
             var damage = rawDamage - _attributes[Defense];
             damage = damage > 0 ? damage : 0;
             CurrentHealth -= damage;
+            return damage;
         }
     }
 }

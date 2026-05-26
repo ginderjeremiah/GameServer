@@ -1,6 +1,3 @@
-﻿using Game.Core.Enemies;
-using Game.Core.Players;
-
 namespace Game.Core.Battle
 {
     public class BattleSimulator
@@ -9,25 +6,27 @@ namespace Game.Core.Battle
         private Battler EnemyBattler { get; set; }
 
         private const int MsPerTick = 40;
-        private const int MaxMs = MsPerTick * 10000;
+        private const int DefaultMaxMs = MsPerTick * 10000;
 
-        public BattleSimulator(Player player, Enemy enemy)
+        public BattleSimulator(Battler playerBattler, Battler enemyBattler)
         {
-            PlayerBattler = new Battler(player);
-            EnemyBattler = new Battler(enemy);
+            PlayerBattler = playerBattler;
+            EnemyBattler = enemyBattler;
         }
 
-        public bool Simulate(out int totalMs)
+        public BattleResult Simulate(int? maxMs = null)
         {
+            var limit = maxMs ?? DefaultMaxMs;
             var context = new BattleContext(PlayerBattler, EnemyBattler, MsPerTick);
 
-            for (totalMs = MsPerTick; totalMs <= MaxMs; totalMs += MsPerTick)
+            int totalMs;
+            for (totalMs = MsPerTick; totalMs <= limit; totalMs += MsPerTick)
             {
                 PlayerBattler.Update(context);
 
                 if (EnemyBattler.IsDead)
                 {
-                    return true;
+                    return new BattleResult(true, false, totalMs, context.Stats);
                 }
 
                 context.SwapActiveAndTargetBattlers();
@@ -36,13 +35,13 @@ namespace Game.Core.Battle
 
                 if (PlayerBattler.IsDead)
                 {
-                    return false;
+                    return new BattleResult(false, true, totalMs, context.Stats);
                 }
 
                 context.SwapActiveAndTargetBattlers();
             }
 
-            return false;
+            return new BattleResult(false, false, totalMs - MsPerTick, context.Stats);
         }
     }
 }

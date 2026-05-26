@@ -23,18 +23,20 @@ namespace Game.Application
         {
             var playerId = domainEvent.PlayerId;
             var enemyId = domainEvent.EnemyId;
+            var player = await _playerRepo.GetPlayer(playerId);
+            if (player is null)
+            {
+                return;
+            }
 
             var totalKilled = await _playerStatistics.IncrementStatistic(
-                playerId, (int)EStatisticType.EnemiesKilled, 0, 1);
+                playerId, (int)EStatisticType.EnemiesKilled, null, 1);
 
             var enemyTypeKilled = await _playerStatistics.IncrementStatistic(
                 playerId, (int)EStatisticType.EnemiesKilled, enemyId, 1);
 
-            var player = await _playerRepo.GetPlayer(playerId);
-            if (player is null) return;
-
             await _challengeService.CheckAndUpdateProgress(
-                player, EStatisticType.EnemiesKilled, 0, totalKilled);
+                player, EStatisticType.EnemiesKilled, null, totalKilled);
 
             await _challengeService.CheckAndUpdateProgress(
                 player, EStatisticType.EnemiesKilled, enemyId, enemyTypeKilled);

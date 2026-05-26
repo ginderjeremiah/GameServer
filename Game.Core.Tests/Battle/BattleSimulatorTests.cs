@@ -16,10 +16,10 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 100, endurance: 100);
             var enemy = MakeEnemy(statTotal: 10);
 
-            var sim = new BattleSimulator(player, enemy);
-            var victory = sim.Simulate(out _);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsTrue(victory);
+            Assert.IsTrue(result.Victory);
         }
 
         [TestMethod]
@@ -28,10 +28,10 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 1, endurance: 1);
             var enemy = MakeEnemy(statTotal: 200);
 
-            var sim = new BattleSimulator(player, enemy);
-            var victory = sim.Simulate(out _);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsFalse(victory);
+            Assert.IsFalse(result.Victory);
         }
 
         [TestMethod]
@@ -40,10 +40,10 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 100, endurance: 100);
             var enemy = MakeEnemy(statTotal: 10);
 
-            var sim = new BattleSimulator(player, enemy);
-            sim.Simulate(out var totalMs);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsTrue(totalMs > 0);
+            Assert.IsTrue(result.TotalMs > 0);
         }
 
         [TestMethod]
@@ -52,12 +52,12 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 10, endurance: 10, skills: []);
             var enemy = MakeEnemy(statTotal: 10, skills: []);
 
-            var sim = new BattleSimulator(player, enemy);
-            var victory = sim.Simulate(out var totalMs);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsFalse(victory);
-            // Loop exits when totalMs exceeds MaxMs (40 * 10000), so final value is MaxMs + one tick.
-            Assert.AreEqual(40 * 10000 + 40, totalMs);
+            Assert.IsFalse(result.Victory);
+            Assert.IsFalse(result.PlayerDied);
+            Assert.AreEqual(40 * 10000, result.TotalMs);
         }
 
         [TestMethod]
@@ -66,10 +66,37 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 50, endurance: 50);
             var enemy = MakeEnemy(statTotal: 20);
 
-            var sim = new BattleSimulator(player, enemy);
-            sim.Simulate(out var totalMs);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.AreEqual(0, totalMs % 40);
+            Assert.AreEqual(0, result.TotalMs % 40);
+        }
+
+        [TestMethod]
+        public void Simulate_Victory_CollectsStats()
+        {
+            var player = MakePlayer(strength: 100, endurance: 100);
+            var enemy = MakeEnemy(statTotal: 10);
+
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
+
+            Assert.IsTrue(result.Victory);
+            Assert.IsTrue(result.Stats.PlayerDamageDealt > 0);
+            Assert.IsTrue(result.Stats.HighestPlayerAttack > 0);
+            Assert.IsTrue(result.Stats.PlayerSkillsUsed > 0);
+        }
+
+        [TestMethod]
+        public void Simulate_WithMaxMs_CapsSimulation()
+        {
+            var player = MakePlayer(strength: 50, endurance: 50);
+            var enemy = MakeEnemy(statTotal: 50);
+
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate(maxMs: 200);
+
+            Assert.IsTrue(result.TotalMs <= 200);
         }
 
         private static Player MakePlayer(double strength, double endurance, List<Skill>? skills = null)

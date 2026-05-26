@@ -1,4 +1,4 @@
-<div class="battler-card" class:player={side === 'player'} class:enemy={side === 'enemy'}>
+<div class="battler-card" class:player={side === 'player'} class:enemy={side === 'enemy'} data-testid="{side}-card">
 	<!-- Name + Level -->
 	<div class="battler-header" class:reversed={side === 'enemy'}>
 		<div class="battler-identity" class:reversed={side === 'enemy'}>

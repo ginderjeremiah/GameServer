@@ -60,11 +60,11 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [enemySkill]);
 
-            var sim = new BattleSimulator(player, enemy);
-            var victory = sim.Simulate(out var totalMs);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsTrue(victory, "Player should win this matchup.");
-            Assert.AreEqual(0, totalMs % 40, "totalMs must be a multiple of the tick rate.");
+            Assert.IsTrue(result.Victory, "Player should win this matchup.");
+            Assert.AreEqual(0, result.TotalMs % 40, "totalMs must be a multiple of the tick rate.");
 
             // Record the authoritative value — the frontend test must match this exactly.
             // Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09
@@ -73,7 +73,7 @@ namespace Game.Core.Tests.Battle
             // Enemy:  MaxHealth=400, Def=17, CDR=0
             //   damage = 5-42 = 0 (clamped)
             // 6 hits to kill (6*68=408>400), at ticks 28,56,84,112,140,168 → 6720ms
-            Assert.AreEqual(6720, totalMs);
+            Assert.AreEqual(6720, result.TotalMs);
         }
 
         /// <summary>
@@ -123,14 +123,14 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [enemySkill]);
 
-            var sim = new BattleSimulator(player, enemy);
-            var victory = sim.Simulate(out var totalMs);
+            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var result = sim.Simulate();
 
-            Assert.IsTrue(victory);
+            Assert.IsTrue(result.Victory);
             // With doubled CDR (18 instead of 9), cdMult=1.18,
             // charge/tick = 47.2, fires every 26 ticks → 6240ms
-            Assert.AreEqual(6240, totalMs);
-            Assert.IsTrue(totalMs < 6720, "Double-counted stats should end the battle sooner.");
+            Assert.AreEqual(6240, result.TotalMs);
+            Assert.IsTrue(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
         }
 
         private static Player MakePlayer(

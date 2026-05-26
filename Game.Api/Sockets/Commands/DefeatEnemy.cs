@@ -1,12 +1,10 @@
-﻿using Game.Api.Models.Common;
+using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Application.Services;
-using Game.Core.Battle;
-using EnemyInstanceModel = Game.Api.Models.Enemies.EnemyInstance;
 
 namespace Game.Api.Sockets.Commands
 {
-    public class DefeatEnemy : AbstractSocketCommand<DefeatEnemyResponse, EnemyInstanceModel>
+    public class DefeatEnemy : AbstractSocketCommand<DefeatEnemyResponse, DefeatEnemyRequest>
     {
         private readonly BattleService _battleService;
         private readonly ILogger<DefeatEnemy> _logger;
@@ -21,11 +19,10 @@ namespace Game.Api.Sockets.Commands
 
         public override async Task<ApiSocketResponse<DefeatEnemyResponse>> HandleExecuteAsync(SocketContext context)
         {
-            var now = DateTime.UtcNow;
             var state = context.Session.PlayerState;
             var player = await context.Session.LoadPlayer();
 
-            if (!state.ActiveEnemyId.HasValue)
+            if (!state.HasActiveBattle)
             {
                 return ErrorWithData("No active enemy.", new DefeatEnemyResponse
                 {
@@ -33,31 +30,30 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
-            var rng = new Mulberry32(state.BattleSeed ?? 0);
-            var rewards = await _battleService.TryDefeatEnemy(
-                player, state,
-                state.ActiveEnemyId.Value,
-                state.ActiveEnemyLevel ?? 1,
-                rng);
+            var claimedTimestamp = DateTimeOffset.FromUnixTimeMilliseconds(Parameters.Timestamp).UtcDateTime;
+
+            var rewards = await _battleService.EndBattleVictory(player, state, claimedTimestamp);
 
             if (rewards is not null)
             {
-                _logger.LogDebug("DefeatEnemy: (currentTime: {CurrentTime}, exp: {Exp})",
-                    now.ToString("O"), rewards.ExpReward);
+                _logger.LogDebug("DefeatEnemy: (timestamp: {Timestamp}, exp: {Exp})",
+                    claimedTimestamp.ToString("O"), rewards.ExpReward);
 
                 context.Session.SavePlayerState();
 
+                var now = DateTime.UtcNow;
                 return Success(new DefeatEnemyResponse
                 {
-                    Cooldown = 5000,
-                    Rewards = new Models.Enemies.DefeatRewards(rewards),
+                    Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
+                    Rewards = new DefeatRewards(rewards),
                 });
             }
             else
             {
-                _logger.LogError("DefeatEnemy: (victory: {Victory}, currentTime: {CurrentTime}, earliestDefeat: {EarliestDefeat})",
-                    state.Victory, now.ToString("O"), state.EarliestDefeat.ToString("O"));
+                _logger.LogError("DefeatEnemy: Could not defeat enemy (timestamp: {Timestamp})",
+                    claimedTimestamp.ToString("O"));
 
+                var now = DateTime.UtcNow;
                 return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                 {
                     Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,

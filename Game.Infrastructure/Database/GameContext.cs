@@ -229,7 +229,10 @@ namespace Game.Infrastructure.Database
 
             modelBuilder.Entity<PlayerStatistic>(entity =>
             {
-                entity.HasKey(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId });
+                entity.HasKey(ps => ps.Id);
+
+                entity.HasIndex(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId })
+                    .IsUnique();
             });
 
             modelBuilder.Entity<Skill>(entity =>

@@ -8,7 +8,7 @@ namespace Game.Abstractions.Entities
         public bool Completed { get; set; }
         public DateTime? CompletedAt { get; set; }
 
-        public virtual Player Player { get; set; }
-        public virtual Challenge Challenge { get; set; }
+        public virtual Player Player { get => field ?? throw new NavigationNotLoadedException(nameof(Player)); set; }
+        public virtual Challenge Challenge { get => field ?? throw new NavigationNotLoadedException(nameof(Challenge)); set; }
     }
 }

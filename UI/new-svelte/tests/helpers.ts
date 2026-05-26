@@ -7,7 +7,7 @@ import { expect } from '@playwright/test';
  * and event handlers aren't attached yet.
  */
 export async function waitForLoginReady(page: Page) {
-	await expect(page.locator('h1')).toHaveText('Login', { timeout: 10000 });
+	await expect(page.getByTestId('login-heading')).toBeVisible({ timeout: 10000 });
 	await page.waitForResponse(
 		(r) => r.url().includes('/api/Login/Status'),
 		{ timeout: 10000 }
@@ -25,10 +25,14 @@ export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.goto('/');
 	await waitForLoginReady(page);
 
+	// Switch to signup mode
+	await page.getByTestId('mode-toggle').click();
+
 	const username = shortUsername(prefix);
-	await page.locator('input[name="username"]').fill(username);
-	await page.locator('input[name="password"]').fill(TEST_PASSWORD);
-	await page.locator('button', { hasText: 'Create Account' }).click();
+	await page.getByTestId('username-input').fill(username);
+	await page.getByTestId('password-input').fill(TEST_PASSWORD);
+	await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
+	await page.getByTestId('submit-button').click();
 
 	await expect(page).toHaveURL('/loading', { timeout: 10000 });
 	return username;
@@ -37,9 +41,9 @@ export async function createAccountAndLogin(page: Page, prefix = 'e') {
 export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 	const username = await createAccountAndLogin(page, prefix);
 
-	const startButton = page.locator('button', { hasText: 'Start Game' });
-	await expect(startButton).toBeEnabled({ timeout: 10000 });
-	await startButton.click();
+	const enterButton = page.getByTestId('enter-button');
+	await expect(enterButton).toBeEnabled({ timeout: 10000 });
+	await enterButton.click();
 	await expect(page).toHaveURL('/game', { timeout: 5000 });
 	return username;
 }

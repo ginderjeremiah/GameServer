@@ -7,7 +7,7 @@
         public decimal BaseAmount { get; set; }
         public decimal AmountPerLevel { get; set; }
 
-        public virtual Enemy Enemy { get; set; }
-        public virtual Attribute Attribute { get; set; }
+        public virtual Enemy Enemy { get => field ?? throw new NavigationNotLoadedException(nameof(Enemy)); set; }
+        public virtual Attribute Attribute { get => field ?? throw new NavigationNotLoadedException(nameof(Attribute)); set; }
     }
 }

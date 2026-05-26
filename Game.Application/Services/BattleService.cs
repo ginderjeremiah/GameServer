@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Players;
 using CoreEnemy = Game.Core.Enemies.Enemy;
@@ -9,15 +10,22 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
-        IDomainEventDispatcher dispatcher)
+        IDomainEventDispatcher dispatcher,
+        BattlerFactory battlerFactory)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
         private readonly IDomainEventDispatcher _dispatcher = dispatcher;
+        private readonly BattlerFactory _battlerFactory = battlerFactory;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
         {
+            if (state.HasActiveBattle)
+            {
+                await AbandonBattle(player, state);
+            }
+
             if (newZoneId.HasValue)
             {
                 player.ChangeZone(newZoneId.Value);
@@ -38,12 +46,9 @@ namespace Game.Application.Services
 
             var now = DateTime.UtcNow;
             var seed = (uint)(now.Ticks % uint.MaxValue);
+            var snapshot = _battlerFactory.CreateSnapshot(player);
 
-            var simulator = new BattleSimulator(player, enemy);
-            var victory = simulator.Simulate(out var totalMs);
-            var earliestDefeat = now.AddMilliseconds(totalMs);
-
-            state.SetActiveBattle(enemy.Id, level, seed, earliestDefeat, victory);
+            state.SetActiveBattle(enemy.Id, level, seed, now, snapshot);
 
             return new BattleStartResult
             {
@@ -52,10 +57,28 @@ namespace Game.Application.Services
             };
         }
 
-        public async Task<DefeatResult?> TryDefeatEnemy(Player player, PlayerState state, int enemyId, int level, Mulberry32 rng)
+        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp)
         {
+            if (!state.HasActiveBattle || state.Snapshot is null)
+            {
+                return null;
+            }
+
+            var enemyId = state.ActiveEnemyId!.Value;
+            var level = state.ActiveEnemyLevel ?? 1;
+            var seed = state.BattleSeed ?? 0;
+
+            var result = SimulateBattle(enemyId, level, seed, state.Snapshot);
+
+            if (!result.Victory)
+            {
+                return null;
+            }
+
+            var earliestDefeat = state.BattleStartTime.AddMilliseconds(result.TotalMs);
             var now = DateTime.UtcNow;
-            if (!state.CanDefeatEnemy(now))
+
+            if (claimedTimestamp < earliestDefeat || claimedTimestamp > now)
             {
                 return null;
             }
@@ -67,15 +90,13 @@ namespace Game.Application.Services
 
             player.GrantExp(rewards.ExpReward);
             player.RecordEnemyDefeat(enemyId, rewards.ExpReward);
+            player.RecordBattleCompleted(enemyId, result);
 
-            state.SetCooldown(now.AddSeconds(5));
+            state.SetCooldown(claimedTimestamp.AddSeconds(5));
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
-
-            var events = player.DomainEvents.ToList();
-            player.ClearEvents();
-            await _dispatcher.DispatchAsync(events);
+            await DispatchEvents(player);
 
             return new DefeatResult
             {
@@ -85,6 +106,89 @@ namespace Game.Application.Services
                 StatPointsGained = player.StatPoints.StatPointsGained,
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
             };
+        }
+
+        public async Task<bool> EndBattleLoss(Player player, PlayerState state)
+        {
+            if (!state.HasActiveBattle || state.Snapshot is null)
+            {
+                return false;
+            }
+
+            var enemyId = state.ActiveEnemyId!.Value;
+            var level = state.ActiveEnemyLevel ?? 1;
+            var seed = state.BattleSeed ?? 0;
+
+            var result = SimulateBattle(enemyId, level, seed, state.Snapshot);
+
+            if (result.Victory)
+            {
+                return false;
+            }
+
+            player.RecordBattleCompleted(enemyId, result);
+
+            state.SetCooldown(DateTime.UtcNow.AddSeconds(5));
+            state.ClearBattle();
+
+            await _playerRepo.SavePlayer(player);
+            await DispatchEvents(player);
+
+            return true;
+        }
+
+        private async Task AbandonBattle(Player player, PlayerState state)
+        {
+            if (state.Snapshot is null)
+            {
+                state.ClearBattle();
+                return;
+            }
+
+            var enemyId = state.ActiveEnemyId!.Value;
+            var level = state.ActiveEnemyLevel ?? 1;
+            var seed = state.BattleSeed ?? 0;
+
+            var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
+            if (elapsedMs <= 0)
+            {
+                state.ClearBattle();
+                return;
+            }
+
+            var result = SimulateBattle(enemyId, level, seed, state.Snapshot, elapsedMs);
+
+            player.RecordBattleCompleted(enemyId, result);
+
+            state.ClearBattle();
+
+            await _playerRepo.SavePlayer(player);
+            await DispatchEvents(player);
+        }
+
+        private BattleResult SimulateBattle(int enemyId, int level, uint seed, BattleSnapshot snapshot, int? maxMs = null)
+        {
+            var enemy = _enemies.GetDomainEnemy(enemyId, level)
+                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
+
+            var battleRng = new Mulberry32(seed);
+            enemy.Skills = enemy.GetRandomSkills(battleRng);
+
+            var playerBattler = _battlerFactory.CreateFromSnapshot(snapshot);
+            var enemyBattler = new Battler(
+                new AttributeCollection(enemy.GetAttributeModifiers()),
+                enemy.Skills,
+                enemy.Level);
+
+            var simulator = new BattleSimulator(playerBattler, enemyBattler);
+            return simulator.Simulate(maxMs);
+        }
+
+        private async Task DispatchEvents(Player player)
+        {
+            var events = player.DomainEvents.ToList();
+            player.ClearEvents();
+            await _dispatcher.DispatchAsync(events);
         }
     }
 

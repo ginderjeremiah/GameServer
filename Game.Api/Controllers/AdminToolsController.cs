@@ -68,7 +68,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public ApiResponse AddEditItemAttributes([FromBody] AddEditAttributesData changeData)
         {
-            var item = _items.GetItem(changeData.Id);
+            var item = _items.LookupItem(changeData.Id);
             if (item is null)
             {
                 return ApiResponse.Error("Item does not exist.");
@@ -109,7 +109,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public ApiResponse AddEditItemModAttributes([FromBody] AddEditAttributesData changeData)
         {
-            var itemMod = _itemMods.GetItemMod(changeData.Id);
+            var itemMod = _itemMods.LookupItemMod(changeData.Id);
             if (itemMod is null)
             {
                 return ApiResponse.Error("Item Mod does not exist.");
@@ -164,7 +164,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var itemMod = _itemMods.GetItemMod(change.Item.Id);
+                    var itemMod = _itemMods.LookupItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
                         itemMod.Name = change.Item.Name;
@@ -176,7 +176,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var itemMod = _itemMods.GetItemMod(change.Item.Id);
+                    var itemMod = _itemMods.LookupItemMod(change.Item.Id);
                     if (itemMod is not null)
                     {
                         _entityStore.Delete(itemMod);
@@ -204,7 +204,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var item = _items.GetItem(change.Item.Id);
+                    var item = _items.LookupItem(change.Item.Id);
                     if (item is not null)
                     {
                         item.Name = change.Item.Name;
@@ -216,7 +216,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var item = _items.GetItem(change.Item.Id);
+                    var item = _items.LookupItem(change.Item.Id);
                     if (item is not null)
                     {
                         _entityStore.Delete(item);
@@ -294,6 +294,9 @@ namespace Game.Api.Controllers
                     _entityStore.Delete(new Game.Abstractions.Entities.Skill
                     {
                         Id = change.Item.Id,
+                        Name = "",
+                        Description = "",
+                        IconPath = "",
                     });
                 }
             }
@@ -328,6 +331,7 @@ namespace Game.Api.Controllers
                     _entityStore.Delete(new Game.Abstractions.Entities.Tag
                     {
                         Id = change.Item.Id,
+                        Name = "",
                     });
                 }
             }
@@ -368,6 +372,8 @@ namespace Game.Api.Controllers
                     _entityStore.Delete(new Game.Abstractions.Entities.Zone
                     {
                         Id = change.Item.Id,
+                        Name = "",
+                        Description = "",
                     });
                 }
             }
@@ -448,7 +454,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public ApiResponse SetSkillMultipliers([FromBody] AddEditAttributesData changeData)
         {
-            var skill = _skills.GetSkill(changeData.Id);
+            var skill = _skills.LookupSkill(changeData.Id);
             if (skill is null)
             {
                 return ApiResponse.Error("Skill does not exist.");
@@ -491,7 +497,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItem([FromBody] SetTagsData setTagsData)
         {
-            var item = _items.GetItem(setTagsData.Id);
+            var item = _items.LookupItem(setTagsData.Id);
             if (item is not null)
             {
                 item.Tags.Clear();
@@ -510,7 +516,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {
-            var itemMod = _itemMods.GetItemMod(setTagsData.Id);
+            var itemMod = _itemMods.LookupItemMod(setTagsData.Id);
             if (itemMod is not null)
             {
                 itemMod.Tags.Clear();

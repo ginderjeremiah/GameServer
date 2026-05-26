@@ -2,7 +2,6 @@ using Game.Abstractions.DataAccess;
 using Game.Application.Services;
 using Game.Application.Tests.Fakes;
 using Game.Core;
-using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 
@@ -141,7 +140,7 @@ namespace Game.Application.Tests.Services
                 Exp = 0,
                 CurrentZoneId = 0,
                 StatPoints = new PlayerStatPoints(allocations)
-                    { StatPointsGained = statPointsGained, StatPointsUsed = statPointsUsed },
+                { StatPointsGained = statPointsGained, StatPointsUsed = statPointsUsed },
                 Inventory = new Inventory(),
                 SelectedSkills = [],
                 Skills = [],
@@ -176,9 +175,10 @@ namespace Game.Application.Tests.Services
         private class FakeItemMods : IItemMods
         {
             public void InvalidateCache() { }
-            public List<Game.Abstractions.Entities.ItemMod> All(bool refreshCache = false) => [];
-            public Dictionary<int, IEnumerable<Game.Abstractions.Entities.ItemMod>> GetModsForItemByType(int itemId) => [];
-            public Game.Abstractions.Entities.ItemMod? GetItemMod(int itemModId) => null;
+            public List<Abstractions.Entities.ItemMod> All(bool refreshCache = false) => [];
+            public Dictionary<int, IEnumerable<Abstractions.Entities.ItemMod>> GetModsForItemByType(int itemId) => [];
+            public Abstractions.Entities.ItemMod? LookupItemMod(int itemModId) => null;
+            public Abstractions.Entities.ItemMod GetItemMod(int itemModId) => null!;
         }
     }
 }

@@ -32,10 +32,16 @@ namespace Game.DataAccess.Repositories
             return _skillDataList;
         }
 
-        public Skill? GetSkill(int skillId)
+        public Skill? LookupSkill(int skillId)
         {
             var skills = AllSkills();
-            return skills.Count <= skillId ? null : skills[skillId];
+            return skills.Count <= skillId || skillId < 0 ? null : skills[skillId];
+        }
+
+        public Skill GetSkill(int skillId)
+        {
+            var skills = AllSkills();
+            return skills[skillId];
         }
 
         public Task SaveSkillsAsync(List<int> skillIds)

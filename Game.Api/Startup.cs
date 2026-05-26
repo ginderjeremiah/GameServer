@@ -54,6 +54,7 @@ namespace Game.Api
                 .AddTransient<SocketCommandFactory>()
                 .AddSingleton<ApiCodeGenerator>()
                 // Application services
+                .AddScoped<BattlerFactory>()
                 .AddScoped<BattleService>()
                 .AddScoped<PlayerService>()
                 .AddScoped<StatisticsService>()
@@ -62,7 +63,8 @@ namespace Game.Api
                 .AddScoped<AdminCacheInvalidationFilter>()
                 .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>()
                 .AddScoped<IDomainEventHandler, LoggingEventHandler>()
-                .AddScoped<IDomainEventHandler, StatisticsEventHandler>();
+                .AddScoped<IDomainEventHandler, StatisticsEventHandler>()
+                .AddScoped<IDomainEventHandler, BattleStatisticsEventHandler>();
 
             if (builder.Environment.IsDevelopment())
             {

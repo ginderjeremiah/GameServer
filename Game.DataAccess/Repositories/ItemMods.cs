@@ -62,10 +62,16 @@ namespace Game.DataAccess.Repositories
             return mods;
         }
 
-        public ItemMod? GetItemMod(int itemModId)
+        public ItemMod? LookupItemMod(int itemModId)
         {
             var itemMods = All();
-            return itemMods.Count <= itemModId ? null : itemMods[itemModId];
+            return itemMods.Count <= itemModId || itemModId < 0 ? null : itemMods[itemModId];
+        }
+
+        public ItemMod GetItemMod(int itemModId)
+        {
+            var itemMods = All();
+            return itemMods[itemModId];
         }
 
         private Dictionary<int, IEnumerable<ItemMod>> ModsForItemByType(int itemId)

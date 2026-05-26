@@ -3,8 +3,8 @@ namespace Game.Abstractions.Entities
     public class Challenge : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public required string Name { get; set; }
+        public required string Description { get; set; }
         public int ChallengeTypeId { get; set; }
         public int? TargetEntityId { get; set; }
         public int TargetCount { get; set; }

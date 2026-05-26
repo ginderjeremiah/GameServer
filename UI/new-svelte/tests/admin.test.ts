@@ -3,7 +3,7 @@ import { createAccountAndStartGame } from './helpers';
 
 async function loginAndGoToAdmin(page: import('@playwright/test').Page) {
 	await createAccountAndStartGame(page, 'ad');
-	await page.getByText('Admin', { exact: true }).click();
+	await page.getByTestId('sidebar-item-admin').click();
 	await expect(page).toHaveURL('/admin', { timeout: 5000 });
 }
 

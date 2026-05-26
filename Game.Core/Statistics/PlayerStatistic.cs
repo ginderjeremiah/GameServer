@@ -6,7 +6,7 @@ namespace Game.Core.Statistics
     public class PlayerStatistic
     {
         public required EStatisticType Type { get; set; }
-        public required int EntityId { get; set; }
+        public required int? EntityId { get; set; }
         public required long Value { get; set; }
     }
 }

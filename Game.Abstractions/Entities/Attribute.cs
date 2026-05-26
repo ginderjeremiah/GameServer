@@ -3,13 +3,13 @@
     public partial class Attribute : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public required string Name { get; set; }
+        public required string Description { get; set; }
 
-        public virtual List<AttributeDistribution> AttributeDistributions { get; set; }
-        public virtual List<ItemAttribute> ItemAttributes { get; set; }
-        public virtual List<ItemModAttribute> ItemModAttributes { get; set; }
-        public virtual List<PlayerAttribute> PlayerAttributes { get; set; }
-        public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
+        public virtual List<AttributeDistribution> AttributeDistributions { get => field ?? throw new NavigationNotLoadedException(nameof(AttributeDistributions)); set; }
+        public virtual List<ItemAttribute> ItemAttributes { get => field ?? throw new NavigationNotLoadedException(nameof(ItemAttributes)); set; }
+        public virtual List<ItemModAttribute> ItemModAttributes { get => field ?? throw new NavigationNotLoadedException(nameof(ItemModAttributes)); set; }
+        public virtual List<PlayerAttribute> PlayerAttributes { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerAttributes)); set; }
+        public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get => field ?? throw new NavigationNotLoadedException(nameof(SkillDamageMultipliers)); set; }
     }
 }

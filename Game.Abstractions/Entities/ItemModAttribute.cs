@@ -6,7 +6,7 @@
         public int AttributeId { get; set; }
         public decimal Amount { get; set; }
 
-        public virtual ItemMod ItemMod { get; set; }
-        public virtual Attribute Attribute { get; set; }
+        public virtual ItemMod ItemMod { get => field ?? throw new NavigationNotLoadedException(nameof(ItemMod)); set; }
+        public virtual Attribute Attribute { get => field ?? throw new NavigationNotLoadedException(nameof(Attribute)); set; }
     }
 }

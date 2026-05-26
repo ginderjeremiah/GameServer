@@ -5,44 +5,47 @@ test.describe('Login page', () => {
 	test('renders login form with expected elements', async ({ page }) => {
 		await page.goto('/');
 
-		await expect(page.locator('h1')).toHaveText('Login');
-		await expect(page.locator('input[name="username"]')).toBeVisible();
-		await expect(page.locator('input[name="password"]')).toBeVisible();
-		await expect(page.getByText('Login', { exact: true }).locator('button, [type="submit"]')).toBeTruthy();
-		await expect(page.getByText('Create Account')).toBeVisible();
+		await expect(page.getByTestId('login-heading')).toHaveText('Welcome back.');
+		await expect(page.getByTestId('username-input')).toBeVisible();
+		await expect(page.getByTestId('password-input')).toBeVisible();
+		await expect(page.getByTestId('submit-button')).toBeVisible();
+		await expect(page.getByTestId('mode-toggle')).toBeVisible();
 	});
 
-	test('login button is present and clickable', async ({ page }) => {
+	test('submit button shows Sign In for login mode', async ({ page }) => {
 		await page.goto('/');
 
-		const loginButton = page.locator('button', { hasText: 'Login' });
-		await expect(loginButton).toBeVisible();
+		const submitButton = page.getByTestId('submit-button');
+		await expect(submitButton).toBeVisible();
+		await expect(submitButton).toHaveText(/Sign In/i);
 	});
 
-	test('create account button is present', async ({ page }) => {
+	test('mode toggle switches to signup form', async ({ page }) => {
 		await page.goto('/');
 
-		const createButton = page.locator('button', { hasText: 'Create Account' });
-		await expect(createButton).toBeVisible();
+		await page.getByTestId('mode-toggle').click();
+
+		await expect(page.getByTestId('login-heading')).toHaveText('Begin a new run.');
+		await expect(page.getByTestId('confirm-input')).toBeVisible();
+		await expect(page.getByTestId('submit-button')).toHaveText(/Create/i);
 	});
 
 	test('does not submit with empty credentials', async ({ page }) => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
-		const loginButton = page.locator('button', { hasText: 'Login' });
-		await loginButton.click();
+		const submitButton = page.getByTestId('submit-button');
+		await expect(submitButton).toBeDisabled();
 
 		await page.waitForTimeout(500);
 		await expect(page).toHaveURL('/');
-		await expect(page.locator('h1')).toHaveText('Login');
 	});
 
 	test('username and password inputs accept text', async ({ page }) => {
 		await page.goto('/');
 
-		const usernameInput = page.locator('input[name="username"]');
-		const passwordInput = page.locator('input[name="password"]');
+		const usernameInput = page.getByTestId('username-input');
+		const passwordInput = page.getByTestId('password-input');
 
 		await usernameInput.fill('testuser');
 		await passwordInput.fill('testpass');
@@ -54,7 +57,22 @@ test.describe('Login page', () => {
 	test('password input masks characters', async ({ page }) => {
 		await page.goto('/');
 
-		const passwordInput = page.locator('input[name="password"]');
+		const passwordInput = page.getByTestId('password-input');
+		await expect(passwordInput).toHaveAttribute('type', 'password');
+	});
+
+	test('password toggle reveals and hides password', async ({ page }) => {
+		await page.goto('/');
+
+		const passwordInput = page.getByTestId('password-input');
+		const toggleBtn = page.getByTestId('password-toggle');
+
+		await expect(passwordInput).toHaveAttribute('type', 'password');
+
+		await toggleBtn.click();
+		await expect(passwordInput).toHaveAttribute('type', 'text');
+
+		await toggleBtn.click();
 		await expect(passwordInput).toHaveAttribute('type', 'password');
 	});
 
@@ -62,16 +80,34 @@ test.describe('Login page', () => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
-		const usernameInput = page.locator('input[name="username"]');
-		await usernameInput.fill('testuser');
+		await page.getByTestId('username-input').fill('testuser');
+		await page.getByTestId('password-input').fill('testpass');
 
-		const passwordInput = page.locator('input[name="password"]');
-		await passwordInput.fill('testpass');
-
-		await passwordInput.press('Enter');
+		await page.getByTestId('password-input').press('Enter');
 		await page.waitForTimeout(500);
 
-		const isOnLogin = await page.locator('h1').textContent();
-		expect(['Login', 'Loading']).toContain(isOnLogin);
+		// Either stays on login (bad creds) or navigates to loading
+		const url = page.url();
+		expect(url.endsWith('/') || url.includes('/loading')).toBe(true);
+	});
+
+	test('signup mode shows strength meter when password is entered', async ({ page }) => {
+		await page.goto('/');
+
+		await page.getByTestId('mode-toggle').click();
+		await page.getByTestId('password-input').fill('Test123!');
+
+		await expect(page.getByTestId('strength-meter')).toBeVisible();
+	});
+
+	test('status line shows validation errors after interaction', async ({ page }) => {
+		await page.goto('/');
+
+		const usernameInput = page.getByTestId('username-input');
+		await usernameInput.fill('a');
+		await usernameInput.blur();
+
+		const statusLine = page.getByTestId('status-line');
+		await expect(statusLine).toBeVisible();
 	});
 });

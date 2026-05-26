@@ -1,7 +1,8 @@
 <div
 	class="sidebar"
 	class:expanded
-  role="complementary"
+	data-testid="sidebar"
+	role="complementary"
 	onmouseenter={() => hovering = true}
 	onmouseleave={() => hovering = false}
 >
@@ -17,6 +18,7 @@
 			<button
 				class="pin-button"
 				class:pinned
+				data-testid="pin-button"
 				title={pinned ? 'Unpin' : 'Keep open'}
 				onclick={() => pinned = !pinned}
 			>
@@ -56,6 +58,7 @@
 						<button
 							class="side-item"
 							class:active={active === screen.key}
+							data-testid="sidebar-item-{screen.key}"
 							title={!expanded ? screen.label : undefined}
 							onclick={() => handleClick(screen)}
 						>

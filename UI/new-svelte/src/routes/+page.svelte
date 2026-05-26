@@ -1,4 +1,4 @@
-<div class="login-screen">
+<div class="login-screen" data-testid="login-screen">
 	<div class="login-form">
 		<!-- Diamond mark -->
 		<div class="diamond-container">
@@ -8,7 +8,7 @@
 		</div>
 
 		<div class="heading">
-			<h1>{mode === 'login' ? 'Welcome back.' : 'Begin a new run.'}</h1>
+			<h1 data-testid="login-heading">{mode === 'login' ? 'Welcome back.' : 'Begin a new run.'}</h1>
 			<p class="subtitle">
 				{mode === 'login' ? 'Sign in to continue.' : 'Pick a name. Forge ahead.'}
 			</p>
@@ -18,6 +18,7 @@
 			<!-- Username -->
 			<div class="field-group">
 				<input
+					data-testid="username-input"
 					type="text"
 					placeholder="Username"
 					bind:value={username}
@@ -44,6 +45,7 @@
 			<!-- Password -->
 			<div class="field-group" class:extra-margin={mode === 'signup'}>
 				<input
+					data-testid="password-input"
 					type={showPassword ? 'text' : 'password'}
 					placeholder="Password"
 					bind:value={password}
@@ -54,7 +56,7 @@
 					class:error={passwordError}
 					class:valid={password && passwordValid}
 				/>
-				<button type="button" class="eye-button" onclick={() => showPassword = !showPassword}>
+				<button type="button" class="eye-button" data-testid="password-toggle" onclick={() => showPassword = !showPassword}>
 					{#if showPassword}
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="none">
 							<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
@@ -68,7 +70,7 @@
 					{/if}
 				</button>
 				{#if mode === 'signup' && password}
-					<div class="strength-meter">
+					<div class="strength-meter" data-testid="strength-meter">
 						{#each [0, 1, 2, 3] as i}
 							<div
 								class="strength-segment"
@@ -85,6 +87,7 @@
 			{#if mode === 'signup'}
 				<div class="field-group">
 					<input
+						data-testid="confirm-input"
 						type={showPassword ? 'text' : 'password'}
 						placeholder="Confirm password"
 						bind:value={confirm}
@@ -110,7 +113,7 @@
 			{/if}
 
 			<!-- Status line -->
-			<div class="status-line" style:color={statusColor}>
+			<div class="status-line" data-testid="status-line" style:color={statusColor}>
 				{#if statusLine.type === 'ok'}
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
 						<path d="M3 8.5l3 3 7-7" stroke={statusColor} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -125,6 +128,7 @@
 
 			<!-- Submit button -->
 			<button
+				data-testid="submit-button"
 				type="submit"
 				class="submit-button"
 				disabled={!formValid || submitting}
@@ -143,7 +147,7 @@
 		<div class="mode-toggle">
 			{mode === 'login' ? 'No account yet?' : 'Already a hero?'}
 			{' '}
-			<button class="mode-link" onclick={toggleMode}>
+			<button class="mode-link" data-testid="mode-toggle" onclick={toggleMode}>
 				{mode === 'login' ? 'Create one' : 'Sign in'}
 			</button>
 		</div>

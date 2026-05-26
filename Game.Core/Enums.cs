@@ -292,7 +292,17 @@ namespace Game.Core
         EnemiesKilled = 1,
         BossesDefeated = 2,
         ZonesCleared = 3,
-        TotalDamageDealt = 4
+        TotalDamageDealt = 4,
+        HighestSingleAttackDamage = 5,
+        TotalDamageTaken = 6,
+        TotalDamageHealed = 7,
+        EnemiesEncountered = 8,
+        BattlesWon = 9,
+        BattlesLost = 10,
+        PlayerDeaths = 11,
+        TotalBattleTimeMs = 12,
+        FastestVictoryMs = 13,
+        TotalSkillsUsed = 14,
     }
 
     /// <summary>

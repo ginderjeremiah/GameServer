@@ -1,4 +1,4 @@
-<div class="fight-screen">
+<div class="fight-screen" data-testid="fight-screen">
 	<div class="zone-nav-wrapper">
 		<ZoneNav />
 	</div>
@@ -6,7 +6,7 @@
 		<BattlerCard battler={battleEngine.player} side="player" />
 
 		<!-- VS badge -->
-		<div class="vs-badge">
+		<div class="vs-badge" data-testid="vs-badge">
 			<div class="vs-diamond"></div>
 			<div class="vs-diamond-inner"></div>
 			<span class="vs-text">vs</span>

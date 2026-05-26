@@ -1,8 +1,8 @@
-<div class="game-container">
+<div class="game-container" data-testid="game-screen">
 	<div class="sidebar-spacer"></div>
 
 	<div class="main-content">
-		<div class="screen-container">
+		<div class="screen-container" data-testid="screen-container">
 			<CurrentScreen />
 		</div>
 		<LogPanel />

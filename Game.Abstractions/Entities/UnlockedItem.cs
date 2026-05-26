@@ -6,7 +6,7 @@ namespace Game.Abstractions.Entities
         public int ItemId { get; set; }
         public int? EquipmentSlotId { get; set; }
 
-        public virtual Player Player { get; set; }
-        public virtual Item Item { get; set; }
+        public virtual Player Player { get => field ?? throw new NavigationNotLoadedException(nameof(Player)); set; }
+        public virtual Item Item { get => field ?? throw new NavigationNotLoadedException(nameof(Item)); set; }
     }
 }

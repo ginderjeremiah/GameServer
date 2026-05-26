@@ -1,4 +1,4 @@
-<div class="zone-nav">
+<div class="zone-nav" data-testid="zone-nav">
 	<button class="zone-btn" disabled={leftDisabled} onclick={handleClickLeft}>&#8249;</button>
 	<div class="zone-info">
 		<span class="zone-num">Zone · {String(zoneNum).padStart(2, '0')}</span>

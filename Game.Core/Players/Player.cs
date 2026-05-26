@@ -1,5 +1,6 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.Battle;
 using Game.Core.Events;
 using Game.Core.Items;
 using Game.Core.Players.Inventories;
@@ -133,12 +134,14 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        /// <summary>
-        /// Records that an enemy has been defeated and raises an <see cref="EnemyDefeatedEvent"/>.
-        /// </summary>
         public void RecordEnemyDefeat(int enemyId, int expReward)
         {
             RaiseEvent(new EnemyDefeatedEvent(Id, enemyId, expReward));
+        }
+
+        public void RecordBattleCompleted(int enemyId, BattleResult result)
+        {
+            RaiseEvent(new BattleCompletedEvent(Id, enemyId, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()

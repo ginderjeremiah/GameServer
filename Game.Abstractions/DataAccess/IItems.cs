@@ -6,6 +6,7 @@ namespace Game.Abstractions.DataAccess
     {
         public void InvalidateCache();
         public List<Item> All(bool refreshCache = false);
-        public Item? GetItem(int itemId);
+        public Item? LookupItem(int itemId);
+        public Item GetItem(int itemId);
     }
 }

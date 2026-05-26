@@ -23,6 +23,7 @@ namespace Game.Core.Battle
             if (ChargeTime >= Skill.CooldownMs)
             {
                 ChargeTime = 0.0;
+                context.RecordSkillUse();
                 var damage = CalculateDamage(context);
                 context.DamageTarget(damage);
             }

@@ -1,9 +1,11 @@
-﻿namespace Game.Abstractions.Entities
+using Game.Core.Battle;
+
+namespace Game.Abstractions.Entities
 {
     public class PlayerState
     {
-        public bool Victory { get; set; }
-        public DateTime EarliestDefeat { get; set; }
+        public DateTime BattleStartTime { get; set; }
         public DateTime EnemyCooldown { get; set; }
+        public BattleSnapshot? Snapshot { get; set; }
     }
 }
