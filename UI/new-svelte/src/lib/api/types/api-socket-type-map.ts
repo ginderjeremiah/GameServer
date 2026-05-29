@@ -3,20 +3,22 @@
 */
 
 import type {
+	IBattleLostResponse,
+	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
-	IEnemyInstance,
 	INewEnemyModel,
 	INewEnemyRequest
 } from "./"
 
 export type ApiSocketResponseTypes = {
+	'BattleLost': IBattleLostResponse;
 	'DefeatEnemy': IDefeatEnemyResponse;
 	'NewEnemy': INewEnemyModel;
 	'SocketReplaced': undefined;
 };
 
 export type ApiSocketRequestTypes = {
-	'DefeatEnemy': IEnemyInstance;
+	'DefeatEnemy': IDefeatEnemyRequest;
 	'NewEnemy': INewEnemyRequest;
 };
 

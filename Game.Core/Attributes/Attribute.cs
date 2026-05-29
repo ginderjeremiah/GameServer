@@ -27,7 +27,7 @@ namespace Game.Core.Attributes
         public Attribute(EAttribute id)
         {
             Id = id;
-            Name = id.ToString().Capitalize().SpaceWords();
+            Name = id.ToString().SpaceWords();
             Description = GetDescription(id);
         }
 

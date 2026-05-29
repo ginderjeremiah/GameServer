@@ -22,7 +22,7 @@
 					type="text"
 					placeholder="Username"
 					bind:value={username}
-					onblur={() => touched.username = true}
+					onblur={() => (touched.username = true)}
 					class="underline-input"
 					class:error={usernameError}
 					class:valid={username && usernameValid}
@@ -31,11 +31,22 @@
 					<div class="field-icon">
 						{#if usernameError}
 							<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-								<path d="M4 4l8 8M12 4l-8 8" stroke="var(--error)" stroke-width="2" stroke-linecap="round" />
+								<path
+									d="M4 4l8 8M12 4l-8 8"
+									stroke="var(--error)"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
 							</svg>
 						{:else if usernameValid}
 							<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-								<path d="M3 8.5l3 3 7-7" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+								<path
+									d="M3 8.5l3 3 7-7"
+									stroke="var(--success)"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
 							</svg>
 						{/if}
 					</div>
@@ -49,23 +60,41 @@
 					type={showPassword ? 'text' : 'password'}
 					placeholder="Password"
 					bind:value={password}
-					onblur={() => touched.password = true}
+					onblur={() => (touched.password = true)}
 					onkeydown={detectCapsLock}
 					onkeyup={detectCapsLock}
 					class="underline-input"
 					class:error={passwordError}
 					class:valid={password && passwordValid}
 				/>
-				<button type="button" class="eye-button" data-testid="password-toggle" onclick={() => showPassword = !showPassword}>
+				<button
+					type="button"
+					class="eye-button"
+					data-testid="password-toggle"
+					onclick={() => (showPassword = !showPassword)}
+				>
 					{#if showPassword}
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-							<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
+							<path
+								d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z"
+								stroke="rgba(240,240,240,0.75)"
+								stroke-width="1.4"
+							/>
 							<circle cx="10" cy="10" r="2.5" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
 						</svg>
 					{:else}
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-							<path d="M2 10s3-5 8-5c2 0 3.7.8 5 1.8M18 10s-3 5-8 5c-2 0-3.7-.8-5-1.8" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
-							<path d="M3 3l14 14" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" stroke-linecap="round" />
+							<path
+								d="M2 10s3-5 8-5c2 0 3.7.8 5 1.8M18 10s-3 5-8 5c-2 0-3.7-.8-5-1.8"
+								stroke="rgba(240,240,240,0.75)"
+								stroke-width="1.4"
+							/>
+							<path
+								d="M3 3l14 14"
+								stroke="rgba(240,240,240,0.75)"
+								stroke-width="1.4"
+								stroke-linecap="round"
+							/>
 						</svg>
 					{/if}
 				</button>
@@ -75,7 +104,11 @@
 							<div
 								class="strength-segment"
 								style:background={i < strengthScore
-									? (strengthScore >= 3 ? 'var(--success)' : strengthScore >= 2 ? '#e8b850' : '#e0907a')
+									? strengthScore >= 3
+										? 'var(--success)'
+										: strengthScore >= 2
+											? '#e8b850'
+											: '#e0907a'
 									: 'rgba(240,240,240,0.22)'}
 							></div>
 						{/each}
@@ -91,7 +124,7 @@
 						type={showPassword ? 'text' : 'password'}
 						placeholder="Confirm password"
 						bind:value={confirm}
-						onblur={() => touched.confirm = true}
+						onblur={() => (touched.confirm = true)}
 						class="underline-input"
 						class:error={confirmError}
 						class:valid={confirm && confirmValid}
@@ -100,11 +133,22 @@
 						<div class="field-icon">
 							{#if confirmError}
 								<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-									<path d="M4 4l8 8M12 4l-8 8" stroke="var(--error)" stroke-width="2" stroke-linecap="round" />
+									<path
+										d="M4 4l8 8M12 4l-8 8"
+										stroke="var(--error)"
+										stroke-width="2"
+										stroke-linecap="round"
+									/>
 								</svg>
 							{:else if confirmValid}
 								<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-									<path d="M3 8.5l3 3 7-7" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+									<path
+										d="M3 8.5l3 3 7-7"
+										stroke="var(--success)"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
 								</svg>
 							{/if}
 						</div>
@@ -116,11 +160,22 @@
 			<div class="status-line" data-testid="status-line" style:color={statusColor}>
 				{#if statusLine.type === 'ok'}
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-						<path d="M3 8.5l3 3 7-7" stroke={statusColor} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+						<path
+							d="M3 8.5l3 3 7-7"
+							stroke={statusColor}
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
 					</svg>
 				{:else if statusLine.type === 'err'}
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-						<path d="M4 4l8 8M12 4l-8 8" stroke={statusColor} stroke-width="2" stroke-linecap="round" />
+						<path
+							d="M4 4l8 8M12 4l-8 8"
+							stroke={statusColor}
+							stroke-width="2"
+							stroke-linecap="round"
+						/>
 					</svg>
 				{/if}
 				{statusLine.text}
@@ -159,7 +214,7 @@ import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
 import { onMount } from 'svelte';
 import { playerManager } from '$lib/engine';
-import { preventDefault } from '$lib/common/prevent-default';
+import { preventDefault } from '$lib/common/event-wrappers';
 
 type Mode = 'login' | 'signup';
 
@@ -238,23 +293,33 @@ const formValid = $derived(usernameValid && passwordValid && (mode === 'login' |
 
 const statusLine = $derived.by(() => {
 	if (serverError) return { type: 'err' as const, text: serverError };
-	if (success) return { type: 'ok' as const, text: mode === 'login' ? 'Signed in — loading world…' : 'Account created — entering…' };
-	if (usernameError) return { type: 'err' as const, text: 'Username · ' + usernameError.toLowerCase() };
-	if (passwordError) return { type: 'err' as const, text: 'Password · ' + passwordError.toLowerCase() };
-	if (confirmError) return { type: 'err' as const, text: 'Confirm · ' + confirmError.toLowerCase() };
+	if (success)
+		return {
+			type: 'ok' as const,
+			text: mode === 'login' ? 'Signed in — loading world…' : 'Account created — entering…'
+		};
+	if (usernameError)
+		return { type: 'err' as const, text: 'Username · ' + usernameError.toLowerCase() };
+	if (passwordError)
+		return { type: 'err' as const, text: 'Password · ' + passwordError.toLowerCase() };
+	if (confirmError)
+		return { type: 'err' as const, text: 'Confirm · ' + confirmError.toLowerCase() };
 	if (capsLock) return { type: 'warn' as const, text: 'Caps Lock is on' };
-	if (mode === 'signup' && password) return { type: 'info' as const, text: `Strength · ${strengthLabel.toLowerCase()}` };
+	if (mode === 'signup' && password)
+		return { type: 'info' as const, text: `Strength · ${strengthLabel.toLowerCase()}` };
 	if (formValid && username) return { type: 'ok' as const, text: 'Ready' };
 	return { type: 'idle' as const, text: ' ' };
 });
 
-const statusColor = $derived({
-	err: 'var(--error)',
-	ok: 'var(--success)',
-	warn: 'var(--warning)',
-	info: 'var(--text-secondary)',
-	idle: 'var(--text-tertiary)',
-}[statusLine.type]);
+const statusColor = $derived(
+	{
+		err: 'var(--error)',
+		ok: 'var(--success)',
+		warn: 'var(--warning)',
+		info: 'var(--text-secondary)',
+		idle: 'var(--text-tertiary)'
+	}[statusLine.type]
+);
 
 const detectCapsLock = (e: KeyboardEvent) => {
 	if (typeof e.getModifierState === 'function') {

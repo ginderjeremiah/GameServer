@@ -1,47 +1,42 @@
 using Game.Abstractions.DataAccess;
-using Game.Application.Services;
-using Game.Core;
+using Game.Core.Battle.Events;
 using Game.Core.Events;
 
 namespace Game.Application
 {
-    /// <summary>
-    /// Handles <see cref="EnemyDefeatedEvent"/> by updating player statistics
-    /// and checking challenge progress.
-    /// </summary>
     public class StatisticsEventHandler(
-        IPlayerStatistics playerStatistics,
-        ChallengeService challengeService,
-        IPlayerRepository playerRepo)
-        : IDomainEventHandler<EnemyDefeatedEvent>
+        IPlayerProgressRepository progressRepo,
+        IChallenges challengeRepo
+    ) : IDomainEventHandler<EnemyDefeatedEvent>
     {
-        private readonly IPlayerStatistics _playerStatistics = playerStatistics;
-        private readonly ChallengeService _challengeService = challengeService;
-        private readonly IPlayerRepository _playerRepo = playerRepo;
+        private readonly IPlayerProgressRepository _progressRepo = progressRepo;
+        private readonly IChallenges _challengeRepo = challengeRepo;
 
         public async Task HandleAsync(EnemyDefeatedEvent domainEvent, CancellationToken cancellationToken = default)
         {
-            var playerId = domainEvent.PlayerId;
-            var enemyId = domainEvent.EnemyId;
-            var player = await _playerRepo.GetPlayer(playerId);
-            if (player is null)
+            var progress = await _progressRepo.Load(domainEvent.Player.Id);
+
+            progress.RecordEnemyDefeated(domainEvent.EnemyId);
+
+            var completed = progress.EvaluateChallenges(_challengeRepo.All());
+
+            if (completed.Count > 0)
             {
-                return;
+                var player = domainEvent.Player;
+                foreach (var c in completed)
+                {
+                    if (c.RewardItemId.HasValue)
+                    {
+                        player.UnlockItem(c.RewardItemId.Value);
+                    }
+                    if (c.RewardItemModId.HasValue)
+                    {
+                        player.UnlockMod(c.RewardItemModId.Value);
+                    }
+                }
             }
 
-            var totalKilled = await _playerStatistics.IncrementStatistic(
-                playerId, (int)EStatisticType.EnemiesKilled, null, 1);
-
-            var enemyTypeKilled = await _playerStatistics.IncrementStatistic(
-                playerId, (int)EStatisticType.EnemiesKilled, enemyId, 1);
-
-            await _challengeService.CheckAndUpdateProgress(
-                player, EStatisticType.EnemiesKilled, null, totalKilled);
-
-            await _challengeService.CheckAndUpdateProgress(
-                player, EStatisticType.EnemiesKilled, enemyId, enemyTypeKilled);
-
-            await _playerRepo.SavePlayer(player);
+            _progressRepo.Save(progress);
         }
     }
 }

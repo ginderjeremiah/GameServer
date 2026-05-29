@@ -59,7 +59,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Player data not found");
             }
 
-            _sessionService.CreateSession(user.Id, playerData);
+            _sessionService.CreateSession(user.Id, playerId);
 
             var token = new AuthToken(new AuthTokenClaims(user.Id, DateTime.UtcNow + Constants.TOKEN_LIFETIME));
             _cookieService.SetTokenCookie(token.ToString());

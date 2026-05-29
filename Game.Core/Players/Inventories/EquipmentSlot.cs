@@ -2,7 +2,7 @@
 using static Game.Core.EEquipmentSlot;
 using static Game.Core.EItemCategory;
 
-namespace Game.Core.Players
+namespace Game.Core.Players.Inventories
 {
     /// <inheritdoc cref="EEquipmentSlot"/>
     public class EquipmentSlot

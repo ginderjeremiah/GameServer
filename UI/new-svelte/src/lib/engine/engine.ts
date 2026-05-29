@@ -1,6 +1,6 @@
 import { onDestroy } from 'svelte';
 import { BattleEngine } from './battle/battle-engine';
-import { routeTo, statify } from '$lib/common';
+import { statify } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { PlayerManager } from './player/player-manager';

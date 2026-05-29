@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -33,81 +32,6 @@ namespace Game.Infrastructure.Migrations
             migrationBuilder.DropIndex(
                 name: "IX_ItemModSlots_GuaranteedItemModId",
                 table: "ItemModSlots");
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 0);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 1);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 2);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 3);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 4);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 5);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 6);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 7);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 8);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 9);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 10);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 11);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 12);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 13);
-
-            migrationBuilder.DeleteData(
-                table: "Attributes",
-                keyColumn: "Id",
-                keyValue: 14);
 
             migrationBuilder.DropColumn(
                 name: "PassHash",
@@ -166,24 +90,6 @@ namespace Game.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: 0);
 
-            migrationBuilder.AlterColumn<string>(
-                name: "Name",
-                table: "Attributes",
-                type: "text",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "character varying(50)",
-                oldMaxLength: 50);
-
-            migrationBuilder.AlterColumn<int>(
-                name: "Id",
-                table: "Attributes",
-                type: "integer",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "integer")
-                .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
-
             migrationBuilder.CreateTable(
                 name: "AppliedMods",
                 columns: table => new
@@ -220,19 +126,6 @@ namespace Game.Infrastructure.Migrations
                         principalTable: "Players",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Attribute",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Attribute", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -377,28 +270,6 @@ namespace Game.Infrastructure.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.InsertData(
-                table: "Attribute",
-                columns: new[] { "Id", "Description", "Name" },
-                values: new object[,]
-                {
-                    { 0, "A measure of one's raw physical force.", "Strength" },
-                    { 1, "A measure of one's raw physical force.", "Endurance" },
-                    { 2, "A measure of one's raw physical force.", "Intellect" },
-                    { 3, "A measure of one's raw physical force.", "Agility" },
-                    { 4, "A measure of one's raw physical force.", "Dexterity" },
-                    { 5, "A measure of one's raw physical force.", "Luck" },
-                    { 6, "A measure of one's raw physical force.", "Max Health" },
-                    { 7, "A measure of one's raw physical force.", "Defense" },
-                    { 8, "A measure of one's raw physical force.", "Cooldown Recovery" },
-                    { 9, "A measure of one's raw physical force.", "Drop Bonus" },
-                    { 10, "A measure of one's raw physical force.", "Critical Chance" },
-                    { 11, "A measure of one's raw physical force.", "Critical Damage" },
-                    { 12, "A measure of one's raw physical force.", "Dodge Chance" },
-                    { 13, "A measure of one's raw physical force.", "Block Chance" },
-                    { 14, "A measure of one's raw physical force.", "Block Reduction" }
-                });
-
             migrationBuilder.UpdateData(
                 table: "LogSettings",
                 keyColumn: "Id",
@@ -492,9 +363,6 @@ namespace Game.Infrastructure.Migrations
                 name: "AppliedMods");
 
             migrationBuilder.DropTable(
-                name: "Attribute");
-
-            migrationBuilder.DropTable(
                 name: "PlayerChallenges");
 
             migrationBuilder.DropTable(
@@ -578,24 +446,6 @@ namespace Game.Infrastructure.Migrations
                 scale: 8,
                 nullable: false,
                 defaultValue: 0m);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Name",
-                table: "Attributes",
-                type: "character varying(50)",
-                maxLength: 50,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "text");
-
-            migrationBuilder.AlterColumn<int>(
-                name: "Id",
-                table: "Attributes",
-                type: "integer",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "integer")
-                .OldAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
             migrationBuilder.CreateTable(
                 name: "EnemyDrops",
@@ -708,28 +558,6 @@ namespace Game.Infrastructure.Migrations
                         principalTable: "ItemMods",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.InsertData(
-                table: "Attributes",
-                columns: new[] { "Id", "Description", "Name" },
-                values: new object[,]
-                {
-                    { 0, "A measure of one's raw physical force.", "Strength" },
-                    { 1, "A measure of one's raw physical force.", "Endurance" },
-                    { 2, "A measure of one's raw physical force.", "Intellect" },
-                    { 3, "A measure of one's raw physical force.", "Agility" },
-                    { 4, "A measure of one's raw physical force.", "Dexterity" },
-                    { 5, "A measure of one's raw physical force.", "Luck" },
-                    { 6, "A measure of one's raw physical force.", "Max Health" },
-                    { 7, "A measure of one's raw physical force.", "Defense" },
-                    { 8, "A measure of one's raw physical force.", "Cooldown Recovery" },
-                    { 9, "A measure of one's raw physical force.", "Drop Bonus" },
-                    { 10, "A measure of one's raw physical force.", "Critical Chance" },
-                    { 11, "A measure of one's raw physical force.", "Critical Damage" },
-                    { 12, "A measure of one's raw physical force.", "Dodge Chance" },
-                    { 13, "A measure of one's raw physical force.", "Block Chance" },
-                    { 14, "A measure of one's raw physical force.", "Block Reduction" }
                 });
 
             migrationBuilder.UpdateData(

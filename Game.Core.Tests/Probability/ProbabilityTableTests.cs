@@ -1,34 +1,34 @@
-﻿using Game.Core.Probability;
+using Game.Core.Probability;
+using Xunit;
 
 namespace Game.Core.Tests.Probability
 {
-    [TestClass]
     public class ProbabilityTableTests
     {
-        [TestMethod]
+        [Fact]
         public void EmptyInitializationList_ThrowsException()
         {
             Assert.Throws<ArgumentException>(() => new ProbabilityTable<int>([]));
         }
 
-        [TestMethod]
+        [Fact]
         public void InitializationListHasNegativeWeightElement_ThrowsException()
         {
             List<WeightedValue<int>> list = [new WeightedValue<int>(0, 1), new WeightedValue<int>(1, -1)];
             Assert.Throws<ArgumentException>(() => new ProbabilityTable<int>(list));
         }
 
-        [TestMethod]
+        [Fact]
         public void SingleInitializationList_ProducesValueFromList()
         {
             List<WeightedValue<int>> list = [new WeightedValue<int>(0, 1)];
             var table = new ProbabilityTable<int>(list);
             var randomValue = table.GetRandomValue();
 
-            Assert.AreEqual(list[0].Value, randomValue);
+            Assert.Equal(list[0].Value, randomValue);
         }
 
-        [TestMethod]
+        [Fact]
         public void MultiInitializationList_ProducesReasonableDistribution()
         {
             var list = SetupMultiElementList();
@@ -44,7 +44,7 @@ namespace Game.Core.Tests.Probability
             AssertDistributionIsReasonable(list, buckets);
         }
 
-        [TestMethod]
+        [Fact]
         public void MultiRandomInitializationList_ProducesReasonableDistribution()
         {
             var list = SetupMultiRandomElementList();
@@ -91,7 +91,7 @@ namespace Game.Core.Tests.Probability
             {
                 var actualProbability = (double)list[i].Weight / totalWeight;
                 var sampleProbability = (double)buckets[i] / iterations;
-                Assert.IsTrue(sampleProbability - actualProbability is > -0.01 and < 0.01);
+                Assert.True(sampleProbability - actualProbability is > -0.01 and < 0.01);
             }
         }
     }

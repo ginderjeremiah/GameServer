@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Game.Api"],
+      "port": 5008
+    },
+    {
       "name": "svelte-ui",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "dev", "--port", "5174"],

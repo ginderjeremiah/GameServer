@@ -14,13 +14,19 @@ namespace Game.Infrastructure.Database
             switch (config.DatabaseSystem)
             {
                 case Postgres:
-                    optionsBuilder.UseNpgsql(config.DbConnectionString)
-                        .EnableSensitiveDataLogging();
+                    var connectionString = config.DbConnectionString;
+                    if (config.EnableSensitiveLogging)
+                    {
+                        connectionString = $"{connectionString};Include Error Detail=True";
+                    }
+
+                    optionsBuilder.UseNpgsql(connectionString)
+                        .EnableSensitiveDataLogging(config.EnableSensitiveLogging);
                     break;
                 case SqlServer:
                 default:
                     optionsBuilder.UseSqlServer(config.DbConnectionString)
-                        .EnableSensitiveDataLogging();
+                        .EnableSensitiveDataLogging(config.EnableSensitiveLogging);
                     break;
             }
 

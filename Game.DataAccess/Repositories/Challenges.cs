@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Core;
+using Game.Core.Challenges;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,18 @@ namespace Game.DataAccess.Repositories
         {
             _challengeList ??= [.. _context.Challenges
                 .AsNoTracking()
-                .OrderBy(c => c.Id)];
+                .OrderBy(c => c.Id)
+                .Select(c => new Challenge
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Description = c.Description,
+                    Type = (EChallengeType)c.ChallengeTypeId,
+                    TargetEntityId = c.TargetEntityId,
+                    TargetCount = c.TargetCount,
+                    RewardItemId = c.RewardItemId,
+                    RewardItemModId = c.RewardItemModId,
+                })];
 
             return _challengeList;
         }

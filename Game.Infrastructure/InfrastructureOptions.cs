@@ -14,6 +14,8 @@ namespace Game.Infrastructure
         public DatabaseSystem DatabaseSystem { get; set; }
         /// <inheritdoc/>
         public string? DbConnectionString { get; set; }
+        /// <inheritdoc/>
+        public bool EnableSensitiveLogging { get; set; }
 
         /// <inheritdoc/>
         public CacheSystem CacheSystem { get; set; }

@@ -1,8 +1,9 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
-using Game.Core.Events;
+using Game.Core.Battle.Events;
 using Game.Core.Items;
+using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
 
@@ -136,12 +137,12 @@ namespace Game.Core.Players
 
         public void RecordEnemyDefeat(int enemyId, int expReward)
         {
-            RaiseEvent(new EnemyDefeatedEvent(Id, enemyId, expReward));
+            RaiseEvent(new EnemyDefeatedEvent(this, enemyId, expReward));
         }
 
         public void RecordBattleCompleted(int enemyId, BattleResult result)
         {
-            RaiseEvent(new BattleCompletedEvent(Id, enemyId, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
+            RaiseEvent(new BattleCompletedEvent(this, enemyId, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()

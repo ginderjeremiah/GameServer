@@ -53,27 +53,16 @@ namespace Game.Api.Services
             PlayerState = new();
         }
 
-        public async Task LoadSession(int userId, string sessionId)
-        {
-            UserId = userId;
-            var sessionData = await _sessionStore.GetSession(sessionId);
-            if (sessionData is not null)
-            {
-                PlayerState = sessionData;
-            }
-        }
-
         public async Task<Player> LoadPlayer()
         {
             return _player ??= await _playerService.LoadPlayer(SelectedPlayerId)
                 ?? throw new InvalidOperationException("Player data not loaded.");
         }
 
-        public void CreateSession(int userId, Player player)
+        public void CreateSession(int userId, int playerId)
         {
             UserId = userId;
-            _player = player;
-            PlayerState = new PlayerState { PlayerId = player.Id };
+            PlayerState = new PlayerState { PlayerId = playerId };
             _sessionStore.Update(PlayerState, UserId);
         }
 

@@ -1,12 +1,12 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Xunit;
 
 namespace Game.Core.Tests.Attributes
 {
-    [TestClass]
     public class AttributeCollectionTests
     {
-        [TestMethod]
+        [Fact]
         public void Indexer_AdditiveModifiers_SumsCorrectly()
         {
             var modifiers = new List<AttributeModifier>
@@ -17,18 +17,18 @@ namespace Game.Core.Tests.Attributes
 
             var collection = new AttributeCollection(modifiers);
 
-            Assert.AreEqual(15, collection[EAttribute.Strength]);
+            Assert.Equal(15, collection[EAttribute.Strength]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Indexer_NoModifiers_ReturnsZero()
         {
             var collection = new AttributeCollection([]);
 
-            Assert.AreEqual(0, collection[EAttribute.Intellect]);
+            Assert.Equal(0, collection[EAttribute.Intellect]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Indexer_DerivedModifier_MultipliesBaseAttribute()
         {
             var modifiers = new List<AttributeModifier>
@@ -40,10 +40,10 @@ namespace Game.Core.Tests.Attributes
 
             // MaxHealth has static derived modifiers: base 50 + Endurance*20 + Strength*5
             // With Endurance=10, Strength=0: MaxHealth = 50 + 10*20 + 0*5 = 250
-            Assert.AreEqual(250, collection[EAttribute.MaxHealth]);
+            Assert.Equal(250, collection[EAttribute.MaxHealth]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Indexer_MultipleBaseStats_DerivedComputesFromAll()
         {
             var modifiers = new List<AttributeModifier>
@@ -55,10 +55,10 @@ namespace Game.Core.Tests.Attributes
             var collection = new AttributeCollection(modifiers);
 
             // MaxHealth = base(50) + Endurance(10)*20 + Strength(5)*5 = 50 + 200 + 25 = 275
-            Assert.AreEqual(275, collection[EAttribute.MaxHealth]);
+            Assert.Equal(275, collection[EAttribute.MaxHealth]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Indexer_Defense_IncludesBaseAndDerived()
         {
             var modifiers = new List<AttributeModifier>
@@ -70,10 +70,10 @@ namespace Game.Core.Tests.Attributes
             var collection = new AttributeCollection(modifiers);
 
             // Defense = base(2) + Endurance(10)*1.0 + Agility(4)*0.5 = 2 + 10 + 2 = 14
-            Assert.AreEqual(14, collection[EAttribute.Defense]);
+            Assert.Equal(14, collection[EAttribute.Defense]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Indexer_CooldownRecovery_DerivedFromAgilityAndDexterity()
         {
             var modifiers = new List<AttributeModifier>
@@ -85,10 +85,10 @@ namespace Game.Core.Tests.Attributes
             var collection = new AttributeCollection(modifiers);
 
             // CooldownRecovery = Agility(10)*0.4 + Dexterity(20)*0.1 = 4 + 2 = 6
-            Assert.AreEqual(6, collection[EAttribute.CooldownRecovery]);
+            Assert.Equal(6, collection[EAttribute.CooldownRecovery]);
         }
 
-        [TestMethod]
+        [Fact]
         public void Constructor_DuplicateDerivedModifierSameSourceTarget_Throws()
         {
             // MaxHealth has a static derived modifier from Strength, so adding a modifier to derive Strength from MaxHealth creates a circular dependency
@@ -108,7 +108,7 @@ namespace Game.Core.Tests.Attributes
                 () => new AttributeCollection(modifiers));
         }
 
-        [TestMethod]
+        [Fact]
         public void AddModifier_InvalidatesCachedValue()
         {
             var modifiers = new List<AttributeModifier>
@@ -121,11 +121,11 @@ namespace Game.Core.Tests.Attributes
             collection.AddModifier(Additive(EAttribute.Strength, 5));
             var after = collection[EAttribute.Strength];
 
-            Assert.AreEqual(10, before);
-            Assert.AreEqual(15, after);
+            Assert.Equal(10, before);
+            Assert.Equal(15, after);
         }
 
-        [TestMethod]
+        [Fact]
         public void AllModifiers_ReturnsAllAddedModifiers()
         {
             var modifiers = new List<AttributeModifier>
@@ -138,7 +138,7 @@ namespace Game.Core.Tests.Attributes
 
             // Includes the 2 user modifiers + 8 static modifiers
             var allMods = collection.AllModifiers().ToList();
-            Assert.IsTrue(allMods.Count >= 10);
+            Assert.True(allMods.Count >= 10);
         }
 
         private static AttributeModifier Additive(EAttribute attribute, double amount) => new()

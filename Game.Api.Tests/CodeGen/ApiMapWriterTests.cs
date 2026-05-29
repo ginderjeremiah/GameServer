@@ -1,22 +1,20 @@
 using Game.Api.CodeGen;
 using Game.Api.CodeGen.Data;
 using Game.Api.CodeGen.Writers;
+using Xunit;
 
 namespace Game.Api.Tests.CodeGen
 {
-    [TestClass]
-    public class ApiMapWriterTests
+    public class ApiMapWriterTests : IDisposable
     {
-        private string _tempDir = null!;
+        private readonly string _tempDir;
 
-        [TestInitialize]
-        public void Setup()
+        public ApiMapWriterTests()
         {
             _tempDir = Path.Combine(Path.GetTempPath(), "codegen_test_" + Guid.NewGuid().ToString("N"));
         }
 
-        [TestCleanup]
-        public void Cleanup()
+        public void Dispose()
         {
             if (Directory.Exists(_tempDir))
             {
@@ -24,7 +22,7 @@ namespace Game.Api.Tests.CodeGen
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_CreatesFile()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -33,10 +31,10 @@ namespace Game.Api.Tests.CodeGen
 
             writer.WriteApiMap([endpoint], "// Auto-generated");
 
-            Assert.IsTrue(File.Exists(Path.Combine(_tempDir, "api-type-map.ts")));
+            Assert.True(File.Exists(Path.Combine(_tempDir, "api-type-map.ts")));
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_ContainsResponseTypes()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -46,11 +44,11 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.Contains("export type ApiResponseTypes = {"));
-            Assert.IsTrue(content.Contains("'Test': ISimpleModel;"));
+            Assert.Contains("export type ApiResponseTypes = {", content);
+            Assert.Contains("'Test': ISimpleModel;", content);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_ContainsRequestTypes()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -60,11 +58,11 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.Contains("export type ApiRequestTypes = {"));
-            Assert.IsTrue(content.Contains("'Test/PostData': ISimpleModel;"));
+            Assert.Contains("export type ApiRequestTypes = {", content);
+            Assert.Contains("'Test/PostData': ISimpleModel;", content);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_EndpointsOrderedAlphabetically()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -81,10 +79,10 @@ namespace Game.Api.Tests.CodeGen
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
             var alphaIndex = content.IndexOf("'Alpha'");
             var zebraIndex = content.IndexOf("'Zebra'");
-            Assert.IsTrue(alphaIndex < zebraIndex);
+            Assert.True(alphaIndex < zebraIndex);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_ContainsImports_WhenTypesNeedInterface()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -94,23 +92,23 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.Contains("import type"));
-            Assert.IsTrue(content.Contains("ISimpleModel"));
+            Assert.Contains("import type", content);
+            Assert.Contains("ISimpleModel", content);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_ContainsHelperTypes()
         {
             var writer = new ApiMapWriter(_tempDir);
             writer.WriteApiMap([], "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.Contains("export type ApiEndpoint = keyof ApiResponseTypes;"));
-            Assert.IsTrue(content.Contains("export type ApiEndpointWithRequest = keyof ApiRequestTypes;"));
-            Assert.IsTrue(content.Contains("export type ApiResponseType = ApiResponseTypes[ApiEndpoint];"));
+            Assert.Contains("export type ApiEndpoint = keyof ApiResponseTypes;", content);
+            Assert.Contains("export type ApiEndpointWithRequest = keyof ApiRequestTypes;", content);
+            Assert.Contains("export type ApiResponseType = ApiResponseTypes[ApiEndpoint];", content);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_DoesNotRewrite_WhenContentSame()
         {
             var writer = new ApiMapWriter(_tempDir);
@@ -122,10 +120,10 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([], "// Auto-generated");
 
             var secondWriteTime = File.GetLastWriteTimeUtc(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.AreEqual(firstWriteTime, secondWriteTime);
+            Assert.Equal(firstWriteTime, secondWriteTime);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_IncludesAutoGeneratedComment_AtStartOfFile()
         {
             var testComment = "/* Generated: 2024-01-01 */";
@@ -136,10 +134,10 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], testComment);
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.StartsWith(testComment), $"Expected content to start with '{testComment}'");
+            Assert.StartsWith(testComment, content);
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_UsesProvidedComment_NotDefault()
         {
             var customComment = "// Custom API Map Comment";
@@ -151,11 +149,11 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], customComment);
 
             var content = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
-            Assert.IsTrue(content.StartsWith(customComment));
-            Assert.IsFalse(content.StartsWith(defaultComment));
+            Assert.StartsWith(customComment, content);
+            Assert.False(content.StartsWith(defaultComment));
         }
 
-        [TestMethod]
+        [Fact]
         public void WriteApiMap_DifferentComments_GenerateDifferentFiles()
         {
             var comment1 = "/* Build 1 */";
@@ -172,9 +170,9 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap([endpoint], comment2);
             var content2 = File.ReadAllText(Path.Combine(_tempDir, "api-type-map.ts"));
 
-            Assert.IsTrue(content1.StartsWith(comment1));
-            Assert.IsTrue(content2.StartsWith(comment2));
-            Assert.AreNotEqual(content1, content2);
+            Assert.StartsWith(comment1, content1);
+            Assert.StartsWith(comment2, content2);
+            Assert.NotEqual(content1, content2);
         }
     }
 }

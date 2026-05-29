@@ -51,10 +51,7 @@ namespace Game.Infrastructure.Migrations
             modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -62,11 +59,104 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
                     b.ToTable("Attributes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 0,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Strength"
+                        },
+                        new
+                        {
+                            Id = 1,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Endurance"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Intellect"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Agility"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Dexterity"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Luck"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Max Health"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Defense"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Cooldown Recovery"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Drop Bonus"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Critical Chance"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Critical Damage"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Dodge Chance"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Block Chance"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Block Reduction"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
@@ -643,6 +733,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("StatisticTypeId");
+
                     b.HasIndex("PlayerId", "StatisticTypeId", "EntityId")
                         .IsUnique();
 
@@ -704,6 +796,93 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("AttributeId");
 
                     b.ToTable("SkillDamageMultipliers");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StatisticTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Enemies Killed"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Bosses Defeated"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Zones Cleared"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Total Damage Dealt"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Highest Single Attack Damage"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Total Damage Taken"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Total Damage Healed"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Name = "Enemies Encountered"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Name = "Battles Won"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Name = "Battles Lost"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Name = "Player Deaths"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Name = "Total Battle Time Ms"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Name = "Fastest Victory Ms"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Name = "Total Skills Used"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
@@ -894,117 +1073,6 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("EnemyId");
 
                     b.ToTable("ZoneEnemies");
-                });
-
-            modelBuilder.Entity("Game.Core.Attributes.Attribute", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Attribute");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 0,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Strength"
-                        },
-                        new
-                        {
-                            Id = 1,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Endurance"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Intellect"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Agility"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Dexterity"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Luck"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Max Health"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Defense"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Cooldown Recovery"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Drop Bonus"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Critical Chance"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Critical Damage"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Dodge Chance"
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Block Chance"
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Block Reduction"
-                        });
                 });
 
             modelBuilder.Entity("ItemModTag", b =>
@@ -1310,7 +1378,15 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Game.Abstractions.Entities.StatisticType", "StatisticType")
+                        .WithMany("PlayerStatistics")
+                        .HasForeignKey("StatisticTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Player");
+
+                    b.Navigation("StatisticType");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
@@ -1513,6 +1589,11 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("PlayerSkills");
 
                     b.Navigation("SkillDamageMultipliers");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+                {
+                    b.Navigation("PlayerStatistics");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>

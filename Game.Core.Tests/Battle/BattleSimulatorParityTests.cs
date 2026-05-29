@@ -5,6 +5,7 @@ using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Xunit;
 
 namespace Game.Core.Tests.Battle
 {
@@ -12,7 +13,6 @@ namespace Game.Core.Tests.Battle
     /// Tests that produce deterministic totalMs values for cross-checking
     /// against the frontend battle simulation.
     /// </summary>
-    [TestClass]
     public class BattleSimulatorParityTests
     {
         /// <summary>
@@ -20,7 +20,7 @@ namespace Game.Core.Tests.Battle
         /// Frontend must produce the same totalMs when using RAW stat allocations
         /// (not pre-computed final attribute values from the API).
         /// </summary>
-        [TestMethod]
+        [Fact]
         public void Parity_WithCooldownRecovery_MatchesExpectedTotalMs()
         {
             var playerSkill = new Skill
@@ -63,8 +63,8 @@ namespace Game.Core.Tests.Battle
             var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
             var result = sim.Simulate();
 
-            Assert.IsTrue(result.Victory, "Player should win this matchup.");
-            Assert.AreEqual(0, result.TotalMs % 40, "totalMs must be a multiple of the tick rate.");
+            Assert.True(result.Victory, "Player should win this matchup.");
+            Assert.Equal(0, result.TotalMs % 40);
 
             // Record the authoritative value — the frontend test must match this exactly.
             // Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09
@@ -73,7 +73,7 @@ namespace Game.Core.Tests.Battle
             // Enemy:  MaxHealth=400, Def=17, CDR=0
             //   damage = 5-42 = 0 (clamped)
             // 6 hits to kill (6*68=408>400), at ticks 28,56,84,112,140,168 → 6720ms
-            Assert.AreEqual(6720, result.TotalMs);
+            Assert.Equal(6720, result.TotalMs);
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Game.Core.Tests.Battle
         /// (the bug the frontend currently has). CooldownRecovery doubles from 9→18,
         /// cdMultiplier goes from 1.09→1.18, skills fire every 26 ticks instead of 28.
         /// </summary>
-        [TestMethod]
+        [Fact]
         public void Parity_DoubleDerivedStats_ProducesShorterBattle()
         {
             var playerSkill = new Skill
@@ -126,11 +126,11 @@ namespace Game.Core.Tests.Battle
             var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
             var result = sim.Simulate();
 
-            Assert.IsTrue(result.Victory);
+            Assert.True(result.Victory);
             // With doubled CDR (18 instead of 9), cdMult=1.18,
             // charge/tick = 47.2, fires every 26 ticks → 6240ms
-            Assert.AreEqual(6240, result.TotalMs);
-            Assert.IsTrue(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
+            Assert.Equal(6240, result.TotalMs);
+            Assert.True(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
         }
 
         private static Player MakePlayer(

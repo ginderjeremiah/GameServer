@@ -67,6 +67,20 @@ namespace Game.Infrastructure.Redis
             return _cacheInstance;
         }
 
+        internal static void ResetForTesting()
+        {
+            lock (_cacheLock)
+            {
+                _cacheInstance?.Dispose();
+                _cacheInstance = null;
+            }
+            lock (_pubsubLock)
+            {
+                _pubsubInstance?.Dispose();
+                _pubsubInstance = null;
+            }
+        }
+
         public static ConnectionMultiplexer GetMultiplexer(IPubSubOptions config)
         {
             if (config.PubSubConnectionString is null)

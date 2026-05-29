@@ -16,5 +16,10 @@ namespace Game.Infrastructure.Database
         /// The connection string used by the <see cref="GameContext"/> to connect to a database.
         /// </summary>
         public string? DbConnectionString { get; }
+
+        /// <summary>
+        /// Determines whether logging sensitive information is enabled.
+        /// </summary>
+        public bool EnableSensitiveLogging { get; }
     }
 }

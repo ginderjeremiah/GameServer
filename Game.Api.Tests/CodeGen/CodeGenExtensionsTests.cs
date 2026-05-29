@@ -1,173 +1,173 @@
 using Game.Api.CodeGen;
+using Xunit;
 
 namespace Game.Api.Tests.CodeGen
 {
-    [TestClass]
     public class CodeGenExtensionsTests
     {
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_List_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(List<int>).IsEnumerable());
+            Assert.True(typeof(List<int>).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_IEnumerable_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(IEnumerable<string>).IsEnumerable());
+            Assert.True(typeof(IEnumerable<string>).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_IAsyncEnumerable_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(IAsyncEnumerable<int>).IsEnumerable());
+            Assert.True(typeof(IAsyncEnumerable<int>).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_Array_ReturnsFalse()
         {
             // Arrays are not generic types
-            Assert.IsFalse(typeof(int[]).IsEnumerable());
+            Assert.False(typeof(int[]).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_String_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(string).IsEnumerable());
+            Assert.False(typeof(string).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_Int_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(int).IsEnumerable());
+            Assert.False(typeof(int).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_Dictionary_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(Dictionary<string, int>).IsEnumerable());
+            Assert.True(typeof(Dictionary<string, int>).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsDictionary_Dictionary_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(Dictionary<string, int>).IsDictionary());
+            Assert.True(typeof(Dictionary<string, int>).IsDictionary());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsDictionary_IDictionary_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(IDictionary<string, int>).IsDictionary());
+            Assert.True(typeof(IDictionary<string, int>).IsDictionary());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsDictionary_IReadOnlyDictionary_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(IReadOnlyDictionary<string, int>).IsDictionary());
+            Assert.True(typeof(IReadOnlyDictionary<string, int>).IsDictionary());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsDictionary_List_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(List<int>).IsDictionary());
+            Assert.False(typeof(List<int>).IsDictionary());
         }
 
-        [TestMethod]
+        [Fact]
         public void IsEnumerable_NonGenericClass_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(SimpleModel).IsEnumerable());
+            Assert.False(typeof(SimpleModel).IsEnumerable());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Class_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(SimpleModel).NeedsInterface());
+            Assert.True(typeof(SimpleModel).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_String_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(string).NeedsInterface());
+            Assert.False(typeof(string).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Enum_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(TestEnum).NeedsInterface());
+            Assert.True(typeof(TestEnum).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_DateTime_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(DateTime).NeedsInterface());
+            Assert.False(typeof(DateTime).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_ListOfClass_ReturnsTrue()
         {
             // For enumerables, checks the generic argument
-            Assert.IsTrue(typeof(List<SimpleModel>).NeedsInterface());
+            Assert.True(typeof(List<SimpleModel>).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_ListOfString_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(List<string>).NeedsInterface());
+            Assert.False(typeof(List<string>).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_ListOfEnum_ReturnsTrue()
         {
-            Assert.IsTrue(typeof(List<TestEnum>).NeedsInterface());
+            Assert.True(typeof(List<TestEnum>).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Int_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(int).NeedsInterface());
+            Assert.False(typeof(int).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Bool_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(bool).NeedsInterface());
+            Assert.False(typeof(bool).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Decimal_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(decimal).NeedsInterface());
+            Assert.False(typeof(decimal).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Float_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(float).NeedsInterface());
+            Assert.False(typeof(float).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_Long_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(long).NeedsInterface());
+            Assert.False(typeof(long).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_DictionaryWithClassValue_ReturnsTrue()
         {
             // For dictionaries, checks the value type argument
-            Assert.IsTrue(typeof(Dictionary<string, SimpleModel>).NeedsInterface());
+            Assert.True(typeof(Dictionary<string, SimpleModel>).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_DictionaryWithStringValue_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(Dictionary<string, string>).NeedsInterface());
+            Assert.False(typeof(Dictionary<string, string>).NeedsInterface());
         }
 
-        [TestMethod]
+        [Fact]
         public void NeedsInterface_DictionaryWithIntValue_ReturnsFalse()
         {
-            Assert.IsFalse(typeof(Dictionary<string, int>).NeedsInterface());
+            Assert.False(typeof(Dictionary<string, int>).NeedsInterface());
         }
     }
 }

@@ -5,17 +5,23 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class PlayerRepository(GameContext context, ICacheService cache, IPubSubService pubsub) : IPlayerRepository
+    internal class PlayerRepository : IPlayerRepository
     {
         private static string PlayerPrefix => Constants.CACHE_PLAYER_PREFIX;
 
-        private readonly GameContext _context = context;
-        private readonly ICacheService _cache = cache;
-        private readonly IPubSubService _pubsub = pubsub;
+        private readonly GameContext _context;
+        private readonly ICacheService _cache;
+        private readonly IDomainEventDispatcher _dispatcher;
+
+        public PlayerRepository(GameContext context, ICacheService cache, IPubSubService pubsub, IDomainEventDispatcher dispatcher)
+        {
+            _context = context;
+            _cache = cache;
+            _dispatcher = dispatcher;
+        }
 
         public async Task<Player?> GetPlayer(int playerId)
         {
@@ -35,20 +41,16 @@ namespace Game.DataAccess.Repositories
 
         public async Task SavePlayer(Player player)
         {
-            var playerKey = $"{PlayerPrefix}_{player.Id}";
-            _cache.SetAndForget(playerKey, player);
+            await _dispatcher.DispatchAsync(player);
 
-            foreach (var domainEvent in player.DomainEvents)
-            {
-                await _pubsub.Publish(
-                    Constants.PUBSUB_PLAYER_CHANNEL,
-                    Constants.PUBSUB_PLAYER_QUEUE,
-                    SerializeEvent(domainEvent));
-            }
+            var playerKey = $"{PlayerPrefix}_{player.Id}";
+
+            _cache.SetAndForget(playerKey, player);
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
         {
+            //TODO: remove a lot of these sub-includes and utilize the in-memory cached reference data where it's actually needed.
             var entity = await _context.Players
                 .AsNoTracking()
                 .Include(p => p.PlayerAttributes)
@@ -70,17 +72,6 @@ namespace Game.DataAccess.Repositories
                 .FirstOrDefaultAsync(p => p.Id == playerId);
 
             return entity is null ? null : PlayerMapper.ToCore(entity);
-        }
-
-        private static string SerializeEvent(IDomainEvent domainEvent)
-        {
-            var wrapper = new DomainEventEnvelope
-            {
-                Type = domainEvent.GetType().Name,
-                Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
-            };
-
-            return JsonSerializer.Serialize(wrapper);
         }
     }
 

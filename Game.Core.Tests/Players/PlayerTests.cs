@@ -1,38 +1,38 @@
-using Game.Core.Events;
-using Game.Core.Items;
+using Game.Core.Battle.Events;
 using Game.Core.Players;
+using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
+using Xunit;
 
 namespace Game.Core.Tests.Players
 {
-    [TestClass]
     public class PlayerTests
     {
         // ── GrantExp ─────────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_BelowLevelThreshold_DoesNotLevelUp()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(50); // threshold is 1 * 100 = 100
 
-            Assert.AreEqual(1, player.Level);
-            Assert.AreEqual(50, player.Exp);
+            Assert.Equal(1, player.Level);
+            Assert.Equal(50, player.Exp);
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_ReachesThreshold_IncrementsLevel()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(101);
 
-            Assert.AreEqual(2, player.Level);
-            Assert.AreEqual(1, player.Exp);        // 101 - 100 = 1 carried over
+            Assert.Equal(2, player.Level);
+            Assert.Equal(1, player.Exp);        // 101 - 100 = 1 carried over
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_OnLevelUp_RaisesPlayerLeveledUpEvent()
         {
             var player = MakePlayer(level: 1, exp: 0);
@@ -40,23 +40,23 @@ namespace Game.Core.Tests.Players
             player.GrantExp(101);
 
             var evt = player.DomainEvents.OfType<PlayerLeveledUpEvent>().SingleOrDefault();
-            Assert.IsNotNull(evt);
-            Assert.AreEqual(player.Id, evt.PlayerId);
-            Assert.AreEqual(2, evt.NewLevel);
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(2, evt.NewLevel);
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_NoLevelUp_OnlyCoreUpdatedEvent()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(50);
 
-            Assert.AreEqual(1, player.DomainEvents.Count);
-            Assert.IsInstanceOfType<PlayerCoreUpdatedEvent>(player.DomainEvents[0]);
+            Assert.Equal(1, player.DomainEvents.Count);
+            Assert.IsType<PlayerCoreUpdatedEvent>(player.DomainEvents[0]);
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_LevelUp_GrantsSixStatPoints()
         {
             var player = MakePlayer(level: 1, exp: 0);
@@ -64,23 +64,23 @@ namespace Game.Core.Tests.Players
 
             player.GrantExp(101);
 
-            Assert.AreEqual(before + 6, player.StatPoints.StatPointsGained);
+            Assert.Equal(before + 6, player.StatPoints.StatPointsGained);
         }
 
         // ── GrantExp — multi-level-up ────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_EnoughForTwoLevels_LevelsTwice()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(301); // threshold 100 (lvl1) + 200 (lvl2) = 300 to reach lvl3
 
-            Assert.AreEqual(3, player.Level);
-            Assert.AreEqual(1, player.Exp);
+            Assert.Equal(3, player.Level);
+            Assert.Equal(1, player.Exp);
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_MultiLevelUp_RaisesOneEventPerLevel()
         {
             var player = MakePlayer(level: 1, exp: 0);
@@ -88,46 +88,46 @@ namespace Game.Core.Tests.Players
             player.GrantExp(301);
 
             var events = player.DomainEvents.OfType<PlayerLeveledUpEvent>().ToList();
-            Assert.AreEqual(2, events.Count);
-            Assert.AreEqual(2, events[0].NewLevel);
-            Assert.AreEqual(3, events[1].NewLevel);
+            Assert.Equal(2, events.Count);
+            Assert.Equal(2, events[0].NewLevel);
+            Assert.Equal(3, events[1].NewLevel);
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_MultiLevelUp_AccumulatesStatPoints()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(301);
 
-            Assert.AreEqual(12, player.StatPoints.StatPointsGained); // 6 per level * 2
+            Assert.Equal(12, player.StatPoints.StatPointsGained); // 6 per level * 2
         }
 
-        [TestMethod]
+        [Fact]
         public void GrantExp_ExactlyAtThreshold_DoesNotLevelUp()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
             player.GrantExp(100); // threshold is > 100, not >=
 
-            Assert.AreEqual(1, player.Level);
-            Assert.AreEqual(100, player.Exp);
+            Assert.Equal(1, player.Level);
+            Assert.Equal(100, player.Exp);
         }
 
         // ── UnlockItem ──────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void UnlockItem_AddsItemToInventory()
         {
             var player = MakePlayer();
 
             player.UnlockItem(10);
 
-            Assert.AreEqual(1, player.Inventory.UnlockedItems.Count);
-            Assert.AreEqual(10, player.Inventory.UnlockedItems[0].ItemId);
+            Assert.Equal(1, player.Inventory.UnlockedItems.Count);
+            Assert.Equal(10, player.Inventory.UnlockedItems[0].ItemId);
         }
 
-        [TestMethod]
+        [Fact]
         public void UnlockItem_RaisesItemUnlockedEvent()
         {
             var player = MakePlayer();
@@ -135,24 +135,24 @@ namespace Game.Core.Tests.Players
             player.UnlockItem(10);
 
             var evt = player.DomainEvents.OfType<ItemUnlockedEvent>().SingleOrDefault();
-            Assert.IsNotNull(evt);
-            Assert.AreEqual(player.Id, evt.PlayerId);
-            Assert.AreEqual(10, evt.ItemId);
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(10, evt.ItemId);
         }
 
         // ── UnlockMod ───────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void UnlockMod_AddsModToInventory()
         {
             var player = MakePlayer();
 
             player.UnlockMod(5);
 
-            Assert.IsTrue(player.Inventory.UnlockedMods.Contains(5));
+            Assert.Contains(5, player.Inventory.UnlockedMods);
         }
 
-        [TestMethod]
+        [Fact]
         public void UnlockMod_RaisesModUnlockedEvent()
         {
             var player = MakePlayer();
@@ -160,14 +160,14 @@ namespace Game.Core.Tests.Players
             player.UnlockMod(5);
 
             var evt = player.DomainEvents.OfType<ModUnlockedEvent>().SingleOrDefault();
-            Assert.IsNotNull(evt);
-            Assert.AreEqual(player.Id, evt.PlayerId);
-            Assert.AreEqual(5, evt.ItemModId);
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(5, evt.ItemModId);
         }
 
         // ── RecordEnemyDefeat ────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void RecordEnemyDefeat_RaisesEnemyDefeatedEvent()
         {
             var player = MakePlayer();
@@ -175,24 +175,24 @@ namespace Game.Core.Tests.Players
             player.RecordEnemyDefeat(enemyId: 5, expReward: 200);
 
             var evt = player.DomainEvents.OfType<EnemyDefeatedEvent>().SingleOrDefault();
-            Assert.IsNotNull(evt);
-            Assert.AreEqual(player.Id, evt.PlayerId);
-            Assert.AreEqual(5, evt.EnemyId);
-            Assert.AreEqual(200, evt.ExpReward);
+            Assert.NotNull(evt);
+            Assert.Equal(player, evt.Player);
+            Assert.Equal(5, evt.EnemyId);
+            Assert.Equal(200, evt.ExpReward);
         }
 
         // ── ClearEvents ──────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void ClearEvents_RemovesAllCollectedEvents()
         {
             var player = MakePlayer(level: 1, exp: 0);
             player.GrantExp(101);               // produces one event
-            Assert.IsTrue(player.DomainEvents.Count > 0);
+            Assert.True(player.DomainEvents.Count > 0);
 
             player.ClearEvents();
 
-            Assert.AreEqual(0, player.DomainEvents.Count);
+            Assert.Empty(player.DomainEvents);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

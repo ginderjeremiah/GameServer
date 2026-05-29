@@ -21,13 +21,22 @@ let socket: WebSocket;
 const errorHook = createHook<[string]>();
 export const onSocketError = errorHook.onNotified;
 
+const pingHook = createHook<[number]>();
+export const onPingMeasured = pingHook.onNotified;
+
+type InFlightRequest = {
+	startTime: number;
+	command: ApiSocketRequest<any>;
+};
+
 export class ApiSocket {
 	private socketCommandQueue: ApiSocketRequest<any>[] = [];
-	private inFlightCommands: ApiSocketRequest<any>[] = [];
+	private inFlightRequests: InFlightRequest[] = [];
 	private commandCounter = 0;
 	private commandHooks: Partial<{
 		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
 	}> = {};
+	private lastPing = 0;
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
@@ -35,12 +44,11 @@ export class ApiSocket {
 			socket.onopen = this.processCommandQueue.bind(this);
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
+			setInterval(() => apiSocket.attemptPing(), 15000);
 		}
 	}
 
-	public async sendSocketCommand<T extends ApiSocketCommandNoRequest>(
-		commandName: T
-	): Promise<IApiSocketResponse<T>>;
+	public async sendSocketCommand<T extends ApiSocketCommandNoRequest>(commandName: T): Promise<IApiSocketResponse<T>>;
 	public async sendSocketCommand<T extends ApiSocketCommandWithRequest>(
 		commandName: T,
 		params: ApiSocketRequestTypes[T]
@@ -59,19 +67,22 @@ export class ApiSocket {
 		cleanupOnDestroy: boolean = true
 	) {
 		const hook = this.getOrCreateHook(commandName);
-		return hook.onNotified(
-			(data: IApiSocketResponse<T>) => action(data),
-			cleanupOnDestroy
-		);
+		return hook.onNotified((data: IApiSocketResponse<T>) => action(data), cleanupOnDestroy);
+	}
+
+	public attemptPing() {
+		this.ensureSocket();
+		if (socket.readyState === socket.OPEN) {
+			this.lastPing = Date.now();
+			socket.send('ping');
+		}
 	}
 
 	private getOrCreateHook<T extends ApiSocketCommand>(commandName: T) {
 		if (!this.commandHooks[commandName]) {
 			(this.commandHooks as any)[commandName] = createHook<[IApiSocketResponse<T>]>();
 		}
-		return this.commandHooks[commandName] as ReturnType<
-			typeof createHook<[IApiSocketResponse<T>]>
-		>;
+		return this.commandHooks[commandName] as ReturnType<typeof createHook<[IApiSocketResponse<T>]>>;
 	}
 
 	private processCommandQueue() {
@@ -79,34 +90,42 @@ export class ApiSocket {
 		if (socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
-				this.inFlightCommands.push(request);
+				this.inFlightRequests.push({ startTime: Date.now(), command: request });
 				socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
 	}
 
 	private receiveResponse(ev: MessageEvent) {
-		if (ev.data === 'ping') {
+		const now = Date.now();
+		if (ev.data == 'pong') {
+			pingHook.notify(now - this.lastPing);
+			return;
+		} else if (ev.data === 'ping') {
 			socket.send('pong');
-		} else {
-			try {
-				const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
-				const hook = this.commandHooks[data.name];
-				if (hook) {
-					try {
-						hook.notify(data as any);
-					} catch (ex) {
-						console.error('An error occurred while executing a socket listener callback', ex);
-					}
-				}
+			return;
+		}
 
-				if (data.id) {
-					const response = this.inFlightCommands.find((c) => c.id === data.id);
-					response?.resolve(data);
+		try {
+			const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
+			const hook = this.commandHooks[data.name];
+			if (hook) {
+				try {
+					hook.notify(data as any);
+				} catch (ex) {
+					console.error('An error occurred while executing a socket listener callback', ex);
 				}
-			} catch (ex) {
-				console.error('Failed to handle socket response', ex);
 			}
+
+			if (data.id) {
+				const request = this.inFlightRequests.find((c) => c.command.id === data.id);
+				if (request) {
+					request.command.resolve(data);
+					console.debug(`Response to '${request.command.commandName}' received after ${request.startTime - now}ms.`);
+				}
+			}
+		} catch (ex) {
+			console.error('Failed to handle socket response', ex);
 		}
 	}
 

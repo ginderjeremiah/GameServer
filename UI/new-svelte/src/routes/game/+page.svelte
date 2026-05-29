@@ -14,7 +14,6 @@
 <script lang="ts">
 import { NavSidebar } from '$components';
 import LogPanel from '$components/LogPanel.svelte';
-import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { screenMap, type GameScreen } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
@@ -54,14 +53,14 @@ const screens: ScreenDef[] = [
 
 const screenKeyMap: Record<string, GameScreen> = {
 	fight: 'Fight',
-	cardGame: 'CardGame',
+	cardGame: 'PlaceholderScreen',
 	challenges: 'Challenges',
 	inventory: 'Inventory',
-	attributes: 'Attributes',
-	stats: 'Stats',
-	options: 'Options',
-	help: 'Help',
-	quit: 'Quit',
+	attributes: 'PlaceholderScreen',
+	stats: 'PlaceholderScreen',
+	options: 'PlaceholderScreen',
+	help: 'PlaceholderScreen',
+	quit: 'PlaceholderScreen',
 };
 
 const handleNavigate = (key: string) => {

@@ -1,6 +1,6 @@
 using Game.Abstractions.Entities;
 using Game.Abstractions.Infrastructure;
-using Game.Core.Events;
+using Game.Core.Players.Events;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;

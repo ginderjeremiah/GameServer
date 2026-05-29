@@ -1,4 +1,4 @@
-using Game.Abstractions.Entities;
+using Game.Core.Challenges;
 
 namespace Game.Abstractions.DataAccess
 {

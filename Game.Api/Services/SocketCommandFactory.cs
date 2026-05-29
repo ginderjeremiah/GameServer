@@ -7,23 +7,14 @@ namespace Game.Api.Services
     public class SocketCommandFactory
     {
         private static readonly ConcurrentDictionary<string, Func<IServiceProvider, AbstractSocketCommand>> _socketCommandGenerators = [];
-        private static readonly Task _registerCommandGeneratorsTask = Task.Run(RegisterSocketCommandGenerators);
-
-        private readonly IServiceScopeFactory _scopeFactory;
-
-        public SocketCommandFactory(IServiceScopeFactory scopeFactory)
-        {
-            _scopeFactory = scopeFactory;
-        }
 
         /// <summary>
         /// Creates the requested socket command inside a fresh DI scope.
         /// The caller is responsible for disposing the returned <see cref="IServiceScope"/>
         /// after the command has executed (and after any post-execution work such as UoW commit).
         /// </summary>
-        public async Task<AbstractSocketCommand> CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
+        public AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
         {
-            await _registerCommandGeneratorsTask;
             if (_socketCommandGenerators.TryGetValue(commandInfo.Name, out var generator))
             {
                 var command = generator(scope.ServiceProvider);
@@ -37,7 +28,7 @@ namespace Game.Api.Services
             }
         }
 
-        private static void RegisterSocketCommandGenerators()
+        public static void RegisterSocketCommandGenerators()
         {
             var assembly = typeof(SocketCommandFactory).Assembly;
             var types = assembly.GetTypes();

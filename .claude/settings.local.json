@@ -13,7 +13,9 @@
       "PowerShell(Remove-Item \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\\\\Game.Api\\\\Models\\\\Drops\" -Recurse -Force -Confirm:$false)",
       "Bash(npx svelte-check *)",
       "Bash(dotnet ef *)",
-      "PowerShell(dotnet sln add Game.Api.Tests\\\\Game.Api.Tests.csproj)"
+      "PowerShell(dotnet sln add Game.Api.Tests\\\\Game.Api.Tests.csproj)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ginde\\\\source\\\\repos\\\\ginderjeremiah\\\\GameServer\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20 FullName)"
     ]
   }
 }

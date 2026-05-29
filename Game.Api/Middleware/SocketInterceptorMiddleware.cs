@@ -49,6 +49,7 @@ namespace Game.Api.Middleware
         /// <returns>The <see cref="IApplicationBuilder"/> with an interceptor for socket requests.</returns>
         public static IApplicationBuilder UseSocketInterceptor(this IApplicationBuilder builder)
         {
+            SocketCommandFactory.RegisterSocketCommandGenerators();
             return builder.UseMiddleware<SocketInterceptorMiddleware>();
         }
     }

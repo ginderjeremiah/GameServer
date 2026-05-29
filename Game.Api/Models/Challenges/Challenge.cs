@@ -1,8 +1,8 @@
-using ChallengeEntity = Game.Abstractions.Entities.Challenge;
+using CoreChallenge = Game.Core.Challenges.Challenge;
 
 namespace Game.Api.Models.Challenges
 {
-    public class Challenge : IModelFromSource<Challenge, ChallengeEntity>
+    public class Challenge : IModelFromSource<Challenge, CoreChallenge>
     {
         public int Id { get; set; }
         public string Name { get; set; }
@@ -13,18 +13,18 @@ namespace Game.Api.Models.Challenges
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
 
-        public static Challenge FromSource(ChallengeEntity entity)
+        public static Challenge FromSource(CoreChallenge challenge)
         {
             return new Challenge
             {
-                Id = entity.Id,
-                Name = entity.Name,
-                Description = entity.Description,
-                ChallengeTypeId = entity.ChallengeTypeId,
-                TargetEntityId = entity.TargetEntityId,
-                TargetCount = entity.TargetCount,
-                RewardItemId = entity.RewardItemId,
-                RewardItemModId = entity.RewardItemModId,
+                Id = challenge.Id,
+                Name = challenge.Name,
+                Description = challenge.Description,
+                ChallengeTypeId = (int)challenge.Type,
+                TargetEntityId = challenge.TargetEntityId,
+                TargetCount = challenge.TargetCount,
+                RewardItemId = challenge.RewardItemId,
+                RewardItemModId = challenge.RewardItemModId,
             };
         }
     }

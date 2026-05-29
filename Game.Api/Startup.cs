@@ -3,9 +3,9 @@ using Game.Api.CodeGen;
 using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
-using Game.Application;
-using Game.Application.Services;
+using Game.Application.DependencyInjection;
 using Game.Core;
+using Game.Core.Events;
 using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
 
@@ -44,27 +44,19 @@ namespace Game.Api
                 options.Filters.Add<ErrorStatusFilter>();
                 options.Filters.Add<CommitFilter>();
             });
+
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
                 .AddDataAccess()
+                .AddDomainEventDispatcher()
+                .AddApplication()
                 .AddScoped<SessionService>()
                 .AddScoped<CookieService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
                 .AddSingleton<ApiCodeGenerator>()
-                // Application services
-                .AddScoped<BattlerFactory>()
-                .AddScoped<BattleService>()
-                .AddScoped<PlayerService>()
-                .AddScoped<StatisticsService>()
-                .AddScoped<ChallengeService>()
-                // Domain event infrastructure
-                .AddScoped<AdminCacheInvalidationFilter>()
-                .AddScoped<IDomainEventDispatcher, DomainEventDispatcher>()
-                .AddScoped<IDomainEventHandler, LoggingEventHandler>()
-                .AddScoped<IDomainEventHandler, StatisticsEventHandler>()
-                .AddScoped<IDomainEventHandler, BattleStatisticsEventHandler>();
+                .AddScoped<AdminCacheInvalidationFilter>();
 
             if (builder.Environment.IsDevelopment())
             {
@@ -91,7 +83,6 @@ namespace Game.Api
             }
             else
             {
-                app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }

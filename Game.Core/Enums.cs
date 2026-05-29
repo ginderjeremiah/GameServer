@@ -281,7 +281,10 @@ namespace Game.Core
         BossDefeat = 2,
         ZoneClear = 3,
         TimeTrial = 4,
-        LevelReached = 5
+        LevelReached = 5,
+        DamageDealt = 6,
+        BattlesWon = 7,
+        SkillsUsed = 8,
     }
 
     /// <summary>

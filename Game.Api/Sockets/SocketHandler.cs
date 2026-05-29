@@ -15,10 +15,7 @@ namespace Game.Api.Sockets
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<SocketHandler> _logger;
 
-        private DateTime _lastSend = DateTime.UtcNow;
         private DateTime _lastResponse = DateTime.UtcNow;
-
-        private DateTime LastAction => _lastResponse > _lastSend ? _lastResponse : _lastSend;
 
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
@@ -34,50 +31,36 @@ namespace Game.Api.Sockets
         public void Listen()
         {
             Task.Run(ReadLoop);
-            Task.Run(PingLoop);
+            Task.Run(InactivityCheckerLoop);
         }
 
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             using var scope = _scopeFactory.CreateScope();
-            var command = await _commandFactory.CreateCommand(commandInfo, scope);
+            var command = _commandFactory.CreateCommand(commandInfo, scope);
             try
             {
                 var response = await command.ExecuteAsync(_context);
                 await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-                _context.Session.ClearPlayerDomainEvents();
                 await _context.SendData(response);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
                 await _context.SendData(new ApiSocketResponse
                 {
                     Id = commandInfo.Id,
                     Error = "Internal Server Error"
                 });
             }
-
-            _lastSend = DateTime.UtcNow;
         }
 
-        private async Task PingLoop()
+        private async Task InactivityCheckerLoop()
         {
             while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && _context.State is Open)
             {
-                await Task.Delay(5000);
-                if (DateTime.UtcNow - LastAction > TimeSpan.FromSeconds(20))
-                {
-                    try
-                    {
-                        await _context.SendData("ping");
-                        _lastSend = DateTime.UtcNow;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "An error occurred while pinging a client socket");
-                    }
-                }
+                await Task.Delay(10000);
             }
 
             if (_context.State is Open)
@@ -100,7 +83,7 @@ namespace Game.Api.Sockets
                         await HandleMessage(message);
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex.Message is not "The remote end closed the connection.")
                 {
                     _logger.LogError(ex, "An error occurred while reading a socket message.");
                 }
@@ -115,8 +98,14 @@ namespace Game.Api.Sockets
 
         private async Task HandleMessage(string message)
         {
-            if (message == "pong")
+            if (message is "pong")
             {
+                return;
+            }
+
+            if (message is "ping")
+            {
+                await _context.SendData("pong");
                 return;
             }
 

@@ -2,56 +2,56 @@ using Game.Api.CodeGen.Data;
 using Game.Api.Models.Common;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
+using Xunit;
 
 namespace Game.Api.Tests.CodeGen
 {
-    [TestClass]
     public class SocketCommandMetadataTests
     {
-        [TestMethod]
+        [Fact]
         public void Constructor_SetsCommandName()
         {
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
-            Assert.AreEqual("TestSocketCommandWithResponse", metadata.CommandName);
+            Assert.Equal("TestSocketCommandWithResponse", metadata.CommandName);
         }
 
-        [TestMethod]
+        [Fact]
         public void Constructor_WithResponseData_SetsResponseDescriptor()
         {
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
-            Assert.IsNotNull(metadata.ResponseDescriptor);
-            Assert.AreEqual(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
+            Assert.NotNull(metadata.ResponseDescriptor);
+            Assert.Equal(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
         }
 
-        [TestMethod]
+        [Fact]
         public void Constructor_WithParameters_SetsParameterDescriptor()
         {
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithParams));
 
-            Assert.IsNotNull(metadata.ParameterDescriptor);
-            Assert.AreEqual(typeof(SocketParamModel), metadata.ParameterDescriptor.UnderlyingType);
+            Assert.NotNull(metadata.ParameterDescriptor);
+            Assert.Equal(typeof(SocketParamModel), metadata.ParameterDescriptor.UnderlyingType);
         }
 
-        [TestMethod]
+        [Fact]
         public void Constructor_WithBoth_SetsBothDescriptors()
         {
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandFull));
 
-            Assert.IsNotNull(metadata.ResponseDescriptor);
-            Assert.IsNotNull(metadata.ParameterDescriptor);
-            Assert.AreEqual(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
-            Assert.AreEqual(typeof(SocketParamModel), metadata.ParameterDescriptor.UnderlyingType);
+            Assert.NotNull(metadata.ResponseDescriptor);
+            Assert.NotNull(metadata.ParameterDescriptor);
+            Assert.Equal(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
+            Assert.Equal(typeof(SocketParamModel), metadata.ParameterDescriptor.UnderlyingType);
         }
 
-        [TestMethod]
+        [Fact]
         public void Constructor_NoResponseNoParams_BothNull()
         {
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandBasic));
 
-            Assert.IsNull(metadata.ResponseDescriptor);
-            Assert.IsNull(metadata.ParameterDescriptor);
+            Assert.Null(metadata.ResponseDescriptor);
+            Assert.Null(metadata.ParameterDescriptor);
         }
     }
 

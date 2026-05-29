@@ -100,8 +100,6 @@ namespace Game.Core.Attributes
             AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DefenseEndurance);
             AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DefenseAgility);
 
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DropBonusLuck);
-
             AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthBase);
             AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthEndurance);
             AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthStrength);

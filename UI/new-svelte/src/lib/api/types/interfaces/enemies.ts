@@ -21,16 +21,16 @@ export interface ISetEnemySkillsData {
 	skillIds: number[];
 };
 
-export interface IEnemyInstance {
-	id: number;
-	level: number;
-	attributes: IBattlerAttribute[];
-	seed: number;
-	selectedSkills: number[];
+export interface IDefeatEnemyRequest {
+	timestamp: number;
 };
 
 export interface INewEnemyRequest {
 	newZoneId?: number;
+};
+
+export interface IBattleLostResponse {
+	cooldown: number;
 };
 
 export interface IDefeatRewards {
@@ -44,6 +44,14 @@ export interface IDefeatRewards {
 export interface IDefeatEnemyResponse {
 	cooldown: number;
 	rewards?: IDefeatRewards;
+};
+
+export interface IEnemyInstance {
+	id: number;
+	level: number;
+	attributes: IBattlerAttribute[];
+	seed: number;
+	selectedSkills: number[];
 };
 
 export interface INewEnemyModel {

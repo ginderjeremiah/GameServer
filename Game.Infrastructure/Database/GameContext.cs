@@ -37,6 +37,7 @@ namespace Game.Infrastructure.Database
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
+        public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
         public DbSet<Tag> Tags { get; set; }
@@ -54,7 +55,7 @@ namespace Game.Infrastructure.Database
                 entity.HasKey(am => new { am.PlayerId, am.ItemId, am.ItemModSlotId });
             });
 
-            modelBuilder.Entity<Core.Attributes.Attribute>(entity =>
+            modelBuilder.Entity<Attribute>(entity =>
             {
                 entity.Property(a => a.Id)
                     .ValueGeneratedNever();
@@ -62,7 +63,16 @@ namespace Game.Infrastructure.Database
                 entity.Property(a => a.Name)
                     .HasMaxLength(50);
 
-                entity.HasData(Enum.GetValues<EAttribute>().Select(a => new Core.Attributes.Attribute(a)));
+                entity.HasData(Enum.GetValues<EAttribute>().Select(a =>
+                {
+                    var attribute = new Core.Attributes.Attribute(a);
+                    return new Attribute
+                    {
+                        Id = (int)a,
+                        Name = attribute.Name,
+                        Description = attribute.Description,
+                    };
+                }));
             });
 
             modelBuilder.Entity<AttributeDistribution>(entity =>
@@ -112,12 +122,12 @@ namespace Game.Infrastructure.Database
 
                 entity.HasData(Enum.GetValues<EEquipmentSlot>().Select(a =>
                 {
-                    var attribute = new Core.Players.EquipmentSlot(a);
+                    var equipmentSlot = new Core.Players.Inventories.EquipmentSlot(a);
                     return new EquipmentSlot
                     {
                         Id = (int)a,
-                        Name = attribute.Name,
-                        ItemCategoryId = (int)attribute.ItemCategory,
+                        Name = equipmentSlot.Name,
+                        ItemCategoryId = (int)equipmentSlot.ItemCategory,
                     };
                 }));
             });
@@ -259,6 +269,25 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
             });
 
+            modelBuilder.Entity<StatisticType>(entity =>
+            {
+                entity.Property(st => st.Id)
+                    .ValueGeneratedNever();
+
+                entity.Property(st => st.Name)
+                    .HasMaxLength(100);
+
+                entity.HasData(Enum.GetValues<EStatisticType>().Select(a =>
+                {
+                    var type = new Core.Statistics.StatisticType(a);
+                    return new StatisticType
+                    {
+                        Id = (int)type.Id,
+                        Name = type.Name,
+                    };
+                }));
+            });
+
             modelBuilder.Entity<ItemModType>(entity =>
             {
                 entity.Property(st => st.Id)
@@ -330,6 +359,54 @@ namespace Game.Infrastructure.Database
 
             modelBuilder.Entity<ZoneEnemy>()
                 .HasKey(ze => new { ze.ZoneId, ze.EnemyId });
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+            => SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                var tempProps = entry.Properties.Where(p => p.IsTemporary);
+                if (entry.State is not EntityState.Added)
+                {
+                    var idProp = tempProps.FirstOrDefault(p => p.Metadata.IsPrimaryKey());
+                    if (idProp is not null && entry.Entity is IZeroBasedIdentityEntity zbe && zbe.Id == 0)
+                    {
+                        idProp.IsTemporary = false;
+                        idProp.CurrentValue = 0;
+                    }
+                }
+
+                var fkProps = tempProps.Where(p => p.Metadata.IsForeignKey() && p.Metadata.ClrType == typeof(int)).ToList();
+                if (fkProps.Count != 0)
+                {
+                    foreach (var fkProp in fkProps)
+                    {
+                        var navigation = fkProp.Metadata.GetContainingForeignKeys()
+                            .FirstOrDefault(fk => fk.DeclaringEntityType == fkProp.Metadata.DeclaringType);
+
+                        if (navigation is not null && navigation.PrincipalEntityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
+                        {
+                            fkProp.IsTemporary = false;
+                            fkProp.CurrentValue = 0;
+                        }
+                    }
+                }
+            }
+
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        public override int SaveChanges()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            throw new NotImplementedException();
         }
     }
 }

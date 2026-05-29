@@ -53,20 +53,14 @@ export class EnemyManager {
 
 	private async watchBattleStage(stage: BattleStage) {
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
-			logMessage(
-				ELogType.EnemyDefeated,
-				staticData.enemies[this.currentEnemy.id].name + ' was defeated!'
-			);
+			logMessage(ELogType.EnemyDefeated, staticData.enemies[this.currentEnemy.id].name + ' was defeated!');
 
-			const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', this.currentEnemy);
+			const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: Date.now() });
 			if (!defeatResponse.error && defeatResponse.data.rewards) {
 				const rewards = defeatResponse.data.rewards;
 				playerManager.grantExp(rewards.expReward);
 			} else {
-				logMessage(
-					ELogType.Debug,
-					'There was an error defeating the enemy: ' + defeatResponse.error
-				);
+				logMessage(ELogType.Debug, 'There was an error defeating the enemy: ' + defeatResponse.error);
 			}
 
 			if (defeatResponse.data.cooldown > 0) {
@@ -74,11 +68,7 @@ export class EnemyManager {
 			}
 		}
 
-		if (
-			stage === BattleStage.Victorious ||
-			stage === BattleStage.Defeated ||
-			stage === BattleStage.Idle
-		) {
+		if (stage === BattleStage.Victorious || stage === BattleStage.Defeated || stage === BattleStage.Idle) {
 			await this.getNewEnemy();
 		}
 	}

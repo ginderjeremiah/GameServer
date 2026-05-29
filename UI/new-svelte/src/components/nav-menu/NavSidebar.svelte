@@ -85,14 +85,17 @@
 			<div class="pulse-dot"></div>
 		</div>
 		<div class="tick-display" class:show={expanded}>
-			<span title="Logic tick rate">L · {logicRate}</span>
+			<span title="Logic tick rate">L {logicRate}</span>
 			<span class="tick-sep">·</span>
-			<span title="Render tick rate">R · {renderRate}</span>
+			<span title="Render tick rate">R {renderRate}</span>
+			<span class="tick-sep">·</span>
+      <span title="Server Ping">{ping} ms</span>
 		</div>
 	</div>
 </div>
 
 <script lang="ts">
+import { onPingMeasured } from '$lib/api';
 import { logicEngine, renderEngine } from '$lib/engine';
 import SideGlyph from './SideGlyph.svelte';
 
@@ -113,6 +116,9 @@ const { screens, active, onNavigate }: Props = $props();
 
 let hovering = $state(false);
 let pinned = $state(false);
+let ping = $state(0);
+
+onPingMeasured((p) => ping = p);
 
 const expanded = $derived(pinned || hovering);
 

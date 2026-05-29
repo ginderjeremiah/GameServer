@@ -54,17 +54,6 @@ namespace Game.Core.Attributes.Modifiers
         };
         #endregion
 
-        #region DropBonus
-        public static AttributeModifier DropBonusLuck { get; } = new AttributeModifier
-        {
-            Attribute = DropBonus,
-            Amount = 1.0,
-            Source = Derived,
-            DerivedSource = Luck,
-            Type = Additive,
-        };
-        #endregion
-
         #region MaxHealth
         public static AttributeModifier MaxHealthBase { get; } = new AttributeModifier
         {

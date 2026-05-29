@@ -2,26 +2,26 @@ using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
+using Xunit;
 
 namespace Game.Core.Tests.Players
 {
-    [TestClass]
     public class InventoryTests
     {
         // ── UnlockItem ──────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void UnlockItem_NewItem_AddsToUnlockedItems()
         {
             var inventory = new Inventory();
 
             inventory.UnlockItem(42);
 
-            Assert.AreEqual(1, inventory.UnlockedItems.Count);
-            Assert.AreEqual(42, inventory.UnlockedItems[0].ItemId);
+            Assert.Equal(1, inventory.UnlockedItems.Count);
+            Assert.Equal(42, inventory.UnlockedItems[0].ItemId);
         }
 
-        [TestMethod]
+        [Fact]
         public void UnlockItem_DuplicateItem_DoesNotAddTwice()
         {
             var inventory = new Inventory();
@@ -29,22 +29,22 @@ namespace Game.Core.Tests.Players
             inventory.UnlockItem(42);
             inventory.UnlockItem(42);
 
-            Assert.AreEqual(1, inventory.UnlockedItems.Count);
+            Assert.Equal(1, inventory.UnlockedItems.Count);
         }
 
         // ── UnlockMod ───────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void UnlockMod_NewMod_AddsToUnlockedMods()
         {
             var inventory = new Inventory();
 
             inventory.UnlockMod(7);
 
-            Assert.IsTrue(inventory.UnlockedMods.Contains(7));
+            Assert.Contains(7, inventory.UnlockedMods);
         }
 
-        [TestMethod]
+        [Fact]
         public void UnlockMod_DuplicateMod_NoError()
         {
             var inventory = new Inventory();
@@ -52,12 +52,12 @@ namespace Game.Core.Tests.Players
             inventory.UnlockMod(7);
             inventory.UnlockMod(7);
 
-            Assert.AreEqual(1, inventory.UnlockedMods.Count);
+            Assert.Equal(1, inventory.UnlockedMods.Count);
         }
 
         // ── TryEquipItem ────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void TryEquipItem_UnlockedItem_EquipsSuccessfully()
         {
             var inventory = new Inventory();
@@ -66,23 +66,23 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
 
-            Assert.IsTrue(result);
+            Assert.True(result);
             var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
-            Assert.AreEqual(1, slot.ItemId);
-            Assert.AreEqual(item, slot.Item);
+            Assert.Equal(1, slot.ItemId);
+            Assert.Equal(item, slot.Item);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryEquipItem_NotUnlocked_ReturnsFalse()
         {
             var inventory = new Inventory();
 
             var result = inventory.TryEquipItem(999, EEquipmentSlot.AccessorySlot);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryEquipItem_WrongCategory_ReturnsFalse()
         {
             var inventory = new Inventory();
@@ -92,10 +92,10 @@ namespace Game.Core.Tests.Players
             // Weapon into Accessory slot should fail
             var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryEquipItem_AlreadyEquippedElsewhere_MovesToNewSlot()
         {
             var inventory = new Inventory();
@@ -106,12 +106,12 @@ namespace Game.Core.Tests.Players
 
             // Find another accessory slot if one exists, or just verify the old slot is cleared
             var oldSlot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
-            Assert.IsNotNull(oldSlot.Item);
+            Assert.NotNull(oldSlot.Item);
         }
 
         // ── TryUnequipItem ──────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void TryUnequipItem_EquippedSlot_UnequipsSuccessfully()
         {
             var inventory = new Inventory();
@@ -121,25 +121,25 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryUnequipItem(EEquipmentSlot.AccessorySlot);
 
-            Assert.IsTrue(result);
+            Assert.True(result);
             var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
-            Assert.IsNull(slot.ItemId);
-            Assert.IsNull(slot.Item);
+            Assert.Null(slot.ItemId);
+            Assert.Null(slot.Item);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryUnequipItem_EmptySlot_ReturnsFalse()
         {
             var inventory = new Inventory();
 
             var result = inventory.TryUnequipItem(EEquipmentSlot.AccessorySlot);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
         // ── TryApplyMod ─────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void TryApplyMod_ValidModAndSlot_AppliesSuccessfully()
         {
             var inventory = new Inventory();
@@ -162,13 +162,13 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
 
-            Assert.IsTrue(result);
+            Assert.True(result);
             var applied = inventory.UnlockedItems[0].AppliedMods;
-            Assert.AreEqual(1, applied.Count);
-            Assert.AreEqual(mod, applied[0].ItemMod);
+            Assert.Equal(1, applied.Count);
+            Assert.Equal(mod, applied[0].ItemMod);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryApplyMod_ModNotUnlocked_ReturnsFalse()
         {
             var inventory = new Inventory();
@@ -191,10 +191,10 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryApplyMod_WrongModType_ReturnsFalse()
         {
             var inventory = new Inventory();
@@ -217,12 +217,12 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
         // ── TryRemoveMod ────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void TryRemoveMod_ExistingMod_RemovesSuccessfully()
         {
             var inventory = new Inventory();
@@ -246,11 +246,11 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryRemoveMod(1, 0);
 
-            Assert.IsTrue(result);
-            Assert.AreEqual(0, inventory.UnlockedItems[0].AppliedMods.Count);
+            Assert.True(result);
+            Assert.Equal(0, inventory.UnlockedItems[0].AppliedMods.Count);
         }
 
-        [TestMethod]
+        [Fact]
         public void TryRemoveMod_NoModInSlot_ReturnsFalse()
         {
             var inventory = new Inventory();
@@ -259,12 +259,12 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryRemoveMod(1, 0);
 
-            Assert.IsFalse(result);
+            Assert.False(result);
         }
 
         // ── GetEquippedAttributeModifiers ───────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void GetEquippedAttributeModifiers_ReturnsModifiersFromEquippedItems()
         {
             var inventory = new Inventory();
@@ -282,19 +282,19 @@ namespace Game.Core.Tests.Players
 
             var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
 
-            Assert.AreEqual(1, modifiers.Count);
-            Assert.AreEqual(EAttribute.Strength, modifiers[0].Attribute);
-            Assert.AreEqual(5.0, modifiers[0].Amount);
+            Assert.Equal(1, modifiers.Count);
+            Assert.Equal(EAttribute.Strength, modifiers[0].Attribute);
+            Assert.Equal(5.0, modifiers[0].Amount);
         }
 
-        [TestMethod]
+        [Fact]
         public void GetEquippedAttributeModifiers_NoEquippedItems_ReturnsEmpty()
         {
             var inventory = new Inventory();
 
             var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
 
-            Assert.AreEqual(0, modifiers.Count);
+            Assert.Equal(0, modifiers.Count);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

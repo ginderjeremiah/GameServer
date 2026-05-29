@@ -1,13 +1,13 @@
 import { onDestroy } from 'svelte';
 import { Action } from './types';
 
-interface HookTracker<T extends any[]> {
+interface HookTracker<T extends unknown[]> {
 	id: number;
 	callback: Action<[...T, Action]>;
 	unhook: Action;
 }
 
-export const createHook = <T extends any[] = []>() => {
+export const createHook = <T extends unknown[] = []>() => {
 	let nextId = 0;
 	let promiseResolvers: Action<[T]>[] = [];
 	const trackers: HookTracker<T>[] = [];
@@ -49,7 +49,7 @@ export const createHook = <T extends any[] = []>() => {
 	};
 };
 
-function createUnhook<T extends any[]>(trackers: HookTracker<T>[], id: number) {
+function createUnhook<T extends unknown[]>(trackers: HookTracker<T>[], id: number) {
 	return () => {
 		const index = trackers.findIndex((t) => t.id === id);
 		if (index >= 0) {

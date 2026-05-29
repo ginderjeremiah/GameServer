@@ -10,14 +10,12 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
-        IDomainEventDispatcher dispatcher,
-        BattlerFactory battlerFactory)
+        BattleSnapshotService battleSnapshotService)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
-        private readonly IDomainEventDispatcher _dispatcher = dispatcher;
-        private readonly BattlerFactory _battlerFactory = battlerFactory;
+        private readonly BattleSnapshotService _battleSnapshotService = battleSnapshotService;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
         {
@@ -46,7 +44,7 @@ namespace Game.Application.Services
 
             var now = DateTime.UtcNow;
             var seed = (uint)(now.Ticks % uint.MaxValue);
-            var snapshot = _battlerFactory.CreateSnapshot(player);
+            var snapshot = _battleSnapshotService.CreateSnapshot(player);
 
             state.SetActiveBattle(enemy.Id, level, seed, now, snapshot);
 
@@ -78,7 +76,7 @@ namespace Game.Application.Services
             var earliestDefeat = state.BattleStartTime.AddMilliseconds(result.TotalMs);
             var now = DateTime.UtcNow;
 
-            if (claimedTimestamp < earliestDefeat || claimedTimestamp > now)
+            if (earliestDefeat - claimedTimestamp > TimeSpan.FromMilliseconds(100) || claimedTimestamp > now)
             {
                 return null;
             }
@@ -96,7 +94,6 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
-            await DispatchEvents(player);
 
             return new DefeatResult
             {
@@ -132,7 +129,6 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
-            await DispatchEvents(player);
 
             return true;
         }
@@ -163,7 +159,6 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
-            await DispatchEvents(player);
         }
 
         private BattleResult SimulateBattle(int enemyId, int level, uint seed, BattleSnapshot snapshot, int? maxMs = null)
@@ -174,7 +169,7 @@ namespace Game.Application.Services
             var battleRng = new Mulberry32(seed);
             enemy.Skills = enemy.GetRandomSkills(battleRng);
 
-            var playerBattler = _battlerFactory.CreateFromSnapshot(snapshot);
+            var playerBattler = _battleSnapshotService.CreateFromSnapshot(snapshot);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.Skills,
@@ -182,13 +177,6 @@ namespace Game.Application.Services
 
             var simulator = new BattleSimulator(playerBattler, enemyBattler);
             return simulator.Simulate(maxMs);
-        }
-
-        private async Task DispatchEvents(Player player)
-        {
-            var events = player.DomainEvents.ToList();
-            player.ClearEvents();
-            await _dispatcher.DispatchAsync(events);
         }
     }
 

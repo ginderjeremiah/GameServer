@@ -3,35 +3,35 @@ using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Xunit;
 
 namespace Game.Core.Tests.Battle
 {
-    [TestClass]
     public class BattleSkillTests
     {
         // ── Initial state ────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void NewBattleSkill_ChargeTimeIsZero()
         {
             var skill = MakeSkill(cooldownMs: 1000, baseDamage: 10);
             var battleSkill = new BattleSkill(skill);
 
-            Assert.AreEqual(0.0, battleSkill.ChargeTime);
+            Assert.Equal(0.0, battleSkill.ChargeTime);
         }
 
-        [TestMethod]
+        [Fact]
         public void NewBattleSkill_ExposesUnderlyingSkill()
         {
             var skill = MakeSkill(cooldownMs: 500, baseDamage: 20);
             var battleSkill = new BattleSkill(skill);
 
-            Assert.AreEqual(skill, battleSkill.Skill);
+            Assert.Equal(skill, battleSkill.Skill);
         }
 
         // ── Update ───────────────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void Update_AccumulatesChargeTime_BeforeCooldown()
         {
             // Use a huge cooldown so the skill never fires during this test.
@@ -42,11 +42,11 @@ namespace Game.Core.Tests.Battle
             battleSkill.Update(context);
 
             // CooldownMultiplier with no CooldownRecovery = 1.0, so ChargeTime ≈ 100.
-            Assert.IsTrue(battleSkill.ChargeTime > 0, "ChargeTime should have increased.");
-            Assert.IsTrue(battleSkill.ChargeTime < skill.CooldownMs, "ChargeTime should not have fired yet.");
+            Assert.True(battleSkill.ChargeTime > 0, "ChargeTime should have increased.");
+            Assert.True(battleSkill.ChargeTime < skill.CooldownMs, "ChargeTime should not have fired yet.");
         }
 
-        [TestMethod]
+        [Fact]
         public void Update_WhenChargeTimeReachesCooldown_ResetsChargeTime()
         {
             var skill = MakeSkill(cooldownMs: 100, baseDamage: 0);
@@ -55,12 +55,12 @@ namespace Game.Core.Tests.Battle
 
             battleSkill.Update(context);
 
-            Assert.AreEqual(0.0, battleSkill.ChargeTime, "ChargeTime should reset after firing.");
+            Assert.Equal(0.0, battleSkill.ChargeTime);
         }
 
         // ── CalculateDamage ──────────────────────────────────────────────────
 
-        [TestMethod]
+        [Fact]
         public void CalculateDamage_NoMultipliers_ReturnsBaseDamage()
         {
             var skill = MakeSkill(cooldownMs: 1000, baseDamage: 50, multipliers: []);
@@ -69,10 +69,10 @@ namespace Game.Core.Tests.Battle
 
             var damage = battleSkill.CalculateDamage(context);
 
-            Assert.AreEqual(50.0, damage);
+            Assert.Equal(50.0, damage);
         }
 
-        [TestMethod]
+        [Fact]
         public void CalculateDamage_WithStrengthMultiplier_AddsBonusDamage()
         {
             // The active battler (attacker) has 10 Strength.
@@ -92,7 +92,7 @@ namespace Game.Core.Tests.Battle
             var damage = battleSkill.CalculateDamage(context);
 
             // Strength=10, multiplier=2.0 → bonus = 20; BaseDamage=5 → total = 25
-            Assert.AreEqual(25.0, damage, 0.001);
+            Assert.Equal(25.0, damage, 0.001);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
