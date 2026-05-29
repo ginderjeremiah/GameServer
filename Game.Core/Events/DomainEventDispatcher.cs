@@ -15,6 +15,7 @@ namespace Game.Core.Events
     public class DomainEventDispatcher : IDomainEventDispatcher
     {
         private static readonly ConcurrentDictionary<Type, ConcurrentBag<Func<IServiceProvider, IDomainEvent, CancellationToken, Task>>> _domainEventHandlers = [];
+        private static readonly ConcurrentDictionary<(Type, Type), byte> _registeredHandlers = [];
         private static readonly DomainEventTypeCache _domainEventTypeCache = new();
 
         private readonly IServiceProvider _serviceProvider;
@@ -49,10 +50,23 @@ namespace Game.Core.Events
             }
         }
 
+        /// <summary>
+        /// Registers the domain event type <typeparamref name="T1"/> to trigger the handler <typeparamref name="T2"/> when dispatched.
+        /// </summary>
+        /// <remarks>
+        /// Handlers can only be registered once per given type. Duplicate registrations will be silently ignored.
+        /// </remarks>
+        /// <typeparam name="T1"></typeparam>
+        /// <typeparam name="T2"></typeparam>
         public static void RegisterDomainEventHandler<T1, T2>() where T1 : IDomainEvent where T2 : IDomainEventHandler<T1>
         {
             var eventType = typeof(T1);
             var handlerType = typeof(T2);
+
+            if (!_registeredHandlers.TryAdd((eventType, handlerType), 0))
+            {
+                return;
+            }
 
             var serviceExtensions = typeof(ServiceProviderServiceExtensions);
             var handlerConstructor = handlerType.GetConstructors().First();
