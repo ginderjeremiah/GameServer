@@ -12,6 +12,11 @@ This game is an idle incremental RPG where players can progress through various 
 
 VERY IMPORTANT: if you are working on game features or mechanics, you MUST read the [Game Design Document](./docs/game-design.md).
 
+# General Coding Guidelines
+
+- Prefer writing DRY code whenever possible. This is especially important in the frontend!
+- NEVER omit the {} when writing if/else or while blocks.
+
 # Overall Project Guidelines
 
 - All code should be written in a clean, maintainable, and scalable manner, following best practices and design patterns.

@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { formatNum, randomInt, capitalize, normalizeText, plural, keys, groupBy, enumPairs } from './functions';
+import {
+	formatNum,
+	randomInt,
+	capitalize,
+	normalizeText,
+	plural,
+	keys,
+	groupBy,
+	enumPairs
+} from '../../lib/common/functions';
 
 describe('formatNum', () => {
 	it('formats integers without trailing zeros', () => {

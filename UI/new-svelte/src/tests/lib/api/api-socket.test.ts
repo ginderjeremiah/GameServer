@@ -17,7 +17,7 @@ vi.stubGlobal('WebSocket', function (this: any) {
 	socketInstances.push(this);
 });
 
-import { ApiSocket } from './api-socket';
+import { ApiSocket } from '$lib/api/api-socket';
 
 describe('ApiSocket', () => {
 	let apiSocket: ApiSocket;

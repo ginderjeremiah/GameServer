@@ -8,10 +8,7 @@ import { expect } from '@playwright/test';
  */
 export async function waitForLoginReady(page: Page) {
 	await expect(page.getByTestId('login-heading')).toBeVisible({ timeout: 10000 });
-	await page.waitForResponse(
-		(r) => r.url().includes('/api/Login/Status'),
-		{ timeout: 10000 }
-	).catch(() => {});
+	await page.waitForResponse((r) => r.url().includes('/api/Login/Status'), { timeout: 10000 }).catch(() => {});
 }
 
 /** DB username column is varchar(20), so keep test usernames short. */

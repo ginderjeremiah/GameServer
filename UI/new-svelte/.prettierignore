@@ -3,5 +3,13 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 
-# Code gen files
+# Code Gen Files
 src/lib/api/types
+
+# Images
+**/*.png
+
+# Other
+.gitignore
+.npmrc
+.prettierignore

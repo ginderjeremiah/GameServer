@@ -24,7 +24,7 @@ vi.stubGlobal('XMLHttpRequest', function (this: any) {
 
 vi.stubGlobal('window', { encodeURIComponent: encodeURIComponent });
 
-import { ApiRequest } from './api-request';
+import { ApiRequest } from '$lib/api/api-request';
 
 describe('ApiRequest', () => {
 	beforeEach(() => {

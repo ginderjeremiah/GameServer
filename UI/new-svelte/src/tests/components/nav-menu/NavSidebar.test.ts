@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
-import NavSidebar from './NavSidebar.svelte';
+import NavSidebar from '../../../components/nav-menu/NavSidebar.svelte';
 
 vi.mock('$lib/engine', () => ({
 	logicEngine: { tickRate: 0 },

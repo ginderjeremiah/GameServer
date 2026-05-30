@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EAttribute } from '$lib/api';
-import { BattleAttributes } from './battle-attributes';
+import { BattleAttributes } from '$lib/battle/battle-attributes';
 
 /**
  * Pure simulation loop that mirrors the backend BattleSimulator exactly.

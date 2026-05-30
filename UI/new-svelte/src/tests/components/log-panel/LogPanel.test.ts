@@ -9,7 +9,7 @@ vi.mock('$stores', () => ({
 	logs: () => logData
 }));
 
-import LogPanel from './LogPanel.svelte';
+import LogPanel from '../../../components/log-panel/LogPanel.svelte';
 
 afterEach(() => {
 	cleanup();

@@ -43,7 +43,7 @@ vi.mock('$lib/engine/log', () => ({
 	logMessage: vi.fn()
 }));
 
-import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from './inventory-manager';
+import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from '$lib/engine/player/inventory-manager';
 import { logMessage } from '$lib/engine/log';
 
 const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon): IItem => ({

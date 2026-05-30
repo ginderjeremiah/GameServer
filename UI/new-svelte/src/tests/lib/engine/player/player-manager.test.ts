@@ -4,8 +4,8 @@ vi.mock('../log', () => ({
 	logMessage: vi.fn()
 }));
 
-import { PlayerManager } from './player-manager';
-import { logMessage } from '../log';
+import { PlayerManager } from '$lib/engine/player/player-manager';
+import { logMessage } from '$lib/engine/log';
 import { EAttribute, ELogType } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 

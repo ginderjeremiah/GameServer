@@ -79,8 +79,8 @@ vi.mock('./enemy-manager', () => ({
 	})
 }));
 
-import { BattleEngine, BattleStage } from './battle-engine';
-import { logMessage } from '../log';
+import { BattleEngine, BattleStage } from '$lib/engine/battle/battle-engine';
+import { logMessage } from '$lib/engine/log';
 
 describe('BattleEngine', () => {
 	let engine: BattleEngine;

@@ -11,8 +11,7 @@ vi.stubGlobal('window', {
 	requestAnimationFrame: vi.fn()
 });
 
-import { LogicalEngine } from './logical-engine';
-import { onLogicalUpdate, tickSize } from './logical-engine';
+import { LogicalEngine, onLogicalUpdate, tickSize } from '$lib/engine/logical-engine';
 
 describe('LogicalEngine', () => {
 	let engine: LogicalEngine;

@@ -4,7 +4,7 @@ vi.mock('svelte', () => ({
 	onDestroy: vi.fn((fn: () => void) => fn)
 }));
 
-import { createHook } from './hooks';
+import { createHook } from '../../lib/common/hooks';
 import { onDestroy } from 'svelte';
 
 describe('createHook', () => {

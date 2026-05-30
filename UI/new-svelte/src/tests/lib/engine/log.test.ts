@@ -19,7 +19,7 @@ vi.mock('$stores', () => ({
 	logs: () => mockLogs
 }));
 
-import { logMessage } from './log';
+import { logMessage } from '$lib/engine/log';
 
 describe('logMessage', () => {
 	beforeEach(() => {

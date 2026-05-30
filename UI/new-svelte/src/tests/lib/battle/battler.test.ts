@@ -12,7 +12,7 @@ vi.mock('$stores', () => ({
 	}
 }));
 
-import { Battler } from './battler';
+import { Battler } from '$lib/battle/battler';
 
 const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill => ({
 	id,

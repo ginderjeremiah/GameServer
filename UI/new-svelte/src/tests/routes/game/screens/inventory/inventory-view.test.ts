@@ -39,7 +39,15 @@ vi.mock('$stores', () => ({
 	staticData: { itemMods: [] }
 }));
 
-import { InventoryView, rarityColor, rarityMeta, catName, hexA, SORTS, EQUIP_SLOTS } from './inventory-view.svelte';
+import {
+	InventoryView,
+	rarityColor,
+	rarityMeta,
+	catName,
+	hexA,
+	SORTS,
+	EQUIP_SLOTS
+} from '$routes/game/screens/inventory/inventory-view.svelte';
 
 const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERarity, extra: Partial<Item> = {}): Item =>
 	({

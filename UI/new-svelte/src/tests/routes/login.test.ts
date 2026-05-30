@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
-import LoginPage from './+page.svelte';
+import LoginPage from '../../routes/+page.svelte';
 
 // Mock modules that depend on SvelteKit runtime
 vi.mock('$app/environment', () => ({ browser: true }));

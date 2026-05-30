@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
-import PlaceholderScreen from './PlaceholderScreen.svelte';
+import PlaceholderScreen from '../../../../routes/game/screens/PlaceholderScreen.svelte';
 
 afterEach(cleanup);
 

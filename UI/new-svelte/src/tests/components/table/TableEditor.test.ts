@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import TableEditor from './TableEditor.svelte';
+import TableEditor from '../../../components/table/TableEditor.svelte';
 
 // The cell editors don't need the API barrel beyond EChangeType, but TableEditor
 // imports it; keep the real enum.

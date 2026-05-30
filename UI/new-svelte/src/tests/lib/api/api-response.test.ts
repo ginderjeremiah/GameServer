@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ApiResponse } from './api-response';
+import { ApiResponse } from '$lib/api/api-response';
 
 const makeXhr = (overrides: Partial<XMLHttpRequest> = {}): XMLHttpRequest => {
 	return {

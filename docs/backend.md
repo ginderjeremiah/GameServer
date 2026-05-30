@@ -21,7 +21,7 @@ The game is structured is similar to an onion architecture with multiple project
 
 Unit tests should be written according to the classical (Detroit) school of testing as much as possible. This project does not have any unmanaged dependencies, so you should be avoiding test doubles as much as possible in both unit and integration tests. If a service under test involves an out-of-process dependency such as the database or cache, it should only need to be tested through integration tests. Any classes that depend on out-of-process dependencies should NOT contain any logic worth unit testing. If you find that a service contains domain logic and depends on an out-of-process dependency, you should refactor the code to move said logic into an appropriate domain class that can be unit tested without the dependency, and then write integration tests only to validate the interaction with the out-of-process dependency.
 
-# Important Design Decisions
+# Important Architectural Design Decisions
 
 ## Reference Data
 
@@ -34,11 +34,3 @@ The backend uses a mix of HTTP and WebSockets for communication with the fronten
 ## Caching and Pub/Sub
 
 As mentioned above, most of the reference data is cached in-memory on the backend for fast access. However, player data is cached in Redis and uses a write-behind caching strategy where the cache is the source of truth for player data, and changes are persisted to the database asynchronously. The application uses Redis pub/sub to trigger persistence of player data to the database whenever it changes and as a backplane for WebSocket communication.
-
-## Item Rarity & Mod Slots on the API Item Model
-
-`ERarity` (Common → Mythic) and an item's mod slots already exist on the domain `Item`/entity and are eager-loaded by the `Items` repository. The API `Item` model now also exposes `RarityId` and `ModSlots` (the existing `ItemModSlot` model) so the frontend can render rarity-based styling and show an item's empty mod slots, not just its applied mods. No new data was added to the entities — these were already loaded and simply weren't surfaced through the model/codegen.
-
-## Item Favorites
-
-Players can favorite unlocked items. The flag lives on the domain `UnlockedItemSlot.Favorite` and is set via the `SetItemFavorite` websocket command → `PlayerService.SetFavorite` → `player.TrySetFavorite` → `SavePlayer`, which writes the whole player to the Redis cache (the source of truth for player data). Because the favorite rides on the cached player and `PlayerData.FromPlayer` reads it from the domain, no dedicated `UnlockedItem` column or EF migration was added — this keeps the change non-invasive and avoids a schema migration. The flag therefore persists for as long as the player stays in cache; adding a `UnlockedItem.Favorite` column plus a write-behind handler (mirroring `ItemEquippedEvent`) is the follow-up needed for durability across a full cache eviction.
