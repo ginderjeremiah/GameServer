@@ -70,10 +70,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 		});
 	}
 
-	public static async post<T extends ApiEndpointWithRequest>(
-		endpoint: T,
-		payload: ApiRequestTypes[T]
-	) {
+	public static async post<T extends ApiEndpointWithRequest>(endpoint: T, payload: ApiRequestTypes[T]) {
 		const request = new ApiRequest(endpoint);
 		const result = await request.post(payload);
 		return result.data;

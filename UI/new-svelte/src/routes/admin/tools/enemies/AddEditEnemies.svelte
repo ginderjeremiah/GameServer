@@ -34,7 +34,7 @@ const hiddenColumns: (keyof IEnemy)[] = ['attributeDistribution', 'skillPool'];
 const sampleItem = {
 	id: -1,
 	name: '',
-  isBoss: false,
+	isBoss: false,
 	attributeDistribution: [],
 	skillPool: []
 } satisfies IEnemy;

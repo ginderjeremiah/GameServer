@@ -25,7 +25,16 @@
 				title={pinned ? 'Unpin' : 'Keep open'}
 				onclick={() => (pinned = !pinned)}
 			>
-				<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+				<svg
+					width="13"
+					height="13"
+					viewBox="0 0 14 14"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.4"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
 					{#if pinned}
 						<path d="M9 1.5l3.5 3.5-2 2L7 3.5z" />
 						<path d="M7 3.5l-3 3 3.5 3.5 3-3" />
@@ -80,7 +89,12 @@
 
 	<!-- Return to game -->
 	<div class="sidebar-return">
-		<button class="side-item" data-testid="admin-return-to-game" title={!expanded ? 'Return to Game' : undefined} onclick={onBackToGame}>
+		<button
+			class="side-item"
+			data-testid="admin-return-to-game"
+			title={!expanded ? 'Return to Game' : undefined}
+			onclick={onBackToGame}
+		>
 			<div class="glyph-slot">
 				<AdminGlyph kind="back" />
 			</div>
@@ -129,7 +143,9 @@ $expanded-width: 240px;
 	width: $collapsed;
 	background: #14151b;
 	border-right: 1px solid var(--border-subtle);
-	transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease;
+	transition:
+		width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+		box-shadow 220ms ease;
 	display: flex;
 	flex-direction: column;
 	z-index: 10;
@@ -280,7 +296,9 @@ $expanded-width: 240px;
 	display: flex;
 	align-items: center;
 	height: 38px;
-	transition: color 140ms, background 140ms;
+	transition:
+		color 140ms,
+		background 140ms;
 	white-space: nowrap;
 	overflow: hidden;
 

@@ -23,9 +23,7 @@ export const tooltips = {
 	}
 };
 
-export const registerTooltipComponent = <T extends TooltipComponent>(
-	component: () => T | undefined
-) => {
+export const registerTooltipComponent = <T extends TooltipComponent>(component: () => T | undefined) => {
 	let data = $state<TooltipData>({ component, visible: false, position: undefined });
 
 	const setTooltipPosition = (position: Position) => {

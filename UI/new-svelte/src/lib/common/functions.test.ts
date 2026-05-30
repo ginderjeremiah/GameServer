@@ -13,8 +13,8 @@ describe('formatNum', () => {
 	});
 
 	it('strips trailing zeros from decimals', () => {
-		expect(formatNum(1.10)).toBe('1.1');
-		expect(formatNum(2.00)).toBe('2');
+		expect(formatNum(1.1)).toBe('1.1');
+		expect(formatNum(2.0)).toBe('2');
 	});
 });
 
@@ -119,7 +119,11 @@ describe('groupBy', () => {
 
 describe('enumPairs', () => {
 	it('converts a numeric enum to id/name pairs', () => {
-		enum TestEnum { Foo, Bar, Baz }
+		enum TestEnum {
+			Foo,
+			Bar,
+			Baz
+		}
 		const pairs = enumPairs(TestEnum);
 		expect(pairs).toEqual([
 			{ id: 0, name: 'Foo' },
@@ -129,7 +133,9 @@ describe('enumPairs', () => {
 	});
 
 	it('normalizes camelCase enum names', () => {
-		enum TestEnum { MyValue = 0 }
+		enum TestEnum {
+			MyValue = 0
+		}
 		const pairs = enumPairs(TestEnum);
 		expect(pairs[0].name).toBe('My Value');
 	});

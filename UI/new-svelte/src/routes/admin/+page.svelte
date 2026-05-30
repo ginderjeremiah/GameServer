@@ -22,9 +22,7 @@ import { adminGroups, adminTools } from './tools/nav';
 
 let active = $state('addItems');
 let sidebarPinned = $state(false);
-const CurrentTool = $derived(
-	adminTools.find((t) => t.key === active)?.component ?? adminTools[0].component
-);
+const CurrentTool = $derived(adminTools.find((t) => t.key === active)?.component ?? adminTools[0].component);
 
 const handleNavigate = (key: string) => {
 	active = key;
@@ -45,7 +43,7 @@ const backToGame = () => routeTo('/game');
 .sidebar-spacer {
 	width: 60px;
 	flex-shrink: 0;
-	transition: width 220ms cubic-bezier(.4, 0, .2, 1);
+	transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 
 	&.pinned {
 		width: 240px;

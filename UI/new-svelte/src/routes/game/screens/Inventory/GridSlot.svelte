@@ -15,20 +15,40 @@
 	onclick={handleClick}
 	ondblclick={() => onToggleEquip?.(item)}
 	onkeydown={handleKeydown}
-	onmouseenter={(e) => { hover = true; onHoverEnter?.(item, e); }}
+	onmouseenter={(e) => {
+		hover = true;
+		onHoverEnter?.(item, e);
+	}}
 	onmousemove={(e) => onHoverMove?.(e)}
-	onmouseleave={() => { hover = false; onHoverLeave?.(); }}
+	onmouseleave={() => {
+		hover = false;
+		onHoverLeave?.();
+	}}
 >
-	<CategoryGlyph cat={item.itemCategoryId} color={item.equipped ? 'rgba(240,240,240,0.95)' : 'rgba(240,240,240,0.6)'} size={Math.round(size * 0.42)} />
+	<CategoryGlyph
+		cat={item.itemCategoryId}
+		color={item.equipped ? 'rgba(240,240,240,0.95)' : 'rgba(240,240,240,0.6)'}
+		size={Math.round(size * 0.42)}
+	/>
 
 	<button
 		class="fav-star"
 		class:on={item.favorite}
 		class:show={hover}
 		title={item.favorite ? 'Unfavorite' : 'Favorite'}
-		onclick={(e) => { e.stopPropagation(); onToggleFav?.(item); }}
+		onclick={(e) => {
+			e.stopPropagation();
+			onToggleFav?.(item);
+		}}
 	>
-		<svg width="12" height="12" viewBox="0 0 16 16" fill={item.favorite ? '#e8c878' : 'none'} stroke={item.favorite ? '#e8c878' : 'rgba(240,240,240,0.85)'} stroke-width="1.3">
+		<svg
+			width="12"
+			height="12"
+			viewBox="0 0 16 16"
+			fill={item.favorite ? '#e8c878' : 'none'}
+			stroke={item.favorite ? '#e8c878' : 'rgba(240,240,240,0.85)'}
+			stroke-width="1.3"
+		>
 			<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
 		</svg>
 	</button>
@@ -93,7 +113,9 @@ const catColor = $derived(catAccent(item.itemCategoryId));
 const modCount = $derived(item.appliedMods.length);
 
 const borderColor = $derived(accentBorders ? hexA(rc, Math.min(0.85, 0.34 + level * 0.09)) : 'rgba(255,255,255,0.14)');
-const glowShadow = $derived(glow && glowAmount > 0 ? `0 0 ${5 + glowAmount * 16}px ${hexA(rc, glowAmount * 0.5)}` : 'none');
+const glowShadow = $derived(
+	glow && glowAmount > 0 ? `0 0 ${5 + glowAmount * 16}px ${hexA(rc, glowAmount * 0.5)}` : 'none'
+);
 const boxShadow = $derived(
 	selected
 		? `0 0 0 1px ${accent}, 0 0 14px ${hexA(accent, 0.4)}`
@@ -131,7 +153,10 @@ const handleDragStart = (e: DragEvent) => {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	transition: box-shadow 120ms, border-color 120ms, transform 120ms;
+	transition:
+		box-shadow 120ms,
+		border-color 120ms,
+		transform 120ms;
 
 	&:active {
 		cursor: grabbing;

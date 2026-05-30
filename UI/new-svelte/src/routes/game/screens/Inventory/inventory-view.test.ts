@@ -41,13 +41,7 @@ vi.mock('$stores', () => ({
 
 import { InventoryView, rarityColor, rarityMeta, catName, hexA, SORTS, EQUIP_SLOTS } from './inventory-view.svelte';
 
-const makeItem = (
-	itemId: number,
-	name: string,
-	cat: EItemCategory,
-	rarity: ERarity,
-	extra: Partial<Item> = {}
-): Item =>
+const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERarity, extra: Partial<Item> = {}): Item =>
 	({
 		id: itemId,
 		itemId,
@@ -79,7 +73,11 @@ beforeEach(() => {
 
 describe('inventory-view helpers', () => {
 	it('maps each rarity to a distinct color', () => {
-		const colors = new Set(Object.values(ERarity).filter((v) => typeof v === 'number').map((r) => rarityColor(r as ERarity)));
+		const colors = new Set(
+			Object.values(ERarity)
+				.filter((v) => typeof v === 'number')
+				.map((r) => rarityColor(r as ERarity))
+		);
 		expect(colors.size).toBe(6);
 		expect(rarityMeta(ERarity.Mythic).level).toBe(6);
 	});

@@ -35,11 +35,23 @@ export const adminGroups: AdminGroupDef[] = [
 /** Each tool is a sidebar item under its entity group. */
 export const adminTools: AdminToolDef[] = [
 	{ key: 'addEnemies', label: 'Add/Edit Enemies', group: 'enemies', glyph: 'skull', component: AddEditEnemies },
-	{ key: 'attrDist', label: 'Set Attribute Distributions', group: 'enemies', glyph: 'bars', component: SetAttributeDistributions },
+	{
+		key: 'attrDist',
+		label: 'Set Attribute Distributions',
+		group: 'enemies',
+		glyph: 'bars',
+		component: SetAttributeDistributions
+	},
 	{ key: 'enemySkills', label: 'Set Enemy Skills', group: 'enemies', glyph: 'rune', component: SetEnemySkills },
 	{ key: 'addItems', label: 'Add/Edit Items', group: 'items', glyph: 'box', component: AddEditItems },
 	{ key: 'addSkills', label: 'Add/Edit Skills', group: 'skills', glyph: 'bolt', component: AddEditSkills },
-	{ key: 'skillMult', label: 'Set Skill Multipliers', group: 'skills', glyph: 'multiply', component: SetSkillMultipliers },
+	{
+		key: 'skillMult',
+		label: 'Set Skill Multipliers',
+		group: 'skills',
+		glyph: 'multiply',
+		component: SetSkillMultipliers
+	},
 	{ key: 'addZones', label: 'Add/Edit Zones', group: 'zones', glyph: 'map', component: AddEditZones },
 	{ key: 'zoneEnemies', label: 'Set Zone Enemies', group: 'zones', glyph: 'pin', component: SetZoneEnemies }
 ];

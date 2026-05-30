@@ -49,7 +49,9 @@ const style = $derived.by(() => {
 	background: rgba(20, 21, 27, 0.96);
 	border: 1px solid rgba(255, 255, 255, 0.14);
 	border-radius: 3px;
-	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+	box-shadow:
+		0 12px 28px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(0, 0, 0, 0.4);
 	backdrop-filter: blur(6px);
 	z-index: 15;
 	color: #f0f0f0;

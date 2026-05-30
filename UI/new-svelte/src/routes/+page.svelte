@@ -31,12 +31,7 @@
 					<div class="field-icon">
 						{#if usernameError}
 							<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-								<path
-									d="M4 4l8 8M12 4l-8 8"
-									stroke="var(--error)"
-									stroke-width="2"
-									stroke-linecap="round"
-								/>
+								<path d="M4 4l8 8M12 4l-8 8" stroke="var(--error)" stroke-width="2" stroke-linecap="round" />
 							</svg>
 						{:else if usernameValid}
 							<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -75,11 +70,7 @@
 				>
 					{#if showPassword}
 						<svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-							<path
-								d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z"
-								stroke="rgba(240,240,240,0.75)"
-								stroke-width="1.4"
-							/>
+							<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
 							<circle cx="10" cy="10" r="2.5" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" />
 						</svg>
 					{:else}
@@ -89,12 +80,7 @@
 								stroke="rgba(240,240,240,0.75)"
 								stroke-width="1.4"
 							/>
-							<path
-								d="M3 3l14 14"
-								stroke="rgba(240,240,240,0.75)"
-								stroke-width="1.4"
-								stroke-linecap="round"
-							/>
+							<path d="M3 3l14 14" stroke="rgba(240,240,240,0.75)" stroke-width="1.4" stroke-linecap="round" />
 						</svg>
 					{/if}
 				</button>
@@ -133,12 +119,7 @@
 						<div class="field-icon">
 							{#if confirmError}
 								<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-									<path
-										d="M4 4l8 8M12 4l-8 8"
-										stroke="var(--error)"
-										stroke-width="2"
-										stroke-linecap="round"
-									/>
+									<path d="M4 4l8 8M12 4l-8 8" stroke="var(--error)" stroke-width="2" stroke-linecap="round" />
 								</svg>
 							{:else if confirmValid}
 								<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -170,12 +151,7 @@
 					</svg>
 				{:else if statusLine.type === 'err'}
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-						<path
-							d="M4 4l8 8M12 4l-8 8"
-							stroke={statusColor}
-							stroke-width="2"
-							stroke-linecap="round"
-						/>
+						<path d="M4 4l8 8M12 4l-8 8" stroke={statusColor} stroke-width="2" stroke-linecap="round" />
 					</svg>
 				{/if}
 				{statusLine.text}
@@ -245,8 +221,7 @@ const passwordValidation = $derived.by(() => {
 	if (!password) return { ok: false, msg: 'Required' };
 	if (mode === 'login') return { ok: true, msg: '' };
 	if (password.length < 8) return { ok: false, msg: 'At least 8 characters' };
-	if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
-		return { ok: false, msg: 'Mix letters and numbers' };
+	if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) return { ok: false, msg: 'Mix letters and numbers' };
 	return { ok: true, msg: '' };
 });
 
@@ -298,12 +273,9 @@ const statusLine = $derived.by(() => {
 			type: 'ok' as const,
 			text: mode === 'login' ? 'Signed in — loading world…' : 'Account created — entering…'
 		};
-	if (usernameError)
-		return { type: 'err' as const, text: 'Username · ' + usernameError.toLowerCase() };
-	if (passwordError)
-		return { type: 'err' as const, text: 'Password · ' + passwordError.toLowerCase() };
-	if (confirmError)
-		return { type: 'err' as const, text: 'Confirm · ' + confirmError.toLowerCase() };
+	if (usernameError) return { type: 'err' as const, text: 'Username · ' + usernameError.toLowerCase() };
+	if (passwordError) return { type: 'err' as const, text: 'Password · ' + passwordError.toLowerCase() };
+	if (confirmError) return { type: 'err' as const, text: 'Confirm · ' + confirmError.toLowerCase() };
 	if (capsLock) return { type: 'warn' as const, text: 'Caps Lock is on' };
 	if (mode === 'signup' && password)
 		return { type: 'info' as const, text: `Strength · ${strengthLabel.toLowerCase()}` };

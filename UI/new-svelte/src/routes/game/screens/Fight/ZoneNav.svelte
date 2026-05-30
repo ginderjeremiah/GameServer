@@ -12,9 +12,7 @@ import { staticData } from '$stores';
 import { playerManager } from '$lib/engine';
 
 const orderedZones = $derived(staticData.zones?.slice().sort((a, b) => a.order - b.order));
-const current = $derived(
-	orderedZones?.find((z) => z.id === playerManager.currentZone) ?? orderedZones?.[0]
-);
+const current = $derived(orderedZones?.find((z) => z.id === playerManager.currentZone) ?? orderedZones?.[0]);
 const zoneNum = $derived((orderedZones?.indexOf(current) ?? -1) + 1);
 const leftDisabled = $derived(zoneNum === 1);
 const rightDisabled = $derived(zoneNum === orderedZones?.length);

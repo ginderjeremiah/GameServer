@@ -20,12 +20,7 @@
 
 	<!-- Detail drawer: right-side slide-over with dimmed backdrop + click-outside close -->
 	<div class="drawer-layer" style:pointer-events={view.selected ? 'auto' : 'none'}>
-		<div
-			class="backdrop"
-			class:open={!!view.selected}
-			role="presentation"
-			onclick={() => view.select(null)}
-		></div>
+		<div class="backdrop" class:open={!!view.selected} role="presentation" onclick={() => view.select(null)}></div>
 		<div class="drawer" class:open={!!view.selected}>
 			{#if view.selected}
 				<ItemDrawer item={view.selected} {view} />

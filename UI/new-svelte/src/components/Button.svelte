@@ -1,4 +1,4 @@
-<button class="btn round-border hover-glow" disabled={loading} onclick={onClick} type={type}>
+<button class="btn round-border hover-glow" disabled={loading} onclick={onClick} {type}>
 	{#if loading}
 		<Loading></Loading>
 	{/if}
@@ -11,7 +11,7 @@ type Props = {
 	text?: string;
 	loading?: boolean;
 	onClick: (event: MouseEvent) => void;
-  type?: 'button' | 'submit' | 'reset';
+	type?: 'button' | 'submit' | 'reset';
 	textPadding?: 'comfortable' | 'minimal' | 'none';
 };
 

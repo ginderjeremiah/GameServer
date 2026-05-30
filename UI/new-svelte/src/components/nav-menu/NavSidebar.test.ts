@@ -4,7 +4,7 @@ import NavSidebar from './NavSidebar.svelte';
 
 vi.mock('$lib/engine', () => ({
 	logicEngine: { tickRate: 0 },
-	renderEngine: { tickRate: 0 },
+	renderEngine: { tickRate: 0 }
 }));
 
 afterEach(cleanup);
@@ -19,7 +19,7 @@ const screens = [
 	{ key: 'options', label: 'Options', group: 'settings', built: false },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: false },
-	{ key: 'admin', label: 'Admin', group: 'admin', built: true },
+	{ key: 'admin', label: 'Admin', group: 'admin', built: true }
 ];
 
 describe('NavSidebar', () => {

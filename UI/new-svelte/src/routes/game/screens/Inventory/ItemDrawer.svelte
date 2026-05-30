@@ -13,12 +13,18 @@
 
 <div class="drawer-body">
 	<div class="section">
-		<div class="section-rule"><span class="mono-label">Stats</span><div class="line"></div></div>
+		<div class="section-rule">
+			<span class="mono-label">Stats</span>
+			<div class="line"></div>
+		</div>
 		<StatList attrs={stats} />
 	</div>
 
 	<div class="section">
-		<div class="section-rule"><span class="mono-label">Mod slots · {item.modSlots?.length ?? 0}</span><div class="line"></div></div>
+		<div class="section-rule">
+			<span class="mono-label">Mod slots · {item.modSlots?.length ?? 0}</span>
+			<div class="line"></div>
+		</div>
 		<ModSlots {item} {view} />
 	</div>
 
@@ -49,10 +55,7 @@ const equipped = $derived(item.equipmentSlotId != null);
 // Recompute from the item's current attributes + applied mods so the panel
 // reflects mod changes live.
 const stats = $derived(
-	new BattleAttributes(
-		[...item.attributes, ...item.appliedMods.flatMap((m) => m.attributes)],
-		false
-	).getAttributeMap()
+	new BattleAttributes([...item.attributes, ...item.appliedMods.flatMap((m) => m.attributes)], false).getAttributeMap()
 );
 </script>
 

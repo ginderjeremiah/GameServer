@@ -3,7 +3,7 @@ import { EAttribute, ELogType } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 vi.mock('svelte', async (importOriginal) => ({
-	...(await importOriginal() as Record<string, unknown>),
+	...((await importOriginal()) as Record<string, unknown>),
 	onDestroy: vi.fn()
 }));
 
@@ -12,8 +12,12 @@ const mockEnemies: any[] = [];
 
 vi.mock('$stores', () => ({
 	staticData: {
-		get skills() { return mockSkills; },
-		get enemies() { return mockEnemies; }
+		get skills() {
+			return mockSkills;
+		},
+		get enemies() {
+			return mockEnemies;
+		}
 	}
 }));
 
@@ -36,8 +40,12 @@ const mockInventoryManager = {
 };
 
 vi.mock('../engine', () => ({
-	get playerManager() { return mockPlayerManager; },
-	get inventoryManager() { return mockInventoryManager; }
+	get playerManager() {
+		return mockPlayerManager;
+	},
+	get inventoryManager() {
+		return mockInventoryManager;
+	}
 }));
 
 let logicalUpdateCallbacks: Function[] = [];
@@ -48,7 +56,7 @@ vi.mock('../logical-engine', () => ({
 	onLogicalUpdate: vi.fn((cb: Function) => {
 		logicalUpdateCallbacks.push(cb);
 		return () => {
-			logicalUpdateCallbacks = logicalUpdateCallbacks.filter(c => c !== cb);
+			logicalUpdateCallbacks = logicalUpdateCallbacks.filter((c) => c !== cb);
 		};
 	})
 }));
@@ -57,7 +65,7 @@ vi.mock('../render-engine', () => ({
 	onRenderUpdate: vi.fn((cb: Function, cleanup?: boolean) => {
 		renderUpdateCallbacks.push(cb);
 		return () => {
-			renderUpdateCallbacks = renderUpdateCallbacks.filter(c => c !== cb);
+			renderUpdateCallbacks = renderUpdateCallbacks.filter((c) => c !== cb);
 		};
 	})
 }));
@@ -66,7 +74,7 @@ vi.mock('./enemy-manager', () => ({
 	onNewEnemyLoaded: vi.fn((cb: Function) => {
 		enemyLoadedCallbacks.push(cb);
 		return () => {
-			enemyLoadedCallbacks = enemyLoadedCallbacks.filter(c => c !== cb);
+			enemyLoadedCallbacks = enemyLoadedCallbacks.filter((c) => c !== cb);
 		};
 	})
 }));
@@ -193,10 +201,7 @@ describe('BattleEngine', () => {
 
 			logicalUpdateCallbacks[0](500);
 
-			expect(logMessage).toHaveBeenCalledWith(
-				ELogType.Damage,
-				expect.stringContaining('Slash')
-			);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining('Slash'));
 		});
 
 		it('does not process updates when not Active', () => {
@@ -204,10 +209,7 @@ describe('BattleEngine', () => {
 
 			logicalUpdateCallbacks[0](500);
 
-			expect(logMessage).not.toHaveBeenCalledWith(
-				ELogType.Damage,
-				expect.any(String)
-			);
+			expect(logMessage).not.toHaveBeenCalledWith(ELogType.Damage, expect.any(String));
 		});
 
 		it('accumulates timeElapsed', () => {

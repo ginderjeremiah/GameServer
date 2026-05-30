@@ -142,7 +142,9 @@ describe('ApiSocket', () => {
 
 		it('catches listener callback errors and logs them', () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const badListener = vi.fn(() => { throw new Error('listener error'); });
+			const badListener = vi.fn(() => {
+				throw new Error('listener error');
+			});
 
 			apiSocket.listenCommand('SocketReplaced' as any, badListener, false);
 

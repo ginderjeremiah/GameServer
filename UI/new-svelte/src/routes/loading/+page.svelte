@@ -36,7 +36,15 @@
 		</div>
 		<div class="progress-labels">
 			<span>{completed} of {items.length}</span>
-			<span>{phase === 'done' ? 'complete' : phase === 'error' ? 'paused' : phase === 'checking' ? 'checking' : 'loading'}</span>
+			<span
+				>{phase === 'done'
+					? 'complete'
+					: phase === 'error'
+						? 'paused'
+						: phase === 'checking'
+							? 'checking'
+							: 'loading'}</span
+			>
 		</div>
 
 		<!-- Sliding manifest window -->
@@ -47,7 +55,13 @@
 						<div class="row-icon">
 							{#if item.status === 'done'}
 								<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-									<path d="M3 8.5l3 3 7-7" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+									<path
+										d="M3 8.5l3 3 7-7"
+										stroke="var(--success)"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
 								</svg>
 							{:else if item.status === 'error'}
 								<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -65,7 +79,9 @@
 							class:done-label={item.status === 'done'}
 							class:error-label={item.status === 'error'}
 							class:pending-label={item.status === 'pending'}
-						>{item.label}</div>
+						>
+							{item.label}
+						</div>
 						<div
 							class="row-status"
 							class:done-status={item.status === 'done'}
@@ -142,7 +158,7 @@ let manifestEl: HTMLElement;
 
 const ROW_HEIGHT = 42;
 
-const completed = $derived(items.filter(i => i.status === 'done').length);
+const completed = $derived(items.filter((i) => i.status === 'done').length);
 const progressPct = $derived(items.length ? (completed / items.length) * 100 : 0);
 const currentItem = $derived(activeIndex >= 0 && activeIndex < items.length ? items[activeIndex] : null);
 const cursorY = $derived((2 - activeIndex) * ROW_HEIGHT);
@@ -169,12 +185,14 @@ $effect(() => {
 	return () => cancelAnimationFrame(rafId);
 });
 
-const title = $derived({
-	checking: 'Checking for updates.',
-	loading: 'Preparing the realm.',
-	error: 'Connection failed.',
-	done: 'Ready.',
-}[phase]);
+const title = $derived(
+	{
+		checking: 'Checking for updates.',
+		loading: 'Preparing the realm.',
+		error: 'Connection failed.',
+		done: 'Ready.'
+	}[phase]
+);
 
 const rowOpacity = (i: number) => {
 	const visualCenter = 2 - animatedY / ROW_HEIGHT;
@@ -219,7 +237,7 @@ const loadFrom = async (startIdx: number) => {
 			return;
 		}
 
-		await new Promise(r => setTimeout(r, 80));
+		await new Promise((r) => setTimeout(r, 80));
 	}
 
 	phase = 'done';
@@ -232,7 +250,10 @@ const dedupedFetch = (key: string, run: () => Promise<void>): Promise<number> =>
 		const t = performance.now();
 		pending = run()
 			.then(() => Math.round(performance.now() - t))
-			.catch((e) => { pendingFetches.delete(key); throw e; });
+			.catch((e) => {
+				pendingFetches.delete(key);
+				throw e;
+			});
 		pendingFetches.set(key, pending);
 	}
 	return pending;
@@ -248,51 +269,100 @@ onMount(async () => {
 
 	items = [
 		{
-			key: 'zones', label: 'Zones',
+			key: 'zones',
+			label: 'Zones',
 			status: alreadyLoaded(staticData.zones) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('zones', () => ApiRequest.get('Zones').then(d => { staticData.zones = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('zones', () =>
+					ApiRequest.get('Zones').then((d) => {
+						staticData.zones = d;
+					})
+				)
 		},
 		{
-			key: 'enemies', label: 'Enemies',
+			key: 'enemies',
+			label: 'Enemies',
 			status: alreadyLoaded(staticData.enemies) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('enemies', () => ApiRequest.get('Enemies').then(d => { staticData.enemies = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('enemies', () =>
+					ApiRequest.get('Enemies').then((d) => {
+						staticData.enemies = d;
+					})
+				)
 		},
 		{
-			key: 'items', label: 'Items',
+			key: 'items',
+			label: 'Items',
 			status: alreadyLoaded(staticData.items) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('items', () => ApiRequest.get('Items').then(d => { staticData.items = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('items', () =>
+					ApiRequest.get('Items').then((d) => {
+						staticData.items = d;
+					})
+				)
 		},
 		{
-			key: 'skills', label: 'Skills',
+			key: 'skills',
+			label: 'Skills',
 			status: alreadyLoaded(staticData.skills) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('skills', () => ApiRequest.get('Skills').then(d => { staticData.skills = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('skills', () =>
+					ApiRequest.get('Skills').then((d) => {
+						staticData.skills = d;
+					})
+				)
 		},
 		{
-			key: 'itemMods', label: 'Item Mods',
+			key: 'itemMods',
+			label: 'Item Mods',
 			status: alreadyLoaded(staticData.itemMods) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('itemMods', () => ApiRequest.get('ItemMods').then(d => { staticData.itemMods = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('itemMods', () =>
+					ApiRequest.get('ItemMods').then((d) => {
+						staticData.itemMods = d;
+					})
+				)
 		},
 		{
-			key: 'attributes', label: 'Attributes',
+			key: 'attributes',
+			label: 'Attributes',
 			status: alreadyLoaded(staticData.attributes) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('attributes', () => ApiRequest.get('Attributes').then(d => { staticData.attributes = d; })),
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('attributes', () =>
+					ApiRequest.get('Attributes').then((d) => {
+						staticData.attributes = d;
+					})
+				)
 		},
 		{
-			key: 'challenges', label: 'Challenges',
+			key: 'challenges',
+			label: 'Challenges',
 			status: alreadyLoaded(staticData.challenges) ? 'done' : 'pending',
-			durationMs: 0, error: null,
-			fetch: () => dedupedFetch('challenges', () => ApiRequest.get('Challenges').then(d => { staticData.challenges = d; })),
-		},
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('challenges', () =>
+					ApiRequest.get('Challenges').then((d) => {
+						staticData.challenges = d;
+					})
+				)
+		}
 	];
 
 	// If all cached, skip straight to done
-	if (items.every(i => i.status === 'done')) {
+	if (items.every((i) => i.status === 'done')) {
 		phase = 'done';
 		activeIndex = items.length;
 		return;
@@ -300,7 +370,7 @@ onMount(async () => {
 
 	// Checking phase
 	phase = 'checking';
-	await new Promise(r => setTimeout(r, 500));
+	await new Promise((r) => setTimeout(r, 500));
 
 	// Loading phase: sequential
 	phase = 'loading';
@@ -337,7 +407,9 @@ onMount(async () => {
 	border: 1px solid var(--accent);
 	box-shadow: 0 0 8px rgba(161, 194, 247, 0.4);
 	position: relative;
-	transition: border-color 200ms, box-shadow 200ms;
+	transition:
+		border-color 200ms,
+		box-shadow 200ms;
 
 	&.pulsing {
 		animation: pulse-glow 1.6s ease-in-out infinite;
@@ -409,7 +481,9 @@ onMount(async () => {
 	inset: 0;
 	background: var(--accent);
 	box-shadow: 0 0 6px rgba(161, 194, 247, 0.45);
-	transition: width 480ms cubic-bezier(.4, 0, .2, 1), background 200ms;
+	transition:
+		width 480ms cubic-bezier(0.4, 0, 0.2, 1),
+		background 200ms;
 
 	&.error-fill {
 		background: rgba(240, 160, 148, 0.85);

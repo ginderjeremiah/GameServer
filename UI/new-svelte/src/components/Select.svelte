@@ -33,13 +33,7 @@ interface OptionData {
 	selected: boolean;
 }
 
-let {
-	value = $bindable(),
-	label,
-	id = crypto.randomUUID(),
-	disableBlanks,
-	options
-}: Props = $props();
+let { value = $bindable(), label, id = crypto.randomUUID(), disableBlanks, options }: Props = $props();
 
 let selectOptions = $state<OptionData[]>([]);
 let selected = $state<OptionData>();

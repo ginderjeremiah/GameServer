@@ -8,7 +8,16 @@
 					<option value={option.value}>{option.text}</option>
 				{/each}
 			</select>
-			<svg class="select-caret" width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="rgba(240,240,240,0.5)" stroke-width="1.4" aria-hidden="true">
+			<svg
+				class="select-caret"
+				width="9"
+				height="9"
+				viewBox="0 0 10 10"
+				fill="none"
+				stroke="rgba(240,240,240,0.5)"
+				stroke-width="1.4"
+				aria-hidden="true"
+			>
 				<path d="M2 3.5L5 6.5L8 3.5" stroke-linecap="round" stroke-linejoin="round" />
 			</svg>
 			{#if dirty}<span class="dirty-dot" title="Changed from saved value"></span>{/if}
@@ -25,7 +34,15 @@
 				onclick={toggleBool}
 			>
 				{#if data}
-					<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#c0d8ff" stroke-width="1.8" aria-hidden="true">
+					<svg
+						width="11"
+						height="11"
+						viewBox="0 0 12 12"
+						fill="none"
+						stroke="#c0d8ff"
+						stroke-width="1.8"
+						aria-hidden="true"
+					>
 						<path d="M2.5 6.2L4.8 8.5L9.5 3.5" stroke-linecap="round" stroke-linejoin="round" />
 					</svg>
 				{/if}
@@ -160,12 +177,12 @@ const onNumberInput = (e: Event) => {
 }
 
 .str-wrap {
-  width: 100%;
-  min-width: 260px;
+	width: 100%;
+	min-width: 260px;
 }
 
 .adm-input {
-  field-sizing: content;
+	field-sizing: content;
 	width: 100%;
 	background: rgba(255, 255, 255, 0.03);
 	border: 1px solid rgba(255, 255, 255, 0.1);
@@ -175,7 +192,10 @@ const onNumberInput = (e: Event) => {
 	font-size: 13px;
 	padding: 6px 8px;
 	outline: none;
-	transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+	transition:
+		border-color 140ms ease,
+		box-shadow 140ms ease,
+		background 140ms ease;
 
 	&.num {
 		font-family: 'Geist Mono', monospace;
@@ -188,7 +208,9 @@ const onNumberInput = (e: Event) => {
 
 	&:focus {
 		border-color: var(--accent);
-		box-shadow: 0 0 0 1px rgba(161, 194, 247, 0.4), 0 0 8px rgba(161, 194, 247, 0.35);
+		box-shadow:
+			0 0 0 1px rgba(161, 194, 247, 0.4),
+			0 0 8px rgba(161, 194, 247, 0.35);
 		background: rgba(161, 194, 247, 0.04);
 	}
 
@@ -221,7 +243,10 @@ const onNumberInput = (e: Event) => {
 	padding: 6px 26px 6px 8px;
 	outline: none;
 	cursor: pointer;
-	transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+	transition:
+		border-color 140ms ease,
+		box-shadow 140ms ease,
+		background 140ms ease;
 
 	&:hover:not(:disabled) {
 		border-color: rgba(255, 255, 255, 0.2);
@@ -229,7 +254,9 @@ const onNumberInput = (e: Event) => {
 
 	&:focus {
 		border-color: var(--accent);
-		box-shadow: 0 0 0 1px rgba(161, 194, 247, 0.4), 0 0 8px rgba(161, 194, 247, 0.35);
+		box-shadow:
+			0 0 0 1px rgba(161, 194, 247, 0.4),
+			0 0 8px rgba(161, 194, 247, 0.35);
 	}
 
 	&:disabled {

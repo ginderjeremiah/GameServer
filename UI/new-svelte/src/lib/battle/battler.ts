@@ -45,10 +45,7 @@ export class Battler {
 	public updateRenderCooldowns(renderDelta: number) {
 		for (const skill of this.skills) {
 			if (skill) {
-				skill.renderChargeTime = Math.min(
-					skill.chargeTime + renderDelta * this.cdMultiplier,
-					skill.cooldownMs
-				);
+				skill.renderChargeTime = Math.min(skill.chargeTime + renderDelta * this.cdMultiplier, skill.cooldownMs);
 			}
 		}
 	}

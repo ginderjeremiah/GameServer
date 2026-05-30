@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('svelte', async (importOriginal) => ({
-	...(await importOriginal() as Record<string, unknown>),
+	...((await importOriginal()) as Record<string, unknown>),
 	onDestroy: vi.fn()
 }));
 

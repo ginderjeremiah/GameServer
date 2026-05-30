@@ -181,10 +181,7 @@ describe('InventoryManager', () => {
 			});
 
 			expect(manager.unlockedItems.has(3)).toBe(true);
-			expect(logMessage).toHaveBeenCalledWith(
-				ELogType.ItemFound,
-				expect.stringContaining('Item 3')
-			);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, expect.stringContaining('Item 3'));
 		});
 	});
 

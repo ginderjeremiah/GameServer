@@ -15,15 +15,33 @@
 		ondragleave={() => (over = false)}
 		ondrop={handleDrop}
 		onclick={() => filled && onSelect?.(item!)}
-		onkeydown={(e) => { if (filled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelect?.(item!); } }}
-		onmouseenter={(e) => { hover = true; if (filled) onHoverEnter?.(item!, e); }}
+		onkeydown={(e) => {
+			if (filled && (e.key === 'Enter' || e.key === ' ')) {
+				e.preventDefault();
+				onSelect?.(item!);
+			}
+		}}
+		onmouseenter={(e) => {
+			hover = true;
+			if (filled) onHoverEnter?.(item!, e);
+		}}
 		onmousemove={(e) => filled && onHoverMove?.(e)}
-		onmouseleave={() => { hover = false; onHoverLeave?.(); }}
+		onmouseleave={() => {
+			hover = false;
+			onHoverLeave?.();
+		}}
 	>
 		{#if filled}
 			<CategoryGlyph cat={item!.itemCategoryId} color={catAccent(item!.itemCategoryId)} size={20} />
 			{#if hover}
-				<button class="unequip" title="Unequip" onclick={(e) => { e.stopPropagation(); onUnequip?.(slot.id); }}>×</button>
+				<button
+					class="unequip"
+					title="Unequip"
+					onclick={(e) => {
+						e.stopPropagation();
+						onUnequip?.(slot.id);
+					}}>×</button
+				>
 			{/if}
 			{#if item!.appliedMods.length}
 				<span class="mod-count">{item!.appliedMods.length}◈</span>

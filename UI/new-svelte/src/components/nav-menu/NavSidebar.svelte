@@ -3,8 +3,8 @@
 	class:expanded
 	data-testid="sidebar"
 	role="complementary"
-	onmouseenter={() => hovering = true}
-	onmouseleave={() => hovering = false}
+	onmouseenter={() => (hovering = true)}
+	onmouseleave={() => (hovering = false)}
 >
 	<!-- Wordmark / pin -->
 	<div class="sidebar-header">
@@ -20,9 +20,18 @@
 				class:pinned
 				data-testid="pin-button"
 				title={pinned ? 'Unpin' : 'Keep open'}
-				onclick={() => pinned = !pinned}
+				onclick={() => (pinned = !pinned)}
 			>
-				<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+				<svg
+					width="13"
+					height="13"
+					viewBox="0 0 14 14"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.4"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
 					{#if pinned}
 						<path d="M9 1.5l3.5 3.5-2 2L7 3.5z" />
 						<path d="M7 3.5l-3 3 3.5 3.5 3-3" />
@@ -40,7 +49,7 @@
 	<!-- Nav body -->
 	<div class="sidebar-body">
 		{#each groups as group, gi}
-			{@const groupItems = screens.filter(s => s.group === group.key)}
+			{@const groupItems = screens.filter((s) => s.group === group.key)}
 			{#if groupItems.length}
 				<div class="nav-group">
 					<!-- Group header -->
@@ -89,7 +98,7 @@
 			<span class="tick-sep">·</span>
 			<span title="Render tick rate">R {renderRate}</span>
 			<span class="tick-sep">·</span>
-      <span title="Server Ping">{parseFloat(ping.toFixed(3)).toString()} ms</span>
+			<span title="Server Ping">{parseFloat(ping.toFixed(3)).toString()} ms</span>
 		</div>
 	</div>
 </div>
@@ -119,7 +128,7 @@ let { screens, active, onNavigate, pinned = $bindable(false) }: Props = $props()
 let hovering = $state(false);
 let ping = $state(0);
 
-onPingMeasured((p) => ping = p);
+onPingMeasured((p) => (ping = p));
 
 const expanded = $derived(pinned || hovering);
 
@@ -127,7 +136,7 @@ const groups = [
 	{ key: 'combat', label: 'Combat' },
 	{ key: 'character', label: 'Character' },
 	{ key: 'settings', label: 'Settings' },
-	{ key: 'admin', label: 'Admin' },
+	{ key: 'admin', label: 'Admin' }
 ];
 
 const logicRate = $derived(logicEngine.tickRate);
@@ -150,7 +159,9 @@ $expanded-width: 240px;
 	width: $collapsed;
 	background: #14151b;
 	border-right: 1px solid var(--border-subtle);
-	transition: width 220ms cubic-bezier(.4, 0, .2, 1), box-shadow 220ms ease;
+	transition:
+		width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+		box-shadow 220ms ease;
 	display: flex;
 	flex-direction: column;
 	z-index: 10;
@@ -297,7 +308,9 @@ $expanded-width: 240px;
 	display: flex;
 	align-items: center;
 	height: 38px;
-	transition: color 140ms, background 140ms;
+	transition:
+		color 140ms,
+		background 140ms;
 	white-space: nowrap;
 	overflow: hidden;
 

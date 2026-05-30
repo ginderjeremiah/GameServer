@@ -4,11 +4,13 @@ let xhrInstances: any[];
 
 vi.stubGlobal('XMLHttpRequest', function (this: any) {
 	this.open = vi.fn();
-	this.send = vi.fn(function (this: any) {
-		this.status = 200;
-		this.responseText = JSON.stringify({ data: 'test-result' });
-		if (this.onload) this.onload();
-	}.bind(this));
+	this.send = vi.fn(
+		function (this: any) {
+			this.status = 200;
+			this.responseText = JSON.stringify({ data: 'test-result' });
+			if (this.onload) this.onload();
+		}.bind(this)
+	);
 	this.setRequestHeader = vi.fn();
 	this.withCredentials = false;
 	this.status = 0;
@@ -67,7 +69,9 @@ describe('ApiRequest', () => {
 		it('resolves even when send throws', async () => {
 			const request = new ApiRequest('Items' as any);
 			const xhr = lastXhr();
-			xhr.send = vi.fn(() => { throw new Error('Network error'); });
+			xhr.send = vi.fn(() => {
+				throw new Error('Network error');
+			});
 
 			const response = await request.get();
 			expect(response).toBeDefined();
@@ -109,7 +113,9 @@ describe('ApiRequest', () => {
 		it('resolves even when send throws', async () => {
 			const request = new ApiRequest('Login' as any);
 			const xhr = lastXhr();
-			xhr.send = vi.fn(() => { throw new Error('Network error'); });
+			xhr.send = vi.fn(() => {
+				throw new Error('Network error');
+			});
 
 			const response = await request.post({ username: 'u', password: 'p' } as any);
 			expect(response).toBeDefined();

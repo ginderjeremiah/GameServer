@@ -5,10 +5,7 @@
 	{:else}
 		<div class="challenges-list">
 			{#each allChallenges as challenge}
-				<ChallengeCard
-					{challenge}
-					playerChallenge={playerProgressMap.get(challenge.id)}
-				/>
+				<ChallengeCard {challenge} playerChallenge={playerProgressMap.get(challenge.id)} />
 			{/each}
 			{#if allChallenges.length === 0}
 				<p class="empty-text">No challenges available.</p>
@@ -27,13 +24,11 @@ let playerChallenges = $state<IPlayerChallenge[]>([]);
 let loading = $state(true);
 
 const allChallenges = $derived(staticData.challenges ?? []);
-const playerProgressMap = $derived(
-	new Map(playerChallenges.map((pc) => [pc.challengeId, pc]))
-);
+const playerProgressMap = $derived(new Map(playerChallenges.map((pc) => [pc.challengeId, pc])));
 
 onMount(async () => {
 	try {
-		playerChallenges = await ApiRequest.get('Challenges/Player') ?? [];
+		playerChallenges = (await ApiRequest.get('Challenges/Player')) ?? [];
 	} catch {
 		playerChallenges = [];
 	}

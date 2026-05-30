@@ -25,7 +25,8 @@ function updateBattler(attacker: SimBattler, defender: SimBattler, timeDelta: nu
 		skill.chargeTime += timeDelta * attacker.cdMultiplier;
 		if (skill.chargeTime >= skill.cooldownMs) {
 			skill.chargeTime = 0;
-			const rawDmg = skill.baseDamage +
+			const rawDmg =
+				skill.baseDamage +
 				skill.multipliers.reduce((sum, m) => sum + attacker.attributes.getValue(m.attributeId) * m.amount, 0);
 			let dmg = rawDmg - defender.attributes.getValue(EAttribute.Defense);
 			if (dmg < 0) dmg = 0;
@@ -48,7 +49,11 @@ interface SimBattler {
 	skills: SimSkill[];
 }
 
-function makeSkill(baseDamage: number, cooldownMs: number, multipliers: { attributeId: EAttribute; amount: number }[] = []): SimSkill {
+function makeSkill(
+	baseDamage: number,
+	cooldownMs: number,
+	multipliers: { attributeId: EAttribute; amount: number }[] = []
+): SimSkill {
 	return { baseDamage, cooldownMs, chargeTime: 0, multipliers };
 }
 
@@ -57,13 +62,13 @@ function makeSkill(baseDamage: number, cooldownMs: number, multipliers: { attrib
  * Derived stats are calculated once by BattleAttributes.
  */
 function makeBattlerFromRaw(attrs: { id: EAttribute; amount: number }[], skills: SimSkill[]): SimBattler {
-	const battlerAttrs = attrs.map(a => ({ attributeId: a.id, amount: a.amount }));
+	const battlerAttrs = attrs.map((a) => ({ attributeId: a.id, amount: a.amount }));
 	const ba = new BattleAttributes(battlerAttrs, true);
 	return {
 		attributes: ba,
 		currentHealth: ba.getValue(EAttribute.MaxHealth),
 		cdMultiplier: 1 + ba.getValue(EAttribute.CooldownRecovery) / 100,
-		skills,
+		skills
 	};
 }
 
@@ -72,14 +77,14 @@ function makeBattlerFromRaw(attrs: { id: EAttribute; amount: number }[], skills:
  * then recalculates derived stats — reproducing the double-counting bug.
  */
 function makeBattlerFromFinalValues(attrs: { id: EAttribute; amount: number }[], skills: SimSkill[]): SimBattler {
-	const battlerAttrs = attrs.map(a => ({ attributeId: a.id, amount: a.amount }));
+	const battlerAttrs = attrs.map((a) => ({ attributeId: a.id, amount: a.amount }));
 	// calcDerivedStats=true adds derived stats on top of the already-final values
 	const ba = new BattleAttributes(battlerAttrs, true);
 	return {
 		attributes: ba,
 		currentHealth: ba.getValue(EAttribute.MaxHealth),
 		cdMultiplier: 1 + ba.getValue(EAttribute.CooldownRecovery) / 100,
-		skills,
+		skills
 	};
 }
 
@@ -98,12 +103,12 @@ const playerRawAttrs = [
 	{ id: EAttribute.Strength, amount: 50 },
 	{ id: EAttribute.Endurance, amount: 30 },
 	{ id: EAttribute.Agility, amount: 20 },
-	{ id: EAttribute.Dexterity, amount: 10 },
+	{ id: EAttribute.Dexterity, amount: 10 }
 ];
 
 const enemyRawAttrs = [
 	{ id: EAttribute.Strength, amount: 10 },
-	{ id: EAttribute.Endurance, amount: 15 },
+	{ id: EAttribute.Endurance, amount: 15 }
 ];
 
 function playerSkill(): SimSkill {
@@ -145,9 +150,9 @@ describe('Battle simulation parity with backend', () => {
 			{ id: EAttribute.Agility, amount: 20 },
 			{ id: EAttribute.Dexterity, amount: 10 },
 			// These are the FINAL values including derived stats:
-			{ id: EAttribute.MaxHealth, amount: 900 },  // 50 + 20*30 + 5*50
-			{ id: EAttribute.Defense, amount: 42 },      // 2 + 30 + 0.5*20
-			{ id: EAttribute.CooldownRecovery, amount: 9 }, // 0.4*20 + 0.1*10
+			{ id: EAttribute.MaxHealth, amount: 900 }, // 50 + 20*30 + 5*50
+			{ id: EAttribute.Defense, amount: 42 }, // 2 + 30 + 0.5*20
+			{ id: EAttribute.CooldownRecovery, amount: 9 } // 0.4*20 + 0.1*10
 		];
 
 		// This is how the frontend currently constructs the player battler:
@@ -157,8 +162,8 @@ describe('Battle simulation parity with backend', () => {
 		const enemy = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);
 
 		// Derived stats are now DOUBLED
-		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800);   // 900 + 900
-		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84);       // 42 + 42
+		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800); // 900 + 900
+		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84); // 42 + 42
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(18); // 9 + 9
 		expect(player.cdMultiplier).toBeCloseTo(1.18, 10);
 
@@ -178,7 +183,7 @@ describe('Battle simulation parity with backend', () => {
 			...playerRawAttrs,
 			{ id: EAttribute.MaxHealth, amount: 900 },
 			{ id: EAttribute.Defense, amount: 42 },
-			{ id: EAttribute.CooldownRecovery, amount: 9 },
+			{ id: EAttribute.CooldownRecovery, amount: 9 }
 		];
 		const playerBugged = makeBattlerFromFinalValues(playerFinalAttrs, [playerSkill()]);
 		const enemyB = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);

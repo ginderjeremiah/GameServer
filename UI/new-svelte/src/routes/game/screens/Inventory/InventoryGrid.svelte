@@ -15,7 +15,10 @@
 					onHoverEnter={handleHoverEnter}
 					onHoverMove={handleHoverMove}
 					onHoverLeave={handleHoverLeave}
-					onDragStart={(it) => { view.dragItemId = it.itemId; handleHoverLeave(); }}
+					onDragStart={(it) => {
+						view.dragItemId = it.itemId;
+						handleHoverLeave();
+					}}
 					onDragEnd={() => (view.dragItemId = null)}
 				/>
 			{/each}
@@ -31,9 +34,15 @@
 		{:else}
 			<span class="mono-label">{view.visible.length} items</span>
 			<div class="pager">
-				<button class="page-btn" disabled={pageClamped === 0} onclick={() => (view.page = Math.max(0, pageClamped - 1))}>‹</button>
+				<button class="page-btn" disabled={pageClamped === 0} onclick={() => (view.page = Math.max(0, pageClamped - 1))}
+					>‹</button
+				>
 				<span class="page-indicator">{pageClamped + 1} / {pages}</span>
-				<button class="page-btn" disabled={pageClamped === pages - 1} onclick={() => (view.page = Math.min(pages - 1, pageClamped + 1))}>›</button>
+				<button
+					class="page-btn"
+					disabled={pageClamped === pages - 1}
+					onclick={() => (view.page = Math.min(pages - 1, pageClamped + 1))}>›</button
+				>
 			</div>
 		{/if}
 	</div>

@@ -1,12 +1,5 @@
 {#if initialized}
-	<TableEditor
-		bind:this={editor}
-		{data}
-		{sampleItem}
-		primaryKey="id"
-		title="Add/Edit Zones"
-		onSave={saveChanges}
-	/>
+	<TableEditor bind:this={editor} {data} {sampleItem} primaryKey="id" title="Add/Edit Zones" onSave={saveChanges} />
 {/if}
 <Loading loading={!initialized} />
 
@@ -35,7 +28,7 @@ const sampleItem = {
 	description: '',
 	order: 0,
 	levelMin: 0,
-	levelMax: 0,
+	levelMax: 0
 } satisfies IZone;
 
 onMount(async () => {

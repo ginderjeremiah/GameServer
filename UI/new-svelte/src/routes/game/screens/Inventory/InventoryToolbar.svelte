@@ -3,7 +3,10 @@
 		<button
 			class="chip"
 			class:active={view.filterCat == null && !view.favOnly}
-			onclick={() => { view.filterCat = null; view.favOnly = false; }}
+			onclick={() => {
+				view.filterCat = null;
+				view.favOnly = false;
+			}}
 		>
 			All <span class="chip-count">{view.counts.all}</span>
 		</button>
@@ -26,7 +29,14 @@
 			title="Show favorites only"
 			onclick={() => (view.favOnly = !view.favOnly)}
 		>
-			<svg width="11" height="11" viewBox="0 0 16 16" fill={view.favOnly ? '#e8c878' : 'none'} stroke="#e8c878" stroke-width="1.3">
+			<svg
+				width="11"
+				height="11"
+				viewBox="0 0 16 16"
+				fill={view.favOnly ? '#e8c878' : 'none'}
+				stroke="#e8c878"
+				stroke-width="1.3"
+			>
 				<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
 			</svg>
 			Favorites <span class="chip-count">{view.counts.fav}</span>

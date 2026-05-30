@@ -1,11 +1,18 @@
-<div class="item-tooltip" bind:this={container} style={item ? '' : 'display: none;'}
-	style:border-left="3px solid {accentColor}">
+<div
+	class="item-tooltip"
+	bind:this={container}
+	style={item ? '' : 'display: none;'}
+	style:border-left="3px solid {accentColor}"
+>
 	{#if item}
 		<!-- Title section -->
 		<div class="tt-title-section">
 			<div class="tt-category-row">
-				<div class="tt-category-diamond" style:background={accentColor}
-					style:box-shadow="0 0 6px {accentColor}aa"></div>
+				<div
+					class="tt-category-diamond"
+					style:background={accentColor}
+					style:box-shadow="0 0 6px {accentColor}aa"
+				></div>
 				<span class="tt-category-label" style:color={accentColor}>{categoryName}</span>
 				{#if item.equipped}
 					<div class="tt-equipped-badge">
@@ -28,10 +35,9 @@
 					<div class="tt-stats-grid">
 						{#each attributeMap as attr}
 							<div class="tt-stat-name">{attr.name}</div>
-							<div class="tt-stat-value"
-								class:positive={attr.value > 0}
-								class:negative={attr.value < 0}
-							>{attr.value > 0 ? '+' : ''}{attr.value}</div>
+							<div class="tt-stat-value" class:positive={attr.value > 0} class:negative={attr.value < 0}>
+								{attr.value > 0 ? '+' : ''}{attr.value}
+							</div>
 						{/each}
 					</div>
 				</div>
@@ -111,23 +117,25 @@ const CATEGORY_ACCENT: Record<number, string> = {
 	[EItemCategory.Leg]: '#a1c2f7',
 	[EItemCategory.Boot]: '#a1c2f7',
 	[EItemCategory.Weapon]: '#e08778',
-	[EItemCategory.Accessory]: '#e8c878',
+	[EItemCategory.Accessory]: '#e8c878'
 };
 
 const accentColor = $derived(CATEGORY_ACCENT[item?.itemCategoryId ?? 0] ?? '#a1c2f7');
 const categoryName = $derived(EItemCategory[item?.itemCategoryId ?? 0] ?? 'Item');
 
-const modTypeAccent = (modType: number) => ({
-	[EItemModType.Component]: 'rgba(240, 240, 240, 0.55)',
-	[EItemModType.Prefix]: '#9bc7d9',
-	[EItemModType.Suffix]: '#c0a8e6',
-}[modType] ?? 'rgba(240, 240, 240, 0.55)');
+const modTypeAccent = (modType: number) =>
+	({
+		[EItemModType.Component]: 'rgba(240, 240, 240, 0.55)',
+		[EItemModType.Prefix]: '#9bc7d9',
+		[EItemModType.Suffix]: '#c0a8e6'
+	})[modType] ?? 'rgba(240, 240, 240, 0.55)';
 
-const modTypeLabel = (modType: number) => ({
-	[EItemModType.Component]: 'Component',
-	[EItemModType.Prefix]: 'Prefix',
-	[EItemModType.Suffix]: 'Suffix',
-}[modType] ?? '');
+const modTypeLabel = (modType: number) =>
+	({
+		[EItemModType.Component]: 'Component',
+		[EItemModType.Prefix]: 'Prefix',
+		[EItemModType.Suffix]: 'Suffix'
+	})[modType] ?? '';
 </script>
 
 <style lang="scss">
@@ -245,8 +253,12 @@ const modTypeLabel = (modType: number) => ({
 		text-align: right;
 		color: rgba(240, 240, 240, 0.7);
 
-		&.positive { color: #bde0b4; }
-		&.negative { color: #f0a094; }
+		&.positive {
+			color: #bde0b4;
+		}
+		&.negative {
+			color: #f0a094;
+		}
 	}
 }
 

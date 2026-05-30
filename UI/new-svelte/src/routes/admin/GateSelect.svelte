@@ -7,7 +7,16 @@
 				<option value={option.id}>{option.name}</option>
 			{/each}
 		</select>
-		<svg class="gate-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(240,240,240,0.6)" stroke-width="1.4" aria-hidden="true">
+		<svg
+			class="gate-caret"
+			width="10"
+			height="10"
+			viewBox="0 0 10 10"
+			fill="none"
+			stroke="rgba(240,240,240,0.6)"
+			stroke-width="1.4"
+			aria-hidden="true"
+		>
 			<path d="M2 3.5L5 6.5L8 3.5" stroke-linecap="round" stroke-linejoin="round" />
 		</svg>
 	</div>
@@ -57,7 +66,9 @@ let { label, options, value = $bindable(), placeholder = 'Select…' }: Props = 
 	padding: 8px 28px 8px 12px;
 	outline: none;
 	cursor: pointer;
-	transition: border-color 140ms ease, box-shadow 140ms ease;
+	transition:
+		border-color 140ms ease,
+		box-shadow 140ms ease;
 
 	&:hover {
 		border-color: rgba(255, 255, 255, 0.2);
@@ -65,7 +76,9 @@ let { label, options, value = $bindable(), placeholder = 'Select…' }: Props = 
 
 	&:focus {
 		border-color: var(--accent);
-		box-shadow: 0 0 0 1px rgba(161, 194, 247, 0.4), 0 0 8px rgba(161, 194, 247, 0.35);
+		box-shadow:
+			0 0 0 1px rgba(161, 194, 247, 0.4),
+			0 0 8px rgba(161, 194, 247, 0.35);
 	}
 
 	option {

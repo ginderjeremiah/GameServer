@@ -1,6 +1,9 @@
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={stroke} stroke-width="1.4" aria-hidden="true">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" {stroke} stroke-width="1.4" aria-hidden="true">
 	{#if kind === 'skull'}
-		<path d="M8 1.5c3 0 5 2.2 5 5.2 0 1.8-.8 2.7-.8 3.8 0 .8-.6 1.2-1.4 1.2H5.2c-.8 0-1.4-.4-1.4-1.2 0-1.1-.8-2-.8-3.8 0-3 2-5.2 5-5.2z" stroke-linejoin="round" />
+		<path
+			d="M8 1.5c3 0 5 2.2 5 5.2 0 1.8-.8 2.7-.8 3.8 0 .8-.6 1.2-1.4 1.2H5.2c-.8 0-1.4-.4-1.4-1.2 0-1.1-.8-2-.8-3.8 0-3 2-5.2 5-5.2z"
+			stroke-linejoin="round"
+		/>
 		<circle cx="6" cy="7.2" r="1.1" />
 		<circle cx="10" cy="7.2" r="1.1" />
 		<path d="M6.5 13v1.5M9.5 13v1.5" stroke-linecap="round" />
@@ -30,16 +33,7 @@
 </svg>
 
 <script lang="ts" module>
-export type AdminGlyphKind =
-	| 'skull'
-	| 'bars'
-	| 'rune'
-	| 'box'
-	| 'bolt'
-	| 'multiply'
-	| 'map'
-	| 'pin'
-	| 'back';
+export type AdminGlyphKind = 'skull' | 'bars' | 'rune' | 'box' | 'bolt' | 'multiply' | 'map' | 'pin' | 'back';
 </script>
 
 <script lang="ts">

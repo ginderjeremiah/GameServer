@@ -48,7 +48,7 @@ const screens: ScreenDef[] = [
 	{ key: 'options', label: 'Options', group: 'settings', built: false },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: false },
-	{ key: 'admin', label: 'Admin', group: 'admin', built: true },
+	{ key: 'admin', label: 'Admin', group: 'admin', built: true }
 ];
 
 const screenKeyMap: Record<string, GameScreen> = {
@@ -60,7 +60,7 @@ const screenKeyMap: Record<string, GameScreen> = {
 	stats: 'PlaceholderScreen',
 	options: 'PlaceholderScreen',
 	help: 'PlaceholderScreen',
-	quit: 'PlaceholderScreen',
+	quit: 'PlaceholderScreen'
 };
 
 const handleNavigate = (key: string) => {
@@ -88,7 +88,7 @@ const handleNavigate = (key: string) => {
 .sidebar-spacer {
 	width: 60px;
 	flex-shrink: 0;
-	transition: width 220ms cubic-bezier(.4, 0, .2, 1);
+	transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 
 	&.pinned {
 		width: 240px;

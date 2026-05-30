@@ -12,8 +12,15 @@
 					style:border-left-color={accent}
 					role="button"
 					tabindex="0"
-					onclick={() => { if (!applied) togglePicker(slot.id); }}
-					onkeydown={(e) => { if (!applied && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); togglePicker(slot.id); } }}
+					onclick={() => {
+						if (!applied) togglePicker(slot.id);
+					}}
+					onkeydown={(e) => {
+						if (!applied && (e.key === 'Enter' || e.key === ' ')) {
+							e.preventDefault();
+							togglePicker(slot.id);
+						}
+					}}
 				>
 					<div class="mod-info">
 						<div class="mod-head">
@@ -33,7 +40,14 @@
 
 					{#if applied}
 						{#if applied.removable}
-							<button class="mod-remove" title="Remove mod" onclick={(e) => { e.stopPropagation(); view.removeMod(item.itemId, slot.id); }}>×</button>
+							<button
+								class="mod-remove"
+								title="Remove mod"
+								onclick={(e) => {
+									e.stopPropagation();
+									view.removeMod(item.itemId, slot.id);
+								}}>×</button
+							>
 						{:else}
 							<span class="mod-locked" title="Permanent"></span>
 						{/if}
@@ -47,14 +61,19 @@
 					<div class="mod-picker" style:border-left-color={accent}>
 						<div class="picker-label" style:color={accent}>Install {modLabel(slot.itemModSlotTypeId)}</div>
 						{#if options.length === 0}
-							<div class="picker-empty">No unlocked {modLabel(slot.itemModSlotTypeId).toLowerCase()} mods available.</div>
+							<div class="picker-empty">
+								No unlocked {modLabel(slot.itemModSlotTypeId).toLowerCase()} mods available.
+							</div>
 						{:else}
 							<div class="picker-options">
 								{#each options as mod (mod.id)}
 									<button
 										class="picker-option"
 										style:border-left-color={accent}
-										onclick={() => { view.applyMod(item.itemId, slot.id, mod.id); openSlotId = null; }}
+										onclick={() => {
+											view.applyMod(item.itemId, slot.id, mod.id);
+											openSlotId = null;
+										}}
 									>
 										<div class="option-name">{mod.name}</div>
 										<div class="option-desc">{mod.description}</div>

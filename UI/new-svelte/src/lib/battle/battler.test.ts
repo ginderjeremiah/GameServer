@@ -51,24 +51,28 @@ describe('Battler', () => {
 		});
 
 		it('calculates currentHealth from derived MaxHealth', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [
-					{ attributeId: EAttribute.Strength, amount: 10 },
-					{ attributeId: EAttribute.Endurance, amount: 20 }
-				]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Strength, amount: 10 },
+						{ attributeId: EAttribute.Endurance, amount: 20 }
+					]
+				})
+			);
 
 			const expectedMaxHealth = 50 + 20 * 20 + 5 * 10;
 			expect(battler.currentHealth).toBe(expectedMaxHealth);
 		});
 
 		it('calculates cdMultiplier from CooldownRecovery', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [
-					{ attributeId: EAttribute.Agility, amount: 20 },
-					{ attributeId: EAttribute.Dexterity, amount: 10 }
-				]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Agility, amount: 20 },
+						{ attributeId: EAttribute.Dexterity, amount: 10 }
+					]
+				})
+			);
 
 			const cdRecovery = 0.4 * 20 + 0.1 * 10;
 			expect(battler.cdMultiplier).toBeCloseTo(1 + cdRecovery / 100, 10);
@@ -99,20 +103,24 @@ describe('Battler', () => {
 
 	describe('advanceCooldowns', () => {
 		it('advances skill charge time by delta * cdMultiplier', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			battler.advanceCooldowns(500);
 			expect(battler.skills[0]!.chargeTime).toBe(500 * battler.cdMultiplier);
 		});
 
 		it('returns fired skills and resets their charge time', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			const fired = battler.advanceCooldowns(1000);
 			expect(fired).toHaveLength(1);
@@ -121,20 +129,24 @@ describe('Battler', () => {
 		});
 
 		it('returns empty array when no skills are ready', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			const fired = battler.advanceCooldowns(100);
 			expect(fired).toHaveLength(0);
 		});
 
 		it('skips undefined skill slots', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			expect(() => battler.advanceCooldowns(500)).not.toThrow();
 		});
@@ -142,9 +154,11 @@ describe('Battler', () => {
 
 	describe('takeDamage', () => {
 		it('reduces health by damage minus defense', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }]
+				})
+			);
 
 			const defense = battler.attributes.getValue(EAttribute.Defense);
 			const initialHealth = battler.currentHealth;
@@ -157,9 +171,11 @@ describe('Battler', () => {
 		});
 
 		it('floors damage at 0 when defense exceeds raw damage', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }]
+				})
+			);
 
 			const finalDmg = battler.takeDamage(5);
 			expect(finalDmg).toBe(0);
@@ -167,18 +183,22 @@ describe('Battler', () => {
 		});
 
 		it('sets isDead when health drops to 0', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: []
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: []
+				})
+			);
 
 			battler.takeDamage(battler.currentHealth + battler.attributes.getValue(EAttribute.Defense));
 			expect(battler.isDead).toBe(true);
 		});
 
 		it('sets isDead when health drops below 0', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: []
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: []
+				})
+			);
 
 			battler.takeDamage(99999);
 			expect(battler.isDead).toBe(true);
@@ -188,24 +208,26 @@ describe('Battler', () => {
 
 	describe('updateRenderCooldowns', () => {
 		it('updates renderChargeTime without exceeding cooldownMs', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			battler.skills[0]!.chargeTime = 500;
 			battler.updateRenderCooldowns(600);
 
-			expect(battler.skills[0]!.renderChargeTime).toBeLessThanOrEqual(
-				battler.skills[0]!.cooldownMs
-			);
+			expect(battler.skills[0]!.renderChargeTime).toBeLessThanOrEqual(battler.skills[0]!.cooldownMs);
 		});
 
 		it('skips undefined skill slots', () => {
-			const battler = new Battler(makeBattlerData({
-				attributes: [],
-				selectedSkills: [0]
-			}));
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [],
+					selectedSkills: [0]
+				})
+			);
 
 			expect(() => battler.updateRenderCooldowns(100)).not.toThrow();
 		});

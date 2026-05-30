@@ -28,9 +28,7 @@ export function keys<T>(obj?: T) {
 
 export function enumPairs(obj?: any) {
 	const allKeys = keys(obj);
-	return allKeys
-		.slice(0, allKeys.length / 2)
-		.map((key) => ({ id: Number(key), name: normalizeText(obj[key]) }));
+	return allKeys.slice(0, allKeys.length / 2).map((key) => ({ id: Number(key), name: normalizeText(obj[key]) }));
 }
 
 export function capitalize(str: string) {

@@ -28,9 +28,7 @@ const { challenge, playerChallenge }: Props = $props();
 
 const isCompleted = $derived(playerChallenge?.completed ?? false);
 const progress = $derived(playerChallenge?.progress ?? 0);
-const progressPercent = $derived(
-	Math.min(100, (progress / Math.max(1, challenge.targetCount)) * 100)
-);
+const progressPercent = $derived(Math.min(100, (progress / Math.max(1, challenge.targetCount)) * 100));
 
 const rewardName = $derived.by(() => {
 	if (challenge.rewardItemId != null) {

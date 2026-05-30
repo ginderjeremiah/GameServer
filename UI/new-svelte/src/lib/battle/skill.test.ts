@@ -58,9 +58,7 @@ describe('Skill', () => {
 		});
 
 		it('adds attribute-scaled damage from multipliers', () => {
-			const multipliers: IAttributeMultiplier[] = [
-				{ attributeId: EAttribute.Strength, multiplier: 1.5 }
-			];
+			const multipliers: IAttributeMultiplier[] = [{ attributeId: EAttribute.Strength, multiplier: 1.5 }];
 			const owner = makeMockOwner([[EAttribute.Strength, 20]]);
 			const skill = new Skill(makeSkillData({ baseDamage: 10, damageMultipliers: multipliers }), owner);
 
@@ -82,9 +80,7 @@ describe('Skill', () => {
 		});
 
 		it('handles zero attribute value', () => {
-			const multipliers: IAttributeMultiplier[] = [
-				{ attributeId: EAttribute.Strength, multiplier: 2.0 }
-			];
+			const multipliers: IAttributeMultiplier[] = [{ attributeId: EAttribute.Strength, multiplier: 2.0 }];
 			const owner = makeMockOwner();
 			const skill = new Skill(makeSkillData({ baseDamage: 10, damageMultipliers: multipliers }), owner);
 

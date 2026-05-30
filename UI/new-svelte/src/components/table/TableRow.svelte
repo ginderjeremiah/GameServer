@@ -1,6 +1,10 @@
 <tr class:deleted={isDeleted}>
 	<td class="edge-cell">
-		<div class="status-edge" style:background={edgeColor} style:box-shadow={edgeColor === 'transparent' ? 'none' : `0 0 8px ${edgeColor}`}></div>
+		<div
+			class="status-edge"
+			style:background={edgeColor}
+			style:box-shadow={edgeColor === 'transparent' ? 'none' : `0 0 8px ${edgeColor}`}
+		></div>
 	</td>
 
 	{#if !primaryKey}
@@ -105,7 +109,9 @@ tr {
 	width: 3px;
 	height: 30px;
 	margin: 0 auto;
-	transition: background 140ms ease, box-shadow 140ms ease;
+	transition:
+		background 140ms ease,
+		box-shadow 140ms ease;
 }
 
 .index-cell {

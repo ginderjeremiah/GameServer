@@ -1,5 +1,9 @@
-<div class="skill-tooltip" bind:this={container} style={skill ? '' : 'display: none;'}
-	style:border-left="3px solid var(--accent)">
+<div
+	class="skill-tooltip"
+	bind:this={container}
+	style={skill ? '' : 'display: none;'}
+	style:border-left="3px solid var(--accent)"
+>
 	{#if skill}
 		<!-- Title section -->
 		<div class="tt-title-section">
@@ -7,9 +11,7 @@
 				<div class="tt-category-diamond"></div>
 				<span class="tt-category-label">Skill</span>
 				<div class="tt-cooldown-pill">
-					<div class="tt-cooldown-fill"
-						style:width="{cooldownProgress}%"
-						class:ready={isReady}></div>
+					<div class="tt-cooldown-fill" style:width="{cooldownProgress}%" class:ready={isReady}></div>
 					<span class="tt-cooldown-text" class:ready={isReady}>
 						{isReady ? 'READY' : `${remainingCdFormatted}s`}
 					</span>
@@ -251,8 +253,12 @@ const attributeName = (attrId: number) => {
 	color: #f0f0f0;
 	letter-spacing: 0.3px;
 
-	&.positive { color: #bde0b4; }
-	&.negative { color: #f0a094; }
+	&.positive {
+		color: #bde0b4;
+	}
+	&.negative {
+		color: #f0a094;
+	}
 }
 
 .tt-dmg-total {

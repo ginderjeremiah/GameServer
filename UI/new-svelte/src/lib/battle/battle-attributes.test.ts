@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { EAttribute } from '$lib/api';
 import { BattleAttributes } from './battle-attributes';
 
-const makeAttrs = (...pairs: [EAttribute, number][]) =>
-	pairs.map(([attributeId, amount]) => ({ attributeId, amount }));
+const makeAttrs = (...pairs: [EAttribute, number][]) => pairs.map(([attributeId, amount]) => ({ attributeId, amount }));
 
 describe('BattleAttributes', () => {
 	describe('constructor', () => {
@@ -14,19 +13,13 @@ describe('BattleAttributes', () => {
 		});
 
 		it('sets base attribute values from the list', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Strength, 50], [EAttribute.Agility, 20]),
-				false
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 50], [EAttribute.Agility, 20]), false);
 			expect(ba.getValue(EAttribute.Strength)).toBe(50);
 			expect(ba.getValue(EAttribute.Agility)).toBe(20);
 		});
 
 		it('accumulates duplicate attribute entries', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Strength, 10], [EAttribute.Strength, 5]),
-				false
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10], [EAttribute.Strength, 5]), false);
 			expect(ba.getValue(EAttribute.Strength)).toBe(15);
 		});
 
@@ -36,33 +29,24 @@ describe('BattleAttributes', () => {
 		});
 
 		it('skips derived stats when calcDerivedStats is false', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Endurance, 10]),
-				false
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 10]), false);
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(0);
 		});
 	});
 
 	describe('calculateDerivedStats', () => {
 		it('calculates MaxHealth = 50 + 20*End + 5*Str', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Strength, 10], [EAttribute.Endurance, 20])
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10], [EAttribute.Endurance, 20]));
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50 + 20 * 20 + 5 * 10);
 		});
 
 		it('calculates Defense = 2 + End + 0.5*Agi', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Endurance, 30], [EAttribute.Agility, 20])
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 30], [EAttribute.Agility, 20]));
 			expect(ba.getValue(EAttribute.Defense)).toBe(2 + 30 + 0.5 * 20);
 		});
 
 		it('calculates CooldownRecovery = 0.4*Agi + 0.1*Dex', () => {
-			const ba = new BattleAttributes(
-				makeAttrs([EAttribute.Agility, 20], [EAttribute.Dexterity, 10])
-			);
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Agility, 20], [EAttribute.Dexterity, 10]));
 			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(0.4 * 20 + 0.1 * 10);
 		});
 

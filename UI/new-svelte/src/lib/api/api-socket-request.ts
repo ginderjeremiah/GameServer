@@ -1,8 +1,4 @@
-import {
-	ApiSocketCommand,
-	ApiSocketCommandWithRequest,
-	ApiSocketResponseTypes
-} from './types/api-socket-type-map';
+import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketResponseTypes } from './types/api-socket-type-map';
 import { IApiSocketResponse } from './api-socket';
 
 export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {

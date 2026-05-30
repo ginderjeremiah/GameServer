@@ -7,8 +7,7 @@ import TableEditor from './TableEditor.svelte';
 vi.mock('$lib/common', async () => {
 	return {
 		keys: (obj: object) => Object.keys(obj ?? {}),
-		normalizeText: (s: string) =>
-			s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
+		normalizeText: (s: string) => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
 	};
 });
 
@@ -26,12 +25,15 @@ const baseData: Sample[] = [
 ];
 
 const renderEditor = (props: Partial<Record<string, unknown>> = {}) =>
-	render(TableEditor as never, {
-		data: baseData.map((d) => ({ ...d })),
-		primaryKey: 'id',
-		title: 'Add/Edit Skills',
-		...props
-	} as never);
+	render(
+		TableEditor as never,
+		{
+			data: baseData.map((d) => ({ ...d })),
+			primaryKey: 'id',
+			title: 'Add/Edit Skills',
+			...props
+		} as never
+	);
 
 describe('TableEditor', () => {
 	it('renders a row per data item with a header', () => {

@@ -116,11 +116,11 @@ export class InventoryView {
 	});
 
 	readonly selected = $derived(
-		this.selectedId != null ? this.items.find((i) => i.itemId === this.selectedId) ?? null : null
+		this.selectedId != null ? (this.items.find((i) => i.itemId === this.selectedId) ?? null) : null
 	);
 
 	readonly dragItem = $derived(
-		this.dragItemId != null ? this.items.find((i) => i.itemId === this.dragItemId) ?? null : null
+		this.dragItemId != null ? (this.items.find((i) => i.itemId === this.dragItemId) ?? null) : null
 	);
 
 	readonly counts = $derived.by(() => {
@@ -197,9 +197,7 @@ export class InventoryView {
 	compatibleMods(slotType: number, item: Item): ItemMod[] {
 		const used = new Set(item.appliedMods.map((m) => m.id));
 		return (staticData.itemMods ?? [])
-			.filter(
-				(m) => m && m.itemModTypeId === slotType && inventoryManager.unlockedMods.has(m.id) && !used.has(m.id)
-			)
+			.filter((m) => m && m.itemModTypeId === slotType && inventoryManager.unlockedMods.has(m.id) && !used.has(m.id))
 			.map((m) => ({ ...m, itemModSlotId: -1 }));
 	}
 

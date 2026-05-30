@@ -2,8 +2,7 @@
 	<!-- Name + Level -->
 	<div class="battler-header" class:reversed={side === 'enemy'}>
 		<div class="battler-identity" class:reversed={side === 'enemy'}>
-			<div class="accent-bar" style:background={accent}
-				style:box-shadow="0 0 8px {accent}80"></div>
+			<div class="accent-bar" style:background={accent} style:box-shadow="0 0 8px {accent}80"></div>
 			<span class="battler-name">{battler.name}</span>
 		</div>
 		<span class="battler-level">LV · {battler.level}</span>
@@ -36,9 +35,7 @@ const { battler, side }: Props = $props();
 const accent = $derived(side === 'player' ? '#a1c2f7' : '#e08778');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 const healthText = $derived(`${formatNum(battler.currentHealth)} / ${maxHealth}`);
-const healthPerc = $derived(
-	maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100
-);
+const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100);
 </script>
 
 <style lang="scss">
@@ -54,12 +51,16 @@ const healthPerc = $derived(
 
 	&.player {
 		border-left: 3px solid #a1c2f7;
-		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), -4px 0 18px rgba(161, 194, 247, 0.1);
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.4),
+			-4px 0 18px rgba(161, 194, 247, 0.1);
 	}
 
 	&.enemy {
 		border-right: 3px solid #e08778;
-		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 4px 0 18px rgba(224, 135, 120, 0.1);
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.4),
+			4px 0 18px rgba(224, 135, 120, 0.1);
 	}
 }
 

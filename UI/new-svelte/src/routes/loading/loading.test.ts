@@ -6,12 +6,12 @@ import LoadingPage from './+page.svelte';
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$lib/common', () => ({
-	routeTo: vi.fn(),
+	routeTo: vi.fn()
 }));
 vi.mock('$lib/api', () => ({
 	ApiRequest: {
-		get: vi.fn().mockResolvedValue([]),
-	},
+		get: vi.fn().mockResolvedValue([])
+	}
 }));
 vi.mock('$stores', () => ({
 	staticData: {
@@ -21,8 +21,8 @@ vi.mock('$stores', () => ({
 		skills: undefined,
 		itemMods: undefined,
 		attributes: undefined,
-		challenges: undefined,
-	},
+		challenges: undefined
+	}
 }));
 
 afterEach(cleanup);

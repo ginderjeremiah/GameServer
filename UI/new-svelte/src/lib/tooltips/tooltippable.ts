@@ -7,9 +7,5 @@ export abstract class Tooltippable {
 		this.toolTipId = TooltipFactory.getId();
 	}
 
-	abstract updateTooltipData(
-		tooltipTitle: HTMLHeadingElement,
-		tooltipContent: HTMLDivElement,
-		prevId: number
-	): number;
+	abstract updateTooltipData(tooltipTitle: HTMLHeadingElement, tooltipContent: HTMLDivElement, prevId: number): number;
 }

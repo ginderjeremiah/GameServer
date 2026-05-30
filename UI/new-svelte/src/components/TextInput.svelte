@@ -15,14 +15,7 @@ type Props = {
 	disabled?: boolean;
 };
 
-let {
-	value = $bindable(),
-	type,
-	label = '',
-	name = '',
-	id = crypto.randomUUID(),
-	disabled
-}: Props = $props();
+let { value = $bindable(), type, label = '', name = '', id = crypto.randomUUID(), disabled }: Props = $props();
 </script>
 
 <style lang="scss">

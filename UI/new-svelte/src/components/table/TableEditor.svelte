@@ -7,7 +7,16 @@
 			{/if}
 		</div>
 		<button type="button" class="adm-btn ghost" onclick={addNewRow}>
-			<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 12 12"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
 				<path d="M6 2v8M2 6h8" />
 			</svg>
 			Add Row
@@ -55,7 +64,15 @@
 		<div class="save-summary">
 			{#if savedFlash}
 				<span class="saved-flash">
-					<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+					<svg
+						width="13"
+						height="13"
+						viewBox="0 0 14 14"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.6"
+						aria-hidden="true"
+					>
 						<path d="M3 7.3L6 10.2L11 4" stroke-linecap="round" stroke-linejoin="round" />
 					</svg>
 					Changes saved
@@ -73,7 +90,9 @@
 		</div>
 		<div class="save-actions">
 			<button type="button" class="adm-btn ghost" disabled={pendingCount === 0} onclick={discard}>Discard</button>
-			<button type="button" class="adm-btn primary" disabled={pendingCount === 0 || saving} onclick={save}>Save Changes</button>
+			<button type="button" class="adm-btn primary" disabled={pendingCount === 0 || saving} onclick={save}
+				>Save Changes</button
+			>
 		</div>
 	</div>
 </div>
@@ -128,8 +147,7 @@ const editableColumns = $derived(columns.filter((c) => c.key !== primaryKey));
 // Row state is DERIVED from comparing each cell to its saved original, so
 // undo-after-edit returns to the correct modified/clean state and reverting
 // every cell returns the row to clean.
-const isDirty = (row: Row<T>) =>
-	editableColumns.some((c) => !valuesEqual(row.data[c.key], row.originalData[c.key]));
+const isDirty = (row: Row<T>) => editableColumns.some((c) => !valuesEqual(row.data[c.key], row.originalData[c.key]));
 
 const rowState = (row: Row<T>): RowState =>
 	row.deleted
@@ -308,8 +326,8 @@ $effect(() => {
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 4px;
 	background: rgba(255, 255, 255, 0.015);
-  width: fit-content;
-  margin: auto;
+	width: fit-content;
+	margin: auto;
 
 	table {
 		border-collapse: collapse;

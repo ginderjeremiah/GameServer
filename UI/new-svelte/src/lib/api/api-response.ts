@@ -26,9 +26,7 @@ export class ApiResponse<T extends ApiResponseType> {
 	}
 
 	public get error() {
-		return (
-			this.responseJson?.errorMessage || this.#r.statusText || 'Failed to communicate with server.'
-		);
+		return this.responseJson?.errorMessage || this.#r.statusText || 'Failed to communicate with server.';
 	}
 
 	public get responseText() {

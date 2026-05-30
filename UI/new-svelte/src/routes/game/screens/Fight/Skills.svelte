@@ -112,7 +112,9 @@ const isReady = (skill: Skill) => {
 	border-radius: 2px;
 	overflow: hidden;
 	cursor: default;
-	transition: border-color 140ms, box-shadow 140ms;
+	transition:
+		border-color 140ms,
+		box-shadow 140ms;
 
 	&.ready {
 		border-color: rgba(161, 194, 247, 0.53);

@@ -99,20 +99,14 @@ export class BattleEngine {
 			playerSkillsFired.forEach((skill) => {
 				const dmg = skill.calculateDamage();
 				let finalDmg = this.enemy.takeDamage(dmg);
-				logMessage(
-					ELogType.Damage,
-					`You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`
-				);
+				logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
 			});
 			if (!this.enemy.isDead) {
 				const enemySkillsFired = this.enemy.advanceCooldowns(timeDelta);
 				enemySkillsFired.forEach((skill) => {
 					const dmg = skill.calculateDamage();
 					let finalDmg = this.player.takeDamage(dmg);
-					logMessage(
-						ELogType.Damage,
-						`${this.enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`
-					);
+					logMessage(ELogType.Damage, `${this.enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
 				});
 			}
 			if (this.enemy.isDead) {
