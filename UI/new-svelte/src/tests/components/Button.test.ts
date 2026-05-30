@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
-import Button from './Button.svelte';
+import Button from '$components/Button.svelte';
 
 afterEach(cleanup);
 

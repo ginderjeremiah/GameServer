@@ -8,6 +8,6 @@
         public required string PassHash { get; set; }
         public DateTime LastLogin { get; set; }
 
-        public virtual List<Player> Players { get => field ?? throw new NavigationNotLoadedException(nameof(Players)); set; }
+        public virtual List<Player> Players { get => field ?? throw new NotLoadedException(nameof(Players)); set; }
     }
 }

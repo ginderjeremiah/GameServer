@@ -6,8 +6,8 @@
 		{sampleItem}
 		primaryKey="id"
 		title="Add/Edit Skills"
+		onSave={saveChanges}
 	/>
-	{@render children()}
 {/if}
 <Loading loading={!initialized} />
 
@@ -15,11 +15,9 @@
 import { TableEditor, Loading } from '$components';
 import { ApiRequest, type ISkill, type IChange } from '$lib/api';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { onMount } from 'svelte';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const changes = editor?.getChanges();
 	if (changes?.length) {
 		await new ApiRequest('AdminTools/AddEditSkills').post(changes);

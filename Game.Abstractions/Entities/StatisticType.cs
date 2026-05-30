@@ -5,6 +5,6 @@
         public int Id { get; set; }
         public required string Name { get; set; }
 
-        public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerStatistics)); set; }
+        public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NotLoadedException(nameof(PlayerStatistics)); set; }
     }
 }

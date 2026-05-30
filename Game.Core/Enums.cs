@@ -343,4 +343,17 @@ namespace Game.Core
         /// </summary>
         ItemMod = 6
     }
+
+    /// <summary>
+    /// Represents the rarity of something (which loosely corresponds to its strength and the requirements to obtain it).
+    /// </summary>
+    public enum ERarity
+    {
+        Common = 1,
+        Uncommon = 2,
+        Rare = 3,
+        Epic = 4,
+        Legendary = 5,
+        Mythic = 6,
+    }
 }

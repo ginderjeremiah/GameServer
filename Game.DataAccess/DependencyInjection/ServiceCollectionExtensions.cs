@@ -37,7 +37,6 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IPlayerStatistics, PlayerStatistics>()
                 .AddScoped<IPlayerChallenges, PlayerChallenges>()
                 // Reference data repos (in-memory cached)
-                .AddScoped<IAttributes, Attributes>()
                 .AddScoped<IChallenges, Challenges>()
                 .AddScoped<IEnemies, Enemies>()
                 .AddScoped<IItems, Items>()

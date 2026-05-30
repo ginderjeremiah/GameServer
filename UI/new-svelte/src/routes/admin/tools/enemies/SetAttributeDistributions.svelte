@@ -1,5 +1,5 @@
-<div class="enemy-select-container">
-	<Select bind:value={enemyId} options={enemies} label="Select Enemy" />
+<div class="tool-gate">
+	<GateSelect label="Enemy" options={enemies} bind:value={enemyId} />
 </div>
 <Loading {loading} />
 {#if enemyId > -1 && !loading}
@@ -9,20 +9,19 @@
 		{sampleItem}
 		{selectOptions}
 		title="Set Attribute Distributions"
+		onSave={saveChanges}
 	/>
-	{@render children()}
 {/if}
 
 <script lang="ts">
 import { ApiRequest, EAttribute, type IAttributeDistribution } from '$lib/api';
-import { Select, Loading, TableEditor, type SelectOptions } from '$components';
+import { Loading, TableEditor, type SelectOptions } from '$components';
+import GateSelect from '../../GateSelect.svelte';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { onMount } from 'svelte';
 import { enumPairs } from '$lib/common';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const attributeDistributions = editor?.getRowData();
 	if (attributeDistributions?.length) {
 		await ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
@@ -59,8 +58,7 @@ onMount(async () => {
 </script>
 
 <style lang="scss">
-.enemy-select-container {
-	width: 6em;
-	margin-bottom: 1em;
+.tool-gate {
+	margin-bottom: 18px;
 }
 </style>

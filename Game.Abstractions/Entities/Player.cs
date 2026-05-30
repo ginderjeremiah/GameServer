@@ -42,14 +42,14 @@ namespace Game.Abstractions.Entities
         /// </summary>
         public DateTime LastActivity { get; set; }
 
-        public virtual User User { get => field ?? throw new NavigationNotLoadedException(nameof(User)); set; }
-        public virtual List<PlayerAttribute> PlayerAttributes { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerAttributes)); set; }
-        public virtual List<UnlockedItem> UnlockedItems { get => field ?? throw new NavigationNotLoadedException(nameof(UnlockedItems)); set; }
-        public virtual List<UnlockedMod> UnlockedMods { get => field ?? throw new NavigationNotLoadedException(nameof(UnlockedMods)); set; }
-        public virtual List<AppliedMod> AppliedMods { get => field ?? throw new NavigationNotLoadedException(nameof(AppliedMods)); set; }
-        public virtual List<PlayerChallenge> PlayerChallenges { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerChallenges)); set; }
-        public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerStatistics)); set; }
-        public virtual List<LogPreference> LogPreferences { get => field ?? throw new NavigationNotLoadedException(nameof(LogPreferences)); set; }
-        public virtual List<PlayerSkill> PlayerSkills { get => field ?? throw new NavigationNotLoadedException(nameof(PlayerSkills)); set; }
+        public virtual User User { get => field ?? throw new NotLoadedException(nameof(User)); set; }
+        public virtual List<PlayerAttribute> PlayerAttributes { get => field ?? throw new NotLoadedException(nameof(PlayerAttributes)); set; }
+        public virtual List<UnlockedItem> UnlockedItems { get => field ?? throw new NotLoadedException(nameof(UnlockedItems)); set; }
+        public virtual List<UnlockedMod> UnlockedMods { get => field ?? throw new NotLoadedException(nameof(UnlockedMods)); set; }
+        public virtual List<AppliedMod> AppliedMods { get => field ?? throw new NotLoadedException(nameof(AppliedMods)); set; }
+        public virtual List<PlayerChallenge> PlayerChallenges { get => field ?? throw new NotLoadedException(nameof(PlayerChallenges)); set; }
+        public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NotLoadedException(nameof(PlayerStatistics)); set; }
+        public virtual List<LogPreference> LogPreferences { get => field ?? throw new NotLoadedException(nameof(LogPreferences)); set; }
+        public virtual List<PlayerSkill> PlayerSkills { get => field ?? throw new NotLoadedException(nameof(PlayerSkills)); set; }
     }
 }

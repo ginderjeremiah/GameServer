@@ -4,6 +4,6 @@
     {
         public int EnemyId { get; set; }
 
-        public List<int> SkillIds { get; set; }
+        public required List<int> SkillIds { get; set; }
     }
 }

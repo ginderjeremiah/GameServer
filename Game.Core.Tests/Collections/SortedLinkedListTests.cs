@@ -183,21 +183,23 @@ namespace Game.Core.Tests.Collections
             list.Remove(5);
 
             Assert.Equal(0, list.Count);
-            Assert.Equal(0, list.ToList().Count);
+            Assert.Empty(list.ToList());
         }
 
         [Fact]
         public void Clear_RemovesAllElements()
         {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(1);
-            list.Add(2);
-            list.Add(3);
+            var list = new SortedLinkedList<int>(Comparer<int>.Default)
+            {
+                1,
+                2,
+                3
+            };
 
             list.Clear();
 
             Assert.Equal(0, list.Count);
-            Assert.Equal(0, list.ToList().Count);
+            Assert.Empty(list.ToList());
         }
 
         [Fact]
@@ -218,7 +220,7 @@ namespace Game.Core.Tests.Collections
         {
             var list = new SortedLinkedList<int>(Comparer<int>.Default);
 
-            Assert.Equal(0, list.Count());
+            Assert.Empty(list);
         }
 
         [Fact]

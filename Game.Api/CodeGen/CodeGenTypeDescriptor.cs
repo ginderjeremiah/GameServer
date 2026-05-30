@@ -12,6 +12,8 @@ namespace Game.Api.CodeGen
         public List<CodeGenTypeDescriptor> GenericArgumentDescriptors { get; }
         public List<CodeGenTypeDescriptor> PropertyDescriptors { get; }
         public int GenericParameterPosition { get; } = -1;
+        public bool IsObsolete { get; } = false;
+        public string? ObsoleteMessage { get; }
 
         public bool NeedsInterface => UnderlyingType.NeedsInterface();
         public string TypeName => IsGeneric ? UnderlyingType.Name[..UnderlyingType.Name.IndexOf('`')] : UnderlyingType.Name;
@@ -23,12 +25,24 @@ namespace Game.Api.CodeGen
         {
             Name = property.Name;
             GenericParameterPosition = genericParameterPosition;
+            var obsoleteAttribute = property.GetCustomAttribute<ObsoleteAttribute>();
+            if (obsoleteAttribute is not null)
+            {
+                IsObsolete = true;
+                ObsoleteMessage = obsoleteAttribute.Message;
+            }
         }
 
         public CodeGenTypeDescriptor(ParameterInfo parameter) : this(parameter.GetNullabilityInfo())
         {
             Name = parameter.Name;
             HasDefault = parameter.HasDefaultValue;
+            var obsoleteAttribute = parameter.GetCustomAttribute<ObsoleteAttribute>();
+            if (obsoleteAttribute is not null)
+            {
+                IsObsolete = true;
+                ObsoleteMessage = obsoleteAttribute.Message;
+            }
         }
 
         public CodeGenTypeDescriptor(NullabilityInfo nullabilityInfo, Type? overrideType = null)
@@ -40,7 +54,9 @@ namespace Game.Api.CodeGen
             {
                 var genericDefinition = UnderlyingType.GetGenericTypeDefinition();
                 var propertyPairs = UnderlyingType.GetProperties().Zip(genericDefinition.GetProperties());
-                PropertyDescriptors = propertyPairs.Select(p => new CodeGenTypeDescriptor(p.First, p.Second.PropertyType.IsGenericParameter ? p.Second.PropertyType.GenericParameterPosition : -1)).ToList();
+                PropertyDescriptors = propertyPairs.Select(p =>
+                    new CodeGenTypeDescriptor(p.First, p.Second.PropertyType.IsGenericParameter ? p.Second.PropertyType.GenericParameterPosition : -1)
+                ).ToList();
             }
             else if (UnderlyingType.NeedsInterface())
             {
@@ -49,6 +65,13 @@ namespace Game.Api.CodeGen
             else
             {
                 PropertyDescriptors = [];
+            }
+
+            var obsoleteAttribute = UnderlyingType.GetCustomAttribute<ObsoleteAttribute>();
+            if (obsoleteAttribute is not null)
+            {
+                IsObsolete = true;
+                ObsoleteMessage = obsoleteAttribute.Message;
             }
         }
 

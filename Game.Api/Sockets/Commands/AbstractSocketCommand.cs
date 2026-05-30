@@ -44,7 +44,7 @@ namespace Game.Api.Sockets.Commands
 
     public abstract class AbstractSocketCommand<TReturn, TParams> : AbstractSocketCommandWithResponseData<TReturn>
     {
-        public TParams Parameters { get; set; }
+        public required TParams Parameters { get; set; }
 
         public override void SetParameters(string? parameters)
         {
@@ -54,7 +54,7 @@ namespace Game.Api.Sockets.Commands
 
     public abstract class AbstractSocketCommandWithParams<T> : AbstractSocketCommand
     {
-        public T Parameters { get; set; }
+        public required T Parameters { get; set; }
 
         public override void SetParameters(string? parameters)
         {

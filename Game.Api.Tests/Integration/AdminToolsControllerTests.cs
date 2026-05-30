@@ -49,17 +49,17 @@ namespace Game.Api.Tests.Integration
                 }
             };
 
-            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes);
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
             // Verify the enemy was created by fetching enemies
-            var enemiesResponse = await authClient.GetAsync("/api/Enemies");
+            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, enemiesResponse.StatusCode);
-            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>();
+            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
             Assert.NotNull(enemiesResult?.Data);
             Assert.Contains(enemiesResult.Data, e => e.Name == "New Dragon");
         }
@@ -86,16 +86,16 @@ namespace Game.Api.Tests.Integration
                 }
             };
 
-            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes);
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
             // Verify
-            var zonesResponse = await authClient.GetAsync("/api/Zones");
-            var zonesResult = await zonesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Zone>>();
+            var zonesResponse = await authClient.GetAsync("/api/Zones", CancellationToken);
+            var zonesResult = await zonesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Zone>>(CancellationToken);
             Assert.NotNull(zonesResult?.Data);
             Assert.Contains(zonesResult.Data, z => z.Name == "Crystal Caves");
         }
@@ -119,11 +119,11 @@ namespace Game.Api.Tests.Integration
             };
 
             // Act
-            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySkills", data);
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySkills", data, CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
         }
@@ -151,11 +151,11 @@ namespace Game.Api.Tests.Integration
             };
 
             // Act
-            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetZoneEnemies", data);
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetZoneEnemies", data, CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
         }
@@ -164,7 +164,7 @@ namespace Game.Api.Tests.Integration
         public async Task AdminTools_Unauthenticated_Returns401()
         {
             var changes = Array.Empty<object>();
-            var response = await Client.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes);
+            var response = await Client.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
     }

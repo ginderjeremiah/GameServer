@@ -1,5 +1,4 @@
 ﻿using Game.Api.Models.Attributes;
-using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
 using CorePlayer = Game.Core.Players.Player;
 
@@ -7,16 +6,16 @@ namespace Game.Api.Models.Player
 {
     public class PlayerData : IModel
     {
-        public string Name { get; set; }
+        public required string Name { get; set; }
         public int Level { get; set; }
         public int Exp { get; set; }
-        public List<BattlerAttribute> Attributes { get; set; }
-        public List<int> SelectedSkills { get; set; }
+        public required List<BattlerAttribute> Attributes { get; set; }
+        public required List<int> SelectedSkills { get; set; }
         public int CurrentZone { get; set; }
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
-        public List<LogPreference> LogPreferences { get; set; }
-        public InventoryData InventoryData { get; set; }
+        public required List<LogPreference> LogPreferences { get; set; }
+        public required InventoryData InventoryData { get; set; }
 
         public static PlayerData FromPlayer(CorePlayer player)
         {
@@ -58,6 +57,7 @@ namespace Game.Api.Models.Player
                                 ItemId = slot.ItemId,
                                 Equipped = equipSlot is not null,
                                 EquipmentSlotId = equipSlot is not null ? (int)equipSlot.Value : null,
+                                Favorite = slot.Favorite,
                                 AppliedMods = slot.AppliedMods
                                     .Select(am => new AppliedModModel
                                     {

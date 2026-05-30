@@ -1,71 +1,62 @@
-<div class="admin-container">
-	<NavMenu {navMenuItems} />
-	<div class="tool-container round-border">
-		<CurrentTool bind:this={toolInstance}>
-			<div class="save-button-container">
-				<Button text="Save" onClick={saveChanges} />
-			</div>
-		</CurrentTool>
+<div class="admin-shell" data-testid="admin-screen">
+	<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
+
+	<div class="admin-workspace">
+		<CurrentTool />
 	</div>
+
+	<AdminSidebar
+		tools={adminTools}
+		groups={adminGroups}
+		{active}
+		onNavigate={handleNavigate}
+		onBackToGame={backToGame}
+		bind:pinned={sidebarPinned}
+	/>
 </div>
 
 <script lang="ts">
-import { Button, NavMenu, type INavMenuItem } from '$components';
-import { normalizeText, routeTo } from '$lib/common';
-import { toolMap } from './tools';
+import { routeTo } from '$lib/common';
+import AdminSidebar from './AdminSidebar.svelte';
+import { adminGroups, adminTools } from './tools/nav';
 
-let CurrentTool = $state(toolMap['Items']['Add/Edit Items']);
-let toolInstance = $state<{ saveChanges: () => Promise<void> }>();
+let active = $state('addItems');
+let sidebarPinned = $state(false);
+const CurrentTool = $derived(
+	adminTools.find((t) => t.key === active)?.component ?? adminTools[0].component
+);
 
-const navMenuItems: INavMenuItem[] = Object.entries(toolMap).map(([text, item]) => {
-	const baseItem: INavMenuItem = {
-		text: normalizeText(text)
-	};
-
-	if (typeof item === 'object') {
-		baseItem.children = Object.entries(item).map(([itemText, component]) => ({
-			text: itemText,
-			onClick: () => (CurrentTool = component)
-		}));
-	} else {
-		baseItem.onClick = () => (CurrentTool = item);
-	}
-
-	return baseItem;
-});
-
-navMenuItems.push({
-	text: 'Game',
-	onClick: () => routeTo('/game')
-});
-
-const saveChanges = () => {
-	toolInstance?.saveChanges();
+const handleNavigate = (key: string) => {
+	active = key;
 };
+
+const backToGame = () => routeTo('/game');
 </script>
 
 <style lang="scss">
-.admin-container {
+.admin-shell {
 	width: 100%;
 	height: 100%;
 	display: flex;
-	flex-direction: column;
+	position: relative;
+	overflow: hidden;
+}
 
-	.tool-container {
-		height: 100%;
-		margin: 2rem;
-		padding: 0.5rem;
-		border: var(--default-border);
-		border-width: 3px;
-		border-radius: 1vw;
-		background-color: var(--container-background-color);
-		user-select: text;
-		position: relative;
+.sidebar-spacer {
+	width: 60px;
+	flex-shrink: 0;
+	transition: width 220ms cubic-bezier(.4, 0, .2, 1);
 
-		.save-button-container {
-			width: 6rem;
-			margin-top: 1rem;
-		}
+	&.pinned {
+		width: 240px;
 	}
+}
+
+.admin-workspace {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	padding: 34px 44px 28px;
 }
 </style>

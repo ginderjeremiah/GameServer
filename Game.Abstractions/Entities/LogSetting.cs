@@ -6,6 +6,6 @@
         public required string Name { get; set; }
         public bool DefaultValue { get; set; }
 
-        public virtual List<LogPreference> LogPreferences { get => field ?? throw new NavigationNotLoadedException(nameof(LogPreferences)); set; }
+        public virtual List<LogPreference> LogPreferences { get => field ?? throw new NotLoadedException(nameof(LogPreferences)); set; }
     }
 }

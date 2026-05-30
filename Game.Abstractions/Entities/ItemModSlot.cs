@@ -7,7 +7,7 @@
         public int ItemModSlotTypeId { get; set; }
         public int Index { get; set; }
 
-        public virtual Item Item { get => field ?? throw new NavigationNotLoadedException(nameof(Item)); set; }
-        public virtual ItemModType ItemModSlotType { get => field ?? throw new NavigationNotLoadedException(nameof(ItemModSlotType)); set; }
+        public virtual Item Item { get => field ?? throw new NotLoadedException(nameof(Item)); set; }
+        public virtual ItemModType ItemModSlotType { get => field ?? throw new NotLoadedException(nameof(ItemModSlotType)); set; }
     }
 }

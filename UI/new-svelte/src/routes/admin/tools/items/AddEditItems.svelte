@@ -7,20 +7,19 @@
 		{sampleItem}
 		primaryKey="id"
 		title="Add/Edit Items"
+		onSave={saveChanges}
 	/>
-	{@render children()}
 {/if}
 <Loading loading={!initialized} />
 
 <script lang="ts">
 import { TableEditor, Loading } from '$components';
-import { ApiRequest, EItemCategory, type IChange, type IItem, type IItemCategory } from '$lib/api';
+import { ApiRequest, EItemCategory, ERarity, type IChange, type IItem, type IItemCategory } from '$lib/api';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { enumPairs } from '$lib/common';
+import { onMount } from 'svelte';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const changes = editor?.getChanges();
 	if (changes?.length) {
 		await new ApiRequest('AdminTools/AddEditItems').post(changes);
@@ -34,15 +33,17 @@ let data = $state<IItem[]>([]);
 let initialized = $state(false);
 let editor = $state<{ getChanges: () => IChange<IItem>[] }>();
 
-const hiddenColumns: (keyof IItem)[] = ['attributes'];
-const selectOptions = { itemCategoryId: getItemCategories };
+const hiddenColumns: (keyof IItem)[] = ['attributes', 'modSlots'];
+const selectOptions = { itemCategoryId: getItemCategories, rarityId: getRarities };
 const sampleItem = {
 	id: -1,
 	name: '',
 	iconPath: '',
 	itemCategoryId: EItemCategory.Helm,
+	rarityId: ERarity.Common,
 	description: '',
-	attributes: []
+	attributes: [],
+	modSlots: []
 } satisfies IItem;
 
 onMount(async () => {
@@ -56,6 +57,13 @@ onMount(async () => {
 function getItemCategories() {
 	return {
 		options: itemCategories,
+		disableBlanks: true
+	};
+}
+
+function getRarities() {
+	return {
+		options: enumPairs(ERarity),
 		disableBlanks: true
 	};
 }

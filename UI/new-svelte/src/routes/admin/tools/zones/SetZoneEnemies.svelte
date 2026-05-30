@@ -1,21 +1,19 @@
-<div class="zone-select-container">
-	<Select bind:value={zoneId} options={zones} label="Select Zone" />
+<div class="tool-gate">
+	<GateSelect label="Zone" options={zones} bind:value={zoneId} />
 </div>
 <Loading {loading} />
 {#if zoneId > -1 && !loading}
-	<TableEditor bind:this={editor} {data} {sampleItem} {selectOptions} title="Set Zone Enemies" />
-	{@render children()}
+	<TableEditor bind:this={editor} {data} {sampleItem} {selectOptions} title="Set Zone Enemies" onSave={saveChanges} />
 {/if}
 
 <script lang="ts">
 import { ApiRequest, type IZoneEnemy } from '$lib/api';
-import { Select, Loading, TableEditor, type SelectOptions } from '$components';
+import { Loading, TableEditor, type SelectOptions } from '$components';
+import GateSelect from '../../GateSelect.svelte';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { onMount } from 'svelte';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const zoneEnemies = editor?.getRowData();
 	if (zoneEnemies?.length) {
 		await ApiRequest.post('AdminTools/SetZoneEnemies', { zoneId, zoneEnemies });
@@ -69,8 +67,7 @@ const getZoneEnemies = async () => {
 </script>
 
 <style lang="scss">
-.zone-select-container {
-	width: 6em;
-	margin-bottom: 1em;
+.tool-gate {
+	margin-bottom: 18px;
 }
 </style>

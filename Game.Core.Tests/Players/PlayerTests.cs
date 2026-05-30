@@ -52,7 +52,7 @@ namespace Game.Core.Tests.Players
 
             player.GrantExp(50);
 
-            Assert.Equal(1, player.DomainEvents.Count);
+            Assert.Single(player.DomainEvents);
             Assert.IsType<PlayerCoreUpdatedEvent>(player.DomainEvents[0]);
         }
 
@@ -123,7 +123,7 @@ namespace Game.Core.Tests.Players
 
             player.UnlockItem(10);
 
-            Assert.Equal(1, player.Inventory.UnlockedItems.Count);
+            Assert.Single(player.Inventory.UnlockedItems);
             Assert.Equal(10, player.Inventory.UnlockedItems[0].ItemId);
         }
 

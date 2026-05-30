@@ -31,11 +31,13 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 				itemId: 1,
 				equipped: true,
 				equipmentSlotId: 4,
+				favorite: false,
 				appliedMods: [{ itemModId: 10, itemModSlotId: 0 }]
 			},
 			{
 				itemId: 2,
 				equipped: false,
+				favorite: false,
 				appliedMods: []
 			}
 		],

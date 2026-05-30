@@ -15,6 +15,8 @@ namespace Game.Api.Tests.Integration
         protected GameServerFactory Factory { get; }
         protected HttpClient Client { get; private set; } = null!;
 
+        protected static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
         protected ApiIntegrationTestBase(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
         {
             Containers = containers;

@@ -1,4 +1,4 @@
-import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, ApiRequest } from '$lib/api';
+import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, ApiRequest, apiSocket } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { Item, newItem } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
@@ -162,6 +162,26 @@ export class InventoryManager {
 
 		logMessage(ELogType.ItemFound, 'Modifier removed.');
 
+		return true;
+	}
+
+	/**
+	 * Toggles whether an item is favorited and persists it via a websocket
+	 * command. The local flag is updated optimistically; a failed send keeps
+	 * the local state (it re-syncs on the next toggle or on reload).
+	 */
+	public async setFavorite(itemId: number, favorite: boolean) {
+		const item = this.unlockedItems.get(itemId);
+		if (!item) {
+			return false;
+		}
+
+		item.favorite = favorite;
+		try {
+			await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
+		} catch {
+			// Keep the optimistic local state; it re-syncs on the next toggle/reload.
+		}
 		return true;
 	}
 

@@ -4,6 +4,6 @@
     {
         public int ZoneId { get; set; }
 
-        public List<ZoneEnemy> ZoneEnemies { get; set; }
+        public required List<ZoneEnemy> ZoneEnemies { get; set; }
     }
 }

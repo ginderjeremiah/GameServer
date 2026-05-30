@@ -40,8 +40,8 @@
 		</div>
 
 		<!-- Sliding manifest window -->
-		<div class="manifest-window" data-testid="manifest-window">
-			<div class="manifest-track" style:transform="translateY({cursorY}px)">
+		<div class="manifest-window" data-testid="manifest-window" bind:this={manifestEl}>
+			<div class="manifest-track" style:transform="translateY({animatedY}px)">
 				{#each items as item, i}
 					<div class="manifest-row" style:opacity={rowOpacity(i)}>
 						<div class="row-icon">
@@ -112,6 +112,10 @@
 	</div>
 </div>
 
+<script module lang="ts">
+const pendingFetches = new Map<string, Promise<number>>();
+</script>
+
 <script lang="ts">
 import { ApiRequest } from '$lib/api';
 import { routeTo } from '$lib/common';
@@ -127,20 +131,43 @@ interface LoadItem {
 	status: ItemStatus;
 	durationMs: number;
 	error: string | null;
-	fetch: () => Promise<void>;
+	fetch: () => Promise<number>;
 }
 
 let items = $state<LoadItem[]>([]);
 let phase = $state<Phase>('checking');
 let activeIndex = $state(-1);
+let scrollOffset = $state(0);
+let manifestEl: HTMLElement;
 
 const ROW_HEIGHT = 42;
-const VISIBLE_ROWS = 5;
 
 const completed = $derived(items.filter(i => i.status === 'done').length);
 const progressPct = $derived(items.length ? (completed / items.length) * 100 : 0);
 const currentItem = $derived(activeIndex >= 0 && activeIndex < items.length ? items[activeIndex] : null);
 const cursorY = $derived((2 - activeIndex) * ROW_HEIGHT);
+
+const maxOffset = $derived(2 * ROW_HEIGHT - cursorY);
+const minOffset = $derived(items.length > 0 ? (3 - items.length) * ROW_HEIGHT - cursorY : 0);
+const targetY = $derived(cursorY + scrollOffset);
+let animatedY = $state(3 * ROW_HEIGHT); // matches initial cursorY (activeIndex = -1)
+let rafId = 0;
+
+$effect(() => {
+	const target = targetY;
+	cancelAnimationFrame(rafId);
+	function step() {
+		const diff = target - animatedY;
+		if (Math.abs(diff) < 0.5) {
+			animatedY = target;
+			return;
+		}
+		animatedY += diff * 0.18;
+		rafId = requestAnimationFrame(step);
+	}
+	rafId = requestAnimationFrame(step);
+	return () => cancelAnimationFrame(rafId);
+});
 
 const title = $derived({
 	checking: 'Checking for updates.',
@@ -150,9 +177,16 @@ const title = $derived({
 }[phase]);
 
 const rowOpacity = (i: number) => {
-	const distance = Math.abs(i - activeIndex);
+	const visualCenter = 2 - animatedY / ROW_HEIGHT;
+	const distance = Math.abs(i - visualCenter);
 	if (distance > 2) return 0;
 	return 1 - distance * 0.18;
+};
+
+const handleWheel = (e: WheelEvent) => {
+	e.preventDefault();
+	const step = e.deltaY > 0 ? -ROW_HEIGHT : ROW_HEIGHT;
+	scrollOffset = Math.max(minOffset, Math.min(maxOffset, scrollOffset + step));
 };
 
 const enterGame = () => {
@@ -175,10 +209,8 @@ const loadFrom = async (startIdx: number) => {
 		items[i].status = 'loading';
 		items[i].error = null;
 
-		const start = performance.now();
 		try {
-			await items[i].fetch();
-			items[i].durationMs = Math.round(performance.now() - start);
+			items[i].durationMs = await items[i].fetch();
 			items[i].status = 'done';
 		} catch (e) {
 			items[i].status = 'error';
@@ -194,6 +226,23 @@ const loadFrom = async (startIdx: number) => {
 	activeIndex = items.length;
 };
 
+const dedupedFetch = (key: string, run: () => Promise<void>): Promise<number> => {
+	let pending = pendingFetches.get(key);
+	if (!pending) {
+		const t = performance.now();
+		pending = run()
+			.then(() => Math.round(performance.now() - t))
+			.catch((e) => { pendingFetches.delete(key); throw e; });
+		pendingFetches.set(key, pending);
+	}
+	return pending;
+};
+
+onMount(() => {
+	manifestEl.addEventListener('wheel', handleWheel, { passive: false });
+	return () => manifestEl.removeEventListener('wheel', handleWheel);
+});
+
 onMount(async () => {
 	const alreadyLoaded = (data: unknown) => data !== undefined && data !== null;
 
@@ -202,43 +251,43 @@ onMount(async () => {
 			key: 'zones', label: 'Zones',
 			status: alreadyLoaded(staticData.zones) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.zones ??= await ApiRequest.get('Zones'); },
+			fetch: () => dedupedFetch('zones', () => ApiRequest.get('Zones').then(d => { staticData.zones = d; })),
 		},
 		{
 			key: 'enemies', label: 'Enemies',
 			status: alreadyLoaded(staticData.enemies) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.enemies ??= await ApiRequest.get('Enemies'); },
+			fetch: () => dedupedFetch('enemies', () => ApiRequest.get('Enemies').then(d => { staticData.enemies = d; })),
 		},
 		{
 			key: 'items', label: 'Items',
 			status: alreadyLoaded(staticData.items) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.items ??= await ApiRequest.get('Items'); },
+			fetch: () => dedupedFetch('items', () => ApiRequest.get('Items').then(d => { staticData.items = d; })),
 		},
 		{
 			key: 'skills', label: 'Skills',
 			status: alreadyLoaded(staticData.skills) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.skills ??= await ApiRequest.get('Skills'); },
+			fetch: () => dedupedFetch('skills', () => ApiRequest.get('Skills').then(d => { staticData.skills = d; })),
 		},
 		{
 			key: 'itemMods', label: 'Item Mods',
 			status: alreadyLoaded(staticData.itemMods) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.itemMods ??= await ApiRequest.get('ItemMods'); },
+			fetch: () => dedupedFetch('itemMods', () => ApiRequest.get('ItemMods').then(d => { staticData.itemMods = d; })),
 		},
 		{
 			key: 'attributes', label: 'Attributes',
 			status: alreadyLoaded(staticData.attributes) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.attributes ??= await ApiRequest.get('Attributes'); },
+			fetch: () => dedupedFetch('attributes', () => ApiRequest.get('Attributes').then(d => { staticData.attributes = d; })),
 		},
 		{
 			key: 'challenges', label: 'Challenges',
 			status: alreadyLoaded(staticData.challenges) ? 'done' : 'pending',
 			durationMs: 0, error: null,
-			fetch: async () => { staticData.challenges ??= await ApiRequest.get('Challenges'); },
+			fetch: () => dedupedFetch('challenges', () => ApiRequest.get('Challenges').then(d => { staticData.challenges = d; })),
 		},
 	];
 
@@ -394,7 +443,7 @@ onMount(async () => {
 	position: absolute;
 	left: 0;
 	right: 0;
-	transition: transform 420ms cubic-bezier(.4, 0, .2, 1);
+	transition: none;
 }
 
 .manifest-row {
@@ -403,7 +452,6 @@ onMount(async () => {
 	align-items: center;
 	gap: 12px;
 	padding: 0 14px;
-	transition: opacity 380ms ease;
 }
 
 .row-icon {

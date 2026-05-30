@@ -240,6 +240,9 @@ namespace Game.Infrastructure.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
                     NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
 
+                    b.Property<bool>("IsBoss")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -351,9 +354,14 @@ namespace Game.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int>("RarityId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ItemCategoryId");
+
+                    b.HasIndex("RarityId");
 
                     b.ToTable("Items");
                 });
@@ -739,6 +747,53 @@ namespace Game.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("PlayerStatistics");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Rarities");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Common"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Uncommon"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Rare"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Epic"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Legendary"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Mythic"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
@@ -1212,7 +1267,15 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Game.Abstractions.Entities.Rarity", "Rarity")
+                        .WithMany("Items")
+                        .HasForeignKey("RarityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("ItemCategory");
+
+                    b.Navigation("Rarity");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
@@ -1580,6 +1643,11 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("UnlockedItems");
 
                     b.Navigation("UnlockedMods");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>

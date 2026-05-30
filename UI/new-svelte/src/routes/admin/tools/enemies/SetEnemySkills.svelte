@@ -1,21 +1,19 @@
-<div class="enemy-select-container">
-	<Select bind:value={enemyId} options={enemies} label="Select Enemy" />
+<div class="tool-gate">
+	<GateSelect label="Enemy" options={enemies} bind:value={enemyId} />
 </div>
 <Loading {loading} />
 {#if enemyId > -1 && !loading}
-	<TableEditor bind:this={editor} {data} {sampleItem} {selectOptions} title="Set Enemy Skills" />
-	{@render children()}
+	<TableEditor bind:this={editor} {data} {sampleItem} {selectOptions} title="Set Enemy Skills" onSave={saveChanges} />
 {/if}
 
 <script lang="ts">
 import { ApiRequest } from '$lib/api';
-import { Select, Loading, TableEditor, type SelectOptions } from '$components';
+import { Loading, TableEditor, type SelectOptions } from '$components';
+import GateSelect from '../../GateSelect.svelte';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { onMount } from 'svelte';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const enemySkills = editor?.getRowData();
 	if (enemySkills?.length) {
 		const skillIds = enemySkills.map((c) => c.skillId);
@@ -50,8 +48,7 @@ onMount(async () => {
 </script>
 
 <style lang="scss">
-.enemy-select-container {
-	width: 6em;
-	margin-bottom: 1em;
+.tool-gate {
+	margin-bottom: 18px;
 }
 </style>

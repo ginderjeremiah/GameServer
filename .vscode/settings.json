@@ -2,6 +2,7 @@
   "cSpell.words": [
     "Averager",
     "backplane",
+    "Cooldown",
     "Cooldowns",
     "debuffs",
     "equippable",
@@ -9,6 +10,8 @@
     "statified",
     "statify",
     "subcomponents",
+    "Unequip",
     "unlockable"
-  ]
+  ],
+  "terminal.integrated.cwd": "${workspaceFolder}\\UI\\new-svelte"
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, EItemCategory, ELogType } from '$lib/api';
+import { EAttribute, EItemCategory, ELogType, ERarity } from '$lib/api';
 import type { IInventoryData, IItem, IItemMod } from '$lib/api';
 
 const mockInventoryData: IInventoryData = {
@@ -51,8 +51,10 @@ const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon): I
 	name: `Item ${id}`,
 	description: `Description ${id}`,
 	itemCategoryId: category,
+	rarityId: ERarity.Common,
 	iconPath: `/icons/${id}.png`,
-	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }]
+	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
+	modSlots: []
 });
 
 const makeItemMod = (id: number): IItemMod => ({
@@ -81,7 +83,7 @@ describe('InventoryManager', () => {
 		it('loads unlocked items from player inventory data', () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
-			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
 			mockInventoryData.unlockedMods = [10];
 
 			manager.initialize();
@@ -94,7 +96,7 @@ describe('InventoryManager', () => {
 		it('places equipped items into equipment slots', () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot, appliedMods: [] }
+				{ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot, appliedMods: [], favorite: false }
 			];
 
 			manager.initialize();
@@ -105,7 +107,7 @@ describe('InventoryManager', () => {
 
 		it('clears previous state on re-initialize', () => {
 			mockItems[1] = makeItem(1);
-			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
 			manager.initialize();
 
 			mockInventoryData.unlockedItems = [];
@@ -122,8 +124,8 @@ describe('InventoryManager', () => {
 			mockItems[1] = makeItem(1);
 			mockItems[2] = makeItem(2);
 			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: false, appliedMods: [] },
-				{ itemId: 2, equipped: false, appliedMods: [] }
+				{ itemId: 1, equipped: false, appliedMods: [], favorite: false },
+				{ itemId: 2, equipped: false, appliedMods: [], favorite: false }
 			];
 
 			manager.initialize();
@@ -141,7 +143,7 @@ describe('InventoryManager', () => {
 		it('includes attributes from equipped items', () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [
-				{ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot, appliedMods: [] }
+				{ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot, appliedMods: [], favorite: false }
 			];
 
 			manager.initialize();
@@ -158,7 +160,7 @@ describe('InventoryManager', () => {
 
 		it('returns the selected item', () => {
 			mockItems[1] = makeItem(1);
-			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [] }];
+			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
 			manager.initialize();
 
 			manager.selectItem(1);
@@ -174,6 +176,7 @@ describe('InventoryManager', () => {
 			manager.addUnlockedItem({
 				itemId: 3,
 				equipped: false,
+				favorite: false,
 				appliedMods: []
 			});
 

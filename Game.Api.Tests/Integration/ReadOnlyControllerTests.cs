@@ -17,11 +17,8 @@ namespace Game.Api.Tests.Integration
     [Collection("Integration")]
     public class ReadOnlyControllerTests : ApiIntegrationTestBase
     {
-        private readonly HttpClient _authClient;
-
         public ReadOnlyControllerTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper)
         {
-            _authClient = null!; // initialized in InitializeAsync via setup helper
         }
 
         /// <summary>
@@ -64,11 +61,11 @@ namespace Game.Api.Tests.Integration
             using var authClient = await SetupAuthenticatedClientAsync();
 
             // Act
-            var response = await authClient.GetAsync("/api/Enemies");
+            var response = await authClient.GetAsync("/api/Enemies", CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
@@ -80,7 +77,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task GetEnemies_Unauthenticated_Returns401()
         {
-            var response = await Client.GetAsync("/api/Enemies");
+            var response = await Client.GetAsync("/api/Enemies", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
@@ -93,10 +90,10 @@ namespace Game.Api.Tests.Integration
 
             using var authClient = await SetupAuthenticatedClientAsync();
 
-            var response = await authClient.GetAsync("/api/Skills");
+            var response = await authClient.GetAsync("/api/Skills", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Skill>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Skill>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.Data);
 
@@ -113,10 +110,10 @@ namespace Game.Api.Tests.Integration
 
             using var authClient = await SetupAuthenticatedClientAsync();
 
-            var response = await authClient.GetAsync("/api/Zones");
+            var response = await authClient.GetAsync("/api/Zones", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Zone>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Zone>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.Data);
 
@@ -129,10 +126,10 @@ namespace Game.Api.Tests.Integration
         {
             using var authClient = await SetupAuthenticatedClientAsync();
 
-            var response = await authClient.GetAsync("/api/Items");
+            var response = await authClient.GetAsync("/api/Items", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Item>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Item>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             // Data may be null or empty when no items exist
@@ -144,11 +141,11 @@ namespace Game.Api.Tests.Integration
             using var authClient = await SetupAuthenticatedClientAsync();
 
             // Attributes are seeded via migrations, so this should return reference data
-            var response = await authClient.GetAsync("/api/Attributes");
+            var response = await authClient.GetAsync("/api/Attributes", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             // Attributes use ApiAsyncEnumerableResponse which serializes as an array
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Attribute>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Attribute>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
         }

@@ -7,10 +7,10 @@ namespace Game.Api.CodeGen
     {
         public static string GetImportText(IEnumerable<CodeGenTypeDescriptor> typeDescriptors, string importPath = "./")
         {
-            var typeStrings = typeDescriptors.SelectNotNull(GetImportText).Distinct().OrderBy(t => t);
-            return typeStrings.Count() > 3
-                ? $"import type {{\n\t{string.Join(",\n\t", typeStrings)}\n}} from \"{importPath}\"\n"
-                : $"import type {{ {string.Join(", ", typeStrings)} }} from \"{importPath}\"\n";
+            var typeStrings = typeDescriptors.SelectNotNull(GetImportText).Distinct().OrderBy(t => t).ToList();
+            return typeStrings.Count > 3
+                ? $"import type {{\n\t{string.Join(",\n\t", typeStrings)}\n}} from '{importPath}';\n"
+                : $"import type {{ {string.Join(", ", typeStrings)} }} from '{importPath}';\n";
         }
 
         public static string? GetImportText(CodeGenTypeDescriptor descriptor)

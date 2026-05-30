@@ -7,11 +7,13 @@ namespace Game.Api.Models.Items
     public class Item : IModelFromSource<Item, ItemEntity>
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public required string Name { get; set; }
+        public required string Description { get; set; }
         public EItemCategory ItemCategoryId { get; set; }
-        public string IconPath { get; set; }
-        public IEnumerable<BattlerAttribute> Attributes { get; set; }
+        public ERarity RarityId { get; set; }
+        public required string IconPath { get; set; }
+        public required IEnumerable<BattlerAttribute> Attributes { get; set; }
+        public required IEnumerable<ItemModSlot> ModSlots { get; set; }
         public static Item FromSource(ItemEntity item)
         {
             return new Item
@@ -20,8 +22,10 @@ namespace Game.Api.Models.Items
                 Name = item.Name,
                 Description = item.Description,
                 ItemCategoryId = (EItemCategory)item.ItemCategoryId,
+                RarityId = (ERarity)item.RarityId,
                 IconPath = item.IconPath,
                 Attributes = item.ItemAttributes.To().Model<BattlerAttribute>(),
+                ModSlots = item.ItemModSlots.To().Model<ItemModSlot>(),
             };
         }
     }

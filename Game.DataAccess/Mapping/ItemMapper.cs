@@ -1,5 +1,4 @@
 using Game.Core;
-using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using EntityItem = Game.Abstractions.Entities.Item;
@@ -17,6 +16,7 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 Description = entity.Description ?? string.Empty,
                 Category = (EItemCategory)entity.ItemCategoryId,
+                Rarity = (ERarity)entity.RarityId,
                 Attributes = (entity.ItemAttributes ?? [])
                     .Select(ia => new AttributeModifier
                     {

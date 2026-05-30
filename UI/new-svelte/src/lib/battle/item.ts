@@ -7,6 +7,7 @@ export interface Item extends IItem {
 	itemId: number;
 	equipped: boolean;
 	equipmentSlotId?: number;
+	favorite: boolean;
 	appliedMods: ItemMod[];
 	totalAttributes: BattleAttributes;
 }
@@ -21,6 +22,7 @@ export const newItem = (invItem: IInventoryItem): Item => {
 		itemId: invItem.itemId,
 		equipped: invItem.equipped,
 		equipmentSlotId: invItem.equipmentSlotId,
+		favorite: invItem.favorite ?? false,
 		appliedMods,
 		totalAttributes
 	} satisfies Item;

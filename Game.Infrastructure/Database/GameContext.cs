@@ -35,6 +35,7 @@ namespace Game.Infrastructure.Database
         public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
+        public DbSet<Rarity> Rarities { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
@@ -63,14 +64,13 @@ namespace Game.Infrastructure.Database
                 entity.Property(a => a.Name)
                     .HasMaxLength(50);
 
-                entity.HasData(Enum.GetValues<EAttribute>().Select(a =>
+                entity.HasData(Core.Attributes.Attribute.GetAllAttributes().Select(a =>
                 {
-                    var attribute = new Core.Attributes.Attribute(a);
                     return new Attribute
                     {
-                        Id = (int)a,
-                        Name = attribute.Name,
-                        Description = attribute.Description,
+                        Id = (int)a.Id,
+                        Name = a.Name,
+                        Description = a.Description,
                     };
                 }));
             });
@@ -243,6 +243,25 @@ namespace Game.Infrastructure.Database
 
                 entity.HasIndex(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId })
                     .IsUnique();
+            });
+
+            modelBuilder.Entity<Rarity>(entity =>
+            {
+                entity.Property(r => r.Id)
+                    .ValueGeneratedNever();
+
+                entity.Property(r => r.Name)
+                    .HasMaxLength(50);
+
+                entity.HasData(Enum.GetValues<ERarity>().Select(r =>
+                {
+                    var rarity = new Core.Rarity.Rarity(r);
+                    return new Rarity
+                    {
+                        Id = (int)rarity.Id,
+                        Name = rarity.Name,
+                    };
+                }));
             });
 
             modelBuilder.Entity<Skill>(entity =>

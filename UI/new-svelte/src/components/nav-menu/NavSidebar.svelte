@@ -89,7 +89,7 @@
 			<span class="tick-sep">·</span>
 			<span title="Render tick rate">R {renderRate}</span>
 			<span class="tick-sep">·</span>
-      <span title="Server Ping">{ping} ms</span>
+      <span title="Server Ping">{parseFloat(ping.toFixed(3)).toString()} ms</span>
 		</div>
 	</div>
 </div>
@@ -110,12 +110,13 @@ interface Props {
 	screens: ScreenDef[];
 	active: string;
 	onNavigate: (key: string) => void;
+	/** Two-way bound so the parent layout can reserve space for a pinned rail. */
+	pinned?: boolean;
 }
 
-const { screens, active, onNavigate }: Props = $props();
+let { screens, active, onNavigate, pinned = $bindable(false) }: Props = $props();
 
 let hovering = $state(false);
-let pinned = $state(false);
 let ping = $state(0);
 
 onPingMeasured((p) => ping = p);
@@ -139,7 +140,7 @@ const handleClick = (screen: ScreenDef) => {
 
 <style lang="scss">
 $collapsed: 60px;
-$expanded-width: 218px;
+$expanded-width: 240px;
 
 .sidebar {
 	position: absolute;

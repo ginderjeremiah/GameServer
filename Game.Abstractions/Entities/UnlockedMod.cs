@@ -5,7 +5,7 @@ namespace Game.Abstractions.Entities
         public int PlayerId { get; set; }
         public int ItemModId { get; set; }
 
-        public virtual Player Player { get => field ?? throw new NavigationNotLoadedException(nameof(Player)); set; }
-        public virtual ItemMod ItemMod { get => field ?? throw new NavigationNotLoadedException(nameof(ItemMod)); set; }
+        public virtual Player Player { get => field ?? throw new NotLoadedException(nameof(Player)); set; }
+        public virtual ItemMod ItemMod { get => field ?? throw new NotLoadedException(nameof(ItemMod)); set; }
     }
 }

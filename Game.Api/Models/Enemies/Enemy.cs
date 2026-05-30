@@ -6,9 +6,10 @@ namespace Game.Api.Models.Enemies
     public class Enemy : IModelFromSource<Enemy, EnemyEntity>
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
-        public IEnumerable<int> SkillPool { get; set; }
+        public required string Name { get; set; }
+        public bool IsBoss { get; set; }
+        public required IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
+        public required IEnumerable<int> SkillPool { get; set; }
 
         public static Enemy FromSource(EnemyEntity entity)
         {
@@ -17,6 +18,7 @@ namespace Game.Api.Models.Enemies
                 AttributeDistribution = entity.AttributeDistributions.To().Model<AttributeDistribution>(),
                 Name = entity.Name,
                 Id = entity.Id,
+                IsBoss = entity.IsBoss,
                 SkillPool = entity.EnemySkills.Select(s => s.SkillId),
             };
         }

@@ -54,6 +54,15 @@ namespace Game.Application.Services
             return true;
         }
 
+        public async Task<bool> SetFavorite(Player player, int itemId, bool favorite)
+        {
+            if (!player.TrySetFavorite(itemId, favorite))
+                return false;
+
+            await _playerRepo.SavePlayer(player);
+            return true;
+        }
+
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
             var modEntity = _itemMods.LookupItemMod(itemModId);

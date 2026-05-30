@@ -37,22 +37,29 @@
 				</div>
 			{/if}
 
-			<!-- Applied mods -->
-			{#if appliedMods?.length}
+			<!-- Mods — every slot, filled or empty -->
+			{#if modSlots.length}
 				<div class="tt-section">
 					<div class="tt-section-header">
-						<span>Applied mods</span>
+						<span>Mods · {filledCount}/{modSlots.length}</span>
 						<div class="tt-section-line"></div>
 					</div>
 					<div class="tt-mods-list">
-						{#each appliedMods as mod}
-							<div class="tt-mod-tile" style:border-left-color={modTypeAccent(mod.itemModTypeId)}>
-								<div class="tt-mod-header">
-									<span class="tt-mod-name">{mod.name}</span>
-									<span class="tt-mod-type" style:color={modTypeAccent(mod.itemModTypeId)}>{modTypeLabel(mod.itemModTypeId)}</span>
+						{#each modSlots as slot}
+							{#if slot.mod}
+								<div class="tt-mod-tile" style:border-left-color={modTypeAccent(slot.type)}>
+									<div class="tt-mod-header">
+										<span class="tt-mod-name">{slot.mod.name}</span>
+										<span class="tt-mod-type" style:color={modTypeAccent(slot.type)}>{modTypeLabel(slot.type)}</span>
+									</div>
+									<div class="tt-mod-desc">{slot.mod.description}</div>
 								</div>
-								<div class="tt-mod-desc">{mod.description}</div>
-							</div>
+							{:else}
+								<div class="tt-mod-empty" style:border-left-color={modTypeAccent(slot.type)}>
+									<span class="tt-mod-empty-label">Empty slot</span>
+									<span class="tt-mod-type" style:color={modTypeAccent(slot.type)}>{modTypeLabel(slot.type)}</span>
+								</div>
+							{/if}
 						{/each}
 					</div>
 				</div>
@@ -87,7 +94,16 @@ const { item }: Props = $props();
 let container: HTMLDivElement;
 
 const attributeMap = $derived(item?.totalAttributes?.getAttributeMap());
-const appliedMods = $derived(item?.appliedMods);
+
+// Every mod slot (filled or empty), so the tooltip surfaces open slots too.
+const modSlots = $derived(
+	(item?.modSlots ?? []).map((slot) => ({
+		slotId: slot.id,
+		type: slot.itemModSlotTypeId,
+		mod: item?.appliedMods.find((m) => m.itemModSlotId === slot.id) ?? null
+	}))
+);
+const filledCount = $derived(modSlots.filter((s) => s.mod).length);
 
 const CATEGORY_ACCENT: Record<number, string> = {
 	[EItemCategory.Helm]: '#a1c2f7',
@@ -244,6 +260,21 @@ const modTypeLabel = (modType: number) => ({
 	padding: 6px 10px;
 	background: rgba(255, 255, 255, 0.03);
 	border-left: 2px solid;
+}
+
+.tt-mod-empty {
+	padding: 6px 10px;
+	border: 1px dashed rgba(255, 255, 255, 0.14);
+	border-left: 2px solid;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.tt-mod-empty-label {
+	font-size: 11.5px;
+	font-style: italic;
+	color: rgba(240, 240, 240, 0.5);
 }
 
 .tt-mod-header {

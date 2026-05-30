@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
-import CheckBox from './CheckBox.svelte';
+import CheckBox from '$components/CheckBox.svelte';
 
 afterEach(cleanup);
 

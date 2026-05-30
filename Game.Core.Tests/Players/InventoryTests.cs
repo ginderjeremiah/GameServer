@@ -1,6 +1,5 @@
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
-using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Xunit;
 
@@ -17,7 +16,7 @@ namespace Game.Core.Tests.Players
 
             inventory.UnlockItem(42);
 
-            Assert.Equal(1, inventory.UnlockedItems.Count);
+            Assert.Single(inventory.UnlockedItems);
             Assert.Equal(42, inventory.UnlockedItems[0].ItemId);
         }
 
@@ -29,7 +28,7 @@ namespace Game.Core.Tests.Players
             inventory.UnlockItem(42);
             inventory.UnlockItem(42);
 
-            Assert.Equal(1, inventory.UnlockedItems.Count);
+            Assert.Single(inventory.UnlockedItems);
         }
 
         // ── UnlockMod ───────────────────────────────────────────────────────
@@ -52,7 +51,7 @@ namespace Game.Core.Tests.Players
             inventory.UnlockMod(7);
             inventory.UnlockMod(7);
 
-            Assert.Equal(1, inventory.UnlockedMods.Count);
+            Assert.Single(inventory.UnlockedMods);
         }
 
         // ── TryEquipItem ────────────────────────────────────────────────────
@@ -164,7 +163,7 @@ namespace Game.Core.Tests.Players
 
             Assert.True(result);
             var applied = inventory.UnlockedItems[0].AppliedMods;
-            Assert.Equal(1, applied.Count);
+            Assert.Single(applied);
             Assert.Equal(mod, applied[0].ItemMod);
         }
 
@@ -247,7 +246,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryRemoveMod(1, 0);
 
             Assert.True(result);
-            Assert.Equal(0, inventory.UnlockedItems[0].AppliedMods.Count);
+            Assert.Empty(inventory.UnlockedItems[0].AppliedMods);
         }
 
         [Fact]
@@ -282,7 +281,7 @@ namespace Game.Core.Tests.Players
 
             var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
 
-            Assert.Equal(1, modifiers.Count);
+            Assert.Single(modifiers);
             Assert.Equal(EAttribute.Strength, modifiers[0].Attribute);
             Assert.Equal(5.0, modifiers[0].Amount);
         }
@@ -294,22 +293,23 @@ namespace Game.Core.Tests.Players
 
             var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
 
-            Assert.Equal(0, modifiers.Count);
+            Assert.Empty(modifiers);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory,
+        private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
             List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null) => new()
-        {
-            Id = id,
-            Name = $"Item {id}",
-            Description = string.Empty,
-            Category = category,
-            Attributes = attributes ?? [],
-            ModSlots = modSlots ?? [],
-            Tags = [],
-        };
+            {
+                Id = id,
+                Name = $"Item {id}",
+                Description = string.Empty,
+                Category = category,
+                Rarity = rarity,
+                Attributes = attributes ?? [],
+                ModSlots = modSlots ?? [],
+                Tags = [],
+            };
 
         private static void AddUnlockedItem(Inventory inventory, Item item)
         {

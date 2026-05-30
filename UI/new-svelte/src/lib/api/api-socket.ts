@@ -41,10 +41,10 @@ export class ApiSocket {
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
 			socket = new WebSocket('/socket');
-			socket.onopen = this.processCommandQueue.bind(this);
+			socket.onopen = this.onStart.bind(this);
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
-			setInterval(() => apiSocket.attemptPing(), 15000);
+			setInterval(() => apiSocket.attemptPing(), 10000);
 		}
 	}
 
@@ -73,7 +73,7 @@ export class ApiSocket {
 	public attemptPing() {
 		this.ensureSocket();
 		if (socket.readyState === socket.OPEN) {
-			this.lastPing = Date.now();
+			this.lastPing = performance.now();
 			socket.send('ping');
 		}
 	}
@@ -90,14 +90,14 @@ export class ApiSocket {
 		if (socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
-				this.inFlightRequests.push({ startTime: Date.now(), command: request });
+				this.inFlightRequests.push({ startTime: performance.now(), command: request });
 				socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
 	}
 
 	private receiveResponse(ev: MessageEvent) {
-		const now = Date.now();
+		const now = performance.now();
 		if (ev.data == 'pong') {
 			pingHook.notify(now - this.lastPing);
 			return;
@@ -132,6 +132,11 @@ export class ApiSocket {
 	private handleError(ev: Event) {
 		console.error('A socket error occurred', ev);
 		errorHook.notify('WebSocket connection error');
+	}
+
+	private onStart() {
+		this.attemptPing();
+		this.processCommandQueue();
 	}
 }
 

@@ -9,6 +9,6 @@
         public int LevelMin { get; set; }
         public int LevelMax { get; set; }
 
-        public virtual List<ZoneEnemy> ZoneEnemies { get => field ?? throw new NavigationNotLoadedException(nameof(ZoneEnemies)); set; }
+        public virtual List<ZoneEnemy> ZoneEnemies { get => field ?? throw new NotLoadedException(nameof(ZoneEnemies)); set; }
     }
 }

@@ -8,17 +8,17 @@ namespace Game.Core.Attributes
         /// <summary>
         /// The enum value of the attribute.
         /// </summary>
-        public EAttribute Id { get; set; }
+        public EAttribute Id { get; }
 
         /// <summary>
         /// The name of the attribute.
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; }
 
         /// <summary>
         /// A text description of what the attribute represents.
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; }
 
         /// <summary>
         /// Creates a new attribute based on the given enum value.
@@ -38,6 +38,11 @@ namespace Game.Core.Attributes
                 Strength => "A measure of one's raw physical force.",
                 _ => "A measure of one's raw physical force."
             };
+        }
+
+        public static IEnumerable<Attribute> GetAllAttributes()
+        {
+            return Enum.GetValues<EAttribute>().Select(a => new Attribute(a));
         }
     }
 }

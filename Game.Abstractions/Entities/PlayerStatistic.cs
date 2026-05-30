@@ -8,7 +8,7 @@ namespace Game.Abstractions.Entities
         public int? EntityId { get; set; }
         public long Value { get; set; }
 
-        public virtual Player Player { get => field ?? throw new NavigationNotLoadedException(nameof(Player)); set; }
-        public virtual StatisticType StatisticType { get => field ?? throw new NavigationNotLoadedException(nameof(StatisticType)); set; }
+        public virtual Player Player { get => field ?? throw new NotLoadedException(nameof(Player)); set; }
+        public virtual StatisticType StatisticType { get => field ?? throw new NotLoadedException(nameof(StatisticType)); set; }
     }
 }

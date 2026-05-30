@@ -34,3 +34,11 @@ The backend uses a mix of HTTP and WebSockets for communication with the fronten
 ## Caching and Pub/Sub
 
 As mentioned above, most of the reference data is cached in-memory on the backend for fast access. However, player data is cached in Redis and uses a write-behind caching strategy where the cache is the source of truth for player data, and changes are persisted to the database asynchronously. The application uses Redis pub/sub to trigger persistence of player data to the database whenever it changes and as a backplane for WebSocket communication.
+
+## Item Rarity & Mod Slots on the API Item Model
+
+`ERarity` (Common → Mythic) and an item's mod slots already exist on the domain `Item`/entity and are eager-loaded by the `Items` repository. The API `Item` model now also exposes `RarityId` and `ModSlots` (the existing `ItemModSlot` model) so the frontend can render rarity-based styling and show an item's empty mod slots, not just its applied mods. No new data was added to the entities — these were already loaded and simply weren't surfaced through the model/codegen.
+
+## Item Favorites
+
+Players can favorite unlocked items. The flag lives on the domain `UnlockedItemSlot.Favorite` and is set via the `SetItemFavorite` websocket command → `PlayerService.SetFavorite` → `player.TrySetFavorite` → `SavePlayer`, which writes the whole player to the Redis cache (the source of truth for player data). Because the favorite rides on the cached player and `PlayerData.FromPlayer` reads it from the domain, no dedicated `UnlockedItem` column or EF migration was added — this keeps the change non-invasive and avoids a schema migration. The flag therefore persists for as long as the player stays in cache; adding a `UnlockedItem.Favorite` column plus a write-behind handler (mirroring `ItemEquippedEvent`) is the follow-up needed for durability across a full cache eviction.

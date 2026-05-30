@@ -9,7 +9,7 @@
             _source = source;
         }
 
-        public IEnumerable<TModel> Model<TModel>() where TModel : IModelFromSource<TModel, TSource>, new()
+        public IEnumerable<TModel> Model<TModel>() where TModel : IModelFromSource<TModel, TSource>
         {
             if (_source is null)
             {

@@ -126,6 +126,16 @@ namespace Game.Core.Players.Inventories
             return unlocked.AppliedMods.Remove(applied);
         }
 
+        public bool TrySetFavorite(int itemId, bool favorite)
+        {
+            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            if (unlocked is null)
+                return false;
+
+            unlocked.Favorite = favorite;
+            return true;
+        }
+
         public void UnlockItem(int itemId)
         {
             if (UnlockedItems.Any(u => u.ItemId == itemId))

@@ -60,4 +60,24 @@ describe('NavSidebar', () => {
 		const sidebar = screen.getByTestId('sidebar');
 		expect(sidebar.classList.contains('expanded')).toBe(false);
 	});
+
+	it('is expanded and shows the pin button when pinned', () => {
+		render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn(), pinned: true } });
+
+		const sidebar = screen.getByTestId('sidebar');
+		expect(sidebar.classList.contains('expanded')).toBe(true);
+
+		const pinButton = screen.getByTestId('pin-button');
+		expect(pinButton.classList.contains('pinned')).toBe(true);
+	});
+
+	it('toggles the pinned state when the pin button is clicked', async () => {
+		render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn(), pinned: true } });
+
+		const sidebar = screen.getByTestId('sidebar');
+		await fireEvent.click(screen.getByTestId('pin-button'));
+
+		// Unpinning while not hovering collapses the rail back to the spacer width.
+		expect(sidebar.classList.contains('expanded')).toBe(false);
+	});
 });

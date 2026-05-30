@@ -6,6 +6,6 @@
         public required string Name { get; set; }
         public int ItemCategoryId { get; set; }
 
-        public virtual ItemCategory ItemCategory { get => field ?? throw new NavigationNotLoadedException(nameof(ItemCategory)); set; }
+        public virtual ItemCategory ItemCategory { get => field ?? throw new NotLoadedException(nameof(ItemCategory)); set; }
     }
 }

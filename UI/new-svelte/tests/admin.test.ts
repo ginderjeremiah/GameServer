@@ -21,11 +21,12 @@ test.describe('Admin', () => {
 	test('switching between admin tools', async ({ page }) => {
 		await loginAndGoToAdmin(page);
 
-		const addEditSkills = page.getByText('Add/Edit Skills');
-		await expect(addEditSkills).toBeVisible({ timeout: 3000 });
-		await addEditSkills.click({ force: true });
+		// Tool items live in the collapsible admin sidebar; the button is
+		// clickable even when collapsed (the label is hidden, the button is not).
+		await page.getByTestId('admin-tool-addSkills').click();
 
 		await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+		await expect(page.getByRole('heading', { name: 'Add/Edit Skills' })).toBeVisible({ timeout: 3000 });
 	});
 
 	test('add row button works', async ({ page }) => {

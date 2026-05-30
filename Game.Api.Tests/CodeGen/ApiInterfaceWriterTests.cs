@@ -134,7 +134,7 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiInterfaces([descriptor1, descriptor2], "// Auto-generated");
 
             var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
-            Assert.Equal(1, files.Length);
+            Assert.Single(files);
             var content = File.ReadAllText(files[0]);
             Assert.Contains("ISimpleModel", content);
             Assert.Contains("INestedModel", content);

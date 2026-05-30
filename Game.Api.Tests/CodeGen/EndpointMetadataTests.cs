@@ -64,7 +64,7 @@ namespace Game.Api.Tests.CodeGen
             var method = typeof(TestController).GetMethod("GetSimple")!;
             var metadata = new EndpointMetadata(method);
 
-            Assert.Equal(0, metadata.ParameterDescriptors.Count);
+            Assert.Empty(metadata.ParameterDescriptors);
         }
 
         [Fact]
@@ -73,7 +73,7 @@ namespace Game.Api.Tests.CodeGen
             var method = typeof(TestController).GetMethod("PostData")!;
             var metadata = new EndpointMetadata(method);
 
-            Assert.Equal(1, metadata.ParameterDescriptors.Count);
+            Assert.Single(metadata.ParameterDescriptors);
             Assert.Equal(typeof(SimpleModel), metadata.ParameterDescriptors[0].UnderlyingType);
             Assert.Equal("model", metadata.ParameterDescriptors[0].Name);
         }

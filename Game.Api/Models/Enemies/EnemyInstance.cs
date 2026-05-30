@@ -6,10 +6,8 @@ namespace Game.Api.Models.Enemies
     {
         public int Id { get; set; }
         public int Level { get; set; }
-        public IEnumerable<BattlerAttribute> Attributes { get; set; }
+        public required IEnumerable<BattlerAttribute> Attributes { get; set; }
         public uint Seed { get; set; }
-        public List<int> SelectedSkills { get; set; }
-
-        public EnemyInstance() { }
+        public required List<int> SelectedSkills { get; set; }
     }
 }

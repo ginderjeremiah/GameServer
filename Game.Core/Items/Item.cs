@@ -26,6 +26,9 @@ namespace Game.Core.Items
         /// <inheritdoc cref="EItemCategory" />
         public required EItemCategory Category { get; set; }
 
+        /// <inheritdoc cref="ERarity" />
+        public required ERarity Rarity { get; set; }
+
         /// <summary>
         /// The attribute modifiers that the item applies.
         /// </summary>

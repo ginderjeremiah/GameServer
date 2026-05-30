@@ -99,7 +99,7 @@ namespace Game.Api.Tests.CodeGen
             var extractor = new ControllerMetadataExtractor(typeof(TestController));
             var postData = extractor.Endpoints.First(e => e.Endpoint.Contains("PostData"));
 
-            Assert.Equal(1, postData.ParameterDescriptors.Count);
+            Assert.Single(postData.ParameterDescriptors);
             Assert.Equal(typeof(SimpleModel), postData.ParameterDescriptors[0].UnderlyingType);
             Assert.Equal("model", postData.ParameterDescriptors[0].Name);
         }
@@ -133,7 +133,7 @@ namespace Game.Api.Tests.CodeGen
         {
             var extractor = new ControllerMetadataExtractor(typeof(ControllerWithNonAction));
             // Should not include the NonAction method, and should not include Dispose/ToString/etc.
-            Assert.Equal(1, extractor.Endpoints.Count);
+            Assert.Single(extractor.Endpoints);
         }
 
         [Fact]
@@ -141,8 +141,8 @@ namespace Game.Api.Tests.CodeGen
         {
             var extractor = new ControllerMetadataExtractor(typeof(ControllerWithMixedReturns));
             // Only includes methods that return IApiResponse or Task<IApiResponse>
-            Assert.Equal(1, extractor.Endpoints.Count);
-            Assert.True(extractor.Endpoints[0].Endpoint.Contains("Valid"));
+            Assert.Single(extractor.Endpoints);
+            Assert.Contains("Valid", extractor.Endpoints[0].Endpoint);
         }
     }
 }

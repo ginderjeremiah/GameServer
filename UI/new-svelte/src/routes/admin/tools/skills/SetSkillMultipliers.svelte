@@ -1,5 +1,5 @@
-<div class="zone-select-container">
-	<Select bind:value={skillId} options={skills} label="Select Skill" />
+<div class="tool-gate">
+	<GateSelect label="Skill" options={skills} bind:value={skillId} />
 </div>
 <Loading {loading} />
 {#if skillId > -1 && !loading}
@@ -9,20 +9,19 @@
 		{sampleItem}
 		{selectOptions}
 		title="Set Skill Multipliers"
+		onSave={saveChanges}
 	/>
-	{@render children()}
 {/if}
 
 <script lang="ts">
 import { ApiRequest, EAttribute, type IAttributeMultiplier, type IChange } from '$lib/api';
-import { Select, Loading, TableEditor, type SelectOptions } from '$components';
+import { Loading, TableEditor, type SelectOptions } from '$components';
+import GateSelect from '../../GateSelect.svelte';
 import { staticData } from '$stores';
-import { onMount, type Snippet } from 'svelte';
+import { onMount } from 'svelte';
 import { enumPairs } from '$lib/common';
 
-const { children }: { children: Snippet } = $props();
-
-export const saveChanges = async () => {
+const saveChanges = async () => {
 	const multiplierChanges = editor?.getChanges();
 	if (multiplierChanges?.length) {
 		const changes = multiplierChanges.map((c) => ({
@@ -62,8 +61,7 @@ onMount(async () => {
 </script>
 
 <style lang="scss">
-.zone-select-container {
-	width: 6em;
-	margin-bottom: 1em;
+.tool-gate {
+	margin-bottom: 18px;
 }
 </style>

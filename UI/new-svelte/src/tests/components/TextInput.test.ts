@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
-import TextInput from './TextInput.svelte';
+import TextInput from '$components/TextInput.svelte';
 
 afterEach(cleanup);
 

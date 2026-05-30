@@ -66,7 +66,7 @@ namespace Game.Api.Tests.CodeGen
 
             Assert.Equal(typeof(List<SimpleModel>), descriptor.UnderlyingType);
             Assert.True(descriptor.IsGeneric);
-            Assert.Equal(1, descriptor.GenericArgumentDescriptors.Count);
+            Assert.Single(descriptor.GenericArgumentDescriptors);
             Assert.Equal(typeof(SimpleModel), descriptor.GenericArgumentDescriptors[0].UnderlyingType);
         }
 
@@ -184,7 +184,7 @@ namespace Game.Api.Tests.CodeGen
 
             var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
 
-            Assert.Equal(0, references.Count);
+            Assert.Empty(references);
         }
 
         [Fact]
@@ -196,9 +196,9 @@ namespace Game.Api.Tests.CodeGen
             var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
 
             Assert.Equal(3, references.Count);
-            Assert.True(references.Any(r => r.Name == "Id"));
-            Assert.True(references.Any(r => r.Name == "Name"));
-            Assert.True(references.Any(r => r.Name == "IsActive"));
+            Assert.Contains(references, r => r.Name == "Id");
+            Assert.Contains(references, r => r.Name == "Name");
+            Assert.Contains(references, r => r.Name == "IsActive");
         }
 
         [Fact]
@@ -210,7 +210,7 @@ namespace Game.Api.Tests.CodeGen
             var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
 
             // Should include the List<SimpleModel> descriptor and its generic argument SimpleModel
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
         }
 
         [Fact]
@@ -224,9 +224,9 @@ namespace Game.Api.Tests.CodeGen
             // GenericModel<SimpleModel> has two properties: Value (T) and Description (string)
             // The generic argument references should include SimpleModel (from Value property)
             Assert.True(references.Count > 0);
-            Assert.True(references.Any(r => r.Name == "Value"));
-            Assert.True(references.Any(r => r.Name == "Description"));
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+            Assert.Contains(references, r => r.Name == "Value");
+            Assert.Contains(references, r => r.Name == "Description");
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
         }
 
         [Fact]
@@ -238,8 +238,8 @@ namespace Game.Api.Tests.CodeGen
             var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
 
             // Dictionary<string, SimpleModel> should include string and SimpleModel as generic arguments
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(string)));
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(string));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
         }
 
         [Fact]
@@ -253,8 +253,8 @@ namespace Game.Api.Tests.CodeGen
             // List<List<SimpleModel>> should include:
             // - List (from generic argument)
             // - SimpleModel (from nested generic)
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(List<SimpleModel>)));
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(List<SimpleModel>));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
         }
 
         [Fact]
@@ -269,8 +269,8 @@ namespace Game.Api.Tests.CodeGen
             // - string (key)
             // - List<SimpleModel> (value)
             // - SimpleModel (nested in list)
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(string)));
-            Assert.True(references.Any(r => r.UnderlyingType == typeof(SimpleModel)));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(string));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
         }
 
         [Fact]
@@ -295,7 +295,7 @@ namespace Game.Api.Tests.CodeGen
 
             var references = descriptor.GetDirectlyReferencedDescriptorsForProperties().ToList();
 
-            Assert.Equal(0, references.Count);
+            Assert.Empty(references);
         }
 
         [Fact]
@@ -308,8 +308,8 @@ namespace Game.Api.Tests.CodeGen
 
             // Should include GenericModel's properties (Value and Description)
             // and the generic argument SimpleModel
-            Assert.True(references.Any(r => r.Name == "Value"));
-            Assert.True(references.Any(r => r.Name == "Description"));
+            Assert.Contains(references, r => r.Name == "Value");
+            Assert.Contains(references, r => r.Name == "Description");
         }
     }
 }

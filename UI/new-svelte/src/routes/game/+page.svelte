@@ -1,5 +1,5 @@
 <div class="game-container" data-testid="game-screen">
-	<div class="sidebar-spacer"></div>
+	<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
 
 	<div class="main-content">
 		<div class="screen-container" data-testid="screen-container">
@@ -8,12 +8,11 @@
 		<LogPanel />
 	</div>
 
-	<NavSidebar {screens} active={currentScreen} onNavigate={handleNavigate} />
+	<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
 </div>
 
 <script lang="ts">
-import { NavSidebar } from '$components';
-import LogPanel from '$components/LogPanel.svelte';
+import { NavSidebar, LogPanel } from '$components';
 import { screenMap, type GameScreen } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
@@ -30,6 +29,7 @@ if (browser) {
 
 let currentScreen = $state<string>('fight');
 let CurrentScreen: Component = $state(screenMap.Fight as Component);
+let sidebarPinned = $state(false);
 
 interface ScreenDef {
 	key: string;
@@ -88,6 +88,11 @@ const handleNavigate = (key: string) => {
 .sidebar-spacer {
 	width: 60px;
 	flex-shrink: 0;
+	transition: width 220ms cubic-bezier(.4, 0, .2, 1);
+
+	&.pinned {
+		width: 240px;
+	}
 }
 
 .main-content {

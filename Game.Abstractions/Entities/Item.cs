@@ -7,11 +7,14 @@
         public required string Description { get; set; }
         public int ItemCategoryId { get; set; }
         public required string IconPath { get; set; }
+        public int RarityId { get; set; }
 
-        public virtual List<ItemAttribute> ItemAttributes { get => field ?? throw new NavigationNotLoadedException(nameof(ItemAttributes)); set; }
-        public virtual ItemCategory ItemCategory { get => field ?? throw new NavigationNotLoadedException(nameof(ItemCategory)); set; }
-        public virtual List<ItemModSlot> ItemModSlots { get => field ?? throw new NavigationNotLoadedException(nameof(ItemModSlots)); set; }
-        public virtual List<Tag> Tags { get => field ?? throw new NavigationNotLoadedException(nameof(Tags)); set; }
-        public virtual List<UnlockedItem> UnlockedItems { get => field ?? throw new NavigationNotLoadedException(nameof(UnlockedItems)); set; }
+        public virtual ItemCategory ItemCategory { get => field ?? throw new NotLoadedException(nameof(ItemCategory)); set; }
+        public virtual Rarity Rarity { get => field ?? throw new NotLoadedException(nameof(Rarity)); set; }
+
+        public virtual List<ItemAttribute> ItemAttributes { get => field ?? throw new NotLoadedException(nameof(ItemAttributes)); set; }
+        public virtual List<ItemModSlot> ItemModSlots { get => field ?? throw new NotLoadedException(nameof(ItemModSlots)); set; }
+        public virtual List<Tag> Tags { get => field ?? throw new NotLoadedException(nameof(Tags)); set; }
+        public virtual List<UnlockedItem> UnlockedItems { get => field ?? throw new NotLoadedException(nameof(UnlockedItems)); set; }
     }
 }
