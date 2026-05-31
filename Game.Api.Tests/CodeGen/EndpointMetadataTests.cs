@@ -10,7 +10,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_SimpleResponse_ExtractsType()
         {
             var method = typeof(TestController).GetMethod("GetSimple")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.NotNull(metadata.ResponseDescriptor);
             Assert.Equal(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
@@ -20,7 +20,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_TaskWrappedResponse_UnwrapsTask()
         {
             var method = typeof(TestController).GetMethod("AsyncEndpoint")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.NotNull(metadata.ResponseDescriptor);
             Assert.Equal(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
@@ -30,7 +30,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_CollectionResponse_WrapsInList()
         {
             var method = typeof(TestController).GetMethod("GetList")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.NotNull(metadata.ResponseDescriptor);
             Assert.Equal(typeof(List<SimpleModel>), metadata.ResponseDescriptor.UnderlyingType);
@@ -41,7 +41,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_VoidResponse_NullDescriptor()
         {
             var method = typeof(TestController).GetMethod("PostData")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             // ApiResponse (non-generic) → not a constructed generic type → null
             Assert.Null(metadata.ResponseDescriptor);
@@ -51,7 +51,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_WithParameters_ExtractsAll()
         {
             var method = typeof(MultiParamController).GetMethod("UpdateMultiple")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.Equal(2, metadata.ParameterDescriptors.Count);
             Assert.Equal("id", metadata.ParameterDescriptors[0].Name);
@@ -62,7 +62,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_NoParameters_EmptyList()
         {
             var method = typeof(TestController).GetMethod("GetSimple")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.Empty(metadata.ParameterDescriptors);
         }
@@ -71,7 +71,7 @@ namespace Game.Api.Tests.CodeGen
         public void Constructor_SingleClassParameter_ExtractsCorrectly()
         {
             var method = typeof(TestController).GetMethod("PostData")!;
-            var metadata = new EndpointMetadata(method);
+            var metadata = new EndpointMetadata(method) { Endpoint = "Test" };
 
             Assert.Single(metadata.ParameterDescriptors);
             Assert.Equal(typeof(SimpleModel), metadata.ParameterDescriptors[0].UnderlyingType);

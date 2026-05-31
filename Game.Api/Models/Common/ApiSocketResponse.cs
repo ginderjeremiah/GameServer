@@ -9,6 +9,6 @@
 
     public class ApiSocketResponse<T> : ApiSocketResponse
     {
-        public T Data { get; set; }
+        public required T Data { get; set; }
     }
 }

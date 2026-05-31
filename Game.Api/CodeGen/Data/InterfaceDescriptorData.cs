@@ -2,7 +2,7 @@
 {
     internal class InterfaceDescriptorData
     {
-        public CodeGenTypeDescriptor Descriptor { get; set; }
-        public string FilePath { get; set; }
+        public required CodeGenTypeDescriptor Descriptor { get; set; }
+        public required string FilePath { get; set; }
     }
 }

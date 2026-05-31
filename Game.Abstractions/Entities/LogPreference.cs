@@ -1,12 +1,12 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class LogPreference
+    public class LogPreference
     {
         public int PlayerId { get; set; }
-        public int LogSettingId { get; set; }
+        public int LogTypeId { get; set; }
         public bool Enabled { get; set; }
 
         public virtual Player Player { get => field ?? throw new NotLoadedException(nameof(Player)); set; }
-        public virtual LogSetting LogSetting { get => field ?? throw new NotLoadedException(nameof(LogSetting)); set; }
+        public virtual LogType LogType { get => field ?? throw new NotLoadedException(nameof(LogType)); set; }
     }
 }

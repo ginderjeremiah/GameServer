@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class ZoneEnemy
+    public class ZoneEnemy
     {
         public int ZoneId { get; set; }
         public int EnemyId { get; set; }

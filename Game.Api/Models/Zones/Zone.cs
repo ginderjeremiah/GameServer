@@ -5,8 +5,8 @@ namespace Game.Api.Models.Zones
     public class Zone : IModelFromSource<Zone, ZoneEntity>
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public required string Name { get; set; }
+        public required string Description { get; set; }
         public int Order { get; set; }
         public int LevelMin { get; set; }
         public int LevelMax { get; set; }

@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class AttributeDistribution
+    public class AttributeDistribution
     {
         public int EnemyId { get; set; }
         public int AttributeId { get; set; }

@@ -34,7 +34,7 @@ namespace Game.Api.CodeGen.Writers
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {CodeGenTypeFormatter.GetTypeText(endpoint.ResponseDescriptor)};");
             }
 
-            strBuilder.AppendLine("};\n");
+            strBuilder.AppendLine($"}};{Environment.NewLine}");
 
             strBuilder.AppendLine("export type ApiRequestTypes = {");
             foreach (var endpoint in orderedData.Where(endp => endp.ParameterDescriptors.Count > 0))
@@ -42,13 +42,13 @@ namespace Game.Api.CodeGen.Writers
                 strBuilder.AppendLine($"\t'{endpoint.Endpoint}': {CodeGenTypeFormatter.GetParametersTypeText(endpoint)};");
             }
 
-            strBuilder.AppendLine("};\n");
-            strBuilder.AppendLine("export type ApiEndpoint = keyof ApiResponseTypes;\n");
+            strBuilder.AppendLine($"}};{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiEndpoint = keyof ApiResponseTypes;{Environment.NewLine}");
             strBuilder.AppendLine("export type ApiEndpointOptionalRequest = {");
             strBuilder.AppendLine("\t[K in keyof ApiRequestTypes]: undefined extends ApiRequestTypes[K] ? K : never;");
-            strBuilder.AppendLine("}[keyof ApiRequestTypes];\n");
-            strBuilder.AppendLine("export type ApiEndpointWithRequest = keyof ApiRequestTypes;\n");
-            strBuilder.AppendLine("export type ApiEndpointNoRequest = ApiEndpointOptionalRequest | Exclude<ApiEndpoint, ApiEndpointWithRequest>;\n");
+            strBuilder.AppendLine($"}}[keyof ApiRequestTypes];{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiEndpointWithRequest = keyof ApiRequestTypes;{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiEndpointNoRequest = ApiEndpointOptionalRequest | Exclude<ApiEndpoint, ApiEndpointWithRequest>;{Environment.NewLine}");
             strBuilder.Append("export type ApiResponseType = ApiResponseTypes[ApiEndpoint];");
 
             Directory.CreateDirectory(TargetDir);

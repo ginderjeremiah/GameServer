@@ -6,12 +6,12 @@ namespace Game.Api.Models.Skills
     public class Skill : IModelFromSource<Skill, SkillEntity>
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public required string Name { get; set; }
         public decimal BaseDamage { get; set; }
-        public IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
-        public string Description { get; set; }
+        public required IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
+        public required string Description { get; set; }
         public int CooldownMs { get; set; }
-        public string IconPath { get; set; }
+        public required string IconPath { get; set; }
 
         public static Skill FromSource(SkillEntity skill)
         {

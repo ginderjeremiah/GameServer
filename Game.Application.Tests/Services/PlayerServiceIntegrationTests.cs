@@ -26,7 +26,7 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             // Give the player 6 unspent stat points
             playerEntity.StatPointsGained = 106;
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(CancellationToken);
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);

@@ -115,12 +115,12 @@ namespace Game.Api.Controllers
             }).ToList();
 
             playerEntity.LogPreferences = [
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.Damage, Enabled = false, },
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.Debug, Enabled = false, },
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.Exp, Enabled = true, },
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.LevelUp, Enabled = true, },
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.ItemFound, Enabled = true, },
-                new() { Player = playerEntity, LogSettingId = (int)ELogType.EnemyDefeated, Enabled = true, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.Damage, Enabled = false, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.Debug, Enabled = false, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.Exp, Enabled = true, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.LevelUp, Enabled = true, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.ItemFound, Enabled = true, },
+                new() { Player = playerEntity, LogTypeId = (int)ELogType.EnemyDefeated, Enabled = true, },
             ];
 
             _entityStore.Insert(playerEntity);

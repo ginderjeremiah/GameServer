@@ -87,7 +87,7 @@ namespace Game.DataAccess.Mapping
             var logPreferences = (entity.LogPreferences ?? [])
                 .Select(lp => new Core.Players.LogPreference
                 {
-                    LogType = (Core.ELogType)lp.LogSettingId,
+                    LogType = (Core.ELogType)lp.LogTypeId,
                     Enabled = lp.Enabled,
                 }).ToList();
 

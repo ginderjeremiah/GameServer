@@ -243,7 +243,7 @@ namespace Game.Application.Tests.Services
                 new Game.Abstractions.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Game.Core.EAttribute.Endurance, Amount = 1m });
             playerEntity.StatPointsGained = 2;
             playerEntity.StatPointsUsed = 2;
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(CancellationToken);
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);

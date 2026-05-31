@@ -5,7 +5,7 @@ namespace Game.Api.Models.Tags
     public class TagCategory : IModelFromSource<TagCategory, TagCategoryEntity>
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public required string Name { get; set; }
 
         public static TagCategory FromSource(TagCategoryEntity tagCategory)
         {

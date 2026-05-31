@@ -42,7 +42,6 @@ namespace Game.DataAccess.Mapping
             return new ItemMod
             {
                 Name = entity.Name,
-                Removable = entity.Removable,
                 Description = entity.Description ?? string.Empty,
                 Type = (EItemModType)entity.ItemModTypeId,
                 Attributes = (entity.ItemModAttributes ?? [])

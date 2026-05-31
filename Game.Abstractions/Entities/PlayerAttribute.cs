@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class PlayerAttribute
+    public class PlayerAttribute
     {
         public int PlayerId { get; set; }
         public int AttributeId { get; set; }

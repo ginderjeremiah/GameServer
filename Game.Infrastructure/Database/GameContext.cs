@@ -29,7 +29,7 @@ namespace Game.Infrastructure.Database
         public DbSet<Item> Items { get; set; }
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
         public DbSet<LogPreference> LogPreferences { get; set; }
-        public DbSet<LogSetting> LogSettings { get; set; }
+        public DbSet<LogType> LogTypes { get; set; }
         public DbSet<Player> Players { get; set; }
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
         public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
@@ -195,9 +195,9 @@ namespace Game.Infrastructure.Database
             });
 
             modelBuilder.Entity<LogPreference>()
-                .HasKey(lp => new { lp.PlayerId, lp.LogSettingId });
+                .HasKey(lp => new { lp.PlayerId, lp.LogTypeId });
 
-            modelBuilder.Entity<LogSetting>(entity =>
+            modelBuilder.Entity<LogType>(entity =>
             {
                 entity.Property(ls => ls.Id)
                     .ValueGeneratedNever();
@@ -207,7 +207,7 @@ namespace Game.Infrastructure.Database
 
                 entity.HasData(Enum.GetValues<ELogType>().Select(a =>
                 {
-                    return new LogSetting
+                    return new LogType
                     {
                         Id = (int)a,
                         Name = a.ToString().Capitalize().SpaceWords(),

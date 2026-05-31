@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class ItemAttribute
+    public class ItemAttribute
     {
         public int ItemId { get; set; }
         public int AttributeId { get; set; }

@@ -14,11 +14,6 @@ namespace Game.Core.Items
         public required string Name { get; set; }
 
         /// <summary>
-        /// Whether the item mod can be removed.
-        /// </summary>
-        public bool Removable { get; set; }
-
-        /// <summary>
         /// A short description of the item mod.
         /// </summary>
         public required string Description { get; set; }

@@ -20,6 +20,7 @@ namespace Game.TestInfrastructure.Base
         private ITestOutputHelper _testOutputHelper;
 
         protected IntegrationTestContainers Containers { get; }
+        protected CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
         protected ApplicationIntegrationTestBase(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
         {

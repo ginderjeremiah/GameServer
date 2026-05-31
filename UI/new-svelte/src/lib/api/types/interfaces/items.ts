@@ -11,7 +11,6 @@ import type {
 export interface IItemMod {
 	id: number;
 	name: string;
-	removable: boolean;
 	description: string;
 	itemModTypeId: number;
 	attributes: IBattlerAttribute[];

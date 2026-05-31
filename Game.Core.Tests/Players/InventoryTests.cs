@@ -153,7 +153,6 @@ namespace Game.Core.Tests.Players
             {
                 Name = "Sharp",
                 Description = "",
-                Removable = true,
                 Type = EItemModType.Prefix,
                 Attributes = [],
                 Tags = [],
@@ -182,7 +181,6 @@ namespace Game.Core.Tests.Players
             {
                 Name = "Sharp",
                 Description = "",
-                Removable = true,
                 Type = EItemModType.Prefix,
                 Attributes = [],
                 Tags = [],
@@ -208,7 +206,6 @@ namespace Game.Core.Tests.Players
             {
                 Name = "Of Fire",
                 Description = "",
-                Removable = true,
                 Type = EItemModType.Suffix, // Wrong type — slot expects Prefix
                 Attributes = [],
                 Tags = [],
@@ -236,7 +233,6 @@ namespace Game.Core.Tests.Players
             {
                 Name = "Sharp",
                 Description = "",
-                Removable = true,
                 Type = EItemModType.Prefix,
                 Attributes = [],
                 Tags = [],

@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class Tag
+    public class Tag
     {
         public int Id { get; set; }
         public required string Name { get; set; }

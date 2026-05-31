@@ -1,10 +1,9 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class ItemMod : IZeroBasedIdentityEntity
+    public class ItemMod : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public required string Name { get; set; }
-        public bool Removable { get; set; }
         public required string Description { get; set; }
         public int ItemModTypeId { get; set; }
 

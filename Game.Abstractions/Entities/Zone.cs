@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class Zone : IZeroBasedIdentityEntity
+    public class Zone : IZeroBasedIdentityEntity
     {
         public int Id { get; set; }
         public required string Name { get; set; }

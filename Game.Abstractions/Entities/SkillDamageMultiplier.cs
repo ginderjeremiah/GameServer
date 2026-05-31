@@ -1,6 +1,6 @@
 ﻿namespace Game.Abstractions.Entities
 {
-    public partial class SkillDamageMultiplier
+    public class SkillDamageMultiplier
     {
         public int SkillId { get; set; }
         public int AttributeId { get; set; }

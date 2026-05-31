@@ -242,9 +242,9 @@ namespace Game.DataAccess
 
         private static async Task HandleLogPreferenceChanged(GameContext context, LogPreferenceChangedEvent evt)
         {
-            var logSettingId = (int)evt.LogType;
+            var logTypeId = (int)evt.LogType;
             var existing = await context.LogPreferences
-                .FirstOrDefaultAsync(lp => lp.PlayerId == evt.PlayerId && lp.LogSettingId == logSettingId);
+                .FirstOrDefaultAsync(lp => lp.PlayerId == evt.PlayerId && lp.LogTypeId == logTypeId);
 
             if (existing is not null)
             {
@@ -255,7 +255,7 @@ namespace Game.DataAccess
                 context.LogPreferences.Add(new LogPreference
                 {
                     PlayerId = evt.PlayerId,
-                    LogSettingId = logSettingId,
+                    LogTypeId = logTypeId,
                     Enabled = evt.Enabled,
                 });
             }

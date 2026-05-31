@@ -34,7 +34,7 @@ namespace Game.Api.CodeGen.Writers
                 strBuilder.AppendLine($"\t'{command.CommandName}': {CodeGenTypeFormatter.GetTypeText(command.ResponseDescriptor)};");
             }
 
-            strBuilder.AppendLine("};\n");
+            strBuilder.AppendLine($"}};{Environment.NewLine}");
 
             strBuilder.AppendLine("export type ApiSocketRequestTypes = {");
             foreach (var command in orderedData.Where(c => c.ParameterDescriptor is not null))
@@ -42,10 +42,10 @@ namespace Game.Api.CodeGen.Writers
                 strBuilder.AppendLine($"\t'{command.CommandName}': {CodeGenTypeFormatter.GetTypeText(command.ParameterDescriptor)};");
             }
 
-            strBuilder.AppendLine("};\n");
-            strBuilder.AppendLine("export type ApiSocketCommand = keyof ApiSocketResponseTypes;\n");
-            strBuilder.AppendLine("export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes;\n");
-            strBuilder.AppendLine("export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>;\n");
+            strBuilder.AppendLine($"}};{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiSocketCommand = keyof ApiSocketResponseTypes;{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes;{Environment.NewLine}");
+            strBuilder.AppendLine($"export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>;{Environment.NewLine}");
             strBuilder.Append("export type ApiSocketResponseType = ApiSocketResponseTypes[ApiSocketCommand];");
 
             Directory.CreateDirectory(TargetDir);

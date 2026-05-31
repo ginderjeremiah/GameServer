@@ -213,7 +213,7 @@ namespace Game.Api.Tests.CodeGen
         public void GetParametersTypeText_NoParameters_ReturnsVoid()
         {
             var method = typeof(TestController).GetMethod("GetSimple")!;
-            var endpoint = new EndpointMetadata(method);
+            var endpoint = new EndpointMetadata(method) { Endpoint = "Test" };
             Assert.Equal("void", CodeGenTypeFormatter.GetParametersTypeText(endpoint));
         }
 
@@ -221,7 +221,7 @@ namespace Game.Api.Tests.CodeGen
         public void GetParametersTypeText_SingleClassParam_ReturnsTypeName()
         {
             var method = typeof(TestController).GetMethod("PostData")!;
-            var endpoint = new EndpointMetadata(method);
+            var endpoint = new EndpointMetadata(method) { Endpoint = "Test" };
             var result = CodeGenTypeFormatter.GetParametersTypeText(endpoint);
             Assert.Equal("ISimpleModel", result);
         }
@@ -230,7 +230,7 @@ namespace Game.Api.Tests.CodeGen
         public void GetParametersTypeText_MultipleParams_ReturnsAnonymousObject()
         {
             var method = typeof(MultiParamController).GetMethod("UpdateMultiple")!;
-            var endpoint = new EndpointMetadata(method);
+            var endpoint = new EndpointMetadata(method) { Endpoint = "Test" };
             var result = CodeGenTypeFormatter.GetParametersTypeText(endpoint);
             Assert.Equal("{ id: number, name: string }", result);
         }
@@ -239,7 +239,7 @@ namespace Game.Api.Tests.CodeGen
         public void GetParametersTypeText_AllOptionalParams_AppendsUndefined()
         {
             var method = typeof(MultiParamController).GetMethod("OptionalParams")!;
-            var endpoint = new EndpointMetadata(method);
+            var endpoint = new EndpointMetadata(method) { Endpoint = "Test" };
             var result = CodeGenTypeFormatter.GetParametersTypeText(endpoint);
             // id is not nullable/default, so not all params are optional
             Assert.False(result.EndsWith("| undefined"));

@@ -5,7 +5,7 @@ namespace Game.Api.CodeGen.Data
 {
     internal class EndpointMetadata
     {
-        public string Endpoint { get; set; }
+        public required string Endpoint { get; set; }
         public CodeGenTypeDescriptor? ResponseDescriptor { get; }
         public List<CodeGenTypeDescriptor> ParameterDescriptors { get; }
         public bool IsGet { get; set; }

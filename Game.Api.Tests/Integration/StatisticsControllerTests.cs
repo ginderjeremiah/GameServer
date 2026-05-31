@@ -44,10 +44,10 @@ namespace Game.Api.Tests.Integration
         {
             using var authClient = await SetupAuthenticatedClientAsync();
 
-            var response = await authClient.GetAsync("/api/Statistics");
+            var response = await authClient.GetAsync("/api/Statistics", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<PlayerStatistic>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<PlayerStatistic>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             // For a new player, statistics may be empty
@@ -56,7 +56,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task GetStatistics_Unauthenticated_Returns401()
         {
-            var response = await Client.GetAsync("/api/Statistics");
+            var response = await Client.GetAsync("/api/Statistics", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
     }

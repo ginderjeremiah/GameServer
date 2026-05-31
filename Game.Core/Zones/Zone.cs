@@ -13,6 +13,6 @@ namespace Game.Core.Zones
         public required int Order { get; set; }
         public required int LevelMin { get; set; }
         public required int LevelMax { get; set; }
-        public ProbabilityTable<Enemy> EnemyTable { get; set; }
+        public required ProbabilityTable<Enemy> EnemyTable { get; set; }
     }
 }

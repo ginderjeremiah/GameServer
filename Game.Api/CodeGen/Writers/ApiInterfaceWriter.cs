@@ -64,7 +64,7 @@ namespace Game.Api.CodeGen.Writers
                         WriteInterfaceToBuilder(interfaceType.Descriptor, fileBuilder);
                     }
 
-                    fileBuilder.AppendLine("\n");
+                    fileBuilder.AppendLine(Environment.NewLine);
                 }
 
                 OverwriteFileIfTextDiffers($"{TargetDir}\\{group.Key}", fileBuilder.ToString().TrimEnd());
@@ -136,7 +136,7 @@ namespace Game.Api.CodeGen.Writers
 
         private static string GetExportsText(IEnumerable<IGrouping<string, InterfaceDescriptorData>> interfaceDataGroups)
         {
-            return string.Join("\n", interfaceDataGroups.Select(g => $"export * from './{g.Key.Replace("\\", "/")}';"));
+            return string.Join(Environment.NewLine, interfaceDataGroups.Select(g => $"export * from './{g.Key.Replace("\\", "/")}';"));
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Game.Api.Models.Player
         {
             return new LogPreference
             {
-                Id = (ELogType)preference.LogSettingId,
+                Id = (ELogType)preference.LogTypeId,
                 Enabled = preference.Enabled,
             };
         }

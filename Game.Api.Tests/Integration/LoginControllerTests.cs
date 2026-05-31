@@ -29,12 +29,12 @@ namespace Game.Api.Tests.Integration
             var creds = new { Username = "loginuser", Password = "loginpass" };
 
             // Act
-            var response = await Client.PostAsJsonAsync("/api/Login", creds);
+            var response = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
@@ -49,11 +49,11 @@ namespace Game.Api.Tests.Integration
         {
             var creds = new { Username = "nonexistent", Password = "whatever" };
 
-            var response = await Client.PostAsJsonAsync("/api/Login", creds);
+            var response = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
             Assert.Null(result.Data);
@@ -71,11 +71,11 @@ namespace Game.Api.Tests.Integration
 
             var creds = new { Username = "newuser", Password = "newpass" };
 
-            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds);
+            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
         }
@@ -91,11 +91,11 @@ namespace Game.Api.Tests.Integration
             var creds = new { Username = "duplicate", Password = "anotherpass" };
 
             // Act
-            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds);
+            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
         }
@@ -113,7 +113,7 @@ namespace Game.Api.Tests.Integration
 
             // Login first to create a session
             var loginCreds = new { Username = "statususer", Password = "statuspass" };
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login", loginCreds);
+            var loginResponse = await Client.PostAsJsonAsync("/api/Login", loginCreds, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
             // Extract the set-cookie header and add it to a new client
@@ -125,11 +125,11 @@ namespace Game.Api.Tests.Integration
             }
 
             // Act
-            var response = await authClient.GetAsync("/api/Login/Status");
+            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.Data);
             Assert.Equal(player.Name, result.Data.Name);
@@ -138,7 +138,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task Status_Unauthenticated_Returns401()
         {
-            var response = await Client.GetAsync("/api/Login/Status");
+            var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }

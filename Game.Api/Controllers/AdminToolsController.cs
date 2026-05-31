@@ -154,10 +154,9 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.ItemMod
+                    _entityStore.Insert(new Abstractions.Entities.ItemMod
                     {
                         Name = change.Item.Name,
-                        Removable = change.Item.Removable,
                         Description = change.Item.Description,
                         ItemModTypeId = change.Item.ItemModTypeId,
                     });
@@ -168,7 +167,6 @@ namespace Game.Api.Controllers
                     if (itemMod is not null)
                     {
                         itemMod.Name = change.Item.Name;
-                        itemMod.Removable = change.Item.Removable;
                         itemMod.Description = change.Item.Description;
                         itemMod.ItemModTypeId = change.Item.ItemModTypeId;
                         _entityStore.Update(itemMod);

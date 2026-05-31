@@ -58,10 +58,10 @@ namespace Game.Api.Tests.Integration
             var (authClient, _) = await CreateAuthenticatedPlayerAsync();
             using var client = authClient;
 
-            var response = await client.GetAsync("/api/Player");
+            var response = await client.GetAsync("/api/Player", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
@@ -71,7 +71,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task GetPlayer_Unauthenticated_Returns401()
         {
-            var response = await Client.GetAsync("/api/Player");
+            var response = await Client.GetAsync("/api/Player", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
@@ -89,10 +89,10 @@ namespace Game.Api.Tests.Integration
                 new() { AttributeId = (int)Game.Core.EAttribute.Strength, Amount = 3 },
             };
 
-            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates);
+            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
@@ -113,10 +113,10 @@ namespace Game.Api.Tests.Integration
                 new() { AttributeId = (int)Game.Core.EAttribute.Strength, Amount = 999 },
             };
 
-            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates);
+            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates, CancellationToken);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>();
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
         }

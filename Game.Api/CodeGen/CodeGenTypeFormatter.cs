@@ -9,8 +9,8 @@ namespace Game.Api.CodeGen
         {
             var typeStrings = typeDescriptors.SelectNotNull(GetImportText).Distinct().OrderBy(t => t).ToList();
             return typeStrings.Count > 3
-                ? $"import type {{\n\t{string.Join(",\n\t", typeStrings)}\n}} from '{importPath}';\n"
-                : $"import type {{ {string.Join(", ", typeStrings)} }} from '{importPath}';\n";
+                ? $"import type {{{Environment.NewLine}\t{string.Join($",{Environment.NewLine}\t", typeStrings)}{Environment.NewLine}}} from '{importPath}';{Environment.NewLine}"
+                : $"import type {{ {string.Join(", ", typeStrings)} }} from '{importPath}';{Environment.NewLine}";
         }
 
         public static string? GetImportText(CodeGenTypeDescriptor descriptor)

@@ -43,7 +43,7 @@ public class XunitLogger : ILogger
             var message = $"{logLevel}: [{_categoryName}] {formatter(state, exception)}";
             if (exception != null)
             {
-                message += $"\n{exception}";
+                message += $"{Environment.NewLine}{exception}";
             }
 
             _output.WriteLine(message);

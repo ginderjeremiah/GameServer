@@ -6,6 +6,6 @@ namespace Game.Api.Models.Enemies
     {
         public int EnemyId { get; set; }
 
-        public List<AttributeDistribution> AttributeDistributions { get; set; }
+        public required List<AttributeDistribution> AttributeDistributions { get; set; }
     }
 }

@@ -102,7 +102,7 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
             var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
-            var content = string.Join("\n", files.Select(File.ReadAllText));
+            var content = string.Join(Environment.NewLine, files.Select(File.ReadAllText));
 
             Assert.Contains("INestedModel", content);
             Assert.Contains("ISimpleModel", content);
