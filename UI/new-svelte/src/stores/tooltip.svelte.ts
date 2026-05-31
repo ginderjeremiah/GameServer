@@ -5,6 +5,7 @@ export interface TooltipComponent {
 }
 
 export interface TooltipData {
+	id: number;
 	component: () => TooltipComponent | undefined;
 	position?: Position;
 	visible: boolean;
@@ -15,7 +16,7 @@ export interface Position {
 	y: number;
 }
 
-let tooltipsData = $state<TooltipData[]>([]);
+const tooltipsData = $state<TooltipData[]>([]);
 
 export const tooltips = {
 	get data() {
@@ -23,8 +24,11 @@ export const tooltips = {
 	}
 };
 
+let id = 0;
+
 export const registerTooltipComponent = <T extends TooltipComponent>(component: () => T | undefined) => {
-	let data = $state<TooltipData>({ component, visible: false, position: undefined });
+	const data = $state<TooltipData>({ id, component, visible: false, position: undefined });
+	id++;
 
 	const setTooltipPosition = (position: Position) => {
 		data.position = position;

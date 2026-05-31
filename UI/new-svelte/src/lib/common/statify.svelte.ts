@@ -1,4 +1,4 @@
-type Statified<T extends {}> = T & {
+type Statified<T extends object> = T & {
 	__statifyPerformed: boolean;
 };
 
@@ -8,7 +8,7 @@ enum StatifyType {
 	Array
 }
 
-export const statify = <T extends {}>(state: T) => {
+export const statify = <T extends object>(state: T) => {
 	const statified = state as Statified<T>;
 	if (statified?.__statifyPerformed || !isClass(typeof state, state)) {
 		return state;
@@ -19,7 +19,7 @@ export const statify = <T extends {}>(state: T) => {
 		let data = statified[property];
 		const dataType = typeof data;
 		let statifyType = StatifyType.None;
-		if (typeof data !== 'function') {
+		if (dataType !== 'function') {
 			if (isClass(dataType, data)) {
 				data = statify(data);
 				statifyType = StatifyType.Class;
@@ -48,7 +48,7 @@ export const statify = <T extends {}>(state: T) => {
 	return statified;
 };
 
-const isClass = (dataType: string, data: any): data is {} => {
+const isClass = (dataType: string, data: unknown): data is object => {
 	return (
 		dataType === 'object' &&
 		data?.constructor?.name !== undefined &&
@@ -57,14 +57,26 @@ const isClass = (dataType: string, data: any): data is {} => {
 	);
 };
 
-const statifyArray = (data: any) => {
+const statifyArray = <T extends unknown[]>(data: T) => {
 	for (let i = 0; i < data.length; i++) {
-		data[i] = statify(data[i]);
+		const item = data[i];
+		data[i] = statifyAnything(item);
 	}
 
 	return new Proxy(data, {
 		set(target, prop, value) {
-			return Reflect.set(target, prop, statify(value));
+			return Reflect.set(target, prop, statifyAnything(value));
 		}
 	});
+};
+
+const statifyAnything = <T>(value: T) => {
+	const dataType = typeof value;
+	if (isClass(dataType, value)) {
+		return statify(value);
+	} else if (Array.isArray(value)) {
+		return statifyArray(value);
+	} else {
+		return $state(value);
+	}
 };

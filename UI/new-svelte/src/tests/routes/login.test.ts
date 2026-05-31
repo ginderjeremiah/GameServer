@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
 import LoginPage from '../../routes/+page.svelte';
 

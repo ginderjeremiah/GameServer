@@ -1,9 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../log', () => ({
-	logMessage: vi.fn()
-}));
-
 import { PlayerManager } from '$lib/engine/player/player-manager';
 import { logMessage } from '$lib/engine/log';
 import { EAttribute, ELogType } from '$lib/api';

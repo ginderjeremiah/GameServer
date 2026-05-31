@@ -1,12 +1,4 @@
-﻿import { browser } from '$app/environment';
-import { goto } from '$app/navigation';
-import { redirect } from '@sveltejs/kit';
-
-export function routeTo(route: string, redirectCode?: 302 | 307) {
-	browser ? goto(route) : redirect(redirectCode ?? 302, route);
-}
-
-// randomInt between num1 (inclusive) and num2 (exclusive)
+﻿// randomInt between num1 (inclusive) and num2 (exclusive)
 export function randomInt(num1: number, num2: number): number {
 	return Math.floor(num1 + Math.random() * (num2 - num1));
 }
@@ -26,9 +18,11 @@ export function keys<T>(obj?: T) {
 	return obj ? (Object.keys(obj) as (keyof T)[]) : [];
 }
 
-export function enumPairs(obj?: any) {
+export function enumPairs(obj: Record<string | number, string | number>) {
 	const allKeys = keys(obj);
-	return allKeys.slice(0, allKeys.length / 2).map((key) => ({ id: Number(key), name: normalizeText(obj[key]) }));
+	return allKeys
+		.slice(0, allKeys.length / 2)
+		.map((key) => ({ id: Number(key), name: normalizeText(obj[key] as string) }));
 }
 
 export function capitalize(str: string) {

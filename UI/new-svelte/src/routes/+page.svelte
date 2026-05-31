@@ -86,7 +86,7 @@
 				</button>
 				{#if mode === 'signup' && password}
 					<div class="strength-meter" data-testid="strength-meter">
-						{#each [0, 1, 2, 3] as i}
+						{#each [0, 1, 2, 3] as i (i)}
 							<div
 								class="strength-segment"
 								style:background={i < strengthScore
@@ -187,10 +187,11 @@
 
 <script lang="ts">
 import { ApiRequest } from '$lib/api';
-import { routeTo } from '$lib/common';
 import { onMount } from 'svelte';
 import { playerManager } from '$lib/engine';
 import { preventDefault } from '$lib/common/event-wrappers';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 
 type Mode = 'login' | 'signup';
 
@@ -321,7 +322,7 @@ const handleSubmit = async () => {
 		if (response.status === 200) {
 			success = true;
 			playerManager.initialize(response.data);
-			setTimeout(() => routeTo('/loading'), 600);
+			setTimeout(() => goto(resolve('/loading')), 600);
 		} else {
 			serverError = response.error ?? 'Incorrect username or password.';
 		}
@@ -333,7 +334,7 @@ const handleSubmit = async () => {
 			if (loginResponse.status === 200) {
 				success = true;
 				playerManager.initialize(loginResponse.data);
-				setTimeout(() => routeTo('/loading'), 600);
+				setTimeout(() => goto(resolve('/loading')), 600);
 			} else {
 				serverError = loginResponse.error ?? 'Account created but login failed.';
 			}
@@ -349,7 +350,7 @@ onMount(async () => {
 		const response = await new ApiRequest('Login/Status').get();
 		if (response.status === 200) {
 			playerManager.initialize(response.data);
-			routeTo('/loading');
+			goto(resolve('/loading'));
 		}
 	} catch {
 		// Session check failed — stay on login page

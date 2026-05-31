@@ -50,7 +50,7 @@
 		<!-- Sliding manifest window -->
 		<div class="manifest-window" data-testid="manifest-window" bind:this={manifestEl}>
 			<div class="manifest-track" style:transform="translateY({animatedY}px)">
-				{#each items as item, i}
+				{#each items as item, i (item.key)}
 					<div class="manifest-row" style:opacity={rowOpacity(i)}>
 						<div class="row-icon">
 							{#if item.status === 'done'}
@@ -129,12 +129,15 @@
 </div>
 
 <script module lang="ts">
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
 const pendingFetches = new Map<string, Promise<number>>();
 </script>
 
 <script lang="ts">
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+
 import { ApiRequest } from '$lib/api';
-import { routeTo } from '$lib/common';
 import { staticData } from '$stores';
 import { onMount } from 'svelte';
 
@@ -208,7 +211,9 @@ const handleWheel = (e: WheelEvent) => {
 };
 
 const enterGame = () => {
-	if (phase === 'done') routeTo('/game');
+	if (phase === 'done') {
+    goto(resolve('/game'));
+  }
 };
 
 const retryFailed = async () => {

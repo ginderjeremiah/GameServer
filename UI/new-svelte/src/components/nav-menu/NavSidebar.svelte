@@ -48,7 +48,7 @@
 
 	<!-- Nav body -->
 	<div class="sidebar-body">
-		{#each groups as group, gi}
+		{#each groups as group, gi (group.key)}
 			{@const groupItems = screens.filter((s) => s.group === group.key)}
 			{#if groupItems.length}
 				<div class="nav-group">
@@ -63,7 +63,7 @@
 						{/if}
 					</div>
 
-					{#each groupItems as screen}
+					{#each groupItems as screen (screen.key)}
 						<button
 							class="side-item"
 							class:active={active === screen.key}

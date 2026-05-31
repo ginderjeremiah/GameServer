@@ -1,6 +1,6 @@
 {#if attrs.length}
 	<div class="stat-grid">
-		{#each attrs as attr}
+		{#each attrs as attr (attr.name)}
 			<div class="stat-name">{attr.name}</div>
 			<div class="stat-value" class:positive={attr.value > 0} class:negative={attr.value < 0}>
 				{attr.value > 0 ? '+' : ''}{formatValue(attr.value)}

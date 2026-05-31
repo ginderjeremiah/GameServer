@@ -51,7 +51,7 @@
 
 	<!-- Nav body -->
 	<div class="sidebar-body">
-		{#each groups as group, gi}
+		{#each groups as group, gi (group.key)}
 			{@const groupTools = tools.filter((t) => t.group === group.key)}
 			{#if groupTools.length}
 				<div class="nav-group">
@@ -65,7 +65,7 @@
 						{/if}
 					</div>
 
-					{#each groupTools as tool}
+					{#each groupTools as tool (tool.key)}
 						<button
 							class="side-item"
 							class:active={active === tool.key}

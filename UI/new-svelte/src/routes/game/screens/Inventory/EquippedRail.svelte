@@ -6,13 +6,13 @@
 	</div>
 
 	<div class="rail-body">
-		{#each EQUIP_GROUPS as group}
+		{#each EQUIP_GROUPS as group (group.key)}
 			{@const slots = EQUIP_SLOTS.filter((s) => s.group === group.key)}
 			{#if slots.length}
 				<div class="group">
 					<div class="group-label">{group.label}</div>
 					<div class="group-slots">
-						{#each slots as slot}
+						{#each slots as slot (slot.id)}
 							<EquipSlot
 								{slot}
 								item={view.equippedBySlot[slot.id]}

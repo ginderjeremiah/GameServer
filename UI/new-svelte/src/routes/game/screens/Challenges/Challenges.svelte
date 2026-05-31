@@ -4,7 +4,7 @@
 		<p class="loading-text">Loading challenges...</p>
 	{:else}
 		<div class="challenges-list">
-			{#each allChallenges as challenge}
+			{#each allChallenges as challenge (challenge.id)}
 				<ChallengeCard {challenge} playerChallenge={playerProgressMap.get(challenge.id)} />
 			{/each}
 			{#if allChallenges.length === 0}

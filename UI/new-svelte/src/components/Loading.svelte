@@ -27,7 +27,9 @@
 const { hideOverlay = false, loading = true, minimumLoadMs = 0 } = $props();
 
 let lockSpinner = performance.now();
-// svelte-ignore state_referenced_locally - this is intended to only capture the initial value, the $effect handles reactivity.
+
+// this is intended to only capture the initial value, the $effect handles reactivity.
+// svelte-ignore state_referenced_locally
 let showSpinner = $state(loading);
 
 const offset = Math.floor(Math.random() * 360);

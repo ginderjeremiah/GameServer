@@ -38,10 +38,9 @@ export class BattleEngine {
 	public start() {
 		if (!this.running) {
 			this.running = true;
-			const that = this;
-			this.logicalUnhook = onLogicalUpdate((delta) => that.logicalUpdate(delta));
-			this.renderUnhook = onRenderUpdate((_, logicalDelta) => that.renderUpdate(logicalDelta));
-			this.enemyLoadedUnhook = onNewEnemyLoaded((enemy) => that.reset(enemy));
+			this.logicalUnhook = onLogicalUpdate((delta) => this.logicalUpdate(delta));
+			this.renderUnhook = onRenderUpdate((_, logicalDelta) => this.renderUpdate(logicalDelta));
+			this.enemyLoadedUnhook = onNewEnemyLoaded((enemy) => this.reset(enemy));
 			this.player.reset(playerManager, inventoryManager.equipmentStats);
 		}
 	}
@@ -98,14 +97,14 @@ export class BattleEngine {
 			const playerSkillsFired = this.player.advanceCooldowns(timeDelta);
 			playerSkillsFired.forEach((skill) => {
 				const dmg = skill.calculateDamage();
-				let finalDmg = this.enemy.takeDamage(dmg);
+				const finalDmg = this.enemy.takeDamage(dmg);
 				logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
 			});
 			if (!this.enemy.isDead) {
 				const enemySkillsFired = this.enemy.advanceCooldowns(timeDelta);
 				enemySkillsFired.forEach((skill) => {
 					const dmg = skill.calculateDamage();
-					let finalDmg = this.player.takeDamage(dmg);
+					const finalDmg = this.player.takeDamage(dmg);
 					logMessage(ELogType.Damage, `${this.enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
 				});
 			}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, ELogType } from '$lib/api';
+import { ELogType } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 vi.mock('svelte', async (importOriginal) => ({
@@ -7,8 +7,32 @@ vi.mock('svelte', async (importOriginal) => ({
 	onDestroy: vi.fn()
 }));
 
-const mockSkills: ISkill[] = [];
-const mockEnemies: any[] = [];
+const { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager } = vi.hoisted(() => {
+	const mockSkills: ISkill[] = [];
+	const mockEnemies: any[] = [];
+	const mockPlayerManager = {
+		name: 'TestPlayer',
+		level: 5,
+		selectedSkills: [0],
+		attributes: [
+			{ attributeId: 0, amount: 50 },
+			{ attributeId: 1, amount: 30 }
+		]
+	};
+	const mockInventoryManager = {
+		equipmentStats: []
+	};
+
+	return { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager };
+});
+
+let { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks } = vi.hoisted(() => {
+	const logicalUpdateCallbacks: Function[] = [];
+	const renderUpdateCallbacks: Function[] = [];
+	const enemyLoadedCallbacks: Function[] = [];
+
+	return { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks };
+});
 
 vi.mock('$stores', () => ({
 	staticData: {
@@ -25,21 +49,7 @@ vi.mock('$lib/engine/log', () => ({
 	logMessage: vi.fn()
 }));
 
-const mockPlayerManager = {
-	name: 'TestPlayer',
-	level: 5,
-	selectedSkills: [0],
-	attributes: [
-		{ attributeId: EAttribute.Strength, amount: 50 },
-		{ attributeId: EAttribute.Endurance, amount: 30 }
-	]
-};
-
-const mockInventoryManager = {
-	equipmentStats: []
-};
-
-vi.mock('../engine', () => ({
+vi.mock('$lib/engine/engine', () => ({
 	get playerManager() {
 		return mockPlayerManager;
 	},
@@ -48,11 +58,8 @@ vi.mock('../engine', () => ({
 	}
 }));
 
-let logicalUpdateCallbacks: Function[] = [];
-let renderUpdateCallbacks: Function[] = [];
-let enemyLoadedCallbacks: Function[] = [];
-
-vi.mock('../logical-engine', () => ({
+vi.mock('$lib/engine/logical-engine', () => ({
+	LogicalEngine: vi.fn(class {}),
 	onLogicalUpdate: vi.fn((cb: Function) => {
 		logicalUpdateCallbacks.push(cb);
 		return () => {
@@ -61,7 +68,8 @@ vi.mock('../logical-engine', () => ({
 	})
 }));
 
-vi.mock('../render-engine', () => ({
+vi.mock('$lib/engine/render-engine', () => ({
+	RenderEngine: vi.fn(class {}),
 	onRenderUpdate: vi.fn((cb: Function, cleanup?: boolean) => {
 		renderUpdateCallbacks.push(cb);
 		return () => {
@@ -70,7 +78,7 @@ vi.mock('../render-engine', () => ({
 	})
 }));
 
-vi.mock('./enemy-manager', () => ({
+vi.mock('$lib/engine/battle/enemy-manager', () => ({
 	onNewEnemyLoaded: vi.fn((cb: Function) => {
 		enemyLoadedCallbacks.push(cb);
 		return () => {

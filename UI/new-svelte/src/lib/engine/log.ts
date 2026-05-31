@@ -1,5 +1,5 @@
 import { ELogType } from '$lib/api';
-import { playerManager } from './engine';
+import { playerManager } from './';
 import { logs } from '$stores';
 
 export interface LogMessage {

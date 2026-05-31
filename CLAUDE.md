@@ -14,8 +14,9 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 
 # General Coding Guidelines
 
-- Prefer writing DRY code whenever possible. This is especially important in the frontend!
+- Prefer writing DRY code whenever possible.
 - NEVER omit the {} when writing if/else or while blocks.
+- Keep in mind that the code already in the codebase may violate the rules/suggestions in the documentation, but that does NOT mean that the code is "ok". You should not copy the style or patterns of existing code if it contradicts the recommendations from documentation.
 
 # Overall Project Guidelines
 

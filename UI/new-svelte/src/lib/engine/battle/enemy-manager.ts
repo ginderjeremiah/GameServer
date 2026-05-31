@@ -18,8 +18,7 @@ export class EnemyManager {
 	public start() {
 		if (!this.started) {
 			this.started = true;
-			const that = this;
-			this.battleStageUnhook = onBattleStageChanged((stage) => that.watchBattleStage(stage));
+			this.battleStageUnhook = onBattleStageChanged((stage) => this.watchBattleStage(stage));
 			this.watchBattleStage(battleEngine.stage);
 		}
 	}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createAccountAndLogin, shortUsername, TEST_PASSWORD, waitForLoginReady } from './helpers';
+import { createAccountAndLogin, TEST_PASSWORD, waitForLoginReady } from './helpers';
 
 test.describe('Game flow', () => {
 	test.describe.configure({ mode: 'serial' });

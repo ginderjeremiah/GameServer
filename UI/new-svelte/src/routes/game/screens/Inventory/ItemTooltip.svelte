@@ -33,7 +33,7 @@
 						<div class="tt-section-line"></div>
 					</div>
 					<div class="tt-stats-grid">
-						{#each attributeMap as attr}
+						{#each attributeMap as attr (attr.name)}
 							<div class="tt-stat-name">{attr.name}</div>
 							<div class="tt-stat-value" class:positive={attr.value > 0} class:negative={attr.value < 0}>
 								{attr.value > 0 ? '+' : ''}{attr.value}
@@ -51,7 +51,7 @@
 						<div class="tt-section-line"></div>
 					</div>
 					<div class="tt-mods-list">
-						{#each modSlots as slot}
+						{#each modSlots as slot (slot.slotId)}
 							{#if slot.mod}
 								<div class="tt-mod-tile" style:border-left-color={modTypeAccent(slot.type)}>
 									<div class="tt-mod-header">

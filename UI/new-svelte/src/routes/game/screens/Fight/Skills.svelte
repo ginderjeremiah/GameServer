@@ -1,5 +1,5 @@
 <div class="skills-row" class:reversed={side === 'enemy'} role="grid">
-	{#each battler.skills as skill, index}
+	{#each battler.skills as skill, index (skill?.id ?? -index - 1)}
 		<div class="skill-column">
 			<div
 				class="skill-slot"

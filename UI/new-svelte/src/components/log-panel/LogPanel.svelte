@@ -44,7 +44,6 @@ const onScroll = () => {
 // and let the new row animate in (the stack slides down). If they've scrolled
 // back to read history, nudge scrollTop by one row so their view stays put.
 $effect(() => {
-	newestId; // track new entries
 	const el = scrollEl;
 	if (el) {
 		if (untrack(() => atTop)) {

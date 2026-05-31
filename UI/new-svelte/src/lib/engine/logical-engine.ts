@@ -25,8 +25,7 @@ export class LogicalEngine {
 		this.lastTime = performance.now();
 		this.time = this.lastTime;
 
-		const that = this;
-		this.tickHandle = window.setInterval(() => that.logicLoop(), pollingIntervalMs);
+		this.tickHandle = window.setInterval(() => this.logicLoop(), pollingIntervalMs);
 	}
 
 	public stop() {

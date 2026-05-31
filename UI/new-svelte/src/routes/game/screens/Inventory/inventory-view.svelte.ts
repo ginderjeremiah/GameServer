@@ -195,6 +195,7 @@ export class InventoryView {
 
 	/** Unlocked mods compatible with a slot type, minus ones already on the item. */
 	compatibleMods(slotType: number, item: Item): ItemMod[] {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const used = new Set(item.appliedMods.map((m) => m.id));
 		return (staticData.itemMods ?? [])
 			.filter((m) => m && m.itemModTypeId === slotType && inventoryManager.unlockedMods.has(m.id) && !used.has(m.id))

@@ -11,7 +11,7 @@
 			All <span class="chip-count">{view.counts.all}</span>
 		</button>
 
-		{#each FILTER_CATEGORIES as cat}
+		{#each FILTER_CATEGORIES as cat (cat)}
 			<button
 				class="chip"
 				class:active={view.filterCat === cat}
@@ -46,7 +46,7 @@
 	<div class="sort">
 		<span class="mono-label">Sort</span>
 		<div class="sort-toggle">
-			{#each sortKeys as key}
+			{#each sortKeys as key (key)}
 				<button class="sort-option" class:active={view.sort === key} onclick={() => (view.sort = key)}>
 					{SORTS[key].label}
 				</button>

@@ -3,6 +3,7 @@ import { EAttribute } from '$lib/api';
 import type { ISkill, IAttributeMultiplier } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { Skill } from '$lib/battle/skill';
+import { Battler } from '$lib/battle';
 
 const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	id: 1,
@@ -20,7 +21,7 @@ const makeMockOwner = (attrs: [EAttribute, number][] = []) => {
 		attrs.map(([attributeId, amount]) => ({ attributeId, amount })),
 		false
 	);
-	return { attributes } as any;
+	return { attributes } as Battler;
 };
 
 describe('Skill', () => {

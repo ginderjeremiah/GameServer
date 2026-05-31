@@ -35,7 +35,7 @@
 					{#if !primaryKey}
 						<th>Index</th>
 					{/if}
-					{#each columns as column}
+					{#each columns as column (column.key)}
 						<th>{column.name}</th>
 					{/each}
 					<th class="actions-th">Actions</th>
@@ -97,7 +97,7 @@
 	</div>
 </div>
 
-<script lang="ts" generics="T extends {}">
+<script lang="ts" generics="T extends object">
 import { keys, normalizeText } from '$lib/common';
 import { type EditorOptions, RowState, valuesEqual } from './types';
 import TableRow from './TableRow.svelte';
@@ -106,7 +106,7 @@ import { EChangeType, type IChange } from '$lib/api';
 export const getChanges = getRowChanges;
 export const getRowData = getModifiedRowData;
 
-interface Row<T extends {}> {
+interface Row<T extends object> {
 	index: number;
 	data: T;
 	originalData: T;
@@ -276,7 +276,6 @@ function getModifiedRowData() {
 // Rebuild whenever the source data changes (initial load, gate change, or a
 // refetch after saving), resetting all row/cell state to clean.
 $effect(() => {
-	data;
 	buildRows();
 });
 </script>

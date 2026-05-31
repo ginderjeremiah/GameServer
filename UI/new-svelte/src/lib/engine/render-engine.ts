@@ -1,6 +1,5 @@
 import { createHook, getEventCounter } from '$lib/common';
 import { logicEngine } from './engine';
-import { tickSize } from './logical-engine';
 
 const renderUpdateHook = createHook<[number, number]>();
 const notifyRenderUpdate = renderUpdateHook.notify;
@@ -30,8 +29,7 @@ export class RenderEngine {
 	private renderLoop() {
 		if (this.running) {
 			this.update();
-			const that = this;
-			window.requestAnimationFrame(() => that.renderLoop());
+			window.requestAnimationFrame(() => this.renderLoop());
 		}
 	}
 

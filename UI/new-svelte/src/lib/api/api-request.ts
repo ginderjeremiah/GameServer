@@ -76,10 +76,14 @@ export class ApiRequest<U extends ApiEndpoint> {
 		return result.data;
 	}
 
-	private encodeParams(urlParams?: Record<string, any>) {
+	private encodeParams(urlParams?: Record<string, string | number | boolean>) {
+		if (!urlParams) {
+			return '';
+		}
+
 		return keys(urlParams)
-			.filter((key) => urlParams?.[key] !== undefined)
-			.map((key) => key + '=' + window.encodeURIComponent(urlParams?.[key]))
+			.filter((key) => urlParams[key] !== undefined)
+			.map((key) => key + '=' + window.encodeURIComponent(urlParams[key]))
 			.join('&');
 	}
 }

@@ -32,7 +32,7 @@
 						<span class="tt-dmg-label">Base</span>
 						<span class="tt-dmg-value">{baseDamage}</span>
 					</div>
-					{#each multipliers as mult}
+					{#each multipliers as mult (mult.attributeId)}
 						<div class="tt-dmg-row">
 							<span class="tt-dmg-label">
 								{attributeName(mult.attributeId)}

@@ -11,7 +11,7 @@
 		<td class="index-cell">{index}</td>
 	{/if}
 
-	{#each columns as { key, disabled }}
+	{#each columns as { key, disabled } (key)}
 		<TableCell
 			bind:data={data[key]}
 			disabled={disabled || isDeleted}
@@ -35,13 +35,13 @@
 	</td>
 </tr>
 
-<script lang="ts" generics="T extends {}">
+<script lang="ts" generics="T extends object">
 import type { ColumnData } from './types';
 import { RowState, valuesEqual } from './types';
 import TableCell from './TableCell.svelte';
 import type { SelectOptions } from '$components';
 
-interface Props<T extends {}> {
+interface Props<T extends object> {
 	data: T;
 	originalData: T;
 	state: RowState;

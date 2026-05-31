@@ -1,7 +1,7 @@
 import { SelectOptions } from '$components/Select.svelte';
 import type { Snippet } from 'svelte';
 
-export interface EditorOptions<T extends {}> {
+export interface EditorOptions<T extends object> {
 	data: T[];
 	primaryKey?: keyof T;
 	hiddenColumns?: (keyof T)[];

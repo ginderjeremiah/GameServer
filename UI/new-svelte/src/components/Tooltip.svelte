@@ -10,7 +10,9 @@ let container: HTMLDivElement;
 $effect(() => {
 	const comp = component();
 	if (comp) {
+		// eslint-disable-next-line svelte/no-dom-manipulating
 		container.replaceChildren();
+		// eslint-disable-next-line svelte/no-dom-manipulating
 		container.appendChild(comp.getBaseNode());
 	}
 });

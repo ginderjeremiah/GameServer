@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ELogType } from '$lib/api';
 
 const { mockLogs, mockPlayerManager } = vi.hoisted(() => {
-	const mockLogs: any[] = [];
+	const mockLogs: { id: number; logType: number; message: string }[] = [];
 	const mockPlayerManager = {
 		logPreferences: [] as { id: number; enabled: boolean }[]
 	};
 	return { mockLogs, mockPlayerManager };
 });
 
-vi.mock('./engine', () => ({
+vi.mock('$lib/engine', () => ({
 	get playerManager() {
 		return mockPlayerManager;
 	}

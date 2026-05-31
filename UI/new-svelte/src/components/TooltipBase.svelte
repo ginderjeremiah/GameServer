@@ -1,4 +1,4 @@
-{#each tooltips.data as tooltip}
+{#each tooltips.data as tooltip (tooltip.id)}
 	<Tooltip {...tooltip} />
 {/each}
 
