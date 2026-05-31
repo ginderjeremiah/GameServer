@@ -169,11 +169,13 @@ const onNumberInput = (e: Event) => {
 // Cap each editor by data type so columns stay only as wide as their content
 // needs and the table doesn't sprawl across the page.
 .num-wrap {
-	max-width: 90px;
+	width: 100%;
+	min-width: 90px;
 }
 
 .select-wrap {
-	max-width: 200px;
+	width: 100%;
+	min-width: 200px;
 }
 
 .str-wrap {

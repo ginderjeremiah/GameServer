@@ -1,7 +1,7 @@
 <div class="tool-gate">
 	<GateSelect label="Enemy" options={enemies} bind:value={enemyId} />
 </div>
-<Loading {loading} />
+<Loading {loading} delay={50} />
 {#if enemyId > -1 && !loading}
 	<TableEditor
 		bind:this={editor}

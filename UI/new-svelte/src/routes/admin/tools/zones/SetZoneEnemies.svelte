@@ -1,7 +1,7 @@
 <div class="tool-gate">
 	<GateSelect label="Zone" options={zones} bind:value={zoneId} />
 </div>
-<Loading {loading} />
+<Loading {loading} delay={50} />
 {#if zoneId > -1 && !loading}
 	<TableEditor bind:this={editor} {data} {sampleItem} {selectOptions} title="Set Zone Enemies" onSave={saveChanges} />
 {/if}

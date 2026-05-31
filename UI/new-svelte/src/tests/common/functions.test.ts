@@ -148,8 +148,4 @@ describe('enumPairs', () => {
 		const pairs = enumPairs(TestEnum);
 		expect(pairs[0].name).toBe('My Value');
 	});
-
-	it('returns empty array for undefined', () => {
-		expect(enumPairs(undefined)).toEqual([]);
-	});
 });

@@ -136,7 +136,6 @@ const pendingFetches = new Map<string, Promise<number>>();
 <script lang="ts">
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-
 import { ApiRequest } from '$lib/api';
 import { staticData } from '$stores';
 import { onMount } from 'svelte';

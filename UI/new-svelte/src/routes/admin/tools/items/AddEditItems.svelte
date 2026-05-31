@@ -10,7 +10,7 @@
 		onSave={saveChanges}
 	/>
 {/if}
-<Loading loading={!initialized} />
+<Loading loading={!initialized} delay={50} />
 
 <script lang="ts">
 import { TableEditor, Loading } from '$components';

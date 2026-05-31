@@ -1,6 +1,6 @@
-{#if showSpinner}
+{#if loading && !waitingOnDelay}
 	{#if !hideOverlay}
-		<div class="gray-overlay"></div>
+		<div class="overlay"></div>
 	{/if}
 	<div class="loading-spinner-container" {style}>
 		<div class="loading-spinner">
@@ -24,29 +24,21 @@
 {/if}
 
 <script lang="ts">
-const { hideOverlay = false, loading = true, minimumLoadMs = 0 } = $props();
+import { onMount } from "svelte";
 
-let lockSpinner = performance.now();
+const { hideOverlay = false, loading = true, delay = 0 } = $props();
 
-// this is intended to only capture the initial value, the $effect handles reactivity.
-// svelte-ignore state_referenced_locally
-let showSpinner = $state(loading);
+let waitingOnDelay = $state(true);
+
+onMount(() => {
+  waitingOnDelay = !!delay;
+  if (delay) {
+    setTimeout(() => waitingOnDelay = false, delay)
+  }
+});
 
 const offset = Math.floor(Math.random() * 360);
 const style = `--spinner-start-offset: ${offset}deg`;
-
-$effect(() => {
-	if (loading) {
-		lockSpinner = performance.now() + minimumLoadMs;
-		showSpinner = true;
-	} else if (minimumLoadMs) {
-		setTimeout(() => {
-			showSpinner = false;
-		}, lockSpinner - performance.now());
-	} else {
-		showSpinner = false;
-	}
-});
 </script>
 
 <style lang="scss">
@@ -55,17 +47,17 @@ $rotation-step: 15deg;
 $delay-step: -0.04;
 $outer-rotation-count: 3;
 
-.gray-overlay {
+.overlay {
 	position: absolute;
 	width: 100%;
 	height: 100%;
 	top: 0;
 	left: 0;
 	border-radius: inherit;
-	background-color: var(--overlay-color);
-	opacity: 60%;
 	cursor: not-allowed;
 	z-index: 10;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
 }
 
 .loading-spinner-container {

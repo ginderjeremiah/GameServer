@@ -16,8 +16,9 @@ import { NavSidebar, LogPanel } from '$components';
 import { screenMap, type GameScreen } from './screens';
 import { startGame } from '$lib/engine';
 import { browser } from '$app/environment';
-import { routeTo } from '$lib/common';
 import type { Component } from 'svelte';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 
 if (browser) {
 	try {
@@ -65,7 +66,7 @@ const screenKeyMap: Record<string, GameScreen> = {
 
 const handleNavigate = (key: string) => {
 	if (key === 'admin') {
-		routeTo('/admin');
+		goto(resolve('/admin'));
 		return;
 	}
 	currentScreen = key;

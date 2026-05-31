@@ -16,7 +16,8 @@
 </div>
 
 <script lang="ts">
-import { routeTo } from '$lib/common';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import AdminSidebar from './AdminSidebar.svelte';
 import { adminGroups, adminTools } from './tools/nav';
 
@@ -28,7 +29,7 @@ const handleNavigate = (key: string) => {
 	active = key;
 };
 
-const backToGame = () => routeTo('/game');
+const backToGame = () => goto(resolve('/game'));
 </script>
 
 <style lang="scss">

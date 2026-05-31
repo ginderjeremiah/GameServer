@@ -4,8 +4,9 @@
 </div>
 
 <script lang="ts">
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import { page } from '$app/state';
-import { routeTo } from '$lib/common';
 import { TooltipBase } from '$components';
 import { playerManager } from '$lib/engine';
 import '$styles/common.scss';
@@ -14,7 +15,7 @@ let { children } = $props();
 
 $effect(() => {
 	if (!playerManager.name && page.url.pathname !== '/') {
-		routeTo('/');
+		goto(resolve('/'));
 	}
 });
 </script>
