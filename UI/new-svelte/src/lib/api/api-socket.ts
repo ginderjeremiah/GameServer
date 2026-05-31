@@ -79,10 +79,14 @@ export class ApiSocket {
 	}
 
 	private getOrCreateHook<T extends ApiSocketCommand>(commandName: T) {
-		if (!this.commandHooks[commandName]) {
-			(this.commandHooks as any)[commandName] = createHook<[IApiSocketResponse<T>]>();
+		const hook = this.commandHooks[commandName];
+		if (!hook) {
+			const newHook = createHook<[IApiSocketResponse<T>]>();
+			(this.commandHooks as Record<T, typeof newHook>)[commandName] = newHook;
+			return newHook;
 		}
-		return this.commandHooks[commandName] as ReturnType<typeof createHook<[IApiSocketResponse<T>]>>;
+
+		return hook;
 	}
 
 	private processCommandQueue() {
@@ -108,10 +112,10 @@ export class ApiSocket {
 
 		try {
 			const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
-			const hook = this.commandHooks[data.name];
+			const hook = this.getOrCreateHook(data.name);
 			if (hook) {
 				try {
-					hook.notify(data as any);
+					hook.notify(data);
 				} catch (ex) {
 					console.error('An error occurred while executing a socket listener callback', ex);
 				}
