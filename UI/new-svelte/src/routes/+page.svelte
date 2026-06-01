@@ -177,7 +177,6 @@
 		<!-- Mode toggle -->
 		<div class="mode-toggle">
 			{mode === 'login' ? 'No account yet?' : 'Already a hero?'}
-			{' '}
 			<button class="mode-link" data-testid="mode-toggle" onclick={toggleMode}>
 				{mode === 'login' ? 'Create one' : 'Sign in'}
 			</button>

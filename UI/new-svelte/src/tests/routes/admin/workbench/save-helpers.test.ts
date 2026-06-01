@@ -121,4 +121,39 @@ describe('persistEntity', () => {
 		});
 		expect(postPrimary).not.toHaveBeenCalled();
 	});
+
+	it('does not send an identity Edit when only a child collection changed', async () => {
+		interface ChildRow extends Identified {
+			id: number;
+			name: string;
+			kids: number[];
+		}
+		// Identity (id + name) is unchanged; only the child collection (`kids`, which
+		// toPrimaryDto strips) differs, so this record must persist through its child
+		// saver alone — the Add/Edit endpoint should not be touched.
+		const diff: SaveDiff<ChildRow> = {
+			added: [],
+			modified: [{ record: { id: 0, name: 'X', kids: [1, 2] }, baseline: { id: 0, name: 'X', kids: [1] } }],
+			deleted: [],
+			existingIds: [0]
+		};
+		const postPrimary = vi.fn(async () => undefined);
+		const refresh = vi.fn(async () => [{ id: 0, name: 'X', kids: [1, 2] }] as ChildRow[]);
+		const childIds: number[] = [];
+
+		await persistEntity<ChildRow, { id: number; name: string }>({
+			diff,
+			toPrimaryDto: (r) => ({ id: r.id, name: r.name }),
+			postPrimary,
+			refresh,
+			childSavers: [
+				async (id) => {
+					childIds.push(id);
+				}
+			]
+		});
+
+		expect(postPrimary).not.toHaveBeenCalled();
+		expect(childIds).toEqual([0]);
+	});
 });

@@ -30,9 +30,18 @@ interface PersistOptions<T extends Identified, D> {
 export async function persistEntity<T extends Identified, D>(opts: PersistOptions<T, D>): Promise<T[]> {
 	const { diff, toPrimaryDto, postPrimary, refresh, childSavers = [] } = opts;
 
+	// A record can be "modified" because only a child collection changed (e.g. a skill
+	// whose damage multipliers were edited but whose identity fields weren't). Only send
+	// an identity-level Edit when the primary DTO itself differs, so a child-only edit
+	// never needlessly hits — and re-persists — the Add/Edit endpoint. Child collections
+	// are handled by the child savers below, which already skip untouched relationships.
+	const identityEdits = diff.modified.filter(
+		({ record, baseline }) => !listsEqual(toPrimaryDto(record), toPrimaryDto(baseline))
+	);
+
 	const changes: IChange<D>[] = [
 		...diff.added.map((record) => ({ changeType: EChangeType.Add, item: toPrimaryDto(record) })),
-		...diff.modified.map(({ record }) => ({ changeType: EChangeType.Edit, item: toPrimaryDto(record) })),
+		...identityEdits.map(({ record }) => ({ changeType: EChangeType.Edit, item: toPrimaryDto(record) })),
 		...diff.deleted.map((record) => ({ changeType: EChangeType.Delete, item: toPrimaryDto(record) }))
 	];
 

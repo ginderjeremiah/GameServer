@@ -27,19 +27,17 @@ namespace Game.DataAccess.Repositories
 
         public IAsyncEnumerable<Tag> GetTagsForItem(int itemId)
         {
-            return _context.Items
-                .Include(i => i.Tags)
-                .Where(i => i.Id == itemId)
-                .SelectMany(i => i.Tags)
+            return _context.Tags
+                .Include(t => t.Items)
+                .Where(t => t.Items.Any(im => im.Id == itemId))
                 .AsAsyncEnumerable();
         }
 
         public IAsyncEnumerable<Tag> GetTagsForItemMod(int itemModId)
         {
-            return _context.ItemMods
-                .Include(im => im.Tags)
-                .Where(im => im.Id == itemModId)
-                .SelectMany(i => i.Tags)
+            return _context.Tags
+                .Include(t => t.ItemMods)
+                .Where(t => t.ItemMods.Any(im => im.Id == itemModId))
                 .AsAsyncEnumerable();
         }
     }

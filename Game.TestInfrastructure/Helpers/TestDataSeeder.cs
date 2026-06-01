@@ -85,6 +85,62 @@ namespace Game.TestInfrastructure.Helpers
             return skill;
         }
 
+        public static async Task<Item> CreateItemAsync(
+            GameContext context,
+            string name = "Test Item",
+            EAttribute attributeId = EAttribute.Strength,
+            decimal attributeAmount = 5m)
+        {
+            var item = new Item
+            {
+                Name = name,
+                Description = "",
+                ItemCategoryId = (int)EItemCategory.Weapon,
+                RarityId = (int)ERarity.Common,
+                IconPath = "",
+            };
+
+            context.Items.Add(item);
+            await context.SaveChangesAsync();
+
+            context.ItemAttributes.Add(new ItemAttribute
+            {
+                ItemId = item.Id,
+                AttributeId = (int)attributeId,
+                Amount = attributeAmount,
+            });
+            await context.SaveChangesAsync();
+
+            return item;
+        }
+
+        public static async Task<ItemMod> CreateItemModAsync(
+            GameContext context,
+            string name = "Test Mod",
+            EAttribute attributeId = EAttribute.Strength,
+            decimal attributeAmount = 5m)
+        {
+            var itemMod = new ItemMod
+            {
+                Name = name,
+                Description = "",
+                ItemModTypeId = (int)EItemModType.Prefix,
+            };
+
+            context.ItemMods.Add(itemMod);
+            await context.SaveChangesAsync();
+
+            context.ItemModAttributes.Add(new ItemModAttribute
+            {
+                ItemModId = itemMod.Id,
+                AttributeId = (int)attributeId,
+                Amount = attributeAmount,
+            });
+            await context.SaveChangesAsync();
+
+            return itemMod;
+        }
+
         public static async Task<Enemy> CreateEnemyAsync(
             GameContext context,
             string name = "Test Enemy",

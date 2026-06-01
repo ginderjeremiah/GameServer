@@ -1,6 +1,9 @@
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
+using Game.Api.Models.Items;
+using Game.Api.Models.Skills;
 using Game.Api.Models.Zones;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -42,8 +45,10 @@ namespace Game.Api.Tests.Integration
                     {
                         Id = 0,
                         Name = "New Dragon",
+                        IsBoss= true,
                         AttributeDistribution = Array.Empty<object>(),
-                        SkillPool = Array.Empty<int>()
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
                     },
                     ChangeType = 0 // Add
                 }
@@ -243,10 +248,219 @@ namespace Game.Api.Tests.Integration
             };
 
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySpawns", data, CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Equal("Enemy not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetSkillMultipliers_EditExistingMultiplier_UpdatesInPlaceWithoutDuplicatingSkill()
+        {
+            // Arrange — the first skill after a clean truncate has the zero-based Id 0,
+            // which is exactly the case that used to be misread as a new record.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball"); // Id 0, Strength x1.0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = await GetSkillsAsync(authClient);
+
+            var data = new
+            {
+                Id = skill.Id,
+                Changes = new[]
+                {
+                    new
+                    {
+                        Item = new { AttributeId = (int)EAttribute.Strength, Amount = 2.5m },
+                        ChangeType = 1 // Edit
+                    }
+                }
+            };
+
+            // Act
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillMultipliers", data, CancellationToken);
+
+            // Assert — the edit succeeds, no skill is duplicated, and the multiplier is updated.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var after = await GetSkillsAsync(authClient);
+            Assert.Equal(before.Count, after.Count);
+            var edited = Assert.Single(after, s => s.Id == skill.Id);
+            var multiplier = Assert.Single(edited.DamageMultipliers);
+            Assert.Equal(EAttribute.Strength, multiplier.AttributeId);
+            Assert.Equal(2.5m, multiplier.Multiplier);
+        }
+
+        [Fact]
+        public async Task AddEditSkills_EditZeroIdSkill_UpdatesInPlaceWithoutCreatingDuplicate()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Original"); // Id 0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = await GetSkillsAsync(authClient);
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = skill.Id, // 0 — the identity-column seed / CLR default
+                        Name = "Renamed",
+                        BaseDamage = 99m,
+                        CooldownMs = 1500,
+                        Description = "Updated",
+                        IconPath = "skills/new.png",
+                        DamageMultipliers = Array.Empty<object>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditSkills", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var after = await GetSkillsAsync(authClient);
+            Assert.Equal(before.Count, after.Count); // editing record 0 must not insert a new skill
+            var edited = Assert.Single(after, s => s.Id == skill.Id);
+            Assert.Equal("Renamed", edited.Name);
+            Assert.Equal(99m, edited.BaseDamage);
+        }
+
+        private async Task<List<Skill>> GetSkillsAsync(HttpClient client)
+        {
+            var response = await client.GetAsync("/api/Skills", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Skill>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            return result.Data.ToList();
+        }
+
+        [Fact]
+        public async Task AddEditItemAttributes_AddEditDelete_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Sword"); // Strength = 5
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Edit the seeded Strength attribute and add a new Endurance attribute in one batch.
+            var addEdit = new
+            {
+                Id = item.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Strength, Amount = 12.5m }, ChangeType = 1 }, // Edit
+                    new { Item = new { AttributeId = (int)EAttribute.Endurance, Amount = 7m }, ChangeType = 0 } // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", addEdit, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var saved = Assert.Single(await GetItemsAsync(authClient), i => i.Id == item.Id);
+            Assert.Equal(2, saved.Attributes.Count());
+            Assert.Equal(12.5m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(7m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Endurance).Amount);
+
+            // Now delete the Endurance attribute and confirm only the edited Strength remains.
+            var delete = new
+            {
+                Id = item.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Endurance, Amount = 7m }, ChangeType = 2 } // Delete
+                }
+            };
+
+            var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", delete, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            var afterDelete = Assert.Single(await GetItemsAsync(authClient), i => i.Id == item.Id);
+            var remaining = Assert.Single(afterDelete.Attributes);
+            Assert.Equal(EAttribute.Strength, remaining.AttributeId);
+            Assert.Equal(12.5m, remaining.Amount);
+        }
+
+        [Fact]
+        public async Task AddEditItemModAttributes_AddEditDelete_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemMod = await TestDataSeeder.CreateItemModAsync(context, "Sharp"); // Strength = 5
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var addEdit = new
+            {
+                Id = itemMod.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Strength, Amount = 9m }, ChangeType = 1 }, // Edit
+                    new { Item = new { AttributeId = (int)EAttribute.Agility, Amount = 3m }, ChangeType = 0 } // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModAttributes", addEdit, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var saved = Assert.Single(await GetItemModsAsync(authClient), m => m.Id == itemMod.Id);
+            Assert.Equal(2, saved.Attributes.Count());
+            Assert.Equal(9m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(3m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Agility).Amount);
+
+            var delete = new
+            {
+                Id = itemMod.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Agility, Amount = 3m }, ChangeType = 2 } // Delete
+                }
+            };
+
+            var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModAttributes", delete, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            var afterDelete = Assert.Single(await GetItemModsAsync(authClient), m => m.Id == itemMod.Id);
+            var remaining = Assert.Single(afterDelete.Attributes);
+            Assert.Equal(EAttribute.Strength, remaining.AttributeId);
+            Assert.Equal(9m, remaining.Amount);
+        }
+
+        private async Task<List<Item>> GetItemsAsync(HttpClient client)
+        {
+            var response = await client.GetAsync("/api/Items", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Item>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            return result.Data.ToList();
+        }
+
+        private async Task<List<ItemMod>> GetItemModsAsync(HttpClient client)
+        {
+            var response = await client.GetAsync("/api/ItemMods", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<ItemMod>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            return result.Data.ToList();
         }
 
         [Fact]

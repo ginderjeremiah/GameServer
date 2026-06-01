@@ -38,3 +38,8 @@ As mentioned above, most of the reference data is cached in-memory on the backen
 ## Admin Tools API surface
 
 The frontend admin tools were consolidated into a single entity-driven Workbench (see `docs/frontend.md`). That UI saves a whole record (identity + related collections) at once, but the backend keeps persisting each relationship through its own `AdminToolsController` endpoint — the Workbench just orchestrates them.
+
+Two persistence gotchas to respect when adding or editing these endpoints:
+
+- **Updates must not be inferred from the key value.** `IEntityStore.Update` tracks the passed entity as `Modified` directly (`_context.Entry(entity).State = EntityState.Modified`) instead of going through `DbContext.Update`. `DbContext.Update` infers Add-vs-Edit from whether the key is "set", which misfires for our zero-based-identity tables (see [Reference Data](#reference-data)): the first row's `Id == 0` is the CLR/identity-column default, so EF would treat an edit of record 0 as a brand-new insert and silently duplicate it.
+- **Don't update/delete cached entities directly.** Reference data is read with `AsNoTracking().Include(...)`, so a fetched child (e.g. a `SkillDamageMultiplier`) carries a loaded back-reference to its parent and siblings. Passing that instance to `Update`/`Delete` would drag the whole graph into the change tracker and re-insert it. Relationship endpoints therefore build fresh, navigation-free entities keyed only by their own ids (as `SetEnemySkills`/`SetZoneEnemies`/`SetSkillMultipliers` do) rather than mutating the cached objects.

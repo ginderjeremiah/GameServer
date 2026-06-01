@@ -38,7 +38,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.Enemy
+                    _entityStore.Insert(new Abstractions.Entities.Enemy
                     {
                         Name = change.Item.Name,
                         IsBoss = change.Item.IsBoss,
@@ -46,7 +46,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _entityStore.Update(new Game.Abstractions.Entities.Enemy
+                    _entityStore.Update(new Abstractions.Entities.Enemy
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -55,7 +55,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _entityStore.Delete(new Game.Abstractions.Entities.Enemy
+                    _entityStore.Delete(new Abstractions.Entities.Enemy
                     {
                         Id = change.Item.Id,
                         Name = "",
@@ -79,7 +79,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    item.ItemAttributes.Add(new Game.Abstractions.Entities.ItemAttribute()
+                    _entityStore.Insert(new Abstractions.Entities.ItemAttribute
                     {
                         ItemId = item.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -88,18 +88,27 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var att = item.ItemAttributes.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                    // Item back-reference would drag the whole graph into the change tracker).
+                    if (item.ItemAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        att.Amount = change.Item.Amount;
+                        _entityStore.Update(new Abstractions.Entities.ItemAttribute
+                        {
+                            ItemId = item.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                            Amount = change.Item.Amount,
+                        });
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var att = item.ItemAttributes.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    if (item.ItemAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        item.ItemAttributes.Remove(att);
+                        _entityStore.Delete(new Abstractions.Entities.ItemAttribute
+                        {
+                            ItemId = item.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                        });
                     }
                 }
             }
@@ -120,7 +129,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    itemMod.ItemModAttributes.Add(new Game.Abstractions.Entities.ItemModAttribute()
+                    _entityStore.Insert(new Abstractions.Entities.ItemModAttribute
                     {
                         ItemModId = itemMod.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -129,18 +138,27 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var att = itemMod.ItemModAttributes.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                    // ItemMod back-reference would drag the whole graph into the change tracker).
+                    if (itemMod.ItemModAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        att.Amount = change.Item.Amount;
+                        _entityStore.Update(new Abstractions.Entities.ItemModAttribute
+                        {
+                            ItemModId = itemMod.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                            Amount = change.Item.Amount,
+                        });
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var att = itemMod.ItemModAttributes.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    if (itemMod.ItemModAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        itemMod.ItemModAttributes.Remove(att);
+                        _entityStore.Delete(new Abstractions.Entities.ItemModAttribute
+                        {
+                            ItemModId = itemMod.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                        });
                     }
                 }
             }
@@ -193,7 +211,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.Item
+                    _entityStore.Insert(new Abstractions.Entities.Item
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
@@ -235,7 +253,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.ItemModSlot
+                    _entityStore.Insert(new Abstractions.Entities.ItemModSlot
                     {
                         ItemId = change.Item.ItemId,
                         ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
@@ -243,7 +261,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _entityStore.Update(new Game.Abstractions.Entities.ItemModSlot
+                    _entityStore.Update(new Abstractions.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                         ItemId = change.Item.ItemId,
@@ -252,7 +270,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _entityStore.Delete(new Game.Abstractions.Entities.ItemModSlot
+                    _entityStore.Delete(new Abstractions.Entities.ItemModSlot
                     {
                         Id = change.Item.Id,
                     });
@@ -269,7 +287,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.Skill
+                    _entityStore.Insert(new Abstractions.Entities.Skill
                     {
                         Name = change.Item.Name,
                         BaseDamage = change.Item.BaseDamage,
@@ -280,7 +298,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _entityStore.Update(new Game.Abstractions.Entities.Skill
+                    _entityStore.Update(new Abstractions.Entities.Skill
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -292,7 +310,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _entityStore.Delete(new Game.Abstractions.Entities.Skill
+                    _entityStore.Delete(new Abstractions.Entities.Skill
                     {
                         Id = change.Item.Id,
                         Name = "",
@@ -312,7 +330,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.Tag
+                    _entityStore.Insert(new Abstractions.Entities.Tag
                     {
                         Name = change.Item.Name,
                         TagCategoryId = change.Item.TagCategoryId,
@@ -320,7 +338,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _entityStore.Update(new Game.Abstractions.Entities.Tag
+                    _entityStore.Update(new Abstractions.Entities.Tag
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -329,7 +347,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _entityStore.Delete(new Game.Abstractions.Entities.Tag
+                    _entityStore.Delete(new Abstractions.Entities.Tag
                     {
                         Id = change.Item.Id,
                         Name = "",
@@ -347,7 +365,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.Zone
+                    _entityStore.Insert(new Abstractions.Entities.Zone
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
@@ -358,7 +376,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    _entityStore.Update(new Game.Abstractions.Entities.Zone
+                    _entityStore.Update(new Abstractions.Entities.Zone
                     {
                         Id = change.Item.Id,
                         Name = change.Item.Name,
@@ -370,7 +388,7 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    _entityStore.Delete(new Game.Abstractions.Entities.Zone
+                    _entityStore.Delete(new Abstractions.Entities.Zone
                     {
                         Id = change.Item.Id,
                         Name = "",
@@ -397,7 +415,7 @@ namespace Game.Api.Controllers
                 foreach (var dist in enemy.AttributeDistributions.Where(ad => newIds.Contains(ad.AttributeId)))
                 {
                     var newData = distributionsData.AttributeDistributions.First(ad => (int)ad.AttributeId == dist.AttributeId);
-                    _entityStore.Update(new Game.Abstractions.Entities.AttributeDistribution
+                    _entityStore.Update(new Abstractions.Entities.AttributeDistribution
                     {
                         EnemyId = enemy.Id,
                         AttributeId = dist.AttributeId,
@@ -409,7 +427,7 @@ namespace Game.Api.Controllers
                 var existingIds = enemy.AttributeDistributions.Select(ad => ad.AttributeId).ToList();
                 var newDistributions = distributionsData.AttributeDistributions
                     .Where(ad => !existingIds.Contains((int)ad.AttributeId))
-                    .Select(ad => new Game.Abstractions.Entities.AttributeDistribution
+                    .Select(ad => new Abstractions.Entities.AttributeDistribution
                     {
                         EnemyId = enemy.Id,
                         AttributeId = (int)ad.AttributeId,
@@ -439,7 +457,7 @@ namespace Game.Api.Controllers
                 var existingIds = enemy.EnemySkills.Select(ze => ze.SkillId).ToList();
                 var enemySkills = enemySkillsData.SkillIds
                     .Where(id => !existingIds.Contains(id))
-                    .Select(id => new Game.Abstractions.Entities.EnemySkill
+                    .Select(id => new Abstractions.Entities.EnemySkill
                     {
                         EnemyId = enemy.Id,
                         SkillId = id,
@@ -467,7 +485,7 @@ namespace Game.Api.Controllers
                 foreach (var spawn in enemy.ZoneEnemies.Where(ze => newZoneIds.Contains(ze.ZoneId)))
                 {
                     var newData = spawnsData.Spawns.First(s => s.ZoneId == spawn.ZoneId);
-                    _entityStore.Update(new Game.Abstractions.Entities.ZoneEnemy
+                    _entityStore.Update(new Abstractions.Entities.ZoneEnemy
                     {
                         ZoneId = spawn.ZoneId,
                         EnemyId = enemy.Id,
@@ -478,7 +496,7 @@ namespace Game.Api.Controllers
                 var existingZoneIds = enemy.ZoneEnemies.Select(ze => ze.ZoneId).ToList();
                 var newSpawns = spawnsData.Spawns
                     .Where(s => !existingZoneIds.Contains(s.ZoneId))
-                    .Select(s => new Game.Abstractions.Entities.ZoneEnemy
+                    .Select(s => new Abstractions.Entities.ZoneEnemy
                     {
                         ZoneId = s.ZoneId,
                         EnemyId = enemy.Id,
@@ -505,7 +523,7 @@ namespace Game.Api.Controllers
             {
                 if (change.ChangeType == Add)
                 {
-                    _entityStore.Insert(new Game.Abstractions.Entities.SkillDamageMultiplier
+                    _entityStore.Insert(new Abstractions.Entities.SkillDamageMultiplier
                     {
                         SkillId = skill.Id,
                         AttributeId = (int)change.Item.AttributeId,
@@ -514,20 +532,27 @@ namespace Game.Api.Controllers
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var att = skill.SkillDamageMultipliers.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                    // Skill back-reference would drag the whole graph into the change tracker).
+                    if (skill.SkillDamageMultipliers.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        att.Multiplier = change.Item.Amount;
-                        _entityStore.Update(att);
+                        _entityStore.Update(new Abstractions.Entities.SkillDamageMultiplier
+                        {
+                            SkillId = skill.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                            Multiplier = change.Item.Amount,
+                        });
                     }
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var att = skill.SkillDamageMultipliers.FirstOrDefault(att => (int)change.Item.AttributeId == att.AttributeId);
-                    if (att is not null)
+                    if (skill.SkillDamageMultipliers.Any(att => (int)change.Item.AttributeId == att.AttributeId))
                     {
-                        skill.SkillDamageMultipliers.Remove(att);
-                        _entityStore.Delete(att);
+                        _entityStore.Delete(new Abstractions.Entities.SkillDamageMultiplier
+                        {
+                            SkillId = skill.Id,
+                            AttributeId = (int)change.Item.AttributeId,
+                        });
                     }
                 }
             }
@@ -541,11 +566,24 @@ namespace Game.Api.Controllers
             var item = _items.LookupItem(setTagsData.Id);
             if (item is not null)
             {
-                item.Tags.Clear();
+                _entityStore.Track(item);
+                var currentTags = await _tags.GetTagsForItem(setTagsData.Id).ToListAsync();
+                foreach (var currentTag in currentTags)
+                {
+                    if (!setTagsData.TagIds.Contains(currentTag.Id))
+                    {
+                        currentTag.Items.Clear();
+                    }
+                }
+
                 var tags = _tags.GetTags(setTagsData.TagIds);
                 await foreach (var tag in tags)
                 {
-                    item.Tags.Add(tag);
+                    if (!currentTags.Any(t => t.Id == tag.Id))
+                    {
+                        tag.Items = [];
+                        tag.Items.Add(item);
+                    }
                 }
 
                 return ApiResponse.Success();
@@ -560,11 +598,24 @@ namespace Game.Api.Controllers
             var itemMod = _itemMods.LookupItemMod(setTagsData.Id);
             if (itemMod is not null)
             {
-                itemMod.Tags.Clear();
+                _entityStore.Track(itemMod);
+                var currentTags = await _tags.GetTagsForItemMod(setTagsData.Id).ToListAsync();
+                foreach (var currentTag in currentTags)
+                {
+                    if (!setTagsData.TagIds.Contains(currentTag.Id))
+                    {
+                        currentTag.ItemMods.Clear();
+                    }
+                }
+
                 var tags = _tags.GetTags(setTagsData.TagIds);
                 await foreach (var tag in tags)
                 {
-                    itemMod.Tags.Add(tag);
+                    if (!currentTags.Any(t => t.Id == tag.Id))
+                    {
+                        tag.ItemMods = [];
+                        tag.ItemMods.Add(itemMod);
+                    }
                 }
 
                 return ApiResponse.Success();
