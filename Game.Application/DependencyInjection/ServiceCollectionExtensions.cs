@@ -19,7 +19,6 @@ namespace Game.Application.DependencyInjection
         public static void RegisterDomainEventHandlers()
         {
             DomainEventDispatcher.RegisterDomainEventHandler<IDomainEvent, LoggingEventHandler>();
-            DomainEventDispatcher.RegisterDomainEventHandler<EnemyDefeatedEvent, StatisticsEventHandler>();
             DomainEventDispatcher.RegisterDomainEventHandler<BattleCompletedEvent, BattleStatisticsEventHandler>();
         }
     }

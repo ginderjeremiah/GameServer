@@ -66,7 +66,10 @@ namespace Game.Application.Services
             var level = state.ActiveEnemyLevel ?? 1;
             var seed = state.BattleSeed ?? 0;
 
-            var result = SimulateBattle(enemyId, level, seed, state.Snapshot);
+            var enemy = _enemies.GetDomainEnemy(enemyId, level)
+                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
+
+            var result = SimulateBattle(enemy, seed, state.Snapshot);
 
             if (!result.Victory)
             {
@@ -81,14 +84,10 @@ namespace Game.Application.Services
                 return null;
             }
 
-            var enemy = _enemies.GetDomainEnemy(enemyId, level)
-                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
-
             var rewards = new DefeatRewards(player, enemy);
 
             player.GrantExp(rewards.ExpReward);
-            player.RecordEnemyDefeat(enemyId, rewards.ExpReward);
-            player.RecordBattleCompleted(enemyId, result);
+            player.RecordBattleCompleted(enemy, result);
 
             state.SetCooldown(claimedTimestamp.AddSeconds(5));
             state.ClearBattle();
@@ -116,14 +115,17 @@ namespace Game.Application.Services
             var level = state.ActiveEnemyLevel ?? 1;
             var seed = state.BattleSeed ?? 0;
 
-            var result = SimulateBattle(enemyId, level, seed, state.Snapshot);
+            var enemy = _enemies.GetDomainEnemy(enemyId, level)
+                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
+
+            var result = SimulateBattle(enemy, seed, state.Snapshot);
 
             if (result.Victory)
             {
                 return false;
             }
 
-            player.RecordBattleCompleted(enemyId, result);
+            player.RecordBattleCompleted(enemy, result);
 
             state.SetCooldown(DateTime.UtcNow.AddSeconds(5));
             state.ClearBattle();
@@ -145,6 +147,9 @@ namespace Game.Application.Services
             var level = state.ActiveEnemyLevel ?? 1;
             var seed = state.BattleSeed ?? 0;
 
+            var enemy = _enemies.GetDomainEnemy(enemyId, level)
+                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
+
             var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
             if (elapsedMs <= 0)
             {
@@ -152,19 +157,17 @@ namespace Game.Application.Services
                 return;
             }
 
-            var result = SimulateBattle(enemyId, level, seed, state.Snapshot, elapsedMs);
+            var result = SimulateBattle(enemy, seed, state.Snapshot, elapsedMs);
 
-            player.RecordBattleCompleted(enemyId, result);
+            player.RecordBattleCompleted(enemy, result);
 
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
         }
 
-        private BattleResult SimulateBattle(int enemyId, int level, uint seed, BattleSnapshot snapshot, int? maxMs = null)
+        private BattleResult SimulateBattle(CoreEnemy enemy, uint seed, BattleSnapshot snapshot, int? maxMs = null)
         {
-            var enemy = _enemies.GetDomainEnemy(enemyId, level)
-                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
             var battleRng = new Mulberry32(seed);
             enemy.Skills = enemy.GetRandomSkills(battleRng);

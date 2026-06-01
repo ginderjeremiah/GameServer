@@ -1,7 +1,7 @@
 ﻿using static Game.Core.EEntityType;
 using static Game.Core.EStatisticType;
 
-namespace Game.Core.Statistics
+namespace Game.Core.Progress
 {
     public class StatisticType
     {
@@ -16,16 +16,20 @@ namespace Game.Core.Statistics
             Name = id.ToString().SpaceWords();
         }
 
+        public static IEnumerable<StatisticType> GetAll() => Enum.GetValues<EStatisticType>().Select(id => new StatisticType(id));
+
         private static EEntityType GetEntityType(EStatisticType id)
         {
             return id switch
             {
                 EnemiesKilled => Enemy,
                 ZonesCleared => Zone,
+                DamageDealt => Skill,
+                HighestSingleAttackDamage => Skill,
                 EnemiesEncountered => Enemy,
                 BattlesWon => Enemy,
                 BattlesLost => Enemy,
-                TotalSkillsUsed => Skill,
+                SkillsUsed => Skill,
                 _ => None
             };
         }

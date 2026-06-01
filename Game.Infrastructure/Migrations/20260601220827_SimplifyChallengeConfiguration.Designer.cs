@@ -4,6 +4,7 @@ using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260601220827_SimplifyChallengeConfiguration")]
+    partial class SimplifyChallengeConfiguration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -963,13 +966,13 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 4,
-                            EntityType = 3,
+                            EntityType = 0,
                             Name = "Damage Dealt"
                         },
                         new
                         {
                             Id = 5,
-                            EntityType = 3,
+                            EntityType = 0,
                             Name = "Highest Single Attack Damage"
                         },
                         new

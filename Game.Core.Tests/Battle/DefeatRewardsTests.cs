@@ -77,7 +77,7 @@ namespace Game.Core.Tests.Battle
             Exp = 0,
             CurrentZoneId = 0,
             StatPoints = new PlayerStatPoints([])
-                { StatPointsGained = statPointsGained, StatPointsUsed = 0 },
+            { StatPointsGained = statPointsGained, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
@@ -88,6 +88,7 @@ namespace Game.Core.Tests.Battle
         {
             Id = 1,
             Name = "Test Enemy",
+            IsBoss = false,
             Level = 1,
             AttributeDistributions =
             [

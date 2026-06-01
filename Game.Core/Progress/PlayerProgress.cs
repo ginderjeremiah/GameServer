@@ -1,46 +1,55 @@
 using Game.Core.Battle;
 using Game.Core.Challenges;
+using Game.Core.Enemies;
+using Game.Core.Players;
 
-namespace Game.Core.Statistics
+namespace Game.Core.Progress
 {
     public class PlayerProgress
     {
         private readonly Dictionary<(EStatisticType Type, int? EntityId), PlayerStatistic> _statistics;
         private readonly Dictionary<int, PlayerChallenge> _challenges;
 
-        public int PlayerId { get; }
+        public Player Player { get; }
         public IEnumerable<PlayerStatistic> Statistics => _statistics.Values;
         public IEnumerable<PlayerChallenge> ChallengeProgress => _challenges.Values;
 
         public PlayerProgress(
-            int playerId,
+            Player player,
             IEnumerable<PlayerStatistic> statistics,
             IEnumerable<PlayerChallenge> challengeProgress)
         {
-            PlayerId = playerId;
+            Player = player;
             _statistics = statistics.ToDictionary(s => (s.Type, s.EntityId));
-            _challenges = challengeProgress.ToDictionary(c => c.ChallengeId);
+            _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
         }
 
-        public void RecordBattleCompleted(int enemyId, bool victory, bool playerDied, int totalMs, BattleStats stats)
+        public void RecordBattleCompleted(Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats)
         {
-            Increment(EStatisticType.TotalDamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
+            Increment(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
             SetMax(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
-            Increment(EStatisticType.TotalDamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
+            Increment(EStatisticType.DamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
             Increment(EStatisticType.EnemiesEncountered, null, 1);
-            Increment(EStatisticType.EnemiesEncountered, enemyId, 1);
+            Increment(EStatisticType.EnemiesEncountered, enemy.Id, 1);
 
             if (victory)
             {
                 Increment(EStatisticType.BattlesWon, null, 1);
-                Increment(EStatisticType.BattlesWon, enemyId, 1);
-                SetMin(EStatisticType.FastestVictoryMs, null, totalMs);
-                SetMin(EStatisticType.FastestVictoryMs, enemyId, totalMs);
+                Increment(EStatisticType.BattlesWon, enemy.Id, 1);
+                SetMin(EStatisticType.FastestVictory, null, totalMs / 1000m);
+                SetMin(EStatisticType.FastestVictory, enemy.Id, totalMs / 1000m);
+                Increment(EStatisticType.EnemiesKilled, null, 1);
+                Increment(EStatisticType.EnemiesKilled, enemy.Id, 1);
+
+                if (enemy.IsBoss)
+                {
+                    Increment(EStatisticType.BossesDefeated, null, 1);
+                }
             }
             else
             {
                 Increment(EStatisticType.BattlesLost, null, 1);
-                Increment(EStatisticType.BattlesLost, enemyId, 1);
+                Increment(EStatisticType.BattlesLost, enemy.Id, 1);
             }
 
             if (playerDied)
@@ -48,57 +57,37 @@ namespace Game.Core.Statistics
                 Increment(EStatisticType.PlayerDeaths, null, 1);
             }
 
-            Increment(EStatisticType.TotalBattleTimeMs, null, totalMs);
-            Increment(EStatisticType.TotalSkillsUsed, null, stats.PlayerSkillsUsed);
+            Increment(EStatisticType.TotalBattleTime, null, totalMs / 1000m);
+            Increment(EStatisticType.SkillsUsed, null, stats.PlayerSkillsUsed);
+
+            foreach (var (skillId, skillStats) in stats.SkillStats)
+            {
+                Increment(EStatisticType.SkillsUsed, skillId, skillStats.Uses);
+                Increment(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(skillStats.TotalDamage, 3));
+                SetMax(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
+            }
         }
 
-        public void RecordEnemyDefeated(int enemyId)
-        {
-            Increment(EStatisticType.EnemiesKilled, null, 1);
-            Increment(EStatisticType.EnemiesKilled, enemyId, 1);
-        }
-
-        //TODO: Refactor this to move more logic into Challenge entity.
         public List<CompletedChallenge> EvaluateChallenges(IReadOnlyList<Challenge> allChallenges)
         {
             var completed = new List<CompletedChallenge>();
 
             foreach (var challenge in allChallenges)
             {
-                if (_challenges.TryGetValue(challenge.Id, out var progress) && progress.Completed)
+                if (_challenges.TryGetValue(challenge.Id, out var playerChallenge) && playerChallenge.Completed)
                 {
                     continue;
                 }
 
-                if (challenge.StatisticType is null)
+                if (playerChallenge is null)
                 {
-                    continue;
+                    playerChallenge = new PlayerChallenge(challenge, progress: 0, completed: false);
+                    _challenges[challenge.Id] = playerChallenge;
                 }
 
-                var currentValue = GetStatistic(challenge.StatisticType.Value, challenge.TargetEntityId);
-                var newProgress = Math.Min(currentValue, challenge.ProgressGoal);
-
-                if (progress is null)
+                challenge.UpdateChallengeProgress(playerChallenge, this);
+                if (playerChallenge.Completed)
                 {
-                    progress = new PlayerChallenge
-                    {
-                        ChallengeId = challenge.Id,
-                        Progress = newProgress,
-                        ProgressGoal = challenge.ProgressGoal,
-                        Completed = false,
-                    };
-                    _challenges[challenge.Id] = progress;
-                }
-                else
-                {
-                    progress.Progress = newProgress;
-                }
-
-                if (currentValue >= challenge.ProgressGoal)
-                {
-                    progress.Completed = true;
-                    progress.CompletedAt = DateTime.UtcNow;
-
                     completed.Add(new CompletedChallenge
                     {
                         ChallengeId = challenge.Id,
@@ -111,9 +100,10 @@ namespace Game.Core.Statistics
             return completed;
         }
 
-        private decimal GetStatistic(EStatisticType type, int? entityId = null)
+        public decimal GetStatisticValue(EStatisticType type, int? entityId)
         {
-            return _statistics.TryGetValue((type, entityId), out var stat) ? stat.Value : 0m;
+            var key = (type, entityId);
+            return _statistics.TryGetValue(key, out var stat) ? stat.Value : 0m;
         }
 
         private decimal Increment(EStatisticType type, int? entityId, decimal amount)

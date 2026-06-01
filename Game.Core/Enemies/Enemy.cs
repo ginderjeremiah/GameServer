@@ -10,10 +10,11 @@ namespace Game.Core.Enemies
     /// </summary>
     public class Enemy
     {
-        public required int Id { get; set; }
-        public required string Name { get; set; }
-        public required int Level { get; set; }
-        public required List<AttributeDistribution> AttributeDistributions { get; set; }
+        public required int Id { get; init; }
+        public required string Name { get; init; }
+        public required int Level { get; init; }
+        public required bool IsBoss { get; init; }
+        public required List<AttributeDistribution> AttributeDistributions { get; init; }
         public required List<Skill> Skills { get; set; }
 
         public IEnumerable<AttributeModifier> GetAttributeModifiers()

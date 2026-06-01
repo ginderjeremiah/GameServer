@@ -158,7 +158,7 @@ namespace Game.Core.Tests.Battle
                 Exp = 0,
                 CurrentZoneId = 0,
                 StatPoints = new PlayerStatPoints(allocations)
-                    { StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
+                { StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
                 Inventory = new Inventory(),
                 SelectedSkills = defaultSkills,
                 Skills = defaultSkills,
@@ -206,7 +206,7 @@ namespace Game.Core.Tests.Battle
                 Exp = 0,
                 CurrentZoneId = 0,
                 StatPoints = new PlayerStatPoints(allocations)
-                    { StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
+                { StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
                 Inventory = new Inventory(),
                 SelectedSkills = defaultSkills,
                 Skills = defaultSkills,
@@ -224,6 +224,7 @@ namespace Game.Core.Tests.Battle
             {
                 Id = 1,
                 Name = "Test Enemy",
+                IsBoss = false,
                 Level = 1,
                 AttributeDistributions =
                 [

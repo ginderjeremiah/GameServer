@@ -1,29 +1,32 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
-using Game.Core.Statistics;
+using Game.Core.Players;
+using Game.Core.Progress;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using CoreChallenge = Game.Core.Challenges.PlayerChallenge;
-using CoreStat = Game.Core.Statistics.PlayerStatistic;
+using CoreStat = Game.Core.Progress.PlayerStatistic;
 using EntityChallenge = Game.Abstractions.Entities.PlayerChallenge;
 using EntityStat = Game.Abstractions.Entities.PlayerStatistic;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class PlayerProgressRepository(GameContext context) : IPlayerProgressRepository
+    internal class PlayerProgressRepository(GameContext context, IChallenges challenges) : IPlayerProgressRepository
     {
         private readonly GameContext _context = context;
+        private readonly IChallenges _challenges = challenges;
+
         private Dictionary<(int StatTypeId, int? EntityId), EntityStat>? _loadedStats;
         private Dictionary<int, EntityChallenge>? _loadedChallenges;
 
-        public async Task<PlayerProgress> Load(int playerId)
+        public async Task<PlayerProgress> Load(Player player)
         {
             var statEntities = await _context.PlayerStatistics
-                .Where(ps => ps.PlayerId == playerId)
+                .Where(ps => ps.PlayerId == player.Id)
                 .ToListAsync();
 
             var challengeEntities = await _context.PlayerChallenges
-                .Where(pc => pc.PlayerId == playerId)
+                .Where(pc => pc.PlayerId == player.Id)
                 .ToListAsync();
 
             _loadedStats = statEntities.ToDictionary(
@@ -38,16 +41,14 @@ namespace Game.DataAccess.Repositories
                 Value = e.Value,
             });
 
-            var coreChallenges = challengeEntities.Select(e => new CoreChallenge
-            {
-                ChallengeId = e.ChallengeId,
-                Progress = e.Progress,
-                ProgressGoal = 0,
-                Completed = e.Completed,
-                CompletedAt = e.CompletedAt,
-            });
+            var coreChallenges = challengeEntities.Select(e => new CoreChallenge(
+                _challenges.GetChallenge(e.ChallengeId),
+                e.Progress,
+                e.Completed,
+                e.CompletedAt
+            ));
 
-            return new PlayerProgress(playerId, coreStats, coreChallenges);
+            return new PlayerProgress(player, coreStats, coreChallenges);
         }
 
         public void Save(PlayerProgress progress)
@@ -63,7 +64,7 @@ namespace Game.DataAccess.Repositories
                 {
                     _context.PlayerStatistics.Add(new EntityStat
                     {
-                        PlayerId = progress.PlayerId,
+                        PlayerId = progress.Player.Id,
                         StatisticTypeId = (int)stat.Type,
                         EntityId = stat.EntityId,
                         Value = stat.Value,
@@ -73,7 +74,7 @@ namespace Game.DataAccess.Repositories
 
             foreach (var cp in progress.ChallengeProgress)
             {
-                if (_loadedChallenges!.TryGetValue(cp.ChallengeId, out var entity))
+                if (_loadedChallenges!.TryGetValue(cp.Challenge.Id, out var entity))
                 {
                     entity.Progress = cp.Progress;
                     entity.Completed = cp.Completed;
@@ -83,8 +84,8 @@ namespace Game.DataAccess.Repositories
                 {
                     _context.PlayerChallenges.Add(new EntityChallenge
                     {
-                        PlayerId = progress.PlayerId,
-                        ChallengeId = cp.ChallengeId,
+                        PlayerId = progress.Player.Id,
+                        ChallengeId = cp.Challenge.Id,
                         Progress = cp.Progress,
                         Completed = cp.Completed,
                         CompletedAt = cp.CompletedAt,

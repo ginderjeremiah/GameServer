@@ -2,6 +2,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
+using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
@@ -142,14 +143,9 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        public void RecordEnemyDefeat(int enemyId, int expReward)
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result)
         {
-            RaiseEvent(new EnemyDefeatedEvent(this, enemyId, expReward));
-        }
-
-        public void RecordBattleCompleted(int enemyId, BattleResult result)
-        {
-            RaiseEvent(new BattleCompletedEvent(this, enemyId, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
+            RaiseEvent(new BattleCompletedEvent(this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()

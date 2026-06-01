@@ -1,6 +1,6 @@
 using Game.Core.Events;
 
-namespace Game.Core.Statistics.Events
+namespace Game.Core.Progress.Events
 {
     /// <summary>
     /// Raised when a player statistic is updated.

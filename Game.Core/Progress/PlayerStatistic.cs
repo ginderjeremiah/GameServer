@@ -1,4 +1,4 @@
-namespace Game.Core.Statistics
+namespace Game.Core.Progress
 {
     /// <summary>
     /// Represents a tracked statistic for a player.

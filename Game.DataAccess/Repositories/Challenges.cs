@@ -21,9 +21,7 @@ namespace Game.DataAccess.Repositories
                     Id = c.Id,
                     Name = c.Name,
                     Description = c.Description,
-                    Type = (EChallengeType)c.ChallengeTypeId,
-                    StatisticType = (EStatisticType?)c.StatisticTypeId,
-                    EntityType = (EEntityType)c.EntityTypeId,
+                    Type = new ChallengeType((EChallengeType)c.ChallengeTypeId),
                     TargetEntityId = c.TargetEntityId,
                     ProgressGoal = c.ProgressGoal,
                     RewardItemId = c.RewardItemId,
@@ -33,10 +31,10 @@ namespace Game.DataAccess.Repositories
             return _challengeList;
         }
 
-        public Challenge? GetChallenge(int challengeId)
+        public Challenge GetChallenge(int challengeId)
         {
             var challenges = All();
-            return challenges.Count <= challengeId ? null : challenges[challengeId];
+            return challenges[challengeId];
         }
     }
 }

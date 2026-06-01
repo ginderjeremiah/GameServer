@@ -1,4 +1,6 @@
+using Game.Core.Battle;
 using Game.Core.Battle.Events;
+using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
@@ -165,20 +167,26 @@ namespace Game.Core.Tests.Players
             Assert.Equal(5, evt.ItemModId);
         }
 
-        // ── RecordEnemyDefeat ────────────────────────────────────────────────
+        // ── RecordBattleCompleted ────────────────────────────────────────────
 
         [Fact]
-        public void RecordEnemyDefeat_RaisesEnemyDefeatedEvent()
+        public void RecordBattleCompleted_RaisesBattleCompletedEvent()
         {
             var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var stats = new BattleStats { PlayerDamageDealt = 42.0 };
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 3200, Stats: stats);
 
-            player.RecordEnemyDefeat(enemyId: 5, expReward: 200);
+            player.RecordBattleCompleted(enemy, result);
 
-            var evt = player.DomainEvents.OfType<EnemyDefeatedEvent>().SingleOrDefault();
+            var evt = player.DomainEvents.OfType<BattleCompletedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
             Assert.Equal(player, evt.Player);
-            Assert.Equal(5, evt.EnemyId);
-            Assert.Equal(200, evt.ExpReward);
+            Assert.Equal(enemy, evt.Enemy);
+            Assert.True(evt.Victory);
+            Assert.False(evt.PlayerDied);
+            Assert.Equal(3200, evt.TotalMs);
+            Assert.Equal(stats, evt.Stats);
         }
 
         // ── ClearEvents ──────────────────────────────────────────────────────
@@ -209,6 +217,16 @@ namespace Game.Core.Tests.Players
             SelectedSkills = [],
             Skills = [],
             LogPreferences = [],
+        };
+
+        private static Enemy MakeEnemy(int id = 1) => new()
+        {
+            Id = id,
+            Name = "Test Enemy",
+            Level = 1,
+            IsBoss = false,
+            AttributeDistributions = [],
+            Skills = [],
         };
     }
 }

@@ -19,6 +19,7 @@ namespace Game.Infrastructure.Database
         public DbSet<AttributeDistribution> AttributeDistributions { get; set; }
         public DbSet<Attribute> Attributes { get; set; }
         public DbSet<Challenge> Challenges { get; set; }
+        public DbSet<ChallengeType> ChallengeTypes { get; set; }
         public DbSet<Enemy> Enemies { get; set; }
         public DbSet<EnemySkill> EnemySkills { get; set; }
         public DbSet<EquipmentSlot> EquipmentSlots { get; set; }
@@ -100,6 +101,26 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.ProgressGoal)
                     .HasPrecision(36, 3);
+            });
+
+            modelBuilder.Entity<ChallengeType>(entity =>
+            {
+                entity.Property(ct => ct.Id)
+                    .ValueGeneratedNever();
+
+                entity.Property(ct => ct.Name)
+                    .HasMaxLength(100);
+
+                entity.HasData(Enum.GetValues<EChallengeType>().Select(a =>
+                {
+                    var type = new Core.Challenges.ChallengeType(a);
+                    return new ChallengeType
+                    {
+                        Id = (int)type.Id,
+                        Name = type.Name,
+                        StatisticTypeId = (int?)type.StatisticType?.Id,
+                    };
+                }));
             });
 
             modelBuilder.Entity<Enemy>(entity =>
@@ -305,16 +326,13 @@ namespace Game.Infrastructure.Database
                 entity.Property(st => st.Name)
                     .HasMaxLength(100);
 
-                entity.HasData(Enum.GetValues<EStatisticType>().Select(a =>
-                {
-                    var type = new Core.Statistics.StatisticType(a);
-                    return new StatisticType
+                entity.HasData(Core.Progress.StatisticType.GetAll().Select(type =>
+                    new StatisticType
                     {
                         Id = (int)type.Id,
                         Name = type.Name,
                         EntityType = (int)type.EntityType,
-                    };
-                }));
+                    }));
             });
 
             modelBuilder.Entity<ItemModType>(entity =>

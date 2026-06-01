@@ -277,9 +277,9 @@ namespace Game.Core
     /// </summary>
     public enum EChallengeType
     {
-        KillCount = 1,
-        BossDefeat = 2,
-        ZoneClear = 3,
+        EnemiesKilled = 1,
+        BossesDefeated = 2,
+        ZonesCleared = 3,
         TimeTrial = 4,
         LevelReached = 5,
         DamageDealt = 6,
@@ -295,17 +295,17 @@ namespace Game.Core
         EnemiesKilled = 1,
         BossesDefeated = 2,
         ZonesCleared = 3,
-        TotalDamageDealt = 4,
+        DamageDealt = 4,
         HighestSingleAttackDamage = 5,
-        TotalDamageTaken = 6,
-        TotalDamageHealed = 7,
+        DamageTaken = 6,
+        DamageHealed = 7,
         EnemiesEncountered = 8,
         BattlesWon = 9,
         BattlesLost = 10,
         PlayerDeaths = 11,
-        TotalBattleTimeMs = 12,
-        FastestVictoryMs = 13,
-        TotalSkillsUsed = 14,
+        TotalBattleTime = 12,
+        FastestVictory = 13,
+        SkillsUsed = 14,
     }
 
     /// <summary>

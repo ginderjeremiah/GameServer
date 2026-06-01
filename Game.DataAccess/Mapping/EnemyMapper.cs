@@ -1,6 +1,5 @@
 using Game.Core;
 using Game.Core.Attributes;
-using Game.Core.Attributes.Modifiers;
 using Game.Core.Enemies;
 using EntityEnemy = Game.Abstractions.Entities.Enemy;
 using EntitySkill = Game.Abstractions.Entities.Skill;
@@ -20,6 +19,7 @@ namespace Game.DataAccess.Mapping
             {
                 Id = entity.Id,
                 Name = entity.Name,
+                IsBoss = entity.IsBoss,
                 Level = level,
                 AttributeDistributions = (entity.AttributeDistributions ?? [])
                     .Select(ad => new AttributeDistribution

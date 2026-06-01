@@ -51,11 +51,24 @@ namespace Game.Core.Battle
             }
         }
 
-        public void RecordSkillUse()
+        public void RecordSkillUse(int skillId, double damage)
         {
             if (_isPlayerActive)
             {
                 Stats.PlayerSkillsUsed++;
+                if (!Stats.SkillStats.TryGetValue(skillId, out var value))
+                {
+                    value = new SkillStats { SkillId = skillId };
+                    Stats.SkillStats[skillId] = value;
+                }
+
+                value.Uses++;
+                value.TotalDamage += damage;
+                if (damage > value.HighestSingleAttack)
+                {
+                    value.HighestSingleAttack = damage;
+                }
+
             }
         }
     }
