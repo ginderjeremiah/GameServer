@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    [Migration("20260526145746_SeedChallengeData")]
-    partial class SeedChallengeData
+    [Migration("20260601155821_StatisticsAndChallengesUpdates")]
+    partial class StatisticsAndChallengesUpdates
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -54,10 +54,7 @@ namespace Game.Infrastructure.Migrations
             modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -65,11 +62,104 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
                     b.ToTable("Attributes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 0,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Strength"
+                        },
+                        new
+                        {
+                            Id = 1,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Endurance"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Intellect"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Agility"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Dexterity"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Luck"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Max Health"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Defense"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Cooldown Recovery"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Drop Bonus"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Critical Chance"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Critical Damage"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Dodge Chance"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Block Chance"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Description = "A measure of one's raw physical force.",
+                            Name = "Block Reduction"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
@@ -120,13 +210,17 @@ namespace Game.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<decimal>("ProgressGoal")
+                        .HasPrecision(36, 3)
+                        .HasColumnType("numeric(36,3)");
+
                     b.Property<int?>("RewardItemId")
                         .HasColumnType("integer");
 
                     b.Property<int?>("RewardItemModId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("TargetCount")
+                    b.Property<int>("StatisticTypeId")
                         .HasColumnType("integer");
 
                     b.Property<int?>("TargetEntityId")
@@ -152,6 +246,9 @@ namespace Game.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
                     NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<bool>("IsBoss")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -264,9 +361,14 @@ namespace Game.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int>("RarityId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ItemCategoryId");
+
+                    b.HasIndex("RarityId");
 
                     b.ToTable("Items");
                 });
@@ -361,9 +463,6 @@ namespace Game.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<bool>("Removable")
-                        .HasColumnType("boolean");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ItemModTypeId");
@@ -453,20 +552,20 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("LogSettingId")
+                    b.Property<int>("LogTypeId")
                         .HasColumnType("integer");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
-                    b.HasKey("PlayerId", "LogSettingId");
+                    b.HasKey("PlayerId", "LogTypeId");
 
-                    b.HasIndex("LogSettingId");
+                    b.HasIndex("LogTypeId");
 
                     b.ToTable("LogPreferences");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogSetting", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.LogType", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -481,7 +580,7 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LogSettings");
+                    b.ToTable("LogTypes");
 
                     b.HasData(
                         new
@@ -596,8 +695,9 @@ namespace Game.Infrastructure.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("Progress")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("Progress")
+                        .HasPrecision(36, 3)
+                        .HasColumnType("numeric(36,3)");
 
                     b.HasKey("PlayerId", "ChallengeId");
 
@@ -641,15 +741,65 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("StatisticTypeId")
                         .HasColumnType("integer");
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<decimal>("Value")
+                        .HasPrecision(36, 3)
+                        .HasColumnType("numeric(36,3)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("StatisticTypeId");
 
                     b.HasIndex("PlayerId", "StatisticTypeId", "EntityId")
                         .IsUnique();
 
                     b.ToTable("PlayerStatistics");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Rarities");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Common"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Uncommon"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Rare"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Epic"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Legendary"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Mythic"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
@@ -707,6 +857,110 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("AttributeId");
 
                     b.ToTable("SkillDamageMultipliers");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StatisticTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            EntityType = 1,
+                            Name = "Enemies Killed"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            EntityType = 0,
+                            Name = "Bosses Defeated"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            EntityType = 2,
+                            Name = "Zones Cleared"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            EntityType = 0,
+                            Name = "Total Damage Dealt"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            EntityType = 0,
+                            Name = "Highest Single Attack Damage"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            EntityType = 0,
+                            Name = "Total Damage Taken"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            EntityType = 0,
+                            Name = "Total Damage Healed"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            EntityType = 1,
+                            Name = "Enemies Encountered"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            EntityType = 1,
+                            Name = "Battles Won"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            EntityType = 1,
+                            Name = "Battles Lost"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            EntityType = 0,
+                            Name = "Player Deaths"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            EntityType = 0,
+                            Name = "Total Battle Time Ms"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            EntityType = 0,
+                            Name = "Fastest Victory Ms"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            EntityType = 3,
+                            Name = "Total Skills Used"
+                        });
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
@@ -899,117 +1153,6 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ZoneEnemies");
                 });
 
-            modelBuilder.Entity("Game.Core.Attributes.Attribute", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Attribute");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 0,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Strength"
-                        },
-                        new
-                        {
-                            Id = 1,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Endurance"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Intellect"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Agility"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Dexterity"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Luck"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Max Health"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Defense"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Cooldown Recovery"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Drop Bonus"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Critical Chance"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Critical Damage"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Dodge Chance"
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Block Chance"
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Description = "A measure of one's raw physical force.",
-                            Name = "Block Reduction"
-                        });
-                });
-
             modelBuilder.Entity("ItemModTag", b =>
                 {
                     b.Property<int>("ItemModsId")
@@ -1147,7 +1290,15 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Game.Abstractions.Entities.Rarity", "Rarity")
+                        .WithMany("Items")
+                        .HasForeignKey("RarityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("ItemCategory");
+
+                    b.Navigation("Rarity");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
@@ -1220,9 +1371,9 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("Game.Abstractions.Entities.LogPreference", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.LogSetting", "LogSetting")
+                    b.HasOne("Game.Abstractions.Entities.LogType", "LogType")
                         .WithMany("LogPreferences")
-                        .HasForeignKey("LogSettingId")
+                        .HasForeignKey("LogTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1232,7 +1383,7 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("LogSetting");
+                    b.Navigation("LogType");
 
                     b.Navigation("Player");
                 });
@@ -1313,7 +1464,15 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Game.Abstractions.Entities.StatisticType", "StatisticType")
+                        .WithMany("PlayerStatistics")
+                        .HasForeignKey("StatisticTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Player");
+
+                    b.Navigation("StatisticType");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
@@ -1485,7 +1644,7 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogSetting", b =>
+            modelBuilder.Entity("Game.Abstractions.Entities.LogType", b =>
                 {
                     b.Navigation("LogPreferences");
                 });
@@ -1509,6 +1668,11 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("UnlockedMods");
                 });
 
+            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
                 {
                     b.Navigation("EnemySkills");
@@ -1516,6 +1680,11 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("PlayerSkills");
 
                     b.Navigation("SkillDamageMultipliers");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+                {
+                    b.Navigation("PlayerStatistics");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>

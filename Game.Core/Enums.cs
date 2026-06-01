@@ -309,6 +309,17 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// Represents the type of entity that a statistic or challenge may reference.
+    /// </summary>
+    public enum EEntityType
+    {
+        None = 0,
+        Enemy = 1,
+        Zone = 2,
+        Skill = 3,
+    }
+
+    /// <summary>
     /// Represents the source that contributed the attribute modifier.
     /// </summary>
     public enum EAttributeModifierSource

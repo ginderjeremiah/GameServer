@@ -239,8 +239,8 @@ namespace Game.Application.Tests.Services
             var existingAttrs = context.PlayerAttributes.Where(pa => pa.PlayerId == playerEntity.Id);
             context.PlayerAttributes.RemoveRange(existingAttrs);
             context.PlayerAttributes.AddRange(
-                new Game.Abstractions.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Game.Core.EAttribute.Strength, Amount = 1m },
-                new Game.Abstractions.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Game.Core.EAttribute.Endurance, Amount = 1m });
+                new Abstractions.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Strength, Amount = 1m },
+                new Abstractions.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Endurance, Amount = 1m });
             playerEntity.StatPointsGained = 2;
             playerEntity.StatPointsUsed = 2;
             await context.SaveChangesAsync(CancellationToken);

@@ -22,28 +22,25 @@ namespace Game.Core.Statistics
             _challenges = challengeProgress.ToDictionary(c => c.ChallengeId);
         }
 
-        public long GetStatistic(EStatisticType type, int? entityId = null)
-        {
-            return _statistics.TryGetValue((type, entityId), out var stat) ? stat.Value : 0;
-        }
-
         public void RecordBattleCompleted(int enemyId, bool victory, bool playerDied, int totalMs, BattleStats stats)
         {
-            Increment(EStatisticType.TotalDamageDealt, null, stats.PlayerDamageDealt);
-            SetMax(EStatisticType.HighestSingleAttackDamage, null, stats.HighestPlayerAttack);
-            Increment(EStatisticType.TotalDamageTaken, null, stats.PlayerDamageTaken);
+            Increment(EStatisticType.TotalDamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
+            SetMax(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
+            Increment(EStatisticType.TotalDamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
             Increment(EStatisticType.EnemiesEncountered, null, 1);
             Increment(EStatisticType.EnemiesEncountered, enemyId, 1);
 
             if (victory)
             {
                 Increment(EStatisticType.BattlesWon, null, 1);
+                Increment(EStatisticType.BattlesWon, enemyId, 1);
                 SetMin(EStatisticType.FastestVictoryMs, null, totalMs);
                 SetMin(EStatisticType.FastestVictoryMs, enemyId, totalMs);
             }
             else
             {
                 Increment(EStatisticType.BattlesLost, null, 1);
+                Increment(EStatisticType.BattlesLost, enemyId, 1);
             }
 
             if (playerDied)
@@ -61,6 +58,7 @@ namespace Game.Core.Statistics
             Increment(EStatisticType.EnemiesKilled, enemyId, 1);
         }
 
+        //TODO: Refactor this to move more logic into Challenge entity.
         public List<CompletedChallenge> EvaluateChallenges(IReadOnlyList<Challenge> allChallenges)
         {
             var completed = new List<CompletedChallenge>();
@@ -68,14 +66,17 @@ namespace Game.Core.Statistics
             foreach (var challenge in allChallenges)
             {
                 if (_challenges.TryGetValue(challenge.Id, out var progress) && progress.Completed)
+                {
                     continue;
+                }
 
-                var statType = MapChallengeToStatistic(challenge.Type);
-                if (statType is null)
+                if (challenge.StatisticType is null)
+                {
                     continue;
+                }
 
-                var currentValue = GetStatistic(statType.Value, challenge.TargetEntityId);
-                var newProgress = (int)Math.Min(currentValue, challenge.TargetCount);
+                var currentValue = GetStatistic(challenge.StatisticType.Value, challenge.TargetEntityId);
+                var newProgress = Math.Min(currentValue, challenge.ProgressGoal);
 
                 if (progress is null)
                 {
@@ -83,7 +84,7 @@ namespace Game.Core.Statistics
                     {
                         ChallengeId = challenge.Id,
                         Progress = newProgress,
-                        TargetCount = challenge.TargetCount,
+                        ProgressGoal = challenge.ProgressGoal,
                         Completed = false,
                     };
                     _challenges[challenge.Id] = progress;
@@ -93,7 +94,7 @@ namespace Game.Core.Statistics
                     progress.Progress = newProgress;
                 }
 
-                if (currentValue >= challenge.TargetCount)
+                if (currentValue >= challenge.ProgressGoal)
                 {
                     progress.Completed = true;
                     progress.CompletedAt = DateTime.UtcNow;
@@ -110,26 +111,37 @@ namespace Game.Core.Statistics
             return completed;
         }
 
-        private long Increment(EStatisticType type, int? entityId, long amount)
+        private decimal GetStatistic(EStatisticType type, int? entityId = null)
+        {
+            return _statistics.TryGetValue((type, entityId), out var stat) ? stat.Value : 0m;
+        }
+
+        private decimal Increment(EStatisticType type, int? entityId, decimal amount)
         {
             var stat = GetOrCreate(type, entityId);
             stat.Value += amount;
             return stat.Value;
         }
 
-        private long SetMax(EStatisticType type, int? entityId, long value)
+        private decimal SetMax(EStatisticType type, int? entityId, decimal value)
         {
             var stat = GetOrCreate(type, entityId);
             if (value > stat.Value)
+            {
                 stat.Value = value;
+            }
+
             return stat.Value;
         }
 
-        private long SetMin(EStatisticType type, int? entityId, long value)
+        private decimal SetMin(EStatisticType type, int? entityId, decimal value)
         {
             var stat = GetOrCreate(type, entityId);
             if (stat.Value == 0 || value < stat.Value)
+            {
                 stat.Value = value;
+            }
+
             return stat.Value;
         }
 
@@ -141,21 +153,8 @@ namespace Game.Core.Statistics
                 stat = new PlayerStatistic { Type = type, EntityId = entityId, Value = 0 };
                 _statistics[key] = stat;
             }
-            return stat;
-        }
 
-        private static EStatisticType? MapChallengeToStatistic(EChallengeType challengeType)
-        {
-            return challengeType switch
-            {
-                EChallengeType.KillCount => EStatisticType.EnemiesKilled,
-                EChallengeType.BossDefeat => EStatisticType.BossesDefeated,
-                EChallengeType.ZoneClear => EStatisticType.ZonesCleared,
-                EChallengeType.DamageDealt => EStatisticType.TotalDamageDealt,
-                EChallengeType.BattlesWon => EStatisticType.BattlesWon,
-                EChallengeType.SkillsUsed => EStatisticType.TotalSkillsUsed,
-                _ => null,
-            };
+            return stat;
         }
     }
 

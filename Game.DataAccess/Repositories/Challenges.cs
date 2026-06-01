@@ -22,8 +22,10 @@ namespace Game.DataAccess.Repositories
                     Name = c.Name,
                     Description = c.Description,
                     Type = (EChallengeType)c.ChallengeTypeId,
+                    StatisticType = (EStatisticType?)c.StatisticTypeId,
+                    EntityType = (EEntityType)c.EntityTypeId,
                     TargetEntityId = c.TargetEntityId,
-                    TargetCount = c.TargetCount,
+                    ProgressGoal = c.ProgressGoal,
                     RewardItemId = c.RewardItemId,
                     RewardItemModId = c.RewardItemModId,
                 })];

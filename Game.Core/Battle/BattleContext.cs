@@ -39,15 +39,15 @@ namespace Game.Core.Battle
 
             if (_isPlayerActive)
             {
-                Stats.PlayerDamageDealt += (long)actualDamage;
-                if ((long)actualDamage > Stats.HighestPlayerAttack)
+                Stats.PlayerDamageDealt += actualDamage;
+                if (actualDamage > Stats.HighestPlayerAttack)
                 {
-                    Stats.HighestPlayerAttack = (long)actualDamage;
+                    Stats.HighestPlayerAttack = actualDamage;
                 }
             }
             else
             {
-                Stats.PlayerDamageTaken += (long)actualDamage;
+                Stats.PlayerDamageTaken += actualDamage;
             }
         }
 

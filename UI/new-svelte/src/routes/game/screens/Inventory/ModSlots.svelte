@@ -204,15 +204,6 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 	padding: 0;
 }
 
-.mod-locked {
-	flex-shrink: 0;
-	width: 5px;
-	height: 5px;
-	transform: rotate(45deg);
-	border: 1px solid rgba(240, 240, 240, 0.4);
-	margin-top: 4px;
-}
-
 .mod-add {
 	flex-shrink: 0;
 	font-size: 14px;

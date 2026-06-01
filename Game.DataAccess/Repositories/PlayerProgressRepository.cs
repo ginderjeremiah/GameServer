@@ -42,7 +42,7 @@ namespace Game.DataAccess.Repositories
             {
                 ChallengeId = e.ChallengeId,
                 Progress = e.Progress,
-                TargetCount = 0,
+                ProgressGoal = 0,
                 Completed = e.Completed,
                 CompletedAt = e.CompletedAt,
             });

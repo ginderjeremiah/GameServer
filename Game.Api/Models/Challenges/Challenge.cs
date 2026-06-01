@@ -1,3 +1,4 @@
+using Game.Core;
 using CoreChallenge = Game.Core.Challenges.Challenge;
 
 namespace Game.Api.Models.Challenges
@@ -7,9 +8,11 @@ namespace Game.Api.Models.Challenges
         public int Id { get; set; }
         public required string Name { get; set; }
         public required string Description { get; set; }
-        public int ChallengeTypeId { get; set; }
+        public EChallengeType ChallengeTypeId { get; set; }
+        public EStatisticType? StatisticType { get; set; }
+        public EEntityType EntityType { get; set; }
         public int? TargetEntityId { get; set; }
-        public int TargetCount { get; set; }
+        public decimal ProgressGoal { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
 
@@ -20,9 +23,11 @@ namespace Game.Api.Models.Challenges
                 Id = challenge.Id,
                 Name = challenge.Name,
                 Description = challenge.Description,
-                ChallengeTypeId = (int)challenge.Type,
+                ChallengeTypeId = challenge.Type,
+                StatisticType = challenge.StatisticType,
+                EntityType = challenge.EntityType,
                 TargetEntityId = challenge.TargetEntityId,
-                TargetCount = challenge.TargetCount,
+                ProgressGoal = challenge.ProgressGoal,
                 RewardItemId = challenge.RewardItemId,
                 RewardItemModId = challenge.RewardItemModId,
             };

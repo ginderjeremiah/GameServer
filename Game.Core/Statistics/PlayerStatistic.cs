@@ -7,6 +7,6 @@ namespace Game.Core.Statistics
     {
         public required EStatisticType Type { get; set; }
         public required int? EntityId { get; set; }
-        public required long Value { get; set; }
+        public required decimal Value { get; set; }
     }
 }

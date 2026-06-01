@@ -50,6 +50,41 @@ export enum EItemModType {
 	Suffix = 3,
 }
 
+export enum EChallengeType {
+	KillCount = 1,
+	BossDefeat = 2,
+	ZoneClear = 3,
+	TimeTrial = 4,
+	LevelReached = 5,
+	DamageDealt = 6,
+	BattlesWon = 7,
+	SkillsUsed = 8,
+}
+
+export enum EStatisticType {
+	EnemiesKilled = 1,
+	BossesDefeated = 2,
+	ZonesCleared = 3,
+	TotalDamageDealt = 4,
+	HighestSingleAttackDamage = 5,
+	TotalDamageTaken = 6,
+	TotalDamageHealed = 7,
+	EnemiesEncountered = 8,
+	BattlesWon = 9,
+	BattlesLost = 10,
+	PlayerDeaths = 11,
+	TotalBattleTimeMs = 12,
+	FastestVictoryMs = 13,
+	TotalSkillsUsed = 14,
+}
+
+export enum EEntityType {
+	None = 0,
+	Enemy = 1,
+	Zone = 2,
+	Skill = 3,
+}
+
 export enum ELogType {
 	Damage = 1,
 	Debug = 2,

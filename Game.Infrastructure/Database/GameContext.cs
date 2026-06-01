@@ -97,6 +97,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.Description)
                     .HasMaxLength(500);
+
+                entity.Property(c => c.ProgressGoal)
+                    .HasPrecision(36, 3);
             });
 
             modelBuilder.Entity<Enemy>(entity =>
@@ -224,6 +227,9 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<PlayerChallenge>(entity =>
             {
                 entity.HasKey(pc => new { pc.PlayerId, pc.ChallengeId });
+
+                entity.Property(c => c.Progress)
+                    .HasPrecision(36, 3);
             });
 
             modelBuilder.Entity<PlayerSkill>()
@@ -243,6 +249,9 @@ namespace Game.Infrastructure.Database
 
                 entity.HasIndex(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId })
                     .IsUnique();
+
+                entity.Property(c => c.Value)
+                    .HasPrecision(36, 3);
             });
 
             modelBuilder.Entity<Rarity>(entity =>
@@ -303,6 +312,7 @@ namespace Game.Infrastructure.Database
                     {
                         Id = (int)type.Id,
                         Name = type.Name,
+                        EntityType = (int)type.EntityType,
                     };
                 }));
             });

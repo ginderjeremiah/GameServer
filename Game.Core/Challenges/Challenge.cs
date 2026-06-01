@@ -9,8 +9,10 @@ namespace Game.Core.Challenges
         public required string Name { get; set; }
         public required string Description { get; set; }
         public required EChallengeType Type { get; set; }
+        public EStatisticType? StatisticType { get; set; }
+        public EEntityType EntityType { get; set; }
         public int? TargetEntityId { get; set; }
-        public required int TargetCount { get; set; }
+        public required decimal ProgressGoal { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
     }

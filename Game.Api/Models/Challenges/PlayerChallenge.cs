@@ -5,7 +5,7 @@ namespace Game.Api.Models.Challenges
     public class PlayerChallenge : IModelFromSource<PlayerChallenge, PlayerChallengeEntity>
     {
         public int ChallengeId { get; set; }
-        public int Progress { get; set; }
+        public decimal Progress { get; set; }
         public bool Completed { get; set; }
         public DateTime? CompletedAt { get; set; }
 

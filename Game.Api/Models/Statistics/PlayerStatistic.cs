@@ -1,18 +1,19 @@
+using Game.Core;
 using PlayerStatisticEntity = Game.Abstractions.Entities.PlayerStatistic;
 
 namespace Game.Api.Models.Statistics
 {
     public class PlayerStatistic : IModelFromSource<PlayerStatistic, PlayerStatisticEntity>
     {
-        public int StatisticTypeId { get; set; }
+        public EStatisticType StatisticTypeId { get; set; }
         public int? EntityId { get; set; }
-        public long Value { get; set; }
+        public decimal Value { get; set; }
 
         public static PlayerStatistic FromSource(PlayerStatisticEntity entity)
         {
             return new PlayerStatistic
             {
-                StatisticTypeId = entity.StatisticTypeId,
+                StatisticTypeId = (EStatisticType)entity.StatisticTypeId,
                 EntityId = entity.EntityId,
                 Value = entity.Value,
             };

@@ -16,20 +16,22 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 Description = entity.Description ?? string.Empty,
                 Type = (EChallengeType)entity.ChallengeTypeId,
+                StatisticType = (EStatisticType?)entity.StatisticTypeId,
+                EntityType = (EEntityType)entity.EntityTypeId,
                 TargetEntityId = entity.TargetEntityId,
-                TargetCount = entity.TargetCount,
+                ProgressGoal = entity.ProgressGoal,
                 RewardItemId = entity.RewardItemId,
                 RewardItemModId = entity.RewardItemModId,
             };
         }
 
-        public static CorePlayerChallenge ToCore(EntityPlayerChallenge entity, int targetCount)
+        public static CorePlayerChallenge ToCore(EntityPlayerChallenge entity, int progressGoal)
         {
             return new CorePlayerChallenge
             {
                 ChallengeId = entity.ChallengeId,
                 Progress = entity.Progress,
-                TargetCount = targetCount,
+                ProgressGoal = progressGoal,
                 Completed = entity.Completed,
                 CompletedAt = entity.CompletedAt,
             };
