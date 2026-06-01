@@ -24,6 +24,7 @@ import type {
 	IRemoveModRequest,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
+	ISetEnemySpawnsData,
 	ISetTagsData,
 	ISetZoneEnemiesData,
 	ISkill,
@@ -45,6 +46,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditZones': undefined;
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
+	'AdminTools/SetEnemySpawns': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
 	'AdminTools/SetTagsForItem': undefined;
 	'AdminTools/SetTagsForItemMod': undefined;
@@ -90,6 +92,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditZones': IChange<IZone>[];
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
+	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
 	'AdminTools/SetTagsForItem': ISetTagsData;
 	'AdminTools/SetTagsForItemMod': ISetTagsData;

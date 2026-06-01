@@ -1,0 +1,133 @@
+import { describe, it, expect, vi } from 'vitest';
+import { EntityStore } from '../../../../routes/admin/workbench/entity-store.svelte';
+import type { EntityConfig, Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
+
+interface Row extends Identified {
+	id: number;
+	name: string;
+	value: number;
+}
+
+const makeConfig = (persist: (diff: SaveDiff<Row>) => Promise<Row[]> = async () => []): EntityConfig<Row> => ({
+	key: 'rows',
+	label: 'Rows',
+	singular: 'Row',
+	glyph: 'box',
+	blankName: 'Unnamed',
+	newItem: (id) => ({ id, name: '', value: 0 }),
+	meta: () => [],
+	sections: [],
+	refresh: async () => [],
+	persist
+});
+
+const seed: Row[] = [
+	{ id: 0, name: 'Alpha', value: 1 },
+	{ id: 1, name: 'Beta', value: 2 }
+];
+
+describe('EntityStore', () => {
+	it('starts clean with the seeded records', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		expect(store.items).toHaveLength(2);
+		expect(store.counts.total).toBe(0);
+		expect(store.status(store.items[0])).toBe('clean');
+	});
+
+	it('does not mutate the seed array', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		store.patch(0, (draft) => (draft.value = 99));
+		expect(seed[0].value).toBe(1);
+	});
+
+	it('flags an added record and counts it', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		const id = store.addItem();
+		expect(id).toBeLessThan(0);
+		expect(store.items[0].id).toBe(id);
+		expect(store.status(store.items[0])).toBe('added');
+		expect(store.counts.added).toBe(1);
+		expect(store.counts.total).toBe(1);
+	});
+
+	it('marks a record modified and returns to clean when reverted', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		store.patch(1, (draft) => (draft.value = 50));
+		expect(store.status(store.items.find((r) => r.id === 1)!)).toBe('modified');
+		expect(store.counts.modified).toBe(1);
+
+		store.patch(1, (draft) => (draft.value = 2));
+		expect(store.status(store.items.find((r) => r.id === 1)!)).toBe('clean');
+		expect(store.counts.total).toBe(0);
+	});
+
+	it('drops never-saved records on remove but marks saved ones deleted', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		const newId = store.addItem();
+		store.removeItem(newId);
+		expect(store.items.find((r) => r.id === newId)).toBeUndefined();
+
+		store.removeItem(0);
+		expect(store.status(store.items.find((r) => r.id === 0)!)).toBe('deleted');
+		expect(store.counts.deleted).toBe(1);
+	});
+
+	it('restores a deleted record and resets a modified one', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		store.removeItem(0);
+		store.restoreItem(0);
+		expect(store.status(store.items.find((r) => r.id === 0)!)).toBe('clean');
+
+		store.patch(1, (draft) => (draft.value = 7));
+		store.resetItem(1);
+		expect(store.items.find((r) => r.id === 1)!.value).toBe(2);
+		expect(store.counts.total).toBe(0);
+	});
+
+	it('discard reverts every pending change', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		store.addItem();
+		store.patch(0, (draft) => (draft.name = 'changed'));
+		store.removeItem(1);
+		expect(store.counts.total).toBe(3);
+
+		store.discard();
+		expect(store.counts.total).toBe(0);
+		expect(store.items).toHaveLength(2);
+		expect(store.items.find((r) => r.id === 0)!.name).toBe('Alpha');
+	});
+
+	it('save passes the diff to persist and adopts the returned baseline', async () => {
+		const fresh: Row[] = [
+			{ id: 0, name: 'Alpha', value: 1 },
+			{ id: 1, name: 'Beta edited', value: 2 },
+			{ id: 2, name: 'Gamma', value: 3 }
+		];
+		let captured: SaveDiff<Row> | undefined;
+		const persist = vi.fn(async (diff: SaveDiff<Row>) => {
+			captured = diff;
+			return fresh;
+		});
+		const store = new EntityStore(makeConfig(persist), seed);
+
+		store.addItem();
+		store.patch(1, (draft) => (draft.name = 'Beta edited'));
+		await store.save();
+
+		expect(persist).toHaveBeenCalledOnce();
+		expect(captured?.added).toHaveLength(1);
+		expect(captured?.modified).toHaveLength(1);
+		expect(captured?.existingIds).toEqual([0, 1]);
+
+		expect(store.counts.total).toBe(0);
+		expect(store.items).toHaveLength(3);
+		expect(store.saved).toBe(true);
+	});
+
+	it('does not call persist when there are no changes', async () => {
+		const persist = vi.fn(async () => seed);
+		const store = new EntityStore(makeConfig(persist), seed);
+		await store.save();
+		expect(persist).not.toHaveBeenCalled();
+	});
+});

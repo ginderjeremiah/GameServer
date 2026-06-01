@@ -40,25 +40,26 @@ namespace Game.Api.Controllers
                 {
                     _entityStore.Insert(new Game.Abstractions.Entities.Enemy
                     {
-                        Name = change.Item.Name
+                        Name = change.Item.Name,
+                        IsBoss = change.Item.IsBoss,
                     });
                 }
                 else if (change.ChangeType == Edit)
                 {
-                    var enemy = _enemies.GetEnemy(change.Item.Id);
-                    if (enemy is not null)
+                    _entityStore.Update(new Game.Abstractions.Entities.Enemy
                     {
-                        enemy.Name = change.Item.Name;
-                        _entityStore.Update(enemy);
-                    }
+                        Id = change.Item.Id,
+                        Name = change.Item.Name,
+                        IsBoss = change.Item.IsBoss,
+                    });
                 }
                 else if (change.ChangeType == Delete)
                 {
-                    var enemy = _enemies.GetEnemy(change.Item.Id);
-                    if (enemy is not null)
+                    _entityStore.Delete(new Game.Abstractions.Entities.Enemy
                     {
-                        _entityStore.Delete(enemy);
-                    }
+                        Id = change.Item.Id,
+                        Name = "",
+                    });
                 }
             }
 
@@ -197,6 +198,7 @@ namespace Game.Api.Controllers
                         Name = change.Item.Name,
                         Description = change.Item.Description,
                         ItemCategoryId = (int)change.Item.ItemCategoryId,
+                        RarityId = (int)change.Item.RarityId,
                         IconPath = change.Item.IconPath,
                     });
                 }
@@ -208,6 +210,7 @@ namespace Game.Api.Controllers
                         item.Name = change.Item.Name;
                         item.Description = change.Item.Description;
                         item.ItemCategoryId = (int)change.Item.ItemCategoryId;
+                        item.RarityId = (int)change.Item.RarityId;
                         item.IconPath = change.Item.IconPath;
                         _entityStore.Update(item);
                     }
@@ -398,7 +401,7 @@ namespace Game.Api.Controllers
                     {
                         EnemyId = enemy.Id,
                         AttributeId = dist.AttributeId,
-                        BaseAmount = newData.AmountPerLevel,
+                        BaseAmount = newData.BaseAmount,
                         AmountPerLevel = newData.AmountPerLevel
                     });
                 }
@@ -410,7 +413,7 @@ namespace Game.Api.Controllers
                     {
                         EnemyId = enemy.Id,
                         AttributeId = (int)ad.AttributeId,
-                        BaseAmount = ad.AmountPerLevel,
+                        BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel
                     }).ToList();
 
@@ -443,6 +446,46 @@ namespace Game.Api.Controllers
                     }).ToList();
 
                 _entityStore.InsertAll(enemySkills);
+                return ApiResponse.Success();
+            }
+
+            return ApiResponse.Error("Enemy not found.");
+        }
+
+        [HttpPost]
+        public ApiResponse SetEnemySpawns([FromBody] SetEnemySpawnsData spawnsData)
+        {
+            var enemy = _enemies.GetEnemy(spawnsData.EnemyId);
+            if (enemy is not null)
+            {
+                var newZoneIds = spawnsData.Spawns.Select(s => s.ZoneId).ToList();
+                foreach (var spawn in enemy.ZoneEnemies.Where(ze => !newZoneIds.Contains(ze.ZoneId)))
+                {
+                    _entityStore.Delete(spawn);
+                }
+
+                foreach (var spawn in enemy.ZoneEnemies.Where(ze => newZoneIds.Contains(ze.ZoneId)))
+                {
+                    var newData = spawnsData.Spawns.First(s => s.ZoneId == spawn.ZoneId);
+                    _entityStore.Update(new Game.Abstractions.Entities.ZoneEnemy
+                    {
+                        ZoneId = spawn.ZoneId,
+                        EnemyId = enemy.Id,
+                        Weight = newData.Weight,
+                    });
+                }
+
+                var existingZoneIds = enemy.ZoneEnemies.Select(ze => ze.ZoneId).ToList();
+                var newSpawns = spawnsData.Spawns
+                    .Where(s => !existingZoneIds.Contains(s.ZoneId))
+                    .Select(s => new Game.Abstractions.Entities.ZoneEnemy
+                    {
+                        ZoneId = s.ZoneId,
+                        EnemyId = enemy.Id,
+                        Weight = s.Weight,
+                    }).ToList();
+
+                _entityStore.InsertAll(newSpawns);
                 return ApiResponse.Success();
             }
 

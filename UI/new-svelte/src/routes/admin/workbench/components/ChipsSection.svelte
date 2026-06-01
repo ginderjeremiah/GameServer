@@ -1,0 +1,85 @@
+<div>
+	{#if ids.length === 0}
+		<EmptySection icon={section.emptyIcon} title={section.emptyTitle} sub={section.emptySub} />
+	{:else}
+		<div class="chips">
+			{#each ids as id (id)}
+				{@const entry = catalogue.find((c) => c.id === id)}
+				<div class="skill-chip" class:added={baseIds && !baseIds.includes(id)}>
+					<span class="nm">{entry ? section.labelOf(entry) : `#${id}`}</span>
+					<span class="dm">{entry ? section.metaOf(entry) : ''}</span>
+					<span
+						class="x"
+						role="button"
+						tabindex="0"
+						title="Remove"
+						onclick={() => remove(id)}
+						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), remove(id))}
+					>
+						<WorkbenchIcon kind="x" size={11} />
+					</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if available.length > 0}
+		<div class="fld add-select">
+			<select class="sel" value="" onchange={(e) => add(+e.currentTarget.value)}>
+				<option value="">＋ {section.addLabel}</option>
+				{#each available as entry (entry.id)}
+					<option value={entry.id}>{section.labelOf(entry)} · {section.metaOf(entry)}</option>
+				{/each}
+			</select>
+			<SelectCaret />
+		</div>
+	{/if}
+</div>
+
+<script lang="ts">
+import WorkbenchIcon from '../WorkbenchIcon.svelte';
+import type { EntityStore } from '../entity-store.svelte';
+import { fieldsOf, type ChipsSectionConfig, type Identified } from '../entities/types';
+import EmptySection from './EmptySection.svelte';
+import SelectCaret from './SelectCaret.svelte';
+
+interface Props {
+	section: ChipsSectionConfig<Identified>;
+	record: Identified;
+	baseline: Identified | undefined;
+	store: EntityStore<Identified>;
+}
+
+const { section, record, baseline, store }: Props = $props();
+
+const itemsKey = $derived(section.itemsKey as string);
+const ids = $derived((fieldsOf(record)[itemsKey] as number[]) ?? []);
+const baseIds = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as number[]) : null);
+const catalogue = $derived(section.catalogue());
+const available = $derived(catalogue.filter((c) => !ids.includes(c.id)));
+
+const add = (id: number) => {
+	if (id && !ids.includes(id)) {
+		store.patch(record.id, (draft) => {
+			(fieldsOf(draft)[itemsKey] as number[]).push(id);
+		});
+	}
+};
+const remove = (id: number) => {
+	store.patch(record.id, (draft) => {
+		fieldsOf(draft)[itemsKey] = ids.filter((k) => k !== id);
+	});
+};
+</script>
+
+<style lang="scss">
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.add-select {
+	margin-top: 14px;
+	max-width: 280px;
+}
+</style>

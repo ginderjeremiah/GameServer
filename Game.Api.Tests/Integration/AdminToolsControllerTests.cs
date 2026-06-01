@@ -161,6 +161,95 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditEnemies_AddBossEnemy_PersistsIsBoss()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ancient Wyrm",
+                        IsBoss = true,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
+            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
+            Assert.NotNull(enemiesResult?.Data);
+            var boss = Assert.Single(enemiesResult.Data, e => e.Name == "Ancient Wyrm");
+            Assert.True(boss.IsBoss);
+        }
+
+        [Fact]
+        public async Task SetEnemySpawns_ValidEnemy_PersistsSpawn()
+        {
+            // Arrange — seed an enemy and a zone with no link between them yet.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Spawner");
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Spawn Zone");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                EnemyId = enemy.Id,
+                Spawns = new[]
+                {
+                    new { ZoneId = zone.Id, Weight = 42 }
+                }
+            };
+
+            // Act
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySpawns", data, CancellationToken);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            // The enemy's embedded spawns now include the zone with the assigned weight.
+            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
+            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
+            Assert.NotNull(enemiesResult?.Data);
+            var saved = Assert.Single(enemiesResult.Data, e => e.Id == enemy.Id);
+            var spawn = Assert.Single(saved.Spawns);
+            Assert.Equal(zone.Id, spawn.ZoneId);
+            Assert.Equal(42, spawn.Weight);
+        }
+
+        [Fact]
+        public async Task SetEnemySpawns_UnknownEnemy_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                EnemyId = 999999,
+                Spawns = Array.Empty<object>()
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySpawns", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task AdminTools_Unauthenticated_Returns401()
         {
             var changes = Array.Empty<object>();

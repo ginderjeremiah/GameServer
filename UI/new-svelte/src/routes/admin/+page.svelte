@@ -2,7 +2,13 @@
 	<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
 
 	<div class="admin-workspace">
-		<CurrentTool />
+		{#if reference.loaded && activeEntity}
+			{#key active}
+				<Workbench entity={activeEntity} groupLabel={groupLabelFor(active)} />
+			{/key}
+		{:else}
+			<Loading loading={true} delay={50} />
+		{/if}
 	</div>
 
 	<AdminSidebar
@@ -16,14 +22,28 @@
 </div>
 
 <script lang="ts">
+import { onMount } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { Loading } from '$components';
 import AdminSidebar from './AdminSidebar.svelte';
-import { adminGroups, adminTools } from './tools/nav';
+import Workbench from './workbench/Workbench.svelte';
+import { entityByKey, groupLabelFor } from './workbench/entities';
+import { adminGroups, adminTools } from './workbench/nav';
+import { reference } from './workbench/reference.svelte';
 
-let active = $state('addItems');
+let active = $state('enemies');
 let sidebarPinned = $state(false);
-const CurrentTool = $derived(adminTools.find((t) => t.key === active)?.component ?? adminTools[0].component);
+
+const activeEntity = $derived(entityByKey(active));
+
+// Load the shared reference catalogues (used by every entity's select options,
+// tag UI, and derived spawn shares) before rendering any workbench.
+onMount(() => {
+	if (!reference.loaded) {
+		reference.load();
+	}
+});
 
 const handleNavigate = (key: string) => {
 	active = key;
@@ -39,6 +59,9 @@ const backToGame = () => goto(resolve('/game'));
 	display: flex;
 	position: relative;
 	overflow: hidden;
+	// Flat near-black page surface (matches the design), instead of the game's
+	// gradient backdrop showing through behind the workbench panels.
+	background: var(--page);
 }
 
 .sidebar-spacer {
@@ -56,6 +79,8 @@ const backToGame = () => goto(resolve('/game'));
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	padding: 34px 44px 28px;
+	overflow: hidden;
+	// No outer padding: the Workbench is full-bleed (list pane flush to the rail,
+	// full-width header/save bar) and supplies its own internal insets.
 }
 </style>

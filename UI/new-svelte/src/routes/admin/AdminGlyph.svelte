@@ -27,13 +27,16 @@
 	{:else if kind === 'pin'}
 		<path d="M8 14s4.2-4 4.2-7A4.2 4.2 0 008 2.8 4.2 4.2 0 003.8 7c0 3 4.2 7 4.2 7z" stroke-linejoin="round" />
 		<circle cx="8" cy="6.9" r="1.4" />
+	{:else if kind === 'tag'}
+		<path d="M2.5 2.5h5L13 8l-5 5-5.5-5.5z" stroke-linejoin="round" />
+		<circle cx="5" cy="5" r="0.9" fill={stroke} stroke="none" />
 	{:else if kind === 'back'}
 		<path d="M7 3.5L2.5 8 7 12.5M2.5 8H13" stroke-linecap="round" stroke-linejoin="round" />
 	{/if}
 </svg>
 
 <script lang="ts" module>
-export type AdminGlyphKind = 'skull' | 'bars' | 'rune' | 'box' | 'bolt' | 'multiply' | 'map' | 'pin' | 'back';
+export type AdminGlyphKind = 'skull' | 'bars' | 'rune' | 'box' | 'bolt' | 'multiply' | 'map' | 'pin' | 'tag' | 'back';
 </script>
 
 <script lang="ts">

@@ -1,0 +1,124 @@
+import { describe, it, expect, vi } from 'vitest';
+import { EChangeType, type IChange, type IItemModSlot } from '$lib/api';
+import { attributeChanges, modSlotChanges, persistEntity } from '../../../../routes/admin/workbench/save-helpers';
+import type { Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
+
+describe('attributeChanges', () => {
+	it('emits Add / Edit / Delete keyed by attributeId', () => {
+		const current = [
+			{ attributeId: 0, amount: 5 },
+			{ attributeId: 1, amount: 3 }
+		];
+		const baseline = [
+			{ attributeId: 0, amount: 2 },
+			{ attributeId: 2, amount: 9 }
+		];
+		const changes = attributeChanges(current, baseline, 'amount');
+		expect(changes).toEqual([
+			{ changeType: EChangeType.Edit, item: { attributeId: 0, amount: 5 } },
+			{ changeType: EChangeType.Add, item: { attributeId: 1, amount: 3 } },
+			{ changeType: EChangeType.Delete, item: { attributeId: 2, amount: 9 } }
+		]);
+	});
+
+	it('treats a missing baseline as all-added and reads the configured value key', () => {
+		const changes = attributeChanges([{ attributeId: 4, multiplier: 1.5 }], undefined, 'multiplier');
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: { attributeId: 4, amount: 1.5 } }]);
+	});
+});
+
+describe('modSlotChanges', () => {
+	it('adds new slots, edits changed types, and deletes removed slots', () => {
+		const current: IItemModSlot[] = [
+			{ id: 1, itemId: 5, itemModSlotTypeId: 2 },
+			{ id: 0, itemId: 0, itemModSlotTypeId: 3 }
+		];
+		const baseline: IItemModSlot[] = [
+			{ id: 1, itemId: 5, itemModSlotTypeId: 1 },
+			{ id: 2, itemId: 5, itemModSlotTypeId: 1 }
+		];
+		const changes = modSlotChanges(current, baseline, 5);
+		expect(changes).toEqual([
+			{ changeType: EChangeType.Edit, item: { id: 1, itemId: 5, itemModSlotTypeId: 2 } },
+			{ changeType: EChangeType.Add, item: { id: 0, itemId: 5, itemModSlotTypeId: 3 } },
+			{ changeType: EChangeType.Delete, item: { id: 2, itemId: 5, itemModSlotTypeId: 1 } }
+		]);
+	});
+});
+
+interface Row extends Identified {
+	id: number;
+	name: string;
+}
+
+describe('persistEntity', () => {
+	it('posts the primary diff, resolves new ids, and runs child savers against real ids', async () => {
+		const diff: SaveDiff<Row> = {
+			added: [
+				{ id: -1, name: 'A' },
+				{ id: -2, name: 'B' }
+			],
+			modified: [{ record: { id: 0, name: 'X' }, baseline: { id: 0, name: 'x' } }],
+			deleted: [{ id: 1, name: 'D' }],
+			existingIds: [0, 1]
+		};
+
+		// After the primary save, record 1 is gone and the two adds receive ids 2 and 3.
+		const fresh: Row[] = [
+			{ id: 0, name: 'X' },
+			{ id: 2, name: 'A' },
+			{ id: 3, name: 'B' }
+		];
+
+		let primaryChanges: IChange<Row>[] = [];
+		const postPrimary = vi.fn(async (changes: IChange<Row>[]) => {
+			primaryChanges = changes;
+		});
+		const refresh = vi.fn(async () => fresh);
+		const childCalls: { id: number; name: string; hasBaseline: boolean }[] = [];
+
+		const result = await persistEntity<Row, Row>({
+			diff,
+			toPrimaryDto: (record) => ({ id: record.id, name: record.name }),
+			postPrimary,
+			refresh,
+			childSavers: [
+				async (id, record, baseline) => {
+					childCalls.push({ id, name: record.name, hasBaseline: baseline !== undefined });
+				}
+			]
+		});
+
+		// Primary call carries the full diff in Add → Edit → Delete order.
+		expect(postPrimary).toHaveBeenCalledOnce();
+		expect(primaryChanges.map((c) => c.changeType)).toEqual([
+			EChangeType.Add,
+			EChangeType.Add,
+			EChangeType.Edit,
+			EChangeType.Delete
+		]);
+
+		// Added records map positionally to the lowest new ids; modified keeps its id.
+		expect(childCalls).toEqual([
+			{ id: 2, name: 'A', hasBaseline: false },
+			{ id: 3, name: 'B', hasBaseline: false },
+			{ id: 0, name: 'X', hasBaseline: true }
+		]);
+
+		// refresh runs after the primary save and again after children.
+		expect(refresh).toHaveBeenCalledTimes(2);
+		expect(result).toEqual(fresh);
+	});
+
+	it('skips the primary call when nothing is added, edited, or deleted', async () => {
+		const refresh = vi.fn(async () => [] as Row[]);
+		const postPrimary = vi.fn(async () => undefined);
+		await persistEntity<Row, Row>({
+			diff: { added: [], modified: [], deleted: [], existingIds: [] },
+			toPrimaryDto: (r) => r,
+			postPrimary,
+			refresh
+		});
+		expect(postPrimary).not.toHaveBeenCalled();
+	});
+});

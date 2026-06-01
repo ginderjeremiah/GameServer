@@ -31,6 +31,7 @@ namespace Game.DataAccess.Repositories
             {
                 _allMods = _context.ItemMods
                     .Include(im => im.ItemModAttributes)
+                    .Include(im => im.Tags)
                     .AsNoTracking()
                     .ToList();
             }

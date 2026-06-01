@@ -129,7 +129,7 @@ namespace Game.Api.Tests.CodeGen
             Assert.Contains("ISimpleModel", result);
             Assert.Contains("TestEnum", result);
             Assert.StartsWith("import type { ", result);
-            Assert.Contains("from \"./\"", result);
+            Assert.Contains("from './'", result);
         }
 
         [Fact]
@@ -156,7 +156,7 @@ namespace Game.Api.Tests.CodeGen
         {
             var descriptors = new[] { GetPropertyDescriptor<NestedModel>("Child") };
             var result = CodeGenTypeFormatter.GetImportText(descriptors, "../types/");
-            Assert.Contains("from \"../types/\"", result);
+            Assert.Contains("from '../types/'", result);
         }
 
         [Fact]

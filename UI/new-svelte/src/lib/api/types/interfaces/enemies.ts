@@ -3,12 +3,18 @@
 
 import type { IAttributeDistribution, IBattlerAttribute } from '../';
 
+export interface IEnemySpawn {
+	zoneId: number;
+	weight: number;
+}
+
 export interface IEnemy {
 	id: number;
 	name: string;
 	isBoss: boolean;
 	attributeDistribution: IAttributeDistribution[];
 	skillPool: number[];
+	spawns: IEnemySpawn[];
 }
 
 export interface ISetEnemyAttributeDistributions {
@@ -19,6 +25,11 @@ export interface ISetEnemyAttributeDistributions {
 export interface ISetEnemySkillsData {
 	enemyId: number;
 	skillIds: number[];
+}
+
+export interface ISetEnemySpawnsData {
+	enemyId: number;
+	spawns: IEnemySpawn[];
 }
 
 export interface IDefeatEnemyRequest {

@@ -14,6 +14,7 @@ namespace Game.Api.Models.Items
         public required string IconPath { get; set; }
         public required IEnumerable<BattlerAttribute> Attributes { get; set; }
         public required IEnumerable<ItemModSlot> ModSlots { get; set; }
+        public required IEnumerable<int> Tags { get; set; }
         public static Item FromSource(ItemEntity item)
         {
             return new Item
@@ -26,6 +27,7 @@ namespace Game.Api.Models.Items
                 IconPath = item.IconPath,
                 Attributes = item.ItemAttributes.To().Model<BattlerAttribute>(),
                 ModSlots = item.ItemModSlots.To().Model<ItemModSlot>(),
+                Tags = item.Tags.Select(t => t.Id),
             };
         }
     }

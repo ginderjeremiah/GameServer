@@ -32,6 +32,7 @@ namespace Game.DataAccess.Repositories
                     .AsNoTracking()
                     .Include(e => e.AttributeDistributions)
                     .Include(e => e.EnemySkills)
+                    .Include(e => e.ZoneEnemies)
                     .OrderBy(e => e.Id)];
             }
 

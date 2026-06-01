@@ -10,6 +10,7 @@ namespace Game.Api.Models.Enemies
         public bool IsBoss { get; set; }
         public required IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
         public required IEnumerable<int> SkillPool { get; set; }
+        public required IEnumerable<EnemySpawn> Spawns { get; set; }
 
         public static Enemy FromSource(EnemyEntity entity)
         {
@@ -20,6 +21,7 @@ namespace Game.Api.Models.Enemies
                 Id = entity.Id,
                 IsBoss = entity.IsBoss,
                 SkillPool = entity.EnemySkills.Select(s => s.SkillId),
+                Spawns = entity.ZoneEnemies.To().Model<EnemySpawn>(),
             };
         }
     }

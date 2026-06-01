@@ -113,7 +113,7 @@
 
 <script lang="ts">
 import AdminGlyph from './AdminGlyph.svelte';
-import type { AdminGroupDef, AdminToolDef } from './tools/nav';
+import type { AdminGroupDef, AdminToolDef } from './workbench/nav';
 
 interface Props {
 	tools: AdminToolDef[];

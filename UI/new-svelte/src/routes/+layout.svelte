@@ -47,6 +47,13 @@ $effect(() => {
 	--slot-highlight-color: #{colors.$red};
 	--surface: #{colors.$surface};
 	--surface-alpha: #{colors.$surface-alpha};
+	--page: #0f1014;
+	--panel: #16171e;
+	--panel-2: #1b1c24;
+	--mono: 'Geist Mono', ui-monospace, monospace;
+	--sans: Geist, system-ui, sans-serif;
+	--enemy: #{colors.$enemy-accent};
+	--error: #{colors.$error};
 	--accent: #{colors.$accent};
 	--accent-light: #{colors.$accent-light};
 	--text-primary: #{colors.$text-primary};

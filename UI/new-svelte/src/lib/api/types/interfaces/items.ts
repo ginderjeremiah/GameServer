@@ -14,6 +14,7 @@ export interface IItemMod {
 	description: string;
 	itemModTypeId: number;
 	attributes: IBattlerAttribute[];
+	tags: number[];
 }
 
 export interface IItemModSlot {
@@ -31,6 +32,7 @@ export interface IItem {
 	iconPath: string;
 	attributes: IBattlerAttribute[];
 	modSlots: IItemModSlot[];
+	tags: number[];
 }
 
 export interface IItemCategory {

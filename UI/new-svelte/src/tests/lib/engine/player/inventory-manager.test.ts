@@ -54,16 +54,17 @@ const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon): I
 	rarityId: ERarity.Common,
 	iconPath: `/icons/${id}.png`,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
-	modSlots: []
+	modSlots: [],
+	tags: []
 });
 
 const makeItemMod = (id: number): IItemMod => ({
 	id,
 	name: `Mod ${id}`,
-	removable: true,
 	description: `Mod description ${id}`,
 	itemModTypeId: 1,
-	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }]
+	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
+	tags: []
 });
 
 describe('InventoryManager', () => {

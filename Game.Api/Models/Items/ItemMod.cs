@@ -10,6 +10,7 @@ namespace Game.Api.Models.Items
         public required string Description { get; set; }
         public int ItemModTypeId { get; set; }
         public required IEnumerable<BattlerAttribute> Attributes { get; set; }
+        public required IEnumerable<int> Tags { get; set; }
 
         public static ItemMod FromSource(ItemModEntity itemMod)
         {
@@ -20,6 +21,7 @@ namespace Game.Api.Models.Items
                 Description = itemMod.Description,
                 ItemModTypeId = itemMod.ItemModTypeId,
                 Attributes = itemMod.ItemModAttributes.To().Model<BattlerAttribute>(),
+                Tags = itemMod.Tags.Select(t => t.Id),
             };
         }
     }

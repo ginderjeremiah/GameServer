@@ -1,0 +1,161 @@
+import { ApiRequest, type IEnemy } from '$lib/api';
+import { staticData } from '$stores';
+import { reference } from '../reference.svelte';
+import { childChanged, persistEntity } from '../save-helpers';
+import { firstFree } from './helpers';
+import type { EntityConfig } from './types';
+
+const refresh = async (): Promise<IEnemy[]> => {
+	const enemies = await ApiRequest.get('Enemies', { refreshCache: true });
+	staticData.enemies = enemies;
+	return enemies;
+};
+
+export const enemyEntity: EntityConfig<IEnemy> = {
+	key: 'enemies',
+	label: 'Enemies',
+	singular: 'Enemy',
+	glyph: 'skull',
+	blankName: 'Unnamed enemy',
+	newItem: (id) => ({ id, name: '', isBoss: false, attributeDistribution: [], skillPool: [], spawns: [] }),
+	listBadge: (e) => (e.isBoss ? 'Boss' : null),
+	badgeColor: () => 'var(--enemy-accent)',
+	meta: (e) => [
+		['attr', e.attributeDistribution.length],
+		['skill', e.skillPool.length],
+		['zone', e.spawns.length]
+	],
+	sections: [
+		{
+			key: 'identity',
+			label: 'Identity',
+			glyph: 'tag',
+			desc: 'Name & classification',
+			kind: 'fields',
+			fields: [
+				{
+					key: 'name',
+					label: 'Enemy Name',
+					type: 'text',
+					placeholder: 'Name this enemy…',
+					grow: true,
+					required: true,
+					reqMsg: 'Missing name'
+				},
+				{ key: 'isBoss', label: 'Classification', type: 'toggle', onLabel: 'Boss enemy', offLabel: 'Standard enemy' }
+			]
+		},
+		{
+			key: 'attrs',
+			label: 'Attributes',
+			glyph: 'bars',
+			desc: 'Stat distribution per level',
+			count: (e) => e.attributeDistribution.length,
+			warn: (e) => (e.attributeDistribution.length ? null : 'No attribute distribution'),
+			kind: 'table',
+			itemsKey: 'attributeDistribution',
+			addLabel: 'Add attribute',
+			emptyIcon: 'bars',
+			emptyTitle: 'No attributes set',
+			emptySub: 'This enemy has no stat distribution yet.',
+			newRow: (e) => ({
+				attributeId: firstFree(
+					e.attributeDistribution.map((a) => a.attributeId),
+					reference.attributeOptions()
+				),
+				baseAmount: 0,
+				amountPerLevel: 0
+			}),
+			columns: [
+				{
+					key: 'attributeId',
+					label: 'Attribute',
+					type: 'select',
+					options: reference.attributeOptions,
+					min: 190,
+					unique: true
+				},
+				{ key: 'baseAmount', label: 'Base', type: 'number', align: 'r', width: 110, allowNegative: true },
+				{ key: 'amountPerLevel', label: 'Per Level', type: 'number', align: 'r', width: 110, allowNegative: true }
+			]
+		},
+		{
+			key: 'skills',
+			label: 'Skills',
+			glyph: 'rune',
+			desc: 'Skill pool used in battle',
+			count: (e) => e.skillPool.length,
+			warn: (e) => (e.skillPool.length ? null : 'No skills assigned'),
+			kind: 'chips',
+			itemsKey: 'skillPool',
+			catalogue: () => reference.skillCatalogue(),
+			labelOf: (s) => s.name,
+			metaOf: (s) => `${(s as unknown as { baseDamage: number }).baseDamage} dmg`,
+			emptyIcon: 'rune',
+			emptyTitle: 'No skills in pool',
+			emptySub: "Enemies with no skills can't act in battle.",
+			addLabel: 'Add skill from pool…'
+		},
+		{
+			key: 'spawns',
+			label: 'Spawns',
+			glyph: 'pin',
+			desc: 'Zones this enemy appears in',
+			count: (e) => e.spawns.length,
+			warn: (e) => (e.spawns.length ? null : 'Not assigned to any zone'),
+			kind: 'table',
+			itemsKey: 'spawns',
+			addLabel: 'Assign zone',
+			emptyIcon: 'pin',
+			emptyTitle: 'Not assigned to any zone',
+			emptySub: 'This enemy will never spawn in the world.',
+			newRow: (e) => ({
+				zoneId: firstFree(
+					e.spawns.map((s) => s.zoneId),
+					reference.zoneOptions()
+				),
+				weight: 5
+			}),
+			columns: [
+				{ key: 'zoneId', label: 'Zone', type: 'select', options: reference.zoneOptions, min: 200, unique: true },
+				{ key: 'weight', label: 'Weight', type: 'number', align: 'r', width: 100 },
+				{
+					key: '__share',
+					label: 'Spawn share',
+					type: 'share',
+					width: 150,
+					weightKey: 'weight',
+					shareTotal: reference.enemySpawnShareTotal
+				}
+			]
+		}
+	],
+	refresh,
+	persist: (diff) =>
+		persistEntity({
+			diff,
+			toPrimaryDto: (e) => ({ ...e, attributeDistribution: [], skillPool: [], spawns: [] }),
+			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditEnemies', changes),
+			refresh,
+			childSavers: [
+				async (id, record, baseline) => {
+					if (childChanged(record.attributeDistribution, baseline?.attributeDistribution)) {
+						await ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
+							enemyId: id,
+							attributeDistributions: record.attributeDistribution
+						});
+					}
+				},
+				async (id, record, baseline) => {
+					if (childChanged(record.skillPool, baseline?.skillPool)) {
+						await ApiRequest.post('AdminTools/SetEnemySkills', { enemyId: id, skillIds: record.skillPool });
+					}
+				},
+				async (id, record, baseline) => {
+					if (childChanged(record.spawns, baseline?.spawns)) {
+						await ApiRequest.post('AdminTools/SetEnemySpawns', { enemyId: id, spawns: record.spawns });
+					}
+				}
+			]
+		})
+};

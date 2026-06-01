@@ -39,18 +39,14 @@
 					</div>
 
 					{#if applied}
-						{#if applied.removable}
-							<button
-								class="mod-remove"
-								title="Remove mod"
-								onclick={(e) => {
-									e.stopPropagation();
-									view.removeMod(item.itemId, slot.id);
-								}}>×</button
-							>
-						{:else}
-							<span class="mod-locked" title="Permanent"></span>
-						{/if}
+            <button
+              class="mod-remove"
+              title="Remove mod"
+              onclick={(e) => {
+                e.stopPropagation();
+                view.removeMod(item.itemId, slot.id);
+              }}>×</button
+            >
 					{:else}
 						<span class="mod-add" style:color={accent}>+</span>
 					{/if}

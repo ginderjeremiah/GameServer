@@ -34,3 +34,7 @@ The backend uses a mix of HTTP and WebSockets for communication with the fronten
 ## Caching and Pub/Sub
 
 As mentioned above, most of the reference data is cached in-memory on the backend for fast access. However, player data is cached in Redis and uses a write-behind caching strategy where the cache is the source of truth for player data, and changes are persisted to the database asynchronously. The application uses Redis pub/sub to trigger persistence of player data to the database whenever it changes and as a backplane for WebSocket communication.
+
+## Admin Tools API surface
+
+The frontend admin tools were consolidated into a single entity-driven Workbench (see `docs/frontend.md`). That UI saves a whole record (identity + related collections) at once, but the backend keeps persisting each relationship through its own `AdminToolsController` endpoint — the Workbench just orchestrates them.
