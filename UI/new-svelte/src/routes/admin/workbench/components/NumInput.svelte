@@ -21,16 +21,18 @@ let { value, onChange, class: className = '', allowNegative = false }: Props = $
 // Keep the in-progress text locally so typing "1." or "0.5" isn't clobbered by
 // re-coercion on every keystroke, and reflect external resets when not editing.
 const numToStr = (v: number) => (Number.isFinite(v) ? String(v) : '');
-let text = $state(numToStr(value));
+let inputText = $state<string>();
+const text = $derived(inputText ?? numToStr(value));
 let focused = $state(false);
 
 $effect(() => {
 	if (focused) {
 		return;
 	}
+
 	const next = numToStr(value);
-	if (next !== text) {
-		text = next;
+	if (next !== inputText) {
+		inputText = next;
 	}
 });
 
@@ -43,7 +45,7 @@ const handleInput = (event: Event) => {
 		el.value = text; // reject the keystroke
 		return;
 	}
-	text = raw;
+	inputText = raw;
 	if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
 		onChange(0);
 		return;

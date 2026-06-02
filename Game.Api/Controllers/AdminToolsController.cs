@@ -177,7 +177,8 @@ namespace Game.Api.Controllers
                     {
                         Name = change.Item.Name,
                         Description = change.Item.Description,
-                        ItemModTypeId = change.Item.ItemModTypeId,
+                        ItemModTypeId = (int)change.Item.ItemModTypeId,
+                        RarityId = (int)change.Item.RarityId,
                     });
                 }
                 else if (change.ChangeType == Edit)
@@ -187,7 +188,8 @@ namespace Game.Api.Controllers
                     {
                         itemMod.Name = change.Item.Name;
                         itemMod.Description = change.Item.Description;
-                        itemMod.ItemModTypeId = change.Item.ItemModTypeId;
+                        itemMod.ItemModTypeId = (int)change.Item.ItemModTypeId;
+                        itemMod.RarityId = (int)change.Item.RarityId;
                         _entityStore.Update(itemMod);
                     }
                 }

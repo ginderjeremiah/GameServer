@@ -24,7 +24,7 @@
 				record={selected}
 				baseline={selectedBaseline}
 				{tab}
-				onTab={(key) => (tab = key)}
+				onTab={(key) => (selectedTab = key)}
 				onNew={newItem}
 			/>
 		</div>
@@ -53,7 +53,8 @@ const { entity, groupLabel = '' }: Props = $props();
 
 let store = $state<EntityStore<Identified>>();
 let selId = $state(0);
-let tab = $state(entity.sections[0].key);
+let selectedTab = $state<string>();
+const tab = $derived(selectedTab ?? entity.sections[0]?.key);
 
 onMount(async () => {
 	const seed = await entity.refresh();
@@ -80,8 +81,9 @@ const newItem = () => {
 	if (!store) {
 		return;
 	}
+  
 	selId = store.addItem();
-	tab = entity.sections[0].key;
+	selectedTab = entity.sections[0].key;
 };
 </script>
 

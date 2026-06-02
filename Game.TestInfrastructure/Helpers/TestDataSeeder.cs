@@ -1,7 +1,6 @@
 using Game.Abstractions.Entities;
 using Game.Core;
 using Game.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore;
 
 namespace Game.TestInfrastructure.Helpers
 {
@@ -118,6 +117,7 @@ namespace Game.TestInfrastructure.Helpers
             GameContext context,
             string name = "Test Mod",
             EAttribute attributeId = EAttribute.Strength,
+            ERarity rarityId = ERarity.Common,
             decimal attributeAmount = 5m)
         {
             var itemMod = new ItemMod
@@ -125,6 +125,7 @@ namespace Game.TestInfrastructure.Helpers
                 Name = name,
                 Description = "",
                 ItemModTypeId = (int)EItemModType.Prefix,
+                RarityId = (int)rarityId,
             };
 
             context.ItemMods.Add(itemMod);

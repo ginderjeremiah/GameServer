@@ -154,6 +154,7 @@ namespace Game.Core.Tests.Players
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,
+                Rarity = ERarity.Uncommon,
                 Attributes = [],
                 Tags = [],
             };
@@ -182,6 +183,7 @@ namespace Game.Core.Tests.Players
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,
+                Rarity = ERarity.Uncommon,
                 Attributes = [],
                 Tags = [],
             };
@@ -207,6 +209,7 @@ namespace Game.Core.Tests.Players
                 Name = "Of Fire",
                 Description = "",
                 Type = EItemModType.Suffix, // Wrong type — slot expects Prefix
+                Rarity = ERarity.Uncommon,
                 Attributes = [],
                 Tags = [],
             };
@@ -234,6 +237,7 @@ namespace Game.Core.Tests.Players
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,
+                Rarity = ERarity.Uncommon,
                 Attributes = [],
                 Tags = [],
             };

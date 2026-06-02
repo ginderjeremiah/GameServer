@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, EItemCategory, ELogType, ERarity } from '$lib/api';
+import { EAttribute, EItemCategory, EItemModType, ELogType, ERarity } from '$lib/api';
 import type { IInventoryData, IItem, IItemMod } from '$lib/api';
 
 const mockInventoryData: IInventoryData = {
@@ -62,7 +62,8 @@ const makeItemMod = (id: number): IItemMod => ({
 	id,
 	name: `Mod ${id}`,
 	description: `Mod description ${id}`,
-	itemModTypeId: 1,
+	itemModTypeId: EItemModType.Component,
+	rarityId: ERarity.Uncommon,
 	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
 	tags: []
 });

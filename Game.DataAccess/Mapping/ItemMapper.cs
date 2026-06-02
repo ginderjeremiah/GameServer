@@ -44,6 +44,7 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 Description = entity.Description ?? string.Empty,
                 Type = (EItemModType)entity.ItemModTypeId,
+                Rarity = (ERarity)entity.RarityId,
                 Attributes = (entity.ItemModAttributes ?? [])
                     .Select(ima => new AttributeModifier
                     {

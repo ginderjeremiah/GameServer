@@ -74,6 +74,7 @@ namespace Game.Application.Services
                 Name = modEntity.Name,
                 Description = modEntity.Description ?? string.Empty,
                 Type = (EItemModType)modEntity.ItemModTypeId,
+                Rarity = (ERarity)modEntity.RarityId,
                 Attributes = [],
                 Tags = [],
             };

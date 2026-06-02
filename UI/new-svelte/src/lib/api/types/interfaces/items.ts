@@ -12,7 +12,8 @@ export interface IItemMod {
 	id: number;
 	name: string;
 	description: string;
-	itemModTypeId: number;
+	itemModTypeId: EItemModType;
+	rarityId: ERarity;
 	attributes: IBattlerAttribute[];
 	tags: number[];
 }

@@ -1,4 +1,4 @@
-import { ApiRequest, EItemModType, type IItemMod } from '$lib/api';
+import { ApiRequest, EItemModType, ERarity, type IItemMod } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, childChanged, persistEntity } from '../save-helpers';
@@ -18,7 +18,15 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 	singular: 'Item Mod',
 	glyph: 'rune',
 	blankName: 'Unnamed mod',
-	newItem: (id) => ({ id, name: '', description: '', itemModTypeId: EItemModType.Component, attributes: [], tags: [] }),
+	newItem: (id) => ({
+		id,
+		name: '',
+		description: '',
+		itemModTypeId: EItemModType.Component,
+		rarityId: ERarity.Common,
+		attributes: [],
+		tags: []
+	}),
 	listBadge: (m) => reference.modTypeName(m.itemModTypeId),
 	badgeColor: () => 'var(--accent)',
 	meta: (m) => [

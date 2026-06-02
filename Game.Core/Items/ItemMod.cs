@@ -21,6 +21,9 @@ namespace Game.Core.Items
         /// <inheritdoc cref="EItemModType" />
         public EItemModType Type { get; set; }
 
+        /// <inheritdoc cref="ERarity" />
+        public required ERarity Rarity { get; set; }
+
         /// <summary>
         /// The attribute modifiers that the item mod applies.
         /// </summary>
