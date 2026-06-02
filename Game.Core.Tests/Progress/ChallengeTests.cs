@@ -1,5 +1,3 @@
-using Game.Core;
-using Game.Core.Challenges;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Progress;

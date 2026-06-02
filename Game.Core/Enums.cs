@@ -288,6 +288,25 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// Represents how a challenge's tracked value is compared against its goal to determine completion.
+    /// This is intrinsic to the challenge type and is not persisted.
+    /// </summary>
+    public enum EChallengeGoalComparison
+    {
+        /// <summary>
+        /// The challenge completes once the tracked value reaches at least the goal. Used for
+        /// accumulating statistics where higher is better (e.g. kills, damage dealt).
+        /// </summary>
+        AtLeast = 1,
+
+        /// <summary>
+        /// The challenge completes once the tracked value is at or below the goal. Used for
+        /// statistics where lower is better (e.g. a time trial against the fastest victory time).
+        /// </summary>
+        AtMost = 2,
+    }
+
+    /// <summary>
     /// Represents a type of player statistic that is tracked over time.
     /// </summary>
     public enum EStatisticType

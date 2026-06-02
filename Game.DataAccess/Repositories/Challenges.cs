@@ -1,6 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
-using Game.Core.Challenges;
+using Game.Core.Progress;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 

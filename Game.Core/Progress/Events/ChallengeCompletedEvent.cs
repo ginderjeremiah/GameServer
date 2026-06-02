@@ -1,6 +1,6 @@
 using Game.Core.Events;
 
-namespace Game.Core.Challenges.Events
+namespace Game.Core.Progress.Events
 {
     /// <summary>
     /// Raised when a player completes a challenge.

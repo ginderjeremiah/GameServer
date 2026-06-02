@@ -2,7 +2,7 @@ using Game.Abstractions.DataAccess;
 using Game.Core.Battle.Events;
 using Game.Core.Events;
 
-namespace Game.Application
+namespace Game.Application.Events
 {
     public class BattleStatisticsEventHandler(
         IPlayerProgressRepository progressRepo,

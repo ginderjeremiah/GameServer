@@ -4,7 +4,7 @@ using Game.Core.Players;
 using Game.Core.Progress;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using CoreChallenge = Game.Core.Challenges.PlayerChallenge;
+using CoreChallenge = Game.Core.Progress.PlayerChallenge;
 using CoreStat = Game.Core.Progress.PlayerStatistic;
 using EntityChallenge = Game.Abstractions.Entities.PlayerChallenge;
 using EntityStat = Game.Abstractions.Entities.PlayerStatistic;
@@ -21,27 +21,34 @@ namespace Game.DataAccess.Repositories
 
         public async Task<PlayerProgress> Load(Player player)
         {
-            var statEntities = await _context.PlayerStatistics
-                .Where(ps => ps.PlayerId == player.Id)
-                .ToListAsync();
+            if (_loadedStats is null)
+            {
+                var statEntities = await _context.PlayerStatistics
+                    .Where(ps => ps.PlayerId == player.Id)
+                    .ToListAsync();
 
-            var challengeEntities = await _context.PlayerChallenges
-                .Where(pc => pc.PlayerId == player.Id)
-                .ToListAsync();
+                _loadedStats = statEntities.ToDictionary(
+                    e => (e.StatisticTypeId, e.EntityId));
+            }
 
-            _loadedStats = statEntities.ToDictionary(
-                e => (e.StatisticTypeId, e.EntityId));
-            _loadedChallenges = challengeEntities.ToDictionary(
-                e => e.ChallengeId);
+            if (_loadedChallenges is null)
+            {
+                var challengeEntities = await _context.PlayerChallenges
+                    .Where(pc => pc.PlayerId == player.Id)
+                    .ToListAsync();
 
-            var coreStats = statEntities.Select(e => new CoreStat
+                _loadedChallenges = challengeEntities.ToDictionary(
+                    e => e.ChallengeId);
+            }
+
+            var coreStats = _loadedStats.Values.Select(e => new CoreStat
             {
                 Type = (EStatisticType)e.StatisticTypeId,
                 EntityId = e.EntityId,
                 Value = e.Value,
             });
 
-            var coreChallenges = challengeEntities.Select(e => new CoreChallenge(
+            var coreChallenges = _loadedChallenges.Values.Select(e => new CoreChallenge(
                 _challenges.GetChallenge(e.ChallengeId),
                 e.Progress,
                 e.Completed,

@@ -9,7 +9,6 @@ export * from './interfaces/items.ts';
 export * from './interfaces/skills.ts';
 export * from './interfaces/tags.ts';
 export * from './interfaces/zones.ts';
-export * from './interfaces/challenges.ts';
+export * from './interfaces/progress.ts';
 export * from './interfaces/player.ts';
 export * from './interfaces/inventory-items.ts';
-export * from './interfaces/statistics.ts';

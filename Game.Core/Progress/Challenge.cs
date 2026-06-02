@@ -1,6 +1,4 @@
-using Game.Core.Progress;
-
-namespace Game.Core.Challenges
+namespace Game.Core.Progress
 {
     /// <summary>
     /// Represents a challenge that can be completed to unlock an item or modifier.

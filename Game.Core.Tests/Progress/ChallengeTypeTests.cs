@@ -1,5 +1,4 @@
-using Game.Core;
-using Game.Core.Challenges;
+using Game.Core.Progress;
 using Xunit;
 
 namespace Game.Core.Tests.Progress
@@ -30,6 +29,29 @@ namespace Game.Core.Tests.Progress
 
             Assert.Equal(EChallengeType.LevelReached, challengeType.Id);
             Assert.Null(challengeType.StatisticType);
+        }
+
+        [Fact]
+        public void TimeTrial_UsesAtMostGoalComparison()
+        {
+            var challengeType = new ChallengeType(EChallengeType.TimeTrial);
+
+            Assert.Equal(EChallengeGoalComparison.AtMost, challengeType.GoalComparison);
+        }
+
+        [Theory]
+        [InlineData(EChallengeType.EnemiesKilled)]
+        [InlineData(EChallengeType.BossesDefeated)]
+        [InlineData(EChallengeType.ZonesCleared)]
+        [InlineData(EChallengeType.LevelReached)]
+        [InlineData(EChallengeType.DamageDealt)]
+        [InlineData(EChallengeType.BattlesWon)]
+        [InlineData(EChallengeType.SkillsUsed)]
+        public void AccumulatingTypes_UseAtLeastGoalComparison(EChallengeType type)
+        {
+            var challengeType = new ChallengeType(type);
+
+            Assert.Equal(EChallengeGoalComparison.AtLeast, challengeType.GoalComparison);
         }
 
         [Fact]

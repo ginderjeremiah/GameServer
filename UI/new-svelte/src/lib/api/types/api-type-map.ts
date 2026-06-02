@@ -8,6 +8,7 @@ import type {
 	IAttributeUpdate,
 	IBattlerAttribute,
 	IChallenge,
+	IChallengeType,
 	IChange,
 	IEnemy,
 	IEquipRequest,
@@ -53,6 +54,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetZoneEnemies': undefined;
 	'Attributes': IAttribute[];
 	'Challenges': IChallenge[];
+	'Challenges/ChallengeTypes': IChallengeType[];
 	'Challenges/Player': IPlayerChallenge[];
 	'Enemies': IEnemy[];
 	'ItemCategories': IItemCategory[];

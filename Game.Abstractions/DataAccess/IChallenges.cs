@@ -1,4 +1,4 @@
-using Game.Core.Challenges;
+using Game.Core.Progress;
 
 namespace Game.Abstractions.DataAccess
 {

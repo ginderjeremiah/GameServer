@@ -1,6 +1,6 @@
 using Game.Abstractions.DataAccess;
-using Game.Api.Models.Challenges;
 using Game.Api.Models.Common;
+using Game.Api.Models.Progress;
 using Game.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,6 +26,12 @@ namespace Game.Api.Controllers
             var player = await _sessionService.LoadPlayer();
             var progress = await _playerChallenges.GetPlayerChallenges(player.Id);
             return ApiResponse.Success(progress.To().Model<PlayerChallenge>());
+        }
+
+        [HttpGet]
+        public async Task<ApiEnumerableResponse<ChallengeType>> ChallengeTypes()
+        {
+            return ApiResponse.Success(Core.Progress.ChallengeType.GetAll().To().Model<ChallengeType>());
         }
     }
 }

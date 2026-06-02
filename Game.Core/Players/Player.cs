@@ -56,7 +56,7 @@ namespace Game.Core.Players
                 Exp -= Level * 100;
                 Level++;
                 StatPoints.StatPointsGained += 6;
-                RaiseEvent(new PlayerLeveledUpEvent(Id, Level, StatPoints.StatPointsGained));
+                RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
             }
 
             RaiseCoreUpdated();

@@ -1,6 +1,6 @@
 using PlayerChallengeEntity = Game.Abstractions.Entities.PlayerChallenge;
 
-namespace Game.Api.Models.Challenges
+namespace Game.Api.Models.Progress
 {
     public class PlayerChallenge : IModelFromSource<PlayerChallenge, PlayerChallengeEntity>
     {

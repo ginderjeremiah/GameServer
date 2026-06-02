@@ -1,6 +1,5 @@
 using Game.Core;
 using Game.Core.Battle;
-using Game.Core.Challenges;
 using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
@@ -331,6 +330,46 @@ namespace Game.Core.Tests.Progress
 
             Assert.Empty(completed);
             Assert.Equal(5m, Assert.Single(progress.ChallengeProgress).Progress);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_TimeTrial_CompletesWhenFastestVictoryAtOrBelowGoal()
+        {
+            var challenge = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.FastestVictory, null, 8m), // best victory in 8s, goal is "within 10s"
+            ]);
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Single(completed);
+            Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_TimeTrial_DoesNotCompleteWhenFastestVictoryAboveGoal()
+        {
+            var challenge = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.FastestVictory, null, 14m),
+            ]);
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Empty(completed);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_TimeTrial_DoesNotCompleteWithNoRecordedVictory()
+        {
+            var challenge = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var progress = MakeProgress(); // no FastestVictory statistic recorded yet
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Empty(completed);
         }
 
         [Fact]

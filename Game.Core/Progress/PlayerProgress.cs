@@ -1,5 +1,4 @@
 using Game.Core.Battle;
-using Game.Core.Challenges;
 using Game.Core.Enemies;
 using Game.Core.Players;
 

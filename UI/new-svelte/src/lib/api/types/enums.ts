@@ -85,6 +85,11 @@ export enum EEntityType {
 	Skill = 3,
 }
 
+export enum EChallengeGoalComparison {
+	AtLeast = 1,
+	AtMost = 2,
+}
+
 export enum ELogType {
 	Damage = 1,
 	Debug = 2,

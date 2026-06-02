@@ -34,6 +34,16 @@ Challenges and Statistics are relatively new additions to the game, and their de
 
 Not all Challenges are tied to Statistics and vice versa, but many will be. Statistics are tracked metrics that can be used to gate content and progression in the game. For example, a Challenge may require a player to have a certain number of kills with a specific weapon type, which would be tracked as a Statistic.
 
+## Challenge Goal Comparison Direction
+
+Most challenges are *accumulating* goals: the tracked statistic increases over time and the challenge is completed once it reaches **at least** the goal (e.g. "defeat 100 enemies"). However, some statistics are minimized rather than maximized — for example, `FastestVictory` records the lowest victory time, where lower is better. A `TimeTrial` challenge ("win a battle within N seconds") is therefore satisfied when the tracked value is **at or below** the goal, which is the opposite comparison.
+
+To handle both cases, each challenge type declares a goal comparison direction (`EChallengeGoalComparison`): `AtLeast` for accumulating goals and `AtMost` for minimization goals. This is intrinsic to the challenge type (derived in `ChallengeType`, not persisted) so the completion rule lives in one place. `PlayerChallenge.UpdateProgress` applies the appropriate comparison.
+
+For `AtMost` goals, a tracked value of `0` is treated as "no data yet" (e.g. the player has not won a qualifying battle) and does **not** complete the challenge — otherwise a brand-new player with no victories would instantly satisfy every time trial. This matches how `FastestVictory` is stored, where `0` is the sentinel for "no victory recorded".
+
+> **Note:** Progress for an `AtMost` challenge is stored as the player's current best value (e.g. their fastest victory time), not as a 0→goal accumulation. A future frontend change may need to interpret these challenges differently when rendering a progress indicator, since a lower value represents *better* progress.
+
 # Logs
 
 Logs here refer to messages displayed in the UI of the game for various events, such as combat actions, item drops, level-ups, and other significant occurrences. Logs are an important part of the user experience, as they provide feedback and information to players about what is happening in the game. Logs can be filtered by type (e.g., damage dealt, experience gained, level-ups) and are meant to be informative enough that the player can step away from the game and see if anything significant happened while they were away or to have a record of what happened during a battle. Logs should only ever be generated on the frontend, as they are purely a UI element and do not affect any game logic or state. The backend should not be concerned with these kinds of logs, as its primary responsibility is to maintain the integrity of the game state and logic.

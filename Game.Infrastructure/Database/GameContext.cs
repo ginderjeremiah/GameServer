@@ -111,9 +111,8 @@ namespace Game.Infrastructure.Database
                 entity.Property(ct => ct.Name)
                     .HasMaxLength(100);
 
-                entity.HasData(Enum.GetValues<EChallengeType>().Select(a =>
+                entity.HasData(Core.Progress.ChallengeType.GetAll().Select(type =>
                 {
-                    var type = new Core.Challenges.ChallengeType(a);
                     return new ChallengeType
                     {
                         Id = (int)type.Id,

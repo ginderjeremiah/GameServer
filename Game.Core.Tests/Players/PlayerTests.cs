@@ -43,7 +43,7 @@ namespace Game.Core.Tests.Players
 
             var evt = player.DomainEvents.OfType<PlayerLeveledUpEvent>().SingleOrDefault();
             Assert.NotNull(evt);
-            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(player, evt.Player);
             Assert.Equal(2, evt.NewLevel);
         }
 

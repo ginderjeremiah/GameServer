@@ -1,4 +1,5 @@
-﻿using Game.Application.Services;
+﻿using Game.Application.Events;
+using Game.Application.Services;
 using Game.Core.Battle.Events;
 using Game.Core.Events;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
-using Game.Api.Models.Statistics;
+using Game.Api.Models.Progress;
 using Game.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 

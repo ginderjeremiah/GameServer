@@ -1,5 +1,5 @@
 using Game.Api.Models.Common;
-using Game.Api.Models.Statistics;
+using Game.Api.Models.Progress;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;

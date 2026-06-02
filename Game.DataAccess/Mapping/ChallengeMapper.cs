@@ -1,7 +1,7 @@
 using Game.Core;
-using CoreChallenge = Game.Core.Challenges.Challenge;
-using CoreChallengeType = Game.Core.Challenges.ChallengeType;
-using CorePlayerChallenge = Game.Core.Challenges.PlayerChallenge;
+using CoreChallenge = Game.Core.Progress.Challenge;
+using CoreChallengeType = Game.Core.Progress.ChallengeType;
+using CorePlayerChallenge = Game.Core.Progress.PlayerChallenge;
 using EntityChallenge = Game.Abstractions.Entities.Challenge;
 using EntityPlayerChallenge = Game.Abstractions.Entities.PlayerChallenge;
 

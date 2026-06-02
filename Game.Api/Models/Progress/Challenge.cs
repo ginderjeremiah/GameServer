@@ -1,7 +1,7 @@
 using Game.Core;
-using CoreChallenge = Game.Core.Challenges.Challenge;
+using CoreChallenge = Game.Core.Progress.Challenge;
 
-namespace Game.Api.Models.Challenges
+namespace Game.Api.Models.Progress
 {
     public class Challenge : IModelFromSource<Challenge, CoreChallenge>
     {

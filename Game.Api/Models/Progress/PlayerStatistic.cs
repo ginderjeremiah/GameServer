@@ -1,7 +1,7 @@
 using Game.Core;
 using PlayerStatisticEntity = Game.Abstractions.Entities.PlayerStatistic;
 
-namespace Game.Api.Models.Statistics
+namespace Game.Api.Models.Progress
 {
     public class PlayerStatistic : IModelFromSource<PlayerStatistic, PlayerStatisticEntity>
     {
