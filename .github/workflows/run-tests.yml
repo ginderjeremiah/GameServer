@@ -55,6 +55,11 @@ jobs:
         working-directory: UI/new-svelte
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
     - name: Install node modules
       run: npm install
 
