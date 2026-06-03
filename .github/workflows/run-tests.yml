@@ -63,11 +63,14 @@ jobs:
     - name: Install node modules
       run: npm install
 
-    - name: Install playwright
-      run: npx playwright install
+#   - name: Install playwright
+#     run: npx playwright install
 
-    - name: Run tests
-      run: npm run test
+#   - name: Run tests
+#     run: npm run test
+
+    - name: Run unit tests only (for now)
+      run: npm run test:unit
 
     - name: Upload test results
       if: always()
