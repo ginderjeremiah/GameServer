@@ -53,6 +53,15 @@ jobs:
     - name: Execute unit tests
       run: dotnet test
 
+    - name: Move to new UI directory
+      run: cd UI/new-svelte
+
+    - name: Install node modules
+      run: npm i
+
+    - name: Run tests
+      run: npm run test
+
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
