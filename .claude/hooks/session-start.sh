@@ -12,11 +12,16 @@
 #   1. Docker bridge works (local dev / CI) → no marker; Testcontainers handles everything.
 #   2. Docker available but constrained (vfs / no-iptables sandbox) → start containers with
 #      host networking and write .container-info.json for the test fixtures.
-#   3. Docker containers fail (image pull rate-limited, no cached image, etc.) → fall back
-#      to natively-installed PostgreSQL + Redis, write .container-info.json.
+#      NOTE: Docker images are expected to be pre-pulled by the environment setup script.
+#   3. Docker containers fail (no cached image, etc.) → fall back to natively-installed
+#      PostgreSQL + Redis, write .container-info.json.
 #   4. Nothing works → exit 0 (best-effort; session continues without integration tests).
 #
 # The hook is best-effort: it never fails the session — it always exits 0.
+
+if [ "$CLAUDE_CODE_REMOTE" != "true" ]; then
+  exit 0
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -102,9 +107,6 @@ if docker info >/dev/null 2>&1; then
     log "PostgreSQL container already running."
     DOCKER_POSTGRES_OK=true
   else
-    log "Pulling $POSTGRES_IMAGE (first pull is slow with the vfs storage driver)..."
-    docker pull "$POSTGRES_IMAGE" >/dev/null 2>&1 || log "Could not pull $POSTGRES_IMAGE; using cached image if present."
-
     docker rm -f "$POSTGRES_CONTAINER" >/dev/null 2>&1 || true
     log "Starting PostgreSQL on localhost:$POSTGRES_PORT (host networking)..."
     # Host networking bypasses the bridge/iptables requirement. The trailing "-p PORT" is passed
@@ -135,9 +137,6 @@ if docker info >/dev/null 2>&1; then
     log "Redis container already running."
     DOCKER_REDIS_OK=true
   else
-    log "Pulling $REDIS_IMAGE..."
-    docker pull "$REDIS_IMAGE" >/dev/null 2>&1 || log "Could not pull $REDIS_IMAGE; using cached image if present."
-
     docker rm -f "$REDIS_CONTAINER" >/dev/null 2>&1 || true
     log "Starting Redis on localhost:$REDIS_PORT (host networking)..."
     if docker run -d --rm --network host --name "$REDIS_CONTAINER" \

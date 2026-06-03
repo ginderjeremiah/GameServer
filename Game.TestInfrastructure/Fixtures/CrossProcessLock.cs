@@ -12,8 +12,8 @@ namespace Game.TestInfrastructure.Fixtures
     internal sealed class CrossProcessLock : IDisposable
     {
         // Generous upper bound so a wedged peer fails the run loudly instead of hanging forever.
-        private static readonly TimeSpan AcquireTimeout = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan _acquireTimeout = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan _pollInterval = TimeSpan.FromMilliseconds(100);
 
         private readonly FileStream _handle;
 
@@ -24,7 +24,7 @@ namespace Game.TestInfrastructure.Fixtures
 
         public static async Task<CrossProcessLock> AcquireAsync(string lockFilePath, CancellationToken cancellationToken = default)
         {
-            var deadline = DateTime.UtcNow + AcquireTimeout;
+            var deadline = DateTime.UtcNow + _acquireTimeout;
             while (true)
             {
                 try
@@ -35,7 +35,7 @@ namespace Game.TestInfrastructure.Fixtures
                 catch (IOException) when (DateTime.UtcNow < deadline)
                 {
                     // Another process holds the lock; wait and retry until it releases or we time out.
-                    await Task.Delay(PollInterval, cancellationToken);
+                    await Task.Delay(_pollInterval, cancellationToken);
                 }
             }
         }
