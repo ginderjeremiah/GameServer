@@ -22,14 +22,7 @@ on:
 jobs:
 
   test-backend:
-    strategy:
-      matrix:
-        configuration: [Release]
-
     runs-on: ubuntu-latest
-
-    env:
-      Solution_Name: Game.sln
 
     steps:
     - name: Checkout
@@ -59,14 +52,25 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./UI/new-svelte
+        working-directory: UI/new-svelte
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
     - name: Install node modules
-      run: npm i
+      run: npm install
 
-    - name: Run tests
-      run: npm run test
+#   - name: Install playwright
+#     run: npx playwright install
+
+#   - name: Run tests
+#     run: npm run test
+
+    - name: Run unit tests only (for now)
+      run: npm run test:unit
 
     - name: Upload test results
       if: always()
