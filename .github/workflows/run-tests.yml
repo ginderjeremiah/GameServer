@@ -22,14 +22,7 @@ on:
 jobs:
 
   test-backend:
-    strategy:
-      matrix:
-        configuration: [Release]
-
     runs-on: ubuntu-latest
-
-    env:
-      Solution_Name: Game.sln
 
     steps:
     - name: Checkout
@@ -59,11 +52,11 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./UI/new-svelte
+        working-directory: UI/new-svelte
 
     steps:
     - name: Install node modules
-      run: npm i
+      run: npm install
 
     - name: Run tests
       run: npm run test
