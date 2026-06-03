@@ -1,3 +1,4 @@
+import { challengeEntity } from './challenge';
 import { enemyEntity } from './enemy';
 import { itemEntity } from './item';
 import { itemModEntity } from './item-mod';
@@ -21,7 +22,8 @@ export const workbenchEntities: EntityConfig<Identified>[] = [
 	asEntity(itemEntity),
 	asEntity(itemModEntity),
 	asEntity(zoneEntity),
-	asEntity(tagEntity)
+	asEntity(tagEntity),
+	asEntity(challengeEntity)
 ];
 
 export interface WorkbenchGroup {
@@ -33,7 +35,8 @@ export interface WorkbenchGroup {
 export const workbenchGroups: WorkbenchGroup[] = [
 	{ key: 'combat', label: 'Combat', entityKeys: ['enemies', 'skills'] },
 	{ key: 'items', label: 'Items', entityKeys: ['items', 'itemMods', 'tags'] },
-	{ key: 'world', label: 'World', entityKeys: ['zones'] }
+	{ key: 'world', label: 'World', entityKeys: ['zones'] },
+	{ key: 'progression', label: 'Progression', entityKeys: ['challenges'] }
 ];
 
 export const entityByKey = (key: string): EntityConfig<Identified> | undefined =>

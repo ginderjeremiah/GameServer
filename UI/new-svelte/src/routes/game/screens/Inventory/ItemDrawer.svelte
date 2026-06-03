@@ -3,8 +3,9 @@
 		<span class="cat-diamond" style:background={accent} style:box-shadow="0 0 6px {accent}aa"></span>
 		<span class="cat-label" style:color={accent}>{catName(item.itemCategoryId)}</span>
 		<span class="rarity-tag">
-			<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {hexA(rc, 0.65)}"></span>
-			<span class="rarity-label" style:color={rc}>{rarityMeta(item.rarityId).label}</span>
+			<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
+			></span>
+			<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
 		</span>
 		<button class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
 	</div>
@@ -44,7 +45,8 @@
 import StatList from './StatList.svelte';
 import ModSlots from './ModSlots.svelte';
 import { BattleAttributes, type Item } from '$lib/battle';
-import { catAccent, catName, hexA, rarityColor, rarityMeta, type InventoryView } from './inventory-view.svelte';
+import { rarityColor, rarityLabel, rarityTint } from '$lib/common';
+import { catAccent, catName, type InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
 

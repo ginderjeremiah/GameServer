@@ -8,6 +8,10 @@
 	<TagsSection {section} {record} {baseline} {store} />
 {:else if section.kind === 'usage'}
 	<UsageSection record={record as unknown as ITag} />
+{:else if section.kind === 'challenge-condition'}
+	<ChallengeConditionSection {record} {baseline} {store} />
+{:else if section.kind === 'challenge-reward'}
+	<ChallengeRewardSection {record} {baseline} {store} />
 {/if}
 
 <script lang="ts">
@@ -19,6 +23,8 @@ import FieldsSection from './FieldsSection.svelte';
 import SectionTable from './SectionTable.svelte';
 import TagsSection from './TagsSection.svelte';
 import UsageSection from './UsageSection.svelte';
+import ChallengeConditionSection from './challenge/ChallengeConditionSection.svelte';
+import ChallengeRewardSection from './challenge/ChallengeRewardSection.svelte';
 
 interface Props {
 	section: SectionConfig<Identified>;

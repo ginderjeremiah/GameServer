@@ -27,3 +27,11 @@ $enemy-accent: #e08778;
 $mod-component: rgba(240, 240, 240, 0.55);
 $mod-prefix: #9bc7d9;
 $mod-suffix: #c0a8e6;
+
+// rarity palette (white → green → blue → purple → gold → red, ascending tier)
+$rarity-common: #d4d4d4;
+$rarity-uncommon: #86c98f;
+$rarity-rare: #a1c2f7;
+$rarity-epic: #bfa2ec;
+$rarity-legendary: #e8c878;
+$rarity-mythic: #e8806f;

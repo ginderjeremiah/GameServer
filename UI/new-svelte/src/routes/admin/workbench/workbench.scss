@@ -833,4 +833,305 @@
 		border-radius: 3px;
 		padding: 2px 7px;
 	}
+
+	/* ════════════════════════════════════════════════════════════════════════
+	   Challenges tool — condition builder, sentence preview, reward slots /
+	   picker. Layered on the shared tokens above; only the bespoke structure the
+	   generic kinds don't cover lives here (ported from the design's challenges.css).
+	   ════════════════════════════════════════════════════════════════════════ */
+	.ch-compact-grid {
+		display: flex;
+		gap: 18px 20px;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		padding: 18px;
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.012);
+	}
+	.ch-stat-readout {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		height: 38px;
+		padding: 0 12px;
+		border: 1px solid rgba(161, 194, 247, 0.22);
+		border-radius: 4px;
+		background: rgba(161, 194, 247, 0.05);
+
+		&.none {
+			border-color: var(--border-subtle);
+			background: rgba(255, 255, 255, 0.02);
+		}
+		.nm {
+			font-size: 13px;
+			color: var(--text-primary);
+			white-space: nowrap;
+
+			&.muted {
+				color: var(--text-tertiary);
+			}
+		}
+		.ch-stat-ent {
+			margin-left: auto;
+			font-family: var(--mono);
+			font-size: 9px;
+			letter-spacing: 1px;
+			text-transform: uppercase;
+			color: var(--accent);
+			border: 1px solid rgba(161, 194, 247, 0.35);
+			border-radius: 3px;
+			padding: 2px 6px;
+		}
+	}
+	.ch-grid-cap {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		font-family: var(--mono);
+		font-size: 10.5px;
+		letter-spacing: 0.3px;
+		color: var(--text-muted);
+		margin-top: 13px;
+	}
+	.ch-scope-global {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		height: 38px;
+		padding: 0 13px;
+		border: 1px dashed var(--border-light);
+		border-radius: 4px;
+		font-size: 12.5px;
+		color: var(--text-tertiary);
+		background: rgba(255, 255, 255, 0.015);
+	}
+	.ch-sentence {
+		margin-top: 22px;
+		padding: 16px 18px;
+		border: 1px solid rgba(161, 194, 247, 0.25);
+		border-radius: 8px;
+		background: linear-gradient(180deg, rgba(161, 194, 247, 0.07), rgba(161, 194, 247, 0.02));
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		flex-wrap: wrap;
+	}
+	.ch-sentence-eye {
+		font-family: var(--mono);
+		font-size: 9px;
+		letter-spacing: 1.6px;
+		text-transform: uppercase;
+		color: var(--accent);
+		border: 1px solid rgba(161, 194, 247, 0.4);
+		border-radius: 3px;
+		padding: 3px 7px;
+		white-space: nowrap;
+	}
+	.ch-sentence-text {
+		font-size: 17px;
+		font-weight: 500;
+		color: var(--text-primary);
+		letter-spacing: -0.2px;
+	}
+	.ch-flag {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--mono);
+		font-size: 10px;
+		letter-spacing: 0.4px;
+		padding: 3px 8px;
+		border-radius: 3px;
+		margin-left: auto;
+		white-space: nowrap;
+
+		&.info {
+			color: var(--accent-light);
+			border: 1px solid rgba(161, 194, 247, 0.3);
+			background: rgba(161, 194, 247, 0.07);
+		}
+	}
+	.ch-reward-intro {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		font-size: 12.5px;
+		color: var(--text-tertiary);
+		line-height: 1.5;
+		margin-bottom: 18px;
+		max-width: 760px;
+	}
+	.ch-reward-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+		max-width: 760px;
+	}
+	.ch-reward-slot {
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		padding: 16px;
+		background: var(--panel);
+		transition:
+			border-color 0.14s,
+			box-shadow 0.14s;
+
+		&.filled {
+			border-color: var(--border-light);
+		}
+		&.open {
+			border-color: rgba(161, 194, 247, 0.4);
+			box-shadow: 0 0 0 1px rgba(161, 194, 247, 0.15);
+		}
+	}
+	.ch-reward-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+	}
+	.ch-reward-ic {
+		width: 34px;
+		height: 34px;
+		flex-shrink: 0;
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid var(--border-subtle);
+		color: var(--text-tertiary);
+	}
+	.ch-reward-label {
+		font-family: var(--mono);
+		font-size: 9.5px;
+		letter-spacing: 1.6px;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.ch-reward-name {
+		font-size: 14.5px;
+		font-weight: 500;
+		color: var(--text-primary);
+		margin-top: 5px;
+		display: flex;
+		align-items: baseline;
+		gap: 9px;
+		flex-wrap: wrap;
+	}
+	.ch-reward-sub {
+		font-family: var(--mono);
+		font-size: 9.5px;
+		letter-spacing: 1px;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.ch-reward-empty {
+		font-size: 13.5px;
+		color: var(--text-muted);
+		margin-top: 5px;
+		font-style: italic;
+	}
+	.ch-picker {
+		margin-top: 16px;
+		border: 1px solid rgba(161, 194, 247, 0.3);
+		border-radius: 8px;
+		overflow: hidden;
+		max-width: 760px;
+		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+	}
+	.ch-picker-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+		border-bottom: 1px solid var(--border-subtle);
+		background: var(--surface);
+	}
+	.ch-picker-count {
+		font-family: var(--mono);
+		font-size: 10.5px;
+		color: var(--text-tertiary);
+		white-space: nowrap;
+	}
+	.ch-picker-list {
+		max-height: 320px;
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding: 6px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.ch-picker-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		min-width: 0;
+		text-align: left;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 5px;
+		padding: 9px 11px;
+		cursor: pointer;
+		overflow: hidden;
+		transition:
+			background 0.12s,
+			border-color 0.12s;
+
+		&:hover:not(:disabled) {
+			background: rgba(255, 255, 255, 0.04);
+			border-color: var(--border-subtle);
+		}
+		.rare-tag {
+			flex-shrink: 0;
+		}
+		&.current {
+			background: rgba(161, 194, 247, 0.1);
+			border-color: rgba(161, 194, 247, 0.35);
+		}
+		&.claimed {
+			opacity: 0.5;
+			cursor: not-allowed;
+
+			.ch-picker-nm {
+				color: var(--text-tertiary);
+				text-decoration: line-through;
+			}
+		}
+	}
+	.ch-picker-nm {
+		font-size: 13px;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex-shrink: 1;
+	}
+	.ch-picker-state {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font-family: var(--mono);
+		font-size: 9.5px;
+		letter-spacing: 0.3px;
+		color: var(--text-muted);
+		white-space: nowrap;
+		max-width: 160px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex-shrink: 0;
+
+		&.current {
+			color: var(--accent);
+		}
+	}
+
+	@media (max-width: 900px) {
+		.ch-reward-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 }

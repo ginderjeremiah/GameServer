@@ -25,7 +25,7 @@
 					<div class="mod-info">
 						<div class="mod-head">
 							{#if applied}
-								<span class="mod-name">{applied.name}</span>
+								<span class="mod-name" style:color={rarityColor(applied.rarityId)}>{applied.name}</span>
 							{:else}
 								<span class="mod-empty">Empty slot</span>
 							{/if}
@@ -39,14 +39,14 @@
 					</div>
 
 					{#if applied}
-            <button
-              class="mod-remove"
-              title="Remove mod"
-              onclick={(e) => {
-                e.stopPropagation();
-                view.removeMod(item.itemId, slot.id);
-              }}>×</button
-            >
+						<button
+							class="mod-remove"
+							title="Remove mod"
+							onclick={(e) => {
+								e.stopPropagation();
+								view.removeMod(item.itemId, slot.id);
+							}}>×</button
+						>
 					{:else}
 						<span class="mod-add" style:color={accent}>+</span>
 					{/if}
@@ -71,7 +71,7 @@
 											openSlotId = null;
 										}}
 									>
-										<div class="option-name">{mod.name}</div>
+										<div class="option-name" style:color={rarityColor(mod.rarityId)}>{mod.name}</div>
 										<div class="option-desc">{mod.description}</div>
 									</button>
 								{/each}
@@ -87,6 +87,7 @@
 <script lang="ts">
 import { EItemModType } from '$lib/api';
 import type { Item } from '$lib/battle';
+import { rarityColor } from '$lib/common';
 import type { InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();

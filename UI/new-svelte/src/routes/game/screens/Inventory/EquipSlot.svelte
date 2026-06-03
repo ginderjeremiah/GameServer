@@ -10,7 +10,11 @@
 		role="button"
 		tabindex="0"
 		style:border-color={tileBorder}
-		style:background={over ? hexA('#a1c2f7', 0.14) : filled ? hexA(rc, 0.07) : 'rgba(255,255,255,0.03)'}
+		style:background={over
+			? hexA('#a1c2f7', 0.14)
+			: filled
+				? rarityTint(item!.rarityId, 0.07)
+				: 'rgba(255,255,255,0.03)'}
 		ondragover={handleDragOver}
 		ondragleave={() => (over = false)}
 		ondrop={handleDrop}
@@ -55,8 +59,9 @@
 		{#if filled}
 			<div class="item-name">{item!.name}</div>
 			<div class="rarity-tag">
-				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {hexA(rc, 0.65)}"></span>
-				<span class="rarity-label" style:color={rc}>{rarityMeta(item!.rarityId).label}</span>
+				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item!.rarityId, 0.65)}"
+				></span>
+				<span class="rarity-label" style:color={rc}>{rarityLabel(item!.rarityId)}</span>
 			</div>
 		{:else}
 			<div class="empty-label">Empty</div>
@@ -66,8 +71,9 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
+import { rarityColor, rarityLabel, rarityTint } from '$lib/common';
 import CategoryGlyph from './CategoryGlyph.svelte';
-import { catAccent, hexA, rarityColor, rarityMeta, type EquipSlotDef } from './inventory-view.svelte';
+import { catAccent, hexA, type EquipSlotDef } from './inventory-view.svelte';
 
 interface Props {
 	slot: EquipSlotDef;
@@ -89,11 +95,17 @@ let over = $state(false);
 let hover = $state(false);
 
 const filled = $derived(!!item);
-const rc = $derived(item ? rarityColor(item.rarityId) : '#a1c2f7');
+const rc = $derived(item ? rarityColor(item.rarityId) : 'var(--accent)');
 const canAccept = $derived(!!dragItem && dragItem.itemCategoryId === slot.category);
 
 const tileBorder = $derived(
-	over || selected ? '#a1c2f7' : filled ? hexA(rc, 0.6) : canAccept ? 'rgba(161,194,247,0.5)' : 'rgba(255,255,255,0.14)'
+	over || selected
+		? '#a1c2f7'
+		: filled
+			? rarityTint(item!.rarityId, 0.6)
+			: canAccept
+				? 'rgba(161,194,247,0.5)'
+				: 'rgba(255,255,255,0.14)'
 );
 
 const handleDragOver = (e: DragEvent) => {

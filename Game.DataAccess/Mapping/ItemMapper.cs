@@ -41,6 +41,7 @@ namespace Game.DataAccess.Mapping
         {
             return new ItemMod
             {
+                Id = entity.Id,
                 Name = entity.Name,
                 Description = entity.Description ?? string.Empty,
                 Type = (EItemModType)entity.ItemModTypeId,

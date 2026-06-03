@@ -1,6 +1,7 @@
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
+using Game.Api.Models.Progress;
 using Game.Api.Models.Skills;
 using Game.Api.Models.Zones;
 using Game.Core;
@@ -336,6 +337,49 @@ namespace Game.Api.Tests.Integration
             var edited = Assert.Single(after, s => s.Id == skill.Id);
             Assert.Equal("Renamed", edited.Name);
             Assert.Equal(99m, edited.BaseDamage);
+        }
+
+        [Fact]
+        public async Task AddEditChallenges_AddChallenge_Succeeds()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "First Blood",
+                        Description = "Defeat your very first foes in battle.",
+                        ChallengeTypeId = (int)EChallengeType.EnemiesKilled,
+                        TargetEntityId = (int?)null,
+                        ProgressGoal = 10m,
+                        RewardItemId = (int?)null,
+                        RewardItemModId = (int?)null
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditChallenges", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            // Verify the challenge was created — and its statistic/entity were derived from the type.
+            var challengesResponse = await authClient.GetAsync("/api/Challenges", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, challengesResponse.StatusCode);
+            var challengesResult = await challengesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Challenge>>(CancellationToken);
+            Assert.NotNull(challengesResult?.Data);
+            var created = Assert.Single(challengesResult.Data, c => c.Name == "First Blood");
+            Assert.Equal(EChallengeType.EnemiesKilled, created.ChallengeTypeId);
+            Assert.Equal(EStatisticType.EnemiesKilled, created.StatisticType);
+            Assert.Equal(EEntityType.Enemy, created.EntityType);
+            Assert.Equal(10m, created.ProgressGoal);
         }
 
         private async Task<List<Skill>> GetSkillsAsync(HttpClient client)

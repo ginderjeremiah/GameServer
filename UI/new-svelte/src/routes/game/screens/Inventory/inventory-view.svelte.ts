@@ -1,4 +1,4 @@
-import { EItemCategory, ERarity } from '$lib/api';
+import { EItemCategory } from '$lib/api';
 import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager } from '$lib/engine';
 import { BattleAttributes, type Item, type ItemMod } from '$lib/battle';
 import { staticData } from '$stores';
@@ -27,17 +27,6 @@ export const EQUIP_GROUPS: { key: 'armor' | 'arms'; label: string }[] = [
 	{ key: 'arms', label: 'Arms' }
 ];
 
-/* Rarity drives the grid-cell border color (white→green→blue→purple→gold→red)
-   and the glow intensity (scales with tier). */
-export const RARITY_META: Record<ERarity, { label: string; level: number; color: string; glow: number }> = {
-	[ERarity.Common]: { label: 'Common', level: 1, color: '#d4d4d4', glow: 0.0 },
-	[ERarity.Uncommon]: { label: 'Uncommon', level: 2, color: '#86c98f', glow: 0.22 },
-	[ERarity.Rare]: { label: 'Rare', level: 3, color: '#a1c2f7', glow: 0.38 },
-	[ERarity.Epic]: { label: 'Epic', level: 4, color: '#bfa2ec', glow: 0.54 },
-	[ERarity.Legendary]: { label: 'Legendary', level: 5, color: '#e8c878', glow: 0.72 },
-	[ERarity.Mythic]: { label: 'Mythic', level: 6, color: '#e8806f', glow: 0.9 }
-};
-
 const CATEGORY_ACCENT: Record<number, string> = {
 	[EItemCategory.Helm]: '#a1c2f7',
 	[EItemCategory.Chest]: '#a1c2f7',
@@ -47,8 +36,6 @@ const CATEGORY_ACCENT: Record<number, string> = {
 	[EItemCategory.Accessory]: '#e8c878'
 };
 
-export const rarityMeta = (rarityId: ERarity) => RARITY_META[rarityId] ?? RARITY_META[ERarity.Common];
-export const rarityColor = (rarityId: ERarity) => rarityMeta(rarityId).color;
 export const catAccent = (cat: EItemCategory) => CATEGORY_ACCENT[cat] ?? '#a1c2f7';
 export const catName = (cat: EItemCategory) => EItemCategory[cat] ?? 'Item';
 

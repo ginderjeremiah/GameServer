@@ -71,6 +71,7 @@ namespace Game.Application.Services
 
             var mod = new ItemMod
             {
+                Id = itemModId,
                 Name = modEntity.Name,
                 Description = modEntity.Description ?? string.Empty,
                 Type = (EItemModType)modEntity.ItemModTypeId,

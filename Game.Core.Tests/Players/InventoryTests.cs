@@ -13,20 +13,22 @@ namespace Game.Core.Tests.Players
         public void UnlockItem_NewItem_AddsToUnlockedItems()
         {
             var inventory = new Inventory();
+            var item = MakeItem(42);
 
-            inventory.UnlockItem(42);
+            inventory.UnlockItem(item);
 
             Assert.Single(inventory.UnlockedItems);
-            Assert.Equal(42, inventory.UnlockedItems[0].ItemId);
+            Assert.Equal(item, inventory.UnlockedItems[0].Item);
         }
 
         [Fact]
         public void UnlockItem_DuplicateItem_DoesNotAddTwice()
         {
             var inventory = new Inventory();
+            var item = MakeItem(42);
 
-            inventory.UnlockItem(42);
-            inventory.UnlockItem(42);
+            inventory.UnlockItem(item);
+            inventory.UnlockItem(item);
 
             Assert.Single(inventory.UnlockedItems);
         }
@@ -151,6 +153,7 @@ namespace Game.Core.Tests.Players
 
             var mod = new ItemMod
             {
+                Id = 0,
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,
@@ -180,6 +183,7 @@ namespace Game.Core.Tests.Players
 
             var mod = new ItemMod
             {
+                Id = 0,
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,
@@ -206,6 +210,7 @@ namespace Game.Core.Tests.Players
 
             var mod = new ItemMod
             {
+                Id = 0,
                 Name = "Of Fire",
                 Description = "",
                 Type = EItemModType.Suffix, // Wrong type — slot expects Prefix
@@ -234,6 +239,7 @@ namespace Game.Core.Tests.Players
 
             var mod = new ItemMod
             {
+                Id = 0,
                 Name = "Sharp",
                 Description = "",
                 Type = EItemModType.Prefix,

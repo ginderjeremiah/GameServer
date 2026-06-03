@@ -38,6 +38,10 @@
 				{/if}
 			</div>
 
+			{#if entity.headline}
+				<div class="detail-headline">{entity.headline(record)}</div>
+			{/if}
+
 			<div class="tabs">
 				{#each entity.sections as section (section.key)}
 					{@const count = section.count?.(record) ?? null}
@@ -140,6 +144,9 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 		const key = section.itemsKey as string;
 		return !recordsEqual(current[key], base[key]);
 	}
+	if (section.dirtyKeys) {
+		return section.dirtyKeys.some((key) => !recordsEqual(current[key as string], base[key as string]));
+	}
 	return false;
 };
 </script>
@@ -183,6 +190,12 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 	&.blank {
 		color: var(--text-muted);
 	}
+}
+.detail-headline {
+	margin-top: 8px;
+	font-size: 14px;
+	color: var(--text-secondary);
+	letter-spacing: -0.1px;
 }
 .tabs {
 	display: flex;

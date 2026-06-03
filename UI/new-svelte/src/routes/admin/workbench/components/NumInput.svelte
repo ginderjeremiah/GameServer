@@ -2,6 +2,7 @@
 	class={className}
 	type="text"
 	inputmode="decimal"
+	{style}
 	value={text}
 	oninput={handleInput}
 	onfocus={() => (focused = true)}
@@ -13,10 +14,11 @@ interface Props {
 	value: number;
 	onChange: (value: number) => void;
 	class?: string;
+	style?: string;
 	allowNegative?: boolean;
 }
 
-let { value, onChange, class: className = '', allowNegative = false }: Props = $props();
+let { value, onChange, class: className = '', style = undefined, allowNegative = false }: Props = $props();
 
 // Keep the in-progress text locally so typing "1." or "0.5" isn't clobbered by
 // re-coercion on every keystroke, and reflect external resets when not editing.

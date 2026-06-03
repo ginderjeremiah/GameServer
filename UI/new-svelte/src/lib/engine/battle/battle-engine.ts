@@ -5,7 +5,8 @@ import { logMessage } from '../log';
 import { formatNum, createHook, Action } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
-import { inventoryManager, playerManager } from '../engine';
+import { inventoryManager } from '../engine';
+import { playerManager } from '../player/player-manager';
 import { onNewEnemyLoaded } from './enemy-manager';
 
 export enum BattleStage {

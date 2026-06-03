@@ -8,7 +8,8 @@ namespace Game.Api.Filters
         IItems items,
         IItemMods itemMods,
         ISkills skills,
-        IZones zones) : IAsyncActionFilter
+        IZones zones,
+        IChallenges challenges) : IAsyncActionFilter
     {
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
@@ -20,6 +21,7 @@ namespace Game.Api.Filters
                 itemMods.InvalidateCache();
                 skills.InvalidateCache();
                 zones.InvalidateCache();
+                challenges.InvalidateCache();
             }
         }
     }

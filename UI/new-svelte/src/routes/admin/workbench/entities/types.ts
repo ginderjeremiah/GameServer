@@ -70,6 +70,12 @@ interface BaseSection<T> {
 	count?: (rec: T) => number;
 	/** Section-level validation warning (e.g. "No skills assigned"). */
 	warn?: (rec: T) => string | null;
+	/**
+	 * Record keys that constitute a change for this section's tab dirty-dot. Used by
+	 * custom-kind sections (which have no single `fields`/`itemsKey` to diff); the
+	 * built-in kinds derive dirtiness from their fields/collection instead.
+	 */
+	dirtyKeys?: (keyof T & string)[];
 }
 
 export interface FieldsSectionConfig<T> extends BaseSection<T> {
@@ -109,12 +115,28 @@ export interface UsageSectionConfig<T> extends BaseSection<T> {
 	kind: 'usage';
 }
 
+/**
+ * The challenge condition builder: objective type + the read-only statistic/entity
+ * derived from it + goal + scope. Carries no extra config — the editor reads the
+ * challenge-type metadata from reference data.
+ */
+export interface ChallengeConditionSectionConfig<T> extends BaseSection<T> {
+	kind: 'challenge-condition';
+}
+
+/** The challenge reward picker (item and/or mod) with hard cross-challenge exclusivity. */
+export interface ChallengeRewardSectionConfig<T> extends BaseSection<T> {
+	kind: 'challenge-reward';
+}
+
 export type SectionConfig<T> =
 	| FieldsSectionConfig<T>
 	| TableSectionConfig<T>
 	| ChipsSectionConfig<T>
 	| TagsSectionConfig<T>
-	| UsageSectionConfig<T>;
+	| UsageSectionConfig<T>
+	| ChallengeConditionSectionConfig<T>
+	| ChallengeRewardSectionConfig<T>;
 
 /** The per-record diff handed to an entity's persist routine. */
 export interface SaveDiff<T> {
@@ -134,6 +156,8 @@ export interface EntityConfig<T extends Identified> {
 	newItem: (id: number) => T;
 	listBadge?: (rec: T) => string | null;
 	badgeColor?: (rec: T) => string;
+	/** Optional one-line preview rendered under the detail title (e.g. a challenge's objective). */
+	headline?: (rec: T) => string;
 	/** Compact stat line for the list row: [label, value][] (blank label = bare value). */
 	meta: (rec: T) => [string, string | number][];
 	sections: SectionConfig<T>[];

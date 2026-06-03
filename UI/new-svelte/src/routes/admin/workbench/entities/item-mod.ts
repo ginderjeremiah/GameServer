@@ -27,9 +27,10 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 		attributes: [],
 		tags: []
 	}),
-	listBadge: (m) => reference.modTypeName(m.itemModTypeId),
-	badgeColor: () => 'var(--accent)',
+	listBadge: (m) => reference.rarityName(m.rarityId),
+	badgeColor: (m) => reference.rarityColor(m.rarityId),
 	meta: (m) => [
+		['', reference.modTypeName(m.itemModTypeId)],
 		['attr', m.attributes.length],
 		['tag', m.tags.length]
 	],
@@ -38,7 +39,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 			key: 'identity',
 			label: 'Identity',
 			glyph: 'tag',
-			desc: 'Name, type & description',
+			desc: 'Name, type, rarity & description',
 			kind: 'fields',
 			fields: [
 				{
@@ -51,6 +52,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 					reqMsg: 'Missing name'
 				},
 				{ key: 'itemModTypeId', label: 'Type', type: 'select', options: reference.modTypeOptions, width: 170 },
+				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
 				{
 					key: 'description',
 					label: 'Description',

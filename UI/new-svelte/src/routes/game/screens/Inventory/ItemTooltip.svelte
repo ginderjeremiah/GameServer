@@ -55,7 +55,7 @@
 							{#if slot.mod}
 								<div class="tt-mod-tile" style:border-left-color={modTypeAccent(slot.type)}>
 									<div class="tt-mod-header">
-										<span class="tt-mod-name">{slot.mod.name}</span>
+										<span class="tt-mod-name" style:color={rarityColor(slot.mod.rarityId)}>{slot.mod.name}</span>
 										<span class="tt-mod-type" style:color={modTypeAccent(slot.type)}>{modTypeLabel(slot.type)}</span>
 									</div>
 									<div class="tt-mod-desc">{slot.mod.description}</div>
@@ -88,6 +88,7 @@
 <script lang="ts">
 import { EItemCategory, EItemModType } from '$lib/api';
 import type { Item } from '$lib/battle';
+import { rarityColor } from '$lib/common';
 
 export const getBaseNode = () => container;
 

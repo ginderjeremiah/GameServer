@@ -20,11 +20,12 @@ const tooltipsData = $state<TooltipData[]>([]);
 
 export const tooltips = {
 	get data() {
-		return tooltipsData;
+		// filter out any undefined entries that may exist due to the async nature of tooltip registration and unregistration
+		return tooltipsData.filter((t) => t);
 	}
 };
 
-let id = 0;
+let id = 1;
 
 export const registerTooltipComponent = <T extends TooltipComponent>(component: () => T | undefined) => {
 	const data = $state<TooltipData>({ id, component, visible: false, position: undefined });

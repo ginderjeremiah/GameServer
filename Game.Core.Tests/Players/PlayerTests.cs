@@ -1,6 +1,8 @@
+using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
 using Game.Core.Enemies;
+using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
@@ -122,19 +124,21 @@ namespace Game.Core.Tests.Players
         public void UnlockItem_AddsItemToInventory()
         {
             var player = MakePlayer();
+            var item = MakeItem(id: 10);
 
-            player.UnlockItem(10);
+            player.UnlockItem(item);
 
             Assert.Single(player.Inventory.UnlockedItems);
-            Assert.Equal(10, player.Inventory.UnlockedItems[0].ItemId);
+            Assert.Equal(item, player.Inventory.UnlockedItems[0].Item);
         }
 
         [Fact]
         public void UnlockItem_RaisesItemUnlockedEvent()
         {
             var player = MakePlayer();
+            var item = MakeItem(id: 10);
 
-            player.UnlockItem(10);
+            player.UnlockItem(item);
 
             var evt = player.DomainEvents.OfType<ItemUnlockedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -228,5 +232,17 @@ namespace Game.Core.Tests.Players
             AttributeDistributions = [],
             Skills = [],
         };
+        private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
+            List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null) => new()
+            {
+                Id = id,
+                Name = $"Item {id}",
+                Description = string.Empty,
+                Category = category,
+                Rarity = rarity,
+                Attributes = attributes ?? [],
+                ModSlots = modSlots ?? [],
+                Tags = [],
+            };
     }
 }

@@ -1,8 +1,9 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
-
 using Microsoft.EntityFrameworkCore;
+using CoreItem = Game.Core.Items.Item;
 
 namespace Game.DataAccess.Repositories
 {
@@ -39,10 +40,10 @@ namespace Game.DataAccess.Repositories
             return items.Count <= itemId || itemId < 0 ? null : items[itemId];
         }
 
-        public Item GetItem(int itemId)
+        public CoreItem GetItem(int itemId)
         {
             var items = All();
-            return items[itemId];
+            return ItemMapper.ToCore(items[itemId]);
         }
     }
 }

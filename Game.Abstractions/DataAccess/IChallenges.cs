@@ -6,5 +6,6 @@ namespace Game.Abstractions.DataAccess
     {
         public List<Challenge> All();
         public Challenge GetChallenge(int challengeId);
+        public void InvalidateCache();
     }
 }

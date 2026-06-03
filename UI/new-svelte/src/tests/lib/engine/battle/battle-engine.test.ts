@@ -50,11 +50,14 @@ vi.mock('$lib/engine/log', () => ({
 }));
 
 vi.mock('$lib/engine/engine', () => ({
-	get playerManager() {
-		return mockPlayerManager;
-	},
 	get inventoryManager() {
 		return mockInventoryManager;
+	}
+}));
+
+vi.mock('$lib/engine/player/player-manager', () => ({
+	get playerManager() {
+		return mockPlayerManager;
 	}
 }));
 
@@ -70,7 +73,7 @@ vi.mock('$lib/engine/logical-engine', () => ({
 
 vi.mock('$lib/engine/render-engine', () => ({
 	RenderEngine: vi.fn(class {}),
-	onRenderUpdate: vi.fn((cb: Function, cleanup?: boolean) => {
+	onRenderUpdate: vi.fn((cb: Function) => {
 		renderUpdateCallbacks.push(cb);
 		return () => {
 			renderUpdateCallbacks = renderUpdateCallbacks.filter((c) => c !== cb);

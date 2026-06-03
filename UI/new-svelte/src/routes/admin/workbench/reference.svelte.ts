@@ -1,26 +1,19 @@
 import {
 	ApiRequest,
 	EAttribute,
+	EEntityType,
 	EItemCategory,
 	EItemModType,
 	ERarity,
+	type IChallengeType,
 	type IItem,
 	type IItemMod,
 	type ITag,
 	type ITagCategory
 } from '$lib/api';
-import { enumPairs } from '$lib/common';
+import { enumPairs, rarityColor as rarityVar, rarityLabel } from '$lib/common';
 import { staticData } from '$stores';
 import type { SelectOption } from './entities/types';
-
-const RARITY_COLOR: Record<number, string> = {
-	1: '#9aa0a6',
-	2: '#7fc28b',
-	3: '#a1c2f7',
-	4: '#c0a8e6',
-	5: '#f0c078',
-	6: '#e08a78'
-};
 
 export interface TagColor {
 	fg: string;
@@ -40,17 +33,19 @@ const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 class WorkbenchReference {
 	tags = $state<ITag[]>([]);
 	tagCategories = $state<ITagCategory[]>([]);
+	challengeTypes = $state<IChallengeType[]>([]);
 	loaded = $state(false);
 
 	async load() {
-		const [enemies, skills, zones, items, itemMods, tags, tagCategories] = await Promise.all([
+		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes] = await Promise.all([
 			ApiRequest.get('Enemies', { refreshCache: true }),
 			ApiRequest.get('Skills', { refreshCache: true }),
 			ApiRequest.get('Zones', { refreshCache: true }),
 			ApiRequest.get('Items', { refreshCache: true }),
 			ApiRequest.get('ItemMods', { refreshCache: true }),
 			ApiRequest.get('Tags'),
-			ApiRequest.get('Tags/TagCategories')
+			ApiRequest.get('Tags/TagCategories'),
+			ApiRequest.get('Challenges/ChallengeTypes')
 		]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;
@@ -59,6 +54,7 @@ class WorkbenchReference {
 		staticData.itemMods = itemMods;
 		this.tags = tags;
 		this.tagCategories = tagCategories;
+		this.challengeTypes = challengeTypes;
 		this.loaded = true;
 	}
 
@@ -73,11 +69,43 @@ class WorkbenchReference {
 	enemyOptions = (): SelectOption[] => staticData.enemies.map((e) => ({ value: e.id, text: e.name }));
 	skillCatalogue = () => staticData.skills.map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
 
+	// ── Challenges ──
+	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));
+	challengeTypeById = (id: number) => this.challengeTypes.find((t) => t.id === id);
+
+	/** Target-entity catalogue for a statistic's entity dimension (Enemy / Zone / Skill). */
+	entityCatalog = (entityType: EEntityType): { id: number; name: string }[] => {
+		const source =
+			entityType === EEntityType.Enemy
+				? staticData.enemies
+				: entityType === EEntityType.Zone
+					? staticData.zones
+					: entityType === EEntityType.Skill
+						? staticData.skills
+						: [];
+		return (source ?? []).map((e) => ({ id: e.id, name: e.name }));
+	};
+	entityOptions = (entityType: EEntityType): SelectOption[] =>
+		this.entityCatalog(entityType).map((e) => ({ value: e.id, text: e.name }));
+	entityName = (entityType: EEntityType, id: number): string | null =>
+		this.entityCatalog(entityType).find((e) => e.id === id)?.name ?? null;
+
+	// ── Reward lookups (item / item-mod records the challenge reward picker reads) ──
+	itemRecords = () => staticData.items ?? [];
+	itemModRecords = () => staticData.itemMods ?? [];
+	itemRecName = (id: number) => (staticData.items ?? []).find((i) => i.id === id)?.name;
+	itemRarityId = (id: number) => (staticData.items ?? []).find((i) => i.id === id)?.rarityId;
+	itemModName = (id: number) => (staticData.itemMods ?? []).find((m) => m.id === id)?.name;
+	itemModTypeName = (id: number) => {
+		const mod = (staticData.itemMods ?? []).find((m) => m.id === id);
+		return mod ? this.modTypeName(mod.itemModTypeId) : undefined;
+	};
+
 	// ── Name lookups ──
 	itemCategoryName = (id: number) => EItemCategory[id] ?? '';
-	rarityName = (id: number) => ERarity[id] ?? '';
+	rarityName = (id: number) => rarityLabel(id as ERarity);
 	modTypeName = (id: number) => EItemModType[id] ?? '';
-	rarityColor = (id: number) => RARITY_COLOR[id] ?? '#9aa0a6';
+	rarityColor = (id: number) => rarityVar(id as ERarity);
 
 	// ── Tags ──
 	tagById = (id: number) => this.tags.find((t) => t.id === id);

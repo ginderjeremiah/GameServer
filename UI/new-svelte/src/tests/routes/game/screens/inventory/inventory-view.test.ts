@@ -39,15 +39,7 @@ vi.mock('$stores', () => ({
 	staticData: { itemMods: [] }
 }));
 
-import {
-	InventoryView,
-	rarityColor,
-	rarityMeta,
-	catName,
-	hexA,
-	SORTS,
-	EQUIP_SLOTS
-} from '$routes/game/screens/inventory/inventory-view.svelte';
+import { InventoryView, catName, hexA, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
 
 const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERarity, extra: Partial<Item> = {}): Item =>
 	({
@@ -80,16 +72,6 @@ beforeEach(() => {
 });
 
 describe('inventory-view helpers', () => {
-	it('maps each rarity to a distinct color', () => {
-		const colors = new Set(
-			Object.values(ERarity)
-				.filter((v) => typeof v === 'number')
-				.map((r) => rarityColor(r as ERarity))
-		);
-		expect(colors.size).toBe(6);
-		expect(rarityMeta(ERarity.Mythic).level).toBe(6);
-	});
-
 	it('names categories and builds rgba from hex', () => {
 		expect(catName(EItemCategory.Weapon)).toBe('Weapon');
 		expect(hexA('#a1c2f7', 0.5)).toBe('rgba(161, 194, 247, 0.5)');

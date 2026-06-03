@@ -36,5 +36,7 @@ namespace Game.DataAccess.Repositories
             var challenges = All();
             return challenges[challengeId];
         }
+
+        public void InvalidateCache() => _challengeList = null;
     }
 }

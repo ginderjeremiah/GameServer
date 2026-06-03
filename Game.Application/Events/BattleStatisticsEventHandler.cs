@@ -6,11 +6,13 @@ namespace Game.Application.Events
 {
     public class BattleStatisticsEventHandler(
         IPlayerProgressRepository progressRepo,
-        IChallenges challengeRepo
+        IChallenges challengeRepo,
+        IItems items
     ) : IDomainEventHandler<BattleCompletedEvent>
     {
         private readonly IPlayerProgressRepository _progressRepo = progressRepo;
         private readonly IChallenges _challengeRepo = challengeRepo;
+        private readonly IItems _items = items;
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
@@ -27,7 +29,8 @@ namespace Game.Application.Events
                 {
                     if (c.RewardItemId.HasValue)
                     {
-                        player.UnlockItem(c.RewardItemId.Value);
+                        var item = _items.GetItem(c.RewardItemId.Value);
+                        player.UnlockItem(item);
                     }
                     if (c.RewardItemModId.HasValue)
                     {

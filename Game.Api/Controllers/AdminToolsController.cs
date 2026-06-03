@@ -3,6 +3,7 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
+using Game.Api.Models.Progress;
 using Game.Api.Models.Skills;
 using Game.Api.Models.Tags;
 using Game.Api.Models.Zones;
@@ -391,6 +392,54 @@ namespace Game.Api.Controllers
                 else if (change.ChangeType == Delete)
                 {
                     _entityStore.Delete(new Abstractions.Entities.Zone
+                    {
+                        Id = change.Item.Id,
+                        Name = "",
+                        Description = "",
+                    });
+                }
+            }
+
+            return ApiResponse.Success();
+        }
+
+        [HttpPost]
+        public ApiResponse AddEditChallenges([FromBody] List<Change<Challenge>> changes)
+        {
+            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
+            {
+                if (change.ChangeType == Add)
+                {
+                    _entityStore.Insert(new Abstractions.Entities.Challenge
+                    {
+                        Name = change.Item.Name,
+                        Description = change.Item.Description,
+                        ChallengeTypeId = (int)change.Item.ChallengeTypeId,
+                        TargetEntityId = change.Item.TargetEntityId,
+                        ProgressGoal = change.Item.ProgressGoal,
+                        RewardItemId = change.Item.RewardItemId,
+                        RewardItemModId = change.Item.RewardItemModId,
+                    });
+                }
+                else if (change.ChangeType == Edit)
+                {
+                    // Construct a fresh, navigation-free entity so EntityStore.Update emits a
+                    // single-row UPDATE without dragging in the type-derived statistic/entity graph.
+                    _entityStore.Update(new Abstractions.Entities.Challenge
+                    {
+                        Id = change.Item.Id,
+                        Name = change.Item.Name,
+                        Description = change.Item.Description,
+                        ChallengeTypeId = (int)change.Item.ChallengeTypeId,
+                        TargetEntityId = change.Item.TargetEntityId,
+                        ProgressGoal = change.Item.ProgressGoal,
+                        RewardItemId = change.Item.RewardItemId,
+                        RewardItemModId = change.Item.RewardItemModId,
+                    });
+                }
+                else if (change.ChangeType == Delete)
+                {
+                    _entityStore.Delete(new Abstractions.Entities.Challenge
                     {
                         Id = change.Item.Id,
                         Name = "",

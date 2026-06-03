@@ -4,6 +4,12 @@ import { logMessage } from '$lib/engine/log';
 import { EAttribute, ELogType } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 
+// PlayerManager only depends on logMessage; mock it so the unit under test is
+// isolated and the spy assertions below work (mirrors inventory-manager.test.ts).
+vi.mock('$lib/engine/log', () => ({
+	logMessage: vi.fn()
+}));
+
 const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 	name: 'TestPlayer',
 	level: 5,

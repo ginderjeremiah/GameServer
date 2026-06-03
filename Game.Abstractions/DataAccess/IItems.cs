@@ -1,4 +1,5 @@
 ﻿using Game.Abstractions.Entities;
+using CoreItem = Game.Core.Items.Item;
 
 namespace Game.Abstractions.DataAccess
 {
@@ -7,6 +8,6 @@ namespace Game.Abstractions.DataAccess
         public void InvalidateCache();
         public List<Item> All(bool refreshCache = false);
         public Item? LookupItem(int itemId);
-        public Item GetItem(int itemId);
+        public CoreItem GetItem(int itemId);
     }
 }

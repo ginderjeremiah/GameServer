@@ -3,9 +3,9 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
+using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Skills;
-using EntityItem = Game.Abstractions.Entities.Item;
 using EntityItemMod = Game.Abstractions.Entities.ItemMod;
 using EntitySkill = Game.Abstractions.Entities.Skill;
 
@@ -103,12 +103,12 @@ namespace Game.Application.Services
             return new Battler(attributes, resolvedSkills, snapshot.Level);
         }
 
-        private static IEnumerable<AttributeModifier> MapItemAttributes(EntityItem entity)
+        private static IEnumerable<AttributeModifier> MapItemAttributes(Item item)
         {
-            return entity.ItemAttributes.Select(ia => new AttributeModifier
+            return item.Attributes.Select(ia => new AttributeModifier
             {
-                Attribute = (EAttribute)ia.AttributeId,
-                Amount = (double)ia.Amount,
+                Attribute = ia.Attribute,
+                Amount = ia.Amount,
                 Type = EModifierType.Additive,
                 Source = EAttributeModifierSource.Item,
             });

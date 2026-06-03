@@ -6,8 +6,8 @@
 	draggable="true"
 	style:width="{size}px"
 	style:height="{size}px"
-	style:background={accentBorders ? hexA(rc, 0.05 + level * 0.012) : 'rgba(255,255,255,0.03)'}
-	style:border-color={selected ? accent : borderColor}
+	style:background={bg}
+	style:border-color={borderColor}
 	style:box-shadow={boxShadow}
 	style:transform={hover ? 'translateY(-1px)' : 'none'}
 	ondragstart={handleDragStart}
@@ -68,7 +68,8 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { catAccent, hexA, rarityColor, rarityMeta } from './inventory-view.svelte';
+import { rarityColor, rarityGlow, rarityLevel, rarityTint } from '$lib/common';
+import { catAccent, hexA } from './inventory-view.svelte';
 import CategoryGlyph from './CategoryGlyph.svelte';
 
 interface Props {
@@ -105,22 +106,30 @@ const {
 
 let hover = $state(false);
 
-const accent = '#a1c2f7';
 const rc = $derived(rarityColor(item.rarityId));
-const level = $derived(rarityMeta(item.rarityId).level);
-const glowAmount = $derived(rarityMeta(item.rarityId).glow);
+const level = $derived(rarityLevel(item.rarityId));
 const catColor = $derived(catAccent(item.itemCategoryId));
 const modCount = $derived(item.appliedMods.length);
 
-const borderColor = $derived(accentBorders ? hexA(rc, Math.min(0.85, 0.34 + level * 0.09)) : 'rgba(255,255,255,0.14)');
+const bg = $derived(accentBorders ? rarityTint(item.rarityId, 0.05 + level * 0.012) : 'rgba(255,255,255,0.03)');
+const borderColor = $derived(
+	selected
+		? 'var(--accent)'
+		: accentBorders
+			? rarityTint(item.rarityId, Math.min(0.85, 0.34 + level * 0.09))
+			: 'rgba(255,255,255,0.14)'
+);
+// Glow intensity is a themeable CSS var, so the blur radius and alpha are derived in-CSS via calc().
 const glowShadow = $derived(
-	glow && glowAmount > 0 ? `0 0 ${5 + glowAmount * 16}px ${hexA(rc, glowAmount * 0.5)}` : 'none'
+	glow
+		? `0 0 calc(5px + ${rarityGlow(item.rarityId)} * 16px) color-mix(in srgb, ${rc} calc(${rarityGlow(item.rarityId)} * 50%), transparent)`
+		: '0 0 0 transparent'
 );
 const boxShadow = $derived(
 	selected
-		? `0 0 0 1px ${accent}, 0 0 14px ${hexA(accent, 0.4)}`
+		? '0 0 0 1px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent)'
 		: hover
-			? `0 0 0 1px ${hexA(rc, 0.6)}, ${glowShadow}`
+			? `0 0 0 1px ${rarityTint(item.rarityId, 0.6)}, ${glowShadow}`
 			: glowShadow
 );
 

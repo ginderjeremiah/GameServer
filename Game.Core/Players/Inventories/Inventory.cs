@@ -136,16 +136,17 @@ namespace Game.Core.Players.Inventories
             return true;
         }
 
-        public void UnlockItem(int itemId)
+        public void UnlockItem(Item item)
         {
-            if (UnlockedItems.Any(u => u.ItemId == itemId))
+            if (UnlockedItems.Any(u => u.ItemId == item.Id))
+            {
                 return;
+            }
 
-            // Item reference will be set by the caller / mapper
             UnlockedItems.Add(new UnlockedItemSlot
             {
-                ItemId = itemId,
-                Item = null!,
+                ItemId = item.Id,
+                Item = item,
                 AppliedMods = [],
             });
         }

@@ -36,6 +36,7 @@ import type {
 } from './';
 
 export type ApiResponseTypes = {
+	'AdminTools/AddEditChallenges': undefined;
 	'AdminTools/AddEditEnemies': undefined;
 	'AdminTools/AddEditItemAttributes': undefined;
 	'AdminTools/AddEditItemModAttributes': undefined;
@@ -83,6 +84,7 @@ export type ApiResponseTypes = {
 };
 
 export type ApiRequestTypes = {
+	'AdminTools/AddEditChallenges': IChange<IChallenge>[];
 	'AdminTools/AddEditEnemies': IChange<IEnemy>[];
 	'AdminTools/AddEditItemAttributes': IAddEditAttributesData;
 	'AdminTools/AddEditItemModAttributes': IAddEditAttributesData;

@@ -3,13 +3,11 @@ import { BattleEngine } from './battle/battle-engine';
 import { statify } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
-import { PlayerManager } from './player/player-manager';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
 import { staticData } from '$stores';
 import { apiSocket } from '$lib/api';
 
-export const playerManager = statify(new PlayerManager());
 export const inventoryManager = statify(new InventoryManager());
 export const enemyManager = statify(new EnemyManager());
 

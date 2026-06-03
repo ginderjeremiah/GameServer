@@ -8,7 +8,7 @@
 	</div>
 	<div class="usage-groups">
 		{@render group('Items', 'box', usage.itemList, 'items', true)}
-		{@render group('Item Mods', 'rune', usage.modList, 'mods', false)}
+		{@render group('Item Mods', 'rune', usage.modList, 'mods', true)}
 	</div>
 </div>
 

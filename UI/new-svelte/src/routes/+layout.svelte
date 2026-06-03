@@ -62,5 +62,20 @@ $effect(() => {
 	--success: #{colors.$success};
 	--warning: #{colors.$warning};
 	--enemy-accent: #{colors.$enemy-accent};
+
+	// Rarity palette + per-tier glow intensity (0–1, unitless). Consumed by the
+	// inventory and admin rarity UI via the shared helpers in $lib/common/rarity.
+	--rarity-common: #{colors.$rarity-common};
+	--rarity-uncommon: #{colors.$rarity-uncommon};
+	--rarity-rare: #{colors.$rarity-rare};
+	--rarity-epic: #{colors.$rarity-epic};
+	--rarity-legendary: #{colors.$rarity-legendary};
+	--rarity-mythic: #{colors.$rarity-mythic};
+	--rarity-common-glow: 0;
+	--rarity-uncommon-glow: 0.22;
+	--rarity-rare-glow: 0.38;
+	--rarity-epic-glow: 0.54;
+	--rarity-legendary-glow: 0.72;
+	--rarity-mythic-glow: 0.9;
 }
 </style>

@@ -9,7 +9,7 @@ const { mockLogs, mockPlayerManager } = vi.hoisted(() => {
 	return { mockLogs, mockPlayerManager };
 });
 
-vi.mock('$lib/engine', () => ({
+vi.mock('$lib/engine/player/player-manager', () => ({
 	get playerManager() {
 		return mockPlayerManager;
 	}

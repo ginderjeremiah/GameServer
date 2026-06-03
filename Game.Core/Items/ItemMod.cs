@@ -9,6 +9,11 @@ namespace Game.Core.Items
     public class ItemMod
     {
         /// <summary>
+        /// The unique identifier for the item mod.
+        /// </summary>
+        public required int Id { get; set; }
+
+        /// <summary>
         /// The name of the item mod.
         /// </summary>
         public required string Name { get; set; }

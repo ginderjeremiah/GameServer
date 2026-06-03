@@ -1,5 +1,5 @@
 import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData } from '$lib/api';
-import { formatNum } from '$lib/common';
+import { formatNum, statify } from '$lib/common';
 import { logMessage } from '../log';
 
 const expPerLevel = 100;
@@ -49,3 +49,8 @@ export class PlayerManager implements IPlayerData {
 		logMessage(ELogType.LevelUp, `You are now level ${this.level}.`);
 	}
 }
+
+// The app-wide singleton lives with its class (rather than in engine.ts) so that
+// `log.ts` — which PlayerManager depends on — can read it back without dragging
+// the eager engine wiring into the import graph. See docs/frontend.md.
+export const playerManager = statify(new PlayerManager());

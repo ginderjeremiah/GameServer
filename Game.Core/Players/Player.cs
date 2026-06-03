@@ -65,10 +65,10 @@ namespace Game.Core.Players
         /// <summary>
         /// Unlocks an item for the player and raises an <see cref="ItemUnlockedEvent"/>.
         /// </summary>
-        public void UnlockItem(int itemId)
+        public void UnlockItem(Item item)
         {
-            Inventory.UnlockItem(itemId);
-            RaiseEvent(new ItemUnlockedEvent(Id, itemId));
+            Inventory.UnlockItem(item);
+            RaiseEvent(new ItemUnlockedEvent(Id, item.Id));
         }
 
         /// <summary>

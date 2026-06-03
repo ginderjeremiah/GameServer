@@ -1,4 +1,5 @@
 export * from './functions';
+export * from './rarity';
 export * from './types';
 export * from './hooks';
 export * from './event-measuring';
