@@ -3,6 +3,10 @@
 ###############################################################################
 * text=auto
 
+# Shell scripts must keep LF endings so bash can run them on any platform
+# (e.g. the Claude Code session-start hook).
+*.sh text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

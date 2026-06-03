@@ -12,13 +12,30 @@ namespace Game.TestInfrastructure.Fixtures
 {
     public class PostgresContainerFixture : IAsyncDisposable
     {
-        private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        private readonly PreexistingContainerInfo? _preexisting = PreexistingContainerInfo.TryLoad();
 
-        public string ConnectionString => _container.GetConnectionString();
+        // Only provision a Testcontainers-managed container when no pre-existing PostgreSQL was
+        // supplied by the session-start hook (see PreexistingContainerInfo).
+        private readonly PostgreSqlContainer? _container;
+
+        public PostgresContainerFixture()
+        {
+            _container = _preexisting is null
+                ? new PostgreSqlBuilder("postgres:18-alpine").Build()
+                : null;
+        }
+
+        public string ConnectionString => _preexisting?.Postgres ?? _container!.GetConnectionString();
 
         public async Task StartAsync()
         {
-            await _container.StartAsync();
+            if (_container is not null)
+            {
+                await _container.StartAsync();
+            }
+
+            // Migrations are applied in both modes: a freshly started container is empty, and a
+            // reused container relies on EF's idempotent migrations to converge to the schema.
             await ApplyMigrationsAsync();
         }
 
@@ -46,7 +63,12 @@ namespace Game.TestInfrastructure.Fixtures
 
         public async ValueTask DisposeAsync()
         {
-            await _container.DisposeAsync();
+            // A reused container is owned by the session-start hook, not the test process.
+            if (_container is not null)
+            {
+                await _container.DisposeAsync();
+            }
+
             GC.SuppressFinalize(this);
         }
     }

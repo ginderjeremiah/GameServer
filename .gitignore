@@ -10,6 +10,9 @@
 *.userosscache
 *.sln.docstates
 
+# Backing-service marker written by .claude/hooks/session-start.sh in constrained sandboxes
+.container-info.json
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
