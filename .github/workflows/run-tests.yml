@@ -21,17 +21,15 @@ on:
 
 jobs:
 
-  build:
-
+  test-backend:
     strategy:
       matrix:
         configuration: [Release]
 
-    runs-on: ubuntu-latest  # For a list of available runner types, refer to
-                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    runs-on: ubuntu-latest
 
     env:
-      Solution_Name: Game.sln                      # Replace with your solution name, i.e. MyWpfApp.sln.
+      Solution_Name: Game.sln
 
     steps:
     - name: Checkout
@@ -39,23 +37,31 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Install the .NET Core workload
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
 
-    # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Build solution
       run: dotnet build
 
-    # Execute all unit tests in the solution
     - name: Execute unit tests
       run: dotnet test
+      
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: '**/TestResults/'
 
-    - name: Move to new UI directory
-      run: cd UI/new-svelte
+  test-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./UI/new-svelte
 
+    steps:
     - name: Install node modules
       run: npm i
 
