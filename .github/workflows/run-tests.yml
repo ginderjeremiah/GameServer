@@ -4,12 +4,6 @@
 # documentation.
 
 # This workflow will test a .NET application
-#
-# To configure this workflow:
-#
-# 1. Configure environment variables
-# GitHub sets default environment variables for every workflow run.
-# Replace the variables relative to your project in the "env" section below.
 
 name: Run tests
 
@@ -38,7 +32,7 @@ jobs:
     - name: Build solution
       run: dotnet build
 
-    - name: Execute unit tests
+    - name: Execute full test suite
       run: dotnet test
       
     - name: Upload test results
