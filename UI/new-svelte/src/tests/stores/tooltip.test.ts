@@ -13,15 +13,15 @@ afterEach(() => {
 describe('tooltip store', () => {
 	it('registers a tooltip on mount and removes it on destroy', () => {
 		const a = render(Registrar);
-		expect(tooltips.data).toHaveLength(1);
+		expect([...tooltips.data]).toHaveLength(1);
 
 		a.unmount();
-		expect(tooltips.data).toHaveLength(0);
+		expect([...tooltips.data]).toHaveLength(0);
 	});
 
 	it('keeps the correct entries when screens overlap during navigation', () => {
-		// A consumer (like TooltipBase) is actively rendering the reactive array
-		// while screens mount and unmount.
+		// A consumer (like TooltipBase) is actively rendering the reactive
+		// collection while screens mount and unmount.
 		render(Consumer);
 
 		// Simulate navigating Fight -> Inventory: the new screen's tooltips mount
@@ -35,7 +35,7 @@ describe('tooltip store', () => {
 		const invC = render(Registrar);
 		const invD = render(Registrar);
 		flushSync();
-		expect(tooltips.data).toHaveLength(4);
+		expect([...tooltips.data]).toHaveLength(4);
 		const invIds = [...tooltips.data].map((t) => t.id).filter((id) => !fightIds.includes(id));
 		expect(invIds).toHaveLength(2);
 
@@ -53,18 +53,18 @@ describe('tooltip store', () => {
 
 		invC.unmount();
 		invD.unmount();
-		expect(tooltips.data).toHaveLength(0);
+		expect([...tooltips.data]).toHaveLength(0);
 	});
 
 	it('swapping screens within a single tree keeps exactly the new screen tooltips', async () => {
 		const view = render(Nav, { props: { screen: 'fight' as const } });
 		flushSync();
-		expect(tooltips.data).toHaveLength(2);
+		expect([...tooltips.data]).toHaveLength(2);
 
 		await view.rerender({ screen: 'inventory' as const });
 		flushSync();
 
-		expect(tooltips.data.every((t) => t !== undefined)).toBe(true);
-		expect(tooltips.data).toHaveLength(2);
+		expect([...tooltips.data].every((t) => t !== undefined)).toBe(true);
+		expect([...tooltips.data]).toHaveLength(2);
 	});
 });
