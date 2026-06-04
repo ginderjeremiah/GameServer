@@ -48,12 +48,12 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Creates a new HttpClient with an auth cookie for the given user ID.
+        /// Creates a new HttpClient with an auth cookie for the given user ID and any granted roles.
         /// </summary>
-        protected HttpClient CreateAuthenticatedClient(int userId, int playerId)
+        protected HttpClient CreateAuthenticatedClient(int userId, int playerId, params string[] roles)
         {
             var client = Factory.CreateClient();
-            TestAuthHelper.AddAuthCookie(client, userId);
+            TestAuthHelper.AddAuthCookie(client, userId, roles);
             using var scope = Factory.Services.CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
             sessionService.CreateSession(userId, playerId);

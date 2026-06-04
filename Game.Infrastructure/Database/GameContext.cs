@@ -37,6 +37,7 @@ namespace Game.Infrastructure.Database
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
         public DbSet<Rarity> Rarities { get; set; }
+        public DbSet<Role> Roles { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
@@ -289,6 +290,28 @@ namespace Game.Infrastructure.Database
                     {
                         Id = (int)rarity.Id,
                         Name = rarity.Name,
+                    };
+                }));
+            });
+
+            modelBuilder.Entity<Role>(entity =>
+            {
+                entity.Property(r => r.Id)
+                    .ValueGeneratedNever();
+
+                entity.Property(r => r.Name)
+                    .HasMaxLength(50);
+
+                entity.HasMany(r => r.Users)
+                    .WithMany(u => u.Roles)
+                    .UsingEntity(join => join.ToTable("UserRoles"));
+
+                entity.HasData(Enum.GetValues<ERole>().Select(r =>
+                {
+                    return new Role
+                    {
+                        Id = (int)r,
+                        Name = r.ToString(),
                     };
                 }));
             });

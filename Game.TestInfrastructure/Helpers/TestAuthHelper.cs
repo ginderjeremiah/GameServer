@@ -13,17 +13,17 @@ namespace Game.TestInfrastructure.Helpers
             Hashing.SetPepper(TestPepper);
         }
 
-        public static string CreateAuthTokenString(int userId)
+        public static string CreateAuthTokenString(int userId, params string[] roles)
         {
             EnsurePepperSet();
-            var claims = new AuthTokenClaims(userId, DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME));
+            var claims = new AuthTokenClaims(userId, roles, DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME));
             var token = new AuthToken(claims);
             return token.ToString();
         }
 
-        public static void AddAuthCookie(HttpClient client, int userId)
+        public static void AddAuthCookie(HttpClient client, int userId, params string[] roles)
         {
-            var tokenString = CreateAuthTokenString(userId);
+            var tokenString = CreateAuthTokenString(userId, roles);
             client.DefaultRequestHeaders.Add("Cookie", $"{Constants.TOKEN_NAME}={tokenString}");
         }
     }

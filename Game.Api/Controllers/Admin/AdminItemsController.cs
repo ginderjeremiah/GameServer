@@ -15,6 +15,7 @@ namespace Game.Api.Controllers.Admin
     /// </summary>
     [Route("/api/AdminTools/[action]")]
     [ApiController]
+    [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
     [ServiceFilter(typeof(AdminCacheInvalidationFilter))]
     public class AdminItemsController(
         IItems items,
