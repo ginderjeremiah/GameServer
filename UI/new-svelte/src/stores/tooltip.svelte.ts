@@ -1,4 +1,5 @@
 import { onDestroy } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 
 export interface TooltipComponent {
 	getBaseNode: () => HTMLDivElement;
@@ -16,20 +17,27 @@ export interface Position {
 	y: number;
 }
 
-const tooltipsData = $state<TooltipData[]>([]);
+// Keyed by the tooltip's stable id rather than held in a reactive array. An
+// array relied on `findIndex(... === data)` + `splice` to unregister, which is
+// not robust when screens overlap during navigation (the new screen mounts its
+// tooltips before the old screen's onDestroy runs): the interleaved push/splice
+// on the reactive array dropped the wrong entries and left undefined holes,
+// causing tooltips to disappear when switching between screens that both render
+// them (e.g. Fight <-> Inventory). Removing by id makes unregistration
+// reference-independent and order-independent.
+const tooltipsData = new SvelteMap<number, TooltipData>();
 
 export const tooltips = {
 	get data() {
-		// filter out any undefined entries that may exist due to the async nature of tooltip registration and unregistration
-		return tooltipsData.filter((t) => t);
+		return tooltipsData.values();
 	}
 };
 
 let id = 1;
 
 export const registerTooltipComponent = <T extends TooltipComponent>(component: () => T | undefined) => {
-	const data = $state<TooltipData>({ id, component, visible: false, position: undefined });
-	id++;
+	const tooltipId = id++;
+	const data = $state<TooltipData>({ id: tooltipId, component, visible: false, position: undefined });
 
 	const setTooltipPosition = (position: Position) => {
 		data.position = position;
@@ -43,11 +51,10 @@ export const registerTooltipComponent = <T extends TooltipComponent>(component: 
 		data.visible = false;
 	};
 
-	tooltipsData.push(data);
+	tooltipsData.set(tooltipId, data);
 
 	onDestroy(() => {
-		const index = tooltipsData.findIndex((tData) => tData === data);
-		tooltipsData.splice(index, 1);
+		tooltipsData.delete(tooltipId);
 	});
 
 	return {

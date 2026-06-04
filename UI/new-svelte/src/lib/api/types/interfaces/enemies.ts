@@ -3,9 +3,25 @@
 
 import type { IAttributeDistribution, IBattlerAttribute } from '../';
 
-export interface IEnemySpawn {
-	zoneId: number;
-	weight: number;
+export interface IBattleLostResponse {
+	cooldown: number;
+}
+
+export interface IDefeatEnemyRequest {
+	timestamp: number;
+}
+
+export interface IDefeatEnemyResponse {
+	cooldown: number;
+	rewards?: IDefeatRewards;
+}
+
+export interface IDefeatRewards {
+	expReward: number;
+	newLevel: number;
+	newExp: number;
+	statPointsGained: number;
+	statPointsUsed: number;
 }
 
 export interface IEnemy {
@@ -15,6 +31,28 @@ export interface IEnemy {
 	attributeDistribution: IAttributeDistribution[];
 	skillPool: number[];
 	spawns: IEnemySpawn[];
+}
+
+export interface IEnemyInstance {
+	id: number;
+	level: number;
+	attributes: IBattlerAttribute[];
+	seed: number;
+	selectedSkills: number[];
+}
+
+export interface IEnemySpawn {
+	zoneId: number;
+	weight: number;
+}
+
+export interface INewEnemyModel {
+	cooldown?: number;
+	enemyInstance?: IEnemyInstance;
+}
+
+export interface INewEnemyRequest {
+	newZoneId?: number;
 }
 
 export interface ISetEnemyAttributeDistributions {
@@ -30,42 +68,4 @@ export interface ISetEnemySkillsData {
 export interface ISetEnemySpawnsData {
 	enemyId: number;
 	spawns: IEnemySpawn[];
-}
-
-export interface IDefeatEnemyRequest {
-	timestamp: number;
-}
-
-export interface INewEnemyRequest {
-	newZoneId?: number;
-}
-
-export interface IBattleLostResponse {
-	cooldown: number;
-}
-
-export interface IDefeatRewards {
-	expReward: number;
-	newLevel: number;
-	newExp: number;
-	statPointsGained: number;
-	statPointsUsed: number;
-}
-
-export interface IDefeatEnemyResponse {
-	cooldown: number;
-	rewards?: IDefeatRewards;
-}
-
-export interface IEnemyInstance {
-	id: number;
-	level: number;
-	attributes: IBattlerAttribute[];
-	seed: number;
-	selectedSkills: number[];
-}
-
-export interface INewEnemyModel {
-	cooldown?: number;
-	enemyInstance?: IEnemyInstance;
 }

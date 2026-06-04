@@ -3,15 +3,16 @@
 
 import type { EAttribute } from '../';
 
+export interface IAttribute {
+	id: EAttribute;
+	name: string;
+	description: string;
+}
+
 export interface IAttributeDistribution {
 	attributeId: EAttribute;
 	baseAmount: number;
 	amountPerLevel: number;
-}
-
-export interface IBattlerAttribute {
-	attributeId: EAttribute;
-	amount: number;
 }
 
 export interface IAttributeMultiplier {
@@ -19,13 +20,12 @@ export interface IAttributeMultiplier {
 	multiplier: number;
 }
 
-export interface IAttribute {
-	id: EAttribute;
-	name: string;
-	description: string;
-}
-
 export interface IAttributeUpdate {
 	attributeId: number;
+	amount: number;
+}
+
+export interface IBattlerAttribute {
+	attributeId: EAttribute;
 	amount: number;
 }

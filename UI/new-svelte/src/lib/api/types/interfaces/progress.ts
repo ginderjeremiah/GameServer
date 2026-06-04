@@ -21,19 +21,6 @@ export interface IChallenge {
 	rewardItemModId?: number;
 }
 
-export interface IPlayerChallenge {
-	challengeId: number;
-	progress: number;
-	completed: boolean;
-	completedAt?: string;
-}
-
-export interface IStatisticType {
-	id: EStatisticType;
-	entityType: EEntityType;
-	name: string;
-}
-
 export interface IChallengeType {
 	id: EChallengeType;
 	statisticType?: IStatisticType;
@@ -41,8 +28,21 @@ export interface IChallengeType {
 	name: string;
 }
 
+export interface IPlayerChallenge {
+	challengeId: number;
+	progress: number;
+	completed: boolean;
+	completedAt?: string;
+}
+
 export interface IPlayerStatistic {
 	statisticTypeId: EStatisticType;
 	entityId?: number;
 	value: number;
+}
+
+export interface IStatisticType {
+	id: EStatisticType;
+	entityType: EEntityType;
+	name: string;
 }

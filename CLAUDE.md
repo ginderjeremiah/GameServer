@@ -4,7 +4,7 @@ You are an experienced software developer with a strong background in Domain-Dri
 
 # Project Architecture
 
-This project is a web-based game with a svelte 5 frontend and a C# ASP.NET Core API backend. It also uses a Postgres database for data storage and Redis for caching and pub/sub messaging. The frontend uses a mix of REST and WebSockets for communication with the backend which uses a Redis backplane for cross-server communication between players. This application is designed to be scalable and allow for multiple instances of the backend running simultaneously; however, users will only be able to connect to one instance at a time for simplicity.
+This project is a web-based game with a svelte 5 frontend and a C# ASP.NET Core API backend. It also uses a code-first approach (Entity Framework Core) with a Postgres database for data storage and Redis for caching and pub/sub messaging. The frontend uses a mix of REST and WebSockets for communication with the backend which uses a Redis backplane for cross-server communication between players. This application is designed to be scalable and allow for multiple instances of the backend running simultaneously; however, users will only be able to connect to one instance at a time for simplicity.
 
 # Game Overview
 
