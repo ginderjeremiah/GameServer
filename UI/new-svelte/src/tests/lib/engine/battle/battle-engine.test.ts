@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ELogType } from '$lib/api';
-import type { ISkill } from '$lib/api';
+import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
+
+// Callbacks captured from the mocked engine hooks. `onLogicalUpdate` emits a delta,
+// `onRenderUpdate` a (renderDelta, logicalDelta) pair, and `onNewEnemyLoaded` an enemy instance.
+type DeltaCallback = (delta: number) => void;
+type RenderCallback = (renderDelta: number, logicalDelta: number) => void;
+type EnemyLoadedCallback = (enemy: IEnemyInstance) => void;
 
 vi.mock('svelte', async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
@@ -9,7 +15,7 @@ vi.mock('svelte', async (importOriginal) => ({
 
 const { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager } = vi.hoisted(() => {
 	const mockSkills: ISkill[] = [];
-	const mockEnemies: any[] = [];
+	const mockEnemies: IEnemy[] = [];
 	const mockPlayerManager = {
 		name: 'TestPlayer',
 		level: 5,
@@ -27,9 +33,9 @@ const { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager } = vi.
 });
 
 let { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks } = vi.hoisted(() => {
-	const logicalUpdateCallbacks: Function[] = [];
-	const renderUpdateCallbacks: Function[] = [];
-	const enemyLoadedCallbacks: Function[] = [];
+	const logicalUpdateCallbacks: DeltaCallback[] = [];
+	const renderUpdateCallbacks: RenderCallback[] = [];
+	const enemyLoadedCallbacks: EnemyLoadedCallback[] = [];
 
 	return { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks };
 });
@@ -63,7 +69,7 @@ vi.mock('$lib/engine/player/player-manager', () => ({
 
 vi.mock('$lib/engine/logical-engine', () => ({
 	LogicalEngine: vi.fn(class {}),
-	onLogicalUpdate: vi.fn((cb: Function) => {
+	onLogicalUpdate: vi.fn((cb: DeltaCallback) => {
 		logicalUpdateCallbacks.push(cb);
 		return () => {
 			logicalUpdateCallbacks = logicalUpdateCallbacks.filter((c) => c !== cb);
@@ -73,7 +79,7 @@ vi.mock('$lib/engine/logical-engine', () => ({
 
 vi.mock('$lib/engine/render-engine', () => ({
 	RenderEngine: vi.fn(class {}),
-	onRenderUpdate: vi.fn((cb: Function) => {
+	onRenderUpdate: vi.fn((cb: RenderCallback) => {
 		renderUpdateCallbacks.push(cb);
 		return () => {
 			renderUpdateCallbacks = renderUpdateCallbacks.filter((c) => c !== cb);
@@ -82,7 +88,7 @@ vi.mock('$lib/engine/render-engine', () => ({
 }));
 
 vi.mock('$lib/engine/battle/enemy-manager', () => ({
-	onNewEnemyLoaded: vi.fn((cb: Function) => {
+	onNewEnemyLoaded: vi.fn((cb: EnemyLoadedCallback) => {
 		enemyLoadedCallbacks.push(cb);
 		return () => {
 			enemyLoadedCallbacks = enemyLoadedCallbacks.filter((c) => c !== cb);
@@ -114,7 +120,7 @@ describe('BattleEngine', () => {
 		};
 
 		mockEnemies.length = 0;
-		mockEnemies[1] = { name: 'Goblin', selectedSkills: [0], attributes: [] };
+		mockEnemies[1] = { id: 1, name: 'Goblin', isBoss: false, attributeDistribution: [], skillPool: [0], spawns: [] };
 
 		engine = new BattleEngine();
 	});
@@ -161,7 +167,7 @@ describe('BattleEngine', () => {
 		it('transitions to Active when enemy is loaded', () => {
 			engine.start();
 
-			const enemyInstance = { id: 1, level: 1, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			expect(engine.stage).toBe(BattleStage.Active);
@@ -170,7 +176,7 @@ describe('BattleEngine', () => {
 		it('transitions to Victorious when enemy dies', () => {
 			engine.start();
 
-			const enemyInstance = { id: 1, level: 1, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			// Simulate enough logical updates to kill the enemy
@@ -186,7 +192,7 @@ describe('BattleEngine', () => {
 
 		it('pause sets stage to Paused', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.pause();
@@ -195,7 +201,7 @@ describe('BattleEngine', () => {
 
 		it('resume returns to Active when both alive', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.pause();
@@ -207,7 +213,7 @@ describe('BattleEngine', () => {
 	describe('logicalUpdate', () => {
 		it('logs damage messages', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			logicalUpdateCallbacks[0](500);

@@ -5,8 +5,8 @@ import LoginPage from '../../routes/+page.svelte';
 // Mock modules that depend on SvelteKit runtime
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/stores', () => {
-	const { readable } = require('svelte/store');
+vi.mock('$app/stores', async () => {
+	const { readable } = await import('svelte/store');
 	return { page: readable({ url: new URL('http://localhost/') }) };
 });
 vi.mock('$lib/api', () => ({

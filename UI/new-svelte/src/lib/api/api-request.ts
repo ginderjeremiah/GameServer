@@ -21,6 +21,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 	public get(
 		urlParams: U extends ApiEndpointWithRequest ? ApiRequestTypes[U] : never
 	): Promise<ApiResponse<ApiResponseTypes[U]>>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; the per-endpoint request DTOs aren't assignable to a concrete index signature.
 	public get(urlParams?: Record<string, any>) {
 		const params = this.encodeParams(urlParams);
 		const endpoint = params ? this.endpoint + '?' + params : this.endpoint;
@@ -45,6 +46,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 		endpoint: U,
 		urlParams: ApiRequestTypes[U]
 	): Promise<ApiResponseTypes[U]>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; the per-endpoint request DTOs can't be expressed as a single concrete param type.
 	public static async get<U extends ApiEndpoint>(endpoint: U, urlParams?: any) {
 		const request = new ApiRequest(endpoint);
 		const result = await request.get(urlParams);
