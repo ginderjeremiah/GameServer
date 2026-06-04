@@ -1,5 +1,6 @@
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -141,6 +142,67 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Login_AdminUser_InjectsRoleIntoTokenAndGrantsAdminAccess()
+        {
+            // Arrange — a user granted the seeded Admin role.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "adminlogin", "adminpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
+
+            // Act — log in and reuse the issued auth cookie against an admin endpoint.
+            var authClient = await LoginAndBuildClientAsync("adminlogin", "adminpass");
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", Array.Empty<object>(), CancellationToken);
+
+            // Assert — the role baked into the token grants access (no 401/403).
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            authClient.Dispose();
+        }
+
+        [Fact]
+        public async Task Login_NonAdminUser_DoesNotGrantAdminAccess()
+        {
+            // Arrange — a user without any roles.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "plainlogin", "plainpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            // Act
+            var authClient = await LoginAndBuildClientAsync("plainlogin", "plainpass");
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", Array.Empty<object>(), CancellationToken);
+
+            // Assert — authenticated, but lacking the Admin role.
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            authClient.Dispose();
+        }
+
+        /// <summary>
+        /// Logs in with the given credentials and returns a client carrying the issued auth cookie,
+        /// exercising the real login → token issuance flow rather than a hand-built test token.
+        /// </summary>
+        private async Task<HttpClient> LoginAndBuildClientAsync(string username, string password)
+        {
+            var loginResponse = await Client.PostAsJsonAsync("/api/Login", new { Username = username, Password = password }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+            var authClient = Factory.CreateClient();
+            foreach (var cookie in loginResponse.Headers.GetValues("Set-Cookie"))
+            {
+                authClient.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
+            }
+
+            return authClient;
         }
     }
 }

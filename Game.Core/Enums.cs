@@ -386,4 +386,16 @@ namespace Game.Core
         Legendary = 5,
         Mythic = 6,
     }
+
+    /// <summary>
+    /// Represents an access role that can be granted to a user. Roles are intrinsic reference data
+    /// (encoded in the application and used to gate functionality) rather than free-form data.
+    /// </summary>
+    public enum ERole
+    {
+        /// <summary>
+        /// Grants access to the administrative tooling endpoints.
+        /// </summary>
+        Admin = 1,
+    }
 }

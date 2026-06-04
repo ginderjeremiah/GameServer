@@ -56,7 +56,8 @@ namespace Game.Api
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
                 .AddSingleton<ApiCodeGenerator>()
-                .AddScoped<AdminCacheInvalidationFilter>();
+                .AddScoped<AdminCacheInvalidationFilter>()
+                .AddScoped<AdminRoleAuthorizationFilter>();
 
             if (builder.Environment.IsDevelopment())
             {

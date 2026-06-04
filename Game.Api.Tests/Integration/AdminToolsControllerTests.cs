@@ -20,7 +20,7 @@ namespace Game.Api.Tests.Integration
     {
         public AdminToolsControllerTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
-        private async Task<HttpClient> SetupAuthenticatedClientAsync()
+        private async Task<HttpClient> SetupAuthenticatedClientAsync(bool admin = true)
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -30,7 +30,8 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
-            return CreateAuthenticatedClient(user.Id, player.Id);
+            var roles = admin ? new[] { nameof(ERole.Admin) } : [];
+            return CreateAuthenticatedClient(user.Id, player.Id, roles);
         }
 
         [Fact]
@@ -513,6 +514,17 @@ namespace Game.Api.Tests.Integration
             var changes = Array.Empty<object>();
             var response = await Client.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task AdminTools_AuthenticatedWithoutAdminRole_Returns403()
+        {
+            // An authenticated user that has not been granted the Admin role is forbidden.
+            using var authClient = await SetupAuthenticatedClientAsync(admin: false);
+
+            var changes = Array.Empty<object>();
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
     }
 }

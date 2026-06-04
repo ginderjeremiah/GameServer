@@ -61,7 +61,8 @@ namespace Game.Api.Controllers
 
             _sessionService.CreateSession(user.Id, playerId);
 
-            var token = new AuthToken(new AuthTokenClaims(user.Id, DateTime.UtcNow + Constants.TOKEN_LIFETIME));
+            var roles = user.Roles.Select(role => role.Name).ToList();
+            var token = new AuthToken(new AuthTokenClaims(user.Id, roles, DateTime.UtcNow + Constants.TOKEN_LIFETIME));
             _cookieService.SetTokenCookie(token.ToString());
 
             return ApiResponse.Success(PlayerData.FromPlayer(playerData));

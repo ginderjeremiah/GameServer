@@ -9,5 +9,6 @@
         public DateTime LastLogin { get; set; }
 
         public virtual List<Player> Players { get => field ?? throw new NotLoadedException(nameof(Players)); set; }
+        public virtual List<Role> Roles { get => field ?? throw new NotLoadedException(nameof(Roles)); set; }
     }
 }

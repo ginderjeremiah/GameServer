@@ -86,10 +86,12 @@ namespace Game.Api.Auth
         public string Aud { get; }
         public DateTime Exp { get; }
         public string Jti { get; }
+        public IReadOnlyList<string> Roles { get; }
 
-        public AuthTokenClaims(int sub, DateTime exp = default, string iss = Constants.SERVER_PRINCIPAL, string aud = Constants.SERVER_PRINCIPAL)
+        public AuthTokenClaims(int sub, IReadOnlyList<string>? roles = null, DateTime exp = default, string iss = Constants.SERVER_PRINCIPAL, string aud = Constants.SERVER_PRINCIPAL)
         {
             Sub = sub;
+            Roles = roles ?? [];
             Exp = exp == default ? DateTime.UtcNow : exp;
             Iss = iss;
             Aud = aud;
@@ -98,7 +100,7 @@ namespace Game.Api.Auth
 
         public AuthTokenClaims CloneWithNewExpiration(DateTime newExpiration)
         {
-            return new AuthTokenClaims(Sub, newExpiration, Iss, Aud);
+            return new AuthTokenClaims(Sub, Roles, newExpiration, Iss, Aud);
         }
     }
 }

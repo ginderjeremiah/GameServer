@@ -1,6 +1,7 @@
 using Game.Abstractions.Entities;
 using Game.Core;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 
 namespace Game.TestInfrastructure.Helpers
 {
@@ -193,6 +194,14 @@ namespace Game.TestInfrastructure.Helpers
             context.Zones.Add(zone);
             await context.SaveChangesAsync();
             return zone;
+        }
+
+        public static async Task AssignRoleToUserAsync(GameContext context, int userId, ERole role)
+        {
+            var user = await context.Users.Include(u => u.Roles).FirstAsync(u => u.Id == userId);
+            var roleEntity = await context.Roles.FirstAsync(r => r.Id == (int)role);
+            user.Roles.Add(roleEntity);
+            await context.SaveChangesAsync();
         }
 
         public static async Task LinkEnemyToZoneAsync(GameContext context, int zoneId, int enemyId)

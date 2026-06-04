@@ -22,6 +22,11 @@ namespace Game.Api.Services
 
         public PlayerState PlayerState { get; private set; } = new();
 
+        /// <summary>
+        /// The access roles granted to the authenticated user, sourced from the auth token claims.
+        /// </summary>
+        public IReadOnlyList<string> Roles { get; private set; } = [];
+
         public bool SessionAvailable => UserId > 0;
 
         /// <summary>
@@ -44,6 +49,23 @@ namespace Game.Api.Services
         }
 
         /// <summary>
+        /// Sets the access roles for the current request from the auth token claims.
+        /// Called by TokenAuthMiddleware once a token has been validated.
+        /// </summary>
+        public void SetRoles(IReadOnlyList<string> roles)
+        {
+            Roles = roles;
+        }
+
+        /// <summary>
+        /// Determines whether the authenticated user has been granted the given role.
+        /// </summary>
+        public bool IsInRole(string role)
+        {
+            return Roles.Contains(role);
+        }
+
+        /// <summary>
         /// Clears all session state (called when a token is invalid).
         /// </summary>
         public void ClearSession()
@@ -51,6 +73,7 @@ namespace Game.Api.Services
             UserId = 0;
             _player = null;
             PlayerState = new();
+            Roles = [];
         }
 
         public async Task<Player> LoadPlayer()

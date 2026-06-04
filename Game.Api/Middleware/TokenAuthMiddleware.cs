@@ -33,6 +33,8 @@ namespace Game.Api.Middleware
                 await sessionService.LoadPlayerState(token.Claims.Sub);
                 if (sessionService.Authenticated)
                 {
+                    sessionService.SetRoles(token.Claims.Roles);
+
                     //Slide cookie if over halfway to expiration
                     if (token.Claims.Exp < DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME / 2))
                     {
