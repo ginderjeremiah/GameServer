@@ -3,7 +3,6 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Zones;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -26,41 +25,30 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditZones([FromBody] List<Change<Zone>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Zone
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Zone
-                    {
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        LevelMin = change.Item.LevelMin,
-                        LevelMax = change.Item.LevelMax,
-                        Order = change.Item.Order,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    Description = item.Description,
+                    LevelMin = item.LevelMin,
+                    LevelMax = item.LevelMax,
+                    Order = item.Order,
+                }),
+                edit: item => _entityStore.Update(new Abstractions.Entities.Zone
                 {
-                    _entityStore.Update(new Abstractions.Entities.Zone
-                    {
-                        Id = change.Item.Id,
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        LevelMin = change.Item.LevelMin,
-                        LevelMax = change.Item.LevelMax,
-                        Order = change.Item.Order,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    LevelMin = item.LevelMin,
+                    LevelMax = item.LevelMax,
+                    Order = item.Order,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.Zone
                 {
-                    _entityStore.Delete(new Abstractions.Entities.Zone
-                    {
-                        Id = change.Item.Id,
-                        Name = "",
-                        Description = "",
-                    });
-                }
-            }
+                    Id = item.Id,
+                    Name = "",
+                    Description = "",
+                }));
 
             return ApiResponse.Success();
         }

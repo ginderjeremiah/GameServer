@@ -4,7 +4,6 @@ using Game.Api.Models.Common;
 using Game.Api.Models.Items;
 using Game.Api.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -29,39 +28,34 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.ItemMod
                 {
-                    _entityStore.Insert(new Abstractions.Entities.ItemMod
-                    {
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        ItemModTypeId = (int)change.Item.ItemModTypeId,
-                        RarityId = (int)change.Item.RarityId,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    Description = item.Description,
+                    ItemModTypeId = (int)item.ItemModTypeId,
+                    RarityId = (int)item.RarityId,
+                }),
+                edit: item =>
                 {
-                    var itemMod = _itemMods.LookupItemMod(change.Item.Id);
-                    if (itemMod is not null)
+                    var existing = _itemMods.LookupItemMod(item.Id);
+                    if (existing is not null)
                     {
-                        itemMod.Name = change.Item.Name;
-                        itemMod.Description = change.Item.Description;
-                        itemMod.ItemModTypeId = (int)change.Item.ItemModTypeId;
-                        itemMod.RarityId = (int)change.Item.RarityId;
-                        _entityStore.Update(itemMod);
+                        existing.Name = item.Name;
+                        existing.Description = item.Description;
+                        existing.ItemModTypeId = (int)item.ItemModTypeId;
+                        existing.RarityId = (int)item.RarityId;
+                        _entityStore.Update(existing);
                     }
-                }
-                else if (change.ChangeType == Delete)
+                },
+                delete: item =>
                 {
-                    var itemMod = _itemMods.LookupItemMod(change.Item.Id);
-                    if (itemMod is not null)
+                    var existing = _itemMods.LookupItemMod(item.Id);
+                    if (existing is not null)
                     {
-                        _entityStore.Delete(itemMod);
+                        _entityStore.Delete(existing);
                     }
-                }
-            }
+                });
 
             return ApiResponse.Success();
         }
@@ -75,43 +69,38 @@ namespace Game.Api.Controllers.Admin
                 return ApiResponse.Error("Item Mod does not exist.");
             }
 
-            foreach (var change in changeData.Changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changeData.Changes,
+                add: attribute => _entityStore.Insert(new Abstractions.Entities.ItemModAttribute
                 {
-                    _entityStore.Insert(new Abstractions.Entities.ItemModAttribute
-                    {
-                        ItemModId = itemMod.Id,
-                        AttributeId = (int)change.Item.AttributeId,
-                        Amount = change.Item.Amount,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    ItemModId = itemMod.Id,
+                    AttributeId = (int)attribute.AttributeId,
+                    Amount = attribute.Amount,
+                }),
+                // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                // ItemMod back-reference would drag the whole graph into the change tracker).
+                edit: attribute =>
                 {
-                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
-                    // ItemMod back-reference would drag the whole graph into the change tracker).
-                    if (itemMod.ItemModAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (itemMod.ItemModAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Update(new Abstractions.Entities.ItemModAttribute
                         {
                             ItemModId = itemMod.Id,
-                            AttributeId = (int)change.Item.AttributeId,
-                            Amount = change.Item.Amount,
+                            AttributeId = (int)attribute.AttributeId,
+                            Amount = attribute.Amount,
                         });
                     }
-                }
-                else if (change.ChangeType == Delete)
+                },
+                delete: attribute =>
                 {
-                    if (itemMod.ItemModAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (itemMod.ItemModAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Delete(new Abstractions.Entities.ItemModAttribute
                         {
                             ItemModId = itemMod.Id,
-                            AttributeId = (int)change.Item.AttributeId,
+                            AttributeId = (int)attribute.AttributeId,
                         });
                     }
-                }
-            }
+                });
 
             return ApiResponse.Success();
         }

@@ -4,7 +4,6 @@ using Game.Api.Models.Common;
 using Game.Api.Models.Items;
 using Game.Api.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -29,41 +28,36 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Item
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Item
-                    {
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        ItemCategoryId = (int)change.Item.ItemCategoryId,
-                        RarityId = (int)change.Item.RarityId,
-                        IconPath = change.Item.IconPath,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    Description = item.Description,
+                    ItemCategoryId = (int)item.ItemCategoryId,
+                    RarityId = (int)item.RarityId,
+                    IconPath = item.IconPath,
+                }),
+                edit: item =>
                 {
-                    var item = _items.LookupItem(change.Item.Id);
-                    if (item is not null)
+                    var existing = _items.LookupItem(item.Id);
+                    if (existing is not null)
                     {
-                        item.Name = change.Item.Name;
-                        item.Description = change.Item.Description;
-                        item.ItemCategoryId = (int)change.Item.ItemCategoryId;
-                        item.RarityId = (int)change.Item.RarityId;
-                        item.IconPath = change.Item.IconPath;
-                        _entityStore.Update(item);
+                        existing.Name = item.Name;
+                        existing.Description = item.Description;
+                        existing.ItemCategoryId = (int)item.ItemCategoryId;
+                        existing.RarityId = (int)item.RarityId;
+                        existing.IconPath = item.IconPath;
+                        _entityStore.Update(existing);
                     }
-                }
-                else if (change.ChangeType == Delete)
+                },
+                delete: item =>
                 {
-                    var item = _items.LookupItem(change.Item.Id);
-                    if (item is not null)
+                    var existing = _items.LookupItem(item.Id);
+                    if (existing is not null)
                     {
-                        _entityStore.Delete(item);
+                        _entityStore.Delete(existing);
                     }
-                }
-            }
+                });
 
             return ApiResponse.Success();
         }
@@ -77,43 +71,38 @@ namespace Game.Api.Controllers.Admin
                 return ApiResponse.Error("Item does not exist.");
             }
 
-            foreach (var change in changeData.Changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changeData.Changes,
+                add: attribute => _entityStore.Insert(new Abstractions.Entities.ItemAttribute
                 {
-                    _entityStore.Insert(new Abstractions.Entities.ItemAttribute
-                    {
-                        ItemId = item.Id,
-                        AttributeId = (int)change.Item.AttributeId,
-                        Amount = change.Item.Amount,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    ItemId = item.Id,
+                    AttributeId = (int)attribute.AttributeId,
+                    Amount = attribute.Amount,
+                }),
+                // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                // Item back-reference would drag the whole graph into the change tracker).
+                edit: attribute =>
                 {
-                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
-                    // Item back-reference would drag the whole graph into the change tracker).
-                    if (item.ItemAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (item.ItemAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Update(new Abstractions.Entities.ItemAttribute
                         {
                             ItemId = item.Id,
-                            AttributeId = (int)change.Item.AttributeId,
-                            Amount = change.Item.Amount,
+                            AttributeId = (int)attribute.AttributeId,
+                            Amount = attribute.Amount,
                         });
                     }
-                }
-                else if (change.ChangeType == Delete)
+                },
+                delete: attribute =>
                 {
-                    if (item.ItemAttributes.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (item.ItemAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Delete(new Abstractions.Entities.ItemAttribute
                         {
                             ItemId = item.Id,
-                            AttributeId = (int)change.Item.AttributeId,
+                            AttributeId = (int)attribute.AttributeId,
                         });
                     }
-                }
-            }
+                });
 
             return ApiResponse.Success();
         }
@@ -121,33 +110,22 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.ItemModSlot
                 {
-                    _entityStore.Insert(new Abstractions.Entities.ItemModSlot
-                    {
-                        ItemId = change.Item.ItemId,
-                        ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    ItemId = item.ItemId,
+                    ItemModSlotTypeId = (int)item.ItemModSlotTypeId,
+                }),
+                edit: item => _entityStore.Update(new Abstractions.Entities.ItemModSlot
                 {
-                    _entityStore.Update(new Abstractions.Entities.ItemModSlot
-                    {
-                        Id = change.Item.Id,
-                        ItemId = change.Item.ItemId,
-                        ItemModSlotTypeId = (int)change.Item.ItemModSlotTypeId,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    ItemId = item.ItemId,
+                    ItemModSlotTypeId = (int)item.ItemModSlotTypeId,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.ItemModSlot
                 {
-                    _entityStore.Delete(new Abstractions.Entities.ItemModSlot
-                    {
-                        Id = change.Item.Id,
-                    });
-                }
-            }
+                    Id = item.Id,
+                }));
 
             return ApiResponse.Success();
         }

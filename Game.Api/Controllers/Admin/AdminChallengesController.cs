@@ -3,7 +3,6 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Progress;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -24,47 +23,36 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditChallenges([FromBody] List<Change<Challenge>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Challenge
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Challenge
-                    {
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        ChallengeTypeId = (int)change.Item.ChallengeTypeId,
-                        TargetEntityId = change.Item.TargetEntityId,
-                        ProgressGoal = change.Item.ProgressGoal,
-                        RewardItemId = change.Item.RewardItemId,
-                        RewardItemModId = change.Item.RewardItemModId,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    Description = item.Description,
+                    ChallengeTypeId = (int)item.ChallengeTypeId,
+                    TargetEntityId = item.TargetEntityId,
+                    ProgressGoal = item.ProgressGoal,
+                    RewardItemId = item.RewardItemId,
+                    RewardItemModId = item.RewardItemModId,
+                }),
+                // Construct a fresh, navigation-free entity so EntityStore.Update emits a
+                // single-row UPDATE without dragging in the type-derived statistic/entity graph.
+                edit: item => _entityStore.Update(new Abstractions.Entities.Challenge
                 {
-                    // Construct a fresh, navigation-free entity so EntityStore.Update emits a
-                    // single-row UPDATE without dragging in the type-derived statistic/entity graph.
-                    _entityStore.Update(new Abstractions.Entities.Challenge
-                    {
-                        Id = change.Item.Id,
-                        Name = change.Item.Name,
-                        Description = change.Item.Description,
-                        ChallengeTypeId = (int)change.Item.ChallengeTypeId,
-                        TargetEntityId = change.Item.TargetEntityId,
-                        ProgressGoal = change.Item.ProgressGoal,
-                        RewardItemId = change.Item.RewardItemId,
-                        RewardItemModId = change.Item.RewardItemModId,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    ChallengeTypeId = (int)item.ChallengeTypeId,
+                    TargetEntityId = item.TargetEntityId,
+                    ProgressGoal = item.ProgressGoal,
+                    RewardItemId = item.RewardItemId,
+                    RewardItemModId = item.RewardItemModId,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.Challenge
                 {
-                    _entityStore.Delete(new Abstractions.Entities.Challenge
-                    {
-                        Id = change.Item.Id,
-                        Name = "",
-                        Description = "",
-                    });
-                }
-            }
+                    Id = item.Id,
+                    Name = "",
+                    Description = "",
+                }));
 
             return ApiResponse.Success();
         }

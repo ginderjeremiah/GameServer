@@ -3,7 +3,6 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -22,34 +21,23 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Tag
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Tag
-                    {
-                        Name = change.Item.Name,
-                        TagCategoryId = change.Item.TagCategoryId,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    TagCategoryId = item.TagCategoryId,
+                }),
+                edit: item => _entityStore.Update(new Abstractions.Entities.Tag
                 {
-                    _entityStore.Update(new Abstractions.Entities.Tag
-                    {
-                        Id = change.Item.Id,
-                        Name = change.Item.Name,
-                        TagCategoryId = change.Item.TagCategoryId,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    Name = item.Name,
+                    TagCategoryId = item.TagCategoryId,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.Tag
                 {
-                    _entityStore.Delete(new Abstractions.Entities.Tag
-                    {
-                        Id = change.Item.Id,
-                        Name = "",
-                    });
-                }
-            }
+                    Id = item.Id,
+                    Name = "",
+                }));
 
             return ApiResponse.Success();
         }
