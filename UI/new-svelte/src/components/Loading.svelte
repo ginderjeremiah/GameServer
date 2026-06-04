@@ -24,7 +24,7 @@
 {/if}
 
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount } from "svelte";
 
 const { hideOverlay = false, loading = true, delay = 0 } = $props();
 
