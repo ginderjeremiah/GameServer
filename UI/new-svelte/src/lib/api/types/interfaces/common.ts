@@ -3,12 +3,12 @@
 
 import type { EChangeType, IBattlerAttribute } from '../';
 
-export interface IChange<T> {
-	item: T;
-	changeType: EChangeType;
-}
-
 export interface IAddEditAttributesData {
 	id: number;
 	changes: IChange<IBattlerAttribute>[];
+}
+
+export interface IChange<T> {
+	item: T;
+	changeType: EChangeType;
 }

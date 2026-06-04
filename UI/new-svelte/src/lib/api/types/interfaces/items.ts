@@ -8,22 +8,6 @@ import type {
 	IBattlerAttribute
 } from '../';
 
-export interface IItemMod {
-	id: number;
-	name: string;
-	description: string;
-	itemModTypeId: EItemModType;
-	rarityId: ERarity;
-	attributes: IBattlerAttribute[];
-	tags: number[];
-}
-
-export interface IItemModSlot {
-	id: number;
-	itemId: number;
-	itemModSlotTypeId: EItemModType;
-}
-
 export interface IItem {
 	id: number;
 	name: string;
@@ -39,6 +23,22 @@ export interface IItem {
 export interface IItemCategory {
 	id: number;
 	name: string;
+}
+
+export interface IItemMod {
+	id: number;
+	name: string;
+	description: string;
+	itemModTypeId: EItemModType;
+	rarityId: ERarity;
+	attributes: IBattlerAttribute[];
+	tags: number[];
+}
+
+export interface IItemModSlot {
+	id: number;
+	itemId: number;
+	itemModSlotTypeId: EItemModType;
 }
 
 export interface IItemModType {

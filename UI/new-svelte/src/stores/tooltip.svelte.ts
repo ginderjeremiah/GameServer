@@ -29,7 +29,7 @@ const tooltipsData = new SvelteMap<number, TooltipData>();
 
 export const tooltips = {
 	get data() {
-		return [...tooltipsData.values()];
+		return tooltipsData.values();
 	}
 };
 

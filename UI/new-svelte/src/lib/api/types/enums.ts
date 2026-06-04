@@ -20,34 +20,9 @@ export enum EAttribute {
 	BlockReduction = 14,
 }
 
-export enum EChangeType {
-	Add = 0,
-	Edit = 1,
-	Delete = 2,
-}
-
-export enum EItemModType {
-	Component = 1,
-	Prefix = 2,
-	Suffix = 3,
-}
-
-export enum ERarity {
-	Common = 1,
-	Uncommon = 2,
-	Rare = 3,
-	Epic = 4,
-	Legendary = 5,
-	Mythic = 6,
-}
-
-export enum EItemCategory {
-	Helm = 1,
-	Chest = 2,
-	Leg = 3,
-	Boot = 4,
-	Weapon = 5,
-	Accessory = 6,
+export enum EChallengeGoalComparison {
+	AtLeast = 1,
+	AtMost = 2,
 }
 
 export enum EChallengeType {
@@ -59,6 +34,52 @@ export enum EChallengeType {
 	DamageDealt = 6,
 	BattlesWon = 7,
 	SkillsUsed = 8,
+}
+
+export enum EChangeType {
+	Add = 0,
+	Edit = 1,
+	Delete = 2,
+}
+
+export enum EEntityType {
+	None = 0,
+	Enemy = 1,
+	Zone = 2,
+	Skill = 3,
+}
+
+export enum EItemCategory {
+	Helm = 1,
+	Chest = 2,
+	Leg = 3,
+	Boot = 4,
+	Weapon = 5,
+	Accessory = 6,
+}
+
+export enum EItemModType {
+	Component = 1,
+	Prefix = 2,
+	Suffix = 3,
+}
+
+export enum ELogType {
+	Damage = 1,
+	Debug = 2,
+	Exp = 3,
+	LevelUp = 4,
+	ItemFound = 5,
+	EnemyDefeated = 6,
+}
+
+export enum ERarity {
+	Common = 1,
+	Uncommon = 2,
+	Rare = 3,
+	Epic = 4,
+	Legendary = 5,
+	Mythic = 6,
 }
 
 export enum EStatisticType {
@@ -76,25 +97,4 @@ export enum EStatisticType {
 	TotalBattleTime = 12,
 	FastestVictory = 13,
 	SkillsUsed = 14,
-}
-
-export enum EEntityType {
-	None = 0,
-	Enemy = 1,
-	Zone = 2,
-	Skill = 3,
-}
-
-export enum EChallengeGoalComparison {
-	AtLeast = 1,
-	AtMost = 2,
-}
-
-export enum ELogType {
-	Damage = 1,
-	Debug = 2,
-	Exp = 3,
-	LevelUp = 4,
-	ItemFound = 5,
-	EnemyDefeated = 6,
 }

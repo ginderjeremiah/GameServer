@@ -29,14 +29,14 @@ describe('tooltip store', () => {
 		const fightA = render(Registrar);
 		const fightB = render(Registrar);
 		flushSync();
-		const fightIds = tooltips.data.map((t) => t.id);
+		const fightIds = [...tooltips.data].map((t) => t.id);
 		expect(fightIds).toHaveLength(2);
 
 		const invC = render(Registrar);
 		const invD = render(Registrar);
 		flushSync();
 		expect(tooltips.data).toHaveLength(4);
-		const invIds = tooltips.data.map((t) => t.id).filter((id) => !fightIds.includes(id));
+		const invIds = [...tooltips.data].map((t) => t.id).filter((id) => !fightIds.includes(id));
 		expect(invIds).toHaveLength(2);
 
 		// Old (Fight) screen tears down after the new screen has mounted.
@@ -44,7 +44,7 @@ describe('tooltip store', () => {
 		fightB.unmount();
 		flushSync();
 
-		const remaining = tooltips.data;
+		const remaining = [...tooltips.data];
 		// No undefined holes should leak through.
 		expect(remaining.every((t) => t !== undefined)).toBe(true);
 		// Exactly the two inventory tooltips should remain.

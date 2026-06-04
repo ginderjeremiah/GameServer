@@ -6,17 +6,10 @@ export interface IAppliedModModel {
 	itemModSlotId: number;
 }
 
-export interface IInventoryItem {
+export interface IApplyModRequest {
 	itemId: number;
-	equipped: boolean;
-	equipmentSlotId?: number;
-	favorite: boolean;
-	appliedMods: IAppliedModModel[];
-}
-
-export interface IInventoryData {
-	unlockedItems: IInventoryItem[];
-	unlockedMods: number[];
+	itemModId: number;
+	itemModSlotId: number;
 }
 
 export interface IEquipRequest {
@@ -24,10 +17,17 @@ export interface IEquipRequest {
 	equipmentSlotId: number;
 }
 
-export interface IApplyModRequest {
+export interface IInventoryData {
+	unlockedItems: IInventoryItem[];
+	unlockedMods: number[];
+}
+
+export interface IInventoryItem {
 	itemId: number;
-	itemModId: number;
-	itemModSlotId: number;
+	equipped: boolean;
+	equipmentSlotId?: number;
+	favorite: boolean;
+	appliedMods: IAppliedModModel[];
 }
 
 export interface IRemoveModRequest {
