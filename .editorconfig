@@ -1,7 +1,15 @@
-﻿[*.cs]
+﻿# Apply Unix-style LF line endings to all files
+[*]
+end_of_line = lf
+insert_final_newline = true
 
+[*.cs]
 # IDE0290: Use primary constructor
 dotnet_diagnostic.IDE0290.severity = none
 
 # IDE0305: Simplify collection initialization
 dotnet_diagnostic.IDE0305.severity = none
+
+# Apply Windows-style CRLF line endings specifically to batch files
+[*.bat]
+end_of_line = crlf
