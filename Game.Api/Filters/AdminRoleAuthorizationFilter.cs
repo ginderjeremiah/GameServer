@@ -1,3 +1,4 @@
+using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Core;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,10 @@ namespace Game.Api.Filters
         {
             if (!_sessionService.IsInRole(nameof(ERole.Admin)))
             {
-                context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);
+                context.Result = new ObjectResult(ApiResponse.Error("Forbidden: Admin role required."))
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
             }
         }
     }
