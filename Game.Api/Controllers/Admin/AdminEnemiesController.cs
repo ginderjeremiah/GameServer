@@ -3,7 +3,6 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -26,34 +25,23 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditEnemies([FromBody] List<Change<Enemy>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Enemy
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Enemy
-                    {
-                        Name = change.Item.Name,
-                        IsBoss = change.Item.IsBoss,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    IsBoss = item.IsBoss,
+                }),
+                edit: item => _entityStore.Update(new Abstractions.Entities.Enemy
                 {
-                    _entityStore.Update(new Abstractions.Entities.Enemy
-                    {
-                        Id = change.Item.Id,
-                        Name = change.Item.Name,
-                        IsBoss = change.Item.IsBoss,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    Name = item.Name,
+                    IsBoss = item.IsBoss,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.Enemy
                 {
-                    _entityStore.Delete(new Abstractions.Entities.Enemy
-                    {
-                        Id = change.Item.Id,
-                        Name = "",
-                    });
-                }
-            }
+                    Id = item.Id,
+                    Name = "",
+                }));
 
             return ApiResponse.Success();
         }

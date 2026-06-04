@@ -3,7 +3,6 @@ using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Skills;
 using Microsoft.AspNetCore.Mvc;
-using static Game.Api.EChangeType;
 
 namespace Game.Api.Controllers.Admin
 {
@@ -26,42 +25,31 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditSkills([FromBody] List<Change<Skill>> changes)
         {
-            foreach (var change in changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changes,
+                add: item => _entityStore.Insert(new Abstractions.Entities.Skill
                 {
-                    _entityStore.Insert(new Abstractions.Entities.Skill
-                    {
-                        Name = change.Item.Name,
-                        BaseDamage = change.Item.BaseDamage,
-                        CooldownMs = change.Item.CooldownMs,
-                        Description = change.Item.Description,
-                        IconPath = change.Item.IconPath,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    Name = item.Name,
+                    BaseDamage = item.BaseDamage,
+                    CooldownMs = item.CooldownMs,
+                    Description = item.Description,
+                    IconPath = item.IconPath,
+                }),
+                edit: item => _entityStore.Update(new Abstractions.Entities.Skill
                 {
-                    _entityStore.Update(new Abstractions.Entities.Skill
-                    {
-                        Id = change.Item.Id,
-                        Name = change.Item.Name,
-                        BaseDamage = change.Item.BaseDamage,
-                        CooldownMs = change.Item.CooldownMs,
-                        Description = change.Item.Description,
-                        IconPath = change.Item.IconPath,
-                    });
-                }
-                else if (change.ChangeType == Delete)
+                    Id = item.Id,
+                    Name = item.Name,
+                    BaseDamage = item.BaseDamage,
+                    CooldownMs = item.CooldownMs,
+                    Description = item.Description,
+                    IconPath = item.IconPath,
+                }),
+                delete: item => _entityStore.Delete(new Abstractions.Entities.Skill
                 {
-                    _entityStore.Delete(new Abstractions.Entities.Skill
-                    {
-                        Id = change.Item.Id,
-                        Name = "",
-                        Description = "",
-                        IconPath = "",
-                    });
-                }
-            }
+                    Id = item.Id,
+                    Name = "",
+                    Description = "",
+                    IconPath = "",
+                }));
 
             return ApiResponse.Success();
         }
@@ -75,43 +63,38 @@ namespace Game.Api.Controllers.Admin
                 return ApiResponse.Error("Skill does not exist.");
             }
 
-            foreach (var change in changeData.Changes.OrderByDescending(c => c.ChangeType))
-            {
-                if (change.ChangeType == Add)
+            ChangeSetProcessor.Apply(changeData.Changes,
+                add: attribute => _entityStore.Insert(new Abstractions.Entities.SkillDamageMultiplier
                 {
-                    _entityStore.Insert(new Abstractions.Entities.SkillDamageMultiplier
-                    {
-                        SkillId = skill.Id,
-                        AttributeId = (int)change.Item.AttributeId,
-                        Multiplier = change.Item.Amount,
-                    });
-                }
-                else if (change.ChangeType == Edit)
+                    SkillId = skill.Id,
+                    AttributeId = (int)attribute.AttributeId,
+                    Multiplier = attribute.Amount,
+                }),
+                // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
+                // Skill back-reference would drag the whole graph into the change tracker).
+                edit: attribute =>
                 {
-                    // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
-                    // Skill back-reference would drag the whole graph into the change tracker).
-                    if (skill.SkillDamageMultipliers.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (skill.SkillDamageMultipliers.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Update(new Abstractions.Entities.SkillDamageMultiplier
                         {
                             SkillId = skill.Id,
-                            AttributeId = (int)change.Item.AttributeId,
-                            Multiplier = change.Item.Amount,
+                            AttributeId = (int)attribute.AttributeId,
+                            Multiplier = attribute.Amount,
                         });
                     }
-                }
-                else if (change.ChangeType == Delete)
+                },
+                delete: attribute =>
                 {
-                    if (skill.SkillDamageMultipliers.Any(att => (int)change.Item.AttributeId == att.AttributeId))
+                    if (skill.SkillDamageMultipliers.Any(att => (int)attribute.AttributeId == att.AttributeId))
                     {
                         _entityStore.Delete(new Abstractions.Entities.SkillDamageMultiplier
                         {
                             SkillId = skill.Id,
-                            AttributeId = (int)change.Item.AttributeId,
+                            AttributeId = (int)attribute.AttributeId,
                         });
                     }
-                }
-            }
+                });
 
             return ApiResponse.Success();
         }
