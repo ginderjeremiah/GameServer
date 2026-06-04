@@ -24,17 +24,17 @@
 {/if}
 
 <script lang="ts">
-import { onMount } from "svelte";
+import { onMount } from 'svelte';
 
 const { hideOverlay = false, loading = true, delay = 0 } = $props();
 
 let waitingOnDelay = $state(true);
 
 onMount(() => {
-  waitingOnDelay = !!delay;
-  if (delay) {
-    setTimeout(() => waitingOnDelay = false, delay)
-  }
+	waitingOnDelay = !!delay;
+	if (delay) {
+		setTimeout(() => (waitingOnDelay = false), delay);
+	}
 });
 
 const offset = Math.floor(Math.random() * 360);

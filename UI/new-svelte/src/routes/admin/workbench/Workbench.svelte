@@ -81,7 +81,7 @@ const newItem = () => {
 	if (!store) {
 		return;
 	}
-  
+
 	selId = store.addItem();
 	selectedTab = entity.sections[0].key;
 };

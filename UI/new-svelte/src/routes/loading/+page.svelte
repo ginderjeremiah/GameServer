@@ -211,8 +211,8 @@ const handleWheel = (e: WheelEvent) => {
 
 const enterGame = () => {
 	if (phase === 'done') {
-    goto(resolve('/game'));
-  }
+		goto(resolve('/game'));
+	}
 };
 
 const retryFailed = async () => {

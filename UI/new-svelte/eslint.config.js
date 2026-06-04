@@ -1,20 +1,19 @@
 import ts from 'typescript-eslint';
 import svelte from 'eslint-plugin-svelte';
-import prettier from 'eslint-config-prettier';
+import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
-import importPlugin from 'eslint-plugin-import';
+import prettierPlugin from 'eslint-plugin-prettier';
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 export default [
 	...ts.configs.recommended,
 	...svelte.configs['flat/recommended'],
-	prettier,
 	...svelte.configs['flat/prettier'],
 	{
 		languageOptions: {
 			globals: {
 				...globals.browser,
-        ...globals.node
+				...globals.node
 			}
 		}
 	},
@@ -27,18 +26,14 @@ export default [
 		}
 	},
 	{
-		files: ['**/*.ts'],
-		languageOptions: {
-			ecmaVersion: 'latest',
-			sourceType: 'module'
+		plugins: {
+			prettier: prettierPlugin
 		},
-    plugins: {
-      import: importPlugin
-    },
 		rules: {
-			'import/no-cycle': 'error'
+			'prettier/prettier': 'error'
 		}
 	},
+	prettierConfig,
 	{
 		ignores: ['build/', '.svelte-kit/', 'dist/', 'node_modules/']
 	}

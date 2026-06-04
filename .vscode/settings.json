@@ -15,5 +15,6 @@
     "Unequip",
     "unlockable"
   ],
-  "terminal.integrated.cwd": "${workspaceFolder}\\UI\\new-svelte"
+  "terminal.integrated.cwd": "${workspaceFolder}\\UI\\new-svelte",
+  "files.eol": "\n"
 }
