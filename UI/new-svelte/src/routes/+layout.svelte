@@ -1,17 +1,25 @@
 <div class="page-base">
 	{@render children()}
 	<TooltipBase />
+	<ToastContainer />
 </div>
 
 <script lang="ts">
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
-import { TooltipBase } from '$components';
+import { TooltipBase, ToastContainer } from '$components';
+import { onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
+import { toastError } from '$stores';
 import '$styles/common.scss';
 
 let { children } = $props();
+
+// Surface otherwise-silent WebSocket failures to the player. Registered during
+// layout init (the root layout lives for the whole app session), so the hook's
+// onDestroy cleanup is valid and a single subscription covers every screen.
+onSocketError((message) => toastError(message));
 
 $effect(() => {
 	if (!playerManager.name && page.url.pathname !== '/') {
