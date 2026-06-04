@@ -26,10 +26,12 @@ export const onPingMeasured = pingHook.onNotified;
 
 type InFlightRequest = {
 	startTime: number;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	command: ApiSocketRequest<any>;
 };
 
 export class ApiSocket {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	private socketCommandQueue: ApiSocketRequest<any>[] = [];
 	private inFlightRequests: InFlightRequest[] = [];
 	private commandCounter = 0;
@@ -53,6 +55,7 @@ export class ApiSocket {
 		commandName: T,
 		params: ApiSocketRequestTypes[T]
 	): Promise<IApiSocketResponse<T>>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; TS cannot narrow the conditional param type from the generic T here.
 	public async sendSocketCommand<T extends ApiSocketCommand>(commandName: T, params?: any) {
 		const id = (this.commandCounter++).toString();
 		const request = new ApiSocketRequest(id, commandName, params);

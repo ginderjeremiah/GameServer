@@ -1,21 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 vi.mock('svelte', () => ({
 	onDestroy: vi.fn()
 }));
 
-let socketInstances: any[];
+interface MockWebSocket {
+	readyState: number;
+	OPEN: number;
+	CLOSED: number;
+	send: Mock;
+	onopen: (() => void) | null;
+	onmessage: ((ev: { data: string }) => void) | null;
+	onerror: (() => void) | null;
+}
 
-vi.stubGlobal('WebSocket', function (this: any) {
-	this.readyState = 1;
-	this.OPEN = 1;
-	this.CLOSED = 3;
-	this.send = vi.fn();
-	this.onopen = null;
-	this.onmessage = null;
-	this.onerror = null;
-	socketInstances.push(this);
-});
+let socketInstances: MockWebSocket[] = [];
+
+function createMockWebSocket(): MockWebSocket {
+	const ws: MockWebSocket = {
+		readyState: 1,
+		OPEN: 1,
+		CLOSED: 3,
+		send: vi.fn(),
+		onopen: null,
+		onmessage: null,
+		onerror: null
+	};
+	socketInstances.push(ws);
+	return ws;
+}
+
+vi.stubGlobal('WebSocket', vi.fn(createMockWebSocket));
 
 import { ApiSocket } from '$lib/api/api-socket';
 
@@ -23,21 +38,26 @@ describe('ApiSocket', () => {
 	let apiSocket: ApiSocket;
 
 	beforeEach(() => {
-		// Force the module-level socket to be seen as CLOSED so ensureSocket creates a new one
-		for (const s of socketInstances ?? []) {
-			s.readyState = 3; // CLOSED
+		// Force any socket left from a previous test to read as CLOSED so ensureSocket creates a fresh one.
+		for (const s of socketInstances) {
+			s.readyState = s.CLOSED;
 		}
 		socketInstances = [];
 		apiSocket = new ApiSocket();
 	});
 
-	function lastWs() {
-		return socketInstances[socketInstances.length - 1];
-	}
+	const lastWs = () => socketInstances[socketInstances.length - 1];
+
+	const receive = (ws: MockWebSocket, data: string) => {
+		if (!ws.onmessage) {
+			throw new Error('WebSocket has no message handler registered');
+		}
+		ws.onmessage({ data });
+	};
 
 	describe('sendSocketCommand', () => {
 		it('creates a WebSocket and sends the command', async () => {
-			const promise = apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
 			expect(ws.send).toHaveBeenCalledTimes(1);
@@ -45,25 +65,23 @@ describe('ApiSocket', () => {
 			expect(sent.name).toBe('DefeatEnemy');
 			expect(sent.id).toBeDefined();
 
-			ws.onmessage({
-				data: JSON.stringify({ id: sent.id, name: 'DefeatEnemy', data: { exp: 100 } })
-			});
+			receive(ws, JSON.stringify({ id: sent.id, name: 'DefeatEnemy', data: { cooldown: 100 } }));
 
 			const response = await promise;
-			expect(response.data).toEqual({ exp: 100 });
+			expect(response.data).toEqual({ cooldown: 100 });
 		});
 
 		it('assigns incrementing command IDs', async () => {
-			const p1 = apiSocket.sendSocketCommand('DefeatEnemy' as any);
-			const p2 = apiSocket.sendSocketCommand('NewEnemy' as any);
+			const p1 = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const p2 = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1 });
 			const ws = lastWs();
 
 			const sent1 = JSON.parse(ws.send.mock.calls[0][0]);
 			const sent2 = JSON.parse(ws.send.mock.calls[1][0]);
 			expect(Number(sent2.id)).toBeGreaterThan(Number(sent1.id));
 
-			ws.onmessage({ data: JSON.stringify({ id: sent1.id, name: 'DefeatEnemy', data: {} }) });
-			ws.onmessage({ data: JSON.stringify({ id: sent2.id, name: 'NewEnemy', data: {} }) });
+			receive(ws, JSON.stringify({ id: sent1.id, name: 'DefeatEnemy', data: {} }));
+			receive(ws, JSON.stringify({ id: sent2.id, name: 'NewEnemy', data: {} }));
 
 			await p1;
 			await p2;
@@ -73,14 +91,12 @@ describe('ApiSocket', () => {
 	describe('listenCommand', () => {
 		it('calls listener when matching command arrives', () => {
 			const listener = vi.fn();
-			apiSocket.listenCommand('SocketReplaced' as any, listener, false);
+			apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
-			ws.onmessage({
-				data: JSON.stringify({ name: 'SocketReplaced', data: {} })
-			});
+			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
@@ -88,15 +104,13 @@ describe('ApiSocket', () => {
 		it('supports multiple listeners for the same command', () => {
 			const listener1 = vi.fn();
 			const listener2 = vi.fn();
-			apiSocket.listenCommand('SocketReplaced' as any, listener1, false);
-			apiSocket.listenCommand('SocketReplaced' as any, listener2, false);
+			apiSocket.listenCommand('SocketReplaced', listener1, false);
+			apiSocket.listenCommand('SocketReplaced', listener2, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
-			ws.onmessage({
-				data: JSON.stringify({ name: 'SocketReplaced', data: {} })
-			});
+			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 
 			expect(listener1).toHaveBeenCalledTimes(1);
 			expect(listener2).toHaveBeenCalledTimes(1);
@@ -104,14 +118,12 @@ describe('ApiSocket', () => {
 
 		it('does not call listeners for different commands', () => {
 			const listener = vi.fn();
-			apiSocket.listenCommand('SocketReplaced' as any, listener, false);
+			apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
-			ws.onmessage({
-				data: JSON.stringify({ id: '0', name: 'DefeatEnemy', data: {} })
-			});
+			receive(ws, JSON.stringify({ id: '0', name: 'DefeatEnemy', data: {} }));
 
 			expect(listener).not.toHaveBeenCalled();
 		});
@@ -119,10 +131,10 @@ describe('ApiSocket', () => {
 
 	describe('ping/pong', () => {
 		it('responds with pong when ping received', () => {
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
-			ws.onmessage({ data: 'ping' });
+			receive(ws, 'ping');
 
 			expect(ws.send).toHaveBeenCalledWith('pong');
 		});
@@ -132,9 +144,9 @@ describe('ApiSocket', () => {
 		it('logs error and does not crash on malformed JSON', () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
-			ws.onmessage({ data: 'not-json' });
+			receive(ws, 'not-json');
 
 			expect(consoleSpy).toHaveBeenCalled();
 			consoleSpy.mockRestore();
@@ -146,13 +158,11 @@ describe('ApiSocket', () => {
 				throw new Error('listener error');
 			});
 
-			apiSocket.listenCommand('SocketReplaced' as any, badListener, false);
+			apiSocket.listenCommand('SocketReplaced', badListener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
-			ws.onmessage({
-				data: JSON.stringify({ name: 'SocketReplaced', data: {} })
-			});
+			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 
 			expect(badListener).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalled();
@@ -163,21 +173,17 @@ describe('ApiSocket', () => {
 	describe('listenCommand unhook', () => {
 		it('returns an unhook function that removes the listener', () => {
 			const listener = vi.fn();
-			const unhook = apiSocket.listenCommand('SocketReplaced' as any, listener, false);
+			const unhook = apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy' as any);
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const ws = lastWs();
 
-			ws.onmessage({
-				data: JSON.stringify({ name: 'SocketReplaced', data: {} })
-			});
+			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 			expect(listener).toHaveBeenCalledTimes(1);
 
 			unhook();
 
-			ws.onmessage({
-				data: JSON.stringify({ name: 'SocketReplaced', data: {} })
-			});
+			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
 	});
