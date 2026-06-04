@@ -1,4 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
+import { toastError } from '$stores';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
 export type RecordStatus = 'clean' | 'added' | 'modified' | 'deleted';
@@ -146,6 +147,10 @@ export class EntityStore<T extends Identified> {
 			this.deleted.clear();
 			this.saved = true;
 			setTimeout(() => (this.saved = false), 1900);
+		} catch (ex) {
+			// Without this, a failed persist reset only the saving flag and the
+			// user was left with unsaved edits and no indication anything broke.
+			toastError(ex instanceof Error ? ex.message : 'Failed to save changes.');
 		} finally {
 			this.saving = false;
 		}

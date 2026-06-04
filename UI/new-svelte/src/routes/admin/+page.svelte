@@ -31,6 +31,7 @@ import Workbench from './workbench/Workbench.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
 import { adminGroups, adminTools } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
+import { toastError } from '$stores';
 
 let active = $state('enemies');
 let sidebarPinned = $state(false);
@@ -41,7 +42,9 @@ const activeEntity = $derived(entityByKey(active));
 // tag UI, and derived spawn shares) before rendering any workbench.
 onMount(() => {
 	if (!reference.loaded) {
-		reference.load();
+		reference.load().catch((ex) => {
+			toastError(ex instanceof Error ? ex.message : 'Failed to load admin reference data.');
+		});
 	}
 });
 
