@@ -1,4 +1,4 @@
-import type { PlaywrightTestConfig } from '@playwright/test';
+import { devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
 	webServer: {
@@ -11,7 +11,21 @@ const config: PlaywrightTestConfig = {
 	timeout: 15000,
 	use: {
 		baseURL: 'http://localhost:4173'
-	}
+	},
+	projects: [
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'] }
+		},
+		{
+			name: 'firefox',
+			use: { ...devices['Desktop Firefox'] }
+		},
+		{
+			name: 'webkit',
+			use: { ...devices['Desktop Safari'] }
+		}
+	]
 };
 
 export default config;
