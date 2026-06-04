@@ -362,6 +362,19 @@ onMount(async () => {
 						staticData.challenges = d;
 					})
 				)
+		},
+		{
+			key: 'challengeTypes',
+			label: 'Challenge Types',
+			status: alreadyLoaded(staticData.challengeTypes) ? 'done' : 'pending',
+			durationMs: 0,
+			error: null,
+			fetch: () =>
+				dedupedFetch('challengeTypes', () =>
+					ApiRequest.get('Challenges/ChallengeTypes').then((d) => {
+						staticData.challengeTypes = d;
+					})
+				)
 		}
 	];
 

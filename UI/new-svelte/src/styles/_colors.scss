@@ -28,6 +28,23 @@ $mod-component: rgba(240, 240, 240, 0.55);
 $mod-prefix: #9bc7d9;
 $mod-suffix: #c0a8e6;
 
+// item-category accents (armour shares the UI accent, weapons the enemy hue,
+// accessories a warm gold) — consumed via the helpers in $lib/common/item-display
+$category-armor: $accent;
+$category-weapon: $enemy-accent;
+$category-accessory: #e8c878;
+
+// challenge-type accents (one hue per EChallengeType 1..8) — consumed via the
+// helpers in $lib/common/challenge-type
+$challenge-enemies-killed: #df8470;
+$challenge-bosses-defeated: #d9a441;
+$challenge-zones-cleared: #8bb060;
+$challenge-time-trial: #9b8fd4;
+$challenge-level-reached: #6f9fd9;
+$challenge-damage-dealt: #cf7a9e;
+$challenge-battles-won: #5fae9a;
+$challenge-skills-used: #5aa6bd;
+
 // rarity palette (white → green → blue → purple → gold → red, ascending tier)
 $rarity-common: #d4d4d4;
 $rarity-uncommon: #86c98f;
