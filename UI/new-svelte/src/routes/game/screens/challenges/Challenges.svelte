@@ -1,64 +1,204 @@
-<div class="challenges-screen">
-	<h2 class="challenges-title">Challenges</h2>
-	{#if loading}
-		<p class="loading-text">Loading challenges...</p>
-	{:else}
-		<div class="challenges-list">
-			{#each allChallenges as challenge (challenge.id)}
-				<ChallengeCard {challenge} playerChallenge={playerProgressMap.get(challenge.id)} />
-			{/each}
-			{#if allChallenges.length === 0}
-				<p class="empty-text">No challenges available.</p>
+<div class="challenges-frame" bind:this={frame}>
+	<!-- Header -->
+	<div class="chal-header">
+		<div>
+			<div class="chal-eyebrow">
+				<span class="diamond"></span>
+				<span class="mono-label accent">Quests</span>
+			</div>
+			<div class="chal-title">Challenges</div>
+		</div>
+		<div class="chal-summary">
+			<div class="summary-count">
+				<span class="summary-done">{view.summary.done}</span>
+				<span class="summary-total">/ {view.summary.total}</span>
+			</div>
+			<div class="mono-label sm">unlocked · {view.summary.pct}%</div>
+		</div>
+	</div>
+
+	<!-- Body: type rail + detail/overview -->
+	<div class="chal-body">
+		<TypeRail groups={view.groups} selected={view.selectedType} onSelect={(t) => view.select(t)} />
+
+		<div class="chal-detail">
+			{#if view.selectedType === 'all'}
+				<OverviewPane summary={view.summary} nextUp={view.nextUp} groups={view.groups} onPick={(t) => view.select(t)} />
+			{:else if view.selectedGroup}
+				<TypeHero group={view.selectedGroup} />
+				<div class="detail-toolbar">
+					<span class="mono-label sm">{view.selectedGroup.items.length} challenges</span>
+					<SortControl value={view.sort} onChange={(s) => view.setSort(s)} />
+				</div>
+				<div class="detail-grid">
+					{#each view.detail as challenge (challenge.id)}
+						<ChallengeDetailCard c={challenge} />
+					{/each}
+				</div>
 			{/if}
 		</div>
+	</div>
+
+	{#if view.loading}
+		<Loading />
 	{/if}
+
+	<RewardTooltip bind:this={tooltip} reward={hoveredReward} />
 </div>
 
 <script lang="ts">
-import { ApiRequest, type IPlayerChallenge } from '$lib/api';
-import { staticData } from '$stores';
-import ChallengeCard from './ChallengeCard.svelte';
+import { ApiRequest } from '$lib/api';
+import { Loading } from '$components';
+import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import { onMount } from 'svelte';
+import { ChallengesView, type ResolvedReward } from './challenges-view.svelte';
+import { setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
+import ChallengeDetailCard from './ChallengeDetailCard.svelte';
+import OverviewPane from './OverviewPane.svelte';
+import RewardTooltip from './RewardTooltip.svelte';
+import SortControl from './SortControl.svelte';
+import TypeHero from './TypeHero.svelte';
+import TypeRail from './TypeRail.svelte';
 
-let playerChallenges = $state<IPlayerChallenge[]>([]);
-let loading = $state(true);
+const view = new ChallengesView();
 
-const allChallenges = $derived(staticData.challenges ?? []);
-const playerProgressMap = $derived(new Map(playerChallenges.map((pc) => [pc.challengeId, pc])));
+let frame: HTMLDivElement;
+let tooltip = $state<TooltipComponent>();
+let hoveredReward = $state<ResolvedReward>();
+
+const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+
+// One reward tooltip for the whole screen, driven through context so nested
+// reward affordances don't have to thread hover handlers down the tree.
+const controller: RewardTooltipController = {
+	show: (reward, ev) => {
+		hoveredReward = reward;
+		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+		showTooltip();
+	},
+	move: (ev) => setTooltipPosition({ x: ev.clientX, y: ev.clientY }),
+	hide: () => {
+		hoveredReward = undefined;
+		hideTooltip();
+	}
+};
+setRewardTooltip(controller);
 
 onMount(async () => {
 	try {
-		playerChallenges = (await ApiRequest.get('Challenges/Player')) ?? [];
+		view.playerChallenges = (await ApiRequest.get('Challenges/Player')) ?? [];
 	} catch {
-		playerChallenges = [];
+		view.playerChallenges = [];
 	}
-	loading = false;
+	view.loading = false;
 });
 </script>
 
 <style lang="scss">
-.challenges-screen {
-	padding: 1rem;
-	max-width: 40rem;
-	margin: 0 auto;
+.challenges-frame {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	position: relative;
+	color: var(--text-primary);
+	font-family: Geist, Arial, Helvetica, sans-serif;
+	overflow: hidden;
+}
 
-	.challenges-title {
-		text-align: center;
-		color: var(--title-color);
-		margin-bottom: 1rem;
+.chal-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	padding: 24px 30px 16px;
+}
+
+.chal-eyebrow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 7px;
+}
+
+.diamond {
+	width: 7px;
+	height: 7px;
+	transform: rotate(45deg);
+	background: var(--accent);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+	flex-shrink: 0;
+}
+
+.chal-title {
+	font-size: 28px;
+	font-weight: 400;
+	letter-spacing: -0.4px;
+	line-height: 1;
+}
+
+.mono-label {
+	font-family: 'Geist Mono', monospace;
+	font-size: 9.5px;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+
+	&.accent {
+		color: var(--accent-light);
 	}
 
-	.loading-text,
-	.empty-text {
-		text-align: center;
-		color: var(--text-color);
-		opacity: 0.6;
+	&.sm {
+		font-size: 8.5px;
 	}
+}
 
-	.challenges-list {
-		max-height: 70vh;
-		overflow-y: auto;
-		padding-right: 0.5rem;
-	}
+.chal-summary {
+	text-align: right;
+}
+
+.summary-count {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	justify-content: flex-end;
+}
+
+.summary-done {
+	font-family: 'Geist Mono', monospace;
+	font-size: 22px;
+	color: var(--success);
+}
+
+.summary-total {
+	font-family: 'Geist Mono', monospace;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.chal-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	padding: 0 30px 8px;
+}
+
+.chal-detail {
+	flex: 1;
+	min-width: 0;
+	overflow-y: auto;
+	padding: 2px 0 24px 22px;
+}
+
+.detail-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 13px;
+}
+
+.detail-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
 }
 </style>

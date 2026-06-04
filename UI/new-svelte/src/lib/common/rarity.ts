@@ -1,4 +1,5 @@
 import { ERarity } from '$lib/api';
+import { tintColor } from './functions';
 
 /*
  * Single source of truth for rarity visuals. The actual hues and per-tier glow
@@ -27,5 +28,4 @@ export const rarityLevel = (id: ERarity): number => id;
  * The rarity hue at a given opacity, expressed with CSS `color-mix` so theme
  * overrides of the base hue flow through (replaces hard-coded rgba blending).
  */
-export const rarityTint = (id: ERarity, alpha: number): string =>
-	`color-mix(in srgb, ${rarityColor(id)} ${+(alpha * 100).toFixed(3)}%, transparent)`;
+export const rarityTint = (id: ERarity, alpha: number): string => tintColor(rarityColor(id), alpha);

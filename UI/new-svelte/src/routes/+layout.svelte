@@ -71,6 +71,27 @@ $effect(() => {
 	--warning: #{colors.$warning};
 	--enemy-accent: #{colors.$enemy-accent};
 
+	// Item-mod-type accents. Consumed via the helpers in $lib/common/item-display.
+	--mod-component: #{colors.$mod-component};
+	--mod-prefix: #{colors.$mod-prefix};
+	--mod-suffix: #{colors.$mod-suffix};
+
+	// Item-category accents. Consumed via the helpers in $lib/common/item-display.
+	--category-armor: #{colors.$category-armor};
+	--category-weapon: #{colors.$category-weapon};
+	--category-accessory: #{colors.$category-accessory};
+
+	// Challenge-type accents (one per EChallengeType). Consumed via the helpers
+	// in $lib/common/challenge-type.
+	--challenge-enemies-killed: #{colors.$challenge-enemies-killed};
+	--challenge-bosses-defeated: #{colors.$challenge-bosses-defeated};
+	--challenge-zones-cleared: #{colors.$challenge-zones-cleared};
+	--challenge-time-trial: #{colors.$challenge-time-trial};
+	--challenge-level-reached: #{colors.$challenge-level-reached};
+	--challenge-damage-dealt: #{colors.$challenge-damage-dealt};
+	--challenge-battles-won: #{colors.$challenge-battles-won};
+	--challenge-skills-used: #{colors.$challenge-skills-used};
+
 	// Rarity palette + per-tier glow intensity (0–1, unitless). Consumed by the
 	// inventory and admin rarity UI via the shared helpers in $lib/common/rarity.
 	--rarity-common: #{colors.$rarity-common};

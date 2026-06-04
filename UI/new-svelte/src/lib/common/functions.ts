@@ -46,6 +46,15 @@ export function plural(str: string) {
 	}
 }
 
+/**
+ * Any CSS colour (hex, named, or a `var(--x)` reference) at a given opacity,
+ * expressed with `color-mix` so theme overrides of the base colour flow through.
+ * Prefer this over hard-coded rgba blending for themeable colours.
+ */
+export function tintColor(color: string, alpha: number): string {
+	return `color-mix(in srgb, ${color} ${+(alpha * 100).toFixed(3)}%, transparent)`;
+}
+
 export function groupBy<T>(arr: T[], groupFn: (item: T) => string) {
 	const ret: { [key: string]: T[] } = {};
 	for (const t of arr) {
