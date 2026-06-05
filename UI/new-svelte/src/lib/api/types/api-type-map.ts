@@ -105,7 +105,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditZones': IChange<IZone>[];
 	'AdminTools/ArchiveUser': IUserActionData;
 	'AdminTools/BanUser': IUserActionData;
-	'AdminTools/GetUsers': { search?: string, roleId?: number, page?: number, pageSize?: number } | undefined;
+	'AdminTools/GetUsers': { search?: string, roleId?: number, archived?: boolean, page?: number, pageSize?: number } | undefined;
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;

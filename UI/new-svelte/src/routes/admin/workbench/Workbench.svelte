@@ -29,7 +29,7 @@
 			/>
 		</div>
 	{:else}
-		<Loading loading={true} delay={50} />
+		<Loading loading={true} delay={150} />
 	{/if}
 </div>
 
