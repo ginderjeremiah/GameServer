@@ -31,14 +31,15 @@ namespace Game.Api.Controllers.Admin
         public async Task<ApiResponse<AdminUserSearchResults>> GetUsers(
             string? search = null,
             int? roleId = null,
+            bool? archived = null,
             int page = 1,
             int pageSize = DefaultPageSize)
         {
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-            var totalCount = await _users.CountUsers(search, roleId);
-            var matches = await _users.SearchUsers(search, roleId, (page - 1) * pageSize, pageSize);
+            var totalCount = await _users.CountUsers(search, roleId, archived);
+            var matches = await _users.SearchUsers(search, roleId, archived, (page - 1) * pageSize, pageSize);
 
             return ApiResponse.Success(new AdminUserSearchResults
             {

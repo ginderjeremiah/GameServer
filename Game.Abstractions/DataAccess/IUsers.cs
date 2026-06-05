@@ -20,12 +20,12 @@ namespace Game.Abstractions.DataAccess
         /// by a case-insensitive search matched against the username and the names of the user's players,
         /// and/or membership in a given role.
         /// </summary>
-        Task<List<User>> SearchUsers(string? search, int? roleId, int skip, int take);
+        Task<List<User>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take);
 
         /// <summary>
         /// Counts the non-archived users matching the same filters as <see cref="SearchUsers"/>.
         /// </summary>
-        Task<int> CountUsers(string? search, int? roleId);
+        Task<int> CountUsers(string? search, int? roleId, bool? archived);
 
         /// <summary>
         /// Replaces the set of roles granted to the user with the given role ids. Returns false if the user does not exist.

@@ -11,4 +11,5 @@ export * from './interfaces/player.ts';
 export * from './interfaces/progress.ts';
 export * from './interfaces/skills.ts';
 export * from './interfaces/tags.ts';
+export * from './interfaces/users.ts';
 export * from './interfaces/zones.ts';

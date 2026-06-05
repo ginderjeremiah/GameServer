@@ -3,6 +3,7 @@
 
 import type {
 	IAddEditAttributesData,
+	IAdminUserSearchResults,
 	IApplyModRequest,
 	IAttribute,
 	IAttributeUpdate,
@@ -23,14 +24,17 @@ import type {
 	IPlayerData,
 	IPlayerStatistic,
 	IRemoveModRequest,
+	IRole,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
 	ISetTagsData,
+	ISetUserRolesData,
 	ISetZoneEnemiesData,
 	ISkill,
 	ITag,
 	ITagCategory,
+	IUserActionData,
 	IZone,
 	IZoneEnemy
 } from './';
@@ -46,12 +50,17 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditSkills': undefined;
 	'AdminTools/AddEditTags': undefined;
 	'AdminTools/AddEditZones': undefined;
+	'AdminTools/ArchiveUser': undefined;
+	'AdminTools/BanUser': undefined;
+	'AdminTools/GetRoles': IRole[];
+	'AdminTools/GetUsers': IAdminUserSearchResults;
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
 	'AdminTools/SetTagsForItem': undefined;
 	'AdminTools/SetTagsForItemMod': undefined;
+	'AdminTools/SetUserRoles': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
 	'Attributes': IAttribute[];
 	'Challenges': IChallenge[];
@@ -94,12 +103,16 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditSkills': IChange<ISkill>[];
 	'AdminTools/AddEditTags': IChange<ITag>[];
 	'AdminTools/AddEditZones': IChange<IZone>[];
+	'AdminTools/ArchiveUser': IUserActionData;
+	'AdminTools/BanUser': IUserActionData;
+	'AdminTools/GetUsers': { search?: string, roleId?: number, page?: number, pageSize?: number } | undefined;
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
 	'AdminTools/SetTagsForItem': ISetTagsData;
 	'AdminTools/SetTagsForItemMod': ISetTagsData;
+	'AdminTools/SetUserRoles': ISetUserRolesData;
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
 	'Enemies': { refreshCache?: boolean } | undefined;
 	'ItemMods': { refreshCache?: boolean } | undefined;

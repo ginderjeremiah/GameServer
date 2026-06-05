@@ -27,9 +27,9 @@ namespace Game.DataAccess.Repositories
             return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
         }
 
-        public async Task<List<User>> SearchUsers(string? search, int? roleId, int skip, int take)
+        public async Task<List<User>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take)
         {
-            return await FilteredUsers(search, roleId)
+            return await FilteredUsers(search, roleId, archived)
                 .Include(u => u.Players)
                 .Include(u => u.Roles)
                 .OrderBy(u => u.Username)
@@ -39,9 +39,9 @@ namespace Game.DataAccess.Repositories
                 .ToListAsync();
         }
 
-        public Task<int> CountUsers(string? search, int? roleId)
+        public Task<int> CountUsers(string? search, int? roleId, bool? archived)
         {
-            return FilteredUsers(search, roleId).CountAsync();
+            return FilteredUsers(search, roleId, archived).CountAsync();
         }
 
         public async Task<bool> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds)
@@ -49,6 +49,7 @@ namespace Game.DataAccess.Repositories
             var user = await _context.Users
                 .Include(u => u.Roles)
                 .FirstOrDefaultAsync(u => u.Id == userId);
+
             if (user is null)
             {
                 return false;
@@ -60,6 +61,7 @@ namespace Game.DataAccess.Repositories
             var rolesToAdd = await _context.Roles
                 .Where(r => roleIds.Contains(r.Id) && !existingRoleIds.Contains(r.Id))
                 .ToListAsync();
+
             user.Roles.AddRange(rolesToAdd);
 
             return true;
@@ -87,9 +89,9 @@ namespace Game.DataAccess.Repositories
             return true;
         }
 
-        private IQueryable<User> FilteredUsers(string? search, int? roleId)
+        private IQueryable<User> FilteredUsers(string? search, int? roleId, bool? archived)
         {
-            var query = _context.Users.Where(u => u.ArchivedAt == null);
+            var query = _context.Users.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -102,6 +104,13 @@ namespace Game.DataAccess.Repositories
             if (roleId is not null)
             {
                 query = query.Where(u => u.Roles.Any(r => r.Id == roleId));
+            }
+
+            if (archived is not null)
+            {
+                query = archived.Value
+                    ? query.Where(u => u.ArchivedAt != null)
+                    : query.Where(u => u.ArchivedAt == null);
             }
 
             return query;

@@ -1,3 +1,4 @@
+using Game.Api.CodeGen;
 using Game.Api.CodeGen.Data;
 using Game.Api.CodeGen.Writers;
 using Xunit;
@@ -6,41 +7,45 @@ namespace Game.Api.Tests.CodeGen
 {
     public class SocketMapWriterTests : IDisposable
     {
-        private readonly string _tempDir;
+        private readonly CodeGenOptions _options;
 
         public SocketMapWriterTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "codegen_socket_test_" + Guid.NewGuid().ToString("N"));
+            _options = new CodeGenOptions
+            {
+                TargetDirectory = Path.Combine(Path.GetTempPath(), "codegen_socket_test_" + Guid.NewGuid().ToString("N")),
+                NewLine = "\n"
+            };
         }
 
         public void Dispose()
         {
-            if (Directory.Exists(_tempDir))
+            if (Directory.Exists(_options.TargetDirectory))
             {
-                Directory.Delete(_tempDir, recursive: true);
+                Directory.Delete(_options.TargetDirectory, recursive: true);
             }
         }
 
         [Fact]
         public void WriteSocketMap_CreatesFile()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
             writer.WriteSocketMap([metadata], "// Auto-generated");
 
-            Assert.True(File.Exists(Path.Combine(_tempDir, "api-socket-type-map.ts")));
+            Assert.True(File.Exists(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts")));
         }
 
         [Fact]
         public void WriteSocketMap_ContainsResponseTypes()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
             writer.WriteSocketMap([metadata], "// Auto-generated");
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.Contains("export type ApiSocketResponseTypes = {", content);
             Assert.Contains($"'{metadata.CommandName}': ISimpleModel;", content);
         }
@@ -48,12 +53,12 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteSocketMap_ContainsRequestTypes()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandFull));
 
             writer.WriteSocketMap([metadata], "// Auto-generated");
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.Contains("export type ApiSocketRequestTypes = {", content);
             Assert.Contains($"'{metadata.CommandName}': ISocketParamModel;", content);
         }
@@ -61,12 +66,12 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteSocketMap_NoParamCommand_ExcludedFromRequests()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandBasic));
 
             writer.WriteSocketMap([metadata], "// Auto-generated");
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             // Should appear in response types (with undefined since no response descriptor)
             Assert.Contains($"'{metadata.CommandName}': undefined;", content);
             // Request section should be empty (no entry for this command)
@@ -77,10 +82,10 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteSocketMap_ContainsHelperTypes()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             writer.WriteSocketMap([], "// Auto-generated");
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.Contains("export type ApiSocketCommand = keyof ApiSocketResponseTypes;", content);
             Assert.Contains("export type ApiSocketCommandWithRequest = keyof ApiSocketRequestTypes;", content);
             Assert.Contains("export type ApiSocketCommandNoRequest = Exclude<ApiSocketCommand, ApiSocketCommandWithRequest>;", content);
@@ -90,7 +95,7 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteSocketMap_CommandsOrderedAlphabetically()
         {
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new List<SocketCommandMetadata>
             {
                 new(typeof(TestSocketCommandWithResponse)),
@@ -99,7 +104,7 @@ namespace Game.Api.Tests.CodeGen
 
             writer.WriteSocketMap(metadata, "// Auto-generated");
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             var basicIndex = content.IndexOf("TestSocketCommandBasic");
             var responseIndex = content.IndexOf("TestSocketCommandWithResponse");
             Assert.True(basicIndex < responseIndex);
@@ -109,12 +114,12 @@ namespace Game.Api.Tests.CodeGen
         public void WriteSocketMap_IncludesAutoGeneratedComment_AtStartOfFile()
         {
             var testComment = "/* Socket Map Generated */";
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
             writer.WriteSocketMap([metadata], testComment);
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.StartsWith(testComment, content);
         }
 
@@ -123,12 +128,12 @@ namespace Game.Api.Tests.CodeGen
         {
             var customComment = "// Custom Socket Map Comment";
             var defaultComment = "// Auto-generated";
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
             writer.WriteSocketMap([metadata], customComment);
 
-            var content = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.StartsWith(customComment, content);
             Assert.False(content.StartsWith(defaultComment));
         }
@@ -138,16 +143,16 @@ namespace Game.Api.Tests.CodeGen
         {
             var comment1 = "/* Timestamp: 100 */";
             var comment2 = "/* Timestamp: 200 */";
-            var writer = new SocketMapWriter(_tempDir);
+            var writer = new SocketMapWriter(_options);
             var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithResponse));
 
             // First write with comment1
             writer.WriteSocketMap([metadata], comment1);
-            var content1 = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content1 = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
 
             // Second write with comment2
             writer.WriteSocketMap([metadata], comment2);
-            var content2 = File.ReadAllText(Path.Combine(_tempDir, "api-socket-type-map.ts"));
+            var content2 = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
 
             Assert.StartsWith(comment1, content1);
             Assert.StartsWith(comment2, content2);

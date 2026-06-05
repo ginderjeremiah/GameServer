@@ -149,7 +149,7 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task GetUsers_ExcludesArchivedUsers()
+        public async Task GetUsers_WithNoArchivedParameter_ReturnsAllUsers()
         {
             using var authClient = await SetupAdminClientAsync();
             int ghostId;
@@ -168,6 +168,54 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
 
             var afterArchive = await GetUsersAsync(authClient);
+            Assert.Contains(afterArchive.Users, u => u.Username == "ghost");
+            Assert.Equal(beforeArchive.TotalCount, afterArchive.TotalCount);
+        }
+
+        [Fact]
+        public async Task GetUsers_WithArchivedTrue_ReturnsOnlyArchivedUsers()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int ghostId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var ghost = await TestDataSeeder.CreateUserAsync(context, "ghost", "pw");
+                ghostId = ghost.Id;
+            }
+
+            var beforeArchive = await GetUsersAsync(authClient, "archived=true");
+            Assert.DoesNotContain(beforeArchive.Users, u => u.Username == "ghost");
+
+            var archiveResponse = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = ghostId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
+
+            var afterArchive = await GetUsersAsync(authClient, "archived=true");
+            Assert.Contains(afterArchive.Users, u => u.Username == "ghost");
+            Assert.Equal(beforeArchive.TotalCount + 1, afterArchive.TotalCount);
+        }
+
+        [Fact]
+        public async Task GetUsers_WithArchivedFalse_ReturnsOnlyActiveUsers()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int ghostId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var ghost = await TestDataSeeder.CreateUserAsync(context, "ghost", "pw");
+                ghostId = ghost.Id;
+            }
+
+            var beforeArchive = await GetUsersAsync(authClient, "archived=false");
+            Assert.Contains(beforeArchive.Users, u => u.Username == "ghost");
+
+            var archiveResponse = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = ghostId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
+
+            var afterArchive = await GetUsersAsync(authClient, "archived=false");
             Assert.DoesNotContain(afterArchive.Users, u => u.Username == "ghost");
             Assert.Equal(beforeArchive.TotalCount - 1, afterArchive.TotalCount);
         }

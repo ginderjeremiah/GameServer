@@ -72,7 +72,7 @@ namespace Game.Api
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
                 var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
                 var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
-                codeGen.GenerateCode(typeof(Startup).Assembly, targetDir);
+                codeGen.GenerateCode(typeof(Startup).Assembly, new CodeGenOptions { TargetDirectory = targetDir, NewLine = "\n" });
 
                 // GameContext is Scoped, so the migrator must be resolved from a scope.
                 using var migrationScope = app.Services.CreateScope();

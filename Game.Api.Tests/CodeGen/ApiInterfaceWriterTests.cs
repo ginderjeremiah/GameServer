@@ -6,65 +6,69 @@ namespace Game.Api.Tests.CodeGen
 {
     public class ApiInterfaceWriterTests : IDisposable
     {
-        private readonly string _tempDir;
+        private readonly CodeGenOptions _options;
 
         public ApiInterfaceWriterTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "codegen_iface_test_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(_tempDir);
+            _options = new CodeGenOptions
+            {
+                TargetDirectory = Path.Combine(Path.GetTempPath(), "codegen_iface_test_" + Guid.NewGuid().ToString("N")),
+                NewLine = "\n"
+            };
+            Directory.CreateDirectory(_options.TargetDirectory);
         }
 
         public void Dispose()
         {
-            if (Directory.Exists(_tempDir))
+            if (Directory.Exists(_options.TargetDirectory))
             {
-                Directory.Delete(_tempDir, recursive: true);
+                Directory.Delete(_options.TargetDirectory, recursive: true);
             }
         }
 
         [Fact]
         public void WriteApiInterfaces_CreatesInterfacesDirectory()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            Assert.True(Directory.Exists(Path.Combine(_tempDir, "interfaces")));
+            Assert.True(Directory.Exists(Path.Combine(_options.TargetDirectory, "interfaces")));
         }
 
         [Fact]
         public void WriteApiInterfaces_CreatesIndexFile()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            Assert.True(File.Exists(Path.Combine(_tempDir, "index.ts")));
+            Assert.True(File.Exists(Path.Combine(_options.TargetDirectory, "index.ts")));
         }
 
         [Fact]
         public void WriteApiInterfaces_WritesExportStatement()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            var indexContent = File.ReadAllText(Path.Combine(_tempDir, "index.ts"));
+            var indexContent = File.ReadAllText(Path.Combine(_options.TargetDirectory, "index.ts"));
             Assert.Contains("export * from", indexContent);
         }
 
         [Fact]
         public void WriteApiInterfaces_InterfaceContainsProperties()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             Assert.True(files.Length > 0);
 
             var content = File.ReadAllText(files[0]);
@@ -77,12 +81,12 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteApiInterfaces_EnumType_WritesEnumDefinition()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<ModelWithEnum>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            var enumPath = Path.Combine(_tempDir, "enums.ts");
+            var enumPath = Path.Combine(_options.TargetDirectory, "enums.ts");
             Assert.True(File.Exists(enumPath));
 
             var content = File.ReadAllText(enumPath);
@@ -96,12 +100,12 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteApiInterfaces_NestedClass_WritesImports()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<NestedModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
 
-            var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             var content = string.Join(Environment.NewLine, files.Select(File.ReadAllText));
 
             Assert.Contains("INestedModel", content);
@@ -111,11 +115,11 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteApiInterfaces_RemovesStaleFiles()
         {
-            var interfacesDir = Path.Combine(_tempDir, "interfaces");
+            var interfacesDir = Path.Combine(_options.TargetDirectory, "interfaces");
             Directory.CreateDirectory(interfacesDir);
             File.WriteAllText(Path.Combine(interfacesDir, "stale-file.ts"), "old content");
 
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], "// Auto-generated");
@@ -126,14 +130,14 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void WriteApiInterfaces_GroupsByNamespace()
         {
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor1 = GetDescriptorForClass<SimpleModel>();
             var descriptor2 = GetDescriptorForClass<NestedModel>();
 
             // Both are in same namespace (Game.Api.Tests.CodeGen), so should go to same file
             writer.WriteApiInterfaces([descriptor1, descriptor2], "// Auto-generated");
 
-            var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             Assert.Single(files);
             var content = File.ReadAllText(files[0]);
             Assert.Contains("ISimpleModel", content);
@@ -144,12 +148,12 @@ namespace Game.Api.Tests.CodeGen
         public void WriteApiInterfaces_IncludesAutoGeneratedComment_InInterfaceFiles()
         {
             var testComment = "// Custom Auto-generated Comment";
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], testComment);
 
-            var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             Assert.True(files.Length > 0);
 
             var content = File.ReadAllText(files[0]);
@@ -161,12 +165,12 @@ namespace Game.Api.Tests.CodeGen
         {
             var customComment = "/* Custom Generated */";
             var defaultComment = "// Auto-generated";
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             writer.WriteApiInterfaces([descriptor], customComment);
 
-            var files = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             var content = File.ReadAllText(files[0]);
             Assert.StartsWith(customComment, content);
             Assert.False(content.StartsWith(defaultComment));
@@ -177,17 +181,17 @@ namespace Game.Api.Tests.CodeGen
         {
             var comment1 = "/* Version 1 */";
             var comment2 = "/* Version 2 */";
-            var writer = new ApiInterfaceWriter(_tempDir);
+            var writer = new ApiInterfaceWriter(_options);
             var descriptor = GetDescriptorForClass<SimpleModel>();
 
             // First write with comment1
             writer.WriteApiInterfaces([descriptor], comment1);
-            var files1 = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files1 = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             var content1 = File.ReadAllText(files1[0]);
 
             // Second write with comment2
             writer.WriteApiInterfaces([descriptor], comment2);
-            var files2 = Directory.GetFiles(Path.Combine(_tempDir, "interfaces"), "*.ts");
+            var files2 = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             var content2 = File.ReadAllText(files2[0]);
 
             Assert.StartsWith(comment1, content1);
