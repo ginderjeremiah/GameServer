@@ -74,6 +74,7 @@ export type ApiResponseTypes = {
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': IPlayerData;
 	'Login/CreateAccount': undefined;
+	'Login/Logout': undefined;
 	'Login/Status': IPlayerData;
 	'Player': IPlayerData;
 	'Player/ApplyMod': undefined;

@@ -1,4 +1,4 @@
-import { Fight, Inventory, Attributes, Challenges, Stats, Help, Options, CardGame, Quit, PlaceholderScreen } from './';
+import { Fight, Inventory, Attributes, Challenges, Stats, Help, Options, CardGame, PlaceholderScreen } from './';
 
 export const screenMap = {
 	Fight,
@@ -9,7 +9,6 @@ export const screenMap = {
 	Help,
 	Options,
 	CardGame,
-	Quit,
 	PlaceholderScreen
 };
 

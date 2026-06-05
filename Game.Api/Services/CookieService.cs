@@ -27,5 +27,18 @@
                 IsEssential = true,
             });
         }
+
+        public void ClearTokenCookie()
+        {
+            // The deletion options must mirror the attributes used when the cookie was set,
+            // otherwise the browser treats it as a different cookie and won't remove it.
+            Context.Response.Cookies.Delete(Constants.TOKEN_NAME, new CookieOptions()
+            {
+                Secure = true,
+                HttpOnly = true,
+                SameSite = SameSiteMode.None,
+                IsEssential = true,
+            });
+        }
     }
 }

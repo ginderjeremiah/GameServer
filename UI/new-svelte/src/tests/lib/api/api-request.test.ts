@@ -127,6 +127,13 @@ describe('ApiRequest', () => {
 			const response = await request.post({ username: 'u', password: 'p' });
 			expect(response).toBeDefined();
 		});
+
+		it('sends an empty body for endpoints with no request payload', async () => {
+			await new ApiRequest('Login/Logout').post();
+
+			expect(lastXhr().open).toHaveBeenCalledWith('POST', '/api/Login/Logout', true);
+			expect(lastXhr().send).toHaveBeenCalledWith(undefined);
+		});
 	});
 
 	describe('static get', () => {

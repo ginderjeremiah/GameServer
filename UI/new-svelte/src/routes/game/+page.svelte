@@ -15,6 +15,7 @@
 import { NavSidebar, LogPanel } from '$components';
 import { screenMap, type GameScreen } from './screens';
 import { startGame } from '$lib/engine';
+import { logout } from '$lib/api';
 import { browser } from '$app/environment';
 import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
@@ -48,7 +49,7 @@ const screens: ScreenDef[] = [
 	{ key: 'stats', label: 'Stats', group: 'character', built: false },
 	{ key: 'options', label: 'Options', group: 'settings', built: false },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
-	{ key: 'quit', label: 'Quit', group: 'settings', built: false },
+	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
 	{ key: 'admin', label: 'Admin', group: 'admin', built: true }
 ];
 
@@ -60,13 +61,16 @@ const screenKeyMap: Record<string, GameScreen> = {
 	attributes: 'PlaceholderScreen',
 	stats: 'PlaceholderScreen',
 	options: 'PlaceholderScreen',
-	help: 'PlaceholderScreen',
-	quit: 'PlaceholderScreen'
+	help: 'PlaceholderScreen'
 };
 
 const handleNavigate = (key: string) => {
 	if (key === 'admin') {
 		goto(resolve('/admin'));
+		return;
+	}
+	if (key === 'quit') {
+		logout();
 		return;
 	}
 	currentScreen = key;
