@@ -63,7 +63,7 @@ const done = $derived(c.state === 'done');
 }
 
 .best-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 13px;
 	color: var(--text-primary);
 
@@ -76,7 +76,7 @@ const done = $derived(c.state === 'done');
 }
 
 .best-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	color: var(--text-muted);
 }
@@ -88,19 +88,19 @@ const done = $derived(c.state === 'done');
 }
 
 .beat-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1px;
 	color: var(--text-muted);
 }
 
 .beat-target {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 }
 
 .count {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 	letter-spacing: 0.3px;
 	color: var(--text-primary);
@@ -114,7 +114,7 @@ const done = $derived(c.state === 'done');
 }
 
 .pct {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	color: var(--text-tertiary);
 }

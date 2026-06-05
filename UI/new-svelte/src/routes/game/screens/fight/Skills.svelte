@@ -146,7 +146,7 @@ const isReady = (skill: Skill) => {
 }
 
 .skill-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;

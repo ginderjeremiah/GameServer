@@ -62,7 +62,7 @@ const { label }: Props = $props();
 
 .placeholder-subtitle {
 	margin-top: 4px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11px;
 	color: rgba(240, 240, 240, 0.5);
 	letter-spacing: 1px;

@@ -54,7 +54,7 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 }
 
 .cat-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -69,7 +69,7 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 	border-radius: 2px;
 
 	span {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 9px;
 		letter-spacing: 1.2px;
 		text-transform: uppercase;

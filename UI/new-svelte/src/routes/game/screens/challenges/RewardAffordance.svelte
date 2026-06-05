@@ -143,7 +143,7 @@ const onLeave = () => {
 
 .tile-sub {
 	margin-top: 4px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

@@ -90,7 +90,7 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 }
 
 .qmark {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 1px;
 }

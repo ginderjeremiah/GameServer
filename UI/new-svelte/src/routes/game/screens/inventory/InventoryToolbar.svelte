@@ -124,7 +124,7 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 }
 
 .chip-count {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	opacity: 0.6;
 }
@@ -137,7 +137,7 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

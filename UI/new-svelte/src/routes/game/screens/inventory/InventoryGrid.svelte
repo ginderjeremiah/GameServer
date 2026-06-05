@@ -138,7 +138,7 @@ const handleHoverLeave = () => {
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -159,7 +159,7 @@ const handleHoverLeave = () => {
 	cursor: pointer;
 	background: transparent;
 	color: rgba(240, 240, 240, 0.78);
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 
 	&:disabled {
@@ -169,7 +169,7 @@ const handleHoverLeave = () => {
 }
 
 .page-indicator {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

@@ -226,7 +226,7 @@ const handleDragStart = (e: DragEvent) => {
 	position: absolute;
 	top: 3px;
 	left: 4px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8px;
 	letter-spacing: 0.4px;
 	color: rgba(240, 240, 240, 0.55);

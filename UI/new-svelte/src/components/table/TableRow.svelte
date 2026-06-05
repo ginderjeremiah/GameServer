@@ -117,7 +117,7 @@ tr {
 .index-cell {
 	padding: 6px 10px;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 	color: rgba(240, 240, 240, 0.45);
 	text-align: center;
@@ -141,7 +141,7 @@ tr {
 	background: transparent;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	color: rgba(240, 240, 240, 0.55);
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;

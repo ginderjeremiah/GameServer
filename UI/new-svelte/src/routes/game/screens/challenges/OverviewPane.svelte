@@ -108,7 +108,7 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -139,14 +139,14 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 }
 
 .summary-done {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 32px;
 	color: var(--success);
 	line-height: 1;
 }
 
 .summary-total {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 14px;
 	color: var(--text-muted);
 }
@@ -231,7 +231,7 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 }
 
 .all-unlocked {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
