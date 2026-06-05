@@ -78,7 +78,7 @@ namespace Game.Api
             if (app.Environment.IsDevelopment())
             {
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
-                var targetDir = $"{rootFolder}\\UI\\new-svelte\\src\\lib\\api\\types";
+                var targetDir = Path.Combine(rootFolder, "UI", "new-svelte", "src", "lib", "api", "types");
                 var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
                 codeGen.GenerateCode(typeof(Startup).Assembly, new CodeGenOptions { TargetDirectory = targetDir, NewLine = "\n" });
 
