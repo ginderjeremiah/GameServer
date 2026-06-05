@@ -8,7 +8,7 @@ There are some choices already made in the design of the game to support this:
 
 - All battle RNG MUST use the same implementation (currently Mulberry32) that can be seeded with the same value on both the frontend and backend to ensure consistent results.
 - The "state" of a player is snapshot when combat starts. This means that all relevant player stats, items, and skills are included in the combat state, and no external factors will influence the result of the battle once it has started. Since the backend does not simulate the battle until AFTER it is resolved in the frontend, this ensures that the battle will be consistent regardless of any changes that may occur to the player's state during combat.
-- The battle simulation "runs" in 40ms ticks, meaning that all actions are processed in discrete intervals of 40ms. This allows for a consistent simulation and is a reasonable approach for a performant simulation on the backend while still providing a responsive experience on the frontend. The frontend will contain additional logic to interpolate values between ticks for smoother animations, but the core battle logic will be processed in these discrete ticks.
+- The battle simulation "runs" in 40ms ticks, meaning that all actions are processed in discrete intervals of 40ms. This allows for a consistent simulation and is a reasonable approach for a performant simulation on the backend while still providing a responsive experience on the frontend. The frontend should contain additional logic to interpolate values between ticks for smoother animations, but the core battle logic will be processed in these discrete ticks.
 
 # Character Progression and Attributes
 
@@ -36,13 +36,7 @@ Not all Challenges are tied to Statistics and vice versa, but many will be. Stat
 
 ## Challenge Goal Comparison Direction
 
-Most challenges are *accumulating* goals: the tracked statistic increases over time and the challenge is completed once it reaches **at least** the goal (e.g. "defeat 100 enemies"). However, some statistics are minimized rather than maximized — for example, `FastestVictory` records the lowest victory time, where lower is better. A `TimeTrial` challenge ("win a battle within N seconds") is therefore satisfied when the tracked value is **at or below** the goal, which is the opposite comparison.
-
-To handle both cases, each challenge type declares a goal comparison direction (`EChallengeGoalComparison`): `AtLeast` for accumulating goals and `AtMost` for minimization goals. This is intrinsic to the challenge type (derived in `ChallengeType`, not persisted) so the completion rule lives in one place. `PlayerChallenge.UpdateProgress` applies the appropriate comparison.
-
-For `AtMost` goals, a tracked value of `0` is treated as "no data yet" (e.g. the player has not won a qualifying battle) and does **not** complete the challenge — otherwise a brand-new player with no victories would instantly satisfy every time trial. This matches how `FastestVictory` is stored, where `0` is the sentinel for "no victory recorded".
-
-> **Note:** Progress for an `AtMost` challenge is stored as the player's current best value (e.g. their fastest victory time), not as a 0→goal accumulation. A future frontend change may need to interpret these challenges differently when rendering a progress indicator, since a lower value represents *better* progress.
+Most challenges are _accumulating_ goals: the tracked statistic increases over time and the challenge is completed once it reaches **at least** the goal (e.g. "defeat 100 enemies"). However, some statistics are minimized rather than maximized — for example, `FastestVictory` records the lowest victory time, where lower is better. A `TimeTrial` challenge ("win a battle within N seconds") is therefore satisfied when the tracked value is **at or below** the goal, which is the opposite comparison. For **at or below** goals, a tracked value of `0` is treated as "no data yet" (e.g. the player has not won a qualifying battle) and does **not** complete the challenge — otherwise a brand-new player with no victories would instantly satisfy every time trial. This matches how `FastestVictory` is stored, where `0` is the sentinel for "no victory recorded".
 
 # Logs
 

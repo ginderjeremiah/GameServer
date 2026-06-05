@@ -22,7 +22,10 @@ In addition to the ongoing goal of achieving feature parity with the old fronten
 
 - When creating new components avoid putting too much markup in a single component. If a component is getting too large or complex or you feel the need to write comments indicating each section, break it down into smaller subcomponents and put them in their own folder if there are several. Even if they are only used by the parent component, it is still an improvement to readability and maintainability.
 - When writing logic or classes for the frontend, make use of [statify](..\UI\new-svelte\src\lib\common\statify.svelte.ts) to make a class reactive in Svelte. This will allow you to write more object-oriented code and keep your components cleaner, while still maintaining reactivity in the UI. This is especially useful for UI related to battle simulation, where there is a lot of complex logic and state that would be cumbersome to manage directly in Svelte stores or components.
-- Make sure tests go in a corresponding folder in the `tests` folder with the same structure as what you are testing in the `src` folder. Do NOT put tests in the same folder as the code they are testing.
+
+## Testing Guidelines
+
+Unit tests should be written for all pages, components, and lib code in the new frontend. The tests should be placed in the `tests` folder with a corresponding folder structure to the code being tested. For example, if you are writing a test for a component in `src/components/MyComponent.svelte`, the test should be placed in `tests/components/MyComponent.test.ts`. End-to-end tests should be written using Playwright and placed in the `e2e-tests` folder. You should only write end-to-end tests for critical user flows and features rather than trying to cover every possible interaction in the UI.
 
 # Important Architectural Design Decisions
 
