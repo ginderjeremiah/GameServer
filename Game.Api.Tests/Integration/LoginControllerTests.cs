@@ -1,3 +1,4 @@
+using Game.Api;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Core;
@@ -168,6 +169,52 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_Authenticated_ClearsAuthCookieAndEndsSession()
+        {
+            // Arrange — a logged-in user carrying a valid auth cookie.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "logoutuser", "logoutpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            using var authClient = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
+
+            // Act
+            var response = await authClient.PostAsync("/api/Login/Logout", null, CancellationToken);
+
+            // Assert — logout succeeds and issues a Set-Cookie that clears the token.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            Assert.True(response.Headers.Contains("Set-Cookie"));
+            var clearedCookie = response.Headers.GetValues("Set-Cookie")
+                .First(cookie => cookie.StartsWith($"{Constants.TOKEN_NAME}="));
+            Assert.StartsWith($"{Constants.TOKEN_NAME}=;", clearedCookie);
+
+            // Reusing the cleared cookie no longer authenticates against a protected endpoint.
+            using var clearedClient = Factory.CreateClient();
+            clearedClient.DefaultRequestHeaders.Add("Cookie", clearedCookie.Split(';')[0]);
+            var statusResponse = await clearedClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, statusResponse.StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_Unauthenticated_Succeeds()
+        {
+            // Logout is AllowAnonymous so it always clears the cookie, even without a valid session.
+            var response = await Client.PostAsync("/api/Login/Logout", null, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
         }
 
         [Fact]

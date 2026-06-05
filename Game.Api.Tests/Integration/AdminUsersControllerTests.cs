@@ -184,14 +184,14 @@ namespace Game.Api.Tests.Integration
                 ghostId = ghost.Id;
             }
 
-            var beforeArchive = await GetUsersAsync(authClient, "archived=true");
+            var beforeArchive = await GetUsersAsync(authClient, "?archived=true");
             Assert.DoesNotContain(beforeArchive.Users, u => u.Username == "ghost");
 
             var archiveResponse = await authClient.PostAsJsonAsync(
                 "/api/AdminTools/ArchiveUser", new { UserId = ghostId }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
 
-            var afterArchive = await GetUsersAsync(authClient, "archived=true");
+            var afterArchive = await GetUsersAsync(authClient, "?archived=true");
             Assert.Contains(afterArchive.Users, u => u.Username == "ghost");
             Assert.Equal(beforeArchive.TotalCount + 1, afterArchive.TotalCount);
         }
@@ -208,14 +208,14 @@ namespace Game.Api.Tests.Integration
                 ghostId = ghost.Id;
             }
 
-            var beforeArchive = await GetUsersAsync(authClient, "archived=false");
+            var beforeArchive = await GetUsersAsync(authClient, "?archived=false");
             Assert.Contains(beforeArchive.Users, u => u.Username == "ghost");
 
             var archiveResponse = await authClient.PostAsJsonAsync(
                 "/api/AdminTools/ArchiveUser", new { UserId = ghostId }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
 
-            var afterArchive = await GetUsersAsync(authClient, "archived=false");
+            var afterArchive = await GetUsersAsync(authClient, "?archived=false");
             Assert.DoesNotContain(afterArchive.Users, u => u.Username == "ghost");
             Assert.Equal(beforeArchive.TotalCount - 1, afterArchive.TotalCount);
         }

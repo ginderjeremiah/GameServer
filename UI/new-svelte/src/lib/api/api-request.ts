@@ -53,26 +53,36 @@ export class ApiRequest<U extends ApiEndpoint> {
 		return result.data;
 	}
 
-	public post<T extends U & ApiEndpointWithRequest>(payload: ApiRequestTypes[T]) {
+	public post(): U extends ApiEndpointNoRequest ? Promise<ApiResponse<ApiResponseTypes[U]>> : never;
+	public post<T extends U & ApiEndpointWithRequest>(
+		payload: ApiRequestTypes[T]
+	): Promise<ApiResponse<ApiResponseTypes[U]>>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; the per-endpoint request DTOs aren't assignable to a concrete index signature.
+	public post(payload?: any) {
 		const r = this.r;
 		const endpoint = `/api/${this.endpoint}`;
 		r.open('POST', endpoint, true);
 		r.setRequestHeader('content-type', 'application/json');
 		r.withCredentials = true;
-		const p = payload;
 		return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
 			r.onload = () => resolved(new ApiResponse(r));
 			r.onerror = r.onload;
 			r.onabort = r.onerror;
 			try {
-				r.send(JSON.stringify(p));
+				r.send(payload === undefined ? undefined : JSON.stringify(payload));
 			} catch {
 				resolved(new ApiResponse(r));
 			}
 		});
 	}
 
-	public static async post<T extends ApiEndpointWithRequest>(endpoint: T, payload: ApiRequestTypes[T]) {
+	public static post<U extends ApiEndpointNoRequest>(endpoint: U): Promise<ApiResponseTypes[U]>;
+	public static post<U extends ApiEndpointWithRequest>(
+		endpoint: U,
+		payload: ApiRequestTypes[U]
+	): Promise<ApiResponseTypes[U]>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; the per-endpoint request DTOs can't be expressed as a single concrete param type.
+	public static async post<U extends ApiEndpoint>(endpoint: U, payload?: any) {
 		const request = new ApiRequest(endpoint);
 		const result = await request.post(payload);
 		return result.data;

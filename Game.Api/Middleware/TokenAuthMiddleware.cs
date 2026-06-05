@@ -45,7 +45,7 @@ namespace Game.Api.Middleware
                 else //clear session if invalid
                 {
                     sessionService.ClearSession();
-                    cookieService.SetTokenCookie("");
+                    cookieService.ClearTokenCookie();
                 }
             }
 
