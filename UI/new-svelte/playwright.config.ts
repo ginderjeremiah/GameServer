@@ -6,7 +6,7 @@ const config: PlaywrightTestConfig = {
 		port: 4173,
 		reuseExistingServer: true
 	},
-	testDir: 'integration-tests',
+	testDir: 'e2e-tests',
 	testMatch: /(.+\.)?(test|spec)\.[jt]s/,
 	timeout: 15000,
 	use: {

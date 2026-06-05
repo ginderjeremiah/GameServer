@@ -12,9 +12,9 @@ All of the frontend code is contained in the `UI` folder, and all the new code i
   - `routes`: Svelte components for each route/page in the application, also includes any route-specific components
   - `stores`: Svelte stores for managing application state, such as log data, static reference data, and tooltip data. NOTE: most stateful data is instead being moved to classes in the `lib` folder that are made reactive using the `statify` utility function, so avoid adding new stores if possible and consider whether the state you need can be managed using a reactive class.
   - `styles`: Global styles and theming for the frontend.inventory page, etc.
-  - `tests`: Unit tests for the lib code and components
+  - `tests`: Unit tests for the lib code, pages, and components
 - `static`: Static assets such as images, icons, and fonts used in the frontend.
-- `tests`: Playwright integration tests for the frontend components
+- `e2e-tests`: Playwright end-to-end tests for the frontend components
 
 # General Frontend Guidelines
 
