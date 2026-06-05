@@ -3,6 +3,7 @@
 
 export * from './enums.ts';
 export * from './interfaces/attributes.ts';
+export * from './interfaces/auth.ts';
 export * from './interfaces/common.ts';
 export * from './interfaces/enemies.ts';
 export * from './interfaces/inventory-items.ts';

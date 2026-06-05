@@ -7,6 +7,7 @@ import type {
 	IApplyModRequest,
 	IAttribute,
 	IAttributeUpdate,
+	IAuthTokens,
 	IBattlerAttribute,
 	IChallenge,
 	IChallengeType,
@@ -19,10 +20,12 @@ import type {
 	IItemModSlot,
 	IItemModType,
 	ILoginCredentials,
+	ILoginResult,
 	ILogPreference,
 	IPlayerChallenge,
 	IPlayerData,
 	IPlayerStatistic,
+	IRefreshRequest,
 	IRemoveModRequest,
 	IRole,
 	ISetEnemyAttributeDistributions,
@@ -72,9 +75,10 @@ export type ApiResponseTypes = {
 	'ItemMods/ItemModTypes': IItemModType[];
 	'Items': IItem[];
 	'Items/SlotsForItem': IItemModSlot[];
-	'Login': IPlayerData;
+	'Login': ILoginResult;
 	'Login/CreateAccount': undefined;
 	'Login/Logout': undefined;
+	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
 	'Player': IPlayerData;
 	'Player/ApplyMod': undefined;
@@ -121,6 +125,8 @@ export type ApiRequestTypes = {
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
+	'Login/Logout': IRefreshRequest;
+	'Login/Refresh': IRefreshRequest;
 	'Player/ApplyMod': IApplyModRequest;
 	'Player/EquipItem': IEquipRequest;
 	'Player/RemoveMod': IRemoveModRequest;

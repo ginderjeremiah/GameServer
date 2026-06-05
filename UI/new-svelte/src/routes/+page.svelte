@@ -86,7 +86,7 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest } from '$lib/api';
+import { ApiRequest, getTokens, setTokens } from '$lib/api';
 import { onMount } from 'svelte';
 import { playerManager } from '$lib/engine';
 import { preventDefault } from '$lib/common/event-wrappers';
@@ -208,7 +208,8 @@ const handleSubmit = async () => {
 	const response = await new ApiRequest('Login').post({ username, password });
 	submitting = false;
 	if (response.status === 200) {
-		enterWorld(response.data);
+		setTokens(response.data.tokens);
+		enterWorld(response.data.player);
 	} else if (mode === 'signup') {
 		serverError = response.error ?? 'Account created but login failed.';
 	} else {
@@ -217,6 +218,13 @@ const handleSubmit = async () => {
 };
 
 onMount(async () => {
+	// "Stay logged in": if a token pair survived a refresh, resume the session without re-entering
+	// credentials. The request layer silently refreshes (and clears on failure) as needed, so an
+	// expired/revoked pair simply falls through and leaves the user on the login screen.
+	if (!getTokens()) {
+		return;
+	}
+
 	try {
 		const response = await new ApiRequest('Login/Status').get();
 		if (response.status === 200) {

@@ -29,6 +29,17 @@ Unit tests should be written for all pages, components, and lib code in the new 
 
 # Important Architectural Design Decisions
 
+## Authentication (JWT bearer + rotating refresh tokens)
+
+The frontend authenticates against the backend's JWT scheme (see the backend doc for the server side). All of the token handling lives in the API client layer (`lib/api`) so the rest of the app never touches tokens directly:
+
+- **`token-store.ts`** is the single source of truth for credentials: it persists the `{ accessToken, refreshToken }` pair in local storage (so a logged-in session survives a page refresh — the "stay logged in" behaviour) and can decode the access token's `exp` claim for pre-emptive refresh.
+- **`auth.ts`** owns the refresh lifecycle. `refreshTokens()` exchanges the stored refresh token for a new pair and **collapses concurrent callers onto a single in-flight request** — refresh tokens are single-use on the backend, so parallel refreshes would consume the token twice and log the user out. It deliberately uses `fetch` (not `ApiRequest`) to stay out of the 401-retry path and avoid an import cycle. `ensureValidAccessToken()` refreshes just before expiry; `handleAuthFailure()` clears storage and routes to login when refresh is no longer possible.
+- **`api-request.ts`** attaches `Authorization: Bearer <accessToken>` to every authenticated request, refreshes pre-emptively before sending, and on a `401` refreshes once and retries. The `[AllowAnonymous]` auth endpoints (`Login`, `Login/CreateAccount`, `Login/Refresh`, `Login/Logout`) are exempt from this machinery.
+- **`api-socket.ts`** passes the access token as the `?access_token=` query parameter (browsers can't set headers on the WS handshake) and, if a handshake is rejected for auth reasons (the socket closes before it ever opens), refreshes once and reconnects.
+
+Login stores the pair from the `LoginResult` and enters the game; logout sends the refresh token so the backend can revoke it, then clears storage. The generated API types (`lib/api/types`) are produced by the backend's dev-time codegen — when changing a DTO, run the backend in Development to regenerate them rather than editing the files by hand.
+
 ## Reference Data
 
 Most of the reference data in the frontend is fetched from the backend API on application startup and cached in-memory in Svelte stores for fast access. This includes things like items, item modifications, skills, enemies, zones, and challenges. Since this data is static and does not change often, it is not a problem to cache it in-memory, and it allows for much faster access than fetching from the API every time it is needed. Eventually this data will be cached in persistent browser storage and only fetched from the API when it changes, but for now it is simply fetched on startup for simplicity.

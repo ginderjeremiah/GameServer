@@ -1,4 +1,4 @@
-﻿import {
+import {
 	ApiEndpoint,
 	ApiEndpointWithRequest,
 	ApiEndpointNoRequest,
@@ -7,14 +7,29 @@
 } from './types/api-type-map';
 import { ApiResponse } from './api-response';
 import { keys } from '../common/functions';
+import { getAccessToken } from './token-store';
+import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
+
+/**
+ * Endpoints that authenticate the caller themselves (login, account creation) or operate on the
+ * refresh token directly (refresh, logout). They are `[AllowAnonymous]` on the backend, so the bearer
+ * token / 401-refresh machinery must be skipped for them — otherwise a logout would try to refresh a
+ * token it is about to revoke, and the refresh call could recurse.
+ */
+const ANONYMOUS_ENDPOINTS: ReadonlySet<string> = new Set([
+	'Login',
+	'Login/CreateAccount',
+	'Login/Refresh',
+	'Login/Logout'
+]);
 
 export class ApiRequest<U extends ApiEndpoint> {
-	r: XMLHttpRequest;
 	endpoint: U;
+	private readonly requiresAuth: boolean;
 
 	constructor(endpoint: U) {
-		this.r = new XMLHttpRequest();
 		this.endpoint = endpoint;
+		this.requiresAuth = !ANONYMOUS_ENDPOINTS.has(endpoint);
 	}
 
 	public get(): U extends ApiEndpointNoRequest ? Promise<ApiResponse<ApiResponseTypes[U]>> : never;
@@ -25,20 +40,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 	public get(urlParams?: Record<string, any>) {
 		const params = this.encodeParams(urlParams);
 		const endpoint = params ? this.endpoint + '?' + params : this.endpoint;
-		const finalEndpoint = `/api/${endpoint}`;
-		const r = this.r;
-		r.withCredentials = true;
-		r.open('GET', finalEndpoint, true);
-		return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
-			r.onload = () => resolved(new ApiResponse(r));
-			r.onerror = r.onload;
-			r.onabort = r.onerror;
-			try {
-				r.send();
-			} catch {
-				resolved(new ApiResponse(r));
-			}
-		});
+		return this.execute('GET', `/api/${endpoint}`);
 	}
 
 	public static get<U extends ApiEndpointNoRequest>(endpoint: U): Promise<ApiResponseTypes[U]>;
@@ -59,21 +61,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 	): Promise<ApiResponse<ApiResponseTypes[U]>>;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; the per-endpoint request DTOs aren't assignable to a concrete index signature.
 	public post(payload?: any) {
-		const r = this.r;
-		const endpoint = `/api/${this.endpoint}`;
-		r.open('POST', endpoint, true);
-		r.setRequestHeader('content-type', 'application/json');
-		r.withCredentials = true;
-		return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
-			r.onload = () => resolved(new ApiResponse(r));
-			r.onerror = r.onload;
-			r.onabort = r.onerror;
-			try {
-				r.send(payload === undefined ? undefined : JSON.stringify(payload));
-			} catch {
-				resolved(new ApiResponse(r));
-			}
-		});
+		return this.execute('POST', `/api/${this.endpoint}`, payload);
 	}
 
 	public static post<U extends ApiEndpointNoRequest>(endpoint: U): Promise<ApiResponseTypes[U]>;
@@ -86,6 +74,69 @@ export class ApiRequest<U extends ApiEndpoint> {
 		const request = new ApiRequest(endpoint);
 		const result = await request.post(payload);
 		return result.data;
+	}
+
+	/**
+	 * Sends the request, attaching the bearer access token, and transparently handles token expiry.
+	 * Before authenticated requests the access token is refreshed pre-emptively when it is about to
+	 * expire; if the server still rejects the request as unauthorized (401), the token pair is
+	 * refreshed once and the request is retried. When refresh is impossible the user is routed back to
+	 * the login screen.
+	 */
+	private async execute(
+		method: 'GET' | 'POST',
+		url: string,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the typed overloads above guarantee the payload matches the endpoint; this is the shared implementation.
+		payload?: any,
+		isRetry = false
+	): Promise<ApiResponse<ApiResponseTypes[U]>> {
+		if (this.requiresAuth) {
+			await ensureValidAccessToken();
+		}
+
+		const response = await this.send(method, url, payload);
+
+		if (response.status === 401 && this.requiresAuth && !isRetry) {
+			const refreshed = await refreshTokens();
+			if (refreshed) {
+				return this.execute(method, url, payload, true);
+			}
+
+			handleAuthFailure();
+		}
+
+		return response;
+	}
+
+	private send(
+		method: 'GET' | 'POST',
+		url: string,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the typed overloads above guarantee the payload matches the endpoint; this is the shared implementation.
+		payload?: any
+	): Promise<ApiResponse<ApiResponseTypes[U]>> {
+		const r = new XMLHttpRequest();
+		r.open(method, url, true);
+		if (method === 'POST') {
+			r.setRequestHeader('content-type', 'application/json');
+		}
+
+		if (this.requiresAuth) {
+			const accessToken = getAccessToken();
+			if (accessToken) {
+				r.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+			}
+		}
+
+		return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
+			r.onload = () => resolved(new ApiResponse(r));
+			r.onerror = r.onload;
+			r.onabort = r.onerror;
+			try {
+				r.send(payload === undefined ? undefined : JSON.stringify(payload));
+			} catch {
+				resolved(new ApiResponse(r));
+			}
+		});
 	}
 
 	private encodeParams(urlParams?: Record<string, string | number | boolean>) {

@@ -8,6 +8,11 @@ import {
 import { ApiSocketRequest } from './api-socket-request';
 import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
+import { getAccessToken, getRefreshToken } from './token-store';
+import { handleAuthFailure, refreshTokens } from './auth';
+
+/** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
+const NORMAL_CLOSURE = 1000;
 
 export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 	id: string;
@@ -39,14 +44,26 @@ export class ApiSocket {
 		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
 	}> = {};
 	private lastPing = 0;
+	private socketOpened = false;
+	private socketAuthRetried = false;
+	private pingIntervalStarted = false;
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
-			socket = new WebSocket('/socket');
+			this.socketOpened = false;
+			// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
+			// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
+			const accessToken = getAccessToken();
+			const url = accessToken ? `/socket?access_token=${encodeURIComponent(accessToken)}` : '/socket';
+			socket = new WebSocket(url);
 			socket.onopen = this.onStart.bind(this);
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
-			setInterval(() => apiSocket.attemptPing(), 10000);
+			socket.onclose = this.handleClose.bind(this);
+			if (!this.pingIntervalStarted) {
+				this.pingIntervalStarted = true;
+				setInterval(() => apiSocket.attemptPing(), 10000);
+			}
 		}
 	}
 
@@ -75,7 +92,7 @@ export class ApiSocket {
 
 	public attemptPing() {
 		this.ensureSocket();
-		if (socket.readyState === socket.OPEN) {
+		if (socket && socket.readyState === socket.OPEN) {
 			this.lastPing = performance.now();
 			socket.send('ping');
 		}
@@ -94,7 +111,7 @@ export class ApiSocket {
 
 	private processCommandQueue() {
 		this.ensureSocket();
-		if (socket.readyState === socket.OPEN) {
+		if (socket && socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
 				this.inFlightRequests.push({ startTime: performance.now(), command: request });
@@ -141,7 +158,36 @@ export class ApiSocket {
 		errorHook.notify('WebSocket connection error');
 	}
 
+	/**
+	 * A handshake rejected for auth reasons (expired/invalid access token) closes the socket without it
+	 * ever opening. When that happens we refresh the token pair once and reconnect. A socket that did
+	 * open before dropping (e.g. SocketReplaced, or a transient network blip) is left alone — its own
+	 * handler manages the teardown, and retrying here risks fighting an intentional close or looping
+	 * against a server that keeps closing the connection.
+	 */
+	private handleClose(ev: CloseEvent) {
+		if (this.socketOpened || this.socketAuthRetried || ev.code === NORMAL_CLOSURE) {
+			return;
+		}
+
+		if (!getRefreshToken()) {
+			return;
+		}
+
+		this.socketAuthRetried = true;
+		refreshTokens().then((tokens) => {
+			if (tokens) {
+				this.ensureSocket();
+				this.processCommandQueue();
+			} else {
+				handleAuthFailure();
+			}
+		});
+	}
+
 	private onStart() {
+		this.socketOpened = true;
+		this.socketAuthRetried = false;
 		this.attemptPing();
 		this.processCommandQueue();
 	}
