@@ -25,17 +25,7 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
-            var loginCreds = new { Username = "statsuser", Password = "statspass" };
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login", loginCreds);
-            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-            var authClient = Factory.CreateClient();
-            var cookies = loginResponse.Headers.GetValues("Set-Cookie");
-            foreach (var cookie in cookies)
-            {
-                authClient.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
-            }
-
+            var (authClient, _) = await LoginAndBuildClientAsync("statsuser", "statspass");
             return authClient;
         }
 

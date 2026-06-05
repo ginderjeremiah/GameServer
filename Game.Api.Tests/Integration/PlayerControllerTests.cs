@@ -37,18 +37,8 @@ namespace Game.Api.Tests.Integration
                 await context.SaveChangesAsync();
             }
 
-            // Login to create session
-            var loginCreds = new { Username = username, Password = password };
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login", loginCreds);
-            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-            var authClient = Factory.CreateClient();
-            var cookies = loginResponse.Headers.GetValues("Set-Cookie");
-            foreach (var cookie in cookies)
-            {
-                authClient.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
-            }
-
+            // Login to create session and obtain a bearer access token
+            var (authClient, _) = await LoginAndBuildClientAsync(username, password);
             return (authClient, player.Id);
         }
 

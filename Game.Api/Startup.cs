@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Api.Auth;
 using Game.Api.CodeGen;
 using Game.Api.Filters;
 using Game.Api.Middleware;
@@ -8,6 +9,11 @@ using Game.Core;
 using Game.Core.Events;
 using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Game.Api
 {
@@ -38,6 +44,8 @@ namespace Game.Api
             builder.Services.AddOptions<DataAccessOptions>()
                 .BindConfiguration(nameof(DataAccessOptions));
 
+            ConfigureAuth(builder);
+
             // Add services to the container.
             builder.Services.AddControllers(options =>
             {
@@ -52,7 +60,7 @@ namespace Game.Api
                 .AddDomainEventDispatcher()
                 .AddApplication()
                 .AddScoped<SessionService>()
-                .AddScoped<CookieService>()
+                .AddSingleton<JwtTokenService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
                 .AddSingleton<ApiCodeGenerator>()
@@ -97,13 +105,77 @@ namespace Game.Api
             });
 
             //app.UseHttpsRedirection();
-            app.UseTokenAuth();
+            app.UseAuthentication();
+            app.UseSessionLoader();
             app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
             app.UseSocketInterceptor();
+            app.UseAuthorization();
 
             app.MapControllers();
 
             await app.RunAsync();
+        }
+
+        /// <summary>
+        /// Configures standard ASP.NET Core JWT bearer authentication and authorization. Access tokens
+        /// are validated against the configured signing key/issuer/audience and projected onto
+        /// <see cref="System.Security.Claims.ClaimsPrincipal"/>. A fallback policy requires every endpoint
+        /// to be authenticated unless explicitly marked <c>[AllowAnonymous]</c>.
+        /// </summary>
+        private static void ConfigureAuth(WebApplicationBuilder builder)
+        {
+            var jwtSection = builder.Configuration.GetSection("Jwt");
+            builder.Services.AddOptions<JwtOptions>().Bind(jwtSection);
+
+            var signingKey = jwtSection["SigningKey"] ?? throw new InvalidOperationException("Jwt:SigningKey not set");
+            var issuer = jwtSection["Issuer"] ?? Constants.SERVER_PRINCIPAL;
+            var audience = jwtSection["Audience"] ?? Constants.SERVER_PRINCIPAL;
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    // Keep claim types verbatim ("sub"/"role") rather than remapping to legacy URIs.
+                    options.MapInboundClaims = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = issuer,
+                        ValidateAudience = true,
+                        ValidAudience = audience,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.FromSeconds(30),
+                        NameClaimType = JwtRegisteredClaimNames.Sub,
+                        RoleClaimType = JwtTokenService.RoleClaimType,
+                    };
+                    // Browsers can't set Authorization headers on the WebSocket handshake, so the socket
+                    // endpoint accepts the access token via the access_token query-string parameter
+                    // (the standard ASP.NET Core pattern for token auth over WebSockets).
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            if (string.IsNullOrEmpty(context.Token) && context.HttpContext.Request.Path == "/socket")
+                            {
+                                var queryToken = context.Request.Query["access_token"];
+                                if (!string.IsNullOrEmpty(queryToken))
+                                {
+                                    context.Token = queryToken;
+                                }
+                            }
+
+                            return Task.CompletedTask;
+                        }
+                    };
+                });
+
+            builder.Services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
         }
     }
 }

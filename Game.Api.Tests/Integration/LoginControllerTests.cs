@@ -1,12 +1,13 @@
 using Game.Abstractions.Infrastructure;
+using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
-using Game.Api.Models.Player;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Xunit;
 
@@ -18,7 +19,7 @@ namespace Game.Api.Tests.Integration
         public LoginControllerTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task Login_ValidCredentials_ReturnsPlayerData()
+        public async Task Login_ValidCredentials_ReturnsPlayerDataAndTokens()
         {
             // Arrange
             using var scope = CreateScope();
@@ -36,14 +37,40 @@ namespace Game.Api.Tests.Integration
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
-            Assert.Equal(player.Name, result.Data.Name);
+            Assert.Equal(player.Name, result.Data.Player.Name);
 
-            // Verify auth cookie is set
-            Assert.True(response.Headers.Contains("Set-Cookie"));
+            // Both tokens are issued in the response body (no auth cookie).
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+            Assert.False(string.IsNullOrEmpty(result.Data.Tokens.AccessToken));
+            Assert.False(string.IsNullOrEmpty(result.Data.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task Login_IssuedAccessToken_AuthenticatesProtectedEndpoint()
+        {
+            // Arrange
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "beareruser", "bearerpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var (authClient, _) = await LoginAndBuildClientAsync("beareruser", "bearerpass");
+
+            // Act — the bearer access token authenticates a protected endpoint.
+            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Equal(player.Name, result.Data.Name);
+            authClient.Dispose();
         }
 
         [Fact]
@@ -55,7 +82,7 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
             Assert.Null(result.Data);
@@ -77,14 +104,13 @@ namespace Game.Api.Tests.Integration
             // Act
             var response = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
 
-            // Assert — authentication is rejected and no auth cookie is issued.
+            // Assert — authentication is rejected and no tokens are issued.
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
             Assert.Null(result.Data);
-            Assert.False(response.Headers.Contains("Set-Cookie"));
         }
 
         [Fact]
@@ -129,41 +155,6 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task Status_Authenticated_ReturnsPlayerData()
-        {
-            // Arrange
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "statususer", "statuspass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-
-            // Login first to create a session
-            var loginCreds = new { Username = "statususer", Password = "statuspass" };
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login", loginCreds, CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-            // Extract the set-cookie header and add it to a new client
-            using var authClient = Factory.CreateClient();
-            var cookies = loginResponse.Headers.GetValues("Set-Cookie");
-            foreach (var cookie in cookies)
-            {
-                authClient.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
-            }
-
-            // Act
-            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
-            Assert.NotNull(result);
-            Assert.NotNull(result.Data);
-            Assert.Equal(player.Name, result.Data.Name);
-        }
-
-        [Fact]
         public async Task Status_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
@@ -172,9 +163,81 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task Logout_Authenticated_ClearsAuthCookieAndEndsSession()
+        public async Task Refresh_ValidToken_RotatesAndReturnsNewTokens()
         {
-            // Arrange — a logged-in user carrying a valid auth cookie.
+            // Arrange
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "refreshuser", "refreshpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var login = await LoginAsync("refreshuser", "refreshpass");
+
+            // Act — exchange the refresh token for a new pair.
+            var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+
+            // Assert — a fresh, rotated pair is returned.
+            Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+            var refreshed = await refreshResponse.Content.ReadFromJsonAsync<ApiResponse<AuthTokens>>(CancellationToken);
+            Assert.NotNull(refreshed?.Data);
+            Assert.False(string.IsNullOrEmpty(refreshed.Data.AccessToken));
+            Assert.False(string.IsNullOrEmpty(refreshed.Data.RefreshToken));
+            Assert.NotEqual(login.Tokens.RefreshToken, refreshed.Data.RefreshToken);
+
+            // The new access token authenticates a protected endpoint.
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", refreshed.Data.AccessToken);
+            var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+        }
+
+        [Fact]
+        public async Task Refresh_SameTokenTwice_IsRejectedSecondTime()
+        {
+            // Arrange
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "rotateuser", "rotatepass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var login = await LoginAsync("rotateuser", "rotatepass");
+
+            // Act — first use succeeds, replaying the same (now consumed) token fails.
+            var first = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+            var second = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+
+            // Assert — single-use rotation means the original token is no longer valid.
+            Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+            var result = await second.Content.ReadFromJsonAsync<ApiResponse<AuthTokens>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Refresh_InvalidToken_ReturnsError()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = "not-a-real-token" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<AuthTokens>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Logout_Authenticated_RevokesRefreshTokenAndEndsSession()
+        {
+            // Arrange — a logged-in user carrying a valid access token.
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var user = await TestDataSeeder.CreateUserAsync(context, "logoutuser", "logoutpass");
@@ -182,38 +245,35 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
-            using var authClient = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
+            var (authClient, login) = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
 
             // Act
-            var response = await authClient.PostAsync("/api/Login/Logout", null, CancellationToken);
+            var response = await authClient.PostAsJsonAsync("/api/Login/Logout",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
 
-            // Assert — logout succeeds and issues a Set-Cookie that clears the token and session state is cleared.
+            // Assert — logout succeeds, the session is cleared, and the refresh token is revoked.
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            Assert.True(response.Headers.Contains("Set-Cookie"));
-            var clearedCookie = response.Headers.GetValues("Set-Cookie")
-                .First(cookie => cookie.StartsWith($"{Constants.TOKEN_NAME}="));
-            Assert.StartsWith($"{Constants.TOKEN_NAME}=;", clearedCookie);
-
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
             var session = await cache.Get($"Session_{user.Id}");
             Assert.Null(session);
 
-            // Using the cleared cookie no longer authenticates against a protected endpoint.
-            using var clearedClient = Factory.CreateClient();
-            clearedClient.DefaultRequestHeaders.Add("Cookie", clearedCookie.Split(';')[0]);
-            var statusResponse = await clearedClient.GetAsync("/api/Login/Status", CancellationToken);
-            Assert.Equal(HttpStatusCode.Unauthorized, statusResponse.StatusCode);
+            // The revoked refresh token can no longer be exchanged for new tokens.
+            var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
+            authClient.Dispose();
         }
 
         [Fact]
         public async Task Logout_Unauthenticated_Succeeds()
         {
-            // Logout is AllowAnonymous so it always clears the cookie, even without a valid session.
-            var response = await Client.PostAsync("/api/Login/Logout", null, CancellationToken);
+            // Logout is AllowAnonymous so it always succeeds, even without a valid session/token.
+            var response = await Client.PostAsJsonAsync("/api/Login/Logout",
+                new { RefreshToken = "irrelevant" }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
@@ -233,8 +293,8 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
             await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
 
-            // Act — log in and reuse the issued auth cookie against an admin endpoint.
-            var authClient = await LoginAndBuildClientAsync("adminlogin", "adminpass");
+            // Act — log in and reuse the issued access token against an admin endpoint.
+            var (authClient, _) = await LoginAndBuildClientAsync("adminlogin", "adminpass");
 
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", Array.Empty<object>(), CancellationToken);
 
@@ -255,31 +315,13 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
             // Act
-            var authClient = await LoginAndBuildClientAsync("plainlogin", "plainpass");
+            var (authClient, _) = await LoginAndBuildClientAsync("plainlogin", "plainpass");
 
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", Array.Empty<object>(), CancellationToken);
 
             // Assert — authenticated, but lacking the Admin role.
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
             authClient.Dispose();
-        }
-
-        /// <summary>
-        /// Logs in with the given credentials and returns a client carrying the issued auth cookie,
-        /// exercising the real login → token issuance flow rather than a hand-built test token.
-        /// </summary>
-        private async Task<HttpClient> LoginAndBuildClientAsync(string username, string password)
-        {
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login", new { Username = username, Password = password }, CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-            var authClient = Factory.CreateClient();
-            foreach (var cookie in loginResponse.Headers.GetValues("Set-Cookie"))
-            {
-                authClient.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
-            }
-
-            return authClient;
         }
     }
 }

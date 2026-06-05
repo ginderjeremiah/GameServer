@@ -48,6 +48,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<ITagCategories, TagCategories>()
                 .AddScoped<IZones, Zones>()
                 .AddScoped<ISessionStore, SessionStore>()
+                .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
                 .AddScoped<IUsers, Users>()
                 .AddScoped<IRoles, Roles>();
         }

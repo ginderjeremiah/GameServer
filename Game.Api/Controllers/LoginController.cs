@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.Api.Auth;
+using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
@@ -20,24 +21,20 @@ namespace Game.Api.Controllers
         IPlayerRepository playerRepo,
         IEntityStore entityStore,
         SessionService sessionService,
-        CookieService cookieService) : ControllerBase
+        JwtTokenService tokenService,
+        IRefreshTokenStore refreshTokenStore) : ControllerBase
     {
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEntityStore _entityStore = entityStore;
         private readonly SessionService _sessionService = sessionService;
-        private readonly CookieService _cookieService = cookieService;
+        private readonly JwtTokenService _tokenService = tokenService;
+        private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
-        public async Task<ApiResponse<PlayerData>> Login([FromBody] LoginCredentials creds)
+        public async Task<ApiResponse<LoginResult>> Login([FromBody] LoginCredentials creds)
         {
-            if (_sessionService.SessionAvailable)
-            {
-                var existingPlayer = await _sessionService.LoadPlayer();
-                return ApiResponse.Success(PlayerData.FromPlayer(existingPlayer));
-            }
-
             var user = await _users.GetUser(creds.Username);
             if (user is null || !creds.Password.VerifyHash(user.Salt.ToString(), user.PassHash))
             {
@@ -50,20 +47,36 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("User has no player characters");
             }
 
-            var playerId = player.Id;
-            var playerData = await _playerRepo.GetPlayer(playerId);
+            var playerData = await _playerRepo.GetPlayer(player.Id);
             if (playerData is null)
             {
                 return ApiResponse.Error("Player data not found");
             }
 
-            _sessionService.CreateSession(user.Id, playerId);
+            _sessionService.CreateSession(user.Id, player.Id);
 
             var roles = user.Roles.Select(role => role.Name).ToList();
-            var token = new AuthToken(new AuthTokenClaims(user.Id, roles, DateTime.UtcNow + Constants.TOKEN_LIFETIME));
-            _cookieService.SetTokenCookie(token.ToString());
+            var tokens = await IssueTokens(user.Id, roles);
 
-            return ApiResponse.Success(PlayerData.FromPlayer(playerData));
+            return ApiResponse.Success(new LoginResult
+            {
+                Tokens = tokens,
+                Player = PlayerData.FromPlayer(playerData),
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<ApiResponse<AuthTokens>> Refresh([FromBody] RefreshRequest request)
+        {
+            var session = await _refreshTokenStore.Consume(request.RefreshToken);
+            if (session is null)
+            {
+                return ApiResponse.Error("Invalid or expired refresh token");
+            }
+
+            var tokens = await IssueTokens(session.UserId, session.Roles);
+            return ApiResponse.Success(tokens);
         }
 
         [AllowAnonymous]
@@ -129,10 +142,10 @@ namespace Game.Api.Controllers
 
         [AllowAnonymous]
         [HttpPost]
-        public ApiResponse Logout()
+        public async Task<ApiResponse> Logout([FromBody] RefreshRequest request)
         {
+            await _refreshTokenStore.Revoke(request.RefreshToken);
             _sessionService.ClearSession();
-            _cookieService.ClearTokenCookie();
             return ApiResponse.Success();
         }
 
@@ -146,6 +159,22 @@ namespace Game.Api.Controllers
 
             var player = await _sessionService.LoadPlayer();
             return ApiResponse.Success(PlayerData.FromPlayer(player));
+        }
+
+        /// <summary>
+        /// Issues a fresh access/refresh token pair for the given user. The refresh token is rotated on
+        /// every use (login and refresh both call this), so a previously issued refresh token is never
+        /// reused.
+        /// </summary>
+        private async Task<AuthTokens> IssueTokens(int userId, IReadOnlyList<string> roles)
+        {
+            var accessToken = _tokenService.CreateAccessToken(userId, roles);
+            var refreshToken = await _refreshTokenStore.Issue(userId, roles, Constants.REFRESH_TOKEN_LIFETIME);
+            return new AuthTokens
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+            };
         }
     }
 }

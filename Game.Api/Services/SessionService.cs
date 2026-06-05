@@ -36,7 +36,7 @@ namespace Game.Api.Services
 
         /// <summary>
         /// Loads player state from the session store using the userId from the auth token.
-        /// Called by TokenAuthMiddleware on every authenticated request.
+        /// Called by SessionLoaderMiddleware on every authenticated request.
         /// </summary>
         public async Task LoadPlayerState(int userId)
         {
@@ -50,7 +50,7 @@ namespace Game.Api.Services
 
         /// <summary>
         /// Sets the access roles for the current request from the auth token claims.
-        /// Called by TokenAuthMiddleware once a token has been validated.
+        /// Called by SessionLoaderMiddleware once a token has been validated.
         /// </summary>
         public void SetRoles(IReadOnlyList<string> roles)
         {

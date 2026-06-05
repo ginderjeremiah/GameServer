@@ -1,6 +1,7 @@
-using Game.Api;
 using Game.Api.Auth;
 using Game.Core;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 
 namespace Game.TestInfrastructure.Helpers
 {
@@ -8,23 +9,26 @@ namespace Game.TestInfrastructure.Helpers
     {
         public const string TestPepper = "test-pepper-value-for-integration-tests";
 
+        /// <summary>
+        /// Must match the Jwt:SigningKey configured for the Testing environment (see
+        /// <c>GameServerFactory</c> and <c>appsettings.Testing.json</c>) so hand-built tokens validate.
+        /// </summary>
+        public const string TestSigningKey = "test-signing-key-for-integration-tests-at-least-32-bytes";
+
         public static void EnsurePepperSet()
         {
             Hashing.SetPepper(TestPepper);
         }
 
-        public static string CreateAuthTokenString(int userId, params string[] roles)
+        public static string CreateAccessToken(int userId, params string[] roles)
         {
-            EnsurePepperSet();
-            var claims = new AuthTokenClaims(userId, roles, DateTime.UtcNow.Add(Constants.TOKEN_LIFETIME));
-            var token = new AuthToken(claims);
-            return token.ToString();
+            var tokenService = new JwtTokenService(Options.Create(new JwtOptions { SigningKey = TestSigningKey }));
+            return tokenService.CreateAccessToken(userId, roles);
         }
 
-        public static void AddAuthCookie(HttpClient client, int userId, params string[] roles)
+        public static void AddAuthHeader(HttpClient client, int userId, params string[] roles)
         {
-            var tokenString = CreateAuthTokenString(userId, roles);
-            client.DefaultRequestHeaders.Add("Cookie", $"{Constants.TOKEN_NAME}={tokenString}");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(userId, roles));
         }
     }
 }

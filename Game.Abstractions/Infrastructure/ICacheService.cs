@@ -10,6 +10,8 @@
         public Task<T?> GetSet<T>(string key, T value);
         public Task Set(string key, string value);
         public Task Set<T>(string key, T value);
+        public Task Set(string key, string value, TimeSpan expiry);
+        public Task Set<T>(string key, T value, TimeSpan expiry);
         public void SetAndForget(string key, string value);
         public void SetAndForget<T>(string key, T value);
         public Task SetNotExists(string key, string value);
