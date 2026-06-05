@@ -60,7 +60,7 @@ const rowOpacity = $derived(isLatest ? 1 : Math.max(0.4, 0.9 - index * 0.1));
 }
 
 .row-time {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 0.4px;
 	min-width: 38px;

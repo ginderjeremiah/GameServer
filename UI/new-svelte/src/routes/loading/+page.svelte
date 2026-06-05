@@ -471,7 +471,7 @@ onMount(async () => {
 		margin: 8px 0 0;
 		font-size: 12.5px;
 		color: var(--text-secondary);
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		letter-spacing: 0.5px;
 		min-height: 18px;
 	}
@@ -515,7 +515,7 @@ onMount(async () => {
 	display: flex;
 	justify-content: space-between;
 	margin-top: 5px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	color: rgba(240, 240, 240, 0.65);
 	letter-spacing: 0.5px;
@@ -590,7 +590,7 @@ onMount(async () => {
 }
 
 .row-status {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 0.5px;
 	color: rgba(240, 240, 240, 0.4);
@@ -633,7 +633,7 @@ onMount(async () => {
 	gap: 12px;
 
 	.error-message {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 11px;
 		color: var(--error);
 		flex: 1;

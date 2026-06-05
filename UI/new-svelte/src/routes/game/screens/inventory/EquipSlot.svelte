@@ -133,7 +133,7 @@ const handleDrop = (e: DragEvent) => {
 	width: 64px;
 	text-align: right;
 	flex-shrink: 0;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -189,7 +189,7 @@ const handleDrop = (e: DragEvent) => {
 	position: absolute;
 	bottom: 3px;
 	right: 4px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8px;
 	color: rgba(240, 240, 240, 0.55);
 }
@@ -222,7 +222,7 @@ const handleDrop = (e: DragEvent) => {
 }
 
 .rarity-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

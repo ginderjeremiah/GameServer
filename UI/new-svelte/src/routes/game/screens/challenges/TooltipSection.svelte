@@ -28,7 +28,7 @@ const { label, last = false, children }: Props = $props();
 }
 
 .tt-section-header {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;

@@ -76,7 +76,7 @@ const effects = $derived(
 }
 
 .tt-type-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -106,7 +106,7 @@ const effects = $derived(
 	}
 
 	.tt-stat-value {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 11.5px;
 		letter-spacing: 0.3px;
 		text-align: right;

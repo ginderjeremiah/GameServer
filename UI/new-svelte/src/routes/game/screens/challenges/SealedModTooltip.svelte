@@ -70,7 +70,7 @@ const EFFECT_BAR_WIDTHS = [70, 88, 58];
 }
 
 .qmark {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 1px;
 }

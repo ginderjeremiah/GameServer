@@ -97,7 +97,7 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 }
 
 .battler-level {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	color: rgba(240, 240, 240, 0.6);
 	letter-spacing: 0.6px;
@@ -133,7 +133,7 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11px;
 	color: #fff;
 	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);

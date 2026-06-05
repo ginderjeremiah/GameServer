@@ -68,7 +68,7 @@ const done = $derived(c.state === 'done');
 }
 
 .card-target {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 0.5px;
 	border-radius: 2px;
@@ -80,7 +80,7 @@ const done = $derived(c.state === 'done');
 }
 
 .card-completed {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

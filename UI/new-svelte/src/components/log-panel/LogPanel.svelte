@@ -74,7 +74,7 @@ $effect(() => {
 }
 
 .log-title {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.5px;
 	text-transform: uppercase;
@@ -88,7 +88,7 @@ $effect(() => {
 }
 
 .log-count {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 0.5px;
 	color: rgba(240, 240, 240, 0.45);
@@ -121,7 +121,7 @@ $effect(() => {
 
 .log-empty {
 	padding: 16px 14px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11px;
 	letter-spacing: 0.5px;
 	color: rgba(240, 240, 240, 0.35);

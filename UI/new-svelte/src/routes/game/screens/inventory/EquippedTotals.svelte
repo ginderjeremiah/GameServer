@@ -42,7 +42,7 @@ const { view }: { view: InventoryView } = $props();
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -69,7 +69,7 @@ const { view }: { view: InventoryView } = $props();
 }
 
 .filled-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 	color: rgba(240, 240, 240, 0.78);
 }

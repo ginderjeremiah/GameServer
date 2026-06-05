@@ -38,7 +38,7 @@ const formatValue = (v: number) => (Number.isInteger(v) ? v.toString() : v.toFix
 }
 
 .stat-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.3px;
 	text-align: right;

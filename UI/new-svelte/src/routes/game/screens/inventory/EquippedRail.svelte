@@ -103,7 +103,7 @@ const handleDrop = (slotId: number) => {
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -127,7 +127,7 @@ const handleDrop = (slotId: number) => {
 
 .group-label {
 	margin-bottom: 8px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

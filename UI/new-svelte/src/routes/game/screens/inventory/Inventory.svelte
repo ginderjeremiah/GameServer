@@ -73,7 +73,7 @@ const view = new InventoryView();
 }
 
 .inv-subtitle {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -109,7 +109,7 @@ const view = new InventoryView();
 .totals-hint {
 	margin-top: 18px;
 	text-align: center;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

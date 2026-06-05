@@ -145,7 +145,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-category-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -179,7 +179,7 @@ const attributeName = (attrId: number) => {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	color: #c0d8ff;
 	letter-spacing: 0.6px;
@@ -209,7 +209,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-section-header {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -248,7 +248,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-dmg-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	color: #f0f0f0;
 	letter-spacing: 0.3px;
@@ -274,7 +274,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-total-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	color: var(--accent);
 	letter-spacing: 0.3px;
 }
@@ -293,7 +293,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-metric-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.3px;
 	text-transform: uppercase;
@@ -302,7 +302,7 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-metric-value {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 14px;
 	color: #f0f0f0;
 	letter-spacing: 0.3px;
