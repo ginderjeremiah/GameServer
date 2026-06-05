@@ -64,6 +64,7 @@ $effect(() => {
 	--text-secondary: #{colors.$text-secondary};
 	--text-tertiary: #{colors.$text-tertiary};
 	--text-muted: #{colors.$text-muted};
+	--text-on-accent: #{colors.$text-on-accent};
 	--border-subtle: #{colors.$border-subtle};
 	--border-light: #{colors.$border-light};
 	--border-medium: #{colors.$border-medium};
