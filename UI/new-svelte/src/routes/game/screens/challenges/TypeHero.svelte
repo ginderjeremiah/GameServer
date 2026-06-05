@@ -79,7 +79,7 @@ const blurb = $derived(challengeTypeBlurb(group.typeId));
 }
 
 .hero-eyebrow {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -111,7 +111,7 @@ const blurb = $derived(challengeTypeBlurb(group.typeId));
 }
 
 .hero-done {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 26px;
 	color: var(--text-primary);
 	line-height: 1;
@@ -122,13 +122,13 @@ const blurb = $derived(challengeTypeBlurb(group.typeId));
 }
 
 .hero-total {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 14px;
 	color: var(--text-muted);
 }
 
 .hero-pct {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

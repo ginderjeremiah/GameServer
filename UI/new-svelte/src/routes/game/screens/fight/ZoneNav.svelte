@@ -53,7 +53,7 @@ const handleClickRight = () => changeZone(1);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 	transition: background 140ms;
 
@@ -76,7 +76,7 @@ const handleClickRight = () => changeZone(1);
 }
 
 .zone-num {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 1.5px;
 	text-transform: uppercase;

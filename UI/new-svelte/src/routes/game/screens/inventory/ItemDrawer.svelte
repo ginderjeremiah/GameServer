@@ -83,7 +83,7 @@ const stats = $derived(
 }
 
 .cat-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -103,7 +103,7 @@ const stats = $derived(
 }
 
 .rarity-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -145,7 +145,7 @@ const stats = $derived(
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -203,7 +203,7 @@ const stats = $derived(
 }
 
 .equip-hint {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	opacity: 0.7;
 }

@@ -33,7 +33,7 @@ const { value, onChange }: Props = $props();
 }
 
 .sort-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

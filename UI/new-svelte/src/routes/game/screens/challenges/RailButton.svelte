@@ -69,7 +69,7 @@ const unit = $derived(challengeTypeUnit(group.typeId));
 }
 
 .rail-unit {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -77,7 +77,7 @@ const unit = $derived(challengeTypeUnit(group.typeId));
 }
 
 .rail-count {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10px;
 	color: var(--text-tertiary);
 	flex-shrink: 0;

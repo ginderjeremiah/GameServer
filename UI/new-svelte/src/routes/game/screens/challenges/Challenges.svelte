@@ -137,7 +137,7 @@ onMount(async () => {
 }
 
 .mono-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
@@ -164,13 +164,13 @@ onMount(async () => {
 }
 
 .summary-done {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 22px;
 	color: var(--success);
 }
 
 .summary-total {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 13px;
 	color: var(--text-muted);
 }

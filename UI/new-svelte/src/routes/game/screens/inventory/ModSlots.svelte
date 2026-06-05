@@ -173,7 +173,7 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 }
 
 .mod-type {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	letter-spacing: 1.2px;
 	text-transform: uppercase;
@@ -221,7 +221,7 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 }
 
 .picker-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

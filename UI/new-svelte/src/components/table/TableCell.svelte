@@ -146,7 +146,7 @@ const onNumberInput = (e: Event) => {
 }
 
 .id-cell {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 12px;
 	letter-spacing: 0.5px;
 	color: rgba(240, 240, 240, 0.45);
@@ -200,7 +200,7 @@ const onNumberInput = (e: Event) => {
 		background 140ms ease;
 
 	&.num {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		text-align: right;
 	}
 

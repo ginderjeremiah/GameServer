@@ -165,7 +165,7 @@ const modTypeLabel = (modType: number) =>
 }
 
 .tt-category-label {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -182,7 +182,7 @@ const modTypeLabel = (modType: number) =>
 	border-radius: 2px;
 
 	span {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 9px;
 		color: #bde0b4;
 		letter-spacing: 1.2px;
@@ -219,7 +219,7 @@ const modTypeLabel = (modType: number) =>
 }
 
 .tt-section-header {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -248,7 +248,7 @@ const modTypeLabel = (modType: number) =>
 	}
 
 	.tt-stat-value {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 11.5px;
 		letter-spacing: 0.3px;
 		text-align: right;
@@ -304,7 +304,7 @@ const modTypeLabel = (modType: number) =>
 }
 
 .tt-mod-type {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9px;
 	letter-spacing: 1.2px;
 	text-transform: uppercase;

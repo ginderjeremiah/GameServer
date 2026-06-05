@@ -297,7 +297,7 @@ $effect(() => {
 }
 
 .eyebrow {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10px;
 	letter-spacing: 2px;
 	text-transform: uppercase;
@@ -337,7 +337,7 @@ $effect(() => {
 	}
 
 	th {
-		font-family: 'Geist Mono', monospace;
+		font-family: var(--mono);
 		font-size: 9.5px;
 		font-weight: 400;
 		letter-spacing: 1.4px;
@@ -379,7 +379,7 @@ $effect(() => {
 	display: flex;
 	align-items: center;
 	gap: 16px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.4px;
 	color: rgba(240, 240, 240, 0.55);
@@ -449,7 +449,7 @@ $effect(() => {
 	background: transparent;
 	border: 1px solid rgba(255, 255, 255, 0.14);
 	color: rgba(240, 240, 240, 0.85);
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.6px;
 	text-transform: uppercase;

@@ -76,7 +76,7 @@ import { battleEngine } from '$lib/engine';
 
 .vs-text {
 	position: relative;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;

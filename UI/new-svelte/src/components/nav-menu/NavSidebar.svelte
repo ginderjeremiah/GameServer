@@ -210,7 +210,7 @@ $expanded-width: 240px;
 }
 
 .wordmark {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 11px;
 	letter-spacing: 2px;
 	text-transform: uppercase;
@@ -272,7 +272,7 @@ $expanded-width: 240px;
 
 .group-label {
 	padding: 8px 22px 4px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
@@ -338,7 +338,7 @@ $expanded-width: 240px;
 }
 
 .wip-badge {
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 8.5px;
 	color: rgba(240, 240, 240, 0.42);
 	letter-spacing: 0.5px;
@@ -388,7 +388,7 @@ $expanded-width: 240px;
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	font-family: 'Geist Mono', monospace;
+	font-family: var(--mono);
 	font-size: 10.5px;
 	color: rgba(240, 240, 240, 0.55);
 	letter-spacing: 0.5px;
