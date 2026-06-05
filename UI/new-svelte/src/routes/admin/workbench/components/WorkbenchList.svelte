@@ -1,10 +1,10 @@
-<div class="list-pane">
+<div class="list-pane" data-testid="workbench-list">
 	<div class="list-head">
 		<div class="list-title">
 			<span class="title-text">{entity.label}</span>
 			<span class="meta">{liveCount}</span>
 			<div class="spacer"></div>
-			<button type="button" class="btn primary sm" onclick={onNew}>
+			<button type="button" class="btn primary sm" data-testid="workbench-new" onclick={onNew}>
 				<WorkbenchIcon kind="plus" size={12} />New
 			</button>
 		</div>
@@ -30,6 +30,7 @@
 			<button
 				type="button"
 				class="list-row"
+				data-testid="workbench-row"
 				class:selected={record.id === selectedId}
 				class:deleted={status === 'deleted'}
 				onclick={() => onSelect(record.id)}

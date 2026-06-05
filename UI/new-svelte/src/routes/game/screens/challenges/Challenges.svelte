@@ -1,4 +1,4 @@
-<div class="challenges-frame" bind:this={frame}>
+<div class="challenges-frame" data-testid="challenges-screen" bind:this={frame}>
 	<!-- Header -->
 	<div class="chal-header">
 		<div>

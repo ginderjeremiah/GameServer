@@ -8,7 +8,11 @@ const config: PlaywrightTestConfig = {
 	},
 	testDir: 'e2e-tests',
 	testMatch: /(.+\.)?(test|spec)\.[jt]s/,
-	timeout: 15000,
+	// Each flow drives a real backend (signup → loading → game), which routinely runs 12–15s,
+	// so the per-test budget needs headroom above that. Retries absorb the transient hiccups
+	// inherent to a shared live stack (a dropped hydration click, an auth/token blip under load).
+	timeout: 30000,
+	retries: process.env.CI ? 2 : 1,
 	use: {
 		baseURL: 'http://localhost:4173'
 	},

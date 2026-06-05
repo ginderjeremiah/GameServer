@@ -1,4 +1,4 @@
-<div class="inventory-frame">
+<div class="inventory-frame" data-testid="inventory-screen">
 	<div class="inv-header">
 		<span class="diamond"></span>
 		<div>

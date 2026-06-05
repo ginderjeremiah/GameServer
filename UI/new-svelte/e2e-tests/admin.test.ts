@@ -1,43 +1,39 @@
 import { expect, test } from '@playwright/test';
-import { createAccountAndStartGame } from './helpers';
+import { createAccountAndStartGame, gotoAdmin } from './helpers';
 
-async function loginAndGoToAdmin(page: import('@playwright/test').Page) {
-	await createAccountAndStartGame(page, 'ad');
-	await page.getByTestId('sidebar-item-admin').click();
-	await expect(page).toHaveURL('/admin', { timeout: 5000 });
-}
+test.describe('Admin workbench', () => {
+	test('renders the workbench with seeded records', async ({ page }) => {
+		await createAccountAndStartGame(page, 'ad');
+		await gotoAdmin(page);
 
-test.describe('Admin', () => {
-	test('renders table editor with data', async ({ page }) => {
-		await loginAndGoToAdmin(page);
-
-		await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
-		await expect(page.locator('thead')).toBeVisible();
-
-		const rows = page.locator('tbody tr');
-		await expect(rows.first()).toBeVisible({ timeout: 5000 });
+		// The workbench opens on the Enemies catalogue, populated from seed reference data.
+		await expect(page.getByTestId('workbench-title')).toHaveText('Enemies');
+		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 	});
 
-	test('switching between admin tools', async ({ page }) => {
-		await loginAndGoToAdmin(page);
+	test('switching entities via the sidebar swaps the active catalogue', async ({ page }) => {
+		await createAccountAndStartGame(page, 'ad');
+		await gotoAdmin(page);
+		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 
-		// Tool items live in the collapsible admin sidebar; the button is
-		// clickable even when collapsed (the label is hidden, the button is not).
-		await page.getByTestId('admin-tool-addSkills').click();
+		await page.getByTestId('admin-tool-skills').click();
 
-		await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
-		await expect(page.getByRole('heading', { name: 'Add/Edit Skills' })).toBeVisible({ timeout: 3000 });
+		await expect(page.getByTestId('workbench-title')).toHaveText('Skills');
+		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 	});
 
-	test('add row button works', async ({ page }) => {
-		await loginAndGoToAdmin(page);
+	test('New adds an unsaved record to the catalogue', async ({ page }) => {
+		await createAccountAndStartGame(page, 'ad');
+		await gotoAdmin(page);
+		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 
-		await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 5000 });
-		const initialRowCount = await page.locator('tbody tr').count();
+		const rows = page.getByTestId('workbench-row');
+		const before = await rows.count();
 
-		await page.locator('button', { hasText: 'Add Row' }).click();
+		await page.getByTestId('workbench-new').click();
 
-		const newRowCount = await page.locator('tbody tr').count();
-		expect(newRowCount).toBe(initialRowCount + 1);
+		await expect(rows).toHaveCount(before + 1);
+		// The save bar reflects the pending addition.
+		await expect(page.getByText('1 unsaved change', { exact: true })).toBeVisible();
 	});
 });

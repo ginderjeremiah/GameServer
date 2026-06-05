@@ -3,7 +3,7 @@
 		<div class="page-head">
 			<div class="eyebrow">Admin Console{groupLabel ? ` · ${groupLabel}` : ''}</div>
 			<div class="page-title-row">
-				<h1 class="page-title">{entity.label}</h1>
+				<h1 class="page-title" data-testid="workbench-title">{entity.label}</h1>
 				<div class="page-summary">
 					<span>{liveItems.length} {entity.label.toLowerCase()}</span>
 					{#if flagged > 0}

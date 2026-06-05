@@ -113,7 +113,7 @@ jobs:
 
     - name: Run Playwright e2e tests
       working-directory: UI/new-svelte
-      run: npm run test:integration
+      run: npm run test:e2e
 
     - name: Dump container logs on failure
       if: failure()
