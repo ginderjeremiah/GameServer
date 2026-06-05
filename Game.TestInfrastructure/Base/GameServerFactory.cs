@@ -31,6 +31,9 @@ namespace Game.TestInfrastructure.Base
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["HashPepper"] = "test-pepper-value-for-integration-tests",
+                    ["Jwt:SigningKey"] = TestAuthHelper.TestSigningKey,
+                    ["Jwt:Issuer"] = Game.Api.Constants.SERVER_PRINCIPAL,
+                    ["Jwt:Audience"] = Game.Api.Constants.SERVER_PRINCIPAL,
                     ["DataAccessOptions:DatabaseSystem"] = "1",
                     ["DataAccessOptions:EnableSensitiveLogging"] = "true",
                     ["DataAccessOptions:CacheSystem"] = "0",

@@ -8,8 +8,9 @@ namespace Game.Api.Filters
 {
     /// <summary>
     /// Authorization filter that restricts an endpoint to users granted the <see cref="ERole.Admin"/> role.
-    /// Authentication is handled upstream by <see cref="Middleware.TokenAuthMiddleware"/> (which returns a 401
-    /// for unauthenticated requests), so a request that reaches this filter without the role is forbidden (403).
+    /// Authentication is handled upstream by the JWT bearer authentication + authorization middleware (which
+    /// returns a 401 for unauthenticated requests via the fallback policy), so a request that reaches this
+    /// filter without the role is forbidden (403).
     /// </summary>
     public class AdminRoleAuthorizationFilter(SessionService sessionService) : IAuthorizationFilter
     {

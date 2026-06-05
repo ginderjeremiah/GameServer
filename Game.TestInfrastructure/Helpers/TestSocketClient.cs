@@ -1,8 +1,6 @@
-using Game.Api;
 using Game.Api.Models.Common;
 using Game.Api.Sockets.Commands;
 using Game.Core;
-using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 
@@ -21,16 +19,12 @@ namespace Game.TestInfrastructure.Helpers
         /// </summary>
         public async Task ConnectAsync(string baseUrl, int userId)
         {
-            TestAuthHelper.EnsurePepperSet();
-            var tokenString = TestAuthHelper.CreateAuthTokenString(userId);
+            var tokenString = TestAuthHelper.CreateAccessToken(userId);
 
             _ownedSocket = new ClientWebSocket();
-            var cookieContainer = new CookieContainer();
-            var uri = new Uri(baseUrl);
-            cookieContainer.Add(uri, new Cookie(Constants.TOKEN_NAME, tokenString));
-            _ownedSocket.Options.Cookies = cookieContainer;
 
-            var wsUri = new Uri(baseUrl.Replace("https://", "wss://").Replace("http://", "ws://") + "/socket");
+            var wsBase = baseUrl.Replace("https://", "wss://").Replace("http://", "ws://");
+            var wsUri = new Uri($"{wsBase}/socket?access_token={Uri.EscapeDataString(tokenString)}");
             await _ownedSocket.ConnectAsync(wsUri, _cts.Token);
             _socket = _ownedSocket;
         }
@@ -41,15 +35,10 @@ namespace Game.TestInfrastructure.Helpers
         /// </summary>
         public async Task ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, int userId)
         {
-            TestAuthHelper.EnsurePepperSet();
-            var tokenString = TestAuthHelper.CreateAuthTokenString(userId);
+            var tokenString = TestAuthHelper.CreateAccessToken(userId);
 
-            wsClient.ConfigureRequest = request =>
-            {
-                request.Headers["Cookie"] = $"{Constants.TOKEN_NAME}={tokenString}";
-            };
-
-            _socket = await wsClient.ConnectAsync(new Uri("ws://localhost/socket"), _cts.Token);
+            var wsUri = new Uri($"ws://localhost/socket?access_token={Uri.EscapeDataString(tokenString)}");
+            _socket = await wsClient.ConnectAsync(wsUri, _cts.Token);
         }
 
         public async Task<ApiSocketResponse<TResponse>> SendCommandAsync<TResponse>(

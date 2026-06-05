@@ -2,8 +2,8 @@
 {
     public static class Constants
     {
-        public static TimeSpan TOKEN_LIFETIME = TimeSpan.FromDays(1);
-        public const string TOKEN_NAME = "sessionToken";
+        public static readonly TimeSpan ACCESS_TOKEN_LIFETIME = TimeSpan.FromMinutes(15);
+        public static readonly TimeSpan REFRESH_TOKEN_LIFETIME = TimeSpan.FromHours(48);
         public const string SERVER_PRINCIPAL = "game-server-api";
 
         public const string CACHE_PLAYER_SOCKET_PREFIX = "PlayerSocket";

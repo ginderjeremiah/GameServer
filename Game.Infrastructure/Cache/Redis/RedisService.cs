@@ -60,6 +60,16 @@ namespace Game.Infrastructure.Cache.Redis
             await Set(key, value?.Serialize());
         }
 
+        public async Task Set(string key, string? value, TimeSpan expiry)
+        {
+            await StringSetAsync(key, value, expiry: expiry);
+        }
+
+        public async Task Set<T>(string key, T value, TimeSpan expiry)
+        {
+            await Set(key, value?.Serialize(), expiry);
+        }
+
         public void SetAndForget(string key, string? value)
         {
             StringSet(key, value, CommandFlags.FireAndForget);
@@ -95,9 +105,9 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.StringSet(key, value, flags: flags, when: when);
         }
 
-        private async Task StringSetAsync(string key, string? value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always)
         {
-            await Redis.StringSetAsync(key, value, flags: flags, when: when);
+            await Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when);
         }
     }
 }
