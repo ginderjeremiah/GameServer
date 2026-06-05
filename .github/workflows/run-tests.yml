@@ -113,7 +113,19 @@ jobs:
 
     - name: Run Playwright e2e tests
       working-directory: UI/new-svelte
-      run: npm run test:e2e
+      # Run each browser project as its own invocation. Running all three projects in a single
+      # `playwright test` run intermittently leaves a browser worker hung at end-of-run teardown,
+      # which Playwright only force-kills after a ~5-minute grace and so inflates the job; each
+      # project run on its own tears down cleanly. The exit code is aggregated so every browser
+      # still runs (and reports) even when an earlier one fails.
+      run: |
+        rc=0
+        for browser in chromium firefox webkit; do
+          echo "::group::Playwright ($browser)"
+          npx playwright test --project="$browser" || rc=1
+          echo "::endgroup::"
+        done
+        exit $rc
 
     - name: Dump container logs on failure
       if: failure()
