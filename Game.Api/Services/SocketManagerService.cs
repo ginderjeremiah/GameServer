@@ -29,7 +29,7 @@ namespace Game.Api.Services
             var playerId = sessionService.SelectedPlayerId;
             var socketContext = new SocketContext(socket, playerId, sessionService, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>());
-            var oldSocketId = await _cache.GetSetAsync(CurrentSocketKey(playerId), socketContext.SocketId);
+            var oldSocketId = await _cache.GetSet(CurrentSocketKey(playerId), socketContext.SocketId);
             if (oldSocketId is not null)
             {
                 await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
@@ -44,7 +44,7 @@ namespace Game.Api.Services
         public async Task UnRegisterSocket(SocketContext context)
         {
             await UnRegisterSocketCommandListener(context.SocketId);
-            await _cache.CompareAndDeleteAsync(CurrentSocketKey(context.PlayerId), context.SocketId);
+            await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
         }
 
         public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
@@ -101,7 +101,7 @@ namespace Game.Api.Services
 
         private async Task<string?> CurrentSocketId(int playerId)
         {
-            return await _cache.GetAsync(CurrentSocketKey(playerId));
+            return await _cache.Get(CurrentSocketKey(playerId));
         }
 
         private static string SocketQueueName(string socketId)

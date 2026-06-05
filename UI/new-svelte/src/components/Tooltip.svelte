@@ -1,4 +1,6 @@
-<div role="tooltip" class="tooltip-container" {style} bind:this={container}></div>
+<div role="tooltip" class="tooltip-container" {style} bind:this={container}>
+	<!-- The tooltip content is rendered directly into the container, so it is not present in the markup here. -->
+</div>
 
 <script lang="ts">
 import type { TooltipData } from '$stores';
@@ -58,5 +60,6 @@ const style = $derived.by(() => {
 	z-index: 15;
 	color: #f0f0f0;
 	overflow: hidden;
+	opacity: 0.93;
 }
 </style>

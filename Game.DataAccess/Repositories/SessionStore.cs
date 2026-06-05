@@ -17,9 +17,9 @@ namespace Game.DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<PlayerState?> GetSession(string sessionId)
+        public async Task<PlayerState?> GetSession(int userId)
         {
-            return await _cache.GetAsync<PlayerState>($"{SessionPrefix}_{sessionId}");
+            return await _cache.Get<PlayerState>($"{SessionPrefix}_{userId}");
         }
 
         public void Update(PlayerState playerState, int playerId)
@@ -27,5 +27,9 @@ namespace Game.DataAccess.Repositories
             _cache.SetAndForget($"{SessionPrefix}_{playerId}", playerState);
         }
 
+        public void Clear(int userId)
+        {
+            _cache.DeleteAndForget($"{SessionPrefix}_{userId}");
+        }
     }
 }

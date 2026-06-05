@@ -26,7 +26,7 @@ namespace Game.DataAccess.Repositories
         public async Task<Player?> GetPlayer(int playerId)
         {
             var playerKey = $"{PlayerPrefix}_{playerId}";
-            var player = await _cache.GetAsync<Player>(playerKey);
+            var player = await _cache.Get<Player>(playerKey);
             if (player is null)
             {
                 player = await GetPlayerFromDb(playerId);

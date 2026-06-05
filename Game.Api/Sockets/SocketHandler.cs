@@ -83,9 +83,12 @@ namespace Game.Api.Sockets
                         await HandleMessage(message);
                     }
                 }
-                catch (Exception ex) when (ex.Message is not "The remote end closed the connection.")
+                catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occurred while reading a socket message.");
+                    if (_context.State is Open) // Only log if the socket is still open, otherwise it's expected that exceptions may occur
+                    {
+                        _logger.LogError(ex, "An error occurred while reading a socket message.");
+                    }
                 }
             }
             while (_context.State is Open);

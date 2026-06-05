@@ -1,4 +1,4 @@
-using Game.Api;
+using Game.Abstractions.Infrastructure;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Core;
@@ -187,7 +187,7 @@ namespace Game.Api.Tests.Integration
             // Act
             var response = await authClient.PostAsync("/api/Login/Logout", null, CancellationToken);
 
-            // Assert — logout succeeds and issues a Set-Cookie that clears the token.
+            // Assert — logout succeeds and issues a Set-Cookie that clears the token and session state is cleared.
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
@@ -198,7 +198,11 @@ namespace Game.Api.Tests.Integration
                 .First(cookie => cookie.StartsWith($"{Constants.TOKEN_NAME}="));
             Assert.StartsWith($"{Constants.TOKEN_NAME}=;", clearedCookie);
 
-            // Reusing the cleared cookie no longer authenticates against a protected endpoint.
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            var session = await cache.Get($"Session_{user.Id}");
+            Assert.Null(session);
+
+            // Using the cleared cookie no longer authenticates against a protected endpoint.
             using var clearedClient = Factory.CreateClient();
             clearedClient.DefaultRequestHeaders.Add("Cookie", clearedCookie.Split(';')[0]);
             var statusResponse = await clearedClient.GetAsync("/api/Login/Status", CancellationToken);

@@ -131,9 +131,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public ApiResponse Logout()
         {
-            // Clearing the auth cookie is sufficient to end the session under the current
-            // cookie-based scheme: without a valid token the user can no longer authenticate.
-            // AllowAnonymous ensures the cookie is always cleared, even if the token has already expired.
+            _sessionService.ClearSession();
             _cookieService.ClearTokenCookie();
             return ApiResponse.Success();
         }

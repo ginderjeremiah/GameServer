@@ -40,7 +40,7 @@ namespace Game.Api.Services
         /// </summary>
         public async Task LoadPlayerState(int userId)
         {
-            var sessionData = await _sessionStore.GetSession(userId.ToString());
+            var sessionData = await _sessionStore.GetSession(userId);
             if (sessionData is not null)
             {
                 UserId = userId;
@@ -66,10 +66,15 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Clears all session state (called when a token is invalid).
+        /// Clears all session state (called when a token is invalid or on logout).
         /// </summary>
         public void ClearSession()
         {
+            if (SessionAvailable)
+            {
+                _sessionStore.Clear(UserId);
+            }
+
             UserId = 0;
             _player = null;
             PlayerState = new();
