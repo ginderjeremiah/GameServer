@@ -38,6 +38,18 @@ namespace Game.Core
             return Convert.ToBase64String(hashedBytes);
         }
 
+        /// <summary>
+        /// Verifies that <paramref name="input"/> hashes to <paramref name="expectedHash"/> using the
+        /// supplied <paramref name="salt"/>. The comparison is performed in constant time to avoid
+        /// leaking information about the stored hash via timing side channels.
+        /// </summary>
+        public static bool VerifyHash(this string input, string salt, string expectedHash, int? iterations = ITERATIONS)
+        {
+            var computedHash = Encoding.UTF8.GetBytes(input.Hash(salt, iterations));
+            var expectedBytes = Encoding.UTF8.GetBytes(expectedHash);
+            return CryptographicOperations.FixedTimeEquals(computedHash, expectedBytes);
+        }
+
         public static void SetPepper(string pepper)
         {
             _pepper = Encoding.UTF8.GetBytes(pepper);

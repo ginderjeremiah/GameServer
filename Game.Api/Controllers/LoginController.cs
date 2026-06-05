@@ -39,12 +39,10 @@ namespace Game.Api.Controllers
             }
 
             var user = await _users.GetUser(creds.Username);
-            if (user is null)
+            if (user is null || !creds.Password.VerifyHash(user.Salt.ToString(), user.PassHash))
             {
-                return ApiResponse.Error("Username not found");
+                return ApiResponse.Error("Invalid username or password");
             }
-
-            // TODO: validate password hash against user entity
 
             var player = user.Players.FirstOrDefault();
             if (player is null)
