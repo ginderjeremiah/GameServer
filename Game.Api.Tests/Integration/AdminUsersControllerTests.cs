@@ -78,6 +78,42 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetUsers_IncludesPlayerSummaries()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var seeded = await TestDataSeeder.CreateUserAsync(context, "withplayer", "pw");
+                await TestDataSeeder.CreatePlayerAsync(context, seeded.Id, name: "Hero", level: 7);
+            }
+
+            var results = await GetUsersAsync(authClient, "?search=withplayer");
+            var user = Assert.Single(results.Users, u => u.Username == "withplayer");
+            var player = Assert.Single(user.Players);
+            Assert.Equal("Hero", player.Name);
+            Assert.Equal(7, player.Level);
+            Assert.NotEqual(default, player.LastActivity);
+        }
+
+        [Fact]
+        public async Task GetUsers_SearchMatchesPlayerName()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var seeded = await TestDataSeeder.CreateUserAsync(context, "zed", "pw");
+                await TestDataSeeder.CreatePlayerAsync(context, seeded.Id, name: "Wizard");
+            }
+
+            // The username "zed" does not contain the search term, but the player's name does.
+            var results = await GetUsersAsync(authClient, "?search=wiz");
+            var user = Assert.Single(results.Users, u => u.Username == "zed");
+            Assert.Contains(user.Players, p => p.Name == "Wizard");
+        }
+
+        [Fact]
         public async Task GetUsers_SearchFiltersByUsernameCaseInsensitively()
         {
             using var authClient = await SetupAdminClientAsync();

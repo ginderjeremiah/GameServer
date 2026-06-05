@@ -1,25 +1,23 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
-using Game.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore;
+using Game.Core;
 
 namespace Game.DataAccess.Repositories
 {
     internal class Roles : IRoles
     {
-        private readonly GameContext _context;
-
-        public Roles(GameContext context)
+        // Roles are intrinsic reference data: the ERole enum is the source of truth and the database
+        // is only seeded from it (see GameContext). There is therefore nothing to query — the full
+        // set can be constructed in memory directly from the enum.
+        public List<Role> GetRoles()
         {
-            _context = context;
-        }
-
-        public Task<List<Role>> GetRoles()
-        {
-            return _context.Roles
-                .AsNoTracking()
-                .OrderBy(r => r.Id)
-                .ToListAsync();
+            return Enum.GetValues<ERole>()
+                .Select(role => new Role
+                {
+                    Id = (int)role,
+                    Name = role.ToString(),
+                })
+                .ToList();
         }
     }
 }

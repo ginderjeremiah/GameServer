@@ -7,6 +7,6 @@ namespace Game.Abstractions.DataAccess
         /// <summary>
         /// Returns every access role that can be granted to a user.
         /// </summary>
-        Task<List<Role>> GetRoles();
+        List<Role> GetRoles();
     }
 }

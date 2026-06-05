@@ -13,6 +13,7 @@ namespace Game.Api.Models.Users
         public DateTime? ArchivedAt { get; set; }
         public DateTime? BannedAt { get; set; }
         public required IEnumerable<Role> Roles { get; set; }
+        public required IEnumerable<PlayerSummary> Players { get; set; }
 
         public static AdminUser FromSource(UserEntity user)
         {
@@ -24,6 +25,7 @@ namespace Game.Api.Models.Users
                 ArchivedAt = user.ArchivedAt,
                 BannedAt = user.BannedAt,
                 Roles = user.Roles.Select(Role.FromSource).ToList(),
+                Players = user.Players.Select(PlayerSummary.FromSource).ToList(),
             };
         }
     }

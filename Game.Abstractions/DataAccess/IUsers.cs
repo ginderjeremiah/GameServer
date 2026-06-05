@@ -16,13 +16,9 @@ namespace Game.Abstractions.DataAccess
         Task<bool> CheckIfUsernameExists(string userName);
 
         /// <summary>
-        /// Loads a single user by id (including roles) regardless of archived/banned status, for admin management.
-        /// </summary>
-        Task<User?> GetUserById(int id);
-
-        /// <summary>
-        /// Returns a page of non-archived users (including their roles), optionally filtered by a
-        /// case-insensitive username search and/or membership in a given role.
+        /// Returns a page of non-archived users (including their players and roles), optionally filtered
+        /// by a case-insensitive search matched against the username and the names of the user's players,
+        /// and/or membership in a given role.
         /// </summary>
         Task<List<User>> SearchUsers(string? search, int? roleId, int skip, int take);
 

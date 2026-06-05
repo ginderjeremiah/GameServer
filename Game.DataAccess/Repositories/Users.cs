@@ -27,16 +27,10 @@ namespace Game.DataAccess.Repositories
             return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
         }
 
-        public async Task<User?> GetUserById(int id)
-        {
-            return await _context.Users
-                .Include(u => u.Roles)
-                .FirstOrDefaultAsync(u => u.Id == id);
-        }
-
         public async Task<List<User>> SearchUsers(string? search, int? roleId, int skip, int take)
         {
             return await FilteredUsers(search, roleId)
+                .Include(u => u.Players)
                 .Include(u => u.Roles)
                 .OrderBy(u => u.Username)
                 .ThenBy(u => u.Id)
@@ -99,7 +93,10 @@ namespace Game.DataAccess.Repositories
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(u => EF.Functions.ILike(u.Username, $"%{search}%"));
+                var pattern = $"%{search}%";
+                query = query.Where(u =>
+                    EF.Functions.ILike(u.Username, pattern)
+                    || u.Players.Any(p => EF.Functions.ILike(p.Name, pattern)));
             }
 
             if (roleId is not null)

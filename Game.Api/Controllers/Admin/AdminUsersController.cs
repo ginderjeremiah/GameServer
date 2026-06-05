@@ -50,17 +50,16 @@ namespace Game.Api.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<ApiEnumerableResponse<Role>> GetRoles()
+        public ApiEnumerableResponse<Role> GetRoles()
         {
-            var allRoles = await _roles.GetRoles();
-            return ApiResponse.Success(allRoles.Select(Role.FromSource).ToList());
+            return ApiResponse.Success(_roles.GetRoles().Select(Role.FromSource).ToList());
         }
 
         [HttpPost]
         public async Task<ApiResponse> SetUserRoles([FromBody] SetUserRolesData data)
         {
             var roleIds = data.RoleIds.Distinct().ToList();
-            var knownRoleIds = (await _roles.GetRoles()).Select(r => r.Id).ToHashSet();
+            var knownRoleIds = _roles.GetRoles().Select(r => r.Id).ToHashSet();
             if (roleIds.Any(id => !knownRoleIds.Contains(id)))
             {
                 return ApiResponse.Error("One or more roles do not exist.");
