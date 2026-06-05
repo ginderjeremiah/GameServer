@@ -61,6 +61,32 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Login_WrongPassword_ReturnsError()
+        {
+            // Arrange — a real user whose stored hash won't match the supplied password.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "wrongpassuser", "correctpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var creds = new { Username = "wrongpassuser", Password = "wrongpass" };
+
+            // Act
+            var response = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+
+            // Assert — authentication is rejected and no auth cookie is issued.
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+            Assert.Null(result.Data);
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+        }
+
+        [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
             // Arrange — CreateAccount inserts PlayerSkills with SkillId 0, 1, 2
