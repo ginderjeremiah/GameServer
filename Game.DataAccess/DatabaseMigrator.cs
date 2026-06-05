@@ -8,7 +8,7 @@ namespace Game.DataAccess
 {
     internal class DatabaseMigrator(GameContext context, ILogger<DatabaseMigrator> logger) : IDatabaseMigrator
     {
-        public async Task Migrate(bool resetDatabase = false)
+        public async Task Migrate()
         {
             var start = Stopwatch.GetTimestamp();
             logger.LogDebug($"Beginning migration.");

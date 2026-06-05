@@ -1,0 +1,69 @@
+# Backing stack for end-to-end (Playwright) runs: the Game.Api service plus its PostgreSQL and
+# Redis dependencies. The SvelteKit frontend is intentionally NOT included here — Playwright starts
+# the dev server itself (see UI/new-svelte/playwright.config.ts) and Vite proxies /api and /socket
+# to the API on localhost:5008.
+#
+# Networking: every service uses `network_mode: host`. This is deliberate. The constrained sandbox
+# used for remote Claude sessions runs a dockerd with `--iptables=false` and no usable bridge (see
+# docs/backend.md "Integration-Test Containers in Constrained Environments" and
+# .claude/hooks/session-start.sh), so bridge networking and published ports do not work there. Host
+# networking keeps everything on localhost, which works in that sandbox and on GitHub Actions Linux
+# runners alike. Note: host networking requires a Linux Docker host — on Docker Desktop (Windows/Mac)
+# run the API natively instead (this stack targets CI and the sandbox).
+#
+# Ports default to dedicated values to avoid colliding with the integration-test backing services
+# (5499 / 6399) and any native PostgreSQL/Redis. Override via the environment if needed.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    network_mode: host
+    command: ["-p", "${POSTGRES_PORT:-5544}"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-game}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-game}
+      POSTGRES_DB: ${POSTGRES_DB:-game}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-game} -d ${POSTGRES_DB:-game} -p ${POSTGRES_PORT:-5544}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    network_mode: host
+    command: ["--port", "${REDIS_PORT:-6544}"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -p ${REDIS_PORT:-6544} ping | grep -q PONG"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Game.Api/Dockerfile
+    network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Bind the port the Vite dev-server proxy targets (UI/new-svelte/vite.config.ts).
+      ASPNETCORE_HTTP_PORTS: ${API_PORT:-5008}
+      # Secrets required at startup. These are throwaway values for CI / e2e only.
+      HashPepper: docker-compose-e2e-pepper
+      Jwt__SigningKey: docker-compose-e2e-signing-key-at-least-32-bytes-long
+      Jwt__Issuer: game-server-api
+      Jwt__Audience: game-server-api
+      # 1 = Postgres, 0 = Redis (see Game.Abstractions/Infrastructure/Enums.cs).
+      DataAccessOptions__DatabaseSystem: "1"
+      DataAccessOptions__CacheSystem: "0"
+      DataAccessOptions__PubSubSystem: "0"
+      # Apply EF migrations (which carry the seed reference data) on startup outside Development.
+      DataAccessOptions__MigrateOnStartup: "true"
+      DataAccessOptions__DbConnectionString: "Host=localhost;Port=${POSTGRES_PORT:-5544};Database=${POSTGRES_DB:-game};Username=${POSTGRES_USER:-game};Password=${POSTGRES_PASSWORD:-game}"
+      DataAccessOptions__CacheConnectionString: "localhost:${REDIS_PORT:-6544}"
+      DataAccessOptions__PubSubConnectionString: "localhost:${REDIS_PORT:-6544}"

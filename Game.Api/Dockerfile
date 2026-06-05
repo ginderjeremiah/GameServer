@@ -1,25 +1,22 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# Multi-stage build for the Game.Api service.
+# The build context is expected to be the repository root (see docker-compose.yml) so that the
+# referenced projects (Game.Abstractions, Game.Core, Game.DataAccess, Game.Application,
+# Game.Infrastructure) are available for restore/publish.
+# See https://aka.ms/customizecontainer for how Visual Studio uses this Dockerfile.
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-USER app
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
-EXPOSE 8081
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["GameApi/GameApi.csproj", "GameApi/"]
-RUN dotnet restore "./GameApi/GameApi.csproj"
 COPY . .
-WORKDIR "/src/GameApi"
-RUN dotnet build "./GameApi.csproj" -c $BUILD_CONFIGURATION -o /app/build
-
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./GameApi.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet restore "Game.Api/Game.Api.csproj"
+RUN dotnet publish "Game.Api/Game.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "GameApi.dll"]
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "Game.Api.dll"]

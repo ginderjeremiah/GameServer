@@ -60,13 +60,7 @@ jobs:
     - name: Run ESLint
       run: npm run lint
 
-#   - name: Install playwright
-#     run: npx playwright install
-
-#   - name: Run tests
-#     run: npm run test
-
-    - name: Run unit tests only (for now)
+    - name: Run unit tests
       run: npm run test:unit
 
     - name: Upload test results
@@ -75,3 +69,63 @@ jobs:
       with:
         name: test-results
         path: '**/TestResults/'
+
+  test-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Start backing stack (API + Postgres + Redis)
+      run: docker compose up -d --build
+
+    - name: Wait for the API to be ready
+      run: |
+        for i in $(seq 1 90); do
+          # Any HTTP response (even 401) means the server is up and has finished its
+          # startup migration, which runs before Kestrel begins listening.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5008/api/Login/Status || echo 000)
+          if [ "$code" != "000" ]; then
+            echo "API ready (HTTP $code) after ${i} attempt(s)"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "API did not become ready in time"
+        docker compose logs api
+        exit 1
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install node modules
+      working-directory: UI/new-svelte
+      run: npm install
+
+    - name: Install Playwright browsers
+      working-directory: UI/new-svelte
+      run: npx playwright install --with-deps
+
+    - name: Run Playwright e2e tests
+      working-directory: UI/new-svelte
+      run: npm run test:integration
+
+    - name: Dump container logs on failure
+      if: failure()
+      run: docker compose logs
+
+    - name: Tear down backing stack
+      if: always()
+      run: docker compose down -v
+
+    - name: Upload Playwright report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: UI/new-svelte/playwright-report/

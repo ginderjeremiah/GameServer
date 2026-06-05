@@ -67,7 +67,14 @@ namespace Game.Api
                 .AddScoped<AdminCacheInvalidationFilter>()
                 .AddScoped<AdminRoleAuthorizationFilter>();
 
-            if (builder.Environment.IsDevelopment())
+            // Migrations are applied on startup in Development (frictionless local F5) and whenever
+            // DataAccessOptions:MigrateOnStartup is enabled (e.g. the Dockerized API used by CI and
+            // end-to-end runs). This is intentionally decoupled from the Development-only TypeScript
+            // codegen below, which writes into the frontend source tree.
+            var migrateOnStartup = builder.Configuration.GetValue<bool>(
+                $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}");
+
+            if (builder.Environment.IsDevelopment() || migrateOnStartup)
             {
                 builder.Services.AddDatabaseMigrator();
             }
@@ -77,15 +84,12 @@ namespace Game.Api
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
+                // Regenerate the frontend's TypeScript API client from the running API's types. This
+                // writes into the UI source tree, so it is strictly a local-development concern.
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
                 var targetDir = Path.Combine(rootFolder, "UI", "new-svelte", "src", "lib", "api", "types");
                 var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
                 codeGen.GenerateCode(typeof(Startup).Assembly, new CodeGenOptions { TargetDirectory = targetDir, NewLine = "\n" });
-
-                // GameContext is Scoped, so the migrator must be resolved from a scope.
-                using var migrationScope = app.Services.CreateScope();
-                var migrator = migrationScope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
-                await migrator.Migrate(true);
 
                 app.UseSwagger();
                 app.UseSwaggerUI();
@@ -94,6 +98,14 @@ namespace Game.Api
             {
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
+            }
+
+            if (app.Environment.IsDevelopment() || migrateOnStartup)
+            {
+                // GameContext is Scoped, so the migrator must be resolved from a scope.
+                using var migrationScope = app.Services.CreateScope();
+                var migrator = migrationScope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
+                await migrator.Migrate();
             }
 
             app.UseCors(builder =>
