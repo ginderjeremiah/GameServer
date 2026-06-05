@@ -14,7 +14,9 @@ vi.mock('$lib/api', () => ({
 		post = vi.fn().mockResolvedValue({ status: 401, error: 'mock' });
 		get = vi.fn().mockResolvedValue({ status: 401 });
 		constructor() {}
-	}
+	},
+	getTokens: vi.fn(() => null),
+	setTokens: vi.fn()
 }));
 vi.mock('$lib/engine', () => ({
 	playerManager: { name: '', initialize: vi.fn() }

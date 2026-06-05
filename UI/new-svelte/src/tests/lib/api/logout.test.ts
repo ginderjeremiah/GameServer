@@ -13,6 +13,7 @@ vi.mock('$lib/api/api-request', () => ({
 }));
 
 import { logout } from '$lib/api/logout';
+import { getTokens, setTokens } from '$lib/api/token-store';
 
 describe('logout', () => {
 	let originalLocation: Location;
@@ -20,11 +21,13 @@ describe('logout', () => {
 	beforeEach(() => {
 		constructorMock.mockReset();
 		postMock.mockReset().mockResolvedValue({ status: 200 });
+		localStorage.clear();
+		setTokens({ accessToken: 'access', refreshToken: 'refresh' });
 		originalLocation = window.location;
 		Object.defineProperty(window, 'location', {
 			configurable: true,
 			writable: true,
-			value: { href: '' }
+			value: { href: '', pathname: '/game' }
 		});
 	});
 
@@ -34,13 +37,26 @@ describe('logout', () => {
 			writable: true,
 			value: originalLocation
 		});
+		localStorage.clear();
 	});
 
-	it('posts to the logout endpoint and redirects to the login screen', async () => {
+	it('revokes the refresh token, clears storage, and redirects to the login screen', async () => {
 		await logout();
 
 		expect(constructorMock).toHaveBeenCalledWith('Login/Logout');
 		expect(postMock).toHaveBeenCalledTimes(1);
+		expect(postMock).toHaveBeenCalledWith({ refreshToken: 'refresh' });
+		expect(getTokens()).toBeNull();
+		expect(window.location.href).toBe('/');
+	});
+
+	it('still clears storage and redirects when there is no refresh token', async () => {
+		localStorage.clear();
+
+		await logout();
+
+		expect(postMock).not.toHaveBeenCalled();
+		expect(getTokens()).toBeNull();
 		expect(window.location.href).toBe('/');
 	});
 

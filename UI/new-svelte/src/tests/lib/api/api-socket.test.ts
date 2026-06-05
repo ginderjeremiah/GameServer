@@ -12,11 +12,14 @@ interface MockWebSocket {
 	onopen: (() => void) | null;
 	onmessage: ((ev: { data: string }) => void) | null;
 	onerror: (() => void) | null;
+	onclose: ((ev: { code: number }) => void) | null;
 }
 
 let socketInstances: MockWebSocket[] = [];
+let lastSocketUrl: string | undefined;
 
-function createMockWebSocket(): MockWebSocket {
+function createMockWebSocket(url?: string): MockWebSocket {
+	lastSocketUrl = url;
 	const ws: MockWebSocket = {
 		readyState: 1,
 		OPEN: 1,
@@ -24,15 +27,18 @@ function createMockWebSocket(): MockWebSocket {
 		send: vi.fn(),
 		onopen: null,
 		onmessage: null,
-		onerror: null
+		onerror: null,
+		onclose: null
 	};
 	socketInstances.push(ws);
 	return ws;
 }
 
-vi.stubGlobal('WebSocket', vi.fn(createMockWebSocket));
+const webSocketMock = vi.fn(createMockWebSocket);
+vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket } from '$lib/api/api-socket';
+import { setTokens } from '$lib/api/token-store';
 
 describe('ApiSocket', () => {
 	let apiSocket: ApiSocket;
@@ -43,6 +49,9 @@ describe('ApiSocket', () => {
 			s.readyState = s.CLOSED;
 		}
 		socketInstances = [];
+		lastSocketUrl = undefined;
+		webSocketMock.mockClear();
+		localStorage.clear();
 		apiSocket = new ApiSocket();
 	});
 
@@ -54,6 +63,22 @@ describe('ApiSocket', () => {
 		}
 		ws.onmessage({ data });
 	};
+
+	describe('authentication', () => {
+		it('passes the stored access token as the access_token query parameter', () => {
+			setTokens({ accessToken: 'token-123', refreshToken: 'r' });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+
+			expect(lastSocketUrl).toBe('/socket?access_token=token-123');
+		});
+
+		it('opens an unauthenticated socket when no token is stored', () => {
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+
+			expect(lastSocketUrl).toBe('/socket');
+		});
+	});
 
 	describe('sendSocketCommand', () => {
 		it('creates a WebSocket and sends the command', async () => {
