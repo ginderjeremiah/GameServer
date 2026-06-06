@@ -11,6 +11,7 @@ import type {
 	IEnemy,
 	IItem,
 	IItemMod,
+	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
 	ISetItemFavoriteRequest,
@@ -30,6 +31,7 @@ export type ApiSocketResponseTypes = {
 	'GetSkills': ISkill[];
 	'GetZones': IZone[];
 	'NewEnemy': INewEnemyModel;
+	'SaveLogPreferences': undefined;
 	'SetItemFavorite': undefined;
 	'SocketReplaced': undefined;
 };
@@ -37,6 +39,7 @@ export type ApiSocketResponseTypes = {
 export type ApiSocketRequestTypes = {
 	'DefeatEnemy': IDefeatEnemyRequest;
 	'NewEnemy': INewEnemyRequest;
+	'SaveLogPreferences': ILogPreference[];
 	'SetItemFavorite': ISetItemFavoriteRequest;
 };
 
