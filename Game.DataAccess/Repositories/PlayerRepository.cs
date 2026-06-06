@@ -16,7 +16,7 @@ namespace Game.DataAccess.Repositories
         private readonly ICacheService _cache;
         private readonly IDomainEventDispatcher _dispatcher;
 
-        public PlayerRepository(GameContext context, ICacheService cache, IPubSubService pubsub, IDomainEventDispatcher dispatcher)
+        public PlayerRepository(GameContext context, ICacheService cache, IDomainEventDispatcher dispatcher)
         {
             _context = context;
             _cache = cache;
@@ -75,9 +75,4 @@ namespace Game.DataAccess.Repositories
         }
     }
 
-    internal class DomainEventEnvelope
-    {
-        public required string Type { get; set; }
-        public required string Payload { get; set; }
-    }
 }

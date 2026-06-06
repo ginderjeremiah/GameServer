@@ -1,5 +1,7 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Application;
+using Game.Core.Events;
+using Game.Core.Players.Events;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure;
 using Game.Infrastructure.DependencyInjection;
@@ -19,6 +21,8 @@ namespace Game.DataAccess.DependencyInjection
         /// </summary>
         public static IServiceCollection AddDataAccess(this IServiceCollection services)
         {
+            RegisterPlayerPersistenceHandlers();
+
             return services.AddTransient<InfrastructureOptions>(sp => sp.GetRequiredService<IOptions<DataAccessOptions>>().Value)
                 .AddGameContext()
                 .AddCache()
@@ -52,6 +56,25 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IUsers, Users>()
                 .AddScoped<IUserLogins, UserLogins>()
                 .AddScoped<IRoles, Roles>();
+        }
+
+        /// <summary>
+        /// Registers <see cref="PlayerPersistencePublisher"/> against each player domain event whose
+        /// change must be written behind to the database. Events that are only relevant in-process
+        /// (e.g. <see cref="PlayerLeveledUpEvent"/>) are intentionally omitted so they are never
+        /// published to the persistence queue.
+        /// </summary>
+        private static void RegisterPlayerPersistenceHandlers()
+        {
+            DomainEventDispatcher.RegisterDomainEventHandler<PlayerCoreUpdatedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<AttributeAllocationsChangedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ItemUnlockedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ItemEquippedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ItemUnequippedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ModUnlockedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ModAppliedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ModRemovedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<LogPreferenceChangedEvent, PlayerPersistencePublisher>();
         }
 
         /// <summary>

@@ -1,7 +1,6 @@
 using Game.Abstractions.Entities;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players.Events;
-using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -120,7 +119,8 @@ namespace Game.DataAccess
                     await HandleLogPreferenceChanged(context, logEvt);
                     break;
 
-                    // PlayerLeveledUpEvent and EnemyDefeatedEvent are handled in-process only
+                    // PlayerLeveledUpEvent is handled in-process only — it has no persistence
+                    // handler registered, so it is never published to this queue.
             }
         }
 
