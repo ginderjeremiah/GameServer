@@ -1,17 +1,16 @@
 ---
 name: pick-up-issue
 description: >-
-  Find an unclaimed open GitHub issue in this repository and take it end-to-end to a
-  ready-for-review pull request. Use this whenever the user wants to pick up / grab / claim /
-  start the next available issue, work down the backlog, or asks something like "what should I
-  work on next?" — especially for `claude`-labeled issues, but also when they name a specific
-  issue to implement (e.g. "pick up #74"). It auto-selects the highest-priority eligible issue
-  (claude-labeled first, bugs before enhancements, oldest first), skips any issue that already
-  has an open PR or unmet prerequisites, nails down the approach when there's ambiguity, then
-  implements, tests, and opens the PR. Supports a dry-run/preview mode ("just tell me what
-  you'd pick") that stops after proposing the approach. Do NOT use it for creating, triaging,
-  commenting on, or closing issues, or for ad-hoc changes the user is already directing
-  step-by-step.
+  Pick up an unclaimed open GitHub issue from this repository and take it end-to-end to a
+  ready-for-review pull request. Use this when the user explicitly asks to pick up, grab, claim,
+  or start a new issue to work on — e.g. "please pick up a new issue to work on", "grab the next
+  open issue", "claim and start the top claude issue" — or when they name a specific issue to
+  implement (e.g. "pick up #74"). It self-assigns the chosen issue, auto-selects the
+  highest-priority eligible one (claude-labeled first, bugs before enhancements, oldest first),
+  and skips issues that are already claimed (open PR or existing assignee) or have genuinely
+  unmet prerequisites. Do NOT use it for merely listing or summarizing the backlog, for creating
+  / triaging / commenting on / closing issues, or for code changes the user is already directing
+  step by step.
 ---
 
 # Pick Up an Issue
@@ -29,14 +28,15 @@ All GitHub work uses the `mcp__github__*` tools (the `gh` CLI is not available h
 ## Workflow
 
 1. Identify the repo and gather candidates
-2. Exclude the ineligible (taken or blocked)
+2. Exclude the ineligible (already claimed, or blocked with unmet prerequisites)
 3. Rank and auto-pick the top issue
-4. Understand the issue and read the right docs
-5. Agree on the approach (interactive only when it adds value)
-6. Implement to the project's standards
-7. Verify (build, tests, lint)
-8. Commit, push, open the PR
-9. Offer to watch the PR
+4. Self-assign the chosen issue
+5. Understand the issue and read the right docs
+6. Agree on the approach (interactive only when it adds value)
+7. Implement to the project's standards
+8. Verify (build, tests, lint)
+9. Commit, push, open the PR
+10. Offer to watch the PR
 
 ---
 
@@ -46,31 +46,45 @@ Derive `owner`/`repo` from the origin remote (`git remote get-url origin`) rathe
 hardcoding — this skill should keep working if the repo is renamed or forked.
 
 List the open issues. The `claude` label is the priority signal, so pull those first; keep the
-rest as a fallback (see step 3). `claude` is a *priority*, not a hard filter — only fall back to
-non-`claude` issues if no `claude` one is eligible, unless the user explicitly says "claude only".
+rest as a fallback. `claude` is a *priority*, not a hard filter — only fall back to non-`claude`
+issues if no `claude` one is eligible, unless the user explicitly says "claude only".
 
 ### 2. Exclude the ineligible
 
-Starting work that's already claimed or can't proceed wastes effort and risks duplicate PRs, so
-filter the candidate list down before ranking.
+Starting work that's already claimed or can't proceed yet wastes effort and risks duplicate PRs,
+so trim the candidate list before ranking.
 
-**Taken (already has an open PR).** Detect this two ways, because neither alone is reliable here:
-- Run a search such as `repo:OWNER/REPO is:issue is:open -linked:pr` to drop issues GitHub has
-  formally linked to a PR.
-- GitHub only auto-links PRs that use closing keywords, and this repo's PRs don't always do that.
-  So **also** list the open PRs and scan each title + body for issue references (`#N`,
-  `closes/fixes/resolves #N`). Treat any referenced still-open issue as taken.
+**Already claimed — skip.** Either signal means skip:
 
-**Blocked (unmet prerequisites).** Read each remaining candidate's body and recent comments for
-dependency signals and drop the ones that genuinely can't proceed yet:
-- explicit blockers — "blocked by #N", "depends on #N", "after #N is implemented", "needs … first",
-  "mock the design first" (e.g. an issue that says "after proper JWTs are implemented", or
-  "Need to mock the design first").
-- "follow-up to #N" / "after #N" where **#N is still open**. If #N is already merged/closed, it's
-  not a blocker.
+- *Open PR.* Detect it two ways, since neither alone is reliable here: run a search like
+  `repo:OWNER/REPO is:issue is:open -linked:pr` to drop issues GitHub has formally linked to a PR,
+  and **also** list the open PRs and scan each title + body for issue references (`#N`,
+  `closes/fixes/resolves #N`), treating any referenced still-open issue as taken. The second pass
+  matters because this repo's PRs don't always use closing keywords.
+- *Existing assignee.* An issue already assigned to someone is being worked — that's exactly how
+  this skill claims its own pick (step 4). Skip it. (If it's assigned only to **you** from an
+  abandoned earlier attempt, you may resume it.)
 
-When a prerequisite is clearly unmet, exclude the issue. When it's ambiguous, keep it but note the
-concern so it surfaces during the approach step rather than silently dropping real work.
+**Blocked — but verify before excluding.** An issue often *mentions* a prerequisite that may since
+have been satisfied. Excluding on the keyword alone would bury work that's actually ready, so when
+you spot a prerequisite, go check its **real, current** status and only exclude if it's genuinely
+still outstanding:
+
+- *Prereq references an issue/PR* ("after #N", "blocked by #N", "depends on #N", "follow-up to #N"):
+  look up #N. Closed or merged → prerequisite met, the issue is eligible. Still open → still blocked.
+- *Prereq described in prose* ("after proper JWTs are implemented", "needs bearer-token auth first"):
+  search the codebase for evidence it's been done. Present in the code → met → eligible. Clearly
+  absent → blocked.
+- *Process / design prereq* ("mock the design first"): check the issue's comments and any linked
+  resources for a sign-off or a link showing it's done. Evidence it's satisfied → eligible. If you
+  can't find any, treat it as still blocked but **flag it** rather than silently dropping it — you
+  may simply be missing context.
+
+Reflect what you found in the selection announcement: if a once-gated issue is now unblocked, say
+why ("#27 was gated on JWT auth, which is now implemented in `…`, so it's eligible"); if it's
+genuinely still blocked, say that; if you couldn't tell, keep it as a lower-priority candidate and
+flag the uncertainty. **Never exclude an issue for a prerequisite without first checking whether
+that prerequisite is already met.**
 
 ### 3. Rank and auto-pick
 
@@ -81,17 +95,29 @@ Sort the eligible candidates by this precedence and take the top one — **don't
 3. Oldest `created_at` first
 4. Lowest issue number (final tiebreak)
 
-Then briefly announce the choice so the decision is transparent: the issue number + title, the
-one-line reason it won, and a short note of anything you excluded as taken or blocked.
+Announce the choice so the decision is transparent: the issue number + title, the one-line reason
+it won, and a short note of anything you excluded as claimed or blocked (including any prereqs you
+verified as already met).
 
-- **User named a specific issue** ("pick up #74"): skip selection and use it. Still run a quick
-  eligibility check and flag it if it looks taken or blocked before diving in.
-- **Dry-run / preview** ("just tell me what you'd pick", "what's next, don't start it"): do steps
-  1–5 and stop after proposing the approach. Make no changes.
-- **Nothing eligible**: say so plainly, list what was excluded and why, and stop. Do not invent
-  work or pick a blocked/taken issue anyway.
+- **User named a specific issue** ("pick up #74"): skip selection and use it. Still run the
+  eligibility checks from step 2 and flag it if it looks claimed or blocked before diving in.
+- **Nothing eligible**: say so plainly, list what was excluded and why, and stop. Don't invent work
+  or start a blocked/claimed issue anyway.
 
-### 4. Understand the issue and read the right docs
+### 4. Self-assign the chosen issue
+
+Immediately after picking — before you start the work — claim the issue by assigning it to
+yourself. This makes the work visible and stops a parallel session from grabbing the same issue
+(it's why an existing assignee counts as "claimed" in step 2).
+
+- Resolve your GitHub login with `mcp__github__get_me`.
+- Add yourself to the issue's assignees with `mcp__github__issue_write` (`method: "update"`,
+  `assignees: [<your-login>]`). You're normally just adding yourself; keep any existing assignees
+  you intend to preserve.
+
+Do this for a user-named issue too.
+
+### 5. Understand the issue and read the right docs
 
 Read the full issue (body + comments), then explore the actual code paths it points at before
 forming a plan — the issue's suggested resolution is a starting point, not gospel.
@@ -107,7 +133,7 @@ requires it:
 Battle logic lives in **both** the frontend and backend and must stay consistent; if the issue
 touches it, read both docs.
 
-### 5. Agree on the approach (interactive only when it adds value)
+### 6. Agree on the approach (interactive only when it adds value)
 
 The goal is to avoid building the wrong thing without pestering the user over trivial fixes.
 
@@ -118,7 +144,7 @@ The goal is to avoid building the wrong thing without pestering the user over tr
   better solution". For a large issue, propose what's in this PR vs. a follow-up and confirm the
   scope. For substantial changes, consider proposing a plan and waiting for sign-off.
 
-### 6. Implement to the project's standards
+### 7. Implement to the project's standards
 
 Follow `CLAUDE.md` and the area docs. The standards that bite most often:
 
@@ -135,7 +161,7 @@ Follow `CLAUDE.md` and the area docs. The standards that bite most often:
   ("Important Design Decisions" or the relevant feature section) — but don't over-document routine
   bug fixes.
 
-### 7. Verify before you push
+### 8. Verify before you push
 
 Run what CI runs, scoped to what you changed. Integration tests reuse the Postgres (`:5499`) and
 Redis (`:6399`) containers the session-start hook already started (see `.container-info.json`).
@@ -147,7 +173,7 @@ Redis (`:6399`) containers the session-start hook already started (see `.contain
 Report failures honestly and fix them. Don't open a PR on red — a green local run is the whole
 point of doing this before pushing.
 
-### 8. Commit, push, open the PR
+### 9. Commit, push, open the PR
 
 - Work on the session's current branch; don't switch branches without permission. If you're somehow
   on `main`/`master`, create a branch first.
@@ -159,7 +185,7 @@ point of doing this before pushing.
   should have a summary, how it addresses the issue, a test plan/checklist, and a `Closes #N` line
   so the issue auto-closes on merge.
 
-### 9. Offer to watch the PR
+### 10. Offer to watch the PR
 
 After opening the PR, proactively offer to watch it for CI failures and review comments via
 `subscribe_pr_activity`, then let the user decide.
@@ -170,13 +196,16 @@ After opening the PR, proactively offer to watch it for CI failures and review c
 
 Eligible after filtering: a `claude` `bug` from June 2, a `claude` `bug` from June 4, and a
 `claude` `enhancement` from June 1. Ranking picks the **June-2 bug** — `claude` + `bug` beats the
-enhancement, and it's older than the June-4 bug. If that issue's body said "depends on #40" and #40
-were still open, it would have been excluded as blocked and the June-4 bug would win instead.
+enhancement, and it's older than the June-4 bug. But if that June-2 bug's body said "depends on
+#40", you'd look up #40 first: if #40 is merged, the bug stays eligible and is picked; if #40 is
+still open, the bug is excluded as blocked and the June-4 bug wins instead.
 
 ## Guardrails
 
 - This skill picks up and implements issues. It is **not** for creating, triaging, commenting on,
-  or closing issues.
+  or closing issues, and not for merely listing/summarizing the backlog.
+- Self-assign the issue the moment you pick it, and treat an existing assignee as "already claimed"
+  — together these keep parallel sessions from colliding on the same pick.
 - Never fabricate work when nothing is eligible, and never start a blocked or already-claimed issue.
-- Selection is intentionally not announced on the issue itself (no "claiming" comment). If parallel
-  sessions start colliding on the same top pick, revisit this and consider a self-assign/comment.
+- Don't exclude an issue for a prerequisite without first verifying that the prerequisite is still
+  genuinely unmet.
