@@ -1,6 +1,7 @@
 export * from './functions';
 export * from './rarity';
 export * from './challenge-type';
+export * from './attribute-display';
 export * from './item-display';
 export * from './types';
 export * from './hooks';
