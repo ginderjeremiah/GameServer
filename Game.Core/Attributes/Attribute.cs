@@ -33,11 +33,27 @@ namespace Game.Core.Attributes
 
         private static string GetDescription(EAttribute value)
         {
+#pragma warning disable CS0618 // DropBonus is obsolete but still seeded for data integrity.
             return value switch
             {
-                Strength => "A measure of one's raw physical force.",
-                _ => "A measure of one's raw physical force."
+                Strength => "A measure of one's raw physical force. Increases the damage of some physical skills and contributes to maximum health.",
+                Endurance => "A measure of one's resilience and physical fortitude. Contributes to maximum health and defense.",
+                Intellect => "A measure of one's mental acuity and command of the arcane. Increases the damage of magical skills.",
+                Agility => "A measure of one's speed and reflexes. Improves cooldown recovery and contributes to defense.",
+                Dexterity => "A measure of one's precision and finesse. Increases the damage of some physical skills and improves cooldown recovery.",
+                Luck => "A measure of one's fortune, influencing various chance-based outcomes.",
+                MaxHealth => "The amount of health a character has at the start of a battle.",
+                Defense => "A flat reduction applied to all incoming damage.",
+                CooldownRecovery => "A percentage multiplier to the rate at which skills become available again after being used.",
+                DropBonus => "Obsolete. Previously increased the rate at which items were dropped by enemies.",
+                CriticalChance => "The percentage chance for an attack to deal increased damage.",
+                CriticalDamage => "The additional percentage of damage dealt when a critical hit occurs.",
+                DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
+                BlockChance => "The percentage chance to block part of the damage from an incoming attack.",
+                BlockReduction => "A flat reduction applied to damage received when an attack is blocked.",
+                _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No description defined for the given attribute.")
             };
+#pragma warning restore CS0618
         }
 
         public static IEnumerable<Attribute> GetAllAttributes()
