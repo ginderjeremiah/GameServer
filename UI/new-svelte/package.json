@@ -2,6 +2,9 @@
 	"name": "new-svelte",
 	"version": "0.0.1",
 	"private": true,
+	"engines": {
+		"node": ">=26"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -13,7 +16,7 @@
 		"format": "prettier --write .",
 		"test:e2e": "playwright test",
 		"test:unit": "vitest",
-		"test:unit:ci": "vitest --run --reporter=minimal --outputFile=./unit-test-results.json"
+		"test:unit:ci": "vitest --run --reporter=minimal --reporter=json --outputFile.json=./unit-test-results.json"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",
