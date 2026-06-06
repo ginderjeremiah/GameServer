@@ -13,12 +13,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Restore from the project manifests *before* copying the rest of the source. NuGet restore is the
-# slow part of the build, and its inputs are only the .csproj files — so isolating it in its own
-# layer lets Docker (and the CI buildx GHA cache) reuse the restored packages on every build where
-# the dependency graph is unchanged, even when source files change. The set below is Game.Api's full
-# restore graph (it references Abstractions/Core/DataAccess/Application; DataAccess pulls in
-# Infrastructure). Add a line here if Game.Api gains a new project reference.
+# Restore from the project manifests *before* copying the rest of the source — the standard .NET
+# multi-stage layering. NuGet restore is the slow part of the build and its inputs are only the
+# .csproj files, so isolating it in its own layer lets Docker reuse the restored packages from its
+# local layer cache on incremental rebuilds (e.g. local dev) whenever the dependency graph is
+# unchanged, even when source files change. The set below is Game.Api's full restore graph (it
+# references Abstractions/Core/DataAccess/Application; DataAccess pulls in Infrastructure). Add a
+# line here if Game.Api gains a new project reference.
 COPY Game.Abstractions/Game.Abstractions.csproj Game.Abstractions/
 COPY Game.Core/Game.Core.csproj Game.Core/
 COPY Game.Infrastructure/Game.Infrastructure.csproj Game.Infrastructure/

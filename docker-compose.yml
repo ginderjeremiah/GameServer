@@ -46,10 +46,6 @@ services:
       retries: 20
 
   api:
-    # An explicit image tag lets CI build the image once (with buildx layer caching) and have
-    # `docker compose up` reuse the loaded image instead of rebuilding. Local/sandbox runs that pass
-    # `--build` still rebuild and (re)tag this name as usual, so behaviour there is unchanged.
-    image: gameserver-api:ci
     build:
       context: .
       dockerfile: Game.Api/Dockerfile
