@@ -1,3 +1,5 @@
+using Game.Core.Events;
+
 namespace Game.Core.Players.Events
 {
     /// <summary>
@@ -5,5 +7,5 @@ namespace Game.Core.Players.Events
     /// </summary>
     public record ItemUnlockedEvent(
         int PlayerId,
-        int ItemId) : IPlayerPersistenceEvent;
+        int ItemId) : IDomainEvent;
 }

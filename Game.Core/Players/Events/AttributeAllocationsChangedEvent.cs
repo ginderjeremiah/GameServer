@@ -1,3 +1,5 @@
+using Game.Core.Events;
+
 namespace Game.Core.Players.Events
 {
     /// <summary>
@@ -5,7 +7,7 @@ namespace Game.Core.Players.Events
     /// </summary>
     public record AttributeAllocationsChangedEvent(
         int PlayerId,
-        List<AttributeAllocationEntry> Allocations) : IPlayerPersistenceEvent;
+        List<AttributeAllocationEntry> Allocations) : IDomainEvent;
 
     public record AttributeAllocationEntry(EAttribute Attribute, double Amount);
 }

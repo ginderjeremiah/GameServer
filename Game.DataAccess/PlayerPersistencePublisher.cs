@@ -5,11 +5,36 @@ using System.Text.Json;
 
 namespace Game.DataAccess
 {
-    internal class PlayerPersistencePublisher(IPubSubService pubsub) : IDomainEventHandler<IPlayerPersistenceEvent>
+    /// <summary>
+    /// Bridges player domain events into the Redis write-behind queue consumed by
+    /// <see cref="DataProviderSynchronizer"/>. Registered (in <c>AddDataAccess</c>) against each
+    /// player event whose change must be persisted to the database; events that are only relevant
+    /// in-process (e.g. <c>PlayerLeveledUpEvent</c>) are deliberately not registered here.
+    /// </summary>
+    internal class PlayerPersistencePublisher(IPubSubService pubsub) :
+        IDomainEventHandler<PlayerCoreUpdatedEvent>,
+        IDomainEventHandler<AttributeAllocationsChangedEvent>,
+        IDomainEventHandler<ItemUnlockedEvent>,
+        IDomainEventHandler<ItemEquippedEvent>,
+        IDomainEventHandler<ItemUnequippedEvent>,
+        IDomainEventHandler<ModUnlockedEvent>,
+        IDomainEventHandler<ModAppliedEvent>,
+        IDomainEventHandler<ModRemovedEvent>,
+        IDomainEventHandler<LogPreferenceChangedEvent>
     {
         private readonly IPubSubService _pubsub = pubsub;
 
-        public async Task HandleAsync(IPlayerPersistenceEvent domainEvent, CancellationToken cancellationToken = default)
+        public Task HandleAsync(PlayerCoreUpdatedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(AttributeAllocationsChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ItemUnlockedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ItemEquippedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ItemUnequippedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ModUnlockedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ModAppliedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ModRemovedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(LogPreferenceChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+
+        private async Task PublishAsync(IDomainEvent domainEvent)
         {
             var envelope = new DomainEventEnvelope
             {

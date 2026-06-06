@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Players;
+using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -34,13 +35,13 @@ namespace Game.Application.Tests.Services
             var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
             using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
             var db = multiplexer.GetDatabase();
-            Assert.Equal(0, await db.ListLengthAsync("PlayerUpdateQueue"));
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
 
             player.ChangeZone(1);
             await playerRepo.SavePlayer(player);
 
-            // ChangeZone raises PlayerCoreUpdatedEvent, which must now appear in the queue
-            Assert.True(await db.ListLengthAsync("PlayerUpdateQueue") > 0);
+            // ChangeZone raises exactly one PlayerCoreUpdatedEvent, which must now appear in the queue
+            Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         [Fact]
@@ -69,7 +70,7 @@ namespace Game.Application.Tests.Services
             Assert.True(updated);
             await playerRepo.SavePlayer(player);
 
-            Assert.Equal(2, await db.ListLengthAsync("PlayerUpdateQueue"));
+            Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
