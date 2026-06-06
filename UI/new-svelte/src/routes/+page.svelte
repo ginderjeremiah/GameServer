@@ -86,7 +86,7 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest, getTokens, setTokens } from '$lib/api';
+import { ApiRequest, getTokens, reportDeviceInfo, setTokens } from '$lib/api';
 import { onMount } from 'svelte';
 import { playerManager } from '$lib/engine';
 import { preventDefault } from '$lib/common/event-wrappers';
@@ -209,6 +209,8 @@ const handleSubmit = async () => {
 	submitting = false;
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
+		// Fire-and-forget: report this device's capabilities now that we're authenticated.
+		void reportDeviceInfo();
 		enterWorld(response.data.player);
 	} else if (mode === 'signup') {
 		serverError = response.error ?? 'Account created but login failed.';
@@ -228,6 +230,8 @@ onMount(async () => {
 	try {
 		const response = await new ApiRequest('Login/Status').get();
 		if (response.status === 200) {
+			// Fire-and-forget: refresh this device's capabilities on a resumed session too.
+			void reportDeviceInfo();
 			playerManager.initialize(response.data);
 			goto(resolve('/loading'));
 		}

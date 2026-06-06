@@ -12,6 +12,7 @@ import type {
 	IChallenge,
 	IChallengeType,
 	IChange,
+	IDeviceInfoRequest,
 	IEnemy,
 	IEquipRequest,
 	IItem,
@@ -76,6 +77,7 @@ export type ApiResponseTypes = {
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
 	'Login/CreateAccount': undefined;
+	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
@@ -123,6 +125,7 @@ export type ApiRequestTypes = {
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
+	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;
 	'Player/ApplyMod': IApplyModRequest;

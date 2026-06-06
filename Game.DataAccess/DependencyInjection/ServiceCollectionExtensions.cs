@@ -50,6 +50,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<ISessionStore, SessionStore>()
                 .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
                 .AddScoped<IUsers, Users>()
+                .AddScoped<IUserLogins, UserLogins>()
                 .AddScoped<IRoles, Roles>();
         }
 

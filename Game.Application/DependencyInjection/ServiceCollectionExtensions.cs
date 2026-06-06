@@ -14,6 +14,7 @@ namespace Game.Application.DependencyInjection
             return services
                 .AddScoped<BattleSnapshotService>()
                 .AddScoped<BattleService>()
+                .AddScoped<LoginTrackingService>()
                 .AddScoped<PlayerService>();
         }
 
