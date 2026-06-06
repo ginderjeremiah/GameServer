@@ -97,7 +97,12 @@ const revealGlow = $derived(`0 0 calc(4px + ${reward.glow} * 16px) ${tintColor(a
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.16) 50%, transparent 62%);
+		background: linear-gradient(
+			115deg,
+			transparent 38%,
+			color-mix(in srgb, var(--white) 16%, transparent) 50%,
+			transparent 62%
+		);
 		transform: translateX(-130%);
 		animation: seal-sweep 3.4s ease-in-out infinite;
 	}

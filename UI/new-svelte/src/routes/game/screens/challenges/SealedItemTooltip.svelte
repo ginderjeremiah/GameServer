@@ -18,14 +18,7 @@
 				<div class="sealed-slots">
 					{#each item.modSlots as slot (slot.id)}
 						<div class="sealed-slot" style:border-left="2px solid {tintColor(accent, 0.5)}">
-							<svg
-								width="10"
-								height="10"
-								viewBox="0 0 16 16"
-								fill="none"
-								stroke="rgba(240,240,240,0.4)"
-								stroke-width="1.5"
-							>
+							<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
 								<rect x="3.5" y="7" width="9" height="6.5" rx="1" />
 								<path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" />
 							</svg>
@@ -70,7 +63,7 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 .sealed-tooltip {
 	width: 280px;
 	border-radius: 3px;
-	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
 }
 
 .tt-body {
@@ -103,7 +96,7 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 
 .sealed-slot {
 	padding: 6px 10px;
-	border: 1px dashed rgba(255, 255, 255, 0.14);
+	border: 1px dashed var(--border-light);
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -111,7 +104,7 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 
 .sealed-slot-label {
 	font-size: 11.5px;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 	font-style: italic;
 }
 

@@ -36,8 +36,8 @@ const handleClickRight = () => changeZone(1);
 	display: inline-flex;
 	align-items: center;
 	gap: 12px;
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: color-mix(in srgb, var(--white) 4%, transparent);
+	border: 1px solid var(--border-light);
 	border-radius: 3px;
 	padding: 6px 10px 6px 6px;
 }
@@ -45,9 +45,9 @@ const handleClickRight = () => changeZone(1);
 .zone-btn {
 	width: 24px;
 	height: 24px;
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.18);
-	color: rgba(240, 240, 240, 0.85);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid var(--border-medium);
+	color: color-mix(in srgb, var(--text-primary) 85%, transparent);
 	border-radius: 2px;
 	cursor: pointer;
 	display: flex;
@@ -58,7 +58,7 @@ const handleClickRight = () => changeZone(1);
 	transition: background 140ms;
 
 	&:hover:not(:disabled) {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--border-subtle);
 	}
 
 	&:disabled {
@@ -80,12 +80,12 @@ const handleClickRight = () => changeZone(1);
 	font-size: 10.5px;
 	letter-spacing: 1.5px;
 	text-transform: uppercase;
-	color: rgba(192, 216, 255, 0.85);
+	color: color-mix(in srgb, var(--accent-light) 85%, transparent);
 }
 
 .zone-name {
 	font-size: 16px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	font-weight: 400;
 	letter-spacing: 0.1px;
 }
