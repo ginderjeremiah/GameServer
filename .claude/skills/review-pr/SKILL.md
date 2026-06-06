@@ -66,9 +66,13 @@ wrong PR wastes a real, published review.
 
 A good review starts from the *problem*, not the diff. Pull, in this order:
 
-- **The PR** — `pull_request_read` `get` (title, body, author, head/base), `get_files` (changed
-  files with per-file add/delete counts), and `get_diff` (the actual hunks). The diff defines which
-  lines you can leave inline comments on, so note what's in it.
+- **The PR** — pull it with `mcp__github__pull_request_read`. Its `method:` arg picks what comes
+  back; the read methods this skill uses — `get`, `get_files`, `get_diff`, `get_reviews`,
+  `get_review_comments`, `get_comments` — are all values on that one tool, not separate tools. Start
+  with `get` (title, body, author, head/base) and `get_files` (changed files, each with its `patch`
+  hunks and add/delete counts). Those patches are usually the whole diff already, so reach for
+  `get_diff` only as a fallback when a file's patch is omitted or truncated. The diff is what defines
+  which lines you can leave inline comments on, so note what's in it.
 - **The linked issue** — scan the PR body, title, and branch name for `#N` and
   `closes/fixes/resolves #N` (this repo's PRs don't always use closing keywords, so catch bare
   `#N` too). For each, `issue_read` `get`, plus `get_comments` if the discussion carries
@@ -116,6 +120,16 @@ code was added.
 
 **Is it reasonably future-proofed?** Sensible extension points and naming, no obvious foot-guns —
 without gold-plating. Over-engineering for hypothetical needs is itself a finding.
+
+**Is the code itself clean and maintainable?** Beyond the project-specific rules, don't skip the
+ordinary code-quality pass: clear naming, DRY, no dead code, and `CLAUDE.md`'s house rules (e.g.
+always-braced `if`/`while`). Watch for the subtle maintainability traps that are easy to miss while
+you're checking the project-specific boxes — a deliberate-looking construct a later edit might
+naively "simplify" and break (flag it, suggest a clarifying comment), or two sibling functions that
+now behave inconsistently (one returns `null` where its neighbor throws). A pre-existing
+inconsistency the PR didn't introduce is still fair game as a **follow-up** — note it without
+blocking this change. These plain nits are often the most useful feedback, so don't let the
+project-specific checks crowd them out.
 
 **Does it meet the guideline docs for the area it touches?**
 
@@ -188,10 +202,15 @@ broader (architecture, a missing test file, cross-cutting concerns) in the summa
 1. **Open a pending review** — `pull_request_review_write` with `method: "create"` and **no
    `event`**. That creates a pending review you can attach comments to.
 2. **Add inline comments** — for each line-specific finding, `add_comment_to_pending_review` with
-   `path`, `body`, `subjectType: "LINE"`, the `line` (plus `startLine` for a range), and
-   `side: "RIGHT"` (use `LEFT` only when commenting on a removed line). Make each comment specific
-   and actionable: what's wrong, why (cite the doc or rule), and ideally how to fix it. If a point
-   is about a line that isn't in the diff, skip the inline comment and raise it in the summary.
+   `path`, `body`, `subjectType: "LINE"`, the `line`, `side: "RIGHT"` (use `LEFT` only for a removed
+   line), and `startLine` for a multi-line range. The `line` is the file's **absolute line number in
+   the post-image** (the new version of the file), not a position within the diff — derive it by
+   reading the hunk's `@@ -a,b +c,d @@` header (`+c` is the first new-side line of that hunk) and
+   counting down to your target `+` line. Getting this wrong silently lands the comment on the wrong
+   line, so when a single line is ambiguous, prefer a small `startLine`–`line` range bracketing the
+   exact spot. Make each comment specific and actionable: what's wrong, why (cite the doc or rule),
+   and ideally how to fix it. If a point is about a line that isn't in the diff, skip the inline
+   comment and raise it in the summary.
 3. **Submit** — `pull_request_review_write` with `method: "submit_pending"`, the `event` from
    step 5, and a `body` that is the summary below. Caveat: GitHub rejects `APPROVE` /
    `REQUEST_CHANGES` when the reviewer is the PR's own author — if that's the case, submit with
