@@ -5,16 +5,27 @@ interface ApiResponseJson<T> {
 	errorMessage?: string;
 }
 
+/**
+ * The pieces of an HTTP response the API client needs, decoupled from the underlying transport.
+ * The request layer reads the body to text before constructing the response so the getters below can
+ * stay synchronous regardless of how the bytes were fetched.
+ */
+export interface RawApiResponse {
+	status: number;
+	statusText: string;
+	responseText: string;
+}
+
 export class ApiResponse<T extends ApiResponseType> {
-	#r: XMLHttpRequest;
+	readonly #raw: RawApiResponse;
 	#responseJson?: ApiResponseJson<T>;
 
-	constructor(r: XMLHttpRequest) {
-		this.#r = r;
+	constructor(raw: RawApiResponse) {
+		this.#raw = raw;
 	}
 
 	public get status() {
-		return this.#r.status;
+		return this.#raw.status;
 	}
 
 	public get data(): T {
@@ -26,11 +37,11 @@ export class ApiResponse<T extends ApiResponseType> {
 	}
 
 	public get error() {
-		return this.responseJson?.errorMessage || this.#r.statusText || 'Failed to communicate with server.';
+		return this.responseJson?.errorMessage || this.#raw.statusText || 'Failed to communicate with server.';
 	}
 
 	public get responseText() {
-		return this.#r.responseText;
+		return this.#raw.responseText;
 	}
 
 	private get responseJson() {
@@ -38,9 +49,9 @@ export class ApiResponse<T extends ApiResponseType> {
 	}
 
 	private parseJson() {
-		if (this.#r.responseText) {
+		if (this.#raw.responseText) {
 			try {
-				return JSON.parse(this.#r.responseText) as ApiResponseJson<T>;
+				return JSON.parse(this.#raw.responseText) as ApiResponseJson<T>;
 			} catch {
 				return { data: undefined, errorMessage: 'Invalid server response.' } as ApiResponseJson<T>;
 			}

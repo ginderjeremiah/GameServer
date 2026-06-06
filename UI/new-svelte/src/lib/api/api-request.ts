@@ -108,35 +108,41 @@ export class ApiRequest<U extends ApiEndpoint> {
 		return response;
 	}
 
-	private send(
+	private async send(
 		method: 'GET' | 'POST',
 		url: string,
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the typed overloads above guarantee the payload matches the endpoint; this is the shared implementation.
 		payload?: any
 	): Promise<ApiResponse<ApiResponseTypes[U]>> {
-		const r = new XMLHttpRequest();
-		r.open(method, url, true);
+		const headers: Record<string, string> = {};
 		if (method === 'POST') {
-			r.setRequestHeader('content-type', 'application/json');
+			headers['content-type'] = 'application/json';
 		}
 
 		if (this.requiresAuth) {
 			const accessToken = getAccessToken();
 			if (accessToken) {
-				r.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+				headers['Authorization'] = `Bearer ${accessToken}`;
 			}
 		}
 
-		return new Promise<ApiResponse<ApiResponseTypes[U]>>((resolved) => {
-			r.onload = () => resolved(new ApiResponse(r));
-			r.onerror = r.onload;
-			r.onabort = r.onerror;
-			try {
-				r.send(payload === undefined ? undefined : JSON.stringify(payload));
-			} catch {
-				resolved(new ApiResponse(r));
-			}
-		});
+		try {
+			const response = await fetch(url, {
+				method,
+				headers,
+				body: payload === undefined ? undefined : JSON.stringify(payload)
+			});
+			const responseText = await response.text();
+			return new ApiResponse({
+				status: response.status,
+				statusText: response.statusText,
+				responseText
+			});
+		} catch {
+			// Network error / aborted request: surface a 0-status, bodyless response so callers handle it
+			// the same way the previous XHR `onerror`/`onabort` path did.
+			return new ApiResponse({ status: 0, statusText: '', responseText: '' });
+		}
 	}
 
 	private encodeParams(urlParams?: Record<string, string | number | boolean>) {

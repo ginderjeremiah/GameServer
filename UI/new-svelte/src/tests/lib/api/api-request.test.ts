@@ -1,50 +1,49 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-interface MockXhr {
-	open: Mock;
-	send: Mock;
-	setRequestHeader: Mock;
+interface FetchCall {
+	url: string;
+	method: string;
+	headers: Record<string, string>;
+	body: string | undefined;
+}
+
+interface StubResponse {
 	status: number;
-	statusText: string;
-	responseText: string;
-	onload: (() => void) | null;
-	onerror: (() => void) | null;
-	onabort: (() => void) | null;
+	statusText?: string;
+	body: string;
 }
 
-let xhrInstances: MockXhr[] = [];
+let fetchCalls: FetchCall[] = [];
 
-function createMockXhr(): MockXhr {
-	const xhr: MockXhr = {
-		open: vi.fn(),
-		send: vi.fn(),
-		setRequestHeader: vi.fn(),
-		status: 0,
-		statusText: 'OK',
-		responseText: '',
-		onload: null,
-		onerror: null,
-		onabort: null
+// Per-test hook to drive each `fetch` call. Tests that need specific status codes (e.g. a 401 then a
+// retry, or a token refresh) install a responder; otherwise a successful 200 is returned.
+let fetchResponder: ((call: FetchCall) => StubResponse) | null = null;
+
+// A minimal stand-in for the parts of the `fetch` Response the API client touches (`status`,
+// `statusText`, `text()`).
+const makeResponse = ({ status, statusText, body }: StubResponse): Response =>
+	({
+		status,
+		statusText: statusText ?? 'OK',
+		ok: status >= 200 && status < 300,
+		text: async () => body,
+		json: async () => JSON.parse(body)
+	}) as Response;
+
+const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+	const call: FetchCall = {
+		url,
+		method: init?.method ?? 'GET',
+		headers: (init?.headers as Record<string, string>) ?? {},
+		body: init?.body as string | undefined
 	};
-	// Default behaviour: a successful response that synchronously fires the onload handler. Tests that
-	// need other status codes (e.g. a 401 then a retry) install an `xhrResponder` to drive each call.
-	xhr.send.mockImplementation(() => {
-		if (xhrResponder) {
-			xhrResponder(xhr);
-		} else {
-			xhr.status = 200;
-			xhr.responseText = JSON.stringify({ data: 'test-result' });
-		}
-		xhr.onload?.();
-	});
-	xhrInstances.push(xhr);
-	return xhr;
-}
+	fetchCalls.push(call);
 
-let xhrResponder: ((xhr: MockXhr) => void) | null = null;
+	const stub = fetchResponder?.(call) ?? { status: 200, body: JSON.stringify({ data: 'test-result' }) };
+	return makeResponse(stub);
+});
 
-// Returning an object from a constructor makes `new XMLHttpRequest()` resolve to that object.
-vi.stubGlobal('XMLHttpRequest', vi.fn(createMockXhr));
+vi.stubGlobal('fetch', fetchMock);
 vi.stubGlobal('window', { encodeURIComponent });
 
 import { ApiRequest } from '$lib/api/api-request';
@@ -58,31 +57,31 @@ function makeAccessToken(secondsFromNow: number): string {
 	return `header.${payload}.signature`;
 }
 
-const authHeader = (xhr: MockXhr): string | undefined =>
-	xhr.setRequestHeader.mock.calls.find((call) => call[0] === 'Authorization')?.[1];
+const authHeader = (call: FetchCall): string | undefined => call.headers['Authorization'];
+const callsTo = (url: string): FetchCall[] => fetchCalls.filter((call) => call.url === url);
 
 describe('ApiRequest', () => {
 	beforeEach(() => {
-		xhrInstances = [];
-		xhrResponder = null;
+		fetchCalls = [];
+		fetchResponder = null;
 		localStorage.clear();
 	});
 
-	const lastXhr = () => xhrInstances[xhrInstances.length - 1];
+	const lastCall = () => fetchCalls[fetchCalls.length - 1];
 
 	describe('get (instance)', () => {
-		it('opens a GET request to /api/{endpoint}', async () => {
+		it('sends a GET request to /api/{endpoint}', async () => {
 			await new ApiRequest('Items').get();
 
-			expect(lastXhr().open).toHaveBeenCalledWith('GET', '/api/Items', true);
+			expect(lastCall().method).toBe('GET');
+			expect(lastCall().url).toBe('/api/Items');
 		});
 
 		it('appends URL params when provided', async () => {
 			await new ApiRequest('Items/SlotsForItem').get({ itemId: 5, refreshCache: true });
 
-			const url = lastXhr().open.mock.calls[0][1] as string;
-			expect(url).toContain('itemId=5');
-			expect(url).toContain('refreshCache=true');
+			expect(lastCall().url).toContain('itemId=5');
+			expect(lastCall().url).toContain('refreshCache=true');
 		});
 
 		it('attaches the bearer access token when one is stored', async () => {
@@ -90,13 +89,13 @@ describe('ApiRequest', () => {
 
 			await new ApiRequest('Items').get();
 
-			expect(authHeader(lastXhr())).toMatch(/^Bearer header\./);
+			expect(authHeader(lastCall())).toMatch(/^Bearer header\./);
 		});
 
 		it('sends no Authorization header when not logged in', async () => {
 			await new ApiRequest('Items').get();
 
-			expect(authHeader(lastXhr())).toBeUndefined();
+			expect(authHeader(lastCall())).toBeUndefined();
 		});
 
 		it('returns an ApiResponse with parsed data', async () => {
@@ -106,58 +105,61 @@ describe('ApiRequest', () => {
 			expect(data).toBe('test-result');
 		});
 
-		it('resolves even when send throws', async () => {
-			xhrResponder = () => {
+		it('resolves even when the request fails', async () => {
+			fetchResponder = () => {
 				throw new Error('Network error');
 			};
 
 			const response = await new ApiRequest('Items').get();
 			expect(response).toBeDefined();
+			expect(response.status).toBe(0);
 		});
 
 		it('skips undefined URL params', async () => {
 			await new ApiRequest('Items/SlotsForItem').get({ itemId: 5, refreshCache: undefined });
 
-			const url = lastXhr().open.mock.calls[0][1] as string;
-			expect(url).toContain('itemId=5');
-			expect(url).not.toContain('refreshCache');
+			expect(lastCall().url).toContain('itemId=5');
+			expect(lastCall().url).not.toContain('refreshCache');
 		});
 	});
 
 	describe('post', () => {
-		it('opens a POST request to /api/{endpoint}', async () => {
+		it('sends a POST request to /api/{endpoint}', async () => {
 			await new ApiRequest('Login').post({ username: 'u', password: 'p' });
 
-			expect(lastXhr().open).toHaveBeenCalledWith('POST', '/api/Login', true);
+			expect(lastCall().method).toBe('POST');
+			expect(lastCall().url).toBe('/api/Login');
 		});
 
 		it('sets content-type to application/json', async () => {
 			await new ApiRequest('Login').post({ username: 'u', password: 'p' });
 
-			expect(lastXhr().setRequestHeader).toHaveBeenCalledWith('content-type', 'application/json');
+			expect(lastCall().headers['content-type']).toBe('application/json');
 		});
 
 		it('sends JSON-stringified payload', async () => {
 			const payload = { username: 'user', password: 'pass' };
 			await new ApiRequest('Login').post(payload);
 
-			expect(lastXhr().send).toHaveBeenCalledWith(JSON.stringify(payload));
+			expect(lastCall().body).toBe(JSON.stringify(payload));
 		});
 
-		it('resolves even when send throws', async () => {
-			xhrResponder = () => {
+		it('resolves even when the request fails', async () => {
+			fetchResponder = () => {
 				throw new Error('Network error');
 			};
 
 			const response = await new ApiRequest('Login').post({ username: 'u', password: 'p' });
 			expect(response).toBeDefined();
+			expect(response.status).toBe(0);
 		});
 
 		it('sends an empty body for endpoints with no request payload', async () => {
 			await new ApiRequest('Login/Logout').post();
 
-			expect(lastXhr().open).toHaveBeenCalledWith('POST', '/api/Login/Logout', true);
-			expect(lastXhr().send).toHaveBeenCalledWith(undefined);
+			expect(lastCall().method).toBe('POST');
+			expect(lastCall().url).toBe('/api/Login/Logout');
+			expect(lastCall().body).toBeUndefined();
 		});
 	});
 
@@ -179,49 +181,40 @@ describe('ApiRequest', () => {
 		it('refreshes the token pair and retries the request once', async () => {
 			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
 
-			const fetchMock = vi.fn(async () => ({
-				ok: true,
-				json: async () => ({ data: { accessToken: makeAccessToken(900), refreshToken: 'refresh-2' } })
-			}));
-			vi.stubGlobal('fetch', fetchMock);
-
-			let calls = 0;
-			xhrResponder = (xhr) => {
-				calls += 1;
-				if (calls === 1) {
-					xhr.status = 401;
-					xhr.responseText = JSON.stringify({ errorMessage: 'expired' });
-				} else {
-					xhr.status = 200;
-					xhr.responseText = JSON.stringify({ data: 'retried' });
+			let itemsCalls = 0;
+			fetchResponder = (call) => {
+				if (call.url === '/api/Login/Refresh') {
+					return {
+						status: 200,
+						body: JSON.stringify({ data: { accessToken: makeAccessToken(900), refreshToken: 'refresh-2' } })
+					};
 				}
+				itemsCalls += 1;
+				return itemsCalls === 1
+					? { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) }
+					: { status: 200, body: JSON.stringify({ data: 'retried' }) };
 			};
 
 			const response = await new ApiRequest('Items').get();
 
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(xhrInstances).toHaveLength(2);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			const itemsRequests = callsTo('/api/Items');
+			expect(itemsRequests).toHaveLength(2);
 			expect(response.status).toBe(200);
 			expect(response.data as unknown).toBe('retried');
 			// The retry carries the freshly rotated access token, not the one that was rejected.
-			expect(authHeader(xhrInstances[1])).not.toBe(authHeader(xhrInstances[0]));
+			expect(authHeader(itemsRequests[1])).not.toBe(authHeader(itemsRequests[0]));
 		});
 
 		it('does not refresh anonymous endpoints', async () => {
 			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
 
-			const fetchMock = vi.fn();
-			vi.stubGlobal('fetch', fetchMock);
-
-			xhrResponder = (xhr) => {
-				xhr.status = 401;
-				xhr.responseText = JSON.stringify({ errorMessage: 'nope' });
-			};
+			fetchResponder = () => ({ status: 401, body: JSON.stringify({ errorMessage: 'nope' }) });
 
 			const response = await new ApiRequest('Login').post({ username: 'u', password: 'p' });
 
-			expect(fetchMock).not.toHaveBeenCalled();
-			expect(xhrInstances).toHaveLength(1);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(0);
+			expect(fetchCalls).toHaveLength(1);
 			expect(response.status).toBe(401);
 		});
 	});
