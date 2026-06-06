@@ -57,3 +57,12 @@ $rarity-rare: #a1c2f7;
 $rarity-epic: #bfa2ec;
 $rarity-legendary: #e8c878;
 $rarity-mythic: #e8806f;
+
+// core-attribute accents (one hue per core EAttribute 0..5) — consumed via the
+// helpers in $lib/common/attribute-display (radar, steppers, allocation rows)
+$attr-strength: #e8b6a6;
+$attr-endurance: #bde0b4;
+$attr-intellect: #c4b6ec;
+$attr-agility: #a1c2f7;
+$attr-dexterity: #f0d28a;
+$attr-luck: #8fded0;

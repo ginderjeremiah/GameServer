@@ -1,0 +1,287 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EAttribute, type IBattlerAttribute } from '$lib/api';
+
+// Mutable player-manager stand-in: `save()` reassigns `attributes` and bumps
+// `statPointsUsed`, so they are plain writable properties. `vi.hoisted` keeps it
+// initialised before the hoisted vi.mock factory runs.
+const { mockPlayerManager, mockPost, toastError, staticData } = vi.hoisted(() => ({
+	mockPlayerManager: {
+		attributes: [] as IBattlerAttribute[],
+		statPointsGained: 0,
+		statPointsUsed: 0
+	},
+	mockPost: vi.fn(),
+	toastError: vi.fn(),
+	// Reference data is intentionally absent so the view falls back to enum names.
+	staticData: { attributes: undefined as unknown }
+}));
+
+vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	class MockApiRequest {
+		post = mockPost;
+	}
+	return { ...actual, ApiRequest: MockApiRequest };
+});
+
+import {
+	AttributesView,
+	CORE_ATTRIBUTES,
+	DERIVED_STATS,
+	deriveStats,
+	perPointYields,
+	feedsFor,
+	derivedShortLabel,
+	derivedUnit,
+	attributeName
+} from '$routes/game/screens/attributes/attributes-view.svelte';
+
+const allFives = (): IBattlerAttribute[] => CORE_ATTRIBUTES.map((id) => ({ attributeId: id, amount: 5 }));
+
+const idx = {
+	str: CORE_ATTRIBUTES.indexOf(EAttribute.Strength),
+	end: CORE_ATTRIBUTES.indexOf(EAttribute.Endurance),
+	int: CORE_ATTRIBUTES.indexOf(EAttribute.Intellect),
+	agi: CORE_ATTRIBUTES.indexOf(EAttribute.Agility),
+	dex: CORE_ATTRIBUTES.indexOf(EAttribute.Dexterity),
+	luk: CORE_ATTRIBUTES.indexOf(EAttribute.Luck)
+};
+
+let view: AttributesView;
+
+beforeEach(() => {
+	mockPost.mockReset().mockResolvedValue({ status: 200, data: allFives() });
+	toastError.mockReset();
+	localStorage.clear();
+	mockPlayerManager.attributes = allFives();
+	mockPlayerManager.statPointsGained = 10;
+	mockPlayerManager.statPointsUsed = 0;
+	view = new AttributesView();
+});
+
+afterEach(() => view.dispose());
+
+/* ── pure derived-stat helpers (the real combat formulas) ─────────────────── */
+
+describe('deriveStats', () => {
+	it('matches the real BattleAttributes formulas for a zero build', () => {
+		const d = deriveStats([0, 0, 0, 0, 0, 0]);
+		expect(d[EAttribute.MaxHealth]).toBe(50);
+		expect(d[EAttribute.Defense]).toBe(2);
+		expect(d[EAttribute.CooldownRecovery]).toBe(0);
+	});
+
+	it('computes MaxHealth = 50 + 20*END + 5*STR', () => {
+		const values = [...CORE_ATTRIBUTES.map(() => 0)];
+		values[idx.str] = 10;
+		values[idx.end] = 20;
+		expect(deriveStats(values)[EAttribute.MaxHealth]).toBe(50 + 20 * 20 + 5 * 10);
+	});
+
+	it('only surfaces the derived stats the game actually computes', () => {
+		// The deprecated DropBonus and the unimplemented crit/dodge/block stats are
+		// intentionally excluded.
+		const ids = DERIVED_STATS.map((d) => d.id);
+		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(ids).not.toContain(EAttribute.DropBonus);
+		expect(ids).not.toContain(EAttribute.CriticalChance);
+	});
+});
+
+describe('perPointYields', () => {
+	const base = CORE_ATTRIBUTES.map(() => 5);
+
+	it('STR yields +5 Max Health per point', () => {
+		expect(perPointYields(idx.str, base)).toEqual([{ id: EAttribute.MaxHealth, delta: 5 }]);
+	});
+
+	it('END yields +20 Max Health and +1 Defense per point', () => {
+		expect(perPointYields(idx.end, base)).toEqual([
+			{ id: EAttribute.MaxHealth, delta: 20 },
+			{ id: EAttribute.Defense, delta: 1 }
+		]);
+	});
+
+	it('AGI yields +0.5 Defense and +0.4 Cooldown Recovery per point', () => {
+		expect(perPointYields(idx.agi, base)).toEqual([
+			{ id: EAttribute.Defense, delta: 0.5 },
+			{ id: EAttribute.CooldownRecovery, delta: 0.4 }
+		]);
+	});
+
+	it('DEX yields +0.1 Cooldown Recovery per point', () => {
+		expect(perPointYields(idx.dex, base)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.1 }]);
+	});
+
+	it('INT and LUK have no surfaced derived yield yet', () => {
+		expect(perPointYields(idx.int, base)).toEqual([]);
+		expect(perPointYields(idx.luk, base)).toEqual([]);
+	});
+});
+
+describe('feedsFor', () => {
+	it('reports the derived stats each attribute drives', () => {
+		expect(feedsFor(idx.str)).toEqual([EAttribute.MaxHealth]);
+		expect(feedsFor(idx.end)).toEqual([EAttribute.MaxHealth, EAttribute.Defense]);
+		expect(feedsFor(idx.agi)).toEqual([EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(feedsFor(idx.dex)).toEqual([EAttribute.CooldownRecovery]);
+		expect(feedsFor(idx.int)).toEqual([]);
+		expect(feedsFor(idx.luk)).toEqual([]);
+	});
+});
+
+describe('label helpers', () => {
+	it('provides compact labels and units for derived stats', () => {
+		expect(derivedShortLabel(EAttribute.MaxHealth)).toBe('HP');
+		expect(derivedShortLabel(EAttribute.CooldownRecovery)).toBe('CDR');
+		expect(derivedUnit(EAttribute.MaxHealth)).toBe('');
+	});
+
+	it('falls back to a normalised enum name when reference data is absent', () => {
+		expect(attributeName(EAttribute.MaxHealth)).toBe('Max Health');
+		expect(attributeName(EAttribute.Strength)).toBe('Strength');
+	});
+});
+
+/* ── AttributesView allocation model ──────────────────────────────────────── */
+
+describe('AttributesView initialization', () => {
+	it('seeds the baseline and budget from the player manager', () => {
+		expect(view.committed).toEqual([5, 5, 5, 5, 5, 5]);
+		expect(view.values).toEqual([5, 5, 5, 5, 5, 5]);
+		expect(view.savedAvailable).toBe(10);
+		expect(view.remaining).toBe(10);
+		expect(view.dirty).toBe(false);
+	});
+
+	it('defaults a missing allocation to 0', () => {
+		mockPlayerManager.attributes = [{ attributeId: EAttribute.Strength, amount: 7 }];
+		view = new AttributesView();
+		expect(view.committed[idx.str]).toBe(7);
+		expect(view.committed[idx.luk]).toBe(0);
+	});
+});
+
+describe('AttributesView allocation', () => {
+	it('increments an attribute and spends a point', () => {
+		view.inc(idx.str);
+		expect(view.values[idx.str]).toBe(6);
+		expect(view.remaining).toBe(9);
+		expect(view.dirty).toBe(true);
+		expect(view.changedCount).toBe(1);
+	});
+
+	it('blocks incrementing once the pool is empty', () => {
+		for (let n = 0; n < 10; n++) {
+			view.inc(idx.str);
+		}
+		expect(view.remaining).toBe(0);
+		expect(view.canInc()).toBe(false);
+		view.inc(idx.str);
+		expect(view.values[idx.str]).toBe(15); // unchanged by the blocked 11th point
+	});
+
+	it('allows refunding committed points down to zero (free reallocation)', () => {
+		// The backend permits moving points freely, so any attribute can be
+		// decremented below its saved value, refunding to the pool.
+		view.dec(idx.str);
+		expect(view.values[idx.str]).toBe(4);
+		expect(view.remaining).toBe(11);
+
+		for (let n = 0; n < 4; n++) {
+			view.dec(idx.str);
+		}
+		expect(view.values[idx.str]).toBe(0);
+		expect(view.canDec(idx.str)).toBe(false);
+		view.dec(idx.str);
+		expect(view.values[idx.str]).toBe(0);
+	});
+
+	it('discard reverts the draft to the baseline', () => {
+		view.inc(idx.str);
+		view.dec(idx.end);
+		view.discard();
+		expect(view.values).toEqual([5, 5, 5, 5, 5, 5]);
+		expect(view.dirty).toBe(false);
+	});
+
+	it('computes only the changed per-attribute deltas', () => {
+		view.inc(idx.str);
+		view.inc(idx.str);
+		view.dec(idx.agi);
+		expect(view.changedUpdates).toEqual([
+			{ attributeId: EAttribute.Strength, amount: 2 },
+			{ attributeId: EAttribute.Agility, amount: -1 }
+		]);
+	});
+
+	it('previews derived stats for the pending build', () => {
+		view.inc(idx.end); // +20 Max Health
+		expect(view.derived[EAttribute.MaxHealth] - view.savedDerived[EAttribute.MaxHealth]).toBe(20);
+	});
+});
+
+describe('AttributesView mode persistence', () => {
+	it('defaults to guided and persists the chosen mode', () => {
+		expect(view.mode).toBe('guided');
+		view.setMode('theory');
+		expect(view.mode).toBe('theory');
+		expect(localStorage.getItem('ttf.attr.mode')).toBe('theory');
+
+		const reopened = new AttributesView();
+		expect(reopened.mode).toBe('theory');
+		reopened.dispose();
+	});
+});
+
+describe('AttributesView.save', () => {
+	it('posts the deltas, applies the result, and clears dirty on success', async () => {
+		const serverResult: IBattlerAttribute[] = CORE_ATTRIBUTES.map((id) => ({
+			attributeId: id,
+			amount: id === EAttribute.Strength ? 6 : 5
+		}));
+		mockPost.mockResolvedValue({ status: 200, data: serverResult });
+
+		view.inc(idx.str);
+		await view.save();
+
+		expect(mockPost).toHaveBeenCalledTimes(1);
+		expect(mockPost).toHaveBeenCalledWith([{ attributeId: EAttribute.Strength, amount: 1 }]);
+		// Applied to the player manager so battles and other screens see it.
+		expect(mockPlayerManager.attributes).toBe(serverResult);
+		expect(mockPlayerManager.statPointsUsed).toBe(1);
+		expect(view.dirty).toBe(false);
+		expect(view.committed[idx.str]).toBe(6);
+		expect(view.remaining).toBe(9);
+		expect(view.saved).toBe(true);
+		expect(toastError).not.toHaveBeenCalled();
+	});
+
+	it('warns and keeps the changes when the server rejects the save', async () => {
+		mockPost.mockResolvedValue({ status: 500, data: undefined });
+		view.inc(idx.str);
+		await view.save();
+
+		expect(toastError).toHaveBeenCalledTimes(1);
+		expect(view.dirty).toBe(true);
+		expect(view.values[idx.str]).toBe(6);
+		expect(mockPlayerManager.statPointsUsed).toBe(0);
+	});
+
+	it('warns and keeps the changes when the request throws', async () => {
+		mockPost.mockRejectedValue(new Error('network'));
+		view.inc(idx.str);
+		await view.save();
+
+		expect(toastError).toHaveBeenCalledTimes(1);
+		expect(view.dirty).toBe(true);
+	});
+
+	it('does nothing when there are no changes', async () => {
+		await view.save();
+		expect(mockPost).not.toHaveBeenCalled();
+		expect(toastError).not.toHaveBeenCalled();
+	});
+});

@@ -133,5 +133,14 @@ $effect(() => {
 	--rarity-epic-glow: 0.54;
 	--rarity-legendary-glow: 0.72;
 	--rarity-mythic-glow: 0.9;
+
+	// Core-attribute accents (one per core EAttribute 0..5). Consumed via the
+	// helpers in $lib/common/attribute-display.
+	--attr-strength: #{colors.$attr-strength};
+	--attr-endurance: #{colors.$attr-endurance};
+	--attr-intellect: #{colors.$attr-intellect};
+	--attr-agility: #{colors.$attr-agility};
+	--attr-dexterity: #{colors.$attr-dexterity};
+	--attr-luck: #{colors.$attr-luck};
 }
 </style>

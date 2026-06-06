@@ -1,0 +1,111 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
+import { EAttribute, type IAttribute, type IBattlerAttribute } from '$lib/api';
+
+const { mockPlayerManager, mockPost, toastError, staticData } = vi.hoisted(() => ({
+	mockPlayerManager: {
+		attributes: [] as IBattlerAttribute[],
+		statPointsGained: 0,
+		statPointsUsed: 0
+	},
+	mockPost: vi.fn(),
+	toastError: vi.fn(),
+	staticData: { attributes: [] as IAttribute[] }
+}));
+
+vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	class MockApiRequest {
+		post = mockPost;
+	}
+	return { ...actual, ApiRequest: MockApiRequest };
+});
+
+import Attributes from '$routes/game/screens/attributes/Attributes.svelte';
+
+const refAttributes: IAttribute[] = [
+	{ id: EAttribute.Strength, name: 'Strength', description: '' },
+	{ id: EAttribute.Endurance, name: 'Endurance', description: '' },
+	{ id: EAttribute.Intellect, name: 'Intellect', description: '' },
+	{ id: EAttribute.Agility, name: 'Agility', description: '' },
+	{ id: EAttribute.Dexterity, name: 'Dexterity', description: '' },
+	{ id: EAttribute.Luck, name: 'Luck', description: '' },
+	{ id: EAttribute.MaxHealth, name: 'Max Health', description: '' },
+	{ id: EAttribute.Defense, name: 'Defense', description: '' },
+	{ id: EAttribute.CooldownRecovery, name: 'Cooldown Recovery', description: '' }
+];
+
+beforeEach(() => {
+	mockPost.mockReset().mockResolvedValue({ status: 200, data: [] });
+	toastError.mockReset();
+	localStorage.clear();
+	staticData.attributes = refAttributes;
+	mockPlayerManager.attributes = [
+		{ attributeId: EAttribute.Strength, amount: 5 },
+		{ attributeId: EAttribute.Endurance, amount: 5 },
+		{ attributeId: EAttribute.Intellect, amount: 5 },
+		{ attributeId: EAttribute.Agility, amount: 5 },
+		{ attributeId: EAttribute.Dexterity, amount: 5 },
+		{ attributeId: EAttribute.Luck, amount: 5 }
+	];
+	mockPlayerManager.statPointsGained = 8;
+	mockPlayerManager.statPointsUsed = 0;
+	// The radar reads prefers-reduced-motion to decide whether to animate; force
+	// the snap path so no rAF runs during the test.
+	window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+});
+
+afterEach(cleanup);
+
+describe('Attributes screen', () => {
+	it('renders the screen with the points budget', () => {
+		render(Attributes);
+		expect(screen.getByTestId('attributes-screen')).toBeTruthy();
+		expect(screen.getByText('Attributes')).toBeTruthy();
+		// 8 unspent points available, none pending.
+		expect(screen.getByText('8')).toBeTruthy();
+		expect(screen.getByText('No changes')).toBeTruthy();
+	});
+
+	it('spends a point when an attribute stepper is clicked', async () => {
+		render(Attributes);
+		const addButtons = screen.getAllByLabelText('Add a point', { exact: true });
+		expect(addButtons.length).toBe(6);
+
+		await fireEvent.click(addButtons[0]);
+
+		expect(screen.getByText('1 attribute changed')).toBeTruthy();
+	});
+
+	it('switches into theorycraft mode and reveals the derived-stats panel', async () => {
+		render(Attributes);
+		expect(screen.queryByText('Derived Stats')).toBeNull();
+
+		await fireEvent.click(screen.getByText('Theorycraft'));
+
+		expect(screen.getByText('Derived Stats')).toBeTruthy();
+		expect(screen.getByText('Max Health')).toBeTruthy();
+	});
+
+	it('persists the saved allocation deltas when Confirm is clicked', async () => {
+		mockPost.mockResolvedValue({
+			status: 200,
+			data: [
+				{ attributeId: EAttribute.Strength, amount: 6 },
+				{ attributeId: EAttribute.Endurance, amount: 5 },
+				{ attributeId: EAttribute.Intellect, amount: 5 },
+				{ attributeId: EAttribute.Agility, amount: 5 },
+				{ attributeId: EAttribute.Dexterity, amount: 5 },
+				{ attributeId: EAttribute.Luck, amount: 5 }
+			]
+		});
+		render(Attributes);
+
+		await fireEvent.click(screen.getAllByLabelText('Add a point', { exact: true })[0]);
+		await fireEvent.click(screen.getByText('Confirm'));
+
+		expect(mockPost).toHaveBeenCalledWith([{ attributeId: EAttribute.Strength, amount: 1 }]);
+	});
+});
