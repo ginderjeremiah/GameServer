@@ -20,26 +20,36 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
     - name: Install .NET Core
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v5
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
 
     - name: Build solution
       run: dotnet build
 
     - name: Execute full test suite
-      run: dotnet test
-      
+      # The build above already restored and compiled everything; reuse those binaries instead of
+      # letting `dotnet test` trigger a redundant restore + rebuild.
+      run: dotnet test --no-build --no-restore
+
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: test-results
+        name: backend-test-results
         path: '**/TestResults/'
 
   test-frontend:
@@ -50,37 +60,70 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
-        
+
+    - name: Set up Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: UI/new-svelte/package-lock.json
+
     - name: Install node modules
-      run: npm install
+      run: npm ci
 
     - name: Run ESLint
       run: npm run lint
 
     - name: Run unit tests
-      run: npm run test:unit
+      run: npm run test:unit:ci
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: test-results
+        name: frontend-test-results
         path: 'UI/new-svelte/unit-test-results.json'
 
   test-e2e:
     runs-on: ubuntu-latest
+    strategy:
+      # Run each browser as its own parallel job. Besides cutting wall-clock to roughly a single
+      # browser's runtime, this gives every browser project its own `playwright test` invocation,
+      # which tears down cleanly — the serial-loop workaround this replaces existed because running
+      # all three projects in one invocation intermittently left a worker hung at end-of-run teardown.
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Build API image
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: Game.Api/Dockerfile
+        tags: gameserver-api:ci
+        # Load the built image into the Docker daemon so `docker compose up` (without --build) reuses
+        # it via the `image:` tag in docker-compose.yml.
+        load: true
+        # Persist build layers in the GitHub Actions cache so the .NET restore/base-image layers are
+        # reused across runs. A single writer (chromium) updates the shared cache; the other browsers
+        # read it, which avoids concurrent cache-export races between the parallel matrix jobs.
+        cache-from: type=gha,scope=api
+        cache-to: ${{ matrix.browser == 'chromium' && 'type=gha,scope=api,mode=max' || '' }}
+
     - name: Start backing stack (API + Postgres + Redis)
-      run: docker compose up -d --build
+      run: docker compose up -d
 
     - name: Wait for the API to be ready
       run: |
@@ -113,33 +156,37 @@ jobs:
       run: docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-seed.sql
 
     - name: Set up Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: 22
+        cache: npm
+        cache-dependency-path: UI/new-svelte/package-lock.json
 
     - name: Install node modules
       working-directory: UI/new-svelte
-      run: npm install
+      run: npm ci
 
-    - name: Install Playwright browsers
+    - name: Cache Playwright browser
+      id: playwright-cache
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('UI/new-svelte/package-lock.json') }}
+
+    - name: Install Playwright browser
       working-directory: UI/new-svelte
-      run: npx playwright install --with-deps
+      # Only this job's browser is needed. On a cache hit the binaries are already present, so just
+      # (re)install the OS-level dependencies, which actions/cache can't carry. On a miss, install both.
+      run: |
+        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+          npx playwright install-deps ${{ matrix.browser }}
+        else
+          npx playwright install --with-deps ${{ matrix.browser }}
+        fi
 
     - name: Run Playwright e2e tests
       working-directory: UI/new-svelte
-      # Run each browser project as its own invocation. Running all three projects in a single
-      # `playwright test` run intermittently leaves a browser worker hung at end-of-run teardown,
-      # which Playwright only force-kills after a ~5-minute grace and so inflates the job; each
-      # project run on its own tears down cleanly. The exit code is aggregated so every browser
-      # still runs (and reports) even when an earlier one fails.
-      run: |
-        rc=0
-        for browser in chromium firefox webkit; do
-          echo "::group::Playwright ($browser)"
-          npx playwright test --project="$browser" || rc=1
-          echo "::endgroup::"
-        done
-        exit $rc
+      run: npx playwright test --project="${{ matrix.browser }}"
 
     - name: Dump container logs on failure
       if: failure()
@@ -151,7 +198,7 @@ jobs:
 
     - name: Upload Playwright report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: playwright-report
+        name: playwright-report-${{ matrix.browser }}
         path: UI/new-svelte/test-results

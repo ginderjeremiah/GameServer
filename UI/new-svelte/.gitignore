@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 /test-results
 /playwright-report
 /playwright/.cache
+
+# Vitest CI output (written by `npm run test:unit:ci`)
+/unit-test-results.json
