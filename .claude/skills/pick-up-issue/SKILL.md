@@ -46,7 +46,7 @@ Derive `owner`/`repo` from the origin remote (`git remote get-url origin`) rathe
 hardcoding — this skill should keep working if the repo is renamed or forked.
 
 List the open issues. The `claude` label is the priority signal, so pull those first; keep the
-rest as a fallback. `claude` is a *priority*, not a hard filter — only fall back to non-`claude`
+rest as a fallback. `claude` is a _priority_, not a hard filter — only fall back to non-`claude`
 issues if no `claude` one is eligible, unless the user explicitly says "claude only".
 
 ### 2. Exclude the ineligible
@@ -56,28 +56,27 @@ so trim the candidate list before ranking.
 
 **Already claimed — skip.** Either signal means skip:
 
-- *Open PR.* Detect it two ways, since neither alone is reliable here: run a search like
+- _Open PR._ Detect it two ways, since neither alone is reliable here: run a search like
   `repo:OWNER/REPO is:issue is:open -linked:pr` to drop issues GitHub has formally linked to a PR,
   and **also** list the open PRs and scan each title + body for issue references (`#N`,
   `closes/fixes/resolves #N`), treating any referenced still-open issue as taken. The second pass
   matters because this repo's PRs don't always use closing keywords.
-- *Existing assignee.* An issue already assigned to someone is being worked — that's exactly how
-  this skill claims its own pick (step 4). Skip it. (If it's assigned only to **you** from an
-  abandoned earlier attempt, you may resume it.)
+- _Existing assignee._ An issue already assigned to someone is being worked — that's exactly how
+  this skill claims its own pick (step 4). Skip it.
 
-**Blocked — but verify before excluding.** An issue often *mentions* a prerequisite that may since
+**Blocked — but verify before excluding.** An issue often _mentions_ a prerequisite that may since
 have been satisfied. Excluding on the keyword alone would bury work that's actually ready, so when
 you spot a prerequisite, go check its **real, current** status and only exclude if it's genuinely
 still outstanding:
 
-- *Prereq references an issue/PR* ("after #N", "blocked by #N", "depends on #N", "follow-up to #N"):
+- _Prereq references an issue/PR_ ("after #N", "blocked by #N", "depends on #N", "follow-up to #N"):
   look up #N. Closed or merged → prerequisite met, the issue is eligible. Still open → still blocked.
-- *Prereq described in prose* ("after proper JWTs are implemented", "needs bearer-token auth first"):
+- _Prereq described in prose_ ("after proper JWTs are implemented", "needs bearer-token auth first"):
   the prerequisite may have been delivered by other work this issue's body never references by
   number, so check the actual state — search the codebase for the feature, **and** scan closed
   issues / merged PRs for one that shipped it. Present in the code (or clearly delivered by
   completed work) → met → eligible. Clearly absent → blocked.
-- *Process / design prereq* ("mock the design first"): check the issue's comments, any linked
+- _Process / design prereq_ ("mock the design first"): check the issue's comments, any linked
   resources, and closed issues/PRs for a sign-off or artifact showing it's done. Evidence it's
   satisfied → eligible. If you can't find any, treat it as still blocked but **flag it** rather than
   silently dropping it — you may simply be missing context.
@@ -142,7 +141,7 @@ The goal is to avoid building the wrong thing without pestering the user over tr
 - **Clear, contained, one obvious approach** → state a brief plan (a few bullets) and proceed.
 - **Ambiguous, large/multi-part, or a real design fork** → surface the options and ask with
   `AskUserQuestion` (or plain questions) before writing code. Examples that warrant a decision:
-  an issue offering "remove *or* implement this", or one that explicitly asks you to "research a
+  an issue offering "remove _or_ implement this", or one that explicitly asks you to "research a
   better solution". For a large issue, propose what's in this PR vs. a follow-up and confirm the
   scope. For substantial changes, consider proposing a plan and waiting for sign-off.
 
