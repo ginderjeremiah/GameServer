@@ -84,8 +84,13 @@ A good review starts from the *problem*, not the diff. Pull, in this order:
 - **Prior review activity** — `get_reviews` and `get_review_comments` (the threads carry
   `isResolved` / `isOutdated` and their thread IDs, with the comments inside). If the PR already has
   reviews or threads, it's a **re-review** — gather this and then follow the incremental flow in
-  **Re-reviews** below. Resolve your own login with `get_me` so you can tell your threads from a
-  human reviewer's.
+  **Re-reviews** below.
+- **Your reviewer identity** — resolve your own GitHub login with `get_me`, up front. It decides
+  whether your verdict can gate at all: GitHub only accepts `APPROVE` / `REQUEST_CHANGES` when you
+  are **not** the PR's author. If `get_me` equals the author, your review can go out *only* as
+  `COMMENT`, so you'll state the intended verdict in the body (step 5) — settle that now rather than
+  discovering it at submit time. The same login is what tells your own review threads from a human
+  reviewer's on a re-review.
 
 Make sure you understand the full scope and the problem before you start judging the solution.
 
@@ -178,16 +183,16 @@ Tag every finding so the author can tell what's mandatory from what's optional:
   decline.
 - **Nit / suggestion** — minor; take it or leave it.
 
-Then map to a GitHub verdict (`event`):
+Then map to a GitHub verdict (`event`). **Identity decides this before your judgment does:** if you
+are the PR's author (the `get_me` check from step 2), GitHub won't accept a gating verdict on your
+own PR, so the `event` is **always `COMMENT`** — put your real call (approve / request changes) in
+the body so the intent is unambiguous. When you are *not* the author, map your judgment to the event:
 
 - **`REQUEST_CHANGES`** — there is at least one *blocking* finding.
 - **`APPROVE`** — no blocking findings. Should-fixes and nits are fine to approve over; just call
   them out so they're not lost.
-- **`COMMENT`** — reserve for when a verdict isn't appropriate or isn't possible: the PR is a
-  draft/WIP, you genuinely lack the context to judge, or you are the PR's own author (GitHub
-  rejects `APPROVE` / `REQUEST_CHANGES` on your own PR). In that self-author case, state the verdict
-  you *would* have given in the summary body so the intent is unambiguous. Don't use `COMMENT` to
-  dodge a clear call.
+- **`COMMENT`** — for a non-author, reserve this for when a real verdict isn't appropriate: the PR is
+  a draft/WIP, or you genuinely lack the context to judge. Don't use `COMMENT` to dodge a clear call.
 
 Be fair: don't manufacture blockers to look thorough, and don't approve over a real problem to be
 agreeable. Pre-existing issues outside this PR's scope are follow-ups (mention them) — not reasons
@@ -204,17 +209,17 @@ broader (architecture, a missing test file, cross-cutting concerns) in the summa
 2. **Add inline comments** — for each line-specific finding, `add_comment_to_pending_review` with
    `path`, `body`, `subjectType: "LINE"`, the `line`, `side: "RIGHT"` (use `LEFT` only for a removed
    line), and `startLine` for a multi-line range. The `line` is the file's **absolute line number in
-   the post-image** (the new version of the file), not a position within the diff — derive it by
-   reading the hunk's `@@ -a,b +c,d @@` header (`+c` is the first new-side line of that hunk) and
-   counting down to your target `+` line. Getting this wrong silently lands the comment on the wrong
-   line, so when a single line is ambiguous, prefer a small `startLine`–`line` range bracketing the
-   exact spot. Make each comment specific and actionable: what's wrong, why (cite the doc or rule),
-   and ideally how to fix it. If a point is about a line that isn't in the diff, skip the inline
-   comment and raise it in the summary.
+   the post-image** (the new version of the file), not a position within the diff. The reliable way
+   to get it: locate the target line in the head-version file you already fetched in step 2
+   (`get_file_contents` at `refs/pull/<N>/head`) and read its real line number — that's far less
+   error-prone than hand-counting a patch. Fall back to counting from the hunk's `@@ -a,b +c,d @@`
+   header (`+c` is the hunk's first new-side line) only when you don't have the file. Either way the
+   target must be an added/changed line that's part of the diff; when a single line is ambiguous,
+   prefer a small `startLine`–`line` range bracketing the exact spot. Make each comment specific and
+   actionable: what's wrong, why (cite the doc or rule), and ideally how to fix it. If a point is
+   about a line that isn't in the diff, skip the inline comment and raise it in the summary.
 3. **Submit** — `pull_request_review_write` with `method: "submit_pending"`, the `event` from
-   step 5, and a `body` that is the summary below. Caveat: GitHub rejects `APPROVE` /
-   `REQUEST_CHANGES` when the reviewer is the PR's own author — if that's the case, submit with
-   `event: "COMMENT"` and make the intended verdict explicit in the body (see step 5).
+   step 5 (already `COMMENT` if you're the author), and a `body` that is the summary below.
 
 If something fails midway (for example, a comment targets a line outside the diff), `delete_pending`
 and rebuild the review rather than leaving a half-finished pending review attached.
@@ -272,9 +277,9 @@ comments, posted through the normal review flow (step 6). Anything already raise
 existing thread or in the summary — never re-post it. The thread replies and resolves below are
 separate standalone calls, not part of the submitted review.
 
-**Handle the existing threads.** First resolve your own login with `get_me` so you can tell your
-threads from a human reviewer's, and skip any thread already marked `isResolved`. Then, for threads
-**you raised yourself**:
+**Handle the existing threads.** Using your own login (resolved in step 2), tell your threads from a
+human reviewer's, and skip any thread already marked `isResolved`. Then, for threads **you raised
+yourself**:
 
 - Reply with `add_reply_to_pull_request_comment` (it takes the *comment's* `commentId`, from the
   thread's comments) — a short status note: what the new commits fixed, or what's still needed.
