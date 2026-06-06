@@ -13,9 +13,11 @@ const config: PlaywrightTestConfig = {
 	// inherent to a shared live stack (a dropped hydration click, an auth/token blip under load).
 	timeout: 30000,
 	retries: process.env.CI ? 2 : 1,
+	fullyParallel: true,
 	use: {
 		baseURL: 'http://localhost:4173'
 	},
+	workers: process.env.CI ? 4 : undefined,
 	projects: [
 		{
 			name: 'chromium',
