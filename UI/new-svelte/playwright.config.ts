@@ -16,6 +16,11 @@ const config: PlaywrightTestConfig = {
 	fullyParallel: true,
 	use: {
 		baseURL: 'http://localhost:4173',
+		// Capture a full Playwright trace (DOM snapshots, network, console, every action) of the
+		// failed attempt whenever a test is retried. Traces land in the uploaded test-results
+		// artifact, so an intermittent CI flake can be opened in the trace viewer and root-caused
+		// instead of guessed at from log lines.
+		trace: 'on-first-retry',
 		// Emulate the OS "reduce motion" preference so the app's CSS transitions/animations collapse
 		// to ~0ms (see the reduced-motion block in styles/common.scss). This removes a class of
 		// flakiness where a click landed on a still-animating element — e.g. the hover-expand admin
