@@ -4,9 +4,9 @@ import { ELogType, type ILogPreference } from '$lib/api';
 // Mutable player-manager stand-in: `save()` reassigns `logPreferences`, so it is
 // a plain writable property (not a getter). `vi.hoisted` keeps it initialised
 // before the hoisted vi.mock factory runs.
-const { mockPlayerManager, mockPost, toastError } = vi.hoisted(() => ({
+const { mockPlayerManager, mockSendSocketCommand, toastError } = vi.hoisted(() => ({
 	mockPlayerManager: { logPreferences: [] as ILogPreference[] },
-	mockPost: vi.fn(),
+	mockSendSocketCommand: vi.fn(),
 	toastError: vi.fn()
 }));
 
@@ -23,12 +23,9 @@ vi.mock('$components', () => ({
 }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
-	// A real class so `new ApiRequest(...)` is constructable; `.post` delegates
-	// to the hoisted spy each test configures.
-	class MockApiRequest {
-		post = mockPost;
-	}
-	return { ...actual, ApiRequest: MockApiRequest };
+	// `save()` persists through the WebSocket command; the spy each test configures
+	// stands in for the live socket.
+	return { ...actual, apiSocket: { sendSocketCommand: mockSendSocketCommand } };
 });
 
 import { OptionsView, LOG_TYPES } from '$routes/game/screens/options/options-view.svelte';
@@ -38,7 +35,7 @@ const allEnabled = (): ILogPreference[] => LOG_TYPES.map((lt) => ({ id: lt.id, e
 let view: OptionsView;
 
 beforeEach(() => {
-	mockPost.mockReset().mockResolvedValue({ status: 200 });
+	mockSendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
 	mockPlayerManager.logPreferences = allEnabled();
 	view = new OptionsView();
@@ -135,12 +132,12 @@ describe('OptionsView.changedPreferences', () => {
 });
 
 describe('OptionsView.save', () => {
-	it('posts only the changed preferences, applies them, and clears dirty on success', async () => {
+	it('sends only the changed preferences, applies them, and clears dirty on success', async () => {
 		view.setOne(ELogType.Damage, false);
 		await view.save();
 
-		expect(mockPost).toHaveBeenCalledTimes(1);
-		expect(mockPost).toHaveBeenCalledWith([{ id: ELogType.Damage, enabled: false }]);
+		expect(mockSendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(mockSendSocketCommand).toHaveBeenCalledWith('SaveLogPreferences', [{ id: ELogType.Damage, enabled: false }]);
 		// applied to the player manager so the live log filter reflects the change
 		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Damage)?.enabled).toBe(false);
 		expect(view.isDirty).toBe(false);
@@ -149,7 +146,7 @@ describe('OptionsView.save', () => {
 	});
 
 	it('still applies locally but warns when the server rejects the save', async () => {
-		mockPost.mockResolvedValue({ status: 500 });
+		mockSendSocketCommand.mockResolvedValue({ error: 'Unknown log type.' });
 		view.setOne(ELogType.Exp, false);
 		await view.save();
 
@@ -160,7 +157,7 @@ describe('OptionsView.save', () => {
 	});
 
 	it('applies locally and warns when the request throws', async () => {
-		mockPost.mockRejectedValue(new Error('network'));
+		mockSendSocketCommand.mockRejectedValue(new Error('network'));
 		view.setOne(ELogType.Exp, false);
 		await view.save();
 
@@ -171,7 +168,7 @@ describe('OptionsView.save', () => {
 	it('does nothing when there are no changes', async () => {
 		await view.save();
 
-		expect(mockPost).not.toHaveBeenCalled();
+		expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		expect(toastError).not.toHaveBeenCalled();
 	});
 

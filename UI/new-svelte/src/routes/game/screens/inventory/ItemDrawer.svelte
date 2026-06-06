@@ -1,7 +1,7 @@
 <div class="drawer-header" style:border-left-color={accent}>
 	<div class="header-top">
-		<span class="cat-diamond" style:background={accent} style:box-shadow="0 0 6px {accent}aa"></span>
-		<span class="cat-label" style:color={accent}>{catName(item.itemCategoryId)}</span>
+		<span class="cat-diamond" style:background={accent} style:box-shadow="0 0 6px {tintColor(accent, 0.67)}"></span>
+		<span class="cat-label" style:color={accent}>{itemCategoryName(item.itemCategoryId)}</span>
 		<span class="rarity-tag">
 			<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
 			></span>
@@ -45,12 +45,12 @@
 import StatList from './StatList.svelte';
 import ModSlots from './ModSlots.svelte';
 import { BattleAttributes, type Item } from '$lib/battle';
-import { rarityColor, rarityLabel, rarityTint } from '$lib/common';
-import { catAccent, catName, type InventoryView } from './inventory-view.svelte';
+import { itemCategoryColor, itemCategoryName, rarityColor, rarityLabel, rarityTint, tintColor } from '$lib/common';
+import { type InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
 
-const accent = $derived(catAccent(item.itemCategoryId));
+const accent = $derived(itemCategoryColor(item.itemCategoryId));
 const rc = $derived(rarityColor(item.rarityId));
 const equipped = $derived(item.equipmentSlotId != null);
 
@@ -64,7 +64,7 @@ const stats = $derived(
 <style lang="scss">
 .drawer-header {
 	padding: 16px 18px 14px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	border-bottom: 1px solid var(--border-subtle);
 	border-left: 3px solid;
 }
 
@@ -112,7 +112,7 @@ const stats = $derived(
 .close {
 	border: none;
 	background: transparent;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	cursor: pointer;
 	font-size: 16px;
 	line-height: 1;
@@ -124,7 +124,7 @@ const stats = $derived(
 	font-size: 18px;
 	font-weight: 400;
 	letter-spacing: -0.2px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 }
 
 .drawer-body {
@@ -149,25 +149,25 @@ const stats = $derived(
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .line {
 	flex: 1;
 	height: 1px;
-	background: rgba(255, 255, 255, 0.08);
+	background: var(--border-subtle);
 }
 
 .description {
 	font-size: 11.5px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	line-height: 1.55;
 }
 
 .drawer-footer {
 	padding: 16px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid var(--border-subtle);
 }
 
 .equip-button {
@@ -177,9 +177,9 @@ const stats = $derived(
 	font-size: 12.5px;
 	font-weight: 500;
 	cursor: pointer;
-	background: rgba(161, 194, 247, 0.16);
-	color: #a1c2f7;
-	border: 1px solid rgba(161, 194, 247, 0.55);
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	color: var(--accent);
+	border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
 	border-radius: 2px;
 	transition: all 120ms;
 	display: flex;
@@ -188,16 +188,16 @@ const stats = $derived(
 	gap: 8px;
 
 	&:hover {
-		background: rgba(161, 194, 247, 0.24);
+		background: color-mix(in srgb, var(--accent) 24%, transparent);
 	}
 
 	&.equipped {
 		background: transparent;
-		color: #f0a094;
-		border-color: rgba(240, 160, 148, 0.5);
+		color: var(--error);
+		border-color: color-mix(in srgb, var(--error) 50%, transparent);
 
 		&:hover {
-			background: rgba(240, 160, 148, 0.16);
+			background: color-mix(in srgb, var(--error) 16%, transparent);
 		}
 	}
 }

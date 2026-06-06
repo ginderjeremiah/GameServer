@@ -63,6 +63,16 @@ namespace Game.Application.Services
             return true;
         }
 
+        public async Task SaveLogPreferences(Player player, IEnumerable<LogPreference> preferences)
+        {
+            foreach (var preference in preferences)
+            {
+                player.UpdateLogPreference(preference.LogType, preference.Enabled);
+            }
+
+            await _playerRepo.SavePlayer(player);
+        }
+
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
             var modEntity = _itemMods.LookupItemMod(itemModId);

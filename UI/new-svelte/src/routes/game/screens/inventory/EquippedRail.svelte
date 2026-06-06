@@ -79,8 +79,8 @@ const handleDrop = (slotId: number) => {
 	flex-shrink: 0;
 	display: flex;
 	flex-direction: column;
-	background: rgba(20, 21, 27, 0.5);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--surface) 50%, transparent);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
 	padding: 16px;
 	position: relative;
@@ -98,7 +98,7 @@ const handleDrop = (slotId: number) => {
 	height: 5px;
 	transform: rotate(45deg);
 	background: var(--accent);
-	box-shadow: 0 0 6px rgba(161, 194, 247, 0.7);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
 	flex-shrink: 0;
 }
 
@@ -107,13 +107,13 @@ const handleDrop = (slotId: number) => {
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .line {
 	flex: 1;
 	height: 1px;
-	background: rgba(255, 255, 255, 0.08);
+	background: var(--border-subtle);
 }
 
 .rail-body {
@@ -131,7 +131,7 @@ const handleDrop = (slotId: number) => {
 	font-size: 9px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 .group-slots {
@@ -143,7 +143,7 @@ const handleDrop = (slotId: number) => {
 .loadout-footer {
 	margin-top: 14px;
 	padding-top: 14px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid var(--border-subtle);
 }
 
 .loadout-button {
@@ -151,9 +151,9 @@ const handleDrop = (slotId: number) => {
 	padding: 7px 0;
 	font-family: Geist, sans-serif;
 	font-size: 11.5px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	background: transparent;
-	border: 1px dashed rgba(255, 255, 255, 0.14);
+	border: 1px dashed var(--border-light);
 	border-radius: 2px;
 	cursor: not-allowed;
 }

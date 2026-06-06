@@ -11,7 +11,7 @@
 				<div
 					class="tt-category-diamond"
 					style:background={accentColor}
-					style:box-shadow="0 0 6px {accentColor}aa"
+					style:box-shadow="0 0 6px {tintColor(accentColor, 0.67)}"
 				></div>
 				<span class="tt-category-label" style:color={accentColor}>{categoryName}</span>
 				{#if item.equipped}
@@ -53,17 +53,17 @@
 					<div class="tt-mods-list">
 						{#each modSlots as slot (slot.slotId)}
 							{#if slot.mod}
-								<div class="tt-mod-tile" style:border-left-color={modTypeAccent(slot.type)}>
+								<div class="tt-mod-tile" style:border-left-color={modTypeColor(slot.type)}>
 									<div class="tt-mod-header">
 										<span class="tt-mod-name" style:color={rarityColor(slot.mod.rarityId)}>{slot.mod.name}</span>
-										<span class="tt-mod-type" style:color={modTypeAccent(slot.type)}>{modTypeLabel(slot.type)}</span>
+										<span class="tt-mod-type" style:color={modTypeColor(slot.type)}>{modTypeLabel(slot.type)}</span>
 									</div>
 									<div class="tt-mod-desc">{slot.mod.description}</div>
 								</div>
 							{:else}
-								<div class="tt-mod-empty" style:border-left-color={modTypeAccent(slot.type)}>
+								<div class="tt-mod-empty" style:border-left-color={modTypeColor(slot.type)}>
 									<span class="tt-mod-empty-label">Empty slot</span>
-									<span class="tt-mod-type" style:color={modTypeAccent(slot.type)}>{modTypeLabel(slot.type)}</span>
+									<span class="tt-mod-type" style:color={modTypeColor(slot.type)}>{modTypeLabel(slot.type)}</span>
 								</div>
 							{/if}
 						{/each}
@@ -86,9 +86,8 @@
 </div>
 
 <script lang="ts">
-import { EItemCategory, EItemModType } from '$lib/api';
 import type { Item } from '$lib/battle';
-import { rarityColor } from '$lib/common';
+import { itemCategoryColor, itemCategoryName, modTypeColor, modTypeLabel, rarityColor, tintColor } from '$lib/common';
 
 export const getBaseNode = () => container;
 
@@ -112,43 +111,20 @@ const modSlots = $derived(
 );
 const filledCount = $derived(modSlots.filter((s) => s.mod).length);
 
-const CATEGORY_ACCENT: Record<number, string> = {
-	[EItemCategory.Helm]: '#a1c2f7',
-	[EItemCategory.Chest]: '#a1c2f7',
-	[EItemCategory.Leg]: '#a1c2f7',
-	[EItemCategory.Boot]: '#a1c2f7',
-	[EItemCategory.Weapon]: '#e08778',
-	[EItemCategory.Accessory]: '#e8c878'
-};
-
-const accentColor = $derived(CATEGORY_ACCENT[item?.itemCategoryId ?? 0] ?? '#a1c2f7');
-const categoryName = $derived(EItemCategory[item?.itemCategoryId ?? 0] ?? 'Item');
-
-const modTypeAccent = (modType: number) =>
-	({
-		[EItemModType.Component]: 'rgba(240, 240, 240, 0.55)',
-		[EItemModType.Prefix]: '#9bc7d9',
-		[EItemModType.Suffix]: '#c0a8e6'
-	})[modType] ?? 'rgba(240, 240, 240, 0.55)';
-
-const modTypeLabel = (modType: number) =>
-	({
-		[EItemModType.Component]: 'Component',
-		[EItemModType.Prefix]: 'Prefix',
-		[EItemModType.Suffix]: 'Suffix'
-	})[modType] ?? '';
+const accentColor = $derived(item ? itemCategoryColor(item.itemCategoryId) : 'var(--category-armor)');
+const categoryName = $derived(item ? itemCategoryName(item.itemCategoryId) : 'Item');
 </script>
 
 <style lang="scss">
 .item-tooltip {
 	width: 280px;
 	border-radius: 3px;
-	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
 }
 
 .tt-title-section {
 	padding: 14px 16px 12px;
-	border-bottom: 1px solid rgba(240, 240, 240, 0.08);
+	border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .tt-category-row {
@@ -177,14 +153,14 @@ const modTypeLabel = (modType: number) =>
 	align-items: center;
 	gap: 6px;
 	padding: 2px 8px;
-	background: rgba(189, 224, 180, 0.1);
-	border: 1px solid rgba(189, 224, 180, 0.45);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+	border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
 	border-radius: 2px;
 
 	span {
 		font-family: var(--mono);
 		font-size: 9px;
-		color: #bde0b4;
+		color: var(--success);
 		letter-spacing: 1.2px;
 		text-transform: uppercase;
 	}
@@ -194,14 +170,14 @@ const modTypeLabel = (modType: number) =>
 	width: 5px;
 	height: 5px;
 	border-radius: 50%;
-	background: #bde0b4;
-	box-shadow: 0 0 4px rgba(189, 224, 180, 0.9);
+	background: var(--success);
+	box-shadow: 0 0 4px color-mix(in srgb, var(--success) 90%, transparent);
 }
 
 .tt-item-name {
 	font-size: 18px;
 	font-weight: 400;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	letter-spacing: -0.2px;
 	line-height: 1.15;
 }
@@ -223,7 +199,7 @@ const modTypeLabel = (modType: number) =>
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	margin-bottom: 7px;
 	display: flex;
 	align-items: center;
@@ -233,7 +209,7 @@ const modTypeLabel = (modType: number) =>
 .tt-section-line {
 	flex: 1;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.06);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
 .tt-stats-grid {
@@ -244,7 +220,7 @@ const modTypeLabel = (modType: number) =>
 
 	.tt-stat-name {
 		font-size: 12px;
-		color: rgba(240, 240, 240, 0.78);
+		color: var(--text-secondary);
 	}
 
 	.tt-stat-value {
@@ -252,13 +228,13 @@ const modTypeLabel = (modType: number) =>
 		font-size: 11.5px;
 		letter-spacing: 0.3px;
 		text-align: right;
-		color: rgba(240, 240, 240, 0.7);
+		color: color-mix(in srgb, var(--text-primary) 70%, transparent);
 
 		&.positive {
-			color: #bde0b4;
+			color: var(--success);
 		}
 		&.negative {
-			color: #f0a094;
+			color: var(--error);
 		}
 	}
 }
@@ -271,13 +247,13 @@ const modTypeLabel = (modType: number) =>
 
 .tt-mod-tile {
 	padding: 6px 10px;
-	background: rgba(255, 255, 255, 0.03);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
 	border-left: 2px solid;
 }
 
 .tt-mod-empty {
 	padding: 6px 10px;
-	border: 1px dashed rgba(255, 255, 255, 0.14);
+	border: 1px dashed var(--border-light);
 	border-left: 2px solid;
 	display: flex;
 	align-items: center;
@@ -287,7 +263,7 @@ const modTypeLabel = (modType: number) =>
 .tt-mod-empty-label {
 	font-size: 11.5px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 }
 
 .tt-mod-header {
@@ -300,7 +276,7 @@ const modTypeLabel = (modType: number) =>
 .tt-mod-name {
 	font-size: 12px;
 	font-weight: 500;
-	color: #f0f0f0;
+	color: var(--text-primary);
 }
 
 .tt-mod-type {
@@ -312,14 +288,14 @@ const modTypeLabel = (modType: number) =>
 
 .tt-mod-desc {
 	font-size: 11.5px;
-	color: rgba(240, 240, 240, 0.65);
+	color: color-mix(in srgb, var(--text-primary) 65%, transparent);
 	line-height: 1.5;
 }
 
 .tt-description {
 	font-size: 11.5px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.6);
+	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
 	line-height: 1.55;
 }
 </style>

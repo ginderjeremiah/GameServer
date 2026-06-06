@@ -171,6 +171,47 @@ namespace Game.Core.Tests.Players
             Assert.Equal(5, evt.ItemModId);
         }
 
+        // ── UpdateLogPreference ──────────────────────────────────────────────
+
+        [Fact]
+        public void UpdateLogPreference_NewType_AddsPreference()
+        {
+            var player = MakePlayer();
+
+            player.UpdateLogPreference(ELogType.Damage, false);
+
+            var pref = player.LogPreferences.SingleOrDefault(p => p.LogType == ELogType.Damage);
+            Assert.NotNull(pref);
+            Assert.False(pref.Enabled);
+        }
+
+        [Fact]
+        public void UpdateLogPreference_ExistingType_UpdatesInPlace()
+        {
+            var player = MakePlayer();
+            player.LogPreferences.Add(new LogPreference { LogType = ELogType.Damage, Enabled = true });
+
+            player.UpdateLogPreference(ELogType.Damage, false);
+
+            var pref = Assert.Single(player.LogPreferences);
+            Assert.Equal(ELogType.Damage, pref.LogType);
+            Assert.False(pref.Enabled);
+        }
+
+        [Fact]
+        public void UpdateLogPreference_RaisesLogPreferenceChangedEvent()
+        {
+            var player = MakePlayer();
+
+            player.UpdateLogPreference(ELogType.Debug, true);
+
+            var evt = player.DomainEvents.OfType<LogPreferenceChangedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(ELogType.Debug, evt.LogType);
+            Assert.True(evt.Enabled);
+        }
+
         // ── RecordBattleCompleted ────────────────────────────────────────────
 
         [Fact]
