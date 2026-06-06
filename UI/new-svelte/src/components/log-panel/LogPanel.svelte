@@ -59,7 +59,7 @@ $effect(() => {
 <style lang="scss">
 .log-panel {
 	border-top: 1px solid var(--border-subtle);
-	background: rgba(0, 0, 0, 0.4);
+	background: color-mix(in srgb, var(--black) 40%, transparent);
 	padding: 10px 8px 4px;
 	position: relative;
 	display: flex;
@@ -78,20 +78,20 @@ $effect(() => {
 	font-size: 9.5px;
 	letter-spacing: 1.5px;
 	text-transform: uppercase;
-	color: rgba(192, 216, 255, 0.7);
+	color: var(--eyebrow);
 }
 
 .log-divider {
 	flex: 1;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.07);
+	background: color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 .log-count {
 	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 }
 
 .log-body {
@@ -103,14 +103,14 @@ $effect(() => {
 	mask-image: linear-gradient(to bottom, black 0%, black 78%, transparent 100%);
 	-webkit-mask-image: linear-gradient(to bottom, black 0%, black 78%, transparent 100%);
 	scrollbar-width: thin;
-	scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+	scrollbar-color: color-mix(in srgb, var(--white) 16%, transparent) transparent;
 
 	&::-webkit-scrollbar {
 		width: 6px;
 	}
 
 	&::-webkit-scrollbar-thumb {
-		background: rgba(255, 255, 255, 0.16);
+		background: color-mix(in srgb, var(--white) 16%, transparent);
 		border-radius: 3px;
 	}
 
@@ -124,6 +124,6 @@ $effect(() => {
 	font-family: var(--mono);
 	font-size: 11px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.35);
+	color: color-mix(in srgb, var(--text-primary) 35%, transparent);
 }
 </style>

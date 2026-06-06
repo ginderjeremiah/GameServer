@@ -11,11 +11,27 @@ export interface LogKind {
 	label: string;
 }
 
-const PLAYER = '#c0d8ff';
-const ENEMY = '#e8b6a6';
-const LOOT = '#bde0b4';
-const REWARD = '#f0d28a';
-const SYSTEM = 'rgba(240, 240, 240, 0.7)';
+/**
+ * The semantic combat-log palette. The actual colours live in the root CSS
+ * variables (`--log-*`, defined in `+layout.svelte`) so they are themeable and
+ * configurable in one place; these are just `var(...)` references. Reused by the
+ * Options screen's log-type rows and live preview so both stay in sync with the
+ * real log. Each value is valid wherever a colour is — SVG `stroke`, a CSS
+ * `color`, or inside `color-mix(...)`.
+ */
+export const logColors = {
+	player: 'var(--log-player)',
+	enemy: 'var(--log-enemy)',
+	loot: 'var(--log-loot)',
+	reward: 'var(--log-reward)',
+	system: 'var(--log-system)'
+} as const;
+
+const PLAYER = logColors.player;
+const ENEMY = logColors.enemy;
+const LOOT = logColors.loot;
+const REWARD = logColors.reward;
+const SYSTEM = logColors.system;
 
 /**
  * Maps a {@link LogMessage} to its visual treatment for the sliding manifest.

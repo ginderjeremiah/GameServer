@@ -26,6 +26,9 @@ $hp-green-dark: #5da66a;
 $hp-red-bg: rgba(224, 138, 120, 0.18);
 $hp-red-disappearing: rgba(224, 138, 120, 0.55);
 $enemy-accent: #e08778;
+// combat-log "incoming"/enemy hue — a softer salmon than $enemy-accent, used by
+// the log palette for damage-taken and status lines.
+$log-enemy: #e8b6a6;
 $mod-component: rgba(240, 240, 240, 0.55);
 $mod-prefix: #9bc7d9;
 $mod-suffix: #c0a8e6;

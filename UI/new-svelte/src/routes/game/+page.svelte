@@ -47,7 +47,7 @@ const screens: ScreenDef[] = [
 	{ key: 'inventory', label: 'Inventory', group: 'character', built: true },
 	{ key: 'attributes', label: 'Attributes', group: 'character', built: false },
 	{ key: 'stats', label: 'Stats', group: 'character', built: false },
-	{ key: 'options', label: 'Options', group: 'settings', built: false },
+	{ key: 'options', label: 'Options', group: 'settings', built: true },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
 	{ key: 'admin', label: 'Admin', group: 'admin', built: true }
@@ -60,7 +60,7 @@ const screenKeyMap: Record<string, GameScreen> = {
 	inventory: 'Inventory',
 	attributes: 'PlaceholderScreen',
 	stats: 'PlaceholderScreen',
-	options: 'PlaceholderScreen',
+	options: 'Options',
 	help: 'PlaceholderScreen'
 };
 

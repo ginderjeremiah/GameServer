@@ -75,12 +75,28 @@ $effect(() => {
 	--text-tertiary: #{colors.$text-tertiary};
 	--text-muted: #{colors.$text-muted};
 	--text-on-accent: #{colors.$text-on-accent};
+	// Base neutrals — the opaque white/black that the translucent line/fill blends
+	// (color-mix(in srgb, var(--white|--black) N%, transparent)) flow from.
+	--white: #{colors.$white};
+	--black: #{colors.$black};
 	--border-subtle: #{colors.$border-subtle};
 	--border-light: #{colors.$border-light};
 	--border-medium: #{colors.$border-medium};
 	--success: #{colors.$success};
 	--warning: #{colors.$warning};
 	--enemy-accent: #{colors.$enemy-accent};
+
+	// Combat-log palette — semantic colours for log messages, shared by the log
+	// panel, the options live preview, and the per-type rows (via `logColors` in
+	// log-kind.ts). Most reuse a base token; only the softer enemy hue is its own.
+	--log-player: var(--accent-light);
+	--log-enemy: #{colors.$log-enemy};
+	--log-loot: var(--success);
+	--log-reward: var(--warning);
+	--log-system: color-mix(in srgb, var(--text-primary) 70%, transparent);
+	// Mono section-label / eyebrow accent (a muted accent-light), used across the
+	// log + options screens.
+	--eyebrow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
 	// Item-mod-type accents. Consumed via the helpers in $lib/common/item-display.
 	--mod-component: #{colors.$mod-component};
