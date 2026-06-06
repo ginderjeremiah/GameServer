@@ -132,6 +132,8 @@ namespace Game.Core.Tests.Progress
             // A boss victory clears the player's current zone, tracked globally and per-zone.
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
+            // A different zone is unaffected — per-zone isolation.
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 5));
         }
 
         [Fact]
