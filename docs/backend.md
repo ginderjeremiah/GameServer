@@ -31,6 +31,8 @@ Reference data in this app can be split into 2 categories: intrinsic and static.
 
 The backend uses a mix of HTTP and WebSockets for communication with the frontend. Right now, HTTP is used for some operations and data fetching, while WebSockets are used for real-time communication such as battle updates. In the future, the goal is to move towards using WebSockets for all communication (other than login/account creation) between the frontend and backend, as this will also enable the Player state to be kept in-memory on the backend and updated in real-time without having to worry about synchronizing with the redis cache or db. Users will only be able to connect to one instance at a time for simplicity and any websocket commands will be handled sequentially for each player. However, HTTP will still be used for admin tools and other operations that are not directly related to the core game.
 
+As a step in that direction, the read-only reference data the loading screen needs (zones, enemies, items, skills, item mods, attributes, challenges, challenge types) is exposed over the socket via `Get*` commands (`Game.Api/Sockets/Commands`) that mirror the corresponding `GET` endpoints. These share the `AbstractReferenceDataCommand<TModel>` base, which wraps each repository/intrinsic collection in an `ApiSocketResponse<IEnumerable<TModel>>`. The duplicate HTTP endpoints and the frontend's switch to these commands are intentionally deferred to a follow-up so the migration can land incrementally.
+
 ## Caching and Pub/Sub
 
 As mentioned above, most of the reference data is cached in-memory on the backend for fast access. However, player data is cached in Redis and uses a write-behind caching strategy where the cache is the source of truth for player data, and changes are persisted to the database asynchronously. The application uses Redis pub/sub to trigger persistence of player data to the database whenever it changes and as a backplane for WebSocket communication.
@@ -72,6 +74,21 @@ Authenticated users are gated out of the admin tooling unless they hold the `Adm
   - **Archive = soft delete that frees the username.** An archived user is excluded from login (`IUsers.GetUser`), from username-availability checks (`IUsers.CheckIfUsernameExists`, which gates account creation), and from the admin roster (`SearchUsers`/`CountUsers`). Because the username check ignores archived rows, the username becomes available for a brand-new account — there is intentionally **no DB unique index** on `Username`, so an archived row and a new active row can share a username; the active one is the single non-archived match the queries resolve to.
   - **Ban = block while keeping the username reserved.** A banned user still counts toward username availability (so the name cannot be reused) and remains visible in the admin roster for later management. Surfacing the ban to the user at login time is intentionally out of scope for now.
 - **Role changes take effect on next login.** As noted under [Access Roles and Admin Authorization](#access-roles-and-admin-authorization), roles live in the signed auth token, so a `SetUserRoles` change is reflected only after the affected user logs in again.
+
+## Standalone TypeScript codegen
+
+The reflection-based code generator (`Game.Api/CodeGen/ApiCodeGenerator`) that emits the frontend's TypeScript API client only needs the API **assembly** — it inspects controller/socket-command type metadata and writes `.ts` files, with no database, cache, or DI graph involved. Historically it was reachable only as a side effect of running the API in `Development`, so regenerating types meant standing up the full web host (and its Postgres/Redis dependencies), which is awkward in CI and impossible in restricted environments.
+
+It is now also runnable as a standalone command that exits before the web host is built:
+
+```
+dotnet run --project Game.Api -- codegen [outputDirectory]
+```
+
+- **`CodeGenCommand`** (intercepted at the top of `Startup.Main`, before `WebApplication.CreateBuilder`) builds a throwaway console `ILogger`, resolves the target directory, runs `ApiCodeGenerator.GenerateCode`, and returns. Because it short-circuits before host construction, it is independent of `ASPNETCORE_ENVIRONMENT` and never touches an out-of-process dependency. An explicit output directory may be passed; otherwise it defaults to the committed frontend location.
+- **`CodeGenPaths`** centralizes path resolution so the dev-startup hook and the standalone command compute the same target directory. The default directory is found by walking up from the running assembly to the repository root (the directory containing `Game.sln`) and appending the canonical `UI/new-svelte/src/lib/api/types` segments. Resolving the root from the assembly rather than the current working directory keeps the command location-independent (the dev hook continues to derive the root from `ContentRootPath`).
+
+The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch DTO/client drift.
 
 ## Integration-Test Containers in Constrained Environments
 

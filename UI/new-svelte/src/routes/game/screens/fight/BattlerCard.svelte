@@ -2,7 +2,7 @@
 	<!-- Name + Level -->
 	<div class="battler-header" class:reversed={side === 'enemy'}>
 		<div class="battler-identity" class:reversed={side === 'enemy'}>
-			<div class="accent-bar" style:background={accent} style:box-shadow="0 0 8px {accent}80"></div>
+			<div class="accent-bar" style:background={accent} style:box-shadow="0 0 8px {tintColor(accent, 0.5)}"></div>
 			<span class="battler-name">{battler.name}</span>
 		</div>
 		<span class="battler-level">LV · {battler.level}</span>
@@ -22,7 +22,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
-import { formatNum } from '$lib/common';
+import { formatNum, tintColor } from '$lib/common';
 import Skills from './Skills.svelte';
 
 type Props = {
@@ -32,7 +32,7 @@ type Props = {
 
 const { battler, side }: Props = $props();
 
-const accent = $derived(side === 'player' ? '#a1c2f7' : '#e08778');
+const accent = $derived(side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 const healthText = $derived(`${formatNum(battler.currentHealth)} / ${maxHealth}`);
 const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100);
@@ -40,27 +40,27 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 
 <style lang="scss">
 .battler-card {
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid var(--border-light);
 	border-radius: 3px;
 	padding: 18px 20px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	width: 360px;
 	min-width: 200px;
 	flex-shrink: 1;
 
 	&.player {
-		border-left: 3px solid #a1c2f7;
+		border-left: 3px solid var(--accent);
 		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.4),
-			-4px 0 18px rgba(161, 194, 247, 0.1);
+			0 0 0 1px color-mix(in srgb, var(--black) 40%, transparent),
+			-4px 0 18px color-mix(in srgb, var(--accent) 10%, transparent);
 	}
 
 	&.enemy {
-		border-right: 3px solid #e08778;
+		border-right: 3px solid var(--enemy-accent);
 		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.4),
-			4px 0 18px rgba(224, 135, 120, 0.1);
+			0 0 0 1px color-mix(in srgb, var(--black) 40%, transparent),
+			4px 0 18px color-mix(in srgb, var(--enemy-accent) 10%, transparent);
 	}
 }
 
@@ -99,15 +99,15 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 .battler-level {
 	font-family: var(--mono);
 	font-size: 10.5px;
-	color: rgba(240, 240, 240, 0.6);
+	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
 	letter-spacing: 0.6px;
 }
 
 .hp-bar {
 	position: relative;
 	height: 20px;
-	background: rgba(224, 138, 120, 0.18);
-	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: var(--health-missing-color);
+	border: 1px solid color-mix(in srgb, var(--white) 12%, transparent);
 	border-radius: 2px;
 	overflow: hidden;
 	margin-bottom: 14px;
@@ -116,14 +116,14 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 .hp-disappearing {
 	position: absolute;
 	inset: 0;
-	background: rgba(224, 138, 120, 0.55);
+	background: var(--health-disappearing-color);
 	transition: width 1s ease-out;
 }
 
 .hp-remaining {
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(180deg, #7fc28b 0%, #5da66a 100%);
+	background: linear-gradient(180deg, var(--health-remaining-color) 0%, var(--health-remaining-dark) 100%);
 	transition: width 120ms ease-out;
 }
 
@@ -135,8 +135,8 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 	justify-content: center;
 	font-family: var(--mono);
 	font-size: 11px;
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+	color: var(--white);
+	text-shadow: 0 1px 2px color-mix(in srgb, var(--black) 70%, transparent);
 	letter-spacing: 0.3px;
 }
 </style>

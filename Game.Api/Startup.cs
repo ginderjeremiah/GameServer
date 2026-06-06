@@ -25,10 +25,23 @@ namespace Game.Api
         /// <summary>
         /// The entry point of the application.
         /// </summary>
-        /// <param name="args">No parameters are currently supported.</param>
+        /// <param name="args">
+        /// Pass <c>codegen [outputDirectory]</c> to regenerate the frontend's TypeScript API client
+        /// and exit without starting the web host (see <see cref="CodeGenCommand"/>); otherwise no
+        /// arguments are supported and the API starts normally.
+        /// </param>
         /// <returns>An empty <see cref="Task"/>.</returns>
         public static async Task Main(string[] args)
         {
+            // Standalone TypeScript codegen: regenerate the frontend API client without building the
+            // web host or touching the database/cache, so types can be regenerated in CI / restricted
+            // environments. Intercepted before host construction to stay independent of environment.
+            if (CodeGenCommand.Matches(args))
+            {
+                CodeGenCommand.Run(args);
+                return;
+            }
+
             var builder = WebApplication.CreateBuilder(args);
             Hashing.SetPepper(builder.Configuration["HashPepper"] ?? throw new InvalidOperationException("HashPepper not set"));
 
@@ -87,7 +100,7 @@ namespace Game.Api
                 // Regenerate the frontend's TypeScript API client from the running API's types. This
                 // writes into the UI source tree, so it is strictly a local-development concern.
                 var rootFolder = Directory.GetParent(app.Environment.ContentRootPath)!.FullName;
-                var targetDir = Path.Combine(rootFolder, "UI", "new-svelte", "src", "lib", "api", "types");
+                var targetDir = CodeGenPaths.ResolveTargetDirectory(rootFolder);
                 var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
                 codeGen.GenerateCode(typeof(Startup).Assembly, new CodeGenOptions { TargetDirectory = targetDir, NewLine = "\n" });
 

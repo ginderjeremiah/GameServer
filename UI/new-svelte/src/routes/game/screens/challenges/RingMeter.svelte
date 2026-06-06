@@ -1,6 +1,13 @@
 <div class="ring" style:width="{size}px" style:height="{size}px">
 	<svg width={size} height={size} style="transform: rotate(-90deg)">
-		<circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.09)" stroke-width={stroke} />
+		<circle
+			cx={size / 2}
+			cy={size / 2}
+			r={radius}
+			fill="none"
+			stroke="color-mix(in srgb, var(--white) 9%, transparent)"
+			stroke-width={stroke}
+		/>
 		<circle
 			cx={size / 2}
 			cy={size / 2}

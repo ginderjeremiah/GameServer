@@ -35,7 +35,7 @@ const col = $derived(done ? 'var(--success)' : accent);
 .bar-track {
 	position: relative;
 	overflow: hidden;
-	background: rgba(255, 255, 255, 0.07);
+	background: color-mix(in srgb, var(--white) 7%, transparent);
 }
 
 .bar-fill {

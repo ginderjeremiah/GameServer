@@ -14,7 +14,7 @@
 				height="9"
 				viewBox="0 0 10 10"
 				fill="none"
-				stroke="rgba(240,240,240,0.5)"
+				stroke="currentColor"
 				stroke-width="1.4"
 				aria-hidden="true"
 			>
@@ -39,7 +39,7 @@
 						height="11"
 						viewBox="0 0 12 12"
 						fill="none"
-						stroke="#c0d8ff"
+						stroke="currentColor"
 						stroke-width="1.8"
 						aria-hidden="true"
 					>
@@ -141,7 +141,7 @@ const onNumberInput = (e: Event) => {
 <style lang="scss">
 .cell {
 	padding: 6px 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
 	vertical-align: middle;
 }
 
@@ -149,7 +149,7 @@ const onNumberInput = (e: Event) => {
 	font-family: var(--mono);
 	font-size: 12px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 
 	&.is-new {
 		color: var(--accent);
@@ -158,7 +158,7 @@ const onNumberInput = (e: Event) => {
 
 .readonly-cell {
 	font-size: 13px;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 }
 
 .control-wrap {
@@ -186,10 +186,10 @@ const onNumberInput = (e: Event) => {
 .adm-input {
 	field-sizing: content;
 	width: 100%;
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
 	border-radius: 3px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	font-family: Geist, sans-serif;
 	font-size: 13px;
 	padding: 6px 8px;
@@ -205,30 +205,30 @@ const onNumberInput = (e: Event) => {
 	}
 
 	&:hover:not(:disabled) {
-		border-color: rgba(255, 255, 255, 0.2);
+		border-color: color-mix(in srgb, var(--white) 20%, transparent);
 	}
 
 	&:focus {
 		border-color: var(--accent);
 		box-shadow:
-			0 0 0 1px rgba(161, 194, 247, 0.4),
-			0 0 8px rgba(161, 194, 247, 0.35);
-		background: rgba(161, 194, 247, 0.04);
+			0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+			0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+		background: color-mix(in srgb, var(--accent) 4%, transparent);
 	}
 
 	&:disabled {
-		color: rgba(240, 240, 240, 0.5);
+		color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 		cursor: default;
 	}
 
 	&.dirty {
-		border-color: rgba(240, 210, 138, 0.55);
-		background: rgba(240, 210, 138, 0.06);
+		border-color: color-mix(in srgb, var(--change-modified) 55%, transparent);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.dirty:focus {
 		border-color: var(--accent);
-		background: rgba(161, 194, 247, 0.04);
+		background: color-mix(in srgb, var(--accent) 4%, transparent);
 	}
 }
 
@@ -236,10 +236,10 @@ const onNumberInput = (e: Event) => {
 	width: 100%;
 	appearance: none;
 	-webkit-appearance: none;
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
 	border-radius: 3px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	font-family: Geist, sans-serif;
 	font-size: 13px;
 	padding: 6px 26px 6px 8px;
@@ -251,34 +251,34 @@ const onNumberInput = (e: Event) => {
 		background 140ms ease;
 
 	&:hover:not(:disabled) {
-		border-color: rgba(255, 255, 255, 0.2);
+		border-color: color-mix(in srgb, var(--white) 20%, transparent);
 	}
 
 	&:focus {
 		border-color: var(--accent);
 		box-shadow:
-			0 0 0 1px rgba(161, 194, 247, 0.4),
-			0 0 8px rgba(161, 194, 247, 0.35);
+			0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+			0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 
 	&:disabled {
-		color: rgba(240, 240, 240, 0.5);
+		color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 		cursor: default;
 	}
 
 	&.dirty {
-		border-color: rgba(240, 210, 138, 0.55);
-		background: rgba(240, 210, 138, 0.06);
+		border-color: color-mix(in srgb, var(--change-modified) 55%, transparent);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.dirty:focus {
 		border-color: var(--accent);
-		background: rgba(161, 194, 247, 0.04);
+		background: color-mix(in srgb, var(--accent) 4%, transparent);
 	}
 
 	option {
-		background: #14151b;
-		color: #f0f0f0;
+		background: var(--surface);
+		color: var(--text-primary);
 	}
 }
 
@@ -288,6 +288,10 @@ const onNumberInput = (e: Event) => {
 	top: 50%;
 	transform: translateY(-50%);
 	pointer-events: none;
+	// `stroke="currentColor"` on the markup resolves to this colour, keeping the
+	// caret theme-overridable (CSS custom properties can't be used in the SVG
+	// presentation attribute directly).
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 }
 
 .bool-wrap {
@@ -299,7 +303,7 @@ const onNumberInput = (e: Event) => {
 	width: 18px;
 	height: 18px;
 	border-radius: 3px;
-	border: 1px solid rgba(255, 255, 255, 0.22);
+	border: 1px solid color-mix(in srgb, var(--white) 22%, transparent);
 	background: transparent;
 	cursor: pointer;
 	display: flex;
@@ -310,17 +314,19 @@ const onNumberInput = (e: Event) => {
 
 	&.on {
 		border-color: var(--accent);
-		background: rgba(161, 194, 247, 0.18);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		// Drives the checkmark SVG's `stroke="currentColor"`.
+		color: var(--accent-light);
 	}
 
 	&.dirty {
-		border-color: var(--warning);
-		background: rgba(240, 210, 138, 0.06);
+		border-color: var(--change-modified);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.on.dirty {
-		border-color: var(--warning);
-		background: rgba(240, 210, 138, 0.12);
+		border-color: var(--change-modified);
+		background: color-mix(in srgb, var(--change-modified) 12%, transparent);
 	}
 
 	&:disabled {
@@ -335,8 +341,8 @@ const onNumberInput = (e: Event) => {
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	background: var(--warning);
-	box-shadow: 0 0 6px rgba(240, 210, 138, 0.9);
+	background: var(--change-modified);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--change-modified) 90%, transparent);
 	pointer-events: none;
 }
 </style>

@@ -50,16 +50,19 @@ const style = $derived.by(() => {
 .tooltip-container {
 	position: absolute;
 	display: none;
-	background: rgba(20, 21, 27, 0.96);
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-radius: 3px;
+	// See-through panel driven by the themeable `--tooltip-bg` opacity knob; the
+	// backdrop blur keeps content legible over busy backgrounds. The translucency
+	// lives entirely in the background (not an element `opacity`) so the text and
+	// accents stay crisp.
+	background: var(--tooltip-bg);
+	border: 1px solid var(--border-light);
+	border-radius: var(--border-radius);
 	box-shadow:
-		0 12px 28px rgba(0, 0, 0, 0.55),
-		0 0 0 1px rgba(0, 0, 0, 0.4);
+		0 12px 28px color-mix(in srgb, var(--black) 55%, transparent),
+		0 0 0 1px color-mix(in srgb, var(--black) 40%, transparent);
 	backdrop-filter: blur(6px);
 	z-index: 15;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	overflow: hidden;
-	opacity: 0.93;
 }
 </style>

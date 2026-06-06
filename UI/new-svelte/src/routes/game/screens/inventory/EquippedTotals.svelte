@@ -37,7 +37,7 @@ const { view }: { view: InventoryView } = $props();
 	height: 5px;
 	transform: rotate(45deg);
 	background: var(--accent);
-	box-shadow: 0 0 6px rgba(161, 194, 247, 0.7);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
 	flex-shrink: 0;
 }
 
@@ -46,23 +46,23 @@ const { view }: { view: InventoryView } = $props();
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 
 	&.accent {
-		color: rgba(240, 240, 240, 0.4);
+		color: var(--text-muted);
 	}
 }
 
 .line {
 	flex: 1;
 	height: 1px;
-	background: rgba(255, 255, 255, 0.08);
+	background: var(--border-subtle);
 }
 
 .slots-filled {
 	margin-top: 12px;
 	padding-top: 10px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid var(--border-subtle);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -71,6 +71,6 @@ const { view }: { view: InventoryView } = $props();
 .filled-value {
 	font-family: var(--mono);
 	font-size: 12px;
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 }
 </style>

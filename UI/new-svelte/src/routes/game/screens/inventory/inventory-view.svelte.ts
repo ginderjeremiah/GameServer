@@ -27,18 +27,6 @@ export const EQUIP_GROUPS: { key: 'armor' | 'arms'; label: string }[] = [
 	{ key: 'arms', label: 'Arms' }
 ];
 
-const CATEGORY_ACCENT: Record<number, string> = {
-	[EItemCategory.Helm]: '#a1c2f7',
-	[EItemCategory.Chest]: '#a1c2f7',
-	[EItemCategory.Leg]: '#a1c2f7',
-	[EItemCategory.Boot]: '#a1c2f7',
-	[EItemCategory.Weapon]: '#e08778',
-	[EItemCategory.Accessory]: '#e8c878'
-};
-
-export const catAccent = (cat: EItemCategory) => CATEGORY_ACCENT[cat] ?? '#a1c2f7';
-export const catName = (cat: EItemCategory) => EItemCategory[cat] ?? 'Item';
-
 export const FILTER_CATEGORIES: EItemCategory[] = [
 	EItemCategory.Helm,
 	EItemCategory.Chest,
@@ -57,16 +45,6 @@ export const SORTS: Record<SortKey, { label: string; cmp: (a: Item, b: Item) => 
 export interface StatEntry {
 	name: string;
 	value: number;
-}
-
-/** rgba string from a hex color + alpha. */
-export function hexA(hex: string, a: number): string {
-	const h = hex.replace('#', '');
-	const n = h.length === 3 ? h.replace(/./g, (c) => c + c) : h;
-	const r = parseInt(n.slice(0, 2), 16);
-	const g = parseInt(n.slice(2, 4), 16);
-	const b = parseInt(n.slice(4, 6), 16);
-	return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 /* ─── Reactive view-model ────────────────────────────────────────────────

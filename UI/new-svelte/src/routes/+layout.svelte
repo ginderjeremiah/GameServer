@@ -57,10 +57,15 @@ $effect(() => {
 	--error-color: #{colors.$error};
 	--health-missing-color: #{colors.$hp-red-bg};
 	--health-remaining-color: #{colors.$hp-green};
+	--health-remaining-dark: #{colors.$hp-green-dark};
 	--health-disappearing-color: #{colors.$hp-red-disappearing};
 	--slot-background-color: #{colors.$white};
 	--surface: #{colors.$surface};
 	--surface-alpha: #{colors.$surface-alpha};
+	// Tooltip panel background. The surface tint percentage is the configurable
+	// opacity knob — lower it for a more see-through tooltip — and flows through
+	// theme overrides. Paired with the container's backdrop blur for legibility.
+	--tooltip-bg: color-mix(in srgb, var(--surface) 92%, transparent);
 	--page: #0f1014;
 	--panel: #16171e;
 	--panel-2: #1b1c24;
@@ -85,6 +90,16 @@ $effect(() => {
 	--success: #{colors.$success};
 	--warning: #{colors.$warning};
 	--enemy-accent: #{colors.$enemy-accent};
+
+	// Editor change-state accents. The admin table editor and Workbench signal a
+	// pending add / edit (unsaved) / remove with these hues. They currently match
+	// --accent / --warning / --enemy-accent but are distinct functional concerns
+	// (a row marked for removal is not an "enemy"; an unsaved edit is not a
+	// validation "warning"), so they are declared separately and a theme can
+	// restyle change-state affordances on their own.
+	--change-added: #{colors.$accent};
+	--change-modified: #{colors.$warning};
+	--change-removed: #{colors.$enemy-accent};
 
 	// Combat-log palette — semantic colours for log messages, shared by the log
 	// panel, the options live preview, and the per-type rows (via `logColors` in
