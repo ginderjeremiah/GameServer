@@ -301,7 +301,7 @@ $effect(() => {
 	font-size: 10px;
 	letter-spacing: 2px;
 	text-transform: uppercase;
-	color: rgba(161, 194, 247, 0.7);
+	color: color-mix(in srgb, var(--accent) 70%, transparent);
 	margin-bottom: 6px;
 }
 
@@ -310,7 +310,7 @@ $effect(() => {
 	padding: 0;
 	font-size: 26px;
 	font-weight: 500;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	letter-spacing: -0.2px;
 }
 
@@ -322,9 +322,9 @@ $effect(() => {
 	flex: 1;
 	min-height: 0;
 	overflow: auto;
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
-	background: rgba(255, 255, 255, 0.015);
+	background: color-mix(in srgb, var(--white) 1.5%, transparent);
 	width: fit-content;
 	margin: auto;
 
@@ -342,11 +342,11 @@ $effect(() => {
 		font-weight: 400;
 		letter-spacing: 1.4px;
 		text-transform: uppercase;
-		color: rgba(240, 240, 240, 0.5);
+		color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 		text-align: center;
 		padding: 11px 10px;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-		background: rgba(20, 21, 27, 0.92);
+		border-bottom: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
 		position: sticky;
 		top: 0;
 		z-index: 1;
@@ -372,7 +372,7 @@ $effect(() => {
 	justify-content: space-between;
 	margin-top: 16px;
 	padding-top: 16px;
-	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	border-top: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
 }
 
 .save-summary {
@@ -382,18 +382,18 @@ $effect(() => {
 	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.4px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 .saved-flash {
-	color: #bde0b4;
+	color: var(--success);
 	display: inline-flex;
 	align-items: center;
 	gap: 7px;
 }
 
 .pending-count {
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 }
 
 .change-pips {
@@ -413,26 +413,26 @@ $effect(() => {
 	}
 
 	&.added {
-		color: #a1c2f7;
+		color: var(--change-added);
 		.dot {
-			background: #a1c2f7;
-			box-shadow: 0 0 6px #a1c2f7;
+			background: var(--change-added);
+			box-shadow: 0 0 6px var(--change-added);
 		}
 	}
 
 	&.modified {
-		color: #f0d28a;
+		color: var(--change-modified);
 		.dot {
-			background: #f0d28a;
-			box-shadow: 0 0 6px #f0d28a;
+			background: var(--change-modified);
+			box-shadow: 0 0 6px var(--change-modified);
 		}
 	}
 
 	&.deleted {
-		color: #e08a78;
+		color: var(--change-removed);
 		.dot {
-			background: #e08a78;
-			box-shadow: 0 0 6px #e08a78;
+			background: var(--change-removed);
+			box-shadow: 0 0 6px var(--change-removed);
 		}
 	}
 }
@@ -447,8 +447,8 @@ $effect(() => {
 	align-items: center;
 	gap: 7px;
 	background: transparent;
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	color: rgba(240, 240, 240, 0.85);
+	border: 1px solid var(--border-light);
+	color: color-mix(in srgb, var(--text-primary) 85%, transparent);
 	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.6px;
@@ -460,23 +460,23 @@ $effect(() => {
 	white-space: nowrap;
 
 	&.ghost:hover:not(:disabled) {
-		border-color: rgba(255, 255, 255, 0.32);
-		box-shadow: 0 0 10px rgba(161, 194, 247, 0.45);
+		border-color: color-mix(in srgb, var(--white) 32%, transparent);
+		box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 
 	&.primary {
-		background: rgba(161, 194, 247, 0.12);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
 		border-color: var(--accent);
-		color: #c0d8ff;
+		color: var(--accent-light);
 
 		&:hover:not(:disabled) {
-			box-shadow: 0 0 10px rgba(161, 194, 247, 0.5);
+			box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
 		}
 	}
 
 	&:disabled {
-		color: rgba(240, 240, 240, 0.3);
-		border-color: rgba(255, 255, 255, 0.08);
+		color: color-mix(in srgb, var(--text-primary) 30%, transparent);
+		border-color: var(--border-subtle);
 		cursor: not-allowed;
 	}
 }

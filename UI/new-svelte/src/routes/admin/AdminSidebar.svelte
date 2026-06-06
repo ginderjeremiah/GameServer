@@ -141,7 +141,7 @@ $expanded-width: 240px;
 	bottom: 0;
 	left: 0;
 	width: $collapsed;
-	background: #14151b;
+	background: var(--surface);
 	border-right: 1px solid var(--border-subtle);
 	transition:
 		width 220ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -153,13 +153,13 @@ $expanded-width: 240px;
 
 	&.expanded {
 		width: $expanded-width;
-		box-shadow: 6px 0 28px rgba(0, 0, 0, 0.55);
+		box-shadow: 6px 0 28px color-mix(in srgb, var(--black) 55%, transparent);
 	}
 }
 
 .sidebar-header {
 	padding: 14px 0;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
 	position: relative;
 	display: flex;
 	align-items: center;
@@ -179,7 +179,7 @@ $expanded-width: 240px;
 	height: 13px;
 	transform: rotate(45deg);
 	border: 1px solid var(--accent);
-	box-shadow: 0 0 8px rgba(161, 194, 247, 0.35);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
 	position: relative;
 
 	&.pulse {
@@ -210,7 +210,7 @@ $expanded-width: 240px;
 	font-size: 11px;
 	letter-spacing: 2px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.92);
+	color: color-mix(in srgb, var(--text-primary) 92%, transparent);
 }
 
 .wordmark-tag {
@@ -234,7 +234,7 @@ $expanded-width: 240px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 	transition: color 140ms;
 
 	&:hover {
@@ -284,7 +284,7 @@ $expanded-width: 240px;
 .group-divider {
 	width: 18px;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.12);
+	background: color-mix(in srgb, var(--text-primary) 12%, transparent);
 }
 
 .side-item {
@@ -292,7 +292,7 @@ $expanded-width: 240px;
 	width: 100%;
 	background: transparent;
 	border: none;
-	color: rgba(240, 240, 240, 0.65);
+	color: color-mix(in srgb, var(--text-primary) 65%, transparent);
 	font-family: inherit;
 	font-size: 13px;
 	padding: 0;
@@ -308,12 +308,12 @@ $expanded-width: 240px;
 	overflow: hidden;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.03);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
 		color: var(--text-primary);
 	}
 
 	&.active {
-		background: rgba(161, 194, 247, 0.08);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
 		color: var(--text-primary);
 	}
 }
@@ -336,16 +336,16 @@ $expanded-width: 240px;
 	bottom: 5px;
 	width: 2px;
 	background: var(--accent);
-	box-shadow: 0 0 10px rgba(161, 194, 247, 0.75);
+	box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
 .sidebar-return {
-	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	border-top: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
 	padding: 6px 0;
 }
 
 .sidebar-footer {
-	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	border-top: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
 	display: flex;
 	align-items: center;
 	height: 44px;
@@ -357,14 +357,14 @@ $expanded-width: 240px;
 	height: 6px;
 	border-radius: 50%;
 	background: var(--accent);
-	box-shadow: 0 0 8px rgba(161, 194, 247, 0.8);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
 	animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
 .footer-status {
 	font-family: var(--mono);
 	font-size: 10.5px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	letter-spacing: 0.5px;
 	white-space: nowrap;
 	opacity: 0;

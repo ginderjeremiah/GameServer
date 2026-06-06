@@ -90,6 +90,16 @@ $effect(() => {
 	--warning: #{colors.$warning};
 	--enemy-accent: #{colors.$enemy-accent};
 
+	// Editor change-state accents. The admin table editor and Workbench signal a
+	// pending add / edit (unsaved) / remove with these hues. They currently match
+	// --accent / --warning / --enemy-accent but are distinct functional concerns
+	// (a row marked for removal is not an "enemy"; an unsaved edit is not a
+	// validation "warning"), so they are declared separately and a theme can
+	// restyle change-state affordances on their own.
+	--change-added: #{colors.$accent};
+	--change-modified: #{colors.$warning};
+	--change-removed: #{colors.$enemy-accent};
+
 	// Combat-log palette — semantic colours for log messages, shared by the log
 	// panel, the options live preview, and the per-type rows (via `logColors` in
 	// log-kind.ts). Most reuse a base token; only the softer enemy hue is its own.

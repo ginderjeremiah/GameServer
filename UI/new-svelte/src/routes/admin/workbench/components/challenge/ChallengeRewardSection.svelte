@@ -147,8 +147,8 @@ const setMod = (id: number | undefined) => {
 	font-family: var(--mono);
 	font-size: 11px;
 	color: var(--warning);
-	border: 1px solid rgba(240, 210, 138, 0.35);
-	background: rgba(240, 210, 138, 0.08);
+	border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
 	border-radius: 3px;
 	padding: 7px 11px;
 }
