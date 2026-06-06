@@ -8,6 +8,13 @@ const newEnemyLoadedHook = createHook<[IEnemyInstance]>();
 const notifyNewEnemyLoaded = newEnemyLoadedHook.notify;
 export const onNewEnemyLoaded = newEnemyLoadedHook.onNotified;
 
+/**
+ * Backoff before re-requesting an enemy when the server returns no enemy and no explicit cooldown
+ * — i.e. the request failed (e.g. a transient socket/server error, so `data` is absent). Without it,
+ * a persistent failure would spin `getNewEnemy` into a tight request loop.
+ */
+const NEW_ENEMY_RETRY_DELAY_MS = 1000;
+
 export class EnemyManager {
 	public currentEnemy: IEnemyInstance | undefined;
 	public started = false;
@@ -43,9 +50,13 @@ export class EnemyManager {
 			this.currentEnemy = result.data.enemyInstance;
 			notifyNewEnemyLoaded(this.currentEnemy);
 		} else {
-			if (result.data.cooldown) {
-				await delay(result.data.cooldown);
+			// No enemy this time: either the zone is on cooldown (wait it out) or the request failed
+			// (`data` is absent — note the optional chaining; the original code dereferenced `data`
+			// here and threw on an error response). Back off in both cases, then retry.
+			if (result.error) {
+				logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
 			}
+			await delay(result.data?.cooldown ?? NEW_ENEMY_RETRY_DELAY_MS);
 			await this.getNewEnemy();
 		}
 	}

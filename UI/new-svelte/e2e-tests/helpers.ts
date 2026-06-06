@@ -2,13 +2,17 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 /**
- * Wait for the login page to fully hydrate (JS loaded + onMount status check complete).
- * Must be called before interacting with the login form, otherwise Svelte bindings
- * and event handlers aren't attached yet.
+ * Wait for the login page to fully hydrate before interacting with it — otherwise Svelte bindings
+ * and event handlers aren't attached yet and a click on the (server-rendered) form is dropped.
+ *
+ * The root layout sets `data-hydrated="true"` from its onMount, which runs after every child's
+ * onMount, so this resolves as soon as the page is actually interactive. (It previously waited on a
+ * `/api/Login/Status` response, but that request only fires when a stored token exists — never in a
+ * fresh test context — so the wait always burned its full timeout.)
  */
 export async function waitForLoginReady(page: Page) {
 	await expect(page.getByTestId('login-heading')).toBeVisible({ timeout: 10000 });
-	await page.waitForResponse((r) => r.url().includes('/api/Login/Status'), { timeout: 10000 }).catch(() => {});
+	await expect(page.locator('[data-hydrated="true"]')).toBeAttached({ timeout: 10000 });
 }
 
 /**
