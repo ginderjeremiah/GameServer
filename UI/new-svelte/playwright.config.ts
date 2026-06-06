@@ -15,7 +15,14 @@ const config: PlaywrightTestConfig = {
 	retries: process.env.CI ? 2 : 1,
 	fullyParallel: true,
 	use: {
-		baseURL: 'http://localhost:4173'
+		baseURL: 'http://localhost:4173',
+		// Emulate the OS "reduce motion" preference so the app's CSS transitions/animations collapse
+		// to ~0ms (see the reduced-motion block in styles/common.scss). This removes a class of
+		// flakiness where a click landed on a still-animating element — e.g. the hover-expand admin
+		// sidebar shifting buttons mid-click — and was dropped, retrying until the 30s test timeout.
+		contextOptions: {
+			reducedMotion: 'reduce'
+		}
 	},
 	workers: process.env.CI ? 4 : undefined,
 	projects: [

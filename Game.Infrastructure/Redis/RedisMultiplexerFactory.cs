@@ -11,6 +11,9 @@ namespace Game.Infrastructure.Redis
         private static readonly object _cacheLock = new();
         private static readonly object _pubsubLock = new();
 
+        // Minimum size to grow the thread pool to before connecting (see ConnectMultiplexer).
+        private const int MinThreadPoolThreads = 32;
+
         private readonly ICacheOptions _config;
 
         public RedisMultiplexerFactory(ICacheOptions config)
@@ -36,7 +39,7 @@ namespace Game.Infrastructure.Redis
             {
                 lock (_cacheLock)
                 {
-                    _cacheInstance ??= ConnectionMultiplexer.Connect(_config.CacheConnectionString);
+                    _cacheInstance ??= ConnectMultiplexer(_config.CacheConnectionString);
                 }
 
                 return _cacheInstance;
@@ -59,7 +62,7 @@ namespace Game.Infrastructure.Redis
                     }
                     else
                     {
-                        _cacheInstance ??= ConnectionMultiplexer.Connect(config.CacheConnectionString);
+                        _cacheInstance ??= ConnectMultiplexer(config.CacheConnectionString);
                     }
                 }
             }
@@ -98,12 +101,33 @@ namespace Game.Infrastructure.Redis
                     }
                     else
                     {
-                        _pubsubInstance ??= ConnectionMultiplexer.Connect(config.PubSubConnectionString);
+                        _pubsubInstance ??= ConnectMultiplexer(config.PubSubConnectionString);
                     }
                 }
             }
 
             return _pubsubInstance;
+        }
+
+        /// <summary>
+        /// Connects a <see cref="ConnectionMultiplexer"/> after ensuring the thread pool has a sane
+        /// minimum size. StackExchange.Redis completes async commands on the .NET thread pool; the
+        /// pool's default minimum equals the processor count, and once busy threads exceed that
+        /// minimum the CLR only adds roughly one thread every 500ms. On small, busy hosts (a CI
+        /// runner hosting the API + Postgres + Redis, or several integration-test assemblies running
+        /// at once) that ramp-up stall can leave a Redis reply sitting unread in the socket past the
+        /// 5s command timeout, surfacing as a spurious <c>RedisTimeoutException</c> whose diagnostics
+        /// show <c>WORKER: (Busy=N, Min=processorCount)</c>. Raising the floor removes the stall.
+        /// <see cref="Math.Max(int, int)"/> guarantees we never lower a host that already runs higher.
+        /// </summary>
+        private static ConnectionMultiplexer ConnectMultiplexer(string connectionString)
+        {
+            ThreadPool.GetMinThreads(out var workerThreads, out var completionPortThreads);
+            ThreadPool.SetMinThreads(
+                Math.Max(workerThreads, MinThreadPoolThreads),
+                Math.Max(completionPortThreads, MinThreadPoolThreads));
+
+            return ConnectionMultiplexer.Connect(connectionString);
         }
     }
 }

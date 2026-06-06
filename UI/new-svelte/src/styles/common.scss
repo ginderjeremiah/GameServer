@@ -11,6 +11,22 @@ body {
 	box-sizing: border-box;
 }
 
+// Honour the OS "reduce motion" accessibility preference by collapsing all transitions and
+// animations to a near-instant duration. The 0.01ms (rather than 0) keeps `transitionend` /
+// `animationend` events firing so any logic awaiting them still proceeds. Playwright emulates this
+// preference (`use.reducedMotion: 'reduce'`), which also removes a class of e2e flakiness where a
+// click landed on a still-animating element (e.g. the hover-expand admin sidebar) and was dropped.
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
 .hover-glow {
 	position: relative;
 

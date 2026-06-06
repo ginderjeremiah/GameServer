@@ -35,6 +35,10 @@ The backend uses a mix of HTTP and WebSockets for communication with the fronten
 
 As mentioned above, most of the reference data is cached in-memory on the backend for fast access. However, player data is cached in Redis and uses a write-behind caching strategy where the cache is the source of truth for player data, and changes are persisted to the database asynchronously. The application uses Redis pub/sub to trigger persistence of player data to the database whenever it changes and as a backplane for WebSocket communication.
 
+## Redis connection thread-pool floor
+
+`RedisMultiplexerFactory` raises the process thread-pool minimum (to at least `MinThreadPoolThreads`, never lowering a host that already runs higher) before connecting any multiplexer. StackExchange.Redis completes async commands on the .NET thread pool, whose default minimum equals the CPU count; once busy threads exceed that minimum the CLR adds threads only ~1 per 500ms. On small, busy hosts (a CI runner hosting the API + Postgres + Redis, or multiple integration-test assemblies at once) that ramp-up stall could leave a reply unread in the socket past the 5s command timeout, surfacing as a spurious `RedisTimeoutException` (`WORKER: (Busy=N, Min=processorCount)`). Centralizing the bump in the single connection chokepoint covers production and every test process that touches Redis without scattering startup tweaks across entry points.
+
 ## Admin Tools API surface
 
 The frontend admin tools were consolidated into a single entity-driven Workbench (see `docs/frontend.md`). That UI saves a whole record (identity + related collections) at once, but the backend keeps persisting each relationship through its own admin endpoint — the Workbench just orchestrates them.
