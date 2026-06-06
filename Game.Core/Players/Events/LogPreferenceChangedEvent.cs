@@ -1,5 +1,3 @@
-using Game.Core.Events;
-
 namespace Game.Core.Players.Events
 {
     /// <summary>
@@ -8,5 +6,5 @@ namespace Game.Core.Players.Events
     public record LogPreferenceChangedEvent(
         int PlayerId,
         ELogType LogType,
-        bool Enabled) : IDomainEvent;
+        bool Enabled) : IPlayerPersistenceEvent;
 }

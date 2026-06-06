@@ -1,5 +1,7 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Application;
+using Game.Core.Events;
+using Game.Core.Players.Events;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure;
 using Game.Infrastructure.DependencyInjection;
@@ -19,6 +21,8 @@ namespace Game.DataAccess.DependencyInjection
         /// </summary>
         public static IServiceCollection AddDataAccess(this IServiceCollection services)
         {
+            DomainEventDispatcher.RegisterDomainEventHandler<IPlayerPersistenceEvent, PlayerPersistencePublisher>();
+
             return services.AddTransient<InfrastructureOptions>(sp => sp.GetRequiredService<IOptions<DataAccessOptions>>().Value)
                 .AddGameContext()
                 .AddCache()

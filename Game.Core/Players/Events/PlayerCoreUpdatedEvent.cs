@@ -1,5 +1,3 @@
-using Game.Core.Events;
-
 namespace Game.Core.Players.Events
 {
     /// <summary>
@@ -11,5 +9,5 @@ namespace Game.Core.Players.Events
         int Exp,
         int CurrentZoneId,
         int StatPointsGained,
-        int StatPointsUsed) : IDomainEvent;
+        int StatPointsUsed) : IPlayerPersistenceEvent;
 }
