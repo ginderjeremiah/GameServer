@@ -94,7 +94,7 @@ const selectCategory = (id: number) => {
 	gap: 9px;
 
 	&.active {
-		background: rgba(161, 194, 247, 0.08);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 }
 .cat-name {

@@ -137,10 +137,10 @@ const liveCount = $derived(store.items.filter((it) => store.status(it) !== 'dele
 	gap: 10px;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.02);
+		background: color-mix(in srgb, var(--white) 2%, transparent);
 	}
 	&.selected {
-		background: rgba(161, 194, 247, 0.08);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 	&.deleted {
 		opacity: 0.45;

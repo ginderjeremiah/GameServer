@@ -61,5 +61,5 @@ interface Props {
 }
 
 const { kind, active = false }: Props = $props();
-const stroke = $derived(active ? '#a1c2f7' : 'rgba(240, 240, 240, 0.7)');
+const stroke = $derived(active ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 70%, transparent)');
 </script>

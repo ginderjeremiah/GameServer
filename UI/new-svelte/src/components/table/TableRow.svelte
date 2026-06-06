@@ -70,10 +70,10 @@ let {
 const isDeleted = $derived(state === RowState.Deleted || state === RowState.AddedDeleted);
 
 const EDGE: Record<RowState, string> = {
-	[RowState.Added]: '#a1c2f7',
-	[RowState.Modified]: '#f0d28a',
-	[RowState.Deleted]: '#e08a78',
-	[RowState.AddedDeleted]: '#e08a78',
+	[RowState.Added]: 'var(--accent)',
+	[RowState.Modified]: 'var(--warning)',
+	[RowState.Deleted]: 'var(--enemy-accent)',
+	[RowState.AddedDeleted]: 'var(--enemy-accent)',
 	[RowState.Unmodified]: 'transparent'
 };
 const edgeColor = $derived(EDGE[state]);
@@ -90,7 +90,7 @@ const cellDirty = (key: keyof T) => {
 <style lang="scss">
 tr {
 	&.deleted {
-		background: rgba(224, 138, 120, 0.05);
+		background: color-mix(in srgb, var(--enemy-accent) 5%, transparent);
 
 		.index-cell,
 		:global(.cell) {
@@ -102,7 +102,7 @@ tr {
 .edge-cell {
 	padding: 0;
 	width: 28px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
 }
 
 .status-edge {
@@ -116,16 +116,16 @@ tr {
 
 .index-cell {
 	padding: 6px 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
 	font-family: var(--mono);
 	font-size: 12px;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 	text-align: center;
 }
 
 .actions-cell {
 	padding: 6px 16px 6px 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
 	// Match the header so the column always fits Reset + Delete; a lone Delete
 	// then sits centered in that reserved space.
 	min-width: 150px;
@@ -139,8 +139,8 @@ tr {
 
 .row-action {
 	background: transparent;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	color: rgba(240, 240, 240, 0.55);
+	border: 1px solid color-mix(in srgb, var(--white) 12%, transparent);
+	color: var(--text-tertiary);
 	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 0.5px;
@@ -151,21 +151,21 @@ tr {
 	transition: all 130ms ease;
 
 	&.delete:hover {
-		border-color: #e08a78;
-		color: #e08a78;
-		background: rgba(224, 138, 120, 0.12);
+		border-color: var(--enemy-accent);
+		color: var(--enemy-accent);
+		background: color-mix(in srgb, var(--enemy-accent) 12%, transparent);
 	}
 
 	&.restore:hover {
 		border-color: var(--accent);
 		color: var(--accent);
-		background: rgba(161, 194, 247, 0.12);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
 	}
 
 	&.reset:hover {
 		border-color: var(--warning);
 		color: var(--warning);
-		background: rgba(240, 210, 138, 0.12);
+		background: color-mix(in srgb, var(--warning) 12%, transparent);
 	}
 }
 </style>

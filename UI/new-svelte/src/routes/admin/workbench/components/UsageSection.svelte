@@ -65,7 +65,7 @@ const color = $derived(reference.tagColor(record.tagCategoryId));
 	padding: 12px 14px;
 	border: 1px solid var(--border-subtle);
 	border-radius: 6px;
-	background: rgba(255, 255, 255, 0.015);
+	background: color-mix(in srgb, var(--white) 1.5%, transparent);
 }
 .usage-count {
 	font-size: 13.5px;
