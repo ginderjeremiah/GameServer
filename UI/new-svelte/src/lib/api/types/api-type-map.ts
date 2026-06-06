@@ -9,6 +9,7 @@ import type {
 	IAttributeUpdate,
 	IAuthTokens,
 	IBattlerAttribute,
+	IBrowserInfoRequest,
 	IChallenge,
 	IChallengeType,
 	IChange,
@@ -76,6 +77,7 @@ export type ApiResponseTypes = {
 	'Items': IItem[];
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
+	'Login/BrowserInfo': undefined;
 	'Login/CreateAccount': undefined;
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
@@ -124,6 +126,7 @@ export type ApiRequestTypes = {
 	'Items': { refreshCache?: boolean } | undefined;
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
+	'Login/BrowserInfo': IBrowserInfoRequest;
 	'Login/CreateAccount': ILoginCredentials;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;

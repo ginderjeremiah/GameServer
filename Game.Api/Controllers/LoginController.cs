@@ -1,10 +1,12 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.Api.Auth;
+using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
+using Game.Application.Services;
 using Game.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +24,8 @@ namespace Game.Api.Controllers
         IEntityStore entityStore,
         SessionService sessionService,
         JwtTokenService tokenService,
-        IRefreshTokenStore refreshTokenStore) : ControllerBase
+        IRefreshTokenStore refreshTokenStore,
+        LoginTrackingService loginTrackingService) : ControllerBase
     {
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
@@ -30,6 +33,7 @@ namespace Game.Api.Controllers
         private readonly SessionService _sessionService = sessionService;
         private readonly JwtTokenService _tokenService = tokenService;
         private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
+        private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
@@ -159,6 +163,27 @@ namespace Game.Api.Controllers
 
             var player = await _sessionService.LoadPlayer();
             return ApiResponse.Success(PlayerData.FromPlayer(player));
+        }
+
+        /// <summary>
+        /// Records the device signals the frontend reports once after login (fingerprint hash and
+        /// capabilities), enriching the browser profile for the user-agent of this request. Requires
+        /// authentication so it can only be sent by a logged-in client.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse> BrowserInfo([FromBody] BrowserInfoRequest request)
+        {
+            var hints = ClientHints.FromHeaders(Request.Headers);
+            await _loginTrackingService.SaveBrowserInfo(
+                hints.UserAgent,
+                hints.SecChUa,
+                hints.SecChUaMobile,
+                hints.SecChUaPlatform,
+                request.DeviceFingerprintHash,
+                request.DeviceMemory,
+                request.HardwareConcurrency);
+
+            return ApiResponse.Success();
         }
 
         /// <summary>

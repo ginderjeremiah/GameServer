@@ -20,6 +20,8 @@ namespace Game.TestInfrastructure.Helpers
                     "PlayerChallenges",
                     "PlayerStatistics",
                     "LogPreferences",
+                    "UserLogins",
+                    "BrowserInfos",
                     "Players",
                     "Users",
                     "ZoneEnemies",

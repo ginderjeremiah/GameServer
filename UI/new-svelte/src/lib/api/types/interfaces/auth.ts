@@ -8,6 +8,12 @@ export interface IAuthTokens {
 	refreshToken: string;
 }
 
+export interface IBrowserInfoRequest {
+	deviceFingerprintHash?: string;
+	deviceMemory?: number;
+	hardwareConcurrency?: number;
+}
+
 export interface ILoginResult {
 	tokens: IAuthTokens;
 	player: IPlayerData;

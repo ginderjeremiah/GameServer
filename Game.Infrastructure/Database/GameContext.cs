@@ -17,6 +17,7 @@ namespace Game.Infrastructure.Database
 
         public DbSet<AppliedMod> AppliedMods { get; set; }
         public DbSet<AttributeDistribution> AttributeDistributions { get; set; }
+        public DbSet<BrowserInfo> BrowserInfos { get; set; }
         public DbSet<Attribute> Attributes { get; set; }
         public DbSet<Challenge> Challenges { get; set; }
         public DbSet<ChallengeType> ChallengeTypes { get; set; }
@@ -47,6 +48,7 @@ namespace Game.Infrastructure.Database
         public DbSet<UnlockedItem> UnlockedItems { get; set; }
         public DbSet<UnlockedMod> UnlockedMods { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<UserLogin> UserLogins { get; set; }
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
         public DbSet<Zone> Zones { get; set; }
 
@@ -414,6 +416,47 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(u => u.PassHash)
                     .HasMaxLength(88);
+            });
+
+            modelBuilder.Entity<BrowserInfo>(entity =>
+            {
+                entity.Property(b => b.UserAgent)
+                    .HasMaxLength(BrowserInfo.MaxUserAgentLength);
+
+                entity.Property(b => b.SecChUa)
+                    .HasMaxLength(BrowserInfo.MaxClientHintLength);
+
+                entity.Property(b => b.SecChUaMobile)
+                    .HasMaxLength(BrowserInfo.MaxClientHintLength);
+
+                entity.Property(b => b.SecChUaPlatform)
+                    .HasMaxLength(BrowserInfo.MaxClientHintLength);
+
+                entity.Property(b => b.DeviceFingerprintHash)
+                    .HasMaxLength(BrowserInfo.MaxFingerprintLength);
+
+                // Deduplicate browser profiles by their user-agent string.
+                entity.HasIndex(b => b.UserAgent)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<UserLogin>(entity =>
+            {
+                entity.Property(l => l.IpAddress)
+                    .HasMaxLength(UserLogin.MaxIpAddressLength);
+
+                // The (user, IP, browser) combination is unique; its LastConnection is updated in place
+                // rather than appending a new row per request.
+                entity.HasIndex(l => new { l.UserId, l.IpAddress, l.BrowserInfoId })
+                    .IsUnique();
+
+                entity.HasOne(l => l.User)
+                    .WithMany()
+                    .HasForeignKey(l => l.UserId);
+
+                entity.HasOne(l => l.BrowserInfo)
+                    .WithMany(b => b.UserLogins)
+                    .HasForeignKey(l => l.BrowserInfoId);
             });
 
             modelBuilder.Entity<Zone>(entity =>

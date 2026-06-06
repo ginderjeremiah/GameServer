@@ -16,7 +16,8 @@ vi.mock('$lib/api', () => ({
 		constructor() {}
 	},
 	getTokens: vi.fn(() => null),
-	setTokens: vi.fn()
+	setTokens: vi.fn(),
+	reportBrowserInfo: vi.fn()
 }));
 vi.mock('$lib/engine', () => ({
 	playerManager: { name: '', initialize: vi.fn() }
