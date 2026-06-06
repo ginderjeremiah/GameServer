@@ -6,7 +6,7 @@
    active category's content. Adding a future category — or a new `ELogType` —
    is a one-line edit to the arrays below rather than new UI. */
 
-import { ApiRequest, ELogType, type ILogPreference } from '$lib/api';
+import { apiSocket, ELogType, type ILogPreference } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { logColors } from '$components';
 import { toastError } from '$stores';
@@ -190,8 +190,8 @@ export class OptionsView {
 		this.saving = true;
 		let ok = false;
 		try {
-			const response = await new ApiRequest('Player/SaveLogPreferences').post(changed);
-			ok = response.status >= 200 && response.status < 300;
+			const response = await apiSocket.sendSocketCommand('SaveLogPreferences', changed);
+			ok = !response.error;
 		} catch {
 			ok = false;
 		} finally {

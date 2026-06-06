@@ -5,6 +5,7 @@ import type {
 	IBattleLostResponse,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
+	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
 	ISetItemFavoriteRequest
@@ -14,6 +15,7 @@ export type ApiSocketResponseTypes = {
 	'BattleLost': IBattleLostResponse;
 	'DefeatEnemy': IDefeatEnemyResponse;
 	'NewEnemy': INewEnemyModel;
+	'SaveLogPreferences': undefined;
 	'SetItemFavorite': undefined;
 	'SocketReplaced': undefined;
 };
@@ -21,6 +23,7 @@ export type ApiSocketResponseTypes = {
 export type ApiSocketRequestTypes = {
 	'DefeatEnemy': IDefeatEnemyRequest;
 	'NewEnemy': INewEnemyRequest;
+	'SaveLogPreferences': ILogPreference[];
 	'SetItemFavorite': ISetItemFavoriteRequest;
 };
 
