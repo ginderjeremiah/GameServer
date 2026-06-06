@@ -6,6 +6,7 @@ using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Game.DataAccess
@@ -14,11 +15,13 @@ namespace Game.DataAccess
     {
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
+        private readonly ILogger<DataProviderSynchronizer> _logger;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub)
+        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger)
         {
             _services = services;
             _pubsub = pubsub;
+            _logger = logger;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -50,9 +53,17 @@ namespace Game.DataAccess
                         await HandleEvent(envelope);
                     }
                 }
-                catch
+                catch (JsonException ex)
                 {
-                    // TODO: add logging; for now skip malformed events
+                    // Malformed payload (envelope or event body) — log and skip so one bad
+                    // message can't stall persistence of the rest of the queue.
+                    _logger.LogWarning(ex, "Skipping malformed player update event: {Payload}", next);
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected failure while persisting the event (e.g. a database write error).
+                    // Without this the player's data could silently fail to persist with no trace.
+                    _logger.LogError(ex, "Failed to process player update event: {Payload}", next);
                 }
 
                 next = await queue.GetNextAsync();
