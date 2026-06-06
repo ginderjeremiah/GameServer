@@ -73,12 +73,14 @@ still outstanding:
 - *Prereq references an issue/PR* ("after #N", "blocked by #N", "depends on #N", "follow-up to #N"):
   look up #N. Closed or merged → prerequisite met, the issue is eligible. Still open → still blocked.
 - *Prereq described in prose* ("after proper JWTs are implemented", "needs bearer-token auth first"):
-  search the codebase for evidence it's been done. Present in the code → met → eligible. Clearly
-  absent → blocked.
-- *Process / design prereq* ("mock the design first"): check the issue's comments and any linked
-  resources for a sign-off or a link showing it's done. Evidence it's satisfied → eligible. If you
-  can't find any, treat it as still blocked but **flag it** rather than silently dropping it — you
-  may simply be missing context.
+  the prerequisite may have been delivered by other work this issue's body never references by
+  number, so check the actual state — search the codebase for the feature, **and** scan closed
+  issues / merged PRs for one that shipped it. Present in the code (or clearly delivered by
+  completed work) → met → eligible. Clearly absent → blocked.
+- *Process / design prereq* ("mock the design first"): check the issue's comments, any linked
+  resources, and closed issues/PRs for a sign-off or artifact showing it's done. Evidence it's
+  satisfied → eligible. If you can't find any, treat it as still blocked but **flag it** rather than
+  silently dropping it — you may simply be missing context.
 
 Reflect what you found in the selection announcement: if a once-gated issue is now unblocked, say
 why ("#27 was gated on JWT auth, which is now implemented in `…`, so it's eligible"); if it's
