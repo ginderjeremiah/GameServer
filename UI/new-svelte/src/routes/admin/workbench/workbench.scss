@@ -25,7 +25,7 @@
 		font-size: 10px;
 		letter-spacing: 2px;
 		text-transform: uppercase;
-		color: rgba(161, 194, 247, 0.7);
+		color: color-mix(in srgb, var(--accent) 70%, transparent);
 		margin-bottom: 6px;
 	}
 	.page-title-row {
@@ -77,16 +77,16 @@
 		white-space: nowrap;
 
 		&:hover:not(:disabled) {
-			border-color: rgba(255, 255, 255, 0.32);
-			box-shadow: 0 0 10px rgba(161, 194, 247, 0.4);
+			border-color: color-mix(in srgb, var(--white) 32%, transparent);
+			box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
 		}
 		&.primary {
-			background: rgba(161, 194, 247, 0.12);
+			background: color-mix(in srgb, var(--accent) 12%, transparent);
 			border-color: var(--accent);
 			color: var(--accent-light);
 		}
 		&.primary:hover:not(:disabled) {
-			box-shadow: 0 0 12px rgba(161, 194, 247, 0.5);
+			box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
 		}
 		&.sm {
 			padding: 5px 11px;
@@ -107,8 +107,8 @@
 	.inp,
 	.sel {
 		width: 100%;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
+		border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
 		border-radius: 3px;
 		color: var(--text-primary);
 		font-family: var(--sans);
@@ -137,16 +137,16 @@
 	}
 	.inp:hover,
 	.sel:hover {
-		border-color: rgba(255, 255, 255, 0.2);
+		border-color: color-mix(in srgb, var(--white) 20%, transparent);
 	}
 	.inp:focus,
 	.sel:focus,
 	.txtarea:focus {
 		border-color: var(--accent);
 		box-shadow:
-			0 0 0 1px rgba(161, 194, 247, 0.4),
-			0 0 8px rgba(161, 194, 247, 0.35);
-		background: rgba(161, 194, 247, 0.04);
+			0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+			0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+		background: color-mix(in srgb, var(--accent) 4%, transparent);
 	}
 	.sel-caret {
 		position: absolute;
@@ -176,14 +176,14 @@
 	.inp.dirty,
 	.sel.dirty,
 	.txtarea.dirty {
-		border-color: rgba(240, 210, 138, 0.55);
-		background: rgba(240, 210, 138, 0.06);
+		border-color: color-mix(in srgb, var(--change-modified) 55%, transparent);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 	.inp.dirty:focus,
 	.sel.dirty:focus,
 	.txtarea.dirty:focus {
 		border-color: var(--accent);
-		background: rgba(161, 194, 247, 0.04);
+		background: color-mix(in srgb, var(--accent) 4%, transparent);
 	}
 	.inp.invalid,
 	.sel.invalid,
@@ -197,15 +197,15 @@
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: var(--warning);
-		box-shadow: 0 0 6px rgba(240, 210, 138, 0.9);
+		background: var(--change-modified);
+		box-shadow: 0 0 6px color-mix(in srgb, var(--change-modified) 90%, transparent);
 		pointer-events: none;
 	}
 
 	.txtarea {
 		width: 100%;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
+		border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
 		border-radius: 3px;
 		color: var(--text-primary);
 		font-family: var(--sans);
@@ -221,7 +221,7 @@
 			background 0.14s;
 
 		&:hover {
-			border-color: rgba(255, 255, 255, 0.2);
+			border-color: color-mix(in srgb, var(--white) 20%, transparent);
 		}
 	}
 
@@ -274,7 +274,7 @@
 			width: 36px;
 			height: 20px;
 			border-radius: 11px;
-			background: rgba(255, 255, 255, 0.08);
+			background: color-mix(in srgb, var(--white) 8%, transparent);
 			border: 1px solid var(--border-light);
 			position: relative;
 			transition: all 0.16s ease;
@@ -291,20 +291,20 @@
 			transition: all 0.16s ease;
 		}
 		&.on .track {
-			background: rgba(224, 138, 120, 0.25);
+			background: color-mix(in srgb, var(--enemy-accent) 25%, transparent);
 			border-color: var(--enemy);
 		}
 		&.on .knob {
 			left: 18px;
 			background: var(--enemy);
-			box-shadow: 0 0 8px rgba(224, 138, 120, 0.7);
+			box-shadow: 0 0 8px color-mix(in srgb, var(--enemy-accent) 70%, transparent);
 		}
 		.tg-label {
 			font-size: 13px;
 			color: var(--text-secondary);
 		}
 		&.dirty .track {
-			border-color: var(--warning);
+			border-color: var(--change-modified);
 		}
 	}
 
@@ -326,7 +326,7 @@
 		font-family: var(--mono);
 		font-size: 10px;
 		color: var(--text-tertiary);
-		background: rgba(255, 255, 255, 0.05);
+		background: color-mix(in srgb, var(--white) 5%, transparent);
 		border: 1px solid var(--border-subtle);
 		border-radius: 10px;
 		padding: 1px 8px;
@@ -354,19 +354,19 @@
 		border-radius: 3px;
 
 		&.added {
-			color: var(--accent);
-			border: 1px solid rgba(161, 194, 247, 0.4);
-			background: rgba(161, 194, 247, 0.1);
+			color: var(--change-added);
+			border: 1px solid color-mix(in srgb, var(--change-added) 40%, transparent);
+			background: color-mix(in srgb, var(--change-added) 10%, transparent);
 		}
 		&.modified {
-			color: var(--warning);
-			border: 1px solid rgba(240, 210, 138, 0.4);
-			background: rgba(240, 210, 138, 0.08);
+			color: var(--change-modified);
+			border: 1px solid color-mix(in srgb, var(--change-modified) 40%, transparent);
+			background: color-mix(in srgb, var(--change-modified) 8%, transparent);
 		}
 		&.deleted {
-			color: var(--enemy);
-			border: 1px solid rgba(224, 138, 120, 0.4);
-			background: rgba(224, 138, 120, 0.1);
+			color: var(--change-removed);
+			border: 1px solid color-mix(in srgb, var(--change-removed) 40%, transparent);
+			background: color-mix(in srgb, var(--change-removed) 10%, transparent);
 		}
 	}
 
@@ -375,7 +375,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		background: rgba(255, 255, 255, 0.03);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
 		border: 1px solid var(--border-light);
 		border-radius: 4px;
 		padding: 7px 9px 7px 11px;
@@ -397,12 +397,12 @@
 			border-radius: 3px;
 		}
 		.x:hover {
-			color: var(--enemy);
-			background: rgba(224, 138, 120, 0.12);
+			color: var(--change-removed);
+			background: color-mix(in srgb, var(--change-removed) 12%, transparent);
 		}
 		&.added {
-			border-color: rgba(161, 194, 247, 0.5);
-			box-shadow: inset 0 0 0 1px rgba(161, 194, 247, 0.15);
+			border-color: color-mix(in srgb, var(--change-added) 50%, transparent);
+			box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--change-added) 15%, transparent);
 		}
 	}
 
@@ -452,9 +452,9 @@
 		transition: all 0.13s;
 
 		&:hover {
-			border-color: var(--enemy);
-			color: var(--enemy);
-			background: rgba(224, 138, 120, 0.1);
+			border-color: var(--change-removed);
+			color: var(--change-removed);
+			background: color-mix(in srgb, var(--change-removed) 10%, transparent);
 		}
 	}
 	.row-edge {
@@ -465,7 +465,7 @@
 	.share-bar {
 		height: 4px;
 		border-radius: 2px;
-		background: rgba(161, 194, 247, 0.2);
+		background: color-mix(in srgb, var(--accent) 20%, transparent);
 		position: relative;
 		overflow: hidden;
 
@@ -473,7 +473,7 @@
 			position: absolute;
 			inset: 0;
 			background: var(--accent);
-			box-shadow: 0 0 6px rgba(161, 194, 247, 0.6);
+			box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
 			border-radius: 2px;
 		}
 	}
@@ -561,19 +561,19 @@
 		transition: all 0.13s;
 
 		&.danger:hover {
-			border-color: var(--enemy);
-			color: var(--enemy);
-			background: rgba(224, 138, 120, 0.1);
+			border-color: var(--change-removed);
+			color: var(--change-removed);
+			background: color-mix(in srgb, var(--change-removed) 10%, transparent);
 		}
 		&.reset:hover {
-			border-color: var(--warning);
-			color: var(--warning);
-			background: rgba(240, 210, 138, 0.1);
+			border-color: var(--change-modified);
+			color: var(--change-modified);
+			background: color-mix(in srgb, var(--change-modified) 10%, transparent);
 		}
 		&.accent:hover {
 			border-color: var(--accent);
 			color: var(--accent);
-			background: rgba(161, 194, 247, 0.1);
+			background: color-mix(in srgb, var(--accent) 10%, transparent);
 		}
 	}
 
@@ -600,8 +600,8 @@
 			width: 5px;
 			height: 5px;
 			border-radius: 50%;
-			background: var(--warning);
-			box-shadow: 0 0 5px var(--warning);
+			background: var(--change-modified);
+			box-shadow: 0 0 5px var(--change-modified);
 		}
 	}
 
@@ -650,24 +650,24 @@
 			border-radius: 50%;
 		}
 		&.added {
-			color: var(--accent);
+			color: var(--change-added);
 			.dot {
-				background: var(--accent);
-				box-shadow: 0 0 6px var(--accent);
+				background: var(--change-added);
+				box-shadow: 0 0 6px var(--change-added);
 			}
 		}
 		&.modified {
-			color: var(--warning);
+			color: var(--change-modified);
 			.dot {
-				background: var(--warning);
-				box-shadow: 0 0 6px var(--warning);
+				background: var(--change-modified);
+				box-shadow: 0 0 6px var(--change-modified);
 			}
 		}
 		&.deleted {
-			color: var(--enemy);
+			color: var(--change-removed);
 			.dot {
-				background: var(--enemy);
-				box-shadow: 0 0 6px var(--enemy);
+				background: var(--change-removed);
+				box-shadow: 0 0 6px var(--change-removed);
 			}
 		}
 	}
@@ -682,7 +682,7 @@
 	.eswitch {
 		display: inline-flex;
 		gap: 2px;
-		background: rgba(255, 255, 255, 0.04);
+		background: color-mix(in srgb, var(--white) 4%, transparent);
 		border: 1px solid var(--border-subtle);
 		border-radius: 6px;
 		padding: 3px;
@@ -706,9 +706,9 @@
 				color: var(--text-secondary);
 			}
 			&.active {
-				background: rgba(161, 194, 247, 0.12);
+				background: color-mix(in srgb, var(--accent) 12%, transparent);
 				color: var(--text-primary);
-				box-shadow: inset 0 0 0 1px rgba(161, 194, 247, 0.3);
+				box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 			}
 		}
 	}
@@ -716,7 +716,7 @@
 		min-height: 46px;
 		border: 1px solid var(--border-subtle);
 		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.015);
+		background: color-mix(in srgb, var(--white) 1.5%, transparent);
 		padding: 11px 12px;
 		display: flex;
 		align-items: center;
@@ -746,7 +746,7 @@
 		}
 		.x:hover {
 			opacity: 1;
-			background: rgba(255, 255, 255, 0.12);
+			background: color-mix(in srgb, var(--white) 12%, transparent);
 		}
 	}
 	.tag-results {
@@ -793,7 +793,7 @@
 		gap: 7px;
 		font-family: var(--sans);
 		font-size: 12px;
-		background: rgba(255, 255, 255, 0.025);
+		background: color-mix(in srgb, var(--white) 2.5%, transparent);
 		border: 1px solid var(--border-subtle);
 		color: var(--text-secondary);
 		border-radius: 13px;
@@ -814,8 +814,8 @@
 		font-family: var(--mono);
 		font-size: 9px;
 		color: var(--accent);
-		background: rgba(161, 194, 247, 0.12);
-		border: 1px solid rgba(161, 194, 247, 0.35);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 		border-radius: 9px;
 		padding: 0 6px;
 		min-width: 18px;
@@ -828,7 +828,7 @@
 		font-family: var(--mono);
 		font-size: 10.5px;
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.04);
+		background: color-mix(in srgb, var(--white) 4%, transparent);
 		border: 1px solid var(--border-subtle);
 		border-radius: 3px;
 		padding: 2px 7px;
@@ -847,7 +847,7 @@
 		padding: 18px;
 		border: 1px solid var(--border-subtle);
 		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.012);
+		background: color-mix(in srgb, var(--white) 1.2%, transparent);
 	}
 	.ch-stat-readout {
 		display: flex;
@@ -855,13 +855,13 @@
 		gap: 9px;
 		height: 38px;
 		padding: 0 12px;
-		border: 1px solid rgba(161, 194, 247, 0.22);
+		border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
 		border-radius: 4px;
-		background: rgba(161, 194, 247, 0.05);
+		background: color-mix(in srgb, var(--accent) 5%, transparent);
 
 		&.none {
 			border-color: var(--border-subtle);
-			background: rgba(255, 255, 255, 0.02);
+			background: color-mix(in srgb, var(--white) 2%, transparent);
 		}
 		.nm {
 			font-size: 13px;
@@ -879,7 +879,7 @@
 			letter-spacing: 1px;
 			text-transform: uppercase;
 			color: var(--accent);
-			border: 1px solid rgba(161, 194, 247, 0.35);
+			border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 			border-radius: 3px;
 			padding: 2px 6px;
 		}
@@ -904,14 +904,14 @@
 		border-radius: 4px;
 		font-size: 12.5px;
 		color: var(--text-tertiary);
-		background: rgba(255, 255, 255, 0.015);
+		background: color-mix(in srgb, var(--white) 1.5%, transparent);
 	}
 	.ch-sentence {
 		margin-top: 22px;
 		padding: 16px 18px;
-		border: 1px solid rgba(161, 194, 247, 0.25);
+		border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 		border-radius: 8px;
-		background: linear-gradient(180deg, rgba(161, 194, 247, 0.07), rgba(161, 194, 247, 0.02));
+		background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), color-mix(in srgb, var(--accent) 2%, transparent));
 		display: flex;
 		align-items: center;
 		gap: 14px;
@@ -923,7 +923,7 @@
 		letter-spacing: 1.6px;
 		text-transform: uppercase;
 		color: var(--accent);
-		border: 1px solid rgba(161, 194, 247, 0.4);
+		border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 		border-radius: 3px;
 		padding: 3px 7px;
 		white-space: nowrap;
@@ -948,8 +948,8 @@
 
 		&.info {
 			color: var(--accent-light);
-			border: 1px solid rgba(161, 194, 247, 0.3);
-			background: rgba(161, 194, 247, 0.07);
+			border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+			background: color-mix(in srgb, var(--accent) 7%, transparent);
 		}
 	}
 	.ch-reward-intro {
@@ -981,8 +981,8 @@
 			border-color: var(--border-light);
 		}
 		&.open {
-			border-color: rgba(161, 194, 247, 0.4);
-			box-shadow: 0 0 0 1px rgba(161, 194, 247, 0.15);
+			border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+			box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
 		}
 	}
 	.ch-reward-head {
@@ -998,7 +998,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(255, 255, 255, 0.03);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
 		border: 1px solid var(--border-subtle);
 		color: var(--text-tertiary);
 	}
@@ -1034,11 +1034,11 @@
 	}
 	.ch-picker {
 		margin-top: 16px;
-		border: 1px solid rgba(161, 194, 247, 0.3);
+		border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 		border-radius: 8px;
 		overflow: hidden;
 		max-width: 760px;
-		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+		box-shadow: 0 12px 36px color-mix(in srgb, var(--black) 35%, transparent);
 	}
 	.ch-picker-bar {
 		display: flex;
@@ -1081,15 +1081,15 @@
 			border-color 0.12s;
 
 		&:hover:not(:disabled) {
-			background: rgba(255, 255, 255, 0.04);
+			background: color-mix(in srgb, var(--white) 4%, transparent);
 			border-color: var(--border-subtle);
 		}
 		.rare-tag {
 			flex-shrink: 0;
 		}
 		&.current {
-			background: rgba(161, 194, 247, 0.1);
-			border-color: rgba(161, 194, 247, 0.35);
+			background: color-mix(in srgb, var(--accent) 10%, transparent);
+			border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 		}
 		&.claimed {
 			opacity: 0.5;

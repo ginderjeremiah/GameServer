@@ -222,8 +222,8 @@ const onNumberInput = (e: Event) => {
 	}
 
 	&.dirty {
-		border-color: color-mix(in srgb, var(--warning) 55%, transparent);
-		background: color-mix(in srgb, var(--warning) 6%, transparent);
+		border-color: color-mix(in srgb, var(--change-modified) 55%, transparent);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.dirty:focus {
@@ -267,8 +267,8 @@ const onNumberInput = (e: Event) => {
 	}
 
 	&.dirty {
-		border-color: color-mix(in srgb, var(--warning) 55%, transparent);
-		background: color-mix(in srgb, var(--warning) 6%, transparent);
+		border-color: color-mix(in srgb, var(--change-modified) 55%, transparent);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.dirty:focus {
@@ -320,13 +320,13 @@ const onNumberInput = (e: Event) => {
 	}
 
 	&.dirty {
-		border-color: var(--warning);
-		background: color-mix(in srgb, var(--warning) 6%, transparent);
+		border-color: var(--change-modified);
+		background: color-mix(in srgb, var(--change-modified) 6%, transparent);
 	}
 
 	&.on.dirty {
-		border-color: var(--warning);
-		background: color-mix(in srgb, var(--warning) 12%, transparent);
+		border-color: var(--change-modified);
+		background: color-mix(in srgb, var(--change-modified) 12%, transparent);
 	}
 
 	&:disabled {
@@ -341,8 +341,8 @@ const onNumberInput = (e: Event) => {
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	background: var(--warning);
-	box-shadow: 0 0 6px color-mix(in srgb, var(--warning) 90%, transparent);
+	background: var(--change-modified);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--change-modified) 90%, transparent);
 	pointer-events: none;
 }
 </style>

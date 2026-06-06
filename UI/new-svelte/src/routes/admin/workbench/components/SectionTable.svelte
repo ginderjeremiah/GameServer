@@ -23,9 +23,9 @@
 					{@const isNewRow = !baseRows || i >= baseRows.length}
 					{@const baseRow = baseRows?.[i]}
 					{@const edge = isNewRow
-						? 'var(--accent)'
+						? 'var(--change-added)'
 						: baseRow && !recordsEqual(row, baseRow)
-							? 'var(--warning)'
+							? 'var(--change-modified)'
 							: 'transparent'}
 					<tr>
 						<td style:padding="0" style:width="18px">

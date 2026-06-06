@@ -85,6 +85,10 @@ The rarity pattern is now the template for every data-driven accent. Challenge-t
 
 > **Follow-up (pre-existing duplication):** the category and mod-type accent/label maps are still hard-coded inside `inventory/ItemTooltip.svelte`, `inventory/inventory-view.svelte.ts` and `inventory/ModSlots.svelte` (they pre-date the `$lib/common/item-display` helpers above and hold the same values). They should be migrated to the helpers so the colours are defined once.
 
+### Editor change-state accents
+
+The admin editor (the shared `components/table` `TableEditor` and the `routes/admin/workbench`) signals a record/row/cell that is a pending **add**, **edit**, or **remove** with a dedicated token trio — `--change-added` / `--change-modified` / `--change-removed` — declared in `+layout.svelte`. These currently resolve to the same hues as `--accent` / `--warning` / `--enemy-accent`, but they are deliberately separate functional concerns: a row marked for removal is not an "enemy", and an unsaved/dirty edit is not a validation "warning". Keeping them distinct means a theme can restyle change-state affordances (status edges, the add/edit/remove pips and spill tags, the dirty-field/tab dots, the delete/reset action hovers) without disturbing the brand accent, the destructive-enemy hue, or the amber validation-warning signal — which the Workbench intentionally keeps visually separate from the unsaved-dirty signal. Use these tokens for change-state UI and reserve `--warning` for validation.
+
 ## Challenge screen (the Type Rail)
 
 The in-game Challenges screen (`src/routes/game/screens/challenges`) is a **type-driven master/detail** view: a left rail lists each `ChallengeType` (ring meter + done/total) plus an "Overview" entry; selecting a type swaps the right pane to a hero banner + that type's challenge cards with an in-page Progress/Rarity/Name sort, while "Overview" shows overall progress, a pulsing "next up" reward, and a per-type grid. It reuses the existing screen chrome (dark frame, diamond mark, Geist/Geist Mono) and is decomposed into many small components per the component-size guideline.

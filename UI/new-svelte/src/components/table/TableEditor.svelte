@@ -413,26 +413,26 @@ $effect(() => {
 	}
 
 	&.added {
-		color: var(--accent);
+		color: var(--change-added);
 		.dot {
-			background: var(--accent);
-			box-shadow: 0 0 6px var(--accent);
+			background: var(--change-added);
+			box-shadow: 0 0 6px var(--change-added);
 		}
 	}
 
 	&.modified {
-		color: var(--warning);
+		color: var(--change-modified);
 		.dot {
-			background: var(--warning);
-			box-shadow: 0 0 6px var(--warning);
+			background: var(--change-modified);
+			box-shadow: 0 0 6px var(--change-modified);
 		}
 	}
 
 	&.deleted {
-		color: var(--enemy-accent);
+		color: var(--change-removed);
 		.dot {
-			background: var(--enemy-accent);
-			box-shadow: 0 0 6px var(--enemy-accent);
+			background: var(--change-removed);
+			box-shadow: 0 0 6px var(--change-removed);
 		}
 	}
 }

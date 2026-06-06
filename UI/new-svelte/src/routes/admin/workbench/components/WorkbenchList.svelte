@@ -21,11 +21,11 @@
 			{@const badge = entity.listBadge?.(record)}
 			{@const edge =
 				status === 'added'
-					? 'var(--accent)'
+					? 'var(--change-added)'
 					: status === 'modified'
-						? 'var(--warning)'
+						? 'var(--change-modified)'
 						: status === 'deleted'
-							? 'var(--enemy)'
+							? 'var(--change-removed)'
 							: 'transparent'}
 			<button
 				type="button"

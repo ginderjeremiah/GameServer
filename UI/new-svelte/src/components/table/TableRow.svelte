@@ -70,10 +70,10 @@ let {
 const isDeleted = $derived(state === RowState.Deleted || state === RowState.AddedDeleted);
 
 const EDGE: Record<RowState, string> = {
-	[RowState.Added]: 'var(--accent)',
-	[RowState.Modified]: 'var(--warning)',
-	[RowState.Deleted]: 'var(--enemy-accent)',
-	[RowState.AddedDeleted]: 'var(--enemy-accent)',
+	[RowState.Added]: 'var(--change-added)',
+	[RowState.Modified]: 'var(--change-modified)',
+	[RowState.Deleted]: 'var(--change-removed)',
+	[RowState.AddedDeleted]: 'var(--change-removed)',
 	[RowState.Unmodified]: 'transparent'
 };
 const edgeColor = $derived(EDGE[state]);
@@ -90,7 +90,7 @@ const cellDirty = (key: keyof T) => {
 <style lang="scss">
 tr {
 	&.deleted {
-		background: color-mix(in srgb, var(--enemy-accent) 5%, transparent);
+		background: color-mix(in srgb, var(--change-removed) 5%, transparent);
 
 		.index-cell,
 		:global(.cell) {
@@ -151,9 +151,9 @@ tr {
 	transition: all 130ms ease;
 
 	&.delete:hover {
-		border-color: var(--enemy-accent);
-		color: var(--enemy-accent);
-		background: color-mix(in srgb, var(--enemy-accent) 12%, transparent);
+		border-color: var(--change-removed);
+		color: var(--change-removed);
+		background: color-mix(in srgb, var(--change-removed) 12%, transparent);
 	}
 
 	&.restore:hover {
@@ -163,9 +163,9 @@ tr {
 	}
 
 	&.reset:hover {
-		border-color: var(--warning);
-		color: var(--warning);
-		background: color-mix(in srgb, var(--warning) 12%, transparent);
+		border-color: var(--change-modified);
+		color: var(--change-modified);
+		background: color-mix(in srgb, var(--change-modified) 12%, transparent);
 	}
 }
 </style>
