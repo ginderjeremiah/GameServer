@@ -21,7 +21,6 @@ import type {
 	IItemModType,
 	ILoginCredentials,
 	ILoginResult,
-	ILogPreference,
 	IPlayerChallenge,
 	IPlayerData,
 	IPlayerStatistic,
@@ -84,7 +83,6 @@ export type ApiResponseTypes = {
 	'Player/ApplyMod': undefined;
 	'Player/EquipItem': undefined;
 	'Player/RemoveMod': undefined;
-	'Player/SaveLogPreferences': undefined;
 	'Player/UnequipItem': undefined;
 	'Player/UpdatePlayerStats': IBattlerAttribute[];
 	'Skills': ISkill[];
@@ -130,7 +128,6 @@ export type ApiRequestTypes = {
 	'Player/ApplyMod': IApplyModRequest;
 	'Player/EquipItem': IEquipRequest;
 	'Player/RemoveMod': IRemoveModRequest;
-	'Player/SaveLogPreferences': ILogPreference[];
 	'Player/UnequipItem': IEquipRequest;
 	'Player/UpdatePlayerStats': IAttributeUpdate[];
 	'Skills': { refreshCache?: boolean } | undefined;

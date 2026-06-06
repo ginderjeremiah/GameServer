@@ -4,12 +4,8 @@ import { EItemCategory, EItemModType } from '$lib/api';
  * Themeable presentation metadata for item categories and item-mod types: the
  * accent hues live as `--category-*` / `--mod-*` custom properties in
  * `+layout.svelte`, and these helpers reference them (mirroring `rarity.ts`).
- *
- * NOTE (follow-up): the same category/mod-type accent and label maps are
- * currently hard-coded inside `inventory/ItemTooltip.svelte`,
- * `inventory/inventory-view.svelte.ts` and `inventory/ModSlots.svelte`. Those
- * pre-date this module and should be migrated to consume these helpers so the
- * colours are defined once and remain theme-overridable.
+ * They are the single source of truth for category/mod-type colours and labels
+ * across the inventory and challenges screens.
  */
 
 const CATEGORY_GROUP: Record<EItemCategory, 'armor' | 'weapon' | 'accessory'> = {
@@ -38,3 +34,17 @@ export const modTypeLabel = (id: EItemModType): string => EItemModType[id] ?? ''
 
 /** Themeable item-mod-type accent hue, e.g. `var(--mod-prefix)`. */
 export const modTypeColor = (id: EItemModType): string => `var(--mod-${MOD_TYPE_KEY[id] ?? 'component'})`;
+
+/**
+ * Composes an item's display name from its base name plus the names of its
+ * applied prefix/suffix mods, e.g. `Flaming Iron Sword of the Bear`. Prefix mod
+ * names are prepended and suffix mod names appended, both in applied order;
+ * component mods do not affect the name. Kept as a pure helper (taking only the
+ * mod fields it needs) so it stays testable and free of a `$lib/battle` import
+ * cycle, and so the inventory grid can reuse it alongside the tooltip.
+ */
+export const composeItemName = (baseName: string, mods: { name: string; itemModTypeId: EItemModType }[]): string => {
+	const prefixes = mods.filter((m) => m.itemModTypeId === EItemModType.Prefix).map((m) => m.name);
+	const suffixes = mods.filter((m) => m.itemModTypeId === EItemModType.Suffix).map((m) => m.name);
+	return [...prefixes, baseName, ...suffixes].join(' ');
+};

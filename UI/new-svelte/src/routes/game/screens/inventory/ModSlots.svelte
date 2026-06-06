@@ -4,7 +4,7 @@
 	<div class="mod-slots">
 		{#each item.modSlots as slot (slot.id)}
 			{@const applied = item.appliedMods.find((m) => m.itemModSlotId === slot.id)}
-			{@const accent = modAccent(slot.itemModSlotTypeId)}
+			{@const accent = modTypeColor(slot.itemModSlotTypeId)}
 			<div class="mod-slot-wrap">
 				<div
 					class="mod-slot"
@@ -29,12 +29,12 @@
 							{:else}
 								<span class="mod-empty">Empty slot</span>
 							{/if}
-							<span class="mod-type" style:color={accent}>{modLabel(slot.itemModSlotTypeId)}</span>
+							<span class="mod-type" style:color={accent}>{modTypeLabel(slot.itemModSlotTypeId)}</span>
 						</div>
 						{#if applied}
 							<div class="mod-desc">{applied.description}</div>
 						{:else}
-							<div class="mod-hint">Click to install a {modLabel(slot.itemModSlotTypeId).toLowerCase()}</div>
+							<div class="mod-hint">Click to install a {modTypeLabel(slot.itemModSlotTypeId).toLowerCase()}</div>
 						{/if}
 					</div>
 
@@ -55,10 +55,10 @@
 				{#if openSlotId === slot.id && !applied}
 					{@const options = view.compatibleMods(slot.itemModSlotTypeId, item)}
 					<div class="mod-picker" style:border-left-color={accent}>
-						<div class="picker-label" style:color={accent}>Install {modLabel(slot.itemModSlotTypeId)}</div>
+						<div class="picker-label" style:color={accent}>Install {modTypeLabel(slot.itemModSlotTypeId)}</div>
 						{#if options.length === 0}
 							<div class="picker-empty">
-								No unlocked {modLabel(slot.itemModSlotTypeId).toLowerCase()} mods available.
+								No unlocked {modTypeLabel(slot.itemModSlotTypeId).toLowerCase()} mods available.
 							</div>
 						{:else}
 							<div class="picker-options">
@@ -85,9 +85,8 @@
 {/if}
 
 <script lang="ts">
-import { EItemModType } from '$lib/api';
 import type { Item } from '$lib/battle';
-import { rarityColor } from '$lib/common';
+import { modTypeColor, modTypeLabel, rarityColor } from '$lib/common';
 import type { InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
@@ -97,26 +96,13 @@ let openSlotId = $state<number | null>(null);
 const togglePicker = (slotId: number) => {
 	openSlotId = openSlotId === slotId ? null : slotId;
 };
-
-const MOD_LABELS: Record<number, string> = {
-	[EItemModType.Component]: 'Component',
-	[EItemModType.Prefix]: 'Prefix',
-	[EItemModType.Suffix]: 'Suffix'
-};
-const MOD_ACCENTS: Record<number, string> = {
-	[EItemModType.Component]: 'rgba(240, 240, 240, 0.55)',
-	[EItemModType.Prefix]: '#9bc7d9',
-	[EItemModType.Suffix]: '#c0a8e6'
-};
-const modLabel = (type: number) => MOD_LABELS[type] ?? '';
-const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.55)';
 </script>
 
 <style lang="scss">
 .no-slots {
 	font-size: 11.5px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	padding: 4px 0;
 }
 
@@ -136,16 +122,16 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 	gap: 8px;
 	padding: 7px 9px;
 	background: transparent;
-	border: 1px dashed rgba(255, 255, 255, 0.14);
+	border: 1px dashed var(--border-light);
 	border-left: 2px solid;
 	border-radius: 2px;
 	cursor: pointer;
 	min-height: 38px;
 
 	&.filled {
-		background: rgba(255, 255, 255, 0.03);
+		background: color-mix(in srgb, var(--white) 3%, transparent);
 		border-style: solid;
-		border-color: rgba(255, 255, 255, 0.08);
+		border-color: var(--border-subtle);
 		cursor: default;
 	}
 }
@@ -164,12 +150,12 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 .mod-name {
 	font-size: 12px;
 	font-weight: 500;
-	color: #f0f0f0;
+	color: var(--text-primary);
 }
 
 .mod-empty {
 	font-size: 12px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 .mod-type {
@@ -181,14 +167,14 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 
 .mod-desc {
 	font-size: 11px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	line-height: 1.45;
 	margin-top: 2px;
 }
 
 .mod-hint {
 	font-size: 11px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	margin-top: 2px;
 }
 
@@ -198,8 +184,8 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 	height: 18px;
 	border: none;
 	border-radius: 2px;
-	background: rgba(255, 255, 255, 0.06);
-	color: rgba(240, 240, 240, 0.55);
+	background: color-mix(in srgb, var(--white) 6%, transparent);
+	color: var(--text-tertiary);
 	cursor: pointer;
 	font-size: 11px;
 	padding: 0;
@@ -213,8 +199,8 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 
 .mod-picker {
 	margin-top: 4px;
-	background: rgba(20, 21, 27, 0.98);
-	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: color-mix(in srgb, var(--surface) 98%, transparent);
+	border: 1px solid var(--border-light);
 	border-left: 2px solid;
 	border-radius: 3px;
 	padding: 6px;
@@ -231,7 +217,7 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 .picker-empty {
 	padding: 8px 6px;
 	font-size: 11.5px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	font-style: italic;
 }
 
@@ -253,19 +239,19 @@ const modAccent = (type: number) => MOD_ACCENTS[type] ?? 'rgba(240, 240, 240, 0.
 	border-radius: 2px;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: color-mix(in srgb, var(--white) 6%, transparent);
 	}
 }
 
 .option-name {
 	font-size: 12px;
 	font-weight: 500;
-	color: #f0f0f0;
+	color: var(--text-primary);
 }
 
 .option-desc {
 	font-size: 11px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	line-height: 1.45;
 	margin-top: 1px;
 }

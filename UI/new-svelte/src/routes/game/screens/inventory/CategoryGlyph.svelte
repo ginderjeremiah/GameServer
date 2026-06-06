@@ -3,7 +3,7 @@
 	height={size}
 	viewBox="0 0 16 16"
 	fill="none"
-	stroke={color}
+	style:stroke={color}
 	stroke-width="1.2"
 	stroke-linejoin="round"
 	stroke-linecap="round"
