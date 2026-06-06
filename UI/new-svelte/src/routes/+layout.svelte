@@ -1,4 +1,4 @@
-<div class="page-base">
+<div class="page-base" data-hydrated={hydrated ? 'true' : undefined}>
 	{@render children()}
 	<TooltipBase />
 	<ToastContainer />
@@ -8,6 +8,7 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
+import { onMount } from 'svelte';
 import { TooltipBase, ToastContainer } from '$components';
 import { onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
@@ -15,6 +16,15 @@ import { toastError } from '$stores';
 import '$styles/common.scss';
 
 let { children } = $props();
+
+// Hydration signal for end-to-end tests. The form markup is server-rendered, so it is present and
+// clickable before the client bundle has hydrated and wired up event handlers; a click landing in
+// that window is silently dropped. This onMount runs after every child component's onMount (Svelte
+// mounts children first), so `data-hydrated="true"` on the root marks the whole page as interactive.
+let hydrated = $state(false);
+onMount(() => {
+	hydrated = true;
+});
 
 // Surface otherwise-silent WebSocket failures to the player. Registered during
 // layout init (the root layout lives for the whole app session), so the hook's

@@ -13,6 +13,12 @@
 #
 # Ports default to dedicated values to avoid colliding with the integration-test backing services
 # (5499 / 6399) and any native PostgreSQL/Redis. Override via the environment if needed.
+#
+# Seeding: the API migrates on startup but migrations only carry the intrinsic enum-backed reference
+# data. The static content the e2e suite needs (Skills/Enemies/Zones) must be applied separately once
+# the API is up, e.g.:
+#   docker compose exec -T postgres psql -U game -d game -p 5544 -f - < e2e-seed.sql
+# See e2e-seed.sql and docs/backend.md "Dockerized API stack for end-to-end (Playwright) runs".
 
 services:
   postgres:
