@@ -31,12 +31,6 @@ namespace Game.Api.Controllers
         }
 
         [HttpPost]
-        public ApiResponse SaveLogPreferences([FromBody] List<Models.Player.LogPreference> prefs)
-        {
-            throw new NotImplementedException();
-        }
-
-        [HttpPost]
         public async Task<ApiResponse> EquipItem([FromBody] EquipRequest request)
         {
             var player = await _sessionService.LoadPlayer();
