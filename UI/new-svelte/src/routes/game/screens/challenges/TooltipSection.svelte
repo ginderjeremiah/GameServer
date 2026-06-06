@@ -42,6 +42,6 @@ const { label, last = false, children }: Props = $props();
 .tt-section-line {
 	flex: 1;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.06);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 </style>

@@ -121,12 +121,12 @@ const attributeName = (attrId: number) => {
 .skill-tooltip {
 	width: 280px;
 	border-radius: 3px;
-	box-shadow: -4px 0 16px rgba(161, 194, 247, 0.13);
+	box-shadow: -4px 0 16px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 .tt-title-section {
 	padding: 14px 16px 12px;
-	border-bottom: 1px solid rgba(240, 240, 240, 0.08);
+	border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .tt-category-row {
@@ -141,7 +141,7 @@ const attributeName = (attrId: number) => {
 	height: 5px;
 	transform: rotate(45deg);
 	background: var(--accent);
-	box-shadow: 0 0 6px rgba(161, 194, 247, 0.68);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 68%, transparent);
 }
 
 .tt-category-label {
@@ -157,8 +157,8 @@ const attributeName = (attrId: number) => {
 	position: relative;
 	width: 60px;
 	height: 18px;
-	background: rgba(240, 240, 240, 0.06);
-	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+	border: 1px solid var(--border-light);
 	border-radius: 2px;
 	overflow: hidden;
 }
@@ -166,10 +166,18 @@ const attributeName = (attrId: number) => {
 .tt-cooldown-fill {
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(90deg, rgba(161, 194, 247, 0.5), rgba(161, 194, 247, 0.18));
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--accent) 50%, transparent),
+		color-mix(in srgb, var(--accent) 18%, transparent)
+	);
 
 	&.ready {
-		background: linear-gradient(90deg, rgba(189, 224, 180, 0.55), rgba(189, 224, 180, 0.2));
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--success) 55%, transparent),
+			color-mix(in srgb, var(--success) 20%, transparent)
+		);
 	}
 }
 
@@ -181,18 +189,18 @@ const attributeName = (attrId: number) => {
 	justify-content: center;
 	font-family: var(--mono);
 	font-size: 9px;
-	color: #c0d8ff;
+	color: var(--accent-light);
 	letter-spacing: 0.6px;
 
 	&.ready {
-		color: #bde0b4;
+		color: var(--success);
 	}
 }
 
 .tt-skill-name {
 	font-size: 18px;
 	font-weight: 400;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	letter-spacing: -0.2px;
 }
 
@@ -213,7 +221,7 @@ const attributeName = (attrId: number) => {
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	margin-bottom: 7px;
 	display: flex;
 	align-items: center;
@@ -223,7 +231,7 @@ const attributeName = (attrId: number) => {
 .tt-section-line {
 	flex: 1;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.06);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
 .tt-dmg-list {
@@ -240,37 +248,37 @@ const attributeName = (attrId: number) => {
 }
 
 .tt-dmg-label {
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 }
 
 .tt-mult-dim {
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 }
 
 .tt-dmg-value {
 	font-family: var(--mono);
 	font-size: 11.5px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	letter-spacing: 0.3px;
 
 	&.positive {
-		color: #bde0b4;
+		color: var(--success);
 	}
 	&.negative {
-		color: #f0a094;
+		color: var(--error);
 	}
 }
 
 .tt-dmg-total {
 	margin-top: 4px;
 	padding-top: 6px;
-	border-top: 1px solid rgba(240, 240, 240, 0.1);
+	border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
 	font-size: 13px;
 	font-weight: 600;
-	color: #f0f0f0;
+	color: var(--text-primary);
 }
 
 .tt-total-value {
@@ -287,8 +295,8 @@ const attributeName = (attrId: number) => {
 
 .tt-metric {
 	padding: 7px 10px;
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid var(--border-subtle);
 	border-radius: 2px;
 }
 
@@ -297,14 +305,14 @@ const attributeName = (attrId: number) => {
 	font-size: 9px;
 	letter-spacing: 1.3px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 	margin-bottom: 2px;
 }
 
 .tt-metric-value {
 	font-family: var(--mono);
 	font-size: 14px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	letter-spacing: 0.3px;
 }
 </style>

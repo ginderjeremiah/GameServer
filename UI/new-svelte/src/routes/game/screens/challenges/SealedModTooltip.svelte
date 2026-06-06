@@ -50,7 +50,7 @@ const EFFECT_BAR_WIDTHS = [70, 88, 58];
 .sealed-tooltip {
 	width: 280px;
 	border-radius: 3px;
-	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
 }
 
 .tt-body {

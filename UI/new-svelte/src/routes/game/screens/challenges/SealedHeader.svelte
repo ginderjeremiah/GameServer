@@ -37,7 +37,7 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 <style lang="scss">
 .sealed-head {
 	padding: 14px 16px 12px;
-	border-bottom: 1px solid rgba(240, 240, 240, 0.08);
+	border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .head-top {
@@ -79,7 +79,7 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 .masked-name {
 	font-size: 18px;
 	font-weight: 400;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 	letter-spacing: 2px;
 }
 </style>

@@ -30,7 +30,7 @@
 
 <script lang="ts">
 import type { Battler, Skill } from '$lib/battle';
-import { formatNum } from '$lib/common';
+import { formatNum, tintColor } from '$lib/common';
 import { registerTooltipComponent, type TooltipComponent } from '$stores/tooltip.svelte';
 import SkillTooltip from './SkillTooltip.svelte';
 
@@ -45,7 +45,9 @@ let tooltip = $state<TooltipComponent>();
 let tooltipSkillIndex = $state(-1);
 
 const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
-const pulseColor = $derived(side === 'player' ? 'rgba(161, 194, 247, 0.6)' : 'rgba(224, 135, 120, 0.6)');
+const pulseColor = $derived(
+	side === 'player' ? tintColor('var(--accent)', 0.6) : tintColor('var(--enemy-accent)', 0.6)
+);
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -107,8 +109,8 @@ const isReady = (skill: Skill) => {
 	width: 46px;
 	height: 46px;
 	position: relative;
-	background: rgba(255, 255, 255, 0.05);
-	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: color-mix(in srgb, var(--white) 5%, transparent);
+	border: 1px solid var(--border-light);
 	border-radius: 2px;
 	overflow: hidden;
 	cursor: default;
@@ -117,8 +119,8 @@ const isReady = (skill: Skill) => {
 		box-shadow 140ms;
 
 	&.ready {
-		border-color: rgba(161, 194, 247, 0.53);
-		box-shadow: inset 0 0 8px rgba(161, 194, 247, 0.35);
+		border-color: color-mix(in srgb, var(--accent) 53%, transparent);
+		box-shadow: inset 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 }
 
@@ -133,7 +135,10 @@ const isReady = (skill: Skill) => {
 .cooldown-overlay {
 	position: absolute;
 	inset: 0;
-	background: conic-gradient(transparent var(--skill-sweep), rgba(0, 0, 0, 0.65) var(--skill-sweep));
+	background: conic-gradient(
+		transparent var(--skill-sweep),
+		color-mix(in srgb, var(--black) 65%, transparent) var(--skill-sweep)
+	);
 	pointer-events: none;
 }
 
@@ -150,7 +155,7 @@ const isReady = (skill: Skill) => {
 	font-size: 9px;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.6);
+	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
 	white-space: nowrap;
 
 	&.ready-label {

@@ -52,7 +52,7 @@ const { groups, selected, onSelect }: Props = $props();
 
 	&.active {
 		border-color: var(--border-light);
-		background: rgba(255, 255, 255, 0.06);
+		background: color-mix(in srgb, var(--white) 6%, transparent);
 	}
 }
 
@@ -64,7 +64,7 @@ const { groups, selected, onSelect }: Props = $props();
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(255, 255, 255, 0.05);
+	background: color-mix(in srgb, var(--white) 5%, transparent);
 	border: 1px solid var(--border-light);
 }
 

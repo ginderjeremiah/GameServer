@@ -61,17 +61,17 @@ import { battleEngine } from '$lib/engine';
 .vs-diamond {
 	position: absolute;
 	inset: 0;
-	border: 1px solid rgba(255, 255, 255, 0.18);
+	border: 1px solid var(--border-medium);
 	transform: rotate(45deg);
-	background: rgba(20, 21, 27, 0.6);
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
 .vs-diamond-inner {
 	position: absolute;
 	inset: 14px;
-	background: rgba(255, 255, 255, 0.04);
+	background: color-mix(in srgb, var(--white) 4%, transparent);
 	transform: rotate(45deg);
-	box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.08);
+	box-shadow: inset 0 0 12px var(--border-subtle);
 }
 
 .vs-text {
@@ -80,6 +80,6 @@ import { battleEngine } from '$lib/engine';
 	font-size: 10px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.85);
+	color: color-mix(in srgb, var(--text-primary) 85%, transparent);
 }
 </style>

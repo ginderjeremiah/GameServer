@@ -54,12 +54,12 @@ const effects = $derived(
 .mod-tooltip {
 	width: 280px;
 	border-radius: 3px;
-	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
 }
 
 .tt-title-section {
 	padding: 14px 16px 12px;
-	border-bottom: 1px solid rgba(240, 240, 240, 0.08);
+	border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .tt-type-row {
@@ -110,7 +110,7 @@ const effects = $derived(
 		font-size: 11.5px;
 		letter-spacing: 0.3px;
 		text-align: right;
-		color: rgba(240, 240, 240, 0.7);
+		color: color-mix(in srgb, var(--text-primary) 70%, transparent);
 
 		&.positive {
 			color: var(--success);
@@ -124,7 +124,7 @@ const effects = $derived(
 .tt-description {
 	font-size: 11.5px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.6);
+	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
 	line-height: 1.55;
 }
 </style>
