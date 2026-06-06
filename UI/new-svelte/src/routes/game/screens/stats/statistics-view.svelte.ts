@@ -21,7 +21,7 @@
 
 import { EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { normalizeText } from '$lib/common';
-import { buildMockStatistics, MOCK_ENTITIES, type StatEntity } from './statistics-mock';
+import { buildMockStatistics, MOCK_ENTITIES } from './statistics-mock';
 
 export type StatUnit = 'count' | 'damage' | 'time';
 export type StatAgg = 'sum' | 'max' | 'min';
@@ -32,6 +32,18 @@ export type StatEntityKind = 'enemy' | 'zone' | 'skill';
 export type StatKind = StatEntityKind | 'none';
 export type StatCategory = 'combat' | 'survival' | 'exploration' | 'time';
 export type ViewMode = 'stat' | 'entity';
+
+/** A reference entity a statistic can break down by — the shape `StatisticsData`
+ *  resolves entity ids against (today the mock's stand-in for
+ *  `staticData.enemies/zones/skills`). */
+export interface StatEntity {
+	id: number;
+	name: string;
+	/** Boss flag (enemies only). */
+	boss?: boolean;
+	/** Zone order number (zones only). */
+	zoneNum?: number;
+}
 
 export interface StatType {
 	id: EStatisticType;

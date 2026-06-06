@@ -21,7 +21,7 @@
 			<div
 				class="seg mult"
 				style:width="{width}%"
-				style:--mult-color={sourceColor(EAttributeModifierSource.Item)}
+				style:--mult-color={sourceColor(mult.source)}
 				title="×{mult.factor} → {fmtSigned(mult.applied, 1)}"
 			></div>
 		{/if}
@@ -29,7 +29,7 @@
 </div>
 
 <script lang="ts">
-import { groupBySource, EAttributeModifierSource, type ComputedAttribute } from '$lib/battle';
+import { groupBySource, type ComputedAttribute } from '$lib/battle';
 import { sourceColor, sourceLabel } from './source-display';
 import { fmtSigned, type LabeledModifier } from './attribute-breakdown-view.svelte';
 

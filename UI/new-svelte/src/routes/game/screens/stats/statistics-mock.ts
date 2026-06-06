@@ -17,18 +17,7 @@
    breakdowns always agree. */
 
 import { EStatisticType, type IPlayerStatistic } from '$lib/api';
-import type { StatEntityKind } from './statistics-view.svelte';
-
-/** A reference entity a statistic can break down by — the mock stand-in for the
- *  enemy/zone/skill reference data. */
-export interface StatEntity {
-	id: number;
-	name: string;
-	/** Boss flag (enemies only). */
-	boss?: boolean;
-	/** Zone order number (zones only). */
-	zoneNum?: number;
-}
+import type { StatEntity, StatEntityKind } from './statistics-view.svelte';
 
 /* ── raw per-entity tables ───────────────────────────────────────────────── */
 // fastest victory times are in SECONDS, matching the backend (totalMs / 1000).
