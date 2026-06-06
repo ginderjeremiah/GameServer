@@ -9,10 +9,10 @@ import type {
 	IAttributeUpdate,
 	IAuthTokens,
 	IBattlerAttribute,
-	IBrowserInfoRequest,
 	IChallenge,
 	IChallengeType,
 	IChange,
+	IDeviceInfoRequest,
 	IEnemy,
 	IEquipRequest,
 	IItem,
@@ -77,8 +77,8 @@ export type ApiResponseTypes = {
 	'Items': IItem[];
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
-	'Login/BrowserInfo': undefined;
 	'Login/CreateAccount': undefined;
+	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
@@ -126,8 +126,8 @@ export type ApiRequestTypes = {
 	'Items': { refreshCache?: boolean } | undefined;
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
-	'Login/BrowserInfo': IBrowserInfoRequest;
 	'Login/CreateAccount': ILoginCredentials;
+	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;
 	'Player/ApplyMod': IApplyModRequest;

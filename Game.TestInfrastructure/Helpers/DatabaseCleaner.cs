@@ -21,6 +21,7 @@ namespace Game.TestInfrastructure.Helpers
                     "PlayerStatistics",
                     "LogPreferences",
                     "UserLogins",
+                    "Devices",
                     "BrowserInfos",
                     "Players",
                     "Users",

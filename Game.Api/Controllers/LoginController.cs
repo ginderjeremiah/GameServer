@@ -166,20 +166,26 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
-        /// Records the device signals the frontend reports once after login (fingerprint hash and
-        /// capabilities), enriching the browser profile for the user-agent of this request. Requires
-        /// authentication so it can only be sent by a logged-in client.
+        /// Records the device capabilities the frontend reports once after login, enriching the device
+        /// identified by the fingerprint header of this request. Requires authentication so it can only be
+        /// sent by a logged-in client. Returns an error when the request carries no device fingerprint.
         /// </summary>
         [HttpPost]
-        public async Task<ApiResponse> BrowserInfo([FromBody] BrowserInfoRequest request)
+        public async Task<ApiResponse> DeviceInfo([FromBody] DeviceInfoRequest request)
         {
+            var fingerprint = ClientHints.DeviceFingerprint(Request.Headers);
+            if (fingerprint is null)
+            {
+                return ApiResponse.Error("Missing device fingerprint.");
+            }
+
             var hints = ClientHints.FromHeaders(Request.Headers);
-            await _loginTrackingService.SaveBrowserInfo(
+            await _loginTrackingService.SaveDeviceInfo(
+                fingerprint,
                 hints.UserAgent,
                 hints.SecChUa,
                 hints.SecChUaMobile,
                 hints.SecChUaPlatform,
-                request.DeviceFingerprintHash,
                 request.DeviceMemory,
                 request.HardwareConcurrency);
 

@@ -13,7 +13,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    [Migration("20260606122018_AddUserLoginTracking")]
+    [Migration("20260606144545_AddUserLoginTracking")]
     partial class AddUserLoginTracking
     {
         /// <inheritdoc />
@@ -193,16 +193,6 @@ namespace Game.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("DeviceFingerprintHash")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<double?>("DeviceMemory")
-                        .HasColumnType("double precision");
-
-                    b.Property<int?>("HardwareConcurrency")
-                        .HasColumnType("integer");
-
                     b.Property<string>("SecChUa")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -344,6 +334,38 @@ namespace Game.Infrastructure.Migrations
                             Name = "Skills Used",
                             StatisticTypeId = 14
                         });
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Device", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrowserInfoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DeviceFingerprintHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double?>("DeviceMemory")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("HardwareConcurrency")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrowserInfoId");
+
+                    b.HasIndex("DeviceFingerprintHash")
+                        .IsUnique();
+
+                    b.ToTable("Devices");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
@@ -1252,7 +1274,7 @@ namespace Game.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("BrowserInfoId")
+                    b.Property<int>("DeviceId")
                         .HasColumnType("integer");
 
                     b.Property<string>("IpAddress")
@@ -1268,9 +1290,9 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BrowserInfoId");
+                    b.HasIndex("DeviceId");
 
-                    b.HasIndex("UserId", "IpAddress", "BrowserInfoId")
+                    b.HasIndex("UserId", "IpAddress", "DeviceId")
                         .IsUnique();
 
                     b.ToTable("UserLogins");
@@ -1458,6 +1480,17 @@ namespace Game.Infrastructure.Migrations
                         .HasForeignKey("StatisticTypeId");
 
                     b.Navigation("StatisticType");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Device", b =>
+                {
+                    b.HasOne("Game.Abstractions.Entities.BrowserInfo", "BrowserInfo")
+                        .WithMany("Devices")
+                        .HasForeignKey("BrowserInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BrowserInfo");
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
@@ -1761,9 +1794,9 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("Game.Abstractions.Entities.UserLogin", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.BrowserInfo", "BrowserInfo")
+                    b.HasOne("Game.Abstractions.Entities.Device", "Device")
                         .WithMany("UserLogins")
-                        .HasForeignKey("BrowserInfoId")
+                        .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1773,7 +1806,7 @@ namespace Game.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("BrowserInfo");
+                    b.Navigation("Device");
 
                     b.Navigation("User");
                 });
@@ -1856,6 +1889,11 @@ namespace Game.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Game.Abstractions.Entities.BrowserInfo", b =>
+                {
+                    b.Navigation("Devices");
+                });
+
+            modelBuilder.Entity("Game.Abstractions.Entities.Device", b =>
                 {
                     b.Navigation("UserLogins");
                 });

@@ -9,6 +9,10 @@ import { ApiResponse } from './api-response';
 import { keys } from '../common/functions';
 import { getAccessToken } from './token-store';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
+import { ensureDeviceFingerprint, getDeviceFingerprint } from './device-fingerprint';
+
+/** Header carrying the client-computed device fingerprint, used by the backend for connection tracking. */
+const DEVICE_FINGERPRINT_HEADER = 'X-Device-Fingerprint';
 
 /**
  * Endpoints that authenticate the caller themselves (login, account creation) or operate on the
@@ -92,6 +96,8 @@ export class ApiRequest<U extends ApiEndpoint> {
 	): Promise<ApiResponse<ApiResponseTypes[U]>> {
 		if (this.requiresAuth) {
 			await ensureValidAccessToken();
+			// Compute the device fingerprint (once, then cached) so it can be attached below.
+			await ensureDeviceFingerprint();
 		}
 
 		const response = await this.send(method, url, payload);
@@ -123,6 +129,11 @@ export class ApiRequest<U extends ApiEndpoint> {
 			const accessToken = getAccessToken();
 			if (accessToken) {
 				headers['Authorization'] = `Bearer ${accessToken}`;
+			}
+
+			const fingerprint = getDeviceFingerprint();
+			if (fingerprint) {
+				headers[DEVICE_FINGERPRINT_HEADER] = fingerprint;
 			}
 		}
 

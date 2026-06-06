@@ -1,3 +1,4 @@
+using Game.Api.Http;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -13,22 +14,23 @@ namespace Game.Api.Tests.Integration
     public class LoginTrackingTests : ApiIntegrationTestBase
     {
         private const string UserAgent = "TestAgent/1.0 (LoginTrackingTests)";
+        private const string Fingerprint = "fp-abc123";
 
         public LoginTrackingTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task AuthenticatedRequest_RecordsLoginAndBrowserInfo()
+        public async Task AuthenticatedRequest_RecordsLoginDeviceAndBrowserInfo()
         {
             // Arrange — a real, logged-in user (the login itself is anonymous, so tracking fires on the
             // first authenticated request).
             var userId = await SeedUserAsync("trackuser", "trackpass");
-            using var authClient = await LoginWithUserAgentAsync("trackuser", "trackpass");
+            using var authClient = await LoginWithDeviceAsync("trackuser", "trackpass");
 
             // Act
             var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            // Assert — a UserLogin and its BrowserInfo were recorded for this user.
+            // Assert — a UserLogin, its Device, and the device's BrowserInfo were recorded for this user.
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
@@ -36,8 +38,29 @@ namespace Game.Api.Tests.Integration
             Assert.False(string.IsNullOrEmpty(login.IpAddress));
             Assert.True(login.LastConnection > DateTime.UtcNow.AddMinutes(-1));
 
-            var browser = await context.BrowserInfos.SingleAsync(b => b.Id == login.BrowserInfoId, CancellationToken);
+            var device = await context.Devices.SingleAsync(d => d.Id == login.DeviceId, CancellationToken);
+            Assert.Equal(Fingerprint, device.DeviceFingerprintHash);
+
+            var browser = await context.BrowserInfos.SingleAsync(b => b.Id == device.BrowserInfoId, CancellationToken);
             Assert.Equal(UserAgent, browser.UserAgent);
+        }
+
+        [Fact]
+        public async Task RequestWithoutFingerprint_RecordsNothing()
+        {
+            // Arrange — authenticated, but the client sends no device fingerprint header.
+            var userId = await SeedUserAsync("nofpuser", "nofppass");
+            var (authClient, _) = await LoginAndBuildClientAsync("nofpuser", "nofppass");
+            using var _client = authClient;
+
+            // Act
+            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Assert — without a fingerprint there is no device to key on, so nothing is recorded.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Empty(await context.UserLogins.Where(l => l.UserId == userId).ToListAsync(CancellationToken));
         }
 
         [Fact]
@@ -45,9 +68,9 @@ namespace Game.Api.Tests.Integration
         {
             // Arrange
             var userId = await SeedUserAsync("repeatuser", "repeatpass");
-            using var authClient = await LoginWithUserAgentAsync("repeatuser", "repeatpass");
+            using var authClient = await LoginWithDeviceAsync("repeatuser", "repeatpass");
 
-            // Act — two authenticated requests from the same user/IP/browser.
+            // Act — two authenticated requests from the same user/IP/device.
             await authClient.GetAsync("/api/Login/Status", CancellationToken);
             var firstConnection = await ReadLastConnectionAsync(userId);
 
@@ -60,31 +83,46 @@ namespace Game.Api.Tests.Integration
             Assert.Single(logins);
             Assert.True(logins[0].LastConnection >= firstConnection);
 
-            // And only one browser profile for the shared user-agent.
-            var browsers = await context.BrowserInfos.Where(b => b.UserAgent == UserAgent).ToListAsync(CancellationToken);
-            Assert.Single(browsers);
+            // And only one device + browser profile for the shared fingerprint/user-agent.
+            Assert.Single(await context.Devices.Where(d => d.DeviceFingerprintHash == Fingerprint).ToListAsync(CancellationToken));
+            Assert.Single(await context.BrowserInfos.Where(b => b.UserAgent == UserAgent).ToListAsync(CancellationToken));
         }
 
         [Fact]
-        public async Task BrowserInfoEndpoint_EnrichesStoredProfile()
+        public async Task DeviceInfoEndpoint_EnrichesStoredDevice()
         {
             // Arrange
             await SeedUserAsync("enrichuser", "enrichpass");
-            using var authClient = await LoginWithUserAgentAsync("enrichuser", "enrichpass");
+            using var authClient = await LoginWithDeviceAsync("enrichuser", "enrichpass");
 
-            var body = new { DeviceFingerprintHash = "abc123", DeviceMemory = 16.0, HardwareConcurrency = 8 };
+            var body = new { DeviceMemory = 16.0, HardwareConcurrency = 8 };
 
             // Act
-            var response = await authClient.PostAsJsonAsync("/api/Login/BrowserInfo", body, CancellationToken);
+            var response = await authClient.PostAsJsonAsync("/api/Login/DeviceInfo", body, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            // Assert — the device signals were applied to the BrowserInfo for this request's user-agent.
+            // Assert — the capabilities were applied to the Device for this request's fingerprint.
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var browser = await context.BrowserInfos.SingleAsync(b => b.UserAgent == UserAgent, CancellationToken);
-            Assert.Equal("abc123", browser.DeviceFingerprintHash);
-            Assert.Equal(16.0, browser.DeviceMemory);
-            Assert.Equal(8, browser.HardwareConcurrency);
+            var device = await context.Devices.SingleAsync(d => d.DeviceFingerprintHash == Fingerprint, CancellationToken);
+            Assert.Equal(16.0, device.DeviceMemory);
+            Assert.Equal(8, device.HardwareConcurrency);
+        }
+
+        [Fact]
+        public async Task DeviceInfoEndpoint_WithoutFingerprint_ReturnsError()
+        {
+            // Arrange — a logged-in client that omits the fingerprint header.
+            await SeedUserAsync("nofpinfo", "nofpinfo");
+            var (authClient, _) = await LoginAndBuildClientAsync("nofpinfo", "nofpinfo");
+            using var _client = authClient;
+
+            // Act
+            var response = await authClient.PostAsJsonAsync("/api/Login/DeviceInfo",
+                new { DeviceMemory = 8.0, HardwareConcurrency = 4 }, CancellationToken);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
         [Fact]
@@ -111,10 +149,11 @@ namespace Game.Api.Tests.Integration
             return user.Id;
         }
 
-        private async Task<HttpClient> LoginWithUserAgentAsync(string username, string password)
+        private async Task<HttpClient> LoginWithDeviceAsync(string username, string password)
         {
             var (client, _) = await LoginAndBuildClientAsync(username, password);
             client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", UserAgent);
+            client.DefaultRequestHeaders.TryAddWithoutValidation(ClientHints.DeviceFingerprintHeader, Fingerprint);
             return client;
         }
 

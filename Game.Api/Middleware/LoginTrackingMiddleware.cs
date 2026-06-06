@@ -5,10 +5,12 @@ using Game.Application.Services;
 namespace Game.Api.Middleware
 {
     /// <summary>
-    /// Records the connection (user, IP, browser) of each authenticated standard HTTP request, refreshing
+    /// Records the connection (user, IP, device) of each authenticated standard HTTP request, refreshing
     /// the user's last-connection timestamp. Runs after <see cref="SessionLoaderMiddleware"/> so the
-    /// request's user identity is available. Tracking is best-effort: any failure is logged and swallowed
-    /// so it never affects the response.
+    /// request's user identity is available. Recording is keyed on the device fingerprint the frontend
+    /// sends as a header, so a request without one (e.g. a WebSocket handshake, which cannot set custom
+    /// headers) is skipped. Tracking is best-effort: any failure is logged and swallowed so it never
+    /// affects the response.
     /// </summary>
     public class LoginTrackingMiddleware(RequestDelegate next, ILogger<LoginTrackingMiddleware> logger)
     {
@@ -17,7 +19,8 @@ namespace Game.Api.Middleware
 
         public async Task InvokeAsync(HttpContext context, SessionService sessionService, LoginTrackingService trackingService)
         {
-            if (sessionService.Authenticated)
+            var fingerprint = ClientHints.DeviceFingerprint(context.Request.Headers);
+            if (sessionService.Authenticated && fingerprint is not null)
             {
                 try
                 {
@@ -25,6 +28,7 @@ namespace Game.Api.Middleware
                     await trackingService.RecordConnection(
                         sessionService.UserId,
                         ResolveIpAddress(context),
+                        fingerprint,
                         hints.UserAgent,
                         hints.SecChUa,
                         hints.SecChUaMobile,

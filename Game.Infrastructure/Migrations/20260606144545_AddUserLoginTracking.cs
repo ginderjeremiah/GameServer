@@ -21,14 +21,33 @@ namespace Game.Infrastructure.Migrations
                     UserAgent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     SecChUa = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     SecChUaMobile = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    SecChUaPlatform = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    DeviceFingerprintHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    SecChUaPlatform = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BrowserInfos", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Devices",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    DeviceFingerprintHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    BrowserInfoId = table.Column<int>(type: "integer", nullable: false),
                     DeviceMemory = table.Column<double>(type: "double precision", nullable: true),
                     HardwareConcurrency = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_BrowserInfos", x => x.Id);
+                    table.PrimaryKey("PK_Devices", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Devices_BrowserInfos_BrowserInfoId",
+                        column: x => x.BrowserInfoId,
+                        principalTable: "BrowserInfos",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -39,16 +58,16 @@ namespace Game.Infrastructure.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     UserId = table.Column<int>(type: "integer", nullable: false),
                     IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: false),
-                    BrowserInfoId = table.Column<int>(type: "integer", nullable: false),
+                    DeviceId = table.Column<int>(type: "integer", nullable: false),
                     LastConnection = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_UserLogins", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_UserLogins_BrowserInfos_BrowserInfoId",
-                        column: x => x.BrowserInfoId,
-                        principalTable: "BrowserInfos",
+                        name: "FK_UserLogins_Devices_DeviceId",
+                        column: x => x.DeviceId,
+                        principalTable: "Devices",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -66,14 +85,25 @@ namespace Game.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_UserLogins_BrowserInfoId",
-                table: "UserLogins",
+                name: "IX_Devices_BrowserInfoId",
+                table: "Devices",
                 column: "BrowserInfoId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_UserLogins_UserId_IpAddress_BrowserInfoId",
+                name: "IX_Devices_DeviceFingerprintHash",
+                table: "Devices",
+                column: "DeviceFingerprintHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserLogins_DeviceId",
                 table: "UserLogins",
-                columns: new[] { "UserId", "IpAddress", "BrowserInfoId" },
+                column: "DeviceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserLogins_UserId_IpAddress_DeviceId",
+                table: "UserLogins",
+                columns: new[] { "UserId", "IpAddress", "DeviceId" },
                 unique: true);
         }
 
@@ -82,6 +112,9 @@ namespace Game.Infrastructure.Migrations
         {
             migrationBuilder.DropTable(
                 name: "UserLogins");
+
+            migrationBuilder.DropTable(
+                name: "Devices");
 
             migrationBuilder.DropTable(
                 name: "BrowserInfos");

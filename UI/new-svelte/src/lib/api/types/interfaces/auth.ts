@@ -8,8 +8,7 @@ export interface IAuthTokens {
 	refreshToken: string;
 }
 
-export interface IBrowserInfoRequest {
-	deviceFingerprintHash?: string;
+export interface IDeviceInfoRequest {
 	deviceMemory?: number;
 	hardwareConcurrency?: number;
 }

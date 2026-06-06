@@ -17,6 +17,7 @@ namespace Game.DataAccess.Repositories
         public async Task RecordConnection(
             int userId,
             string ipAddress,
+            string deviceFingerprintHash,
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
@@ -24,24 +25,24 @@ namespace Game.DataAccess.Repositories
         {
             ipAddress = Truncate(ipAddress, UserLogin.MaxIpAddressLength) ?? string.Empty;
 
-            var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform);
+            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform);
 
-            // A brand-new browser cannot have an existing login, so skip the lookup and rely on the
-            // navigation to propagate the generated BrowserInfoId onto the new login when saved.
-            if (_context.Entry(browserInfo).State == EntityState.Added)
+            // A brand-new device cannot have an existing login, so skip the lookup and rely on the
+            // navigation to propagate the generated DeviceId onto the new login when saved.
+            if (_context.Entry(device).State == EntityState.Added)
             {
                 _context.UserLogins.Add(new UserLogin
                 {
                     UserId = userId,
                     IpAddress = ipAddress,
-                    BrowserInfo = browserInfo,
+                    Device = device,
                     LastConnection = DateTime.UtcNow,
                 });
                 return;
             }
 
             var login = await _context.UserLogins.FirstOrDefaultAsync(l =>
-                l.UserId == userId && l.IpAddress == ipAddress && l.BrowserInfoId == browserInfo.Id);
+                l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id);
 
             if (login is null)
             {
@@ -49,7 +50,7 @@ namespace Game.DataAccess.Repositories
                 {
                     UserId = userId,
                     IpAddress = ipAddress,
-                    BrowserInfoId = browserInfo.Id,
+                    DeviceId = device.Id,
                     LastConnection = DateTime.UtcNow,
                 });
             }
@@ -59,20 +60,47 @@ namespace Game.DataAccess.Repositories
             }
         }
 
-        public async Task SaveBrowserInfo(
+        public async Task SaveDeviceInfo(
+            string deviceFingerprintHash,
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
             string? secChUaPlatform,
-            string? deviceFingerprintHash,
             double? deviceMemory,
             int? hardwareConcurrency)
         {
-            var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform);
+            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform);
 
-            browserInfo.DeviceFingerprintHash = Truncate(deviceFingerprintHash, BrowserInfo.MaxFingerprintLength);
-            browserInfo.DeviceMemory = deviceMemory;
-            browserInfo.HardwareConcurrency = hardwareConcurrency;
+            device.DeviceMemory = deviceMemory;
+            device.HardwareConcurrency = hardwareConcurrency;
+        }
+
+        /// <summary>
+        /// Returns the tracked <see cref="Device"/> for the fingerprint, adding a new one (linked to the
+        /// user-agent's <see cref="BrowserInfo"/>) when none exists yet.
+        /// </summary>
+        private async Task<Device> GetOrCreateDevice(
+            string deviceFingerprintHash,
+            string userAgent,
+            string? secChUa,
+            string? secChUaMobile,
+            string? secChUaPlatform)
+        {
+            deviceFingerprintHash = Truncate(deviceFingerprintHash, Device.MaxFingerprintLength) ?? string.Empty;
+
+            var device = await _context.Devices.FirstOrDefaultAsync(d => d.DeviceFingerprintHash == deviceFingerprintHash);
+            if (device is null)
+            {
+                var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform);
+                device = new Device
+                {
+                    DeviceFingerprintHash = deviceFingerprintHash,
+                    BrowserInfo = browserInfo,
+                };
+                _context.Devices.Add(device);
+            }
+
+            return device;
         }
 
         /// <summary>
