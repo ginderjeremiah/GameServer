@@ -11,6 +11,9 @@
 		<path d="M5.5 4V2.5h5V4" stroke-linecap="round" />
 	{:else if kind === 'attributes'}
 		<path d="M8 1.5l4.7 2v4.7c0 2.9-2.3 4.7-4.7 5.8-2.4-1.1-4.7-2.9-4.7-5.8V3.5z" stroke-linejoin="round" />
+	{:else if kind === 'attributeBreakdown'}
+		<rect x="2" y="6.3" width="12" height="3.4" rx="1" />
+		<path d="M6.3 6.3v3.4M9.3 6.3v3.4" stroke-linecap="round" />
 	{:else if kind === 'stats'}
 		<path d="M2 13.5h12M3.5 13.5V8M7 13.5V4.5M10.5 13.5V10M14 13.5V6" stroke-linecap="round" />
 	{:else if kind === 'options'}
