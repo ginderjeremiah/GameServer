@@ -73,6 +73,21 @@ Authenticated users are gated out of the admin tooling unless they hold the `Adm
   - **Ban = block while keeping the username reserved.** A banned user still counts toward username availability (so the name cannot be reused) and remains visible in the admin roster for later management. Surfacing the ban to the user at login time is intentionally out of scope for now.
 - **Role changes take effect on next login.** As noted under [Access Roles and Admin Authorization](#access-roles-and-admin-authorization), roles live in the signed auth token, so a `SetUserRoles` change is reflected only after the affected user logs in again.
 
+## Standalone TypeScript codegen
+
+The reflection-based code generator (`Game.Api/CodeGen/ApiCodeGenerator`) that emits the frontend's TypeScript API client only needs the API **assembly** — it inspects controller/socket-command type metadata and writes `.ts` files, with no database, cache, or DI graph involved. Historically it was reachable only as a side effect of running the API in `Development`, so regenerating types meant standing up the full web host (and its Postgres/Redis dependencies), which is awkward in CI and impossible in restricted environments.
+
+It is now also runnable as a standalone command that exits before the web host is built:
+
+```
+dotnet run --project Game.Api -- codegen [outputDirectory]
+```
+
+- **`CodeGenCommand`** (intercepted at the top of `Startup.Main`, before `WebApplication.CreateBuilder`) builds a throwaway console `ILogger`, resolves the target directory, runs `ApiCodeGenerator.GenerateCode`, and returns. Because it short-circuits before host construction, it is independent of `ASPNETCORE_ENVIRONMENT` and never touches an out-of-process dependency. An explicit output directory may be passed; otherwise it defaults to the committed frontend location.
+- **`CodeGenPaths`** centralizes path resolution so the dev-startup hook and the standalone command compute the same target directory. The default directory is found by walking up from the running assembly to the repository root (the directory containing `Game.sln`) and appending the canonical `UI/new-svelte/src/lib/api/types` segments. Resolving the root from the assembly rather than the current working directory keeps the command location-independent (the dev hook continues to derive the root from `ContentRootPath`).
+
+The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch DTO/client drift.
+
 ## Integration-Test Containers in Constrained Environments
 
 Integration tests get a real PostgreSQL + Redis via **Testcontainers** (`PostgresContainerFixture`, `RedisContainerFixture`, composed by `IntegrationTestContainers`). Testcontainers depends on Docker **bridge networking**, which is unavailable in constrained sandboxes such as the Claude Code web environment (old kernel, no iptables, no usable bridge). There, Testcontainers cannot create networks or map ports and every integration test fails before it runs. See [anthropics/claude-code#29515](https://github.com/anthropics/claude-code/issues/29515).

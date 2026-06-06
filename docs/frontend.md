@@ -38,7 +38,7 @@ The frontend authenticates against the backend's JWT scheme (see the backend doc
 - **`api-request.ts`** attaches `Authorization: Bearer <accessToken>` to every authenticated request, refreshes pre-emptively before sending, and on a `401` refreshes once and retries. The `[AllowAnonymous]` auth endpoints (`Login`, `Login/CreateAccount`, `Login/Refresh`, `Login/Logout`) are exempt from this machinery.
 - **`api-socket.ts`** passes the access token as the `?access_token=` query parameter (browsers can't set headers on the WS handshake) and, if a handshake is rejected for auth reasons (the socket closes before it ever opens), refreshes once and reconnects.
 
-Login stores the pair from the `LoginResult` and enters the game; logout sends the refresh token so the backend can revoke it, then clears storage. The generated API types (`lib/api/types`) are produced by the backend's dev-time codegen — when changing a DTO, run the backend in Development to regenerate them rather than editing the files by hand.
+Login stores the pair from the `LoginResult` and enters the game; logout sends the refresh token so the backend can revoke it, then clears storage. The generated API types (`lib/api/types`) are produced by the backend's codegen — when changing a DTO, regenerate them rather than editing the files by hand, either by running the backend in Development or, without standing up the API/database, via `dotnet run --project Game.Api -- codegen` (see [backend.md](backend.md#standalone-typescript-codegen)).
 
 ## Reference Data
 
