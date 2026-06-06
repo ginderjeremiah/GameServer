@@ -98,6 +98,15 @@ jobs:
         docker compose logs api
         exit 1
 
+    - name: Seed static reference data
+      # The API's migrations only seed the intrinsic enum-backed reference data; the static content
+      # (Skills, Enemies, Zones, …) is normally authored through the admin tools and is absent from a
+      # freshly-migrated database. Without at least the starter skills, the first account signup fails
+      # (FK_PlayerSkills_Skills_SkillId) and the whole suite can't log in. Apply the baseline seed now
+      # that migrations have run (the readiness check above guarantees that). Runs inside the Postgres
+      # container so it needs no client tooling on the runner; the script is idempotent.
+      run: docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-seed.sql
+
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
