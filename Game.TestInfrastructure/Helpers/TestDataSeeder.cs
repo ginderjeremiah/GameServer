@@ -204,9 +204,9 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
-        public static async Task LinkEnemyToZoneAsync(GameContext context, int zoneId, int enemyId)
+        public static async Task LinkEnemyToZoneAsync(GameContext context, int zoneId, int enemyId, int weight = 1)
         {
-            context.Set<ZoneEnemy>().Add(new ZoneEnemy { ZoneId = zoneId, EnemyId = enemyId });
+            context.Set<ZoneEnemy>().Add(new ZoneEnemy { ZoneId = zoneId, EnemyId = enemyId, Weight = weight });
             await context.SaveChangesAsync();
         }
 
