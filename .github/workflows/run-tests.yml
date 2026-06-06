@@ -15,7 +15,45 @@ on:
 
 jobs:
 
+  detect-changes:
+    # Only needed for PRs — on push to main we always run all tests.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Detect changed paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          backend:
+            - 'Game.Abstractions/**'
+            - 'Game.Api/**'
+            - 'Game.Api.Tests/**'
+            - 'Game.Application/**'
+            - 'Game.Application.Tests/**'
+            - 'Game.Core/**'
+            - 'Game.Core.Tests/**'
+            - 'Game.DataAccess/**'
+            - 'Game.Infrastructure/**'
+            - 'Game.TestInfrastructure/**'
+            - 'Game.sln'
+            - 'docker-compose.yml'
+            - 'e2e-seed.sql'
+            - '.dockerignore'
+          frontend:
+            - 'UI/new-svelte/**'
+
   test-backend:
+    needs: [detect-changes]
+    # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
 
     steps:
@@ -53,6 +91,11 @@ jobs:
         path: '**/TestResults/'
 
   test-frontend:
+    needs: [detect-changes]
+    # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.frontend == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -91,6 +134,13 @@ jobs:
         path: 'UI/new-svelte/unit-test-results.json'
 
   test-e2e:
+    needs: [detect-changes]
+    # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' ||
+       needs.detect-changes.outputs.backend == 'true' ||
+       needs.detect-changes.outputs.frontend == 'true')
     runs-on: ubuntu-latest
     strategy:
       # Run each browser as its own parallel job. Besides cutting wall-clock to roughly a single
@@ -194,3 +244,19 @@ jobs:
         # On an all-green run Playwright writes nothing here (traces/screenshots are only kept on
         # failure or retry), so an empty directory is expected and not a problem.
         if-no-files-found: ignore
+
+  all-checks-passed:
+    # Single required status check for branch protection. Passes when all jobs succeeded or were
+    # skipped (path-filtered out); fails if any job failed or was cancelled, including
+    # detect-changes itself (a change-detection failure should block the PR, not silently skip tests).
+    if: always()
+    needs: [detect-changes, test-backend, test-frontend, test-e2e]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify all jobs passed or were skipped
+      run: |
+        if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+          echo "One or more required jobs failed or were cancelled"
+          exit 1
+        fi
+        echo "All required jobs passed or were skipped"
