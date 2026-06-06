@@ -202,3 +202,6 @@ jobs:
       with:
         name: playwright-report-${{ matrix.browser }}
         path: UI/new-svelte/test-results
+        # On an all-green run Playwright writes nothing here (traces/screenshots are only kept on
+        # failure or retry), so an empty directory is expected and not a problem.
+        if-no-files-found: ignore
