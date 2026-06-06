@@ -61,16 +61,24 @@ export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 }
 
 /**
- * Open the admin route from the in-game sidebar. The sidebar expands on hover with a width
- * transition, so under parallel load a single synthetic click can land on the still-moving
- * button and be dropped without navigating. Retry the click until the route actually changes.
+ * Open the admin route from the in-game sidebar. Two things make a naive click flaky on the slower
+ * engines (Firefox/WebKit):
+ *   1. The /game page mounts the battle/render engine and opens its socket on entry, so a click
+ *      fired while that's still settling can be swallowed without triggering navigation.
+ *   2. The navigation is client-side (`goto('/admin')`); under load it can take more than a couple
+ *      of seconds, and the old 2s retry window expired mid-navigation so the loop re-clicked and
+ *      interrupted it — leaving the page stuck on /game until the retry budget ran out.
+ * So: wait for the game screen to render first, then retry the click with a window wide enough for
+ * the navigation to actually complete before re-clicking.
  */
 export async function gotoAdmin(page: Page) {
+	await expect(page.getByTestId('game-screen')).toBeVisible({ timeout: 10000 });
+
 	await expect(async () => {
 		if (!new URL(page.url()).pathname.startsWith('/admin')) {
 			await page.getByTestId('sidebar-item-admin').click();
 		}
-		await expect(page).toHaveURL('/admin', { timeout: 2000 });
+		await expect(page).toHaveURL('/admin', { timeout: 5000 });
 	}).toPass({ timeout: 15000 });
 
 	await expect(page.getByTestId('admin-screen')).toBeVisible();
