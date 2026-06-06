@@ -9,19 +9,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(GameContext context, ISkills skills) : IEnemies
+    internal class Enemies(GameContext context, ISkills skills, IZones zones) : IEnemies
     {
-        private static readonly List<ProbabilityTable<int>?> zoneEnemiesTables = [];
-        private static readonly object _lock = new();
         private static List<Enemy>? _enemyList;
+        // Per-zone enemy spawn tables keyed by zone id. Derived from the in-memory enemy list
+        // (which eager-loads ZoneEnemies), so it is rebuilt whenever that list is (re)loaded.
+        private static Dictionary<int, ProbabilityTable<int>>? _zoneEnemyTables;
 
         private readonly GameContext _context = context;
         private readonly ISkills _skills = skills;
+        private readonly IZones _zones = zones;
 
         public void InvalidateCache()
         {
             _enemyList = null;
-            lock (_lock) { zoneEnemiesTables.Clear(); }
+            _zoneEnemyTables = null;
         }
 
         public List<Enemy> All(bool refreshCache = false)
@@ -34,6 +36,8 @@ namespace Game.DataAccess.Repositories
                     .Include(e => e.EnemySkills)
                     .Include(e => e.ZoneEnemies)
                     .OrderBy(e => e.Id)];
+                // Spawn tables are derived from the enemy list; drop them so they rebuild in step.
+                _zoneEnemyTables = null;
             }
 
             return _enemyList;
@@ -47,39 +51,20 @@ namespace Game.DataAccess.Repositories
 
         public Enemy GetRandomEnemy(int zoneId)
         {
+            if (!_zones.ValidateZoneId(zoneId))
+            {
+                throw new ArgumentOutOfRangeException(nameof(zoneId), zoneId, $"No zone exists with Id {zoneId}.");
+            }
+
             var enemies = All();
+            var zoneEnemyTables = _zoneEnemyTables ??= BuildZoneEnemyTables(enemies);
 
-            if (zoneEnemiesTables.Count > zoneId)
+            if (!zoneEnemyTables.TryGetValue(zoneId, out var table))
             {
-                var table = zoneEnemiesTables[zoneId];
-                if (table is not null)
-                {
-                    return enemies[table.GetRandomValue()];
-                }
+                throw new InvalidOperationException($"Zone {zoneId} has no enemies to spawn.");
             }
 
-            //TODO: Refactor to use async queries and also not require a lock
-            lock (_lock)
-            {
-                //TODO: Make this not allow adding an insane amount of values to the list if someone passes in a big id.
-                for (int i = zoneEnemiesTables.Count - 1; i < zoneId; i++)
-                {
-                    zoneEnemiesTables.Add(null);
-                }
-
-                var table = zoneEnemiesTables[zoneId];
-                if (table is null)
-                {
-                    var weightedZoneEnemies = _context.ZoneEnemies
-                        .Where(ze => ze.ZoneId == zoneId)
-                        .Select(ze => new WeightedValue<int>(ze.EnemyId, ze.Weight));
-
-                    table = new ProbabilityTable<int>(weightedZoneEnemies);
-                    zoneEnemiesTables[zoneId] = table;
-                }
-
-                return enemies[table.GetRandomValue()];
-            }
+            return enemies[table.GetRandomValue()];
         }
 
         public CoreEnemy? GetDomainEnemy(int enemyId, int level)
@@ -94,6 +79,22 @@ namespace Game.DataAccess.Repositories
         {
             var entity = GetRandomEnemy(zoneId);
             return EnemyMapper.ToCore(entity, level, _skills.AllSkills());
+        }
+
+        /// <summary>
+        /// Builds the per-zone enemy spawn tables from the in-memory enemy list. The ZoneEnemy weights are
+        /// already eager-loaded by <see cref="All"/>, so no database query (and no lock) is required, and
+        /// keying by zone id avoids the previous unbounded list growth for arbitrary or invalid ids.
+        /// </summary>
+        private static Dictionary<int, ProbabilityTable<int>> BuildZoneEnemyTables(IEnumerable<Enemy> enemies)
+        {
+            return enemies
+                .SelectMany(enemy => enemy.ZoneEnemies)
+                .GroupBy(zoneEnemy => zoneEnemy.ZoneId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new ProbabilityTable<int>(
+                        group.Select(zoneEnemy => new WeightedValue<int>(zoneEnemy.EnemyId, zoneEnemy.Weight))));
         }
     }
 }
