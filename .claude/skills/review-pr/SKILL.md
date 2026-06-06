@@ -159,8 +159,11 @@ Then map to a GitHub verdict (`event`):
 - **`REQUEST_CHANGES`** — there is at least one *blocking* finding.
 - **`APPROVE`** — no blocking findings. Should-fixes and nits are fine to approve over; just call
   them out so they're not lost.
-- **`COMMENT`** — reserve for when a verdict isn't appropriate: the PR is a draft/WIP, or you
-  genuinely lack the context to judge. Don't use it to dodge a clear call.
+- **`COMMENT`** — reserve for when a verdict isn't appropriate or isn't possible: the PR is a
+  draft/WIP, you genuinely lack the context to judge, or you are the PR's own author (GitHub
+  rejects `APPROVE` / `REQUEST_CHANGES` on your own PR). In that self-author case, state the verdict
+  you *would* have given in the summary body so the intent is unambiguous. Don't use `COMMENT` to
+  dodge a clear call.
 
 Be fair: don't manufacture blockers to look thorough, and don't approve over a real problem to be
 agreeable. Pre-existing issues outside this PR's scope are follow-ups (mention them) — not reasons
@@ -180,7 +183,9 @@ broader (architecture, a missing test file, cross-cutting concerns) in the summa
    and actionable: what's wrong, why (cite the doc or rule), and ideally how to fix it. If a point
    is about a line that isn't in the diff, skip the inline comment and raise it in the summary.
 3. **Submit** — `pull_request_review_write` with `method: "submit_pending"`, the `event` from
-   step 5, and a `body` that is the summary below.
+   step 5, and a `body` that is the summary below. Caveat: GitHub rejects `APPROVE` /
+   `REQUEST_CHANGES` when the reviewer is the PR's own author — if that's the case, submit with
+   `event: "COMMENT"` and make the intended verdict explicit in the body (see step 5).
 
 If something fails midway (for example, a comment targets a line outside the diff), `delete_pending`
 and rebuild the review rather than leaving a half-finished pending review attached.
