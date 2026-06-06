@@ -4,7 +4,7 @@
 
 	<!-- glyph chip -->
 	<div class="chip" style:--chip-color={type.color}>
-		<LogGlyph glyph={type.glyph} color={on ? type.color : 'rgba(240, 240, 240, 0.4)'} size={16} />
+		<LogGlyph glyph={type.glyph} color={on ? type.color : 'var(--text-muted)'} size={16} />
 	</div>
 
 	<!-- label + description -->
@@ -43,12 +43,12 @@ const dirty = $derived(view.isDirtyId(type.id));
 	align-items: center;
 	gap: 16px;
 	padding: 14px 18px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
 	transition: background 130ms;
 	position: relative;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.025);
+		background: color-mix(in srgb, var(--white) 2.5%, transparent);
 	}
 
 	&:last-child {
@@ -79,8 +79,8 @@ const dirty = $derived(view.isDirtyId(type.id));
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(255, 255, 255, 0.03);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: color-mix(in srgb, var(--white) 3%, transparent);
+	border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
 	transition: all 160ms;
 
 	.on & {
@@ -104,7 +104,7 @@ const dirty = $derived(view.isDirtyId(type.id));
 .name {
 	font-size: 14.5px;
 	letter-spacing: -0.1px;
-	color: rgba(240, 240, 240, 0.62);
+	color: color-mix(in srgb, var(--text-primary) 62%, transparent);
 	transition: color 140ms;
 
 	.on & {
@@ -125,6 +125,6 @@ const dirty = $derived(view.isDirtyId(type.id));
 
 .desc {
 	font-size: 12.5px;
-	color: rgba(240, 240, 240, 0.45);
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 }
 </style>

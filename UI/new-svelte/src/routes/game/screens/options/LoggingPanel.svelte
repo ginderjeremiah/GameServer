@@ -69,7 +69,7 @@ const groups = LOG_GROUPS.map((def) => ({
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
-	color: rgba(192, 216, 255, 0.7);
+	color: var(--eyebrow);
 	margin-bottom: 7px;
 }
 
@@ -83,7 +83,7 @@ const groups = LOG_GROUPS.map((def) => ({
 .panel-desc {
 	margin: 8px 0 0;
 	font-size: 13.5px;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 	max-width: 560px;
 	line-height: 1.5;
 }
@@ -92,7 +92,7 @@ const groups = LOG_GROUPS.map((def) => ({
 	font-family: var(--mono);
 	font-size: 11px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 	white-space: nowrap;
 	padding-bottom: 2px;
 }

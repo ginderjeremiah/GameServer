@@ -53,8 +53,8 @@ const { view }: Props = $props();
 	align-items: center;
 	justify-content: space-between;
 	padding: 14px 24px;
-	border-top: 1px solid rgba(255, 255, 255, 0.07);
-	background: rgba(0, 0, 0, 0.2);
+	border-top: 1px solid color-mix(in srgb, var(--white) 7%, transparent);
+	background: color-mix(in srgb, var(--black) 20%, transparent);
 	flex-shrink: 0;
 }
 
@@ -62,7 +62,7 @@ const { view }: Props = $props();
 	font-family: var(--mono);
 	font-size: 11.5px;
 	letter-spacing: 0.4px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	display: flex;
 	align-items: center;
 	gap: 9px;
@@ -84,7 +84,7 @@ const { view }: Props = $props();
 }
 
 .status-count {
-	color: rgba(240, 240, 240, 0.8);
+	color: color-mix(in srgb, var(--text-primary) 80%, transparent);
 }
 
 .actions {
@@ -105,12 +105,12 @@ const { view }: Props = $props();
 	cursor: pointer;
 	transition: all 140ms ease;
 	background: transparent;
-	border: 1px solid rgba(255, 255, 255, 0.16);
-	color: rgba(240, 240, 240, 0.85);
+	border: 1px solid color-mix(in srgb, var(--white) 16%, transparent);
+	color: color-mix(in srgb, var(--text-primary) 85%, transparent);
 
 	&.ghost:hover:not(:disabled) {
-		background: rgba(255, 255, 255, 0.05);
-		border-color: rgba(255, 255, 255, 0.3);
+		background: color-mix(in srgb, var(--white) 5%, transparent);
+		border-color: color-mix(in srgb, var(--white) 30%, transparent);
 	}
 
 	&.primary {
@@ -125,8 +125,8 @@ const { view }: Props = $props();
 
 	&:disabled {
 		background: transparent;
-		border-color: rgba(255, 255, 255, 0.08);
-		color: rgba(240, 240, 240, 0.3);
+		border-color: var(--border-subtle);
+		color: color-mix(in srgb, var(--text-primary) 30%, transparent);
 		cursor: not-allowed;
 	}
 }

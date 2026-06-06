@@ -48,7 +48,7 @@ onDestroy(() => view.dispose());
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 7%, transparent);
 	flex-shrink: 0;
 }
 
@@ -72,7 +72,7 @@ onDestroy(() => view.dispose());
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .options-body {

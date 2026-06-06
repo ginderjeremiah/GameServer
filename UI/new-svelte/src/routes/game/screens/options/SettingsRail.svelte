@@ -38,7 +38,7 @@ const { active, onPick }: Props = $props();
 .settings-rail {
 	width: 210px;
 	flex-shrink: 0;
-	border-right: 1px solid rgba(255, 255, 255, 0.07);
+	border-right: 1px solid color-mix(in srgb, var(--white) 7%, transparent);
 	padding: 22px 0;
 	display: flex;
 	flex-direction: column;
@@ -63,7 +63,7 @@ const { active, onPick }: Props = $props();
 	border: none;
 	text-align: left;
 	background: transparent;
-	color: rgba(240, 240, 240, 0.72);
+	color: color-mix(in srgb, var(--text-primary) 72%, transparent);
 	font-family: inherit;
 	font-size: 13.5px;
 	cursor: pointer;
@@ -72,7 +72,7 @@ const { active, onPick }: Props = $props();
 		color 130ms;
 
 	&:hover:not(.disabled) {
-		background: rgba(255, 255, 255, 0.025);
+		background: color-mix(in srgb, var(--white) 2.5%, transparent);
 	}
 
 	&.active {
@@ -81,7 +81,7 @@ const { active, onPick }: Props = $props();
 	}
 
 	&.disabled {
-		color: rgba(240, 240, 240, 0.32);
+		color: color-mix(in srgb, var(--text-primary) 32%, transparent);
 		cursor: default;
 	}
 }
@@ -105,8 +105,8 @@ const { active, onPick }: Props = $props();
 	font-size: 8px;
 	letter-spacing: 0.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.3);
-	border: 1px solid rgba(240, 240, 240, 0.13);
+	color: color-mix(in srgb, var(--text-primary) 30%, transparent);
+	border: 1px solid color-mix(in srgb, var(--text-primary) 13%, transparent);
 	border-radius: 2px;
 	padding: 1px 4px;
 }

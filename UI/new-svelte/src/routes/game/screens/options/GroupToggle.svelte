@@ -32,8 +32,8 @@ const { on, mixed, onClick, testId }: Props = $props();
 	border-radius: 999px;
 	cursor: pointer;
 	padding: 0;
-	border: 1px solid rgba(255, 255, 255, 0.2);
-	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid color-mix(in srgb, var(--white) 20%, transparent);
+	background: color-mix(in srgb, var(--white) 4%, transparent);
 	transition: all 160ms ease;
 
 	&.on,
@@ -58,7 +58,7 @@ const { on, mixed, onClick, testId }: Props = $props();
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background: rgba(240, 240, 240, 0.55);
+	background: var(--text-tertiary);
 	transition:
 		left 160ms cubic-bezier(0.4, 0, 0.2, 1),
 		background 160ms;

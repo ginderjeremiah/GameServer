@@ -8,7 +8,7 @@
 				height="11"
 				viewBox="0 0 12 12"
 				fill="none"
-				stroke="rgba(240, 240, 240, 0.55)"
+				stroke="var(--text-tertiary)"
 				stroke-width="1.5"
 			>
 				<path d="M4 2.5L8 6L4 9.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -61,9 +61,9 @@ const groupDirty = $derived(types.some((t) => view.isDirtyId(t.id)));
 
 <style lang="scss">
 .group {
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
-	background: rgba(255, 255, 255, 0.015);
+	background: color-mix(in srgb, var(--white) 1.5%, transparent);
 	overflow: hidden;
 }
 
@@ -75,7 +75,7 @@ const groupDirty = $derived(types.some((t) => view.isDirtyId(t.id)));
 	transition: background 130ms;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.02);
+		background: color-mix(in srgb, var(--white) 2%, transparent);
 	}
 }
 
@@ -105,7 +105,7 @@ const groupDirty = $derived(types.some((t) => view.isDirtyId(t.id)));
 	font-size: 10.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 }
 
 .group-dirty-dot {
@@ -120,10 +120,10 @@ const groupDirty = $derived(types.some((t) => view.isDirtyId(t.id)));
 	font-family: var(--mono);
 	font-size: 10px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .group-rows {
-	border-top: 1px solid rgba(255, 255, 255, 0.07);
+	border-top: 1px solid color-mix(in srgb, var(--white) 7%, transparent);
 }
 </style>

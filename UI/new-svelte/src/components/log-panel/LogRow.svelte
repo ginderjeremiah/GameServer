@@ -64,10 +64,10 @@ const rowOpacity = $derived(isLatest ? 1 : Math.max(0.4, 0.9 - index * 0.1));
 	font-size: 10.5px;
 	letter-spacing: 0.4px;
 	min-width: 38px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 
 	&.latest {
-		color: rgba(240, 240, 240, 0.55);
+		color: var(--text-tertiary);
 	}
 }
 
@@ -86,13 +86,13 @@ const rowOpacity = $derived(isLatest ? 1 : Math.max(0.4, 0.9 - index * 0.1));
 	flex: 1;
 	min-width: 0;
 	font-size: 12.5px;
-	color: rgba(240, 240, 240, 0.82);
+	color: color-mix(in srgb, var(--text-primary) 82%, transparent);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 
 	&.latest {
-		color: rgba(240, 240, 240, 0.97);
+		color: color-mix(in srgb, var(--text-primary) 97%, transparent);
 		font-weight: 500;
 	}
 }

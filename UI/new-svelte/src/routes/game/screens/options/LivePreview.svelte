@@ -97,8 +97,8 @@ $effect(() => {
 	min-height: 0;
 	height: 100%;
 	width: 100%;
-	background: rgba(0, 0, 0, 0.28);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--black) 28%, transparent);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
 	overflow: hidden;
 }
@@ -108,7 +108,7 @@ $effect(() => {
 	align-items: center;
 	gap: 9px;
 	padding: 12px 16px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
 }
 
 .pulse-dot {
@@ -125,20 +125,20 @@ $effect(() => {
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(192, 216, 255, 0.7);
+	color: var(--eyebrow);
 }
 
 .preview-divider {
 	flex: 1;
 	height: 1px;
-	background: rgba(240, 240, 240, 0.06);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
 .preview-tag {
 	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .preview-body {
@@ -161,7 +161,7 @@ $effect(() => {
 	font-family: var(--mono);
 	font-size: 11px;
 	letter-spacing: 0.5px;
-	color: rgba(240, 240, 240, 0.35);
+	color: color-mix(in srgb, var(--text-primary) 35%, transparent);
 }
 
 @keyframes op-pulse {

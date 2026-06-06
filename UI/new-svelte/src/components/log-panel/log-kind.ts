@@ -12,16 +12,19 @@ export interface LogKind {
 }
 
 /**
- * The semantic combat-log palette — the single source of truth for the colours
- * used to accent log messages (also reused by the Options screen's log-type
- * rows and live preview so both stay in sync with the real log).
+ * The semantic combat-log palette. The actual colours live in the root CSS
+ * variables (`--log-*`, defined in `+layout.svelte`) so they are themeable and
+ * configurable in one place; these are just `var(...)` references. Reused by the
+ * Options screen's log-type rows and live preview so both stay in sync with the
+ * real log. Each value is valid wherever a colour is — SVG `stroke`, a CSS
+ * `color`, or inside `color-mix(...)`.
  */
 export const logColors = {
-	player: '#c0d8ff',
-	enemy: '#e8b6a6',
-	loot: '#bde0b4',
-	reward: '#f0d28a',
-	system: 'rgba(240, 240, 240, 0.7)'
+	player: 'var(--log-player)',
+	enemy: 'var(--log-enemy)',
+	loot: 'var(--log-loot)',
+	reward: 'var(--log-reward)',
+	system: 'var(--log-system)'
 } as const;
 
 const PLAYER = logColors.player;
