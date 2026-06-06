@@ -157,5 +157,14 @@ $effect(() => {
 	--attr-agility: #{colors.$attr-agility};
 	--attr-dexterity: #{colors.$attr-dexterity};
 	--attr-luck: #{colors.$attr-luck};
+
+	// Attribute-modifier-source accents (one per EAttributeModifierSource shown in
+	// the breakdown). Consumed via the helpers in the attribute-breakdown screen's
+	// source-display.
+	--source-base: #{colors.$source-base};
+	--source-points: #{colors.$source-points};
+	--source-item: #{colors.$source-item};
+	--source-mod: #{colors.$source-mod};
+	--source-derived: #{colors.$source-derived};
 }
 </style>

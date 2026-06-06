@@ -1,11 +1,23 @@
-import { Fight, Inventory, Attributes, Challenges, Stats, Help, Options, CardGame, PlaceholderScreen } from './';
+import {
+	Fight,
+	Inventory,
+	Attributes,
+	AttributeBreakdown,
+	Challenges,
+	Statistics,
+	Help,
+	Options,
+	CardGame,
+	PlaceholderScreen
+} from './';
 
 export const screenMap = {
 	Fight,
 	Inventory,
 	Attributes,
+	AttributeBreakdown,
 	Challenges,
-	Stats,
+	Statistics,
 	Help,
 	Options,
 	CardGame,
