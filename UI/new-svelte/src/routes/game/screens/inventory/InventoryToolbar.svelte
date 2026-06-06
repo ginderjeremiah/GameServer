@@ -15,11 +15,11 @@
 			<button
 				class="chip"
 				class:active={view.filterCat === cat}
-				style:--chip-accent={catAccent(cat)}
+				style:--chip-accent={itemCategoryColor(cat)}
 				onclick={() => (view.filterCat = view.filterCat === cat ? null : cat)}
 			>
-				<span class="chip-diamond" style:background={catAccent(cat)}></span>
-				{catName(cat)} <span class="chip-count">{view.counts.cats[cat] ?? 0}</span>
+				<span class="chip-diamond" style:background={itemCategoryColor(cat)}></span>
+				{itemCategoryName(cat)} <span class="chip-count">{view.counts.cats[cat] ?? 0}</span>
 			</button>
 		{/each}
 
@@ -33,8 +33,8 @@
 				width="11"
 				height="11"
 				viewBox="0 0 16 16"
-				fill={view.favOnly ? '#e8c878' : 'none'}
-				stroke="#e8c878"
+				style:fill={view.favOnly ? 'var(--category-accessory)' : 'none'}
+				style:stroke="var(--category-accessory)"
 				stroke-width="1.3"
 			>
 				<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
@@ -56,14 +56,8 @@
 </div>
 
 <script lang="ts">
-import {
-	catAccent,
-	catName,
-	FILTER_CATEGORIES,
-	SORTS,
-	type InventoryView,
-	type SortKey
-} from './inventory-view.svelte';
+import { itemCategoryColor, itemCategoryName } from '$lib/common';
+import { FILTER_CATEGORIES, SORTS, type InventoryView, type SortKey } from './inventory-view.svelte';
 
 const { view }: { view: InventoryView } = $props();
 const sortKeys = Object.keys(SORTS) as SortKey[];
@@ -93,26 +87,26 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 	font-size: 11.5px;
 	line-height: 1.2;
 	background: transparent;
-	color: rgba(240, 240, 240, 0.55);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	color: var(--text-tertiary);
+	border: 1px solid var(--border-subtle);
 	border-radius: 2px;
 	cursor: pointer;
 	white-space: nowrap;
 	transition: all 120ms;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: color-mix(in srgb, var(--white) 6%, transparent);
 	}
 
 	&.active {
-		background: rgba(161, 194, 247, 0.16);
-		color: #f0f0f0;
-		border-color: rgba(161, 194, 247, 0.55);
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+		color: var(--text-primary);
+		border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 	}
 
 	&.fav.active {
-		background: rgba(232, 200, 120, 0.16);
-		border-color: rgba(232, 200, 120, 0.55);
+		background: color-mix(in srgb, var(--category-accessory) 16%, transparent);
+		border-color: color-mix(in srgb, var(--category-accessory) 55%, transparent);
 	}
 }
 
@@ -141,12 +135,12 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .sort-toggle {
 	display: flex;
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border-subtle);
 	border-radius: 2px;
 	overflow: hidden;
 }
@@ -158,16 +152,16 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 	cursor: pointer;
 	border: none;
 	background: transparent;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	transition: all 120ms;
 
 	&:not(:first-child) {
-		border-left: 1px solid rgba(255, 255, 255, 0.08);
+		border-left: 1px solid var(--border-subtle);
 	}
 
 	&.active {
-		background: rgba(161, 194, 247, 0.16);
-		color: #f0f0f0;
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+		color: var(--text-primary);
 	}
 }
 </style>

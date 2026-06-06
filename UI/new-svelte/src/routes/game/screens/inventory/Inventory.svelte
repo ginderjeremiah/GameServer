@@ -45,7 +45,7 @@ const view = new InventoryView();
 	display: flex;
 	flex-direction: column;
 	position: relative;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	font-family: Geist, Arial, Helvetica, sans-serif;
 	overflow: hidden;
 }
@@ -62,7 +62,7 @@ const view = new InventoryView();
 	height: 11px;
 	transform: rotate(45deg);
 	background: var(--accent);
-	box-shadow: 0 0 8px rgba(161, 194, 247, 0.6);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
 	flex-shrink: 0;
 }
 
@@ -77,7 +77,7 @@ const view = new InventoryView();
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .inv-columns {
@@ -93,8 +93,8 @@ const view = new InventoryView();
 	flex-shrink: 0;
 	display: flex;
 	flex-direction: column;
-	background: rgba(20, 21, 27, 0.5);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--surface) 50%, transparent);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
 	overflow: hidden;
 }
@@ -113,7 +113,7 @@ const view = new InventoryView();
 	font-size: 8.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .drawer-layer {
@@ -125,7 +125,7 @@ const view = new InventoryView();
 .backdrop {
 	position: absolute;
 	inset: 0;
-	background: rgba(0, 0, 0, 0.5);
+	background: color-mix(in srgb, var(--black) 50%, transparent);
 	opacity: 0;
 	transition: opacity 200ms;
 
@@ -140,9 +140,9 @@ const view = new InventoryView();
 	right: 0;
 	bottom: 0;
 	width: 380px;
-	background: rgba(18, 19, 25, 0.99);
-	border-left: 1px solid rgba(255, 255, 255, 0.14);
-	box-shadow: -16px 0 48px rgba(0, 0, 0, 0.5);
+	background: color-mix(in srgb, var(--surface) 99%, transparent);
+	border-left: 1px solid var(--border-light);
+	box-shadow: -16px 0 48px color-mix(in srgb, var(--black) 50%, transparent);
 	transform: translateX(100%);
 	transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 	display: flex;

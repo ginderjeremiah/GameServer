@@ -4,12 +4,8 @@ import { EItemCategory, EItemModType } from '$lib/api';
  * Themeable presentation metadata for item categories and item-mod types: the
  * accent hues live as `--category-*` / `--mod-*` custom properties in
  * `+layout.svelte`, and these helpers reference them (mirroring `rarity.ts`).
- *
- * NOTE (follow-up): the same category/mod-type accent and label maps are
- * currently hard-coded inside `inventory/ItemTooltip.svelte`,
- * `inventory/inventory-view.svelte.ts` and `inventory/ModSlots.svelte`. Those
- * pre-date this module and should be migrated to consume these helpers so the
- * colours are defined once and remain theme-overridable.
+ * They are the single source of truth for category/mod-type colours and labels
+ * across the inventory and challenges screens.
  */
 
 const CATEGORY_GROUP: Record<EItemCategory, 'armor' | 'weapon' | 'accessory'> = {
