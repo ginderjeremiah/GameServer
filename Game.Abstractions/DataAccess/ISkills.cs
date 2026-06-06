@@ -8,6 +8,5 @@ namespace Game.Abstractions.DataAccess
         public List<Skill> AllSkills(bool refreshCache = false);
         public Skill? LookupSkill(int skillId);
         public Skill GetSkill(int skillId);
-        public Task SaveSkillsAsync(List<int> skillIds);
     }
 }
