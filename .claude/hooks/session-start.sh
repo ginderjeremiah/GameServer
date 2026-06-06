@@ -23,6 +23,21 @@ if [ "$CLAUDE_CODE_REMOTE" != "true" ]; then
   exit 0
 fi
 
+# Ensure nvm default (v26) wins over system Node on every shell (interactive and non-interactive).
+#
+# ~/.nvm is where the user-installed versions live; /opt/nvm is the system install with no
+# versions. /etc/profile.d/nvm.sh is sourced first by all login shells (before ~/.bashrc),
+# but ~/.bashrc has an early "[ -z $PS1 ] && return" that skips nvm setup for non-interactive
+# shells. Fixing /etc/profile.d/nvm.sh is the correct layer for this environment.
+if [ -f "$HOME/.nvm/nvm.sh" ] && grep -q 'NVM_DIR="/opt/nvm"' /etc/profile.d/nvm.sh 2>/dev/null; then
+  sed -i 's|NVM_DIR="/opt/nvm"|NVM_DIR="$HOME/.nvm"|g' /etc/profile.d/nvm.sh
+  echo "[session-start] Fixed NVM_DIR in /etc/profile.d/nvm.sh to \$HOME/.nvm"
+fi
+if [ -f /etc/profile.d/nvm.sh ] && ! grep -q "nvm use default" /etc/profile.d/nvm.sh 2>/dev/null; then
+  echo 'nvm use default > /dev/null 2>&1  # Activate default Node version' >> /etc/profile.d/nvm.sh
+  echo "[session-start] Added 'nvm use default' to /etc/profile.d/nvm.sh"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MARKER_FILE="$PROJECT_ROOT/.container-info.json"
