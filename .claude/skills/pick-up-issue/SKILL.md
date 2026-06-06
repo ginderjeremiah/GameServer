@@ -36,7 +36,7 @@ All GitHub work uses the `mcp__github__*` tools (the `gh` CLI is not available h
 7. Implement to the project's standards
 8. Verify (build, tests, lint)
 9. Commit, push, open the PR
-10. Offer to watch the PR
+10. Watch the PR
 
 ---
 
@@ -161,6 +161,9 @@ Follow `CLAUDE.md` and the area docs. The standards that bite most often:
 - If you make an important design decision, document it concisely in the right `docs/` file
   ("Important Design Decisions" or the relevant feature section) — but don't over-document routine
   bug fixes.
+- If during the course of implementing your PR you find anything that deserves a follow up to look at
+  then you should create a new issue with the details you've discovered. That being said, if it's a very
+  minor fix then you should include it in your PR.
 
 ### 8. Verify before you push
 
@@ -185,11 +188,11 @@ point of doing this before pushing.
 - Open a **ready-for-review** PR (not a draft) via `mcp__github__create_pull_request`. The body
   should have a summary, how it addresses the issue, a test plan/checklist, and a `Closes #N` line
   so the issue auto-closes on merge.
+- Create follow-up issues as needed with the details you've discovered.
 
-### 10. Offer to watch the PR
+### 10. Watch the PR
 
-After opening the PR, proactively offer to watch it for CI failures and review comments via
-`subscribe_pr_activity`, then let the user decide.
+After opening the PR, watch it for CI failures and review comments via `subscribe_pr_activity`.
 
 ---
 
@@ -203,7 +206,7 @@ still open, the bug is excluded as blocked and the June-4 bug wins instead.
 
 ## Guardrails
 
-- This skill picks up and implements issues. It is **not** for creating, triaging, commenting on,
+- This skill picks up and implements issues. It is **not** for creating (except as a byproduct of implementing), triaging, commenting on,
   or closing issues, and not for merely listing/summarizing the backlog.
 - Self-assign the issue the moment you pick it, and treat an existing assignee as "already claimed"
   — together these keep parallel sessions from colliding on the same pick.

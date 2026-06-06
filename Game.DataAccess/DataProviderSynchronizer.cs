@@ -5,6 +5,7 @@ using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Game.DataAccess
@@ -13,11 +14,13 @@ namespace Game.DataAccess
     {
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
+        private readonly ILogger<DataProviderSynchronizer> _logger;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub)
+        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger)
         {
             _services = services;
             _pubsub = pubsub;
+            _logger = logger;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -36,7 +39,7 @@ namespace Game.DataAccess
                 async args => await ProcessQueue(args.queue));
         }
 
-        private async Task ProcessQueue(IPubSubQueue queue)
+        internal async Task ProcessQueue(IPubSubQueue queue)
         {
             var next = await queue.GetNextAsync();
             while (next is not null)
@@ -49,9 +52,15 @@ namespace Game.DataAccess
                         await HandleEvent(envelope);
                     }
                 }
-                catch
+                catch (JsonException ex)
                 {
-                    // TODO: add logging; for now skip malformed events
+                    // A malformed payload can never be parsed successfully, so it is logged and skipped.
+                    _logger.LogWarning(ex, "Skipping malformed player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, next);
+                }
+                catch (Exception ex)
+                {
+                    // An unexpected failure (e.g. a database error) means the player change may not have been persisted.
+                    _logger.LogError(ex, "Failed to process player data event from queue '{Queue}'. The player change may not have been persisted. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, next);
                 }
 
                 next = await queue.GetNextAsync();
