@@ -7,12 +7,12 @@ export class BattleAttributes {
 	public attributes: number[];
 
 	constructor(attList: IBattlerAttribute[] = [], calcDerivedStats: boolean = true) {
-		this.attributes = new Array<number>(attributesMaxId);
+		this.attributes = new Array<number>(attributesMaxId + 1);
 		this.setData(attList, calcDerivedStats);
 	}
 
 	public setData(attList: IBattlerAttribute[] = [], calcDerivedStats: boolean = true) {
-		this.attributes.fill(0, 0, attributesMaxId);
+		this.attributes.fill(0, 0, attributesMaxId + 1);
 		for (const att of attList) {
 			this.attributes[att.attributeId] += att.amount;
 		}
