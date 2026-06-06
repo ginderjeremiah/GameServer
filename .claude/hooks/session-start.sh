@@ -38,6 +38,26 @@ if [ -f /etc/profile.d/nvm.sh ] && ! grep -q "nvm use default" /etc/profile.d/nv
   echo "[session-start] Added 'nvm use default' to /etc/profile.d/nvm.sh"
 fi
 
+# Ensure the nvm-managed Node (default alias) wins over any system Node (e.g. /opt/node22)
+# for ALL shell types — including the non-interactive shells Claude Code's Bash tool runs,
+# which inherit PATH from the Claude Code process and never source /etc/profile.d scripts.
+# $HOME/.local/bin is first in PATH, so symlinking there overrides /opt/node22/bin.
+if [ -f "$HOME/.nvm/nvm.sh" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  # Load nvm without activating any version so we can query it
+  . "$NVM_DIR/nvm.sh" --no-use 2>/dev/null
+  _nvm_node_path=$(nvm which default 2>/dev/null)
+  if [ -n "$_nvm_node_path" ] && [ -x "$_nvm_node_path" ]; then
+    _nvm_node_bin=$(dirname "$_nvm_node_path")
+    mkdir -p "$HOME/.local/bin"
+    for _bin in node npm npx corepack; do
+      [ -f "$_nvm_node_bin/$_bin" ] && ln -sf "$_nvm_node_bin/$_bin" "$HOME/.local/bin/$_bin"
+    done
+    _node_ver=$("$HOME/.local/bin/node" --version 2>/dev/null)
+    echo "[session-start] Symlinked Node ${_node_ver} (nvm default) into \$HOME/.local/bin — overrides system Node"
+  fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MARKER_FILE="$PROJECT_ROOT/.container-info.json"
