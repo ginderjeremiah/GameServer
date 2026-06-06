@@ -3,7 +3,7 @@ export { default as Attributes } from './Attributes.svelte';
 export { default as CardGame } from './CardGame.svelte';
 export { default as Challenges } from './challenges/Challenges.svelte';
 export { default as Inventory } from './inventory/Inventory.svelte';
-export { default as Options } from './Options.svelte';
+export { default as Options } from './options/Options.svelte';
 export { default as Stats } from './Stats.svelte';
 export { default as Help } from './Help.svelte';
 export { default as PlaceholderScreen } from './PlaceholderScreen.svelte';

@@ -11,11 +11,24 @@ export interface LogKind {
 	label: string;
 }
 
-const PLAYER = '#c0d8ff';
-const ENEMY = '#e8b6a6';
-const LOOT = '#bde0b4';
-const REWARD = '#f0d28a';
-const SYSTEM = 'rgba(240, 240, 240, 0.7)';
+/**
+ * The semantic combat-log palette — the single source of truth for the colours
+ * used to accent log messages (also reused by the Options screen's log-type
+ * rows and live preview so both stay in sync with the real log).
+ */
+export const logColors = {
+	player: '#c0d8ff',
+	enemy: '#e8b6a6',
+	loot: '#bde0b4',
+	reward: '#f0d28a',
+	system: 'rgba(240, 240, 240, 0.7)'
+} as const;
+
+const PLAYER = logColors.player;
+const ENEMY = logColors.enemy;
+const LOOT = logColors.loot;
+const REWARD = logColors.reward;
+const SYSTEM = logColors.system;
 
 /**
  * Maps a {@link LogMessage} to its visual treatment for the sliding manifest.
