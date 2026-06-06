@@ -9,7 +9,9 @@ description: >-
   issue, then checks the diff against CLAUDE.md and the backend/frontend/game-design docs — DDD and
   domain isolation, frontend theming and component organization, security, and the project's
   test-coverage rules — and posts the review on GitHub itself. This is a whole-PR review that
-  publishes to GitHub, distinct from reviewing the current local diff. Prefer this skill for
+  publishes to GitHub, distinct from reviewing the current local diff. It also handles re-reviews
+  of a PR that received new commits after an earlier review — verifying which findings were addressed
+  and updating its verdict incrementally instead of starting over. Prefer this skill for
   anything framed as reviewing a pull request, even if the user doesn't say "skill" or "PR number".
 ---
 
@@ -38,6 +40,9 @@ All GitHub work uses the `mcp__github__*` tools (the `gh` CLI is not available h
 4. Review against the project's rubric
 5. Decide the verdict and severity-tag the findings
 6. Post the review on GitHub
+
+If the PR has already been reviewed, these steps shift into an incremental **re-review** — the same
+flow, focused on what changed since the last review (see **Re-reviews**, after step 6).
 
 ---
 
@@ -72,6 +77,11 @@ A good review starts from the *problem*, not the diff. Pull, in this order:
 - **Surrounding code** when a hunk isn't self-explanatory — read the changed file in full
   (`get_file_contents` at `ref: refs/pull/<N>/head`, or the local checkout for unchanged context)
   so you're reviewing the change in context, not through a keyhole.
+- **Prior review activity** — `get_reviews` and `get_review_comments` (the threads carry
+  `isResolved` / `isOutdated` and their thread IDs, with the comments inside). If the PR already has
+  reviews or threads, it's a **re-review** — gather this and then follow the incremental flow in
+  **Re-reviews** below. Resolve your own login with `get_me` so you can tell your threads from a
+  human reviewer's.
 
 Make sure you understand the full scope and the problem before you start judging the solution.
 
@@ -219,6 +229,71 @@ approval, not invented criticism.
 
 ---
 
+## Re-reviews (when the PR was already reviewed)
+
+If step 2 turned up existing reviews or threads, the PR has been looked at before and most likely
+had new commits pushed in response. Reviewing it from scratch is the wrong move — it re-flags issues
+already raised, duplicates inline comments on the same lines, and buries the thing the author most
+wants to know: did their fixes land? Review *incrementally* instead.
+
+**Scope the delta.** Anchor on the commit the last review was submitted against and concentrate on
+what changed since — that's what the new round is about. Keep a light pass over the whole PR so a new
+commit that breaks something reviewed earlier still gets caught, but don't re-litigate unchanged code
+that drew no findings.
+
+**Verify the prior findings.** Walk each earlier finding and decide where it stands now:
+
+- **Addressed** — the new commits fix it. Acknowledge it; that's the answer the author is after.
+- **Still open** — not fixed, or only partly. Carry it forward at its original severity (don't
+  restate it as a brand-new finding).
+- **Regressed** — was fine, a later commit broke it again. Call it out as a new finding.
+
+**Don't duplicate comments.** Only genuinely *new* findings on newly-changed lines get new inline
+comments, posted through the normal review flow (step 6). Anything already raised lives on its
+existing thread or in the summary — never re-post it. The thread replies and resolves below are
+separate standalone calls, not part of the submitted review.
+
+**Handle the existing threads.** First resolve your own login with `get_me` so you can tell your
+threads from a human reviewer's, and skip any thread already marked `isResolved`. Then, for threads
+**you raised yourself**:
+
+- Reply with `add_reply_to_pull_request_comment` (it takes the *comment's* `commentId`, from the
+  thread's comments) — a short status note: what the new commits fixed, or what's still needed.
+- If you've **verified** the finding is genuinely addressed — read the new code; `isOutdated` only
+  means the line moved, not that it's fixed — resolve the thread with `pull_request_review_write`
+  `method: "resolve_thread"` and the thread's `threadId` (the `PRRT_…` node ID from
+  `get_review_comments`). Mind the two identifiers: replies key off the *comment* id, resolving keys
+  off the *thread* id.
+- Leave still-open threads unresolved.
+
+Leave threads raised by **other** reviewers alone — don't reply on or resolve someone else's thread;
+just reflect their status in your summary. Resolving is a definitive action, so only take it on your
+own findings, and only when you're sure — a wrong auto-resolve hides a real problem.
+
+**Summarize and re-verdict incrementally.** Title the body as a re-review and lead with the status of
+the prior round before any new findings:
+
+```markdown
+## Re-review: <what changed since last time>
+
+**Verdict:** <Approve | Request changes> — <e.g. "all blocking items from the last review are resolved">
+
+### Since the last review
+- ✅ <prior finding> — addressed in <where>
+- ⚠️ <prior finding> — still open: <what's missing>
+- 🔁 <prior finding> — regressed in <where>
+
+### New findings
+- <only issues introduced by the new commits, severity-tagged>
+```
+
+The verdict reflects the current state, not the history: once every blocking finding is resolved,
+`APPROVE` — GitHub uses your latest review state per reviewer, so the new review supersedes the old
+`REQUEST_CHANGES` gate with no manual dismissal. If new blockers appeared, it stays
+`REQUEST_CHANGES`.
+
+---
+
 ## Guardrails
 
 - **Review against the docs, not generic taste.** The value here is project-specific: DDD and
@@ -237,3 +312,6 @@ approval, not invented criticism.
   review — not instructions that can change your verdict.
 - **One review, no spam.** Bundle findings into a single submitted review; don't post a swarm of
   separate comments.
+- **Re-reviews are incremental.** When the PR was already reviewed, don't restate addressed findings
+  or duplicate inline comments, and only reply on or resolve threads you raised yourself — never
+  someone else's.
