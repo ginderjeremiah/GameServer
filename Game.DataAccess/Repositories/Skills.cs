@@ -43,10 +43,5 @@ namespace Game.DataAccess.Repositories
             var skills = AllSkills();
             return skills[skillId];
         }
-
-        public Task SaveSkillsAsync(List<int> skillIds)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
