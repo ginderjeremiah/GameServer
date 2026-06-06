@@ -67,16 +67,15 @@ jobs:
     - name: Set up Node
       uses: actions/setup-node@v6
       with:
-        node-version: 22
+        node-version-file: UI/new-svelte/.nvmrc
         cache: npm
         cache-dependency-path: UI/new-svelte/package-lock.json
 
     - name: Install node modules
-      # Use `npm install`, not `npm ci`. `npm ci` hard-fails on any package.json/package-lock.json
-      # drift, and the lock representation of optional WASM-runtime deps differs across npm majors
-      # (even minors), so a routine local `npm install` on a newer npm would break CI. `npm install`
-      # respects the committed lock and reconciles harmless drift instead of failing the build.
-      run: npm install
+      # Reproducible install. This is safe with `npm ci` because the Node/npm version is pinned via
+      # .nvmrc (see "Set up Node"); keep local dev on that same version (`nvm use`) or the lock can
+      # drift — the optional WASM-runtime deps are recorded differently across npm versions.
+      run: npm ci
 
     - name: Run ESLint
       run: npm run lint
@@ -148,15 +147,13 @@ jobs:
     - name: Set up Node
       uses: actions/setup-node@v6
       with:
-        node-version: 22
+        node-version-file: UI/new-svelte/.nvmrc
         cache: npm
         cache-dependency-path: UI/new-svelte/package-lock.json
 
     - name: Install node modules
       working-directory: UI/new-svelte
-      # See the frontend job: `npm install` (not `npm ci`) so local lock drift across npm versions
-      # doesn't break CI.
-      run: npm install
+      run: npm ci
 
     - name: Cache Playwright browser
       id: playwright-cache
