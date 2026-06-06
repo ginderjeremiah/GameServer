@@ -2,18 +2,34 @@
 // Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 
 import type {
+	IAttribute,
 	IBattleLostResponse,
+	IChallenge,
+	IChallengeType,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
+	IEnemy,
+	IItem,
+	IItemMod,
 	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
-	ISetItemFavoriteRequest
+	ISetItemFavoriteRequest,
+	ISkill,
+	IZone
 } from './';
 
 export type ApiSocketResponseTypes = {
 	'BattleLost': IBattleLostResponse;
 	'DefeatEnemy': IDefeatEnemyResponse;
+	'GetAttributes': IAttribute[];
+	'GetChallenges': IChallenge[];
+	'GetChallengeTypes': IChallengeType[];
+	'GetEnemies': IEnemy[];
+	'GetItemMods': IItemMod[];
+	'GetItems': IItem[];
+	'GetSkills': ISkill[];
+	'GetZones': IZone[];
 	'NewEnemy': INewEnemyModel;
 	'SaveLogPreferences': undefined;
 	'SetItemFavorite': undefined;
