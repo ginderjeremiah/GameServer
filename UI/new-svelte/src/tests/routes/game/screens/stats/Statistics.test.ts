@@ -1,24 +1,63 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
+import { EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { SERVER_STAT_TYPES } from './stat-fixtures';
+
+// Statistics fetches values via ApiRequest and resolves entities from staticData.
+const { mockGet, staticData } = vi.hoisted(() => ({
+	mockGet: vi.fn(),
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	staticData: {} as any
+}));
+
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/api')>();
+	return { ...actual, ApiRequest: { get: mockGet } };
+});
+// Override only staticData; keep the other real stores ($components → log-panel
+// pulls in the engine, which reads the logs store).
+vi.mock('$stores', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$stores')>();
+	return { ...actual, staticData };
+});
+
 import Statistics from '$routes/game/screens/stats/Statistics.svelte';
 
-// Statistics builds its view-model from the self-contained mock data source, so
-// no managers/stores need stubbing here.
+const STATS: IPlayerStatistic[] = [
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 300 },
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 50 },
+	{ statisticTypeId: EStatisticType.EnemiesKilled, value: 350 },
+	{ statisticTypeId: EStatisticType.FastestVictory, entityId: 0, value: 1.8 },
+	{ statisticTypeId: EStatisticType.TotalBattleTime, value: 1200 },
+	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 2 }
+];
+
+beforeEach(() => {
+	staticData.statisticTypes = SERVER_STAT_TYPES;
+	staticData.enemies = [
+		{ id: 0, name: 'Cave Bat', isBoss: false },
+		{ id: 1, name: 'Goblin', isBoss: false }
+	];
+	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 1 }];
+	staticData.skills = [{ id: 0, name: 'Cleave' }];
+	mockGet.mockResolvedValue(STATS);
+});
 
 afterEach(() => cleanup());
 
 describe('Statistics screen', () => {
-	it('renders the screen with the by-statistic view by default', () => {
+	it('fetches real statistics and renders the by-statistic view by default', async () => {
 		render(Statistics);
 		expect(screen.getByTestId('statistics-screen')).toBeTruthy();
-		expect(screen.getByText('Statistics')).toBeTruthy();
-		// The Combat category is active by default → its stat cards are shown.
-		expect(screen.getByText('Enemies Killed')).toBeTruthy();
+		// The Combat category is active by default → its stat cards appear once loaded.
+		expect(await screen.findByText('Enemies Killed')).toBeTruthy();
 		expect(screen.getByTestId('stat-card-grid')).toBeTruthy();
+		expect(mockGet).toHaveBeenCalledWith('Statistics');
 	});
 
 	it('switches to the by-entity view via the top toggle', async () => {
 		render(Statistics);
+		await screen.findByText('Enemies Killed');
 		expect(screen.queryByTestId('entity-picker')).toBeNull();
 		await fireEvent.click(screen.getByTestId('view-entity'));
 		expect(screen.getByTestId('entity-picker')).toBeTruthy();
@@ -27,6 +66,7 @@ describe('Statistics screen', () => {
 
 	it('switches category tabs to show that category’s statistics', async () => {
 		render(Statistics);
+		await screen.findByText('Enemies Killed');
 		await fireEvent.click(screen.getByTestId('tab-time'));
 		expect(screen.getByText('Total Battle Time')).toBeTruthy();
 		expect(screen.getByText('Fastest Victory')).toBeTruthy();
@@ -35,9 +75,17 @@ describe('Statistics screen', () => {
 	it('pivots from a stat card entity row into that entity’s dossier (cross-link)', async () => {
 		render(Statistics);
 		// Cave Bat (entity 0) is the most-killed enemy, so its row is in the
-		// Enemies Killed card (stat id 1). Clicking it pivots to the dossier.
-		await fireEvent.click(screen.getByTestId('stat-row-1-0'));
+		// Enemies Killed card (stat id 1) once the values load. Clicking it pivots.
+		const row = await screen.findByTestId('stat-row-1-0');
+		await fireEvent.click(row);
 		expect(screen.getByTestId('entity-dossier')).toBeTruthy();
 		expect(screen.getByTestId('entity-picker')).toBeTruthy();
+	});
+
+	it('shows a friendly empty state for a player with no statistics', async () => {
+		mockGet.mockResolvedValue([]);
+		render(Statistics);
+		expect(await screen.findByTestId('statistics-empty')).toBeTruthy();
+		expect(screen.queryByTestId('stat-card-grid')).toBeNull();
 	});
 });

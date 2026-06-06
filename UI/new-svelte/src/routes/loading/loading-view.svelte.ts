@@ -104,6 +104,14 @@ const REFERENCE_DATA: RefDataSource[] = [
 		load: async () => {
 			staticData.challengeTypes = await ApiRequest.get('Challenges/ChallengeTypes');
 		}
+	},
+	{
+		key: 'statisticTypes',
+		label: 'Statistic Types',
+		loaded: () => staticData.statisticTypes != null,
+		load: async () => {
+			staticData.statisticTypes = await ApiRequest.get('Statistics/StatisticTypes');
+		}
 	}
 ];
 

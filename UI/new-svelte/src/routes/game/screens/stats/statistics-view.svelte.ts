@@ -7,21 +7,17 @@
        references it, with this entity's rank among its peers (click a stat to
        jump back to its category).
 
-   The statistic→entity-kind mapping mirrors how the backend actually *records*
-   statistics (`PlayerProgress.RecordBattleCompleted`): the stats it writes a
-   per-entity row for break down by that entity; the rest are tracked only as a
-   single grand total ("none"). Display metadata the backend doesn't model
-   (unit, aggregation, comparison direction, category) is defined here.
+   The statistic→entity-kind mapping comes from the backend's statistic-type
+   reference data (`IStatisticType.entityType`, loaded into
+   `staticData.statisticTypes`), so the frontend no longer hard-codes which
+   entity kind each statistic breaks down by. Display metadata the backend does
+   not model (unit, aggregation, comparison direction, category, display order)
+   is a presentation concern defined here in STAT_PRESENTATION and merged with
+   the server metadata by buildStatTypes(). The actual values come from
+   `GET /api/Statistics`; entity ids resolve against the live staticData. */
 
-   NOTE on FastestVictory: it is recorded *per enemy* (and as a global min), so
-   it is treated as an enemy statistic here — but `StatisticType.GetEntityType`
-   on the backend currently returns `None` for it, an inconsistency flagged for
-   the backend follow-up. The display data is sourced from a temporary mock (see
-   statistics-mock.ts); wiring real backend data is the same follow-up. */
-
-import { EStatisticType, type IPlayerStatistic } from '$lib/api';
-import { normalizeText } from '$lib/common';
-import { buildMockStatistics, MOCK_ENTITIES } from './statistics-mock';
+import { EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
+import { staticData } from '$stores';
 
 export type StatUnit = 'count' | 'damage' | 'time';
 export type StatAgg = 'sum' | 'max' | 'min';
@@ -34,8 +30,7 @@ export type StatCategory = 'combat' | 'survival' | 'exploration' | 'time';
 export type ViewMode = 'stat' | 'entity';
 
 /** A reference entity a statistic can break down by — the shape `StatisticsData`
- *  resolves entity ids against (today the mock's stand-in for
- *  `staticData.enemies/zones/skills`). */
+ *  resolves entity ids against (built from `staticData.enemies/zones/skills`). */
 export interface StatEntity {
 	id: number;
 	name: string;
@@ -57,40 +52,84 @@ export interface StatType {
 	bossOnly?: boolean;
 }
 
-const def = (
-	id: EStatisticType,
-	kind: StatKind,
-	unit: StatUnit,
-	agg: StatAgg,
-	comp: StatComp,
-	cat: StatCategory,
-	bossOnly = false
-): StatType => ({ id, name: normalizeText(EStatisticType[id]), kind, unit, agg, comp, cat, bossOnly });
+/** Presentation metadata for a statistic type — the concerns the backend does
+ *  not model (unit, aggregation, comparison, category) plus the display order.
+ *  Merged with the server's `entityType` + `name` by {@link buildStatTypes}. */
+interface StatPresentation {
+	id: EStatisticType;
+	unit: StatUnit;
+	agg: StatAgg;
+	comp: StatComp;
+	cat: StatCategory;
+	bossOnly?: boolean;
+}
 
-/** The statistic-type catalogue (mirrors EStatisticType + the backend's recorded
- *  entity breakdown). Ordered by category for the tab grouping. */
-export const STAT_TYPES: StatType[] = [
+/** The presentation catalogue, ordered for the category-tab grouping. Covers
+ *  every EStatisticType; the entity breakdown (kind) + name come from the server. */
+const STAT_PRESENTATION: StatPresentation[] = [
 	// Combat
-	def(EStatisticType.EnemiesKilled, 'enemy', 'count', 'sum', 'AtLeast', 'combat'),
-	def(EStatisticType.BossesDefeated, 'none', 'count', 'sum', 'AtLeast', 'combat', true),
-	def(EStatisticType.SkillsUsed, 'skill', 'count', 'sum', 'AtLeast', 'combat'),
-	def(EStatisticType.DamageDealt, 'skill', 'damage', 'sum', 'AtLeast', 'combat'),
-	def(EStatisticType.HighestSingleAttackDamage, 'skill', 'damage', 'max', 'AtLeast', 'combat'),
+	{ id: EStatisticType.EnemiesKilled, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
+	{ id: EStatisticType.BossesDefeated, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat', bossOnly: true },
+	{ id: EStatisticType.SkillsUsed, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
+	{ id: EStatisticType.DamageDealt, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
+	{ id: EStatisticType.HighestSingleAttackDamage, unit: 'damage', agg: 'max', comp: 'AtLeast', cat: 'combat' },
 	// Survival
-	def(EStatisticType.DamageTaken, 'none', 'damage', 'sum', 'AtLeast', 'survival'),
-	def(EStatisticType.DamageHealed, 'none', 'damage', 'sum', 'AtLeast', 'survival'),
-	def(EStatisticType.PlayerDeaths, 'none', 'count', 'sum', 'AtMost', 'survival'),
+	{ id: EStatisticType.DamageTaken, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
+	{ id: EStatisticType.DamageHealed, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
+	{ id: EStatisticType.PlayerDeaths, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'survival' },
 	// Exploration
-	def(EStatisticType.ZonesCleared, 'zone', 'count', 'sum', 'AtLeast', 'exploration'),
-	def(EStatisticType.EnemiesEncountered, 'enemy', 'count', 'sum', 'AtLeast', 'exploration'),
-	def(EStatisticType.BattlesWon, 'enemy', 'count', 'sum', 'AtLeast', 'exploration'),
-	def(EStatisticType.BattlesLost, 'enemy', 'count', 'sum', 'AtMost', 'exploration'),
+	{ id: EStatisticType.ZonesCleared, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },
+	{ id: EStatisticType.EnemiesEncountered, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },
+	{ id: EStatisticType.BattlesWon, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },
+	{ id: EStatisticType.BattlesLost, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'exploration' },
 	// Time
-	def(EStatisticType.TotalBattleTime, 'none', 'time', 'sum', 'AtLeast', 'time'),
-	def(EStatisticType.FastestVictory, 'enemy', 'time', 'min', 'AtMost', 'time')
+	{ id: EStatisticType.TotalBattleTime, unit: 'time', agg: 'sum', comp: 'AtLeast', cat: 'time' },
+	{ id: EStatisticType.FastestVictory, unit: 'time', agg: 'min', comp: 'AtMost', cat: 'time' }
 ];
 
-const STAT_BY_ID = new Map(STAT_TYPES.map((s) => [s.id, s]));
+/** Maps the backend's entity type onto the screen's entity-kind discriminator. */
+const KIND_BY_ENTITY_TYPE: Record<EEntityType, StatKind> = {
+	[EEntityType.None]: 'none',
+	[EEntityType.Enemy]: 'enemy',
+	[EEntityType.Zone]: 'zone',
+	[EEntityType.Skill]: 'skill'
+};
+
+/** Builds the statistic-type catalogue by merging the frontend presentation
+ *  metadata with the backend statistic-type reference data (name + entity
+ *  breakdown). Statistics absent from the server metadata are skipped. */
+export function buildStatTypes(statisticTypes: IStatisticType[]): StatType[] {
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive lookup map
+	const metaById = new Map(statisticTypes.map((s) => [s.id, s]));
+	const out: StatType[] = [];
+	for (const p of STAT_PRESENTATION) {
+		const meta = metaById.get(p.id);
+		if (!meta) {
+			continue;
+		}
+		out.push({
+			id: p.id,
+			name: meta.name,
+			kind: KIND_BY_ENTITY_TYPE[meta.entityType] ?? 'none',
+			unit: p.unit,
+			agg: p.agg,
+			comp: p.comp,
+			cat: p.cat,
+			bossOnly: p.bossOnly
+		});
+	}
+	return out;
+}
+
+/** Builds the entity reference lists the screen resolves ids against from the
+ *  in-memory static reference data (enemies / zones / skills). */
+export function buildStatEntities(): Record<StatEntityKind, StatEntity[]> {
+	return {
+		enemy: (staticData.enemies ?? []).filter(Boolean).map((e) => ({ id: e.id, name: e.name, boss: e.isBoss })),
+		zone: (staticData.zones ?? []).filter(Boolean).map((z) => ({ id: z.id, name: z.name, zoneNum: z.order })),
+		skill: (staticData.skills ?? []).filter(Boolean).map((s) => ({ id: s.id, name: s.name }))
+	};
+}
 
 export const STAT_CATEGORIES: { key: StatCategory; label: string }[] = [
 	{ key: 'combat', label: 'Combat' },
@@ -130,16 +169,30 @@ const aggregate = (values: number[], agg: StatAgg): number => {
 	return values.reduce((a, b) => a + b, 0);
 };
 
-/** Wraps a player's statistics + entity reference data with the queries the
- *  screen needs. Plain (non-reactive) so it is trivially unit-testable; the
- *  reactive {@link StatisticsView} holds an instance. */
+/** Wraps a player's statistics + the statistic-type catalogue + entity reference
+ *  data with the queries the screen needs. Plain (non-reactive) so it is
+ *  trivially unit-testable; the reactive {@link StatisticsView} holds an instance. */
 export class StatisticsData {
+	readonly statTypes: StatType[];
 	readonly stats: IPlayerStatistic[];
 	readonly entities: Record<StatEntityKind, StatEntity[]>;
+	private readonly byId: Map<EStatisticType, StatType>;
 
-	constructor(stats: IPlayerStatistic[], entities: Record<StatEntityKind, StatEntity[]>) {
+	constructor(statTypes: StatType[], stats: IPlayerStatistic[], entities: Record<StatEntityKind, StatEntity[]>) {
+		this.statTypes = statTypes;
 		this.stats = stats;
 		this.entities = entities;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive lookup map
+		this.byId = new Map(statTypes.map((s) => [s.id, s]));
+	}
+
+	statType(type: EStatisticType): StatType | undefined {
+		return this.byId.get(type);
+	}
+
+	/** Statistic types in the given category, in catalogue (display) order. */
+	statsInCategory(cat: StatCategory | 'all'): StatType[] {
+		return cat === 'all' ? this.statTypes : this.statTypes.filter((s) => s.cat === cat);
 	}
 
 	entityList(kind: StatEntityKind): StatEntity[] {
@@ -153,7 +206,7 @@ export class StatisticsData {
 	/** Per-entity rows for a statistic, resolved and sorted best-first (ascending
 	 *  for "min" aggregates, where lower is better). Empty for `none` stats. */
 	rowsForStat(type: EStatisticType): StatRow[] {
-		const stat = STAT_BY_ID.get(type);
+		const stat = this.byId.get(type);
 		if (!stat || stat.kind === 'none') {
 			return [];
 		}
@@ -179,7 +232,7 @@ export class StatisticsData {
 		if (totalRow) {
 			return totalRow.value;
 		}
-		const stat = STAT_BY_ID.get(type);
+		const stat = this.byId.get(type);
 		return aggregate(
 			this.rowsForStat(type).map((r) => r.value),
 			stat?.agg ?? 'sum'
@@ -194,7 +247,7 @@ export class StatisticsData {
 	 *  rank among peers, and the statistic's headline. */
 	statsForEntity(kind: StatEntityKind, entityId: number): EntityStatInfo[] {
 		const out: EntityStatInfo[] = [];
-		for (const stat of STAT_TYPES) {
+		for (const stat of this.statTypes) {
 			if (stat.kind !== kind) {
 				continue;
 			}
@@ -207,12 +260,20 @@ export class StatisticsData {
 		}
 		return out;
 	}
+
+	/** Whether the player has recorded any statistic values at all (new player). */
+	get isEmpty(): boolean {
+		return this.stats.length === 0;
+	}
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class StatisticsView {
-	readonly data: StatisticsData;
+	/** The player's statistic values, fetched from `GET /api/Statistics` on mount. */
+	stats = $state<IPlayerStatistic[]>([]);
+	/** True until the statistic values have been fetched. */
+	loading = $state(true);
 
 	/** Top-level view: by statistic or by entity. */
 	mode = $state<ViewMode>('stat');
@@ -225,15 +286,13 @@ export class StatisticsView {
 	/** Entity-picker search query. */
 	query = $state('');
 
-	constructor(data?: StatisticsData) {
-		this.data = data ?? new StatisticsData(buildMockStatistics(), MOCK_ENTITIES);
-		this.entId = this.data.entityList('enemy')[0]?.id ?? 0;
-	}
+	/** The query engine, rebuilt from the live reference data + fetched values. */
+	readonly data = $derived(
+		new StatisticsData(buildStatTypes(staticData.statisticTypes ?? []), this.stats, buildStatEntities())
+	);
 
 	/** Statistics shown in the current category tab. */
-	readonly shownStats = $derived(
-		this.statCat === 'all' ? STAT_TYPES : STAT_TYPES.filter((s) => s.cat === this.statCat)
-	);
+	readonly shownStats = $derived(this.data.statsInCategory(this.statCat));
 
 	/** Entities matching the picker query within the active kind. */
 	readonly filteredEntities = $derived.by(() => {

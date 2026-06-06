@@ -163,5 +163,18 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
         }
+
+        [Fact]
+        public async Task GetStatisticTypes_ReturnsIntrinsicStatisticTypes()
+        {
+            var userId = await SeedReferenceDataAndLoginAsync();
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<StatisticType>>("GetStatisticTypes");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.NotEmpty(response.Data);
+        }
     }
 }

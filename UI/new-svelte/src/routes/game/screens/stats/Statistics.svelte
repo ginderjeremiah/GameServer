@@ -3,8 +3,9 @@
      entity in a stat card pivots to its dossier; clicking a stat in a dossier
      jumps back to its category.
 
-     The displayed values currently come from a temporary mock (statistics-mock.ts);
-     wiring real backend data is a tracked follow-up. -->
+     Values come from GET /api/Statistics; the statistic-type catalogue and the
+     entity reference lists come from the in-memory staticData. A brand-new
+     player with no recorded statistics gets a friendly empty state. -->
 <div class="stats-frame" data-testid="statistics-screen">
 	<div class="header">
 		<div class="eyebrow">Character · Statistics</div>
@@ -15,22 +16,43 @@
 	</div>
 
 	<div class="body">
-		<ViewToggle mode={view.mode} onChange={(m) => view.setMode(m)} />
-		{#if view.mode === 'stat'}
-			<ByStatisticView {view} />
+		{#if !view.loading && view.data.isEmpty}
+			<StatsEmpty />
 		{:else}
-			<ByEntityView {view} />
+			<ViewToggle mode={view.mode} onChange={(m) => view.setMode(m)} />
+			{#if view.mode === 'stat'}
+				<ByStatisticView {view} />
+			{:else}
+				<ByEntityView {view} />
+			{/if}
 		{/if}
 	</div>
+
+	{#if view.loading}
+		<Loading />
+	{/if}
 </div>
 
 <script lang="ts">
+import { onMount } from 'svelte';
+import { ApiRequest } from '$lib/api';
+import { Loading } from '$components';
 import ViewToggle from './ViewToggle.svelte';
 import ByStatisticView from './ByStatisticView.svelte';
 import ByEntityView from './ByEntityView.svelte';
+import StatsEmpty from './StatsEmpty.svelte';
 import { StatisticsView } from './statistics-view.svelte';
 
 const view = new StatisticsView();
+
+onMount(async () => {
+	try {
+		view.stats = (await ApiRequest.get('Statistics')) ?? [];
+	} catch {
+		view.stats = [];
+	}
+	view.loading = false;
+});
 </script>
 
 <style lang="scss">
@@ -38,6 +60,7 @@ const view = new StatisticsView();
 	height: 100%;
 	display: flex;
 	flex-direction: column;
+	position: relative;
 	color: var(--text-primary);
 	font-family: var(--sans);
 	overflow: hidden;

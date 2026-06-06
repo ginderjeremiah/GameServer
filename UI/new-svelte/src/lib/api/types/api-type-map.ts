@@ -35,6 +35,7 @@ import type {
 	ISetUserRolesData,
 	ISetZoneEnemiesData,
 	ISkill,
+	IStatisticType,
 	ITag,
 	ITagCategory,
 	IUserActionData,
@@ -89,6 +90,7 @@ export type ApiResponseTypes = {
 	'Player/UpdatePlayerStats': IBattlerAttribute[];
 	'Skills': ISkill[];
 	'Statistics': IPlayerStatistic[];
+	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 	'Tags/TagsForItem': ITag[];

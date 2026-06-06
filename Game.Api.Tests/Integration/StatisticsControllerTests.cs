@@ -1,5 +1,6 @@
 using Game.Api.Models.Common;
 using Game.Api.Models.Progress;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -47,6 +48,39 @@ namespace Game.Api.Tests.Integration
         public async Task GetStatistics_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/Statistics", CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetStatisticTypes_Authenticated_ReturnsAllTypesWithMetadata()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var response = await authClient.GetAsync("/api/Statistics/StatisticTypes", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<StatisticType>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+            Assert.NotNull(result.Data);
+
+            var types = result.Data.ToList();
+            Assert.Equal(Enum.GetValues<EStatisticType>().Length, types.Count);
+
+            // The declared per-enemy breakdown for FastestVictory must match how it is recorded.
+            var fastest = types.Single(t => t.Id == EStatisticType.FastestVictory);
+            Assert.Equal(EEntityType.Enemy, fastest.EntityType);
+            Assert.Equal("Fastest Victory", fastest.Name);
+
+            // A total-only statistic stays None.
+            var deaths = types.Single(t => t.Id == EStatisticType.PlayerDeaths);
+            Assert.Equal(EEntityType.None, deaths.EntityType);
+        }
+
+        [Fact]
+        public async Task GetStatisticTypes_Unauthenticated_Returns401()
+        {
+            var response = await Client.GetAsync("/api/Statistics/StatisticTypes", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
     }
