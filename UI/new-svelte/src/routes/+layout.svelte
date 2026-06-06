@@ -61,6 +61,10 @@ $effect(() => {
 	--slot-background-color: #{colors.$white};
 	--surface: #{colors.$surface};
 	--surface-alpha: #{colors.$surface-alpha};
+	// Tooltip panel background. The surface tint percentage is the configurable
+	// opacity knob — lower it for a more see-through tooltip — and flows through
+	// theme overrides. Paired with the container's backdrop blur for legibility.
+	--tooltip-bg: color-mix(in srgb, var(--surface) 92%, transparent);
 	--page: #0f1014;
 	--panel: #16171e;
 	--panel-2: #1b1c24;

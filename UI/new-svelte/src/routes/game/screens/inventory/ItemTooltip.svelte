@@ -2,7 +2,7 @@
 	class="item-tooltip"
 	bind:this={container}
 	style={item ? '' : 'display: none;'}
-	style:border-left="3px solid {accentColor}"
+	style:border-left="3px solid {rarityAccent}"
 >
 	{#if item}
 		<!-- Title section -->
@@ -10,10 +10,10 @@
 			<div class="tt-category-row">
 				<div
 					class="tt-category-diamond"
-					style:background={accentColor}
-					style:box-shadow="0 0 6px {tintColor(accentColor, 0.67)}"
+					style:background={categoryColor}
+					style:box-shadow="0 0 6px {tintColor(categoryColor, 0.67)}"
 				></div>
-				<span class="tt-category-label" style:color={accentColor}>{categoryName}</span>
+				<span class="tt-category-label" style:color={categoryColor}>{categoryName}</span>
 				{#if item.equipped}
 					<div class="tt-equipped-badge">
 						<div class="tt-equipped-dot"></div>
@@ -21,7 +21,7 @@
 					</div>
 				{/if}
 			</div>
-			<div class="tt-item-name">{item.name}</div>
+			<div class="tt-item-name">{displayName}</div>
 		</div>
 
 		<div class="tt-body">
@@ -53,7 +53,7 @@
 					<div class="tt-mods-list">
 						{#each modSlots as slot (slot.slotId)}
 							{#if slot.mod}
-								<div class="tt-mod-tile" style:border-left-color={modTypeColor(slot.type)}>
+								<div class="tt-mod-tile" style:border-left-color={rarityColor(slot.mod.rarityId)}>
 									<div class="tt-mod-header">
 										<span class="tt-mod-name" style:color={rarityColor(slot.mod.rarityId)}>{slot.mod.name}</span>
 										<span class="tt-mod-type" style:color={modTypeColor(slot.type)}>{modTypeLabel(slot.type)}</span>
@@ -87,7 +87,15 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { itemCategoryColor, itemCategoryName, modTypeColor, modTypeLabel, rarityColor, tintColor } from '$lib/common';
+import {
+	composeItemName,
+	itemCategoryColor,
+	itemCategoryName,
+	modTypeColor,
+	modTypeLabel,
+	rarityColor,
+	tintColor
+} from '$lib/common';
 
 export const getBaseNode = () => container;
 
@@ -111,8 +119,14 @@ const modSlots = $derived(
 );
 const filledCount = $derived(modSlots.filter((s) => s.mod).length);
 
-const accentColor = $derived(item ? itemCategoryColor(item.itemCategoryId) : 'var(--category-armor)');
+// The tooltip's main accent (left border) reflects the item's rarity, while the
+// category row (diamond + label) stays category-coloured — mirroring how
+// ModTooltip accents its border by rarity and its diamond/label by mod type.
+const rarityAccent = $derived(item ? rarityColor(item.rarityId) : 'var(--rarity-common)');
+const categoryColor = $derived(item ? itemCategoryColor(item.itemCategoryId) : 'var(--category-armor)');
 const categoryName = $derived(item ? itemCategoryName(item.itemCategoryId) : 'Item');
+// Item name reflects its applied mods: prefix mod names prepend, suffix names append.
+const displayName = $derived(item ? composeItemName(item.name, item.appliedMods) : '');
 </script>
 
 <style lang="scss">

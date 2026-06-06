@@ -83,6 +83,12 @@ Rarity visuals (used by both the in-game inventory and the admin workbench) foll
 
 The rarity pattern is now the template for every data-driven accent. Challenge-type accents (`--challenge-*`, one per `EChallengeType`), item-category accents (`--category-armor`/`-weapon`/`-accessory`) and item-mod-type accents (`--mod-component`/`-prefix`/`-suffix`) are all declared as CSS variables in `+layout.svelte` and read only through helpers in `$lib/common` (`challengeTypeColor`/`challengeTypeTint`, `itemCategoryColor`/`itemCategoryName`, `modTypeColor`/`modTypeLabel`). The generic `tintColor(color, alpha)` helper produces a `color-mix(in srgb, …)` for **any** colour (hex, named, or a `var(--x)`), so partial-opacity blends stay theme-overridable; `rarityTint` is now a thin wrapper over it. Prefer `var(--…)` + `tintColor` over hard-coded hex/rgba.
 
+### Tooltip surface & item-tooltip accents
+
+The global tooltip container (`components/Tooltip.svelte`, shared by every tooltip) paints its panel with the themeable `--tooltip-bg` var — a `color-mix` over `--surface` whose tint percentage is the single, theme-overridable see-through knob (paired with a backdrop blur for legibility; the translucency lives in the background, not an element `opacity`, so text/accents stay crisp). Item/mod tooltips set no background of their own and inherit it.
+
+For the inventory **item tooltip** (`ItemTooltip.svelte`) the convention mirrors `ModTooltip`: the panel's **left-border accent reflects the item's rarity** (`rarityColor(item.rarityId)`), while the category row (diamond + label) stays **category-coloured**, and each filled mod tile is accented by **that mod's** rarity. The displayed item name is composed from its applied mods via `composeItemName(baseName, mods)` (prefix mod names prepend, suffix names append, components are name-neutral), and the Stats section reflects the merged item + applied-mod attributes (`Item.totalAttributes`).
+
 ## Challenge screen (the Type Rail)
 
 The in-game Challenges screen (`src/routes/game/screens/challenges`) is a **type-driven master/detail** view: a left rail lists each `ChallengeType` (ring meter + done/total) plus an "Overview" entry; selecting a type swaps the right pane to a hero banner + that type's challenge cards with an in-page Progress/Rarity/Name sort, while "Overview" shows overall progress, a pulsing "next up" reward, and a per-type grid. It reuses the existing screen chrome (dark frame, diamond mark, Geist/Geist Mono) and is decomposed into many small components per the component-size guideline.
