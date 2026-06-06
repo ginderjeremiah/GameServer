@@ -53,7 +53,10 @@ export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 	const enterButton = page.getByTestId('enter-button');
 	await expect(enterButton).toBeEnabled({ timeout: 10000 });
 	await enterButton.click();
-	await expect(page).toHaveURL('/game', { timeout: 5000 });
+	// Entering the game loads battle/zone state before /game renders, which on the slower engines
+	// (WebKit/Firefox) under parallel load routinely takes longer than 5s and flakes. Use the same
+	// 10s budget as the other navigations in this file.
+	await expect(page).toHaveURL('/game', { timeout: 10000 });
 	return username;
 }
 
