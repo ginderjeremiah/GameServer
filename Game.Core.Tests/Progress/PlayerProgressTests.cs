@@ -120,6 +120,56 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
         }
 
+        // ── RecordBattleCompleted: zone clears (boss victory) ────────────────
+
+        [Fact]
+        public void RecordBattleCompleted_BossVictory_IncrementsZonesClearedGloballyAndForCurrentZone()
+        {
+            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+
+            // A boss victory clears the player's current zone, tracked globally and per-zone.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
+            // A different zone is unaffected — per-zone isolation.
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 5));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NonBossVictory_DoesNotIncrementZonesCleared()
+        {
+            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: false), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_BossLoss_DoesNotIncrementZonesCleared()
+        {
+            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: false, playerDied: true, totalMs: 1000, new BattleStats());
+
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_RepeatedBossVictoriesInSameZone_AccumulateZonesCleared()
+        {
+            var progress = MakeProgress(player: MakePlayer(currentZoneId: 2));
+
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
+        }
+
         [Fact]
         public void RecordBattleCompleted_PlayerDied_IncrementsPlayerDeaths()
         {
@@ -310,6 +360,22 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void EvaluateChallenges_ZonesCleared_CompletesAfterBossVictoryInTargetZone()
+        {
+            // Regression test for the bug where ZonesCleared was never written, so a
+            // ZonesCleared challenge could never complete. A boss victory in the target zone
+            // should now satisfy it.
+            var challenge = MakeChallenge(id: 0, EChallengeType.ZonesCleared, goal: 1, targetEntityId: 3);
+            var progress = MakeProgress(player: MakePlayer(currentZoneId: 3));
+
+            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Single(completed);
+            Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
+        }
+
+        [Fact]
         public void EvaluateChallenges_LevelReached_UsesPlayerLevel()
         {
             var challenge = MakeChallenge(id: 0, EChallengeType.LevelReached, goal: 5);
@@ -429,13 +495,13 @@ namespace Game.Core.Tests.Progress
             Skills = [],
         };
 
-        private static Player MakePlayer(int level = 1) => new()
+        private static Player MakePlayer(int level = 1, int currentZoneId = 0) => new()
         {
             Id = 1,
             Name = "Test",
             Level = level,
             Exp = 0,
-            CurrentZoneId = 0,
+            CurrentZoneId = currentZoneId,
             StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],

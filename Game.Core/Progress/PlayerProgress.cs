@@ -43,6 +43,11 @@ namespace Game.Core.Progress
                 if (enemy.IsBoss)
                 {
                     Increment(EStatisticType.BossesDefeated, null, 1);
+
+                    // Defeating a boss clears the zone it was fought in. Tracked both globally and
+                    // per-zone so challenges can target either "clear any zone" or a specific zone.
+                    Increment(EStatisticType.ZonesCleared, null, 1);
+                    Increment(EStatisticType.ZonesCleared, Player.CurrentZoneId, 1);
                 }
             }
             else
