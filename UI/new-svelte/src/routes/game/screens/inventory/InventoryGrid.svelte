@@ -96,15 +96,15 @@ const handleHoverLeave = () => {
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	background: rgba(20, 21, 27, 0.5);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--surface) 50%, transparent);
+	border: 1px solid var(--border-subtle);
 	border-radius: 4px;
 	overflow: hidden;
 }
 
 .grid-toolbar {
 	padding: 14px 16px 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	border-bottom: 1px solid var(--border-subtle);
 }
 
 .grid-scroll {
@@ -125,13 +125,13 @@ const handleHoverLeave = () => {
 	width: 100%;
 	text-align: center;
 	padding: 40px;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	font-size: 13px;
 }
 
 .grid-footer {
 	padding: 10px 16px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid var(--border-subtle);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -142,7 +142,7 @@ const handleHoverLeave = () => {
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 
 .pager {
@@ -154,11 +154,11 @@ const handleHoverLeave = () => {
 .page-btn {
 	width: 24px;
 	height: 22px;
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border-subtle);
 	border-radius: 2px;
 	cursor: pointer;
 	background: transparent;
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 	font-family: var(--mono);
 	font-size: 12px;
 
@@ -173,7 +173,7 @@ const handleHoverLeave = () => {
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 	min-width: 44px;
 	text-align: center;
 }

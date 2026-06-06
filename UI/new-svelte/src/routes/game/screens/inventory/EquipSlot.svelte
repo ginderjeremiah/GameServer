@@ -11,10 +11,10 @@
 		tabindex="0"
 		style:border-color={tileBorder}
 		style:background={over
-			? hexA('#a1c2f7', 0.14)
+			? tintColor('var(--accent)', 0.14)
 			: filled
 				? rarityTint(item!.rarityId, 0.07)
-				: 'rgba(255,255,255,0.03)'}
+				: tintColor('var(--white)', 0.03)}
 		ondragover={handleDragOver}
 		ondragleave={() => (over = false)}
 		ondrop={handleDrop}
@@ -36,7 +36,7 @@
 		}}
 	>
 		{#if filled}
-			<CategoryGlyph cat={item!.itemCategoryId} color={catAccent(item!.itemCategoryId)} size={20} />
+			<CategoryGlyph cat={item!.itemCategoryId} color={itemCategoryColor(item!.itemCategoryId)} size={20} />
 			{#if hover}
 				<button
 					class="unequip"
@@ -51,7 +51,7 @@
 				<span class="mod-count">{item!.appliedMods.length}◈</span>
 			{/if}
 		{:else}
-			<CategoryGlyph cat={slot.category} color="rgba(240,240,240,0.18)" size={19} />
+			<CategoryGlyph cat={slot.category} color={tintColor('var(--text-primary)', 0.18)} size={19} />
 		{/if}
 	</div>
 
@@ -71,9 +71,9 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { rarityColor, rarityLabel, rarityTint } from '$lib/common';
+import { itemCategoryColor, rarityColor, rarityLabel, rarityTint, tintColor } from '$lib/common';
 import CategoryGlyph from './CategoryGlyph.svelte';
-import { catAccent, hexA, type EquipSlotDef } from './inventory-view.svelte';
+import { type EquipSlotDef } from './inventory-view.svelte';
 
 interface Props {
 	slot: EquipSlotDef;
@@ -100,12 +100,12 @@ const canAccept = $derived(!!dragItem && dragItem.itemCategoryId === slot.catego
 
 const tileBorder = $derived(
 	over || selected
-		? '#a1c2f7'
+		? 'var(--accent)'
 		: filled
 			? rarityTint(item!.rarityId, 0.6)
 			: canAccept
-				? 'rgba(161,194,247,0.5)'
-				: 'rgba(255,255,255,0.14)'
+				? tintColor('var(--accent)', 0.5)
+				: 'var(--border-light)'
 );
 
 const handleDragOver = (e: DragEvent) => {
@@ -137,7 +137,7 @@ const handleDrop = (e: DragEvent) => {
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 .equip-tile {
@@ -158,11 +158,11 @@ const handleDrop = (e: DragEvent) => {
 	}
 
 	&.over {
-		box-shadow: 0 0 14px rgba(161, 194, 247, 0.45);
+		box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 
 	&.selected {
-		box-shadow: 0 0 0 1px #a1c2f7;
+		box-shadow: 0 0 0 1px var(--accent);
 	}
 }
 
@@ -174,8 +174,8 @@ const handleDrop = (e: DragEvent) => {
 	height: 16px;
 	border-radius: 2px;
 	border: none;
-	background: rgba(0, 0, 0, 0.5);
-	color: rgba(240, 240, 240, 0.78);
+	background: color-mix(in srgb, var(--black) 50%, transparent);
+	color: var(--text-secondary);
 	cursor: pointer;
 	display: flex;
 	align-items: center;
@@ -191,7 +191,7 @@ const handleDrop = (e: DragEvent) => {
 	right: 4px;
 	font-family: var(--mono);
 	font-size: 8px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 .row-info {
@@ -201,7 +201,7 @@ const handleDrop = (e: DragEvent) => {
 
 .item-name {
 	font-size: 13px;
-	color: #f0f0f0;
+	color: var(--text-primary);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -231,6 +231,6 @@ const handleDrop = (e: DragEvent) => {
 .empty-label {
 	font-size: 12px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 }
 </style>

@@ -39,7 +39,8 @@ vi.mock('$stores', () => ({
 	staticData: { itemMods: [] }
 }));
 
-import { InventoryView, catName, hexA, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
+import { itemCategoryColor, itemCategoryName } from '$lib/common';
+import { InventoryView, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
 
 const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERarity, extra: Partial<Item> = {}): Item =>
 	({
@@ -71,12 +72,19 @@ beforeEach(() => {
 	);
 });
 
-describe('inventory-view helpers', () => {
-	it('names categories and builds rgba from hex', () => {
-		expect(catName(EItemCategory.Weapon)).toBe('Weapon');
-		expect(hexA('#a1c2f7', 0.5)).toBe('rgba(161, 194, 247, 0.5)');
+describe('item-category display helpers', () => {
+	it('names categories from the enum', () => {
+		expect(itemCategoryName(EItemCategory.Weapon)).toBe('Weapon');
 	});
 
+	it('maps categories to themeable accent vars', () => {
+		expect(itemCategoryColor(EItemCategory.Helm)).toBe('var(--category-armor)');
+		expect(itemCategoryColor(EItemCategory.Weapon)).toBe('var(--category-weapon)');
+		expect(itemCategoryColor(EItemCategory.Accessory)).toBe('var(--category-accessory)');
+	});
+});
+
+describe('inventory-view helpers', () => {
 	it('declares an equip slot for every category', () => {
 		expect(EQUIP_SLOTS).toHaveLength(6);
 		expect(SORTS.name.cmp(makeItem(9, 'Aaa', 1, 1), makeItem(8, 'Bbb', 1, 1))).toBeLessThan(0);

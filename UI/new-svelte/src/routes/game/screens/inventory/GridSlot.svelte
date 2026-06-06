@@ -27,7 +27,7 @@
 >
 	<CategoryGlyph
 		cat={item.itemCategoryId}
-		color={item.equipped ? 'rgba(240,240,240,0.95)' : 'rgba(240,240,240,0.6)'}
+		color={item.equipped ? tintColor('var(--text-primary)', 0.95) : tintColor('var(--text-primary)', 0.6)}
 		size={Math.round(size * 0.42)}
 	/>
 
@@ -45,8 +45,8 @@
 			width="12"
 			height="12"
 			viewBox="0 0 16 16"
-			fill={item.favorite ? '#e8c878' : 'none'}
-			stroke={item.favorite ? '#e8c878' : 'rgba(240,240,240,0.85)'}
+			style:fill={item.favorite ? 'var(--category-accessory)' : 'none'}
+			style:stroke={item.favorite ? 'var(--category-accessory)' : tintColor('var(--text-primary)', 0.85)}
 			stroke-width="1.3"
 		>
 			<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
@@ -54,7 +54,7 @@
 	</button>
 
 	<div class="cat-corner">
-		<CategoryGlyph cat={item.itemCategoryId} color={hexA(catColor, 0.85)} size={10} />
+		<CategoryGlyph cat={item.itemCategoryId} color={tintColor(catColor, 0.85)} size={10} />
 	</div>
 
 	{#if item.equipped}
@@ -68,8 +68,7 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { rarityColor, rarityGlow, rarityLevel, rarityTint } from '$lib/common';
-import { catAccent, hexA } from './inventory-view.svelte';
+import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
 import CategoryGlyph from './CategoryGlyph.svelte';
 
 interface Props {
@@ -108,16 +107,16 @@ let hover = $state(false);
 
 const rc = $derived(rarityColor(item.rarityId));
 const level = $derived(rarityLevel(item.rarityId));
-const catColor = $derived(catAccent(item.itemCategoryId));
+const catColor = $derived(itemCategoryColor(item.itemCategoryId));
 const modCount = $derived(item.appliedMods.length);
 
-const bg = $derived(accentBorders ? rarityTint(item.rarityId, 0.05 + level * 0.012) : 'rgba(255,255,255,0.03)');
+const bg = $derived(accentBorders ? rarityTint(item.rarityId, 0.05 + level * 0.012) : tintColor('var(--white)', 0.03));
 const borderColor = $derived(
 	selected
 		? 'var(--accent)'
 		: accentBorders
 			? rarityTint(item.rarityId, Math.min(0.85, 0.34 + level * 0.09))
-			: 'rgba(255,255,255,0.14)'
+			: 'var(--border-light)'
 );
 // Glow intensity is a themeable CSS var, so the blur radius and alpha are derived in-CSS via calc().
 const glowShadow = $derived(
@@ -205,7 +204,7 @@ const handleDragStart = (e: DragEvent) => {
 	width: 15px;
 	height: 15px;
 	border-radius: 2px;
-	background: rgba(0, 0, 0, 0.35);
+	background: color-mix(in srgb, var(--black) 35%, transparent);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -218,8 +217,8 @@ const handleDragStart = (e: DragEvent) => {
 	width: 5px;
 	height: 5px;
 	transform: rotate(45deg);
-	background: #bde0b4;
-	box-shadow: 0 0 6px rgba(189, 224, 180, 0.7);
+	background: var(--success);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--success) 70%, transparent);
 }
 
 .mod-count {
@@ -229,6 +228,6 @@ const handleDragStart = (e: DragEvent) => {
 	font-family: var(--mono);
 	font-size: 8px;
 	letter-spacing: 0.4px;
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 </style>

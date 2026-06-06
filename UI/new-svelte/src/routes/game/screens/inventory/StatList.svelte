@@ -34,7 +34,7 @@ const formatValue = (v: number) => (Number.isInteger(v) ? v.toString() : v.toFix
 
 .stat-name {
 	font-size: 12px;
-	color: rgba(240, 240, 240, 0.78);
+	color: var(--text-secondary);
 }
 
 .stat-value {
@@ -42,21 +42,21 @@ const formatValue = (v: number) => (Number.isInteger(v) ? v.toString() : v.toFix
 	font-size: 11.5px;
 	letter-spacing: 0.3px;
 	text-align: right;
-	color: rgba(240, 240, 240, 0.7);
+	color: color-mix(in srgb, var(--text-primary) 70%, transparent);
 
 	&.positive {
-		color: #bde0b4;
+		color: var(--success);
 	}
 
 	&.negative {
-		color: #f0a094;
+		color: var(--error);
 	}
 }
 
 .stat-empty {
 	font-size: 12px;
 	font-style: italic;
-	color: rgba(240, 240, 240, 0.4);
+	color: var(--text-muted);
 	padding: 4px 0;
 }
 </style>
