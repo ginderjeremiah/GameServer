@@ -4,8 +4,9 @@ import { EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { SERVER_STAT_TYPES } from './stat-fixtures';
 
 // Statistics fetches values via ApiRequest and resolves entities from staticData.
-const { mockGet, staticData } = vi.hoisted(() => ({
+const { mockGet, mockToastError, staticData } = vi.hoisted(() => ({
 	mockGet: vi.fn(),
+	mockToastError: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any
 }));
@@ -14,11 +15,11 @@ vi.mock('$lib/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/api')>();
 	return { ...actual, ApiRequest: { get: mockGet } };
 });
-// Override only staticData; keep the other real stores ($components → log-panel
-// pulls in the engine, which reads the logs store).
+// Override staticData + toastError; keep the other real stores ($components →
+// log-panel pulls in the engine, which reads the logs store).
 vi.mock('$stores', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$stores')>();
-	return { ...actual, staticData };
+	return { ...actual, staticData, toastError: mockToastError };
 });
 
 import Statistics from '$routes/game/screens/stats/Statistics.svelte';
@@ -40,6 +41,7 @@ beforeEach(() => {
 	];
 	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 1 }];
 	staticData.skills = [{ id: 0, name: 'Cleave' }];
+	mockToastError.mockClear();
 	mockGet.mockResolvedValue(STATS);
 });
 
@@ -87,5 +89,16 @@ describe('Statistics screen', () => {
 		render(Statistics);
 		expect(await screen.findByTestId('statistics-empty')).toBeTruthy();
 		expect(screen.queryByTestId('stat-card-grid')).toBeNull();
+		expect(mockToastError).not.toHaveBeenCalled();
+	});
+
+	it('surfaces an error (not the empty state) when the fetch fails', async () => {
+		mockGet.mockRejectedValue(new Error('network down'));
+		render(Statistics);
+		expect(await screen.findByTestId('statistics-error')).toBeTruthy();
+		// A failed load must not masquerade as the new-player empty state.
+		expect(screen.queryByTestId('statistics-empty')).toBeNull();
+		expect(screen.queryByTestId('stat-card-grid')).toBeNull();
+		expect(mockToastError).toHaveBeenCalledTimes(1);
 	});
 });

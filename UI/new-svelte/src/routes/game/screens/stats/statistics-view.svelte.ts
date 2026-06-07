@@ -274,6 +274,8 @@ export class StatisticsView {
 	stats = $state<IPlayerStatistic[]>([]);
 	/** True until the statistic values have been fetched. */
 	loading = $state(true);
+	/** True when the fetch failed (distinct from a genuine empty result). */
+	error = $state(false);
 
 	/** Top-level view: by statistic or by entity. */
 	mode = $state<ViewMode>('stat');
