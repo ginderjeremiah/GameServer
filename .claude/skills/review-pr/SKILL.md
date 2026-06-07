@@ -159,8 +159,8 @@ roles), input validation, injection, secrets committed to the repo, and over-exp
 **Is test coverage sufficient and following the guidelines?** This project takes testing
 seriously, so under-testing is a real (often blocking) finding, not a nit:
 
-- _Frontend:_ every touched page, component, and lib module has unit tests under `tests/` mirroring
-  the source path. E2e (Playwright) only for critical user flows.
+- _Frontend:_ every touched page or component with UI interaction, and lib module has unit tests under
+  `tests/` mirroring the source path. E2e (Playwright) only for critical user flows.
 - _Backend:_ all domain logic is thoroughly unit-tested for edge and error cases, classical
   (Detroit) style with minimal test doubles — the project has no unmanaged dependencies.
   Interactions with out-of-process dependencies (Postgres, Redis) are covered by integration tests,
