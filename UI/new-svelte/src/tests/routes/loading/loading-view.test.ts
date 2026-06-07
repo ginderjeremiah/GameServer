@@ -151,6 +151,34 @@ describe('LoadingView', () => {
 		expect(writeReferenceCache).toHaveBeenCalledWith('items', 'v2', []);
 	});
 
+	it('re-fetches a set the server omits from the versions response', async () => {
+		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
+		// The server reports versions for every set except GetZones (e.g. an older instance without it).
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.resolve({
+					data: COMMANDS.filter((c) => c !== 'GetZones').map((c) => ({ command: c, version: 'v1' }))
+				});
+			}
+			return Promise.resolve({ data: ['fresh'] });
+		});
+
+		const view = await loadView();
+		vi.useFakeTimers();
+		const run = view.start();
+		await vi.runAllTimersAsync();
+		await run;
+		vi.useRealTimers();
+
+		expect(view.phase).toBe('done');
+		// The set with no reported version can't be cache-validated, so it's fetched fresh; the rest hydrate.
+		expect(dataCommandCalls()).toEqual(['GetZones']);
+		expect(staticData.zones).toEqual(['fresh']);
+		expect(staticData.enemies).toEqual(['cached-enemies']);
+		// With no server version for it, the freshly-loaded set isn't written to the cache.
+		expect(writeReferenceCache).not.toHaveBeenCalled();
+	});
+
 	it('loads everything fresh and bypasses the cache when the version check fails', async () => {
 		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
 		sendSocketCommand.mockImplementation((command: string) => {

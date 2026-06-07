@@ -1,5 +1,3 @@
-using Game.Api.Models;
-
 namespace Game.Api.Models.ReferenceData
 {
     /// <summary>
