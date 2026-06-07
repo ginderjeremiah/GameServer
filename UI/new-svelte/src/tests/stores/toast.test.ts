@@ -105,4 +105,44 @@ describe('toast store', () => {
 		toastInfo('info');
 		expect(current().map((t) => t.type)).toEqual(['error', 'success', 'warning', 'info']);
 	});
+
+	it('runs onDismiss when the toast is dismissed manually', () => {
+		const onDismiss = vi.fn();
+		const id = showToast('sticky', { duration: 0, onDismiss });
+
+		expect(onDismiss).not.toHaveBeenCalled();
+		dismissToast(id);
+		expect(onDismiss).toHaveBeenCalledTimes(1);
+	});
+
+	it('runs onDismiss when the toast auto-dismisses', () => {
+		const onDismiss = vi.fn();
+		showToast('temporary', { duration: 1000, onDismiss });
+
+		vi.advanceTimersByTime(1000);
+		expect(current()).toHaveLength(0);
+		expect(onDismiss).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not run onDismiss for toasts removed by clearToasts', () => {
+		const onDismiss = vi.fn();
+		showToast('sticky', { duration: 0, onDismiss });
+
+		clearToasts();
+		expect(current()).toHaveLength(0);
+		expect(onDismiss).not.toHaveBeenCalled();
+	});
+
+	it('removes the toast before invoking onDismiss', () => {
+		let toastsDuringCallback = -1;
+		const id = showToast('sticky', {
+			duration: 0,
+			onDismiss: () => {
+				toastsDuringCallback = current().length;
+			}
+		});
+
+		dismissToast(id);
+		expect(toastsDuringCallback).toBe(0);
+	});
 });
