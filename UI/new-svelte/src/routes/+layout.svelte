@@ -1,5 +1,9 @@
 <div class="page-base" data-hydrated={hydrated ? 'true' : undefined}>
-	{@render children()}
+	{#if booting}
+		<BootSplash />
+	{:else}
+		{@render children()}
+	{/if}
 	<TooltipBase />
 	<ToastContainer />
 </div>
@@ -10,9 +14,11 @@ import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import { onMount } from 'svelte';
 import { TooltipBase, ToastContainer } from '$components';
-import { onSocketError } from '$lib/api';
+import { getTokens, onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
+import { resumeSession } from '$lib/engine/session';
 import { toastError } from '$stores';
+import BootSplash from './BootSplash.svelte';
 import '$styles/common.scss';
 
 let { children } = $props();
@@ -31,8 +37,48 @@ onMount(() => {
 // onDestroy cleanup is valid and a single subscription covers every screen.
 onSocketError((message) => toastError(message));
 
+// Boot gate. On a fresh page load (refresh or deep link) the in-memory game state is gone, so we
+// attempt to restore the session and decide where to land — straight into the game when the whole
+// reference-data cache is current, the loading screen when something must download, or the login
+// screen otherwise — showing a lightweight splash while we work it out rather than flashing the
+// loading manifest or the login form. `booting` starts false so it matches the server render (no
+// hydration mismatch) and is flipped on only on the client, where the stored tokens are visible.
+let booting = $state(false);
+// True once the boot decision has resolved; until then the redirect guard below stays inert so it
+// can't bounce us off a protected route mid-restore.
+let booted = $state(false);
+
+onMount(async () => {
+	try {
+		if (!getTokens()) {
+			// No stored session: a refresh on a protected route still needs to land on login.
+			if (page.url.pathname !== '/') {
+				await goto(resolve('/'));
+			}
+			return;
+		}
+
+		booting = true;
+		const destination = await resumeSession();
+		if (destination === 'game') {
+			await goto(resolve('/game'));
+		} else if (destination === 'loading') {
+			await goto(resolve('/loading'));
+		} else if (page.url.pathname !== '/') {
+			await goto(resolve('/'));
+		}
+	} finally {
+		// Always clear the splash and arm the guard, even if resume/navigation throws, so the boot
+		// gate can never strand the player on the splash.
+		booting = false;
+		booted = true;
+	}
+});
+
+// Safety net once booted: if the in-memory player state is lost (e.g. an auth failure tore it down)
+// while on a protected route, return to login. Inert during boot and on the login route itself.
 $effect(() => {
-	if (!playerManager.name && page.url.pathname !== '/') {
+	if (booted && !playerManager.name && page.url.pathname !== '/') {
 		goto(resolve('/'));
 	}
 });
