@@ -33,7 +33,7 @@ const { label }: Props = $props();
 	width: 64px;
 	height: 64px;
 	border-radius: 2px;
-	border: 1px dashed rgba(240, 240, 240, 0.18);
+	border: 1px dashed color-mix(in srgb, var(--white) 18%, transparent);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -43,14 +43,14 @@ const { label }: Props = $props();
 	width: 16px;
 	height: 16px;
 	transform: rotate(45deg);
-	border: 1px solid rgba(240, 240, 240, 0.4);
+	border: 1px solid color-mix(in srgb, var(--white) 40%, transparent);
 	position: relative;
 }
 
 .placeholder-diamond-inner {
 	position: absolute;
 	inset: 4px;
-	background: rgba(240, 240, 240, 0.4);
+	background: color-mix(in srgb, var(--white) 40%, transparent);
 }
 
 .placeholder-title {
@@ -64,7 +64,7 @@ const { label }: Props = $props();
 	margin-top: 4px;
 	font-family: var(--mono);
 	font-size: 11px;
-	color: rgba(240, 240, 240, 0.5);
+	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
 	letter-spacing: 1px;
 	text-transform: uppercase;
 }

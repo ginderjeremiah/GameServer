@@ -57,7 +57,7 @@ $outer-rotation-count: 3;
 	cursor: not-allowed;
 	z-index: 10;
 	inset: 0;
-	background: rgba(0, 0, 0, 0.5);
+	background: color-mix(in srgb, var(--black) 50%, transparent);
 }
 
 .loading-spinner-container {
