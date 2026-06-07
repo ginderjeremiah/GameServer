@@ -5,12 +5,10 @@ import type {
 	IAddEditAttributesData,
 	IAdminUserSearchResults,
 	IApplyModRequest,
-	IAttribute,
 	IAttributeUpdate,
 	IAuthTokens,
 	IBattlerAttribute,
 	IChallenge,
-	IChallengeType,
 	IChange,
 	IDeviceInfoRequest,
 	IEnemy,
@@ -66,15 +64,9 @@ export type ApiResponseTypes = {
 	'AdminTools/SetTagsForItemMod': undefined;
 	'AdminTools/SetUserRoles': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
-	'Attributes': IAttribute[];
-	'Challenges': IChallenge[];
-	'Challenges/ChallengeTypes': IChallengeType[];
 	'Challenges/Player': IPlayerChallenge[];
-	'Enemies': IEnemy[];
 	'ItemCategories': IItemCategory[];
-	'ItemMods': IItemMod[];
 	'ItemMods/ItemModTypes': IItemModType[];
-	'Items': IItem[];
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
 	'Login/CreateAccount': undefined;
@@ -88,14 +80,12 @@ export type ApiResponseTypes = {
 	'Player/RemoveMod': undefined;
 	'Player/UnequipItem': undefined;
 	'Player/UpdatePlayerStats': IBattlerAttribute[];
-	'Skills': ISkill[];
 	'Statistics': IPlayerStatistic[];
 	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 	'Tags/TagsForItem': ITag[];
 	'Tags/TagsForItemMod': ITag[];
-	'Zones': IZone[];
 	'Zones/ZoneEnemies': IZoneEnemy[];
 };
 
@@ -121,9 +111,6 @@ export type ApiRequestTypes = {
 	'AdminTools/SetTagsForItemMod': ISetTagsData;
 	'AdminTools/SetUserRoles': ISetUserRolesData;
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
-	'Enemies': { refreshCache?: boolean } | undefined;
-	'ItemMods': { refreshCache?: boolean } | undefined;
-	'Items': { refreshCache?: boolean } | undefined;
 	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
@@ -135,10 +122,8 @@ export type ApiRequestTypes = {
 	'Player/RemoveMod': IRemoveModRequest;
 	'Player/UnequipItem': IEquipRequest;
 	'Player/UpdatePlayerStats': IAttributeUpdate[];
-	'Skills': { refreshCache?: boolean } | undefined;
 	'Tags/TagsForItem': { itemId: number };
 	'Tags/TagsForItemMod': { itemModId: number };
-	'Zones': { refreshCache?: boolean } | undefined;
 	'Zones/ZoneEnemies': { zoneId: number };
 };
 

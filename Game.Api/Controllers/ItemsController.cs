@@ -11,12 +11,6 @@ namespace Game.Api.Controllers
     {
         private readonly IItems _items = items;
 
-        [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<Item> Items(bool refreshCache = false)
-        {
-            return ApiResponse.Success(_items.All(refreshCache).To().Model<Item>());
-        }
-
         [HttpGet]
         public ApiEnumerableResponse<ItemModSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {

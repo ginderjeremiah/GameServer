@@ -1,4 +1,4 @@
-import { ApiRequest, EItemModType, ERarity, type IItemMod } from '$lib/api';
+import { ApiRequest, EItemModType, ERarity, fetchSocketData, type IItemMod } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, childChanged, persistEntity } from '../save-helpers';
@@ -7,7 +7,7 @@ import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
 
 const refresh = async (): Promise<IItemMod[]> => {
-	const itemMods = await ApiRequest.get('ItemMods', { refreshCache: true });
+	const itemMods = await fetchSocketData('GetItemMods');
 	staticData.itemMods = itemMods;
 	return itemMods;
 };

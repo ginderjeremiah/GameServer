@@ -11,12 +11,6 @@ namespace Game.Api.Controllers
     {
         private readonly IZones _zones = zones;
 
-        [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<Zone> Zones(bool refreshCache = false)
-        {
-            return ApiResponse.Success(_zones.All(refreshCache).To().Model<Zone>());
-        }
-
         [HttpGet]
         public ApiAsyncEnumerableResponse<ZoneEnemy> ZoneEnemies(int zoneId)
         {

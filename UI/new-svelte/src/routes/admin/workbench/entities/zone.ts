@@ -1,4 +1,4 @@
-import { ApiRequest, type IZone, type IZoneEnemy } from '$lib/api';
+import { ApiRequest, fetchSocketData, type IZone, type IZoneEnemy } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
@@ -11,10 +11,7 @@ export interface WorkbenchZone extends IZone {
 }
 
 const refresh = async (): Promise<WorkbenchZone[]> => {
-	const [zones, enemies] = await Promise.all([
-		ApiRequest.get('Zones', { refreshCache: true }),
-		ApiRequest.get('Enemies', { refreshCache: true })
-	]);
+	const [zones, enemies] = await Promise.all([fetchSocketData('GetZones'), fetchSocketData('GetEnemies')]);
 	staticData.zones = zones;
 	staticData.enemies = enemies;
 	return zones.map((zone) => ({

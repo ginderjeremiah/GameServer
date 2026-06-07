@@ -1,14 +1,14 @@
-import { ApiRequest, EChallengeType, EEntityType, type IChallenge } from '$lib/api';
+import { ApiRequest, EChallengeType, EEntityType, fetchSocketData, type IChallenge } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { persistEntity } from '../save-helpers';
 import { challengeSentence, deriveFromType, fmtNum } from './challenge-helpers';
 import type { EntityConfig } from './types';
 
-// The challenges read-cache is invalidated server-side by the admin filter, so a
-// plain refetch returns the freshly-saved list (no refreshCache flag is exposed).
+// Challenges load over the socket; the admin filter invalidates this cache on every
+// write server-side, so a plain refetch returns the freshly-saved list.
 const refresh = async (): Promise<IChallenge[]> => {
-	const challenges = await ApiRequest.get('Challenges');
+	const challenges = await fetchSocketData('GetChallenges');
 	staticData.challenges = challenges;
 	return challenges;
 };

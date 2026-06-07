@@ -311,5 +311,77 @@ namespace Game.Api.Tests.CodeGen
             Assert.Contains(references, r => r.Name == "Value");
             Assert.Contains(references, r => r.Name == "Description");
         }
+
+        [Fact]
+        public void GetSelfAndGenericArgumentReferences_NonGenericPrimitive_ReturnsOnlySelf()
+        {
+            var prop = typeof(SimpleModel).GetProperty("Id")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetSelfAndGenericArgumentReferences().ToList();
+
+            Assert.Single(references);
+            Assert.Same(descriptor, references[0]);
+        }
+
+        [Fact]
+        public void GetSelfAndGenericArgumentReferences_NonGenericClass_ReturnsSelfAndNotProperties()
+        {
+            var prop = typeof(NestedModel).GetProperty("Child")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetSelfAndGenericArgumentReferences().ToList();
+
+            // Unlike GetDirectlyReferencedDescriptorsForProperties, this walks only generic arguments,
+            // not properties — the rendered type text is just the class name, so its members aren't imported.
+            Assert.Single(references);
+            Assert.Same(descriptor, references[0]);
+            Assert.DoesNotContain(references, r => r.Name is "Id" or "Name" or "IsActive");
+        }
+
+        [Fact]
+        public void GetSelfAndGenericArgumentReferences_SingleGeneric_ReturnsSelfThenArgument()
+        {
+            var prop = typeof(ModelWithList).GetProperty("Items")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetSelfAndGenericArgumentReferences().ToList();
+
+            Assert.Equal(2, references.Count);
+            Assert.Equal(typeof(List<SimpleModel>), references[0].UnderlyingType);
+            Assert.Equal(typeof(SimpleModel), references[1].UnderlyingType);
+        }
+
+        [Fact]
+        public void GetSelfAndGenericArgumentReferences_NestedGeneric_ReturnsSelfAndEveryNestedArgument()
+        {
+            var prop = typeof(ModelWithDeeplyNestedGenerics).GetProperty("DeepList")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetSelfAndGenericArgumentReferences().ToList();
+
+            // List<List<SimpleModel>> mirrors the IChange<IItem>[] case the import bug came from:
+            // pre-order self → nested generic args, so the rendered text's every named type is imported.
+            Assert.Equal(3, references.Count);
+            Assert.Equal(typeof(List<List<SimpleModel>>), references[0].UnderlyingType);
+            Assert.Equal(typeof(List<SimpleModel>), references[1].UnderlyingType);
+            Assert.Equal(typeof(SimpleModel), references[2].UnderlyingType);
+        }
+
+        [Fact]
+        public void GetSelfAndGenericArgumentReferences_DictionaryValueGeneric_IncludesKeyAndNestedValueArguments()
+        {
+            var prop = typeof(ModelWithDeeplyNestedGenerics).GetProperty("DictOfLists")!;
+            var descriptor = new CodeGenTypeDescriptor(prop);
+
+            var references = descriptor.GetSelfAndGenericArgumentReferences().ToList();
+
+            // Dictionary<string, List<SimpleModel>> → self + key (string) + value (List<SimpleModel>) + nested SimpleModel.
+            Assert.Equal(4, references.Count);
+            Assert.Same(descriptor, references[0]);
+            Assert.Contains(references, r => r.UnderlyingType == typeof(string));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(List<SimpleModel>));
+            Assert.Contains(references, r => r.UnderlyingType == typeof(SimpleModel));
+        }
     }
 }

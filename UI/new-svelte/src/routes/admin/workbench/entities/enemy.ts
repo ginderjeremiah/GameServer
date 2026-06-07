@@ -1,4 +1,4 @@
-import { ApiRequest, type IEnemy } from '$lib/api';
+import { ApiRequest, fetchSocketData, type IEnemy } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
@@ -6,7 +6,7 @@ import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
 const refresh = async (): Promise<IEnemy[]> => {
-	const enemies = await ApiRequest.get('Enemies', { refreshCache: true });
+	const enemies = await fetchSocketData('GetEnemies');
 	staticData.enemies = enemies;
 	return enemies;
 };
