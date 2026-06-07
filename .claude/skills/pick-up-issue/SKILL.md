@@ -20,8 +20,9 @@ ready-for-review PR — without grabbing work that's already taken or can't be d
 
 The selection runs unattended (auto-pick, no "which one?" prompt). The interactivity lives at
 the **approach** stage: once an issue is chosen, you confirm the plan before writing code, but
-only when the issue is genuinely ambiguous, large, or has a real design fork. Trivial,
-unambiguous fixes don't need a round-trip — just state the plan briefly and go.
+only when the issue is genuinely ambiguous, large, or has a real design fork OR the user explicitly
+asks you to work with them on the issue. Trivial, unambiguous fixes don't need a round-trip — just
+state the plan briefly and go.
 
 All GitHub work uses the `mcp__github__*` tools (the `gh` CLI is not available here).
 
@@ -32,7 +33,7 @@ All GitHub work uses the `mcp__github__*` tools (the `gh` CLI is not available h
 3. Rank and auto-pick the top issue
 4. Self-assign the chosen issue
 5. Understand the issue and read the right docs
-6. Agree on the approach (interactive only when it adds value)
+6. Agree on the approach (interactive only when it adds value or is requested)
 7. Implement to the project's standards
 8. Verify (build, tests, lint)
 9. Commit, push, open the PR
@@ -134,7 +135,7 @@ requires it:
 Battle logic lives in **both** the frontend and backend and must stay consistent; if the issue
 touches it, read both docs.
 
-### 6. Agree on the approach (interactive only when it adds value)
+### 6. Agree on the approach (interactive only when it adds value or is requested)
 
 The goal is to avoid building the wrong thing without pestering the user over trivial fixes.
 
@@ -206,8 +207,8 @@ still open, the bug is excluded as blocked and the June-4 bug wins instead.
 
 ## Guardrails
 
-- This skill picks up and implements issues. It is **not** for creating (except as a byproduct of implementing), triaging, commenting on,
-  or closing issues, and not for merely listing/summarizing the backlog.
+- This skill picks up and implements issues. It is **not** for creating (except as a byproduct of implementing),
+  triaging, commenting on, or closing issues, and not for merely listing/summarizing the backlog.
 - Self-assign the issue the moment you pick it, and treat an existing assignee as "already claimed"
   — together these keep parallel sessions from colliding on the same pick.
 - Never fabricate work when nothing is eligible, and never start a blocked or already-claimed issue.
