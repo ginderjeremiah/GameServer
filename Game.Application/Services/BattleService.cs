@@ -10,12 +10,14 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
-        BattleSnapshotService battleSnapshotService)
+        BattleSnapshotService battleSnapshotService,
+        BattleFactory battleFactory)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
         private readonly BattleSnapshotService _battleSnapshotService = battleSnapshotService;
+        private readonly BattleFactory _battleFactory = battleFactory;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
         {
@@ -34,19 +36,18 @@ namespace Game.Application.Services
             var zoneEntity = _zones.GetZone(zoneId)
                 ?? throw new InvalidOperationException($"Zone {zoneId} not found");
 
-            var rng = new Random();
-            var level = rng.Next(zoneEntity.LevelMin, zoneEntity.LevelMax + 1);
-
-            var enemy = _enemies.GetRandomDomainEnemy(zoneId, level);
-
-            var battleRng = new Mulberry32((uint)rng.Next());
-            enemy.Skills = enemy.GetRandomSkills(battleRng);
-
             var now = DateTime.UtcNow;
             var seed = (uint)(now.Ticks % uint.MaxValue);
+
+            var enemy = _battleFactory.CreateBattleEnemy(
+                zoneEntity.LevelMin,
+                zoneEntity.LevelMax,
+                seed,
+                level => _enemies.GetRandomDomainEnemy(zoneId, level));
+
             var snapshot = _battleSnapshotService.CreateSnapshot(player);
 
-            state.SetActiveBattle(enemy.Id, level, seed, now, snapshot);
+            state.SetActiveBattle(enemy.Id, enemy.Level, seed, now, snapshot);
 
             return new BattleStartResult
             {
@@ -168,9 +169,7 @@ namespace Game.Application.Services
 
         private BattleResult SimulateBattle(CoreEnemy enemy, uint seed, BattleSnapshot snapshot, int? maxMs = null)
         {
-
-            var battleRng = new Mulberry32(seed);
-            enemy.Skills = enemy.GetRandomSkills(battleRng);
+            enemy.SelectBattleSkills(seed);
 
             var playerBattler = _battleSnapshotService.CreateFromSnapshot(snapshot);
             var enemyBattler = new Battler(

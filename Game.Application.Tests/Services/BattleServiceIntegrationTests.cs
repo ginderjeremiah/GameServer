@@ -46,6 +46,51 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_SelectsEnemySkillsFromReturnedSeed()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // An enemy with more skills than fit a battle loadout, so the selection actually narrows.
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            for (var i = 0; i < 6; i++)
+            {
+                var enemySkill = await TestDataSeeder.CreateSkillAsync(context, name: $"EnemySkill{i}");
+                await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            }
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The loadout sent to the client is capped and must be exactly what re-deriving from the
+            // returned seed produces — otherwise the server's battle validation (which re-derives the
+            // skills from the stored seed) would use a different skill set than the client simulated with.
+            Assert.Equal(4, result.Enemy.Skills.Count);
+
+            var reconstructed = enemies.GetDomainEnemy(result.Enemy.Id, result.Enemy.Level);
+            Assert.NotNull(reconstructed);
+            reconstructed.SelectBattleSkills(result.Seed);
+
+            Assert.Equal(
+                result.Enemy.Skills.Select(s => s.Id),
+                reconstructed.Skills.Select(s => s.Id));
+        }
+
+        [Fact]
         public async Task StartBattle_InvalidZone_Throws()
         {
             using var scope = CreateScope();
