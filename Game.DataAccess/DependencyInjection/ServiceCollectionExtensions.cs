@@ -27,6 +27,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddGameContext()
                 .AddCache()
                 .AddPubSub()
+                .AddSingleton(PlayerUpdateRetryPolicy.Default)
                 .AddSingleton<DataProviderSynchronizer>()
                 .AddHostedService(sp => sp.GetRequiredService<DataProviderSynchronizer>())
                 // Player aggregate (write-behind: Redis + async sync)

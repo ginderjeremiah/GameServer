@@ -10,6 +10,12 @@
         public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null);
         public Task UnSubscribe(string channel);
         public Task UnSubscribe(string channel, string id);
+
+        /// <summary>
+        /// Returns a handle to the named queue without subscribing to any channel. Useful for writing to a
+        /// queue that has no live subscriber (e.g. a dead-letter queue) or for reading a queue on demand.
+        /// </summary>
+        public IPubSubQueue GetQueue(string queueName);
     }
 }
 
