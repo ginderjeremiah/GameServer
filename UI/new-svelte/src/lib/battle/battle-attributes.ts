@@ -35,9 +35,6 @@ export class BattleAttributes {
 			for (const [attr, result] of computed) {
 				this.attributes[attr] = result.total;
 			}
-			// DropBonus uses log10(Luck), which cannot be expressed as a constant
-			// modifier in the pipeline; computed as a post-step once Luck is resolved.
-			this.attributes[EAttribute.DropBonus] += Math.log10(this.attributes[EAttribute.Luck]);
 		} else {
 			for (const att of attList) {
 				this.attributes[att.attributeId] += att.amount;

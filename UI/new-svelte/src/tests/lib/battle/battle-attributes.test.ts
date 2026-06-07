@@ -50,21 +50,11 @@ describe('BattleAttributes', () => {
 			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(0.4 * 20 + 0.1 * 10);
 		});
 
-		it('calculates DropBonus = log10(Luck)', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Luck, 100]));
-			expect(ba.getValue(EAttribute.DropBonus)).toBeCloseTo(2, 10);
-		});
-
 		it('handles zero base stats (MaxHealth still has base 50)', () => {
 			const ba = new BattleAttributes([]);
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50);
 			expect(ba.getValue(EAttribute.Defense)).toBe(2);
 			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(0);
-		});
-
-		it('DropBonus is -Infinity when Luck is 0 (log10(0))', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Luck, 0]));
-			expect(ba.getValue(EAttribute.DropBonus)).toBe(-Infinity);
 		});
 	});
 
