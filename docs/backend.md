@@ -133,7 +133,7 @@ dotnet run --project Game.Api -- codegen [outputDirectory]
 - **`CodeGenCommand`** (intercepted at the top of `Startup.Main`, before `WebApplication.CreateBuilder`) builds a throwaway console `ILogger`, resolves the target directory, runs `ApiCodeGenerator.GenerateCode`, and returns. Because it short-circuits before host construction, it is independent of `ASPNETCORE_ENVIRONMENT` and never touches an out-of-process dependency. An explicit output directory may be passed; otherwise it defaults to the committed frontend location.
 - **`CodeGenPaths`** centralizes path resolution so the dev-startup hook and the standalone command compute the same target directory. The default directory is found by walking up from the running assembly to the repository root (the directory containing `Game.sln`) and appending the canonical `UI/new-svelte/src/lib/api/types` segments. Resolving the root from the assembly rather than the current working directory keeps the command location-independent (the dev hook continues to derive the root from `ContentRootPath`).
 
-The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch DTO/client drift.
+The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch api model/client drift.
 
 ## Integration-Test Containers in Constrained Environments
 
