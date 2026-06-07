@@ -23,12 +23,7 @@ import WorkbenchList from '$routes/admin/workbench/components/WorkbenchList.svel
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
 
-interface Row extends Identified {
-	id: number;
-	name: string;
-}
-
-const makeConfig = (): EntityConfig<Row> => ({
+const makeConfig = (): EntityConfig<Identified> => ({
 	key: 'rows',
 	label: 'Enemies',
 	singular: 'Enemy',
@@ -41,7 +36,7 @@ const makeConfig = (): EntityConfig<Row> => ({
 	persist: async () => []
 });
 
-const seed: Row[] = [
+const seed: Identified[] = [
 	{ id: 1, name: 'Goblin' },
 	{ id: 2, name: 'Orc' },
 	{ id: 3, name: 'Dragon' }

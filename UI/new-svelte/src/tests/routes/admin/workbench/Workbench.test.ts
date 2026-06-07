@@ -21,17 +21,12 @@ vi.mock('$stores', () => ({
 import Workbench from '$routes/admin/workbench/Workbench.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
 
-interface Row extends Identified {
-	id: number;
-	name: string;
-}
-
-const seed: Row[] = [
+const seed: Identified[] = [
 	{ id: 1, name: 'Alpha' },
 	{ id: 2, name: 'Beta' }
 ];
 
-const makeConfig = (overrides: Partial<EntityConfig<Row>> = {}): EntityConfig<Row> => ({
+const makeConfig = (overrides: Partial<EntityConfig<Identified>> = {}): EntityConfig<Identified> => ({
 	key: 'rows',
 	label: 'Enemies',
 	singular: 'Enemy',

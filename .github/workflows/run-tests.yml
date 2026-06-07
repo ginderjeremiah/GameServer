@@ -123,6 +123,9 @@ jobs:
     - name: Run ESLint
       run: npm run lint
 
+    - name: Run Svelte check
+      run: npm run check
+
     - name: Run unit tests
       run: npm run test:unit:ci
 
