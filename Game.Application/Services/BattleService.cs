@@ -33,15 +33,14 @@ namespace Game.Application.Services
                 await _playerRepo.SavePlayer(player);
             }
 
-            var zoneEntity = _zones.GetZone(zoneId)
-                ?? throw new InvalidOperationException($"Zone {zoneId} not found");
+            var zone = _zones.GetZone(zoneId);
 
             var now = DateTime.UtcNow;
             var seed = (uint)(now.Ticks % uint.MaxValue);
 
             var enemy = _battleFactory.CreateBattleEnemy(
-                zoneEntity.LevelMin,
-                zoneEntity.LevelMax,
+                zone.LevelMin,
+                zone.LevelMax,
                 level => _enemies.GetRandomDomainEnemy(zoneId, level));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();

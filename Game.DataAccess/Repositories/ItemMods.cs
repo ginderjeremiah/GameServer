@@ -40,6 +40,11 @@ namespace Game.DataAccess.Repositories
             return [.. AllEntities(refreshCache).Select(ItemMapper.ModToContract)];
         }
 
+        public bool ValidateItemModId(int itemModId)
+        {
+            return itemModId >= 0 && itemModId < AllEntities().Count;
+        }
+
         public ItemMod? LookupItemMod(int itemModId)
         {
             var itemMods = AllEntities();

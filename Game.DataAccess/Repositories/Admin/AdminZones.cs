@@ -8,7 +8,7 @@ namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for zones and their enemy spawn assignments. Reuses the cached
-    /// entity lookup (<see cref="IZones.GetZone"/>) for existence/diff and builds fresh,
+    /// entity lookup (<see cref="IZones.LookupZone"/>) for existence/diff and builds fresh,
     /// navigation-free entities for every write.
     /// </summary>
     internal class AdminZones(IZones zones, IEntityStore entityStore) : IAdminZones
@@ -46,7 +46,7 @@ namespace Game.DataAccess.Repositories.Admin
 
         public bool SetEnemies(SetZoneEnemiesData data)
         {
-            var zone = _zones.GetZone(data.ZoneId);
+            var zone = _zones.LookupZone(data.ZoneId);
             if (zone is null)
             {
                 return false;

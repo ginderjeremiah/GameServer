@@ -8,7 +8,9 @@ namespace Game.Abstractions.DataAccess
     {
         public void InvalidateCache();
         public List<Contracts.ItemMod> All(bool refreshCache = false);
-        // Returns the EF entity for the Content Authoring admin persistence (Game.DataAccess) and PlayerService (#137); the read path uses the contracts above.
+        // Whether an item mod with the given id exists; lets callers validate before GetItemMod without touching the entity.
+        public bool ValidateItemModId(int itemModId);
+        // Returns the EF entity for the Content Authoring admin persistence (Game.DataAccess); the read path uses the contracts above. Internalized in #138.
         public ItemModEntity? LookupItemMod(int itemModId);
         public CoreItemMod GetItemMod(int itemModId);
     }

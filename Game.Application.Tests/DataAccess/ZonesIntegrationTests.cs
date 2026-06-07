@@ -9,14 +9,55 @@ using Xunit;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Verifies <see cref="IZones.ZoneEnemies"/> returns the spawn read contracts for the requested zone
-    /// (and only that zone), exercising the EF projection that backs the reference-data lookup.
+    /// Verifies the <see cref="IZones"/> read paths: <see cref="IZones.ZoneEnemies"/> returns the spawn
+    /// read contracts for the requested zone (and only that zone), <see cref="IZones.GetZone"/> projects a
+    /// zone to its read contract, and the two not-found contracts the rename settled (<see
+    /// cref="IZones.GetZone"/> throws on a bad id; <see cref="IZones.LookupZone"/> returns <c>null</c>).
     /// </summary>
     [Collection("Integration")]
     public class ZonesIntegrationTests : ApplicationIntegrationTestBase
     {
         public ZonesIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
+
+        [Fact]
+        public async Task GetZone_ReturnsZoneAsContract()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Read Zone", levelMin: 3, levelMax: 9, order: 2);
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var result = zones.GetZone(zone.Id);
+
+            Assert.Equal(zone.Id, result.Id);
+            Assert.Equal("Read Zone", result.Name);
+            Assert.Equal(3, result.LevelMin);
+            Assert.Equal(9, result.LevelMax);
+            Assert.Equal(2, result.Order);
+        }
+
+        [Fact]
+        public void GetZone_InvalidId_Throws()
+        {
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => zones.GetZone(99999));
+        }
+
+        [Fact]
+        public void LookupZone_InvalidId_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            // LookupZone (the admin/data-tier entity lookup) reports a missing zone as null — matching the
+            // LookupItemMod convention — so AdminZones.SetEnemies can return false rather than throwing.
+            Assert.Null(zones.LookupZone(99999));
+        }
 
         [Fact]
         public async Task ZoneEnemies_ReturnsTheRequestedZonesSpawnsAsContracts()

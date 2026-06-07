@@ -228,7 +228,6 @@ namespace Game.Application.Tests.Services
             return new AccountService(
                 provider.GetRequiredService<IUsers>(),
                 provider.GetRequiredService<IPlayerRepository>(),
-                provider.GetRequiredService<IEntityStore>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
                 new StubAccessTokenService(),
                 new NewPlayerFactory());

@@ -149,6 +149,26 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task ApplyMod_NonexistentMod_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // A mod id far beyond any seeded catalog entry: ApplyMod must reject it (returning false)
+            // rather than throwing when it resolves the mod for application.
+            var applied = await playerService.ApplyMod(player, itemId: 0, itemModId: 99999, itemModSlotId: 0);
+
+            Assert.False(applied);
+        }
+
+        [Fact]
         public async Task LoadPlayer_PersistedAppliedMod_IncludesModAttributesInEquippedModifiers()
         {
             using var scope = CreateScope();

@@ -1,6 +1,8 @@
 using System.Linq.Expressions;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
+using Game.Core.Players;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using UserEntity = Game.Abstractions.Entities.User;
@@ -44,6 +46,23 @@ namespace Game.DataAccess.Repositories
         public Users(GameContext context)
         {
             _context = context;
+        }
+
+        public void CreateAccount(NewAccount account, NewPlayer player)
+        {
+            // The account graph is persisted straight through the unit of work (no cache write or domain
+            // events): a freshly created player is only loaded into the cache later, on login. The player
+            // links to the user via navigation, so EF resolves the FK without the store-generated user id.
+            var user = new UserEntity
+            {
+                Username = account.Username,
+                PassHash = account.PassHash,
+                Salt = account.Salt,
+                LastLogin = DateTime.UtcNow,
+            };
+
+            _context.Users.Add(user);
+            _context.Players.Add(PlayerMapper.ToEntity(player, user));
         }
 
         public Task<AccountCredentials?> GetUser(string username)
