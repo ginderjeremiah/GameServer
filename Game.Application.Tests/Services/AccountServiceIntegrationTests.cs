@@ -11,6 +11,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using NewPlayerFactory = Game.Core.Players.NewPlayerFactory;
 
 namespace Game.Application.Tests.Services
 {
@@ -211,7 +212,8 @@ namespace Game.Application.Tests.Services
                 provider.GetRequiredService<IPlayerRepository>(),
                 provider.GetRequiredService<IEntityStore>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
-                new StubAccessTokenService());
+                new StubAccessTokenService(),
+                new NewPlayerFactory());
         }
 
         /// <summary>
