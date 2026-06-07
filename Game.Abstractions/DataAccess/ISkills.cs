@@ -8,7 +8,7 @@ namespace Game.Abstractions.DataAccess
     {
         public void InvalidateCache();
         public List<Contracts.Skill> AllSkills(bool refreshCache = false);
-        // Returns the EF entity for the admin Content Authoring write path (#135); the read path uses the contracts above.
+        // Returns the EF entity for the Content Authoring admin persistence (Game.DataAccess); the read path uses the contracts above.
         public SkillEntity? LookupSkill(int skillId);
         public CoreSkill GetSkill(int skillId);
     }

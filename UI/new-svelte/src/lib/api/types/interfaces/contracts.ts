@@ -3,9 +3,12 @@
 
 import type {
 	EAttribute,
+	EChallengeType,
+	EEntityType,
 	EItemCategory,
 	EItemModType,
-	ERarity
+	ERarity,
+	EStatisticType
 } from '../';
 
 export interface IAttributeDistribution {
@@ -22,6 +25,19 @@ export interface IAttributeMultiplier {
 export interface IBattlerAttribute {
 	attributeId: EAttribute;
 	amount: number;
+}
+
+export interface IChallenge {
+	id: number;
+	name: string;
+	description: string;
+	challengeTypeId: EChallengeType;
+	statisticType?: EStatisticType;
+	entityType: EEntityType;
+	targetEntityId?: number;
+	progressGoal: number;
+	rewardItemId?: number;
+	rewardItemModId?: number;
 }
 
 export interface IEnemy {

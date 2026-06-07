@@ -1,8 +1,10 @@
 ﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess.Admin;
 using Game.Application;
 using Game.Core.Events;
 using Game.Core.Players.Events;
 using Game.DataAccess.Repositories;
+using Game.DataAccess.Repositories.Admin;
 using Game.Infrastructure;
 using Game.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,7 +59,15 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
                 .AddScoped<IUsers, Users>()
                 .AddScoped<IUserLogins, UserLogins>()
-                .AddScoped<IRoles, Roles>();
+                .AddScoped<IRoles, Roles>()
+                // Admin "Content Authoring" persistence (entity-free seam for the admin controllers)
+                .AddScoped<IAdminEnemies, AdminEnemies>()
+                .AddScoped<IAdminItems, AdminItems>()
+                .AddScoped<IAdminItemMods, AdminItemMods>()
+                .AddScoped<IAdminSkills, AdminSkills>()
+                .AddScoped<IAdminZones, AdminZones>()
+                .AddScoped<IAdminChallenges, AdminChallenges>()
+                .AddScoped<IAdminTags, AdminTags>();
         }
 
         /// <summary>

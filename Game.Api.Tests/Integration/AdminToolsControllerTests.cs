@@ -1,15 +1,16 @@
 using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
-using Game.Api.Models.Progress;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;
+using CoreChallenge = Game.Core.Progress.Challenge;
 
 namespace Game.Api.Tests.Integration
 {
@@ -358,9 +359,9 @@ namespace Game.Api.Tests.Integration
 
             // Verify the challenge was created — and its statistic/entity were derived from the type.
             var created = Assert.Single(GetChallenges(), c => c.Name == "First Blood");
-            Assert.Equal(EChallengeType.EnemiesKilled, created.ChallengeTypeId);
-            Assert.Equal(EStatisticType.EnemiesKilled, created.StatisticType);
-            Assert.Equal(EEntityType.Enemy, created.EntityType);
+            Assert.Equal(EChallengeType.EnemiesKilled, created.Type.Id);
+            Assert.Equal(EStatisticType.EnemiesKilled, created.Type.StatisticType?.Id);
+            Assert.Equal(EEntityType.Enemy, created.Type.StatisticType?.EntityType);
             Assert.Equal(10m, created.ProgressGoal);
         }
 
@@ -386,10 +387,10 @@ namespace Game.Api.Tests.Integration
             return scope.ServiceProvider.GetRequiredService<IZones>().All().ToList();
         }
 
-        private List<Challenge> GetChallenges()
+        private List<CoreChallenge> GetChallenges()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IChallenges>().All().To().Model<Challenge>().ToList();
+            return scope.ServiceProvider.GetRequiredService<IChallenges>().All().ToList();
         }
 
         [Fact]
@@ -500,6 +501,284 @@ namespace Game.Api.Tests.Integration
         {
             using var scope = CreateScope();
             return scope.ServiceProvider.GetRequiredService<IItemMods>().All().ToList();
+        }
+
+        [Fact]
+        public async Task AddEditItems_AddItem_Succeeds()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Magic Sword",
+                        Description = "A blade humming with power",
+                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        RarityId = (int)ERarity.Common,
+                        IconPath = "items/sword.png",
+                        Attributes = Array.Empty<object>(),
+                        ModSlots = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItems", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            Assert.Contains(GetItems(), i => i.Name == "Magic Sword");
+        }
+
+        [Fact]
+        public async Task AddEditItemMods_AddItemMod_Succeeds()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Flaming",
+                        Description = "Adds fire damage",
+                        ItemModTypeId = (int)EItemModType.Prefix,
+                        RarityId = (int)ERarity.Common,
+                        Attributes = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemMods", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            Assert.Contains(GetItemMods(), m => m.Name == "Flaming");
+        }
+
+        [Fact]
+        public async Task AddEditItemModSlots_AddSlot_PersistsSlot()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Slotted");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        ItemId = item.Id,
+                        ItemModSlotTypeId = (int)EItemModType.Prefix
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModSlots", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var saved = Assert.Single(GetItems(), i => i.Id == item.Id);
+            var slot = Assert.Single(saved.ModSlots);
+            Assert.Equal(EItemModType.Prefix, slot.ItemModSlotTypeId);
+        }
+
+        [Fact]
+        public async Task AddEditTags_AddTag_Succeeds()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Fire",
+                        TagCategoryId = (int)ETagCategory.Accessory
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            Assert.Contains(await GetTags(), t => t.Name == "Fire" && t.TagCategoryId == (int)ETagCategory.Accessory);
+        }
+
+        [Fact]
+        public async Task SetEnemyAttributeDistributions_ValidEnemy_PersistsDistribution()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // The seeded enemy starts with Strength and Endurance distributions.
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Distributor");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Replace the distributions with a single Strength entry — Endurance should be removed.
+            var data = new
+            {
+                EnemyId = enemy.Id,
+                AttributeDistributions = new[]
+                {
+                    new { AttributeId = (int)EAttribute.Strength, BaseAmount = 20m, AmountPerLevel = 3m }
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemyAttributeDistributions", data, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
+            var distribution = Assert.Single(saved.AttributeDistribution);
+            Assert.Equal(EAttribute.Strength, distribution.AttributeId);
+            Assert.Equal(20m, distribution.BaseAmount);
+            Assert.Equal(3m, distribution.AmountPerLevel);
+        }
+
+        [Fact]
+        public async Task SetEnemyAttributeDistributions_UnknownEnemy_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                EnemyId = 999999,
+                AttributeDistributions = Array.Empty<object>()
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemyAttributeDistributions", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetTagsForItem_ValidItem_AssociatesTags()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Tagged Item");
+            var tag1 = await TestDataSeeder.CreateTagAsync(context, "Sharp");
+            var tag2 = await TestDataSeeder.CreateTagAsync(context, "Heavy");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                Id = item.Id,
+                TagIds = new[] { tag1.Id, tag2.Id }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem", data, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var tags = await GetTagsForItem(item.Id);
+            Assert.Equal(2, tags.Count);
+            Assert.Contains(tags, t => t.Id == tag1.Id);
+            Assert.Contains(tags, t => t.Id == tag2.Id);
+        }
+
+        [Fact]
+        public async Task SetTagsForItem_UnknownItem_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                Id = 999999,
+                TagIds = Array.Empty<int>()
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetTagsForItemMod_ValidItemMod_AssociatesTags()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemMod = await TestDataSeeder.CreateItemModAsync(context, "Tagged Mod");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "Fiery");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                Id = itemMod.Id,
+                TagIds = new[] { tag.Id }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod", data, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var tags = await GetTagsForItemMod(itemMod.Id);
+            var associated = Assert.Single(tags);
+            Assert.Equal(tag.Id, associated.Id);
+        }
+
+        private async Task<List<Tag>> GetTagsForItem(int itemId)
+        {
+            using var scope = CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ITags>().GetTagsForItem(itemId).ToListAsync();
+        }
+
+        private async Task<List<Tag>> GetTagsForItemMod(int itemModId)
+        {
+            using var scope = CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ITags>().GetTagsForItemMod(itemModId).ToListAsync();
+        }
+
+        private async Task<List<Tag>> GetTags()
+        {
+            using var scope = CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ITags>().All().ToListAsync();
         }
 
         [Fact]
