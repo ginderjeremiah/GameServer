@@ -41,7 +41,7 @@ namespace Game.DataAccess.Mapping
                         {
                             ItemModId = am.ItemModId,
                             ItemModSlotId = am.ItemModSlotId,
-                            ItemMod = ItemMapper.ModToCore(itemMods.GetItemMod(am.ItemModId)),
+                            ItemMod = itemMods.GetItemMod(am.ItemModId),
                         });
                     }
                 }
@@ -75,7 +75,7 @@ namespace Game.DataAccess.Mapping
 
             // Map player skills, resolving each skill from the cached catalog by id
             var skillsById = entity.PlayerSkills
-                .ToDictionary(ps => ps.SkillId, ps => SkillMapper.ToCore(skills.GetSkill(ps.SkillId)));
+                .ToDictionary(ps => ps.SkillId, ps => skills.GetSkill(ps.SkillId));
 
             var playerSkills = skillsById.Values.ToList();
 

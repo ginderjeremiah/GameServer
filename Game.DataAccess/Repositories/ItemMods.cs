@@ -1,8 +1,9 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
-
 using Microsoft.EntityFrameworkCore;
+using CoreItemMod = Game.Core.Items.ItemMod;
 
 namespace Game.DataAccess.Repositories
 {
@@ -69,10 +70,10 @@ namespace Game.DataAccess.Repositories
             return itemMods.Count <= itemModId || itemModId < 0 ? null : itemMods[itemModId];
         }
 
-        public ItemMod GetItemMod(int itemModId)
+        public CoreItemMod GetItemMod(int itemModId)
         {
             var itemMods = All();
-            return itemMods[itemModId];
+            return ItemMapper.ModToCore(itemMods[itemModId]);
         }
 
         private Dictionary<int, IEnumerable<ItemMod>> ModsForItemByType(int itemId)

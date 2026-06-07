@@ -1,4 +1,5 @@
 ﻿using Game.Abstractions.Entities;
+using CoreSkill = Game.Core.Skills.Skill;
 
 namespace Game.Abstractions.DataAccess
 {
@@ -7,6 +8,6 @@ namespace Game.Abstractions.DataAccess
         public void InvalidateCache();
         public List<Skill> AllSkills(bool refreshCache = false);
         public Skill? LookupSkill(int skillId);
-        public Skill GetSkill(int skillId);
+        public CoreSkill GetSkill(int skillId);
     }
 }

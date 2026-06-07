@@ -3,11 +3,7 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
-using Game.Core.Items;
 using Game.Core.Players;
-using Game.Core.Skills;
-using EntityItemMod = Game.Abstractions.Entities.ItemMod;
-using EntitySkill = Game.Abstractions.Entities.Skill;
 
 namespace Game.Application.Services
 {
@@ -84,12 +80,12 @@ namespace Game.Application.Services
             foreach (var equip in snapshot.EquippedItems)
             {
                 var item = _items.GetItem(equip.ItemId);
-                modifiers.AddRange(MapItemAttributes(item));
+                modifiers.AddRange(item.Attributes);
 
                 foreach (var modId in equip.AppliedModIds)
                 {
                     var mod = _itemMods.GetItemMod(modId);
-                    modifiers.AddRange(MapItemModAttributes(mod));
+                    modifiers.AddRange(mod.Attributes);
                 }
             }
 
@@ -97,52 +93,10 @@ namespace Game.Application.Services
 
             // 3. Resolve skills from catalog by ID
             var resolvedSkills = snapshot.SkillIds
-                .Select(id => MapSkill(_skills.GetSkill(id)))
+                .Select(id => _skills.GetSkill(id))
                 .ToList();
 
             return new Battler(attributes, resolvedSkills, snapshot.Level);
-        }
-
-        private static IEnumerable<AttributeModifier> MapItemAttributes(Item item)
-        {
-            return item.Attributes.Select(ia => new AttributeModifier
-            {
-                Attribute = ia.Attribute,
-                Amount = ia.Amount,
-                Type = EModifierType.Additive,
-                Source = EAttributeModifierSource.Item,
-            });
-        }
-
-        private static IEnumerable<AttributeModifier> MapItemModAttributes(EntityItemMod entity)
-        {
-            return entity.ItemModAttributes.Select(ima => new AttributeModifier
-            {
-                Attribute = (EAttribute)ima.AttributeId,
-                Amount = (double)ima.Amount,
-                Type = EModifierType.Additive,
-                Source = EAttributeModifierSource.ItemMod,
-            });
-        }
-
-        private static Skill MapSkill(EntitySkill entity)
-        {
-            return new Skill
-            {
-                Id = entity.Id,
-                Name = entity.Name,
-                BaseDamage = (double)entity.BaseDamage,
-                Description = entity.Description,
-                CooldownMs = entity.CooldownMs,
-                DamageMultipliers = (entity.SkillDamageMultipliers ?? [])
-                    .Select(sdm => new AttributeModifier
-                    {
-                        Attribute = (EAttribute)sdm.AttributeId,
-                        Amount = (double)sdm.Multiplier,
-                        Type = EModifierType.Multiplicative,
-                        Source = EAttributeModifierSource.Derived,
-                    }).ToList(),
-            };
         }
     }
 }
