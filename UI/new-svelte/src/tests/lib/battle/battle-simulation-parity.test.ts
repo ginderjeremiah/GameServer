@@ -3,21 +3,35 @@ import { EAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 
 /**
- * Pure simulation loop that mirrors the backend BattleSimulator exactly.
- * No runtime dependencies — just math.
+ * Pure simulation loop that mirrors the backend Game.Core.Battle.BattleSimulator
+ * exactly. No runtime dependencies — just math. Returning the same shape as the
+ * backend's BattleResult lets the parity matrix below assert the full outcome
+ * (victory / playerDied / totalMs), not just the duration.
  */
-function simulateBattle(player: SimBattler, enemy: SimBattler): number {
-	const msPerTick = 40;
-	const maxMs = msPerTick * 10000;
+const msPerTick = 40;
+const defaultMaxMs = msPerTick * 10000;
 
-	for (let totalMs = msPerTick; totalMs <= maxMs; totalMs += msPerTick) {
+interface SimResult {
+	victory: boolean;
+	playerDied: boolean;
+	totalMs: number;
+}
+
+function simulateBattle(player: SimBattler, enemy: SimBattler, maxMs: number = defaultMaxMs): SimResult {
+	let totalMs = msPerTick;
+	for (; totalMs <= maxMs; totalMs += msPerTick) {
 		updateBattler(player, enemy, msPerTick);
-		if (enemy.currentHealth <= 0) return totalMs;
+		if (enemy.currentHealth <= 0) {
+			return { victory: true, playerDied: false, totalMs };
+		}
 
 		updateBattler(enemy, player, msPerTick);
-		if (player.currentHealth <= 0) return totalMs;
+		if (player.currentHealth <= 0) {
+			return { victory: false, playerDied: true, totalMs };
+		}
 	}
-	return maxMs + msPerTick;
+	// Mirror the backend's timeout return: the last simulated tick (maxMs), not maxMs + one tick.
+	return { victory: false, playerDied: false, totalMs: totalMs - msPerTick };
 }
 
 function updateBattler(attacker: SimBattler, defender: SimBattler, timeDelta: number) {
@@ -72,61 +86,143 @@ function makeBattlerFromRaw(attrs: { id: EAttribute; amount: number }[], skills:
 	};
 }
 
-/**
- * Creates a battler from FINAL attribute values (as the API sends for the player),
- * then recalculates derived stats — reproducing the double-counting bug.
- */
-function makeBattlerFromFinalValues(attrs: { id: EAttribute; amount: number }[], skills: SimSkill[]): SimBattler {
-	const battlerAttrs = attrs.map((a) => ({ attributeId: a.id, amount: a.amount }));
-	// calcDerivedStats=true adds derived stats on top of the already-final values
-	const ba = new BattleAttributes(battlerAttrs, true);
-	return {
-		attributes: ba,
-		currentHealth: ba.getValue(EAttribute.MaxHealth),
-		cdMultiplier: 1 + ba.getValue(EAttribute.CooldownRecovery) / 100,
-		skills
-	};
+// ── Shared parity matrix ───────────────────────────────────────────────────────
+// Every scenario here MUST mirror — with identical inputs and identical expected
+// totalMs/outcome — a row in the backend suite
+// Game.Core.Tests/Battle/BattleSimulatorParityTests.cs (the `Scenarios` table).
+// The two simulators run on both the client and the server, so a divergence here
+// would let the anti-cheat replay disagree with the live battle.
+
+interface ParityScenario {
+	name: string;
+	player: () => SimBattler;
+	enemy: () => SimBattler;
+	maxMs?: number;
+	expected: SimResult;
 }
 
-// ── Test scenario ────────────────────────────────────────────────────────────
-// Must match Game.Core.Tests.Battle.BattleSimulatorParityTests exactly.
-//
-// Player raw stats: Str=50, End=30, Agi=20, Dex=10
-//   Derived: MaxHealth=900, Defense=42, CooldownRecovery=9
-// Player skill: BaseDmg=10, {Str*1.5}, CD=1200
-//
-// Enemy raw stats: Str=10, End=15
-//   Derived: MaxHealth=400, Defense=17, CooldownRecovery=0
-// Enemy skill: BaseDmg=5, no multipliers, CD=2000
+const scenarios: ParityScenario[] = [
+	// Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
+	//   Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09; damage 85, after def 68.
+	//   Enemy:  MaxHealth=400, Def=17; damage 5-42 clamped to 0.
+	//   6 hits at ticks 28,56,84,112,140,168 → 6720ms.
+	{
+		name: 'cooldownRecovery',
+		player: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 50 },
+					{ id: EAttribute.Endurance, amount: 30 },
+					{ id: EAttribute.Agility, amount: 20 },
+					{ id: EAttribute.Dexterity, amount: 10 }
+				],
+				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])]
+			),
+		enemy: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 15 }
+				],
+				[makeSkill(5, 2000)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 6720 }
+	},
 
-const playerRawAttrs = [
-	{ id: EAttribute.Strength, amount: 50 },
-	{ id: EAttribute.Endurance, amount: 30 },
-	{ id: EAttribute.Agility, amount: 20 },
-	{ id: EAttribute.Dexterity, amount: 10 }
+	// Two player skills on different cooldowns vs an enemy that deals real damage.
+	//   Player: MaxHealth=600, Def=22; skillA 50 raw→33 every 20 ticks, skillB 25 raw→8 every 30 ticks.
+	//   Enemy:  MaxHealth=450, Def=17; attack 30 raw→8 every 25 ticks.
+	//   Cumulative player damage first reaches 450 at tick 240 → 9600ms.
+	{
+		name: 'multiSkill',
+		player: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 30 },
+					{ id: EAttribute.Endurance, amount: 20 }
+				],
+				[makeSkill(20, 800, [{ attributeId: EAttribute.Strength, amount: 1.0 }]), makeSkill(25, 1200)]
+			),
+		enemy: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 20 },
+					{ id: EAttribute.Endurance, amount: 15 }
+				],
+				[makeSkill(30, 1000)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 9600 }
+	},
+
+	// Both sides have so much Defense that every hit clamps to 0 — runs to timeout.
+	//   Player/Enemy: Def=52 each; attacks 5 raw → 5-52 clamped to 0.
+	{
+		name: 'highDefenseFloor',
+		player: () => makeBattlerFromRaw([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
+		enemy: () => makeBattlerFromRaw([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
+		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
+	},
+
+	// Neither side has skills, so no damage is dealt — runs to the default timeout.
+	{
+		name: 'noSkills',
+		player: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 10 }
+				],
+				[]
+			),
+		enemy: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 10 }
+				],
+				[]
+			),
+		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
+	},
+
+	// The cooldownRecovery matchup capped before either skill fires: stops at maxMs.
+	{
+		name: 'maxMsCap',
+		player: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 50 },
+					{ id: EAttribute.Endurance, amount: 30 },
+					{ id: EAttribute.Agility, amount: 20 },
+					{ id: EAttribute.Dexterity, amount: 10 }
+				],
+				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])]
+			),
+		enemy: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 15 }
+				],
+				[makeSkill(5, 2000)]
+			),
+		maxMs: 200,
+		expected: { victory: false, playerDied: false, totalMs: 200 }
+	}
 ];
-
-const enemyRawAttrs = [
-	{ id: EAttribute.Strength, amount: 10 },
-	{ id: EAttribute.Endurance, amount: 15 }
-];
-
-function playerSkill(): SimSkill {
-	return makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }]);
-}
-
-function enemySkill(): SimSkill {
-	return makeSkill(5, 2000);
-}
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('Battle simulation parity with backend', () => {
-	it('produces the correct totalMs with raw stat allocations (should match backend)', () => {
-		const player = makeBattlerFromRaw(playerRawAttrs, [playerSkill()]);
-		const enemy = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);
+	for (const scenario of scenarios) {
+		it(`matches the backend for the ${scenario.name} scenario`, () => {
+			const result = simulateBattle(scenario.player(), scenario.enemy(), scenario.maxMs);
+			expect(result).toEqual(scenario.expected);
+		});
+	}
 
-		// Verify derived stats match expected values
+	it('resolves the cooldownRecovery derived stats to the expected values', () => {
+		const player = scenarios[0].player();
+		const enemy = scenarios[0].enemy();
+
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(900);
 		expect(player.attributes.getValue(EAttribute.Defense)).toBe(42);
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(9);
@@ -134,64 +230,35 @@ describe('Battle simulation parity with backend', () => {
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
 		expect(enemy.attributes.getValue(EAttribute.Defense)).toBe(17);
-
-		const totalMs = simulateBattle(player, enemy);
-
-		// Must match the backend's BattleSimulatorParityTests.Parity_WithCooldownRecovery_MatchesExpectedTotalMs
-		expect(totalMs).toBe(6720);
 	});
 
-	it('demonstrates the double-counting bug: final API values + re-derived stats', () => {
-		// Compute the final attribute values as the API would send them
-		// (this is what PlayerData.FromPlayer produces)
+	it('ends sooner if the player double-counts derived stats (the historical bug)', () => {
+		// The frontend used to pass the API's already-final attribute values to
+		// BattleAttributes with calcDerivedStats=true, adding derived stats AGAIN.
+		// Mirrors BattleSimulatorParityTests.Parity_DoubleDerivedStats_ProducesShorterBattle.
 		const playerFinalAttrs = [
 			{ id: EAttribute.Strength, amount: 50 },
 			{ id: EAttribute.Endurance, amount: 30 },
 			{ id: EAttribute.Agility, amount: 20 },
 			{ id: EAttribute.Dexterity, amount: 10 },
-			// These are the FINAL values including derived stats:
+			// The FINAL values including derived stats, re-fed into the derived pipeline:
 			{ id: EAttribute.MaxHealth, amount: 900 }, // 50 + 20*30 + 5*50
 			{ id: EAttribute.Defense, amount: 42 }, // 2 + 30 + 0.5*20
 			{ id: EAttribute.CooldownRecovery, amount: 9 } // 0.4*20 + 0.1*10
 		];
+		const player = makeBattlerFromRaw(playerFinalAttrs, [
+			makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])
+		]);
+		const enemy = scenarios[0].enemy();
 
-		// This is how the frontend currently constructs the player battler:
-		// it passes the final API values to BattleAttributes with calcDerivedStats=true,
-		// causing derived stats to be added AGAIN on top of the already-computed values.
-		const player = makeBattlerFromFinalValues(playerFinalAttrs, [playerSkill()]);
-		const enemy = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);
-
-		// Derived stats are now DOUBLED
-		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800); // 900 + 900
-		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84); // 42 + 42
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(18); // 9 + 9
+		// Derived stats are now DOUBLED.
+		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800);
+		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84);
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(18);
 		expect(player.cdMultiplier).toBeCloseTo(1.18, 10);
 
-		const totalMs = simulateBattle(player, enemy);
-
-		// Battle ends sooner because player has inflated stats
-		expect(totalMs).toBe(6240);
-		expect(totalMs).toBeLessThan(6720);
-	});
-
-	it('the difference matches the ~300ms discrepancy range', () => {
-		const playerCorrect = makeBattlerFromRaw(playerRawAttrs, [playerSkill()]);
-		const enemyA = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);
-		const correctMs = simulateBattle(playerCorrect, enemyA);
-
-		const playerFinalAttrs = [
-			...playerRawAttrs,
-			{ id: EAttribute.MaxHealth, amount: 900 },
-			{ id: EAttribute.Defense, amount: 42 },
-			{ id: EAttribute.CooldownRecovery, amount: 9 }
-		];
-		const playerBugged = makeBattlerFromFinalValues(playerFinalAttrs, [playerSkill()]);
-		const enemyB = makeBattlerFromRaw(enemyRawAttrs, [enemySkill()]);
-		const buggedMs = simulateBattle(playerBugged, enemyB);
-
-		const differenceMs = correctMs - buggedMs;
-		expect(differenceMs).toBe(480);
-		expect(differenceMs).toBeGreaterThanOrEqual(200);
-		expect(differenceMs).toBeLessThanOrEqual(600);
+		const result = simulateBattle(player, enemy);
+		expect(result.totalMs).toBe(6240);
+		expect(result.totalMs).toBeLessThan(6720);
 	});
 });
