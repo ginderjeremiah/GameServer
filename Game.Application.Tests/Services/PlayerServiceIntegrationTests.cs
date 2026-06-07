@@ -255,8 +255,9 @@ namespace Game.Application.Tests.Services
             Assert.Equal(12.0, loadedSkill.BaseDamage);
             Assert.Equal(1500, loadedSkill.CooldownMs);
             Assert.NotEmpty(loadedSkill.DamageMultipliers);
+            // Skills and SelectedSkills share the same resolved instance (immutable template data)
             var selectedSkill = Assert.Single(player.SelectedSkills);
-            Assert.Equal(loadedSkill.Id, selectedSkill.Id);
+            Assert.Same(loadedSkill, selectedSkill);
 
             // Item definition (with its attributes and mod slots) resolved from the cached catalog
             var unlocked = Assert.Single(player.Inventory.UnlockedItems);
