@@ -2,9 +2,6 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Players;
-using PlayerAttributeEntity = Game.Abstractions.Entities.PlayerAttribute;
-using PlayerEntity = Game.Abstractions.Entities.Player;
-using PlayerSkillEntity = Game.Abstractions.Entities.PlayerSkill;
 using UserEntity = Game.Abstractions.Entities.User;
 
 namespace Game.Application.Services
@@ -19,23 +16,22 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEntityStore entityStore,
         IRefreshTokenStore refreshTokenStore,
-        IAccessTokenService accessTokenService)
+        IAccessTokenService accessTokenService,
+        NewPlayerFactory newPlayerFactory)
     {
-        private const int StarterSkillCount = 3;
-        private const int AttributeCount = 6;
-        private const decimal StartingAttributeAmount = 5m;
-        private const int StartingZoneId = 0;
-
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEntityStore _entityStore = entityStore;
         private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
         private readonly IAccessTokenService _accessTokenService = accessTokenService;
+        private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
 
         /// <summary>
         /// Creates a new account: validates the username is available, hashes the password, and inserts
-        /// the user together with its initial player graph (starter skills, attributes, and log
-        /// preferences). The inserts are persisted by the surrounding unit of work.
+        /// the user together with its initial player graph. The new-player defaults (starter skills,
+        /// attributes, and log preferences) are a domain concern owned by <see cref="NewPlayerFactory"/>;
+        /// this method only orchestrates and delegates persistence to the repository. The inserts are
+        /// persisted by the surrounding unit of work.
         /// </summary>
         public async Task<CreateAccountStatus> CreateAccount(string username, string password)
         {
@@ -55,42 +51,8 @@ namespace Game.Application.Services
 
             _entityStore.Insert(user);
 
-            var playerEntity = new PlayerEntity
-            {
-                User = user,
-                Name = username,
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = StartingZoneId,
-                StatPointsGained = 0,
-                StatPointsUsed = 0,
-            };
-
-            playerEntity.PlayerSkills = Enumerable.Range(0, StarterSkillCount).Select(id => new PlayerSkillEntity
-            {
-                Player = playerEntity,
-                Selected = true,
-                SkillId = id,
-            }).ToList();
-
-            playerEntity.PlayerAttributes = Enumerable.Range(0, AttributeCount).Select(id => new PlayerAttributeEntity
-            {
-                Player = playerEntity,
-                AttributeId = id,
-                Amount = StartingAttributeAmount,
-            }).ToList();
-
-            playerEntity.LogPreferences =
-            [
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Damage, Enabled = false, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Debug, Enabled = false, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Exp, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.LevelUp, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.ItemFound, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.EnemyDefeated, Enabled = true, },
-            ];
-
-            _entityStore.Insert(playerEntity);
+            var newPlayer = _newPlayerFactory.Create(username);
+            _playerRepo.CreatePlayer(user, newPlayer);
 
             return CreateAccountStatus.Success;
         }
