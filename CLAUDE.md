@@ -20,6 +20,15 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 - When you are altering existing code check that you are not leaving dead code behind. If you are removing or replacing functionality, make sure to remove any code that is no longer being used as well. This includes things like unused variables, functions, classes, and imports.
 - Remember that as code evolves over time, some code may become unused, redundant, or overly complex. It is important to regularly review and refactor code to keep it clean and maintainable. If you are working on a piece of code and notice that it has become unwieldy or difficult to understand, take the time to refactor it and improve its readability and maintainability or create a follow-up task to address it later if it would increase the scope of your work by a significant amount.
 
+## Follow-up issues
+
+When creating follow-up issues, add any of the follow tags (if applicable):
+
+- claude: this tag will mark things as something claude should prioritize. You should usually add this unless there is very serious design considerations that need to be made.
+- bug: This issue addresses an actual defect in the application. Do no use this for partially complete or otherwise unimplemented code.
+- tech debt: This issue is for refactoring or cleanup of existing code to increase code maintainability. In other words, there should be no tangible user-facing effect from the change.
+- enhancement: The issue implements new or previously unimplemented functionality.
+
 # Overall Project Guidelines
 
 - If you ever have questions or want to work together to refine ideas, please ask! It is better to ask and get clarification than to make assumptions and potentially write code that does not fit well with the overall architecture or the future direction of the project.
