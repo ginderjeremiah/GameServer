@@ -15,13 +15,13 @@
 import { NavSidebar, LogPanel } from '$components';
 import { screenMap, type GameScreen, GAME_SCREENS, visibleScreens } from './screens';
 import { startGame } from '$lib/engine';
-import { getRoles, logout } from '$lib/api';
-import { confirmModal } from '$stores';
+import { getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { onMount } from 'svelte';
+import { confirmQuit } from './game-actions';
 
 if (browser) {
 	try {
@@ -70,20 +70,6 @@ const handleNavigate = (key: string) => {
 	const mapped = screenKeyMap[key];
 	if (mapped && mapped in screenMap) {
 		CurrentScreen = screenMap[mapped] as Component;
-	}
-};
-
-// Confirm before ending the session — logging out tears down all in-memory game state, so guard
-// against an accidental click on the quit control.
-const confirmQuit = async () => {
-	const confirmed = await confirmModal({
-		title: 'Log out?',
-		body: "You'll be signed out and returned to the login screen.",
-		confirmLabel: 'Log out',
-		cancelLabel: 'Stay'
-	});
-	if (confirmed) {
-		logout();
 	}
 };
 </script>

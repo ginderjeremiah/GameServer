@@ -1,21 +1,21 @@
 using Game.Core;
-using PlayerStatisticEntity = Game.Abstractions.Entities.PlayerStatistic;
+using CorePlayerStatistic = Game.Core.Progress.PlayerStatistic;
 
 namespace Game.Api.Models.Progress
 {
-    public class PlayerStatistic : IModelFromSource<PlayerStatistic, PlayerStatisticEntity>
+    public class PlayerStatistic : IModelFromSource<PlayerStatistic, CorePlayerStatistic>
     {
         public EStatisticType StatisticTypeId { get; set; }
         public int? EntityId { get; set; }
         public decimal Value { get; set; }
 
-        public static PlayerStatistic FromSource(PlayerStatisticEntity entity)
+        public static PlayerStatistic FromSource(CorePlayerStatistic source)
         {
             return new PlayerStatistic
             {
-                StatisticTypeId = (EStatisticType)entity.StatisticTypeId,
-                EntityId = entity.EntityId,
-                Value = entity.Value,
+                StatisticTypeId = source.Type,
+                EntityId = source.EntityId,
+                Value = source.Value,
             };
         }
     }

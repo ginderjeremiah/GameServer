@@ -10,120 +10,151 @@ using Xunit;
 namespace Game.Core.Tests.Battle
 {
     /// <summary>
-    /// Tests that produce deterministic totalMs values for cross-checking
-    /// against the frontend battle simulation.
+    /// Cross-implementation parity matrix for the deterministic battle simulation.
+    /// Every scenario here MUST be mirrored — with identical inputs and identical
+    /// expected <c>totalMs</c>/outcome — in the frontend suite
+    /// <c>UI/new-svelte/src/tests/lib/battle/battle-simulation-parity.test.ts</c>.
+    /// The two simulators run on both the client and the server (the anti-cheat
+    /// replay depends on them agreeing), so any new battle behaviour added on one
+    /// side should gain a matching row here on the other.
     /// </summary>
     public class BattleSimulatorParityTests
     {
         /// <summary>
-        /// Scenario with CooldownRecovery > 0 to exercise the cdMultiplier path.
-        /// Frontend must produce the same totalMs when using RAW stat allocations
-        /// (not pre-computed final attribute values from the API).
+        /// A single deterministic battle scenario: the inputs that build both
+        /// combatants plus the exact result the simulation must produce.
         /// </summary>
-        [Fact]
-        public void Parity_WithCooldownRecovery_MatchesExpectedTotalMs()
+        public sealed record ParityScenario(
+            Func<Battler> Player,
+            Func<Battler> Enemy,
+            bool ExpectedVictory,
+            bool ExpectedPlayerDied,
+            int ExpectedTotalMs,
+            int? MaxMs = null);
+
+        /// <summary>
+        /// The shared scenario table. Keyed by name so xUnit can drive a
+        /// <see cref="TheoryAttribute"/> over the names without serializing the
+        /// (non-serializable) builders; the test resolves the full scenario by name.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, ParityScenario> Scenarios =
+            new Dictionary<string, ParityScenario>
+            {
+                // Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
+                //   Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09
+                //     charge/tick = 40*1.09 = 43.6, fires every 28 ticks (28*43.6=1220.8≥1200)
+                //     damage = 10 + 50*1.5 = 85, after def = 85-17 = 68
+                //   Enemy:  MaxHealth=400, Def=17, CDR=0; damage = 5-42 = 0 (clamped)
+                //   6 hits to kill (6*68=408>400), at ticks 28,56,84,112,140,168 → 6720ms
+                ["cooldownRecovery"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 50, endurance: 30, agility: 20, dexterity: 10,
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 15,
+                        skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 6720),
+
+                // Two player skills firing on different cooldowns against an enemy
+                // that deals real (non-clamped) damage — a genuine multi-skill exchange.
+                //   Player: MaxHealth=600, Def=22, cdMult=1
+                //     skillA: 20 + 30*1.0 = 50 raw, after def = 33, fires every 20 ticks
+                //     skillB: 25 raw, after def = 8, fires every 30 ticks
+                //   Enemy:  MaxHealth=450, Def=17; attack 30 raw, after def = 8, every 25 ticks
+                //   Cumulative player damage first reaches 450 at tick 240 → 9600ms.
+                ["multiSkill"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 30, endurance: 20,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 20, cooldownMs: 800, mult: EAttribute.Strength, multAmount: 1.0),
+                            MakeSkill(2, baseDamage: 25, cooldownMs: 1200),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 20, endurance: 15,
+                        skills: [MakeSkill(3, baseDamage: 30, cooldownMs: 1000)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 9600),
+
+                // Both combatants have so much Defense that every hit clamps to 0,
+                // so neither can ever win — the battle runs to the timeout.
+                //   Player/Enemy: Def=52 each; attacks 5 raw → 5-52 clamped to 0.
+                ["highDefenseFloor"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 50,
+                        skills: [MakeSkill(1, baseDamage: 5, cooldownMs: 1000)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 50,
+                        skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 1000)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 40 * 10000),
+
+                // Neither side has any skills, so no damage is ever dealt and the
+                // battle runs to the default timeout.
+                ["noSkills"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 10, endurance: 10, skills: []),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 10, skills: []),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 40 * 10000),
+
+                // The cooldownRecovery matchup capped well before either skill fires:
+                // the simulation stops at maxMs with no winner.
+                ["maxMsCap"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 50, endurance: 30, agility: 20, dexterity: 10,
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 15,
+                        skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 200,
+                    MaxMs: 200),
+            };
+
+        public static IEnumerable<object[]> ScenarioNames =>
+            Scenarios.Keys.Select(name => new object[] { name });
+
+        [Theory]
+        [MemberData(nameof(ScenarioNames))]
+        public void Parity_Scenario_MatchesExpectedResult(string scenarioName)
         {
-            var playerSkill = new Skill
-            {
-                Id = 1,
-                Name = "Slash",
-                Description = "",
-                CooldownMs = 1200,
-                BaseDamage = 10,
-                DamageMultipliers =
-                [
-                    new AttributeModifier
-                    {
-                        Attribute = EAttribute.Strength,
-                        Amount = 1.5,
-                        Type = EModifierType.Multiplicative,
-                        Source = EAttributeModifierSource.Derived,
-                    }
-                ],
-            };
+            var scenario = Scenarios[scenarioName];
 
-            var enemySkill = new Skill
-            {
-                Id = 2,
-                Name = "Bite",
-                Description = "",
-                CooldownMs = 2000,
-                BaseDamage = 5,
-                DamageMultipliers = [],
-            };
+            var sim = new BattleSimulator(scenario.Player(), scenario.Enemy());
+            var result = sim.Simulate(scenario.MaxMs);
 
-            var player = MakePlayer(
-                strength: 50, endurance: 30, agility: 20, dexterity: 10,
-                skills: [playerSkill]);
-
-            var enemy = MakeEnemy(
-                strength: 10, endurance: 15,
-                skills: [enemySkill]);
-
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
-            var result = sim.Simulate();
-
-            Assert.True(result.Victory, "Player should win this matchup.");
+            Assert.Equal(scenario.ExpectedVictory, result.Victory);
+            Assert.Equal(scenario.ExpectedPlayerDied, result.PlayerDied);
+            Assert.Equal(scenario.ExpectedTotalMs, result.TotalMs);
             Assert.Equal(0, result.TotalMs % 40);
-
-            // Record the authoritative value — the frontend test must match this exactly.
-            // Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09
-            //   charge/tick = 40*1.09 = 43.6, fires every 28 ticks (28*43.6=1220.8≥1200)
-            //   damage = 10 + 50*1.5 = 85, after def = 85-17 = 68
-            // Enemy:  MaxHealth=400, Def=17, CDR=0
-            //   damage = 5-42 = 0 (clamped)
-            // 6 hits to kill (6*68=408>400), at ticks 28,56,84,112,140,168 → 6720ms
-            Assert.Equal(6720, result.TotalMs);
         }
 
         /// <summary>
-        /// Demonstrates what happens if the player's derived stats are doubled
-        /// (the bug the frontend currently has). CooldownRecovery doubles from 9→18,
-        /// cdMultiplier goes from 1.09→1.18, skills fire every 26 ticks instead of 28.
+        /// Demonstrates what happens if the player's derived stats are double-counted
+        /// (the bug the frontend used to have). CooldownRecovery doubles from 9→18,
+        /// cdMultiplier goes from 1.09→1.18, skills fire every 26 ticks instead of 28,
+        /// so the same matchup as the <c>cooldownRecovery</c> scenario ends sooner.
+        /// Kept separate from the matrix because it builds the player from already-final
+        /// attribute values rather than raw allocations.
         /// </summary>
         [Fact]
         public void Parity_DoubleDerivedStats_ProducesShorterBattle()
         {
-            var playerSkill = new Skill
-            {
-                Id = 1,
-                Name = "Slash",
-                Description = "",
-                CooldownMs = 1200,
-                BaseDamage = 10,
-                DamageMultipliers =
-                [
-                    new AttributeModifier
-                    {
-                        Attribute = EAttribute.Strength,
-                        Amount = 1.5,
-                        Type = EModifierType.Multiplicative,
-                        Source = EAttributeModifierSource.Derived,
-                    }
-                ],
-            };
-
-            var enemySkill = new Skill
-            {
-                Id = 2,
-                Name = "Bite",
-                Description = "",
-                CooldownMs = 2000,
-                BaseDamage = 5,
-                DamageMultipliers = [],
-            };
-
-            // Simulate what the frontend does: start with FINAL attribute values
-            // (which already include derived stats), then add derived stats AGAIN.
             var player = MakePlayerWithDoubleDerivedStats(
                 strength: 50, endurance: 30, agility: 20, dexterity: 10,
-                skills: [playerSkill]);
+                skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)]);
 
             var enemy = MakeEnemy(
                 strength: 10, endurance: 15,
-                skills: [enemySkill]);
+                skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
@@ -131,6 +162,36 @@ namespace Game.Core.Tests.Battle
             // charge/tick = 47.2, fires every 26 ticks → 6240ms
             Assert.Equal(6240, result.TotalMs);
             Assert.True(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
+        }
+
+        private static Skill MakeSkill(
+            int id, double baseDamage, int cooldownMs,
+            EAttribute? mult = null, double multAmount = 0) => new()
+            {
+                Id = id,
+                Name = $"Skill {id}",
+                Description = "",
+                CooldownMs = cooldownMs,
+                BaseDamage = baseDamage,
+                DamageMultipliers = mult is null
+                    ? []
+                    :
+                    [
+                        new AttributeModifier
+                        {
+                            Attribute = mult.Value,
+                            Amount = multAmount,
+                            Type = EModifierType.Multiplicative,
+                            Source = EAttributeModifierSource.Derived,
+                        }
+                    ],
+            };
+
+        private static Battler MakeBattler(
+            double strength, double endurance, double agility = 0, double dexterity = 0,
+            List<Skill>? skills = null)
+        {
+            return new Battler(MakePlayer(strength, endurance, agility, dexterity, skills));
         }
 
         private static Player MakePlayer(
@@ -214,7 +275,7 @@ namespace Game.Core.Tests.Battle
             };
         }
 
-        private static Enemy MakeEnemy(
+        private static Battler MakeEnemy(
             double strength, double endurance,
             List<Skill>? skills = null)
         {
@@ -244,7 +305,7 @@ namespace Game.Core.Tests.Battle
                 AvailableSkills = defaultSkills,
             };
             enemy.SetBattleSkills(defaultSkills.Select(s => s.Id).ToList());
-            return enemy;
+            return new Battler(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
         }
     }
 }

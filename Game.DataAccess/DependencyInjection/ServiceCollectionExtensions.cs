@@ -36,11 +36,8 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IEntityStore, EntityStore>()
                 // UnitOfWork (stats/challenges persistence)
                 .AddScoped<IUnitOfWork, UnitOfWork>()
-                // Player progress aggregate repo (UnitOfWork saves)
+                // Player progress repo (UnitOfWork saves; also serves read-only API queries)
                 .AddScoped<IPlayerProgressRepository, PlayerProgressRepository>()
-                // Read-only repos for API queries
-                .AddScoped<IPlayerStatistics, PlayerStatistics>()
-                .AddScoped<IPlayerChallenges, PlayerChallenges>()
                 // Reference data repos (in-memory cached)
                 .AddScoped<IChallenges, Challenges>()
                 .AddScoped<IEnemies, Enemies>()

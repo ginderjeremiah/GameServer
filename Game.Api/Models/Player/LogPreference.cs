@@ -1,20 +1,10 @@
-﻿using Game.Core;
-using LogPreferenceEntity = Game.Abstractions.Entities.LogPreference;
+using Game.Core;
 
 namespace Game.Api.Models.Player
 {
-    public class LogPreference : IModelFromSource<LogPreference, LogPreferenceEntity>
+    public class LogPreference : IModel
     {
         public ELogType Id { get; set; }
         public bool Enabled { get; set; }
-
-        public static LogPreference FromSource(LogPreferenceEntity preference)
-        {
-            return new LogPreference
-            {
-                Id = (ELogType)preference.LogTypeId,
-                Enabled = preference.Enabled,
-            };
-        }
     }
 }

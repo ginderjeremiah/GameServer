@@ -1,5 +1,4 @@
 ﻿using Game.Core.Attributes;
-using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
@@ -24,11 +23,6 @@ namespace Game.Core.Battle
 
         public Battler(Player player)
             : this(player.GetAttributes(), player.SelectedSkills, player.Level)
-        {
-        }
-
-        public Battler(Enemy enemy)
-            : this(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level)
         {
         }
 
