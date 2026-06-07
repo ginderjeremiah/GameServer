@@ -18,26 +18,38 @@
 	</div>
 
 	<!-- Body: type rail + detail/overview -->
-	<div class="chal-body">
-		<TypeRail groups={view.groups} selected={view.selectedType} onSelect={(t) => view.select(t)} />
-
-		<div class="chal-detail">
-			{#if view.selectedType === 'all'}
-				<OverviewPane summary={view.summary} nextUp={view.nextUp} groups={view.groups} onPick={(t) => view.select(t)} />
-			{:else if view.selectedGroup}
-				<TypeHero group={view.selectedGroup} />
-				<div class="detail-toolbar">
-					<span class="mono-label sm">{view.selectedGroup.items.length} challenges</span>
-					<SortControl value={view.sort} onChange={(s) => view.setSort(s)} />
-				</div>
-				<div class="detail-grid">
-					{#each view.detail as challenge (challenge.id)}
-						<ChallengeDetailCard c={challenge} />
-					{/each}
-				</div>
-			{/if}
+	{#if view.error}
+		<div class="chal-error" data-testid="challenges-error">
+			<div class="error-title">Couldn’t load challenges</div>
+			<p class="error-copy">Something went wrong fetching your challenge progress. Please try again later.</p>
 		</div>
-	</div>
+	{:else}
+		<div class="chal-body">
+			<TypeRail groups={view.groups} selected={view.selectedType} onSelect={(t) => view.select(t)} />
+
+			<div class="chal-detail">
+				{#if view.selectedType === 'all'}
+					<OverviewPane
+						summary={view.summary}
+						nextUp={view.nextUp}
+						groups={view.groups}
+						onPick={(t) => view.select(t)}
+					/>
+				{:else if view.selectedGroup}
+					<TypeHero group={view.selectedGroup} />
+					<div class="detail-toolbar">
+						<span class="mono-label sm">{view.selectedGroup.items.length} challenges</span>
+						<SortControl value={view.sort} onChange={(s) => view.setSort(s)} />
+					</div>
+					<div class="detail-grid">
+						{#each view.detail as challenge (challenge.id)}
+							<ChallengeDetailCard c={challenge} />
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 
 	{#if view.loading}
 		<Loading />
@@ -49,7 +61,7 @@
 <script lang="ts">
 import { ApiRequest } from '$lib/api';
 import { Loading } from '$components';
-import { registerTooltipComponent, type TooltipComponent } from '$stores';
+import { registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
 import { onMount } from 'svelte';
 import { ChallengesView, type ResolvedReward } from './challenges-view.svelte';
 import { setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
@@ -87,8 +99,12 @@ setRewardTooltip(controller);
 onMount(async () => {
 	try {
 		view.playerChallenges = (await ApiRequest.get('Challenges/Player')) ?? [];
+		view.error = false;
 	} catch {
-		view.playerChallenges = [];
+		// Don't conflate a failed load with a genuine no-progress result — a
+		// dropped fetch would otherwise render every challenge as zero progress.
+		view.error = true;
+		toastError('Your challenge progress could not be loaded. Please try again later.');
 	}
 	view.loading = false;
 });
@@ -187,6 +203,32 @@ onMount(async () => {
 	min-width: 0;
 	overflow-y: auto;
 	padding: 2px 0 24px 22px;
+}
+
+.chal-error {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	gap: 10px;
+	padding: 24px 30px;
+}
+
+.error-title {
+	font-size: 18px;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+.error-copy {
+	margin: 0;
+	max-width: 420px;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--text-tertiary);
 }
 
 .detail-toolbar {

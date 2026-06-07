@@ -273,6 +273,9 @@ export class ChallengesView {
 	sort = $state<SortKey>('progress');
 	playerChallenges = $state<IPlayerChallenge[]>([]);
 	loading = $state(true);
+	/** A failed `Challenges/Player` load — kept distinct from a genuine
+	 *  no-progress result so it isn't shown as a wall of zero-progress cards. */
+	error = $state(false);
 
 	// Rebuilt from reactive deps on each change (a lookup, not mutable held state).
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
