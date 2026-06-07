@@ -1,6 +1,5 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
-using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Players;
@@ -24,16 +23,6 @@ namespace Game.Application.Services
 
             await _playerRepo.SavePlayer(player);
             return true;
-        }
-
-        public AttributeCollection GetPlayerAttributes(Player player)
-        {
-            return player.GetAttributes();
-        }
-
-        public IEnumerable<AttributeModifier> GetAllModifiers(Player player)
-        {
-            return player.GetAllModifiers();
         }
 
         public async Task<bool> EquipItem(Player player, int itemId, EEquipmentSlot slot)
@@ -86,7 +75,15 @@ namespace Game.Application.Services
                 Description = modEntity.Description ?? string.Empty,
                 Type = (EItemModType)modEntity.ItemModTypeId,
                 Rarity = (ERarity)modEntity.RarityId,
-                Attributes = [],
+                Attributes = modEntity.ItemModAttributes
+                    .Select(ima => new AttributeModifier
+                    {
+                        Attribute = (EAttribute)ima.AttributeId,
+                        Amount = (double)ima.Amount,
+                        Type = EModifierType.Additive,
+                        Source = EAttributeModifierSource.ItemMod,
+                    })
+                    .ToList(),
                 Tags = [],
             };
 

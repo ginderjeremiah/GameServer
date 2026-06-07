@@ -302,6 +302,105 @@ namespace Game.Core.Tests.Players
             Assert.Empty(modifiers);
         }
 
+        [Fact]
+        public void GetEquippedAttributeModifiers_EquippedItemWithAppliedMod_IncludesModAttributes()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, modSlots:
+            [
+                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
+            [
+                MakeModifier(EAttribute.Dexterity, 7.0),
+            ]));
+
+            var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
+
+            Assert.Single(modifiers);
+            Assert.Equal(EAttribute.Dexterity, modifiers[0].Attribute);
+            Assert.Equal(7.0, modifiers[0].Amount);
+            Assert.Equal(EAttributeModifierSource.ItemMod, modifiers[0].Source);
+        }
+
+        [Fact]
+        public void GetEquippedAttributeModifiers_EquippedItemWithBaseAndModAttributes_IncludesBoth()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory,
+                attributes: [MakeModifier(EAttribute.Strength, 5.0, EAttributeModifierSource.Item)],
+                modSlots:
+                [
+                    new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                ]);
+            AddUnlockedItem(inventory, item);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
+            [
+                MakeModifier(EAttribute.Dexterity, 7.0),
+            ]));
+
+            var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
+
+            Assert.Equal(2, modifiers.Count);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 5.0 && m.Source == EAttributeModifierSource.Item);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
+        }
+
+        [Fact]
+        public void GetEquippedAttributeModifiers_AppliedModOnUnequippedItem_NotIncluded()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, modSlots:
+            [
+                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
+            [
+                MakeModifier(EAttribute.Dexterity, 7.0),
+            ]));
+            // The item is unlocked and modded but never equipped, so it must not contribute.
+
+            var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
+
+            Assert.Empty(modifiers);
+        }
+
+        [Fact]
+        public void GetEquippedAttributeModifiers_MultipleAppliedMods_IncludesAll()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, modSlots:
+            [
+                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 1, Index = 1, Type = EItemModType.Suffix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.UnlockMod(10);
+            inventory.UnlockMod(11);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
+            [
+                MakeModifier(EAttribute.Strength, 3.0),
+            ]));
+            inventory.TryApplyMod(1, 11, 1, MakeMod(11, EItemModType.Suffix, attributes:
+            [
+                MakeModifier(EAttribute.Dexterity, 4.0),
+            ]));
+
+            var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
+
+            Assert.Equal(2, modifiers.Count);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 3.0);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 4.0);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
@@ -326,5 +425,25 @@ namespace Game.Core.Tests.Players
                 AppliedMods = [],
             });
         }
+
+        private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier>? attributes = null) => new()
+        {
+            Id = id,
+            Name = $"Mod {id}",
+            Description = string.Empty,
+            Type = type,
+            Rarity = ERarity.Common,
+            Attributes = attributes ?? [],
+            Tags = [],
+        };
+
+        private static AttributeModifier MakeModifier(EAttribute attribute, double amount,
+            EAttributeModifierSource source = EAttributeModifierSource.ItemMod) => new()
+            {
+                Attribute = attribute,
+                Amount = amount,
+                Type = EModifierType.Additive,
+                Source = source,
+            };
     }
 }
