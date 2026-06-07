@@ -55,7 +55,9 @@ namespace Game.TestInfrastructure.Base
                 .ToList();
 
             foreach (var descriptor in hostedServiceDescriptors)
+            {
                 services.Remove(descriptor);
+            }
 
             _rootProvider = services.BuildServiceProvider();
 
@@ -65,7 +67,10 @@ namespace Game.TestInfrastructure.Base
         public async ValueTask DisposeAsync()
         {
             if (_rootProvider is not null)
+            {
                 await _rootProvider.DisposeAsync();
+            }
+
             GC.SuppressFinalize(this);
         }
 

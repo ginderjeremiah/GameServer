@@ -4,6 +4,9 @@ end_of_line = lf
 insert_final_newline = true
 
 [*.cs]
+# IDE0011: Add braces
+csharp_prefer_braces = true:warning
+
 # IDE0290: Use primary constructor
 dotnet_diagnostic.IDE0290.severity = none
 

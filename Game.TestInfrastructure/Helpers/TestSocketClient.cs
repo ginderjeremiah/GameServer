@@ -101,7 +101,9 @@ namespace Game.TestInfrastructure.Helpers
 
                 var response = message.Deserialize<ApiSocketResponse<TResponse>>();
                 if (response is not null && response.Id == expectedId)
+                {
                     return response;
+                }
             }
         }
 
@@ -118,7 +120,9 @@ namespace Game.TestInfrastructure.Helpers
 
                 var response = message.Deserialize<ApiSocketResponse>();
                 if (response is not null && response.Id == expectedId)
+                {
                     return response;
+                }
             }
         }
 
