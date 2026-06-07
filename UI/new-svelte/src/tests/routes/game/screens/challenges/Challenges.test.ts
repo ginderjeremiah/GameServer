@@ -52,6 +52,7 @@ beforeEach(() => {
 		challenge({ id: 1, name: 'First Blood', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 })
 	];
 	mockToastError.mockClear();
+	mockGet.mockClear();
 	mockGet.mockResolvedValue(PLAYER_CHALLENGES);
 });
 
