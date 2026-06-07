@@ -1,9 +1,18 @@
 using Game.Abstractions.Contracts.Identity;
+using Game.Core.Players;
 
 namespace Game.Abstractions.DataAccess
 {
     public interface IUsers
     {
+        /// <summary>
+        /// Persists a brand-new account: the user record described by <paramref name="account"/> together
+        /// with its initial player graph (built from the <paramref name="player"/> blueprint), linked via
+        /// the navigation property so EF resolves the foreign key without the user's store-generated id.
+        /// The inserts are queued in the surrounding unit of work.
+        /// </summary>
+        void CreateAccount(NewAccount account, NewPlayer player);
+
         /// <summary>
         /// Loads the credentials of the active (non-archived) account with the given username — the data
         /// the login use case needs to authenticate and establish a session. Returns <see langword="null"/>

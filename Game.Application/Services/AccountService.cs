@@ -1,8 +1,8 @@
 using Game.Abstractions.Auth;
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Players;
-using UserEntity = Game.Abstractions.Entities.User;
 
 namespace Game.Application.Services
 {
@@ -14,24 +14,22 @@ namespace Game.Application.Services
     public class AccountService(
         IUsers users,
         IPlayerRepository playerRepo,
-        IEntityStore entityStore,
         IRefreshTokenStore refreshTokenStore,
         IAccessTokenService accessTokenService,
         NewPlayerFactory newPlayerFactory)
     {
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
-        private readonly IEntityStore _entityStore = entityStore;
         private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
         private readonly IAccessTokenService _accessTokenService = accessTokenService;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
 
         /// <summary>
-        /// Creates a new account: validates the username is available, hashes the password, and inserts
-        /// the user together with its initial player graph. The new-player defaults (starter skills,
-        /// attributes, and log preferences) are a domain concern owned by <see cref="NewPlayerFactory"/>;
-        /// this method only orchestrates and delegates persistence to the repository. The inserts are
-        /// persisted by the surrounding unit of work.
+        /// Creates a new account: validates the username is available, hashes the password, and hands the
+        /// credential material plus the new-player blueprint to the Identity context for persistence. The
+        /// new-player defaults (starter skills, attributes, and log preferences) are a domain concern
+        /// owned by <see cref="NewPlayerFactory"/>; this method only orchestrates — it builds no entity
+        /// graphs. The inserts are persisted by the surrounding unit of work.
         /// </summary>
         public async Task<CreateAccountStatus> CreateAccount(string username, string password)
         {
@@ -41,18 +39,14 @@ namespace Game.Application.Services
             }
 
             var salt = Guid.NewGuid();
-            var user = new UserEntity
+            var account = new NewAccount
             {
                 Username = username,
                 PassHash = password.Hash(salt.ToString()),
                 Salt = salt,
-                LastLogin = DateTime.UtcNow,
             };
 
-            _entityStore.Insert(user);
-
-            var newPlayer = _newPlayerFactory.Create(username);
-            _playerRepo.CreatePlayer(user, newPlayer);
+            _users.CreateAccount(account, _newPlayerFactory.Create(username));
 
             return CreateAccountStatus.Success;
         }

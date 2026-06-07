@@ -39,7 +39,14 @@ namespace Game.DataAccess.Repositories
             return [.. AllEntities(refreshCache).Select(ZoneMapper.ToContract)];
         }
 
-        public Zone? GetZone(int zoneId)
+        public Contracts.Zone GetZone(int zoneId)
+        {
+            return ValidateZoneId(zoneId)
+                ? ZoneMapper.ToContract(AllEntities()[zoneId])
+                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+        }
+
+        public Zone? LookupZone(int zoneId)
         {
             return ValidateZoneId(zoneId)
                 ? AllEntities()[zoneId]

@@ -70,7 +70,7 @@ namespace Game.Application.Services
 
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
-            if (_itemMods.LookupItemMod(itemModId) is null)
+            if (!_itemMods.ValidateItemModId(itemModId))
             {
                 return false;
             }

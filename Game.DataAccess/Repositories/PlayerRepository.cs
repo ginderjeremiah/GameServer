@@ -5,7 +5,6 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using UserEntity = Game.Abstractions.Entities.User;
 
 namespace Game.DataAccess.Repositories
 {
@@ -59,13 +58,6 @@ namespace Game.DataAccess.Repositories
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
             _cache.SetAndForget(playerKey, player);
-        }
-
-        public void CreatePlayer(UserEntity user, NewPlayer newPlayer)
-        {
-            // The initial graph is persisted straight through the unit of work (no cache write or
-            // domain events): a freshly created player is only loaded into the cache later, on login.
-            _context.Players.Add(PlayerMapper.ToEntity(newPlayer, user));
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
