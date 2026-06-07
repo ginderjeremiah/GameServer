@@ -29,12 +29,24 @@ namespace Game.Core.Players.Inventories
         public IEnumerable<AttributeModifier> GetEquippedAttributeModifiers()
         {
             return EquipmentSlots.SelectNotNull(slot => slot.Item)
-                .SelectMany(item => item.Attributes
-                    .Concat(item.ModSlots
-                        .SelectNotNull(mSlot => mSlot.ItemMod)
-                        .SelectMany(mod => mod.Attributes)
-                    )
-                );
+                .SelectMany(item => item.Attributes.Concat(GetAppliedModModifiers(item.Id)));
+        }
+
+        /// <summary>
+        /// Resolves the attribute modifiers contributed by the mods currently applied to the
+        /// equipped item with the given <paramref name="itemId"/>. Applied mods live on the
+        /// player's <see cref="UnlockedItemSlot"/> rather than on the shared, reference-data
+        /// <see cref="Item.ModSlots"/> (whose <see cref="ItemModSlot.ItemMod"/> is always null).
+        /// </summary>
+        private IEnumerable<AttributeModifier> GetAppliedModModifiers(int itemId)
+        {
+            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            if (unlocked is null)
+            {
+                return [];
+            }
+
+            return unlocked.AppliedMods.SelectMany(applied => applied.ItemMod.Attributes);
         }
 
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)
