@@ -36,7 +36,7 @@
 		class:error-status={item.status === 'error'}
 	>
 		{#if item.status === 'done'}
-			{item.durationMs ? `${item.durationMs}ms` : 'done'}
+			{item.durationMs ? `${item.durationMs}ms` : 'cached'}
 		{:else if item.status === 'loading'}
 			loading…
 		{:else if item.status === 'error'}

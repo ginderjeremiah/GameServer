@@ -101,12 +101,10 @@ const enemyDefense = $derived(opponent?.attributes.getValue(EAttribute.Defense) 
 const total = $derived(Math.max(totalDamage - enemyDefense, 0));
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
 const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
-const remainingCd = $derived(
-	Math.abs(adjustedCd - (cdMultiplier + (skill?.renderChargeTime ?? 0)) / 1000 / cdMultiplier)
-);
+const remainingCd = $derived(Math.max(adjustedCd - (skill?.renderChargeTime ?? 0) / 1000 / cdMultiplier, 0));
 const isReady = $derived(remainingCd <= 0.01);
 const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - remainingCd) / adjustedCd) * 100));
-const remainingCdFormatted = $derived(formatNum(remainingCd));
+const remainingCdFormatted = $derived(remainingCd.toFixed(2));
 
 const getMultiplier = (mult: IAttributeMultiplier) => {
 	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;

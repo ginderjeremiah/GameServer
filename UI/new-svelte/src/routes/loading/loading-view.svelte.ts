@@ -156,9 +156,7 @@ const REFERENCE_DATA: RefDataSource[] = [
 	)
 ];
 
-/* How long the "checking cache" beat lingers before loading starts, and the
-   brief pause between completed sets so the manifest reads as a sequence. */
-const CHECKING_DELAY_MS = 500;
+/* How long the brief pause lasts between completed sets so the manifest reads as a sequence. */
 const STEP_DELAY_MS = 80;
 
 // De-duplicates concurrent fetches of the same set (e.g. a re-mount mid-load)
@@ -228,8 +226,6 @@ export class LoadingView {
 			this.finish();
 			return;
 		}
-
-		await delay(CHECKING_DELAY_MS);
 
 		this.phase = 'loading';
 		await this.loadFrom(0);
