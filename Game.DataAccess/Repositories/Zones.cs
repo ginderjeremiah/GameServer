@@ -48,9 +48,7 @@ namespace Game.DataAccess.Repositories
 
         public Zone? LookupZone(int zoneId)
         {
-            return ValidateZoneId(zoneId)
-                ? AllEntities()[zoneId]
-                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+            return ValidateZoneId(zoneId) ? AllEntities()[zoneId] : null;
         }
 
         public bool ValidateZoneId(int zoneId)
