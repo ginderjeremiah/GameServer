@@ -492,7 +492,7 @@ namespace Game.Core.Tests.Progress
             Level = 1,
             IsBoss = isBoss,
             AttributeDistributions = [],
-            Skills = [],
+            AvailableSkills = [],
         };
 
         private static Player MakePlayer(int level = 1, int currentZoneId = 0) => new()

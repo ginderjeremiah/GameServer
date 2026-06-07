@@ -47,7 +47,7 @@ namespace Game.Api.Sockets.Commands
                     Id = result.Enemy.Id,
                     Level = result.Enemy.Level,
                     Seed = result.Seed,
-                    SelectedSkills = result.Enemy.Skills.Select(s => s.Id).ToList(),
+                    SelectedSkills = result.Enemy.BattleSkills.Select(s => s.Id).ToList(),
                     Attributes = result.Enemy.GetAttributeModifiers()
                         .Select(m => new BattlerAttribute
                         {

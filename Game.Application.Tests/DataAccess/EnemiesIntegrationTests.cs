@@ -97,7 +97,7 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Equal(enemy.Id, domainEnemy.Id);
             Assert.Equal(7, domainEnemy.Level);
-            Assert.Contains(domainEnemy.Skills, s => s.Id == skill.Id);
+            Assert.Contains(domainEnemy.AvailableSkills, s => s.Id == skill.Id);
         }
     }
 }

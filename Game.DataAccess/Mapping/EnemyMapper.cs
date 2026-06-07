@@ -55,7 +55,7 @@ namespace Game.DataAccess.Mapping
                         BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
-                Skills = (entity.EnemySkills ?? [])
+                AvailableSkills = (entity.EnemySkills ?? [])
                     .Where(es => skillLookup.ContainsKey(es.SkillId))
                     .Select(es => SkillMapper.ToCore(skillLookup[es.SkillId]))
                     .ToList(),

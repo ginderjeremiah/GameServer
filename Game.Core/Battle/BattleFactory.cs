@@ -14,7 +14,7 @@ namespace Game.Core.Battle
         /// [<paramref name="levelMin"/>, <paramref name="levelMax"/>] (inclusive): rolls the encounter
         /// level, resolves the enemy to fight at that level via <paramref name="resolveEnemy"/>, and
         /// randomly selects its battle skills. The chosen loadout lives on the returned enemy
-        /// (<see cref="Enemy.Skills"/>) for the caller to snapshot.
+        /// (<see cref="Enemy.BattleSkills"/>) for the caller to snapshot.
         /// </summary>
         /// <param name="resolveEnemy">
         /// Supplies the enemy for the rolled level. The caller provides this so the domain stays

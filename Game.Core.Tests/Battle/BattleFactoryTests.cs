@@ -52,7 +52,7 @@ namespace Game.Core.Tests.Battle
         {
             var enemy = _factory.CreateBattleEnemy(1, 1, resolveEnemy: level => MakeEnemyAtLevel(level, skillCount: 6));
 
-            Assert.Equal(4, enemy.Skills.Count);
+            Assert.Equal(4, enemy.BattleSkills.Count);
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace Game.Core.Tests.Battle
             IsBoss = false,
             Level = level,
             AttributeDistributions = [],
-            Skills = [.. Enumerable.Range(0, skillCount).Select(MakeSkill)],
+            AvailableSkills = [.. Enumerable.Range(0, skillCount).Select(MakeSkill)],
         };
 
         private static Skill MakeSkill(int id) => new()

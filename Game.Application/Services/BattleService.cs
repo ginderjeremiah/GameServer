@@ -44,7 +44,7 @@ namespace Game.Application.Services
                 zoneEntity.LevelMax,
                 level => _enemies.GetRandomDomainEnemy(zoneId, level));
 
-            var enemySkillIds = enemy.Skills.Select(skill => skill.Id).ToList();
+            var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var snapshot = _battleSnapshotService.CreateSnapshot(player);
 
             state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot);
@@ -174,7 +174,7 @@ namespace Game.Application.Services
             var playerBattler = _battleSnapshotService.CreateFromSnapshot(snapshot);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
-                enemy.Skills,
+                enemy.BattleSkills,
                 enemy.Level);
 
             var simulator = new BattleSimulator(playerBattler, enemyBattler);
