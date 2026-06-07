@@ -57,11 +57,12 @@ export const getAccessToken = (): string | null => getTokens()?.accessToken ?? n
 export const getRefreshToken = (): string | null => getTokens()?.refreshToken ?? null;
 
 /**
- * Decodes the `exp` claim (seconds since the Unix epoch) from the stored access token without
- * verifying its signature — that is the server's job. Used to refresh the token pre-emptively, just
- * before it expires, rather than waiting for a request to be rejected with a 401.
+ * Decodes the (unverified) payload of the stored JWT access token. Verifying the signature is the
+ * server's job; the client only reads a couple of claims (expiry, roles) to drive pre-emptive
+ * refresh and role-based UI gating. Returns null when there is no token, it is not a well-formed
+ * JWT, or the payload can't be parsed.
  */
-export const getAccessTokenExpiry = (): number | null => {
+const decodeAccessTokenPayload = (): Record<string, unknown> | null => {
 	const token = getAccessToken();
 	if (!token) {
 		return null;
@@ -74,9 +75,35 @@ export const getAccessTokenExpiry = (): number | null => {
 
 	try {
 		const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-		const payload = JSON.parse(atob(base64)) as { exp?: number };
-		return typeof payload.exp === 'number' ? payload.exp : null;
+		return JSON.parse(atob(base64)) as Record<string, unknown>;
 	} catch {
 		return null;
 	}
+};
+
+/**
+ * Decodes the `exp` claim (seconds since the Unix epoch) from the stored access token. Used to
+ * refresh the token pre-emptively, just before it expires, rather than waiting for a request to be
+ * rejected with a 401.
+ */
+export const getAccessTokenExpiry = (): number | null => {
+	const exp = decodeAccessTokenPayload()?.exp;
+	return typeof exp === 'number' ? exp : null;
+};
+
+/**
+ * Reads the role claim(s) from the stored access token. The backend issues one `role` claim per
+ * granted role; the standard JWT serialization collapses a single role to a string and multiple
+ * roles to an array, so both shapes are normalized to a string array here. Returns an empty array
+ * when not logged in or the token carries no roles.
+ */
+export const getRoles = (): string[] => {
+	const role = decodeAccessTokenPayload()?.role;
+	if (typeof role === 'string') {
+		return [role];
+	}
+	if (Array.isArray(role)) {
+		return role.filter((r): r is string => typeof r === 'string');
+	}
+	return [];
 };

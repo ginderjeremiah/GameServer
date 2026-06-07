@@ -7,3 +7,4 @@ export { default as Statistics } from './stats/Statistics.svelte';
 export { default as AttributeBreakdown } from './attribute-breakdown/AttributeBreakdown.svelte';
 export { default as PlaceholderScreen } from './PlaceholderScreen.svelte';
 export * from './types.ts';
+export * from './screen-defs.ts';

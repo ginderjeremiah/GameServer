@@ -61,6 +61,18 @@ export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 }
 
 /**
+ * Like {@link createAccountAndStartGame}, but the account is provisioned with the Admin role so it
+ * can reach the (role-gated) admin area. The admin area is gated on the frontend (the Admin nav
+ * entry + the /admin route check the role) and the backend (every admin endpoint requires it), and
+ * the signup flow grants no roles, so the e2e DB seed auto-grants Admin to any account whose
+ * username starts with `e2eadmin` (see `e2e-seed.sql`). Each call still creates a unique account,
+ * so admin tests stay parallel-safe (no shared session getting replaced out from under them).
+ */
+export async function createAdminAndStartGame(page: Page) {
+	return createAccountAndStartGame(page, 'e2eadmin');
+}
+
+/**
  * Open the admin route from the in-game sidebar. Two things make a naive click flaky on the slower
  * engines (Firefox/WebKit):
  *   1. The /game page mounts the battle/render engine and opens its socket on entry, so a click

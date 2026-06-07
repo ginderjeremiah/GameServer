@@ -1,25 +1,27 @@
-<div class="admin-shell" data-testid="admin-screen">
-	<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
+{#if authorized}
+	<div class="admin-shell" data-testid="admin-screen">
+		<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
 
-	<div class="admin-workspace">
-		{#if reference.loaded && activeEntity}
-			{#key active}
-				<Workbench entity={activeEntity} groupLabel={groupLabelFor(active)} />
-			{/key}
-		{:else}
-			<Loading loading={true} delay={50} />
-		{/if}
+		<div class="admin-workspace">
+			{#if reference.loaded && activeEntity}
+				{#key active}
+					<Workbench entity={activeEntity} groupLabel={groupLabelFor(active)} />
+				{/key}
+			{:else}
+				<Loading loading={true} delay={50} />
+			{/if}
+		</div>
+
+		<AdminSidebar
+			tools={adminTools}
+			groups={adminGroups}
+			{active}
+			onNavigate={handleNavigate}
+			onBackToGame={backToGame}
+			bind:pinned={sidebarPinned}
+		/>
 	</div>
-
-	<AdminSidebar
-		tools={adminTools}
-		groups={adminGroups}
-		{active}
-		onNavigate={handleNavigate}
-		onBackToGame={backToGame}
-		bind:pinned={sidebarPinned}
-	/>
-</div>
+{/if}
 
 <script lang="ts">
 import { onMount } from 'svelte';
@@ -31,17 +33,23 @@ import Workbench from './workbench/Workbench.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
 import { adminGroups, adminTools } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
+import { ensureAdminAccess } from './admin-access';
 import { toastError } from '$stores';
 
 let active = $state('enemies');
 let sidebarPinned = $state(false);
+// Gates rendering until the client-side admin-role check passes. Starts false so the server render
+// (no token available) shows nothing, and a non-admin who deep-links here is redirected before the
+// workbench mounts or its reference data loads.
+let authorized = $state(false);
 
 const activeEntity = $derived(entityByKey(active));
 
-// Load the shared reference catalogues (used by every entity's select options,
-// tag UI, and derived spawn shares) before rendering any workbench.
+// Guard the route to Admins, then load the shared reference catalogues (used by every entity's
+// select options, tag UI, and derived spawn shares) before rendering any workbench.
 onMount(() => {
-	if (!reference.loaded) {
+	authorized = ensureAdminAccess();
+	if (authorized && !reference.loaded) {
 		reference.load().catch((ex) => {
 			toastError(ex instanceof Error ? ex.message : 'Failed to load admin reference data.');
 		});

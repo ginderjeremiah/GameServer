@@ -4,13 +4,18 @@ import {
 	getAccessToken,
 	getAccessTokenExpiry,
 	getRefreshToken,
+	getRoles,
 	getTokens,
 	setTokens
 } from '$lib/api/token-store';
 
+function makeToken(payload: Record<string, unknown>): string {
+	const body = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	return `header.${body}.signature`;
+}
+
 function makeAccessToken(exp: number): string {
-	const payload = btoa(JSON.stringify({ exp })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-	return `header.${payload}.signature`;
+	return makeToken({ exp });
 }
 
 describe('token-store', () => {
@@ -73,5 +78,39 @@ describe('token-store', () => {
 
 	it('returns null expiry when not logged in', () => {
 		expect(getAccessTokenExpiry()).toBeNull();
+	});
+
+	it('returns an empty role list when not logged in', () => {
+		expect(getRoles()).toEqual([]);
+	});
+
+	it('returns an empty role list for a non-JWT access token', () => {
+		setTokens({ accessToken: 'opaque', refreshToken: 'r' });
+
+		expect(getRoles()).toEqual([]);
+	});
+
+	it('returns an empty role list when the token carries no role claim', () => {
+		setTokens({ accessToken: makeToken({ sub: '1' }), refreshToken: 'r' });
+
+		expect(getRoles()).toEqual([]);
+	});
+
+	it('decodes a single string role claim into a one-element array', () => {
+		setTokens({ accessToken: makeToken({ role: 'Admin' }), refreshToken: 'r' });
+
+		expect(getRoles()).toEqual(['Admin']);
+	});
+
+	it('decodes an array role claim', () => {
+		setTokens({ accessToken: makeToken({ role: ['Admin', 'Moderator'] }), refreshToken: 'r' });
+
+		expect(getRoles()).toEqual(['Admin', 'Moderator']);
+	});
+
+	it('ignores non-string entries in an array role claim', () => {
+		setTokens({ accessToken: makeToken({ role: ['Admin', 5, null] }), refreshToken: 'r' });
+
+		expect(getRoles()).toEqual(['Admin']);
 	});
 });

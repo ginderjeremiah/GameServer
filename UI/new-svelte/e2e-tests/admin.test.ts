@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { createAccountAndStartGame, gotoAdmin } from './helpers';
+import { createAdminAndStartGame, gotoAdmin } from './helpers';
 
 test.describe('Admin workbench', () => {
 	test('renders the workbench with seeded records', async ({ page }) => {
-		await createAccountAndStartGame(page, 'ad');
+		await createAdminAndStartGame(page);
 		await gotoAdmin(page);
 
 		// The workbench opens on the Enemies catalogue, populated from seed reference data.
@@ -12,7 +12,7 @@ test.describe('Admin workbench', () => {
 	});
 
 	test('switching entities via the sidebar swaps the active catalogue', async ({ page }) => {
-		await createAccountAndStartGame(page, 'ad');
+		await createAdminAndStartGame(page);
 		await gotoAdmin(page);
 		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 
@@ -23,7 +23,7 @@ test.describe('Admin workbench', () => {
 	});
 
 	test('New adds an unsaved record to the catalogue', async ({ page }) => {
-		await createAccountAndStartGame(page, 'ad');
+		await createAdminAndStartGame(page);
 		await gotoAdmin(page);
 		await expect(page.getByTestId('workbench-row').first()).toBeVisible({ timeout: 10000 });
 
