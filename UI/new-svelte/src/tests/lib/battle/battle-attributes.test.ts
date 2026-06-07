@@ -34,7 +34,7 @@ describe('BattleAttributes', () => {
 		});
 	});
 
-	describe('calculateDerivedStats', () => {
+	describe('derived stat computation', () => {
 		it('calculates MaxHealth = 50 + 20*End + 5*Str', () => {
 			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10], [EAttribute.Endurance, 20]));
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50 + 20 * 20 + 5 * 10);

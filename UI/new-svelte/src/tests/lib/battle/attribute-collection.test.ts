@@ -126,11 +126,11 @@ describe('groupBySource', () => {
 });
 
 /* ── parity with the battle model ─────────────────────────────────────────────
-   The breakdown must never disagree with the numbers the battle simulation
-   actually produces. `BattleAttributes` is the frontend battle calculator; this
-   asserts the modifier pipeline yields identical totals for the implemented
-   attributes given the same additive inputs. If a formula constant drifts in one
-   place but not the other, this fails. */
+   `BattleAttributes` is now a thin wrapper over the same `computeAttributes`
+   pipeline, so formula constants live in one place (`STATIC_ATTRIBUTE_MODIFIERS`).
+   These cases serve as a regression guard: they verify that `BattleAttributes`
+   delegates correctly and that changes to the pipeline or the static modifiers
+   don't silently break the battle simulation's derived-stat totals. */
 describe('parity with BattleAttributes', () => {
 	const IMPLEMENTED: EAttribute[] = [
 		EAttribute.Strength,
