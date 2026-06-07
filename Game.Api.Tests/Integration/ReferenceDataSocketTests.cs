@@ -1,6 +1,7 @@
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
 using Game.Api.Models.Progress;
+using Game.Api.Models.ReferenceData;
 using Game.Api.Models.Skills;
 using Game.Api.Models.Zones;
 using Game.Infrastructure.Database;
@@ -175,6 +176,40 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.NotEmpty(response.Data);
+        }
+
+        [Fact]
+        public async Task GetReferenceDataVersions_ReturnsANonEmptyVersionForEveryReferenceDataSet()
+        {
+            var userId = await SeedReferenceDataAndLoginAsync();
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<ReferenceDataVersion>>("GetReferenceDataVersions");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            // One entry per Get* reference-data command the loading screen pulls.
+            Assert.Equal(
+                ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetEnemies", "GetItemMods",
+                 "GetItems", "GetSkills", "GetStatisticTypes", "GetZones"],
+                response.Data.Select(v => v.Command).OrderBy(c => c, StringComparer.Ordinal));
+            Assert.All(response.Data, v => Assert.False(string.IsNullOrEmpty(v.Version)));
+        }
+
+        [Fact]
+        public async Task GetReferenceDataVersions_ReturnsStableVersionsForUnchangedData()
+        {
+            var userId = await SeedReferenceDataAndLoginAsync();
+            await using var socketClient = await ConnectAsync(userId);
+
+            var first = await socketClient.SendCommandAsync<List<ReferenceDataVersion>>("GetReferenceDataVersions");
+            var second = await socketClient.SendCommandAsync<List<ReferenceDataVersion>>("GetReferenceDataVersions");
+
+            Assert.Null(first.Error);
+            Assert.Null(second.Error);
+            Assert.Equal(
+                first.Data.Select(v => (v.Command, v.Version)),
+                second.Data.Select(v => (v.Command, v.Version)));
         }
     }
 }

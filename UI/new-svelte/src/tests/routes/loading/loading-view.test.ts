@@ -2,17 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted spies/state shared by the mocks below. `staticData` stands in for the
 // reactive store; each test starts it empty so every set begins "pending".
-const { goto, resolve, get, staticData } = vi.hoisted(() => ({
+const { goto, resolve, sendSocketCommand, staticData, readReferenceCache, writeReferenceCache } = vi.hoisted(() => ({
 	goto: vi.fn(),
 	resolve: vi.fn((p: string) => p),
-	get: vi.fn(),
-	staticData: {} as Record<string, unknown>
+	sendSocketCommand: vi.fn(),
+	staticData: {} as Record<string, unknown>,
+	readReferenceCache: vi.fn(),
+	writeReferenceCache: vi.fn()
 }));
 
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve }));
-vi.mock('$lib/api', () => ({ ApiRequest: { get } }));
+vi.mock('$lib/api', () => ({ apiSocket: { sendSocketCommand } }));
 vi.mock('$stores', () => ({ staticData }));
+vi.mock('$routes/loading/reference-cache', () => ({ readReferenceCache, writeReferenceCache }));
 
 // The module keeps a process-wide in-flight cache; reset modules between tests
 // so a key resolved in one test doesn't satisfy another.
@@ -34,16 +37,47 @@ const SETS = [
 	'statisticTypes'
 ];
 
+const COMMANDS = [
+	'GetZones',
+	'GetEnemies',
+	'GetItems',
+	'GetSkills',
+	'GetItemMods',
+	'GetAttributes',
+	'GetChallenges',
+	'GetChallengeTypes',
+	'GetStatisticTypes'
+];
+
+/** Builds the GetReferenceDataVersions payload, defaulting every set to "v1". */
+const versionsResponse = (overrides: Record<string, string> = {}) => ({
+	data: COMMANDS.map((command) => ({ command, version: overrides[command] ?? 'v1' }))
+});
+
+/** Versions resolve from the map; every data command resolves to an empty array. */
+const respondWithVersions = (overrides: Record<string, string> = {}) => {
+	sendSocketCommand.mockImplementation((command: string) => {
+		if (command === 'GetReferenceDataVersions') {
+			return Promise.resolve(versionsResponse(overrides));
+		}
+		return Promise.resolve({ data: [] });
+	});
+};
+
+const dataCommandCalls = () =>
+	sendSocketCommand.mock.calls.map((c) => c[0]).filter((name) => name !== 'GetReferenceDataVersions');
+
 beforeEach(() => {
 	vi.clearAllMocks();
 	for (const k of Object.keys(staticData)) {
 		delete staticData[k];
 	}
-	get.mockResolvedValue([]);
+	readReferenceCache.mockReturnValue(null);
+	respondWithVersions();
 });
 
 describe('LoadingView', () => {
-	it('builds the manifest and loads every set to done', async () => {
+	it('builds the manifest and loads every set over the socket, caching each one', async () => {
 		const view = await loadView();
 		vi.useFakeTimers();
 		const run = view.start();
@@ -56,14 +90,19 @@ describe('LoadingView', () => {
 		expect(view.items.every((i) => i.status === 'done')).toBe(true);
 		expect(view.completed).toBe(SETS.length);
 		expect(view.progressPct).toBe(100);
-		expect(get).toHaveBeenCalledTimes(SETS.length);
-		// Each set populated its store slot.
+
+		// The version check ran, then each set was fetched over its socket command.
+		expect(sendSocketCommand).toHaveBeenCalledWith('GetReferenceDataVersions');
+		expect(dataCommandCalls()).toEqual(COMMANDS);
+
+		// Each freshly-loaded set was written to the cache under its server version.
+		expect(writeReferenceCache).toHaveBeenCalledTimes(SETS.length);
+		expect(writeReferenceCache).toHaveBeenCalledWith('zones', 'v1', []);
 		expect(staticData.zones).toEqual([]);
-		expect(staticData.challengeTypes).toEqual([]);
 		expect(staticData.statisticTypes).toEqual([]);
 	});
 
-	it('skips straight to done without fetching when everything is cached', async () => {
+	it('skips straight to done without any socket call when everything is already in memory', async () => {
 		for (const k of SETS) {
 			staticData[k] = [];
 		}
@@ -72,13 +111,112 @@ describe('LoadingView', () => {
 
 		expect(view.phase).toBe('done');
 		expect(view.activeIndex).toBe(SETS.length);
-		expect(get).not.toHaveBeenCalled();
+		expect(sendSocketCommand).not.toHaveBeenCalled();
 	});
 
-	it('enters the error phase on a failed fetch and recovers on retry', async () => {
-		get.mockRejectedValueOnce(new Error('boom'));
+	it('hydrates from the cache and skips per-set fetches when versions match', async () => {
+		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
 		const view = await loadView();
+		await view.start();
 
+		expect(view.phase).toBe('done');
+		expect(view.items.every((i) => i.status === 'done')).toBe(true);
+
+		// Only the version check went over the socket — no per-set fetch.
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(dataCommandCalls()).toEqual([]);
+		expect(staticData.zones).toEqual(['cached-zones']);
+		expect(staticData.statisticTypes).toEqual(['cached-statisticTypes']);
+		expect(writeReferenceCache).not.toHaveBeenCalled();
+	});
+
+	it('re-fetches only the sets whose version changed', async () => {
+		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
+		respondWithVersions({ GetItems: 'v2' });
+
+		const view = await loadView();
+		vi.useFakeTimers();
+		const run = view.start();
+		await vi.runAllTimersAsync();
+		await run;
+		vi.useRealTimers();
+
+		expect(view.phase).toBe('done');
+		// Only the stale "items" set was fetched fresh; the rest hydrated from cache.
+		expect(dataCommandCalls()).toEqual(['GetItems']);
+		expect(staticData.items).toEqual([]);
+		expect(staticData.zones).toEqual(['cached-zones']);
+		// The refreshed set was re-cached under its new version.
+		expect(writeReferenceCache).toHaveBeenCalledTimes(1);
+		expect(writeReferenceCache).toHaveBeenCalledWith('items', 'v2', []);
+	});
+
+	it('re-fetches a set the server omits from the versions response', async () => {
+		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
+		// The server reports versions for every set except GetZones (e.g. an older instance without it).
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.resolve({
+					data: COMMANDS.filter((c) => c !== 'GetZones').map((c) => ({ command: c, version: 'v1' }))
+				});
+			}
+			return Promise.resolve({ data: ['fresh'] });
+		});
+
+		const view = await loadView();
+		vi.useFakeTimers();
+		const run = view.start();
+		await vi.runAllTimersAsync();
+		await run;
+		vi.useRealTimers();
+
+		expect(view.phase).toBe('done');
+		// The set with no reported version can't be cache-validated, so it's fetched fresh; the rest hydrate.
+		expect(dataCommandCalls()).toEqual(['GetZones']);
+		expect(staticData.zones).toEqual(['fresh']);
+		expect(staticData.enemies).toEqual(['cached-enemies']);
+		// With no server version for it, the freshly-loaded set isn't written to the cache.
+		expect(writeReferenceCache).not.toHaveBeenCalled();
+	});
+
+	it('loads everything fresh and bypasses the cache when the version check fails', async () => {
+		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.reject(new Error('offline'));
+			}
+			return Promise.resolve({ data: [] });
+		});
+
+		const view = await loadView();
+		vi.useFakeTimers();
+		const run = view.start();
+		await vi.runAllTimersAsync();
+		await run;
+		vi.useRealTimers();
+
+		expect(view.phase).toBe('done');
+		// Every set fetched fresh; the cache was neither read for hydration nor written (no versions).
+		expect(dataCommandCalls()).toEqual(COMMANDS);
+		expect(readReferenceCache).not.toHaveBeenCalled();
+		expect(writeReferenceCache).not.toHaveBeenCalled();
+		expect(staticData.zones).toEqual([]);
+	});
+
+	it('enters the error phase on a failed set load and recovers on retry', async () => {
+		let failZonesOnce = true;
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.resolve(versionsResponse());
+			}
+			if (command === 'GetZones' && failZonesOnce) {
+				failZonesOnce = false;
+				return Promise.reject(new Error('boom'));
+			}
+			return Promise.resolve({ data: [] });
+		});
+
+		const view = await loadView();
 		vi.useFakeTimers();
 		const run = view.start();
 		await vi.runAllTimersAsync();
@@ -100,10 +238,18 @@ describe('LoadingView', () => {
 		expect(view.items.every((i) => i.status === 'done')).toBe(true);
 	});
 
-	it('falls back to a generic message when a fetch rejects without an Error', async () => {
-		get.mockRejectedValueOnce('nope');
-		const view = await loadView();
+	it('falls back to a generic message when a set load rejects without an Error', async () => {
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.resolve(versionsResponse());
+			}
+			if (command === 'GetZones') {
+				return Promise.reject('nope');
+			}
+			return Promise.resolve({ data: [] });
+		});
 
+		const view = await loadView();
 		vi.useFakeTimers();
 		const run = view.start();
 		await vi.runAllTimersAsync();
@@ -112,6 +258,28 @@ describe('LoadingView', () => {
 
 		expect(view.phase).toBe('error');
 		expect(view.currentItem?.error).toBe('Network error — could not reach server.');
+	});
+
+	it('surfaces a timeout error when a set load never resolves', async () => {
+		sendSocketCommand.mockImplementation((command: string) => {
+			if (command === 'GetReferenceDataVersions') {
+				return Promise.resolve(versionsResponse());
+			}
+			if (command === 'GetZones') {
+				return new Promise(() => {}); // never settles
+			}
+			return Promise.resolve({ data: [] });
+		});
+
+		const view = await loadView();
+		vi.useFakeTimers();
+		const run = view.start();
+		await vi.runAllTimersAsync(); // advances past the socket timeout
+		await run;
+		vi.useRealTimers();
+
+		expect(view.phase).toBe('error');
+		expect(view.currentItem?.error).toBe('Timed out waiting for the server.');
 	});
 
 	it('navigates to the game only once loading is done', async () => {
