@@ -5,9 +5,13 @@
 	login/loading chrome; `pulse-glow` is the shared keyframe in styles/common.scss (and is collapsed
 	by the global reduced-motion rule there). -->
 <div class="boot-splash" data-testid="boot-splash" role="status" aria-live="polite">
-	<div class="diamond" aria-hidden="true"></div>
+	<DiamondMark pulsing />
 	<span class="sr-only">Restoring your session…</span>
 </div>
+
+<script lang="ts">
+import DiamondMark from '$components/DiamondMark.svelte';
+</script>
 
 <style lang="scss">
 .boot-splash {
@@ -16,15 +20,6 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-}
-
-.diamond {
-	width: 16px;
-	height: 16px;
-	transform: rotate(45deg);
-	border: 1px solid var(--accent);
-	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
-	animation: pulse-glow 1.6s ease-in-out infinite;
 }
 
 // Accessible label for screen readers without showing visible text.
