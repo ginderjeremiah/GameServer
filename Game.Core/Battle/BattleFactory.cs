@@ -13,17 +13,18 @@ namespace Game.Core.Battle
         /// Creates a battle-ready enemy for a zone whose level range is
         /// [<paramref name="levelMin"/>, <paramref name="levelMax"/>] (inclusive): rolls the encounter
         /// level, resolves the enemy to fight at that level via <paramref name="resolveEnemy"/>, and
-        /// selects its battle skills deterministically from <paramref name="seed"/>.
+        /// randomly selects its battle skills. The chosen loadout lives on the returned enemy
+        /// (<see cref="Enemy.Skills"/>) for the caller to snapshot.
         /// </summary>
         /// <param name="resolveEnemy">
         /// Supplies the enemy for the rolled level. The caller provides this so the domain stays
         /// independent of the data-access layer that owns enemy selection.
         /// </param>
-        public Enemy CreateBattleEnemy(int levelMin, int levelMax, uint seed, Func<int, Enemy> resolveEnemy)
+        public Enemy CreateBattleEnemy(int levelMin, int levelMax, Func<int, Enemy> resolveEnemy)
         {
             var level = Random.Shared.Next(levelMin, levelMax + 1);
             var enemy = resolveEnemy(level);
-            enemy.SelectBattleSkills(seed);
+            enemy.SelectBattleSkills();
             return enemy;
         }
     }

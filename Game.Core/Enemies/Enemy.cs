@@ -1,6 +1,5 @@
 ﻿using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
-using Game.Core.Battle;
 using Game.Core.Skills;
 
 namespace Game.Core.Enemies
@@ -26,15 +25,26 @@ namespace Game.Core.Enemies
         }
 
         /// <summary>
-        /// Selects this enemy's loadout for a battle: up to <see cref="MaxBattleSkills"/> skills drawn
-        /// from its available skills. The selection is derived deterministically from <paramref name="seed"/>,
-        /// so the same seed always produces the same loadout. This lets the battle be reconstructed for
-        /// validation and keeps the skills sent to the client in step with the server's re-simulation.
+        /// Randomly selects this enemy's loadout for a new encounter: up to <see cref="MaxBattleSkills"/>
+        /// skills drawn from its available skills. The chosen loadout is the source of truth — it is
+        /// snapshotted and sent to the client — so the selection deliberately uses ambient randomness
+        /// rather than the battle seed, keeping that seed reserved as the battle simulation's RNG source
+        /// (identical on client and server).
         /// </summary>
-        public void SelectBattleSkills(uint seed)
+        public void SelectBattleSkills()
         {
-            var rng = new Mulberry32(seed);
-            Skills = Skills.OrderBy(_ => rng.Next()).Take(MaxBattleSkills).ToList();
+            Skills = [.. Skills.OrderBy(_ => Random.Shared.Next()).Take(MaxBattleSkills)];
+        }
+
+        /// <summary>
+        /// Restores a previously-selected battle loadout from its <paramref name="skillIds"/> (in order),
+        /// resolved against this enemy's available skills. Used to reconstruct the exact same encounter
+        /// when a battle's result is validated server-side.
+        /// </summary>
+        public void SetBattleSkills(IReadOnlyList<int> skillIds)
+        {
+            var available = Skills.ToDictionary(skill => skill.Id);
+            Skills = [.. skillIds.Select(id => available[id])];
         }
     }
 }

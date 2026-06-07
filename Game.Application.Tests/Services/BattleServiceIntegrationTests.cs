@@ -46,7 +46,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task StartBattle_SelectsEnemySkillsFromReturnedSeed()
+        public async Task StartBattle_SnapshotsEnemyLoadoutSentToClient()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -76,14 +76,16 @@ namespace Game.Application.Tests.Services
 
             var result = await battleService.StartBattle(player, state, zoneId: zone.Id);
 
-            // The loadout sent to the client is capped and must be exactly what re-deriving from the
-            // returned seed produces — otherwise the server's battle validation (which re-derives the
-            // skills from the stored seed) would use a different skill set than the client simulated with.
+            // The loadout is capped and snapshotted; the snapshot must equal what the client received,
+            // so the server validates the battle against the exact same skills the client simulated with.
             Assert.Equal(4, result.Enemy.Skills.Count);
+            Assert.NotNull(state.ActiveEnemySkillIds);
+            Assert.Equal(result.Enemy.Skills.Select(s => s.Id), state.ActiveEnemySkillIds);
 
+            // Reconstructing a fresh enemy from the snapshot reproduces the same loadout (the validation path).
             var reconstructed = enemies.GetDomainEnemy(result.Enemy.Id, result.Enemy.Level);
             Assert.NotNull(reconstructed);
-            reconstructed.SelectBattleSkills(result.Seed);
+            reconstructed.SetBattleSkills(state.ActiveEnemySkillIds);
 
             Assert.Equal(
                 result.Enemy.Skills.Select(s => s.Id),

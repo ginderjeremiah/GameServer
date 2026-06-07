@@ -11,7 +11,7 @@ namespace Game.Core.Tests.Enemies
         {
             var enemy = MakeEnemy(Skills(6));
 
-            enemy.SelectBattleSkills(12345);
+            enemy.SelectBattleSkills();
 
             Assert.Equal(4, enemy.Skills.Count);
         }
@@ -21,7 +21,7 @@ namespace Game.Core.Tests.Enemies
         {
             var enemy = MakeEnemy(Skills(3));
 
-            enemy.SelectBattleSkills(12345);
+            enemy.SelectBattleSkills();
 
             Assert.Equal([0, 1, 2], enemy.Skills.Select(s => s.Id).OrderBy(id => id));
         }
@@ -33,22 +33,34 @@ namespace Game.Core.Tests.Enemies
             var availableIds = available.Select(s => s.Id).ToHashSet();
             var enemy = MakeEnemy(available);
 
-            enemy.SelectBattleSkills(999);
+            enemy.SelectBattleSkills();
 
             Assert.All(enemy.Skills, s => Assert.Contains(s.Id, availableIds));
             Assert.Equal(enemy.Skills.Count, enemy.Skills.Select(s => s.Id).Distinct().Count());
         }
 
         [Fact]
-        public void SelectBattleSkills_SameSeed_ProducesSameLoadout()
+        public void SetBattleSkills_NarrowsToGivenLoadoutInOrder()
         {
-            var enemyA = MakeEnemy(Skills(8));
-            var enemyB = MakeEnemy(Skills(8));
+            var enemy = MakeEnemy(Skills(8));
 
-            enemyA.SelectBattleSkills(42);
-            enemyB.SelectBattleSkills(42);
+            enemy.SetBattleSkills([5, 1, 7]);
 
-            Assert.Equal(enemyA.Skills.Select(s => s.Id), enemyB.Skills.Select(s => s.Id));
+            Assert.Equal([5, 1, 7], enemy.Skills.Select(s => s.Id));
+        }
+
+        [Fact]
+        public void SetBattleSkills_RoundTripsASelectedLoadout()
+        {
+            var enemy = MakeEnemy(Skills(8));
+            enemy.SelectBattleSkills();
+            var selectedIds = enemy.Skills.Select(s => s.Id).ToList();
+
+            // A freshly-built enemy restored from the snapshot reproduces the same loadout.
+            var restored = MakeEnemy(Skills(8));
+            restored.SetBattleSkills(selectedIds);
+
+            Assert.Equal(selectedIds, restored.Skills.Select(s => s.Id));
         }
 
         private static List<Skill> Skills(int count) =>

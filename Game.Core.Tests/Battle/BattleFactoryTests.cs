@@ -18,7 +18,7 @@ namespace Game.Core.Tests.Battle
             // The level is rolled at random, so sample enough times to exercise the full range.
             for (var i = 0; i < 1000; i++)
             {
-                var enemy = _factory.CreateBattleEnemy(min, max, seed: (uint)i, resolveEnemy: MakeEnemyAtLevel);
+                var enemy = _factory.CreateBattleEnemy(min, max, resolveEnemy: MakeEnemyAtLevel);
 
                 Assert.InRange(enemy.Level, min, max);
             }
@@ -27,7 +27,7 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void CreateBattleEnemy_SingleLevelRange_UsesThatLevel()
         {
-            var enemy = _factory.CreateBattleEnemy(5, 5, seed: 1, resolveEnemy: MakeEnemyAtLevel);
+            var enemy = _factory.CreateBattleEnemy(5, 5, resolveEnemy: MakeEnemyAtLevel);
 
             Assert.Equal(5, enemy.Level);
         }
@@ -37,7 +37,7 @@ namespace Game.Core.Tests.Battle
         {
             int? resolvedLevel = null;
 
-            var enemy = _factory.CreateBattleEnemy(2, 2, seed: 1, resolveEnemy: level =>
+            var enemy = _factory.CreateBattleEnemy(2, 2, resolveEnemy: level =>
             {
                 resolvedLevel = level;
                 return MakeEnemyAtLevel(level);
@@ -50,7 +50,7 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void CreateBattleEnemy_SelectsBattleSkillsForResolvedEnemy()
         {
-            var enemy = _factory.CreateBattleEnemy(1, 1, seed: 123, resolveEnemy: level => MakeEnemyAtLevel(level, skillCount: 6));
+            var enemy = _factory.CreateBattleEnemy(1, 1, resolveEnemy: level => MakeEnemyAtLevel(level, skillCount: 6));
 
             Assert.Equal(4, enemy.Skills.Count);
         }
@@ -60,7 +60,7 @@ namespace Game.Core.Tests.Battle
         {
             var resolved = MakeEnemyAtLevel(1, skillCount: 2);
 
-            var returned = _factory.CreateBattleEnemy(1, 1, seed: 1, resolveEnemy: _ => resolved);
+            var returned = _factory.CreateBattleEnemy(1, 1, resolveEnemy: _ => resolved);
 
             Assert.Same(resolved, returned);
         }
