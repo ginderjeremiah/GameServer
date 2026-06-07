@@ -113,9 +113,10 @@ namespace Game.Api.Controllers
         {
             return status switch
             {
+                LoginStatus.InvalidCredentials => "Invalid username or password",
                 LoginStatus.NoPlayer => "User has no player characters",
                 LoginStatus.PlayerDataNotFound => "Player data not found",
-                _ => "Invalid username or password",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }
 
