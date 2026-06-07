@@ -1,3 +1,4 @@
+using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Enemies;
@@ -16,7 +17,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 100, endurance: 100);
             var enemy = MakeEnemy(statTotal: 10);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
@@ -28,7 +29,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 1, endurance: 1);
             var enemy = MakeEnemy(statTotal: 200);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.False(result.Victory);
@@ -40,7 +41,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 100, endurance: 100);
             var enemy = MakeEnemy(statTotal: 10);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.TotalMs > 0);
@@ -52,7 +53,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 10, endurance: 10, skills: []);
             var enemy = MakeEnemy(statTotal: 10, skills: []);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.False(result.Victory);
@@ -66,7 +67,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 50, endurance: 50);
             var enemy = MakeEnemy(statTotal: 20);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.Equal(0, result.TotalMs % 40);
@@ -78,7 +79,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 100, endurance: 100);
             var enemy = MakeEnemy(statTotal: 10);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
@@ -93,7 +94,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(strength: 50, endurance: 50);
             var enemy = MakeEnemy(statTotal: 50);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate(maxMs: 200);
 
             Assert.True(result.TotalMs <= 200);
@@ -148,7 +149,7 @@ namespace Game.Core.Tests.Battle
             };
         }
 
-        private static Enemy MakeEnemy(double statTotal, List<Skill>? skills = null)
+        private static Battler MakeEnemy(double statTotal, List<Skill>? skills = null)
         {
             var defaultSkills = skills ?? [
                 new Skill
@@ -170,13 +171,13 @@ namespace Game.Core.Tests.Battle
                 Level = 1,
                 AttributeDistributions =
                 [
-                    new Core.Attributes.AttributeDistribution
+                    new AttributeDistribution
                     {
                         AttributeId = EAttribute.Strength,
                         BaseAmount = (decimal)(statTotal / 2),
                         AmountPerLevel = 0,
                     },
-                    new Core.Attributes.AttributeDistribution
+                    new AttributeDistribution
                     {
                         AttributeId = EAttribute.Endurance,
                         BaseAmount = (decimal)(statTotal / 2),
@@ -186,7 +187,7 @@ namespace Game.Core.Tests.Battle
                 AvailableSkills = defaultSkills,
             };
             enemy.SetBattleSkills(defaultSkills.Select(s => s.Id).ToList());
-            return enemy;
+            return new Battler(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
         }
     }
 }

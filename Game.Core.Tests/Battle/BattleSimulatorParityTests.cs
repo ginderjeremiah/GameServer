@@ -60,7 +60,7 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [enemySkill]);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.Victory, "Player should win this matchup.");
@@ -123,7 +123,7 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [enemySkill]);
 
-            var sim = new BattleSimulator(new Battler(player), new Battler(enemy));
+            var sim = new BattleSimulator(new Battler(player), enemy);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
@@ -214,7 +214,7 @@ namespace Game.Core.Tests.Battle
             };
         }
 
-        private static Enemy MakeEnemy(
+        private static Battler MakeEnemy(
             double strength, double endurance,
             List<Skill>? skills = null)
         {
@@ -244,7 +244,7 @@ namespace Game.Core.Tests.Battle
                 AvailableSkills = defaultSkills,
             };
             enemy.SetBattleSkills(defaultSkills.Select(s => s.Id).ToList());
-            return enemy;
+            return new Battler(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
         }
     }
 }
