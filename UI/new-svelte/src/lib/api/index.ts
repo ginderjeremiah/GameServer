@@ -5,4 +5,5 @@ export * from './device-fingerprint.ts';
 export * from './device-info.ts';
 export * from './logout.ts';
 export * from './token-store.ts';
+export * from './roles.ts';
 export * from './auth.ts';

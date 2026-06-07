@@ -13,13 +13,14 @@
 
 <script lang="ts">
 import { NavSidebar, LogPanel } from '$components';
-import { screenMap, type GameScreen } from './screens';
+import { screenMap, type GameScreen, GAME_SCREENS, visibleScreens } from './screens';
 import { startGame } from '$lib/engine';
-import { logout } from '$lib/api';
+import { getRoles, logout } from '$lib/api';
 import { browser } from '$app/environment';
 import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { onMount } from 'svelte';
 
 if (browser) {
 	try {
@@ -33,26 +34,15 @@ let currentScreen = $state<string>('fight');
 let CurrentScreen: Component = $state(screenMap.Fight as Component);
 let sidebarPinned = $state(false);
 
-interface ScreenDef {
-	key: string;
-	label: string;
-	group: string;
-	built: boolean;
-}
+// Roles drive which screens appear in the sidebar (e.g. Admin). Read from the access token after
+// mount so the value matches the server render (no token available there) and updates on the client
+// without a hydration mismatch — mirroring the boot gate's `booting`/`hydrated` pattern.
+let roles = $state<string[]>([]);
+onMount(() => {
+	roles = getRoles();
+});
 
-const screens: ScreenDef[] = [
-	{ key: 'fight', label: 'Fight', group: 'combat', built: true },
-	{ key: 'cardGame', label: 'Card Game', group: 'combat', built: false },
-	{ key: 'challenges', label: 'Challenges', group: 'combat', built: true },
-	{ key: 'inventory', label: 'Inventory', group: 'character', built: true },
-	{ key: 'attributes', label: 'Attributes', group: 'character', built: true },
-	{ key: 'attributeBreakdown', label: 'Attribute Breakdown', group: 'character', built: true },
-	{ key: 'stats', label: 'Stats', group: 'character', built: true },
-	{ key: 'options', label: 'Options', group: 'settings', built: true },
-	{ key: 'help', label: 'Help', group: 'settings', built: false },
-	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
-	{ key: 'admin', label: 'Admin', group: 'admin', built: true }
-];
+const screens = $derived(visibleScreens(GAME_SCREENS, roles));
 
 const screenKeyMap: Record<string, GameScreen> = {
 	fight: 'Fight',

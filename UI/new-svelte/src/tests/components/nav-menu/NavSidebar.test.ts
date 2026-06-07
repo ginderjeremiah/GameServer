@@ -36,6 +36,16 @@ describe('NavSidebar', () => {
 		}
 	});
 
+	it('omits a group with no screens (e.g. the Admin section hidden for non-admins)', () => {
+		// The game page filters role-gated screens out before passing them in; the rail should then
+		// render neither the admin item nor an empty Admin group header.
+		const nonAdmin = screens.filter((s) => s.key !== 'admin');
+		render(NavSidebar, { props: { screens: nonAdmin, active: 'fight', onNavigate: vi.fn() } });
+
+		expect(screen.queryByTestId('sidebar-item-admin')).toBeNull();
+		expect(screen.queryByText('Admin')).toBeNull();
+	});
+
 	it('marks the active item', () => {
 		render(NavSidebar, { props: { screens, active: 'inventory', onNavigate: vi.fn() } });
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createAccountAndStartGame, gotoAdmin } from './helpers';
+import { createAccountAndStartGame, createAdminAndStartGame, gotoAdmin } from './helpers';
 
 test.describe('Navigation', () => {
 	test('switching screens via sidebar', async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe('Navigation', () => {
 	});
 
 	test('navigating to admin page', async ({ page }) => {
-		await createAccountAndStartGame(page, 'na');
+		await createAdminAndStartGame(page);
 		await gotoAdmin(page);
 
 		// The admin route renders the entity-driven workbench (list + detail panes).
@@ -28,7 +28,7 @@ test.describe('Navigation', () => {
 	});
 
 	test('navigating back from admin to game', async ({ page }) => {
-		await createAccountAndStartGame(page, 'nb');
+		await createAdminAndStartGame(page);
 		await gotoAdmin(page);
 
 		// The admin sidebar has a dedicated "Return to Game" control.
@@ -36,5 +36,15 @@ test.describe('Navigation', () => {
 		await expect(page).toHaveURL('/game', { timeout: 5000 });
 
 		await expect(page.getByTestId('sidebar-item-fight')).toBeVisible();
+	});
+
+	test('hides the admin area from a non-admin player', async ({ page }) => {
+		await createAccountAndStartGame(page, 'nq');
+
+		// The other groups render as usual, but the role-gated Admin entry must not for a normal
+		// player (the whole Admin nav group collapses when it has no visible screens).
+		await expect(page.getByTestId('game-screen')).toBeVisible();
+		await expect(page.getByTestId('sidebar-item-fight')).toBeVisible();
+		await expect(page.getByTestId('sidebar-item-admin')).toHaveCount(0);
 	});
 });
