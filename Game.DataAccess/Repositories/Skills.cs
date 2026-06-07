@@ -1,8 +1,9 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
-
 using Microsoft.EntityFrameworkCore;
+using CoreSkill = Game.Core.Skills.Skill;
 
 namespace Game.DataAccess.Repositories
 {
@@ -38,10 +39,10 @@ namespace Game.DataAccess.Repositories
             return skills.Count <= skillId || skillId < 0 ? null : skills[skillId];
         }
 
-        public Skill GetSkill(int skillId)
+        public CoreSkill GetSkill(int skillId)
         {
             var skills = AllSkills();
-            return skills[skillId];
+            return SkillMapper.ToCore(skills[skillId]);
         }
     }
 }

@@ -1,7 +1,5 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
-using Game.Core.Attributes.Modifiers;
-using Game.Core.Items;
 using Game.Core.Players;
 
 namespace Game.Application.Services
@@ -72,30 +70,12 @@ namespace Game.Application.Services
 
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
-            var modEntity = _itemMods.LookupItemMod(itemModId);
-            if (modEntity is null)
+            if (_itemMods.LookupItemMod(itemModId) is null)
             {
                 return false;
             }
 
-            var mod = new ItemMod
-            {
-                Id = itemModId,
-                Name = modEntity.Name,
-                Description = modEntity.Description ?? string.Empty,
-                Type = (EItemModType)modEntity.ItemModTypeId,
-                Rarity = (ERarity)modEntity.RarityId,
-                Attributes = modEntity.ItemModAttributes
-                    .Select(ima => new AttributeModifier
-                    {
-                        Attribute = (EAttribute)ima.AttributeId,
-                        Amount = (double)ima.Amount,
-                        Type = EModifierType.Additive,
-                        Source = EAttributeModifierSource.ItemMod,
-                    })
-                    .ToList(),
-                Tags = [],
-            };
+            var mod = _itemMods.GetItemMod(itemModId);
 
             if (!player.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
             {
