@@ -8,16 +8,16 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class StatisticsController(IPlayerStatistics playerStatistics, SessionService sessionService) : ControllerBase
+    public class StatisticsController(IPlayerProgressRepository playerProgress, SessionService sessionService) : ControllerBase
     {
-        private readonly IPlayerStatistics _playerStatistics = playerStatistics;
+        private readonly IPlayerProgressRepository _playerProgress = playerProgress;
         private readonly SessionService _sessionService = sessionService;
 
         [HttpGet("/api/[controller]")]
         public async Task<ApiEnumerableResponse<PlayerStatistic>> Statistics()
         {
             var player = await _sessionService.LoadPlayer();
-            var stats = await _playerStatistics.GetPlayerStatistics(player.Id);
+            var stats = await _playerProgress.GetStatistics(player.Id);
             return ApiResponse.Success(stats.To().Model<PlayerStatistic>());
         }
 
