@@ -108,6 +108,7 @@ namespace Game.DataAccess
                     // Retries exhausted: the change could not be persisted, so the event is dead-lettered for later inspection/replay instead of being dropped.
                     _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; dead-lettering. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
                     await deadLetterQueue.AddToQueueAsync(message);
+                    return;
                 }
             }
         }

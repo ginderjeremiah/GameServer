@@ -142,6 +142,32 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(4321, persisted.Exp);
         }
 
+        [Fact]
+        public async Task ProcessQueue_WellFormedEnvelopeWithMalformedInnerPayload_DeadLettersWithoutRetrying()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The envelope parses cleanly (known event type), but its inner payload is not valid JSON, so
+            // HandleEvent throws a JsonException — a poison message that must be dead-lettered without retrying.
+            var envelope = new DomainEventEnvelope
+            {
+                Type = nameof(PlayerCoreUpdatedEvent),
+                Payload = "this is not valid json",
+            };
+            var message = envelope.Serialize();
+            var queue = new InMemoryPubSubQueue(message);
+
+            await synchronizer.ProcessQueue(queue);
+
+            // A poison inner payload is surfaced as a warning (not retried, so no error) and dead-lettered verbatim.
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
+        }
+
         private static async Task<List<string>> DrainDeadLetterQueue(IPubSubService pubsub)
         {
             var deadLetterQueue = pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
@@ -204,9 +230,6 @@ namespace Game.Application.Tests.DataAccess
         /// </summary>
         private sealed class FlakyServiceProvider(IServiceProvider inner, int failuresBeforeSuccess) : IServiceProvider, IServiceScopeFactory
         {
-            private readonly IServiceProvider _inner = inner;
-            private readonly int _failuresBeforeSuccess = failuresBeforeSuccess;
-
             public int ScopeCreations { get; private set; }
 
             public object? GetService(Type serviceType)
@@ -216,18 +239,18 @@ namespace Game.Application.Tests.DataAccess
                     return this;
                 }
 
-                return _inner.GetService(serviceType);
+                return inner.GetService(serviceType);
             }
 
             public IServiceScope CreateScope()
             {
                 ScopeCreations++;
-                if (ScopeCreations <= _failuresBeforeSuccess)
+                if (ScopeCreations <= failuresBeforeSuccess)
                 {
                     throw new InvalidOperationException("Simulated transient failure creating a scope.");
                 }
 
-                return _inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
+                return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
             }
         }
 
