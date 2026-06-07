@@ -49,7 +49,7 @@ test.describe('Game flow', () => {
 		await expect(page.getByTestId('log-panel')).toBeVisible();
 	});
 
-	test('session persists on page reload', async ({ page }) => {
+	test('resumes straight into the game on reload once the cache is warm', async ({ page }) => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
@@ -58,8 +58,13 @@ test.describe('Game flow', () => {
 		await page.getByTestId('submit-button').click();
 
 		await expect(page).toHaveURL('/loading', { timeout: 10000 });
+		// Let the loading screen finish so every reference-data set is written to the localStorage cache.
+		await expect(page.getByTestId('enter-button')).toBeEnabled({ timeout: 10000 });
 
+		// A refresh with a valid session and a warm cache restores the session and skips the loading
+		// screen entirely, dropping the player straight back into the game (#106).
 		await page.reload();
-		await expect(page).toHaveURL('/loading', { timeout: 5000 });
+		await expect(page).toHaveURL('/game', { timeout: 10000 });
+		await expect(page.getByTestId('game-screen')).toBeVisible();
 	});
 });
