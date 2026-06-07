@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
-
-namespace Game.Api.Models.Common
+﻿namespace Game.Api.Models.Common
 {
     public class ApiResponse<T> : IApiResponse where T : IModel
     {
