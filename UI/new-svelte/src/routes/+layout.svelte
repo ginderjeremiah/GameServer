@@ -6,6 +6,7 @@
 	{/if}
 	<TooltipBase />
 	<ToastContainer />
+	<ModalHost />
 </div>
 
 <script lang="ts">
@@ -13,7 +14,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import { onMount } from 'svelte';
-import { TooltipBase, ToastContainer } from '$components';
+import { TooltipBase, ToastContainer, ModalHost } from '$components';
 import { getTokens, onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';

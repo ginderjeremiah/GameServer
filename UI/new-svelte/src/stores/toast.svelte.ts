@@ -2,12 +2,25 @@ import { SvelteMap } from 'svelte/reactivity';
 
 export type ToastType = 'error' | 'success' | 'warning' | 'info';
 
+/**
+ * An optional inline action surfaced as a single text button inside the toast (e.g. `Retry`,
+ * `View`). Clicking it runs `onClick` and then dismisses the toast. Provided ahead of consumers as
+ * part of the standardized toast design — the system is intentionally capable of more than its
+ * current callers use (mirroring its type-awareness).
+ */
+export interface ToastAction {
+	label: string;
+	onClick: () => void;
+}
+
 export interface ToastData {
 	id: number;
 	message: string;
 	type: ToastType;
 	/** Whether a manual dismiss control is shown for the toast. */
 	dismissible: boolean;
+	/** Optional inline action button. */
+	action?: ToastAction;
 	/** Optional callback run once the toast is dismissed (manually or by auto-dismiss). */
 	onDismiss?: () => void;
 }
@@ -17,6 +30,8 @@ export interface ToastOptions {
 	/** Auto-dismiss delay in ms. Pass `0` to keep the toast until it is dismissed manually. */
 	duration?: number;
 	dismissible?: boolean;
+	/** Optional inline action button. Clicking it runs the callback and then dismisses the toast. */
+	action?: ToastAction;
 	/**
 	 * Callback run once the toast is dismissed — whether by the manual dismiss control or by
 	 * auto-dismiss, but not by a bulk `clearToasts` reset. Useful for follow-up actions such as
@@ -78,21 +93,21 @@ export const clearToasts = () => {
 };
 
 export const showToast = (message: string, options: ToastOptions = {}): number => {
-	const { type = 'info', duration = DEFAULT_DURATION, dismissible = true, onDismiss } = options;
+	const { type = 'info', duration = DEFAULT_DURATION, dismissible = true, action, onDismiss } = options;
 
 	// Collapse a duplicate, still-visible toast (e.g. a socket error that keeps
 	// firing) into the existing one and simply refresh its timer rather than
 	// stacking identical messages on top of each other.
 	for (const toast of toastData.values()) {
 		if (toast.message === message && toast.type === type) {
-			// Collapsing keeps the existing toast's onDismiss; a differing callback on a duplicate is ignored.
+			// Collapsing keeps the existing toast's action/onDismiss; differing ones on a duplicate are ignored.
 			scheduleDismiss(toast.id, duration);
 			return toast.id;
 		}
 	}
 
 	const id = nextId++;
-	toastData.set(id, { id, message, type, dismissible, onDismiss });
+	toastData.set(id, { id, message, type, dismissible, action, onDismiss });
 	scheduleDismiss(id, duration);
 	return id;
 };
