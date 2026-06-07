@@ -60,6 +60,57 @@ namespace Game.Core.Tests.Probability
             AssertDistributionIsReasonable(list, buckets);
         }
 
+        [Fact]
+        public async Task ConcurrentGetRandomValue_StaysValidAndNonDegenerate()
+        {
+            // ProbabilityTable instances are cached in process-wide static collections (e.g. the per-zone
+            // enemy spawn tables) and drawn from concurrently, so GetRandomValue must be safe to call from
+            // many threads at once — the reason it now draws from the thread-safe Random.Shared.
+            //
+            // This is a best-effort concurrency guard, not a deterministic detector of the fix: it hammers
+            // the table from every core and asserts the draws stay in range, complete without throwing, and
+            // keep an even spread (every value drawn, none dominating). On .NET's modern unseeded Random
+            // (xoshiro256**, used by new Random() on this target) a data race over the shared instance is
+            // undefined behaviour but degrades gracefully on typical hardware rather than collapsing the
+            // distribution, so this would not reliably fail against the old per-instance RNG. It instead
+            // documents and locks in the concurrent contract and catches gross regressions.
+            var valueCount = 10;
+            var list = Enumerable.Range(0, valueCount)
+                .Select(value => new WeightedValue<int>(value, 1))
+                .ToList();
+            var table = new ProbabilityTable<int>(list);
+
+            var buckets = new long[valueCount];
+            var iterationsPerTask = 100_000;
+            var taskCount = Math.Max(Environment.ProcessorCount, 4);
+
+            using var startGate = new ManualResetEventSlim(false);
+            var tasks = Enumerable.Range(0, taskCount)
+                .Select(_ => Task.Run(() =>
+                {
+                    // Block every task until all are spun up so the draws actually overlap.
+                    startGate.Wait();
+                    for (int i = 0; i < iterationsPerTask; i++)
+                    {
+                        var value = table.GetRandomValue();
+                        Assert.InRange(value, 0, valueCount - 1);
+                        Interlocked.Increment(ref buckets[value]);
+                    }
+                }))
+                .ToArray();
+
+            startGate.Set();
+            await Task.WhenAll(tasks);
+
+            // Every value must be drawn at least once; a degenerate run collapses onto a single bucket.
+            Assert.All(buckets, count => Assert.True(count > 0, "Expected every value to be drawn at least once."));
+
+            // And with equal weights no single value should dominate far beyond its ~1/valueCount share.
+            var totalDraws = buckets.Sum();
+            var maxShare = buckets.Max() / (double)totalDraws;
+            Assert.True(maxShare < 0.5, $"Distribution is degenerate; one value took {maxShare:P0} of draws.");
+        }
+
         private static List<WeightedValue<int>> SetupMultiElementList()
         {
             // total weight is 45 so the last element is exactly equal 1/5 probability.
