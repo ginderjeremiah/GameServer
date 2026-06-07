@@ -73,6 +73,12 @@ Authentication uses standard ASP.NET Core JWT bearer auth rather than the legacy
 - **WebSockets authenticate via an `access_token` query-string parameter.** Browsers cannot set an `Authorization` header on the WebSocket handshake, so the `/socket` endpoint reads the access token from the query string (wired through `JwtBearerEvents.OnMessageReceived`) — the canonical ASP.NET Core pattern for bearer auth over WebSockets.
 - **Frontend consumption is a follow-up.** This change is backend-only; persisting the tokens in the browser and sending them as a bearer header / socket query param is tracked separately (see issue history).
 
+### Account/login orchestration lives in the application layer
+
+Account creation and the login/refresh/logout flows are orchestrated by `AccountService` (`Game.Application/Services`), not the controller. `LoginController` is a thin HTTP adapter: it calls the service, maps the result to an `ApiResponse`, and wires the **request-scoped** `SessionService` (creating the session on login, clearing it on logout) — session identity is a presentation concern, so it stays in the API layer. `AccountService` owns the data orchestration: username availability, password hashing, inserting the user + initial player graph (starter skills, attributes, log preferences), credential verification, loading the player aggregate, and refresh-token rotation/revocation via `IRefreshTokenStore`.
+
+- **Access-token issuance is abstracted behind `IAccessTokenService` (`Game.Abstractions/Auth`).** The application layer must issue the access token as part of the login/refresh use case, but the concrete JWT implementation (`JwtTokenService`) sits at the presentation edge alongside the bearer-validation pipeline it mirrors. Depending on the abstraction keeps `Game.Application` free of the JWT libraries; the API composition root registers `JwtTokenService` as the implementation. Token-lifetime policy is shared via `AuthConstants` (`Game.Abstractions/Auth`) so the access-token signer and the refresh-token issuer reference one source.
+
 ## Access Roles and Admin Authorization
 
 Authenticated users are gated out of the admin tooling unless they hold the `Admin` role.

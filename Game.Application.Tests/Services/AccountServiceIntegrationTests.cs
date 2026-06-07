@@ -1,0 +1,231 @@
+using Game.Abstractions.Auth;
+using Game.Abstractions.DataAccess;
+using Game.Abstractions.Entities;
+using Game.Application;
+using Game.Application.Services;
+using Game.Core;
+using Game.Infrastructure.Database;
+using Game.TestInfrastructure.Base;
+using Game.TestInfrastructure.Fixtures;
+using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace Game.Application.Tests.Services
+{
+    [Collection("Integration")]
+    public class AccountServiceIntegrationTests : ApplicationIntegrationTestBase
+    {
+        private const string TestPepper = "test-pepper-value-for-integration-tests";
+
+        public AccountServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+            : base(containers, testOutputHelper) { }
+
+        [Fact]
+        public async Task CreateAccount_NewUsername_InsertsUserAndInitialPlayerGraph()
+        {
+            Hashing.SetPepper(TestPepper);
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The starter skills 0/1/2 must exist for the player-skill FK.
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("newaccount", "newpass");
+            Assert.Equal(CreateAccountStatus.Success, status);
+
+            // The inserts are queued in the change tracker; the surrounding unit of work persists them.
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var createdUser = await verifyContext.Users
+                .Include(user => user.Players)
+                .FirstOrDefaultAsync(user => user.Username == "newaccount", CancellationToken);
+
+            Assert.NotNull(createdUser);
+            var createdPlayer = Assert.Single(createdUser.Players);
+            Assert.Equal("newaccount", createdPlayer.Name);
+            Assert.Equal(1, createdPlayer.Level);
+
+            var skillCount = await verifyContext.Set<PlayerSkill>()
+                .CountAsync(skill => skill.PlayerId == createdPlayer.Id, CancellationToken);
+            Assert.Equal(3, skillCount);
+
+            var attributeCount = await verifyContext.Set<PlayerAttribute>()
+                .CountAsync(attribute => attribute.PlayerId == createdPlayer.Id, CancellationToken);
+            Assert.Equal(6, attributeCount);
+
+            var logPreferenceCount = await verifyContext.Set<LogPreference>()
+                .CountAsync(preference => preference.PlayerId == createdPlayer.Id, CancellationToken);
+            Assert.Equal(6, logPreferenceCount);
+        }
+
+        [Fact]
+        public async Task CreateAccount_DuplicateUsername_ReturnsUsernameTaken()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "existing", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("existing", "anotherpass");
+
+            Assert.Equal(CreateAccountStatus.UsernameTaken, status);
+        }
+
+        [Fact]
+        public async Task Login_ValidCredentials_ReturnsTokensAndPlayer()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "loginuser", "loginpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("loginuser", "loginpass");
+
+            Assert.True(result.Success);
+            Assert.Equal(user.Id, result.UserId);
+            Assert.Equal(player.Name, result.Player.Name);
+            Assert.False(string.IsNullOrEmpty(result.Tokens.AccessToken));
+            Assert.False(string.IsNullOrEmpty(result.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task Login_WrongPassword_ReturnsInvalidCredentials()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "wrongpass", "correctpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("wrongpass", "incorrect");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+            Assert.Null(result.Tokens);
+        }
+
+        [Fact]
+        public async Task Login_NonexistentUser_ReturnsInvalidCredentials()
+        {
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("ghost", "whatever");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+        }
+
+        [Fact]
+        public async Task Login_UserWithoutPlayer_ReturnsNoPlayer()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "noplayer", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("noplayer", "pass");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.NoPlayer, result.Status);
+        }
+
+        [Fact]
+        public async Task Refresh_ValidToken_RotatesToNewPair()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "refreshuser", "refreshpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("refreshuser", "refreshpass");
+            Assert.True(login.Success);
+
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
+
+            Assert.NotNull(refreshed);
+            Assert.False(string.IsNullOrEmpty(refreshed.AccessToken));
+            Assert.NotEqual(login.Tokens.RefreshToken, refreshed.RefreshToken);
+
+            // The original refresh token is single-use, so replaying it now fails.
+            var replayed = await accountService.Refresh(login.Tokens.RefreshToken);
+            Assert.Null(replayed);
+        }
+
+        [Fact]
+        public async Task Refresh_InvalidToken_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var refreshed = await accountService.Refresh("not-a-real-token");
+
+            Assert.Null(refreshed);
+        }
+
+        [Fact]
+        public async Task Logout_RevokesRefreshToken()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "logoutuser", "logoutpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("logoutuser", "logoutpass");
+            Assert.True(login.Success);
+
+            await accountService.Logout(login.Tokens.RefreshToken);
+
+            // The revoked refresh token can no longer be exchanged for a new pair.
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
+            Assert.Null(refreshed);
+        }
+
+        private static AccountService CreateAccountService(IServiceProvider provider)
+        {
+            return new AccountService(
+                provider.GetRequiredService<IUsers>(),
+                provider.GetRequiredService<IPlayerRepository>(),
+                provider.GetRequiredService<IEntityStore>(),
+                provider.GetRequiredService<IRefreshTokenStore>(),
+                new StubAccessTokenService());
+        }
+
+        /// <summary>
+        /// A trivial access-token service for the application-layer tests. The real JWT signing/format is
+        /// a presentation-edge concern verified end-to-end by the API integration tests
+        /// (<c>LoginControllerTests</c>); these tests exercise the account orchestration against the real
+        /// Postgres/Redis collaborators, for which the access-token contents are irrelevant.
+        /// </summary>
+        private sealed class StubAccessTokenService : IAccessTokenService
+        {
+            public string CreateAccessToken(int userId, IReadOnlyList<string> roles)
+            {
+                return $"access-token-{userId}";
+            }
+        }
+    }
+}

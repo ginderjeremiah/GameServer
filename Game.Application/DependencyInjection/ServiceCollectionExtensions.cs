@@ -12,6 +12,7 @@ namespace Game.Application.DependencyInjection
         {
             RegisterDomainEventHandlers();
             return services
+                .AddScoped<AccountService>()
                 .AddScoped<BattleSnapshotService>()
                 .AddScoped<BattleService>()
                 .AddScoped<LoginTrackingService>()

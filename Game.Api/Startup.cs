@@ -1,3 +1,4 @@
+using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Api.Auth;
 using Game.Api.CodeGen;
@@ -74,7 +75,7 @@ namespace Game.Api
                 .AddDomainEventDispatcher()
                 .AddApplication()
                 .AddScoped<SessionService>()
-                .AddSingleton<JwtTokenService>()
+                .AddSingleton<IAccessTokenService, JwtTokenService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
                 .AddReferenceDataCommands()
