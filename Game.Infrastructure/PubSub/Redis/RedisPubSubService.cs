@@ -34,19 +34,16 @@ namespace Game.Infrastructure.PubSub.Redis
             return new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
         }
 
-        public async Task Publish(string channel, string queueName, string? queueData)
+        public async Task Publish(string channel, string queueName, string queueData)
         {
-            // Uses the concrete RedisQueue (whose overload tolerates a null payload) rather than the
-            // IPubSubQueue-typed GetQueue, whose AddToQueueAsync contract is non-null.
-            var queue = new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
+            var queue = GetQueue(queueName);
             await queue.AddToQueueAsync(queueData);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "");
         }
 
         public async Task Publish<T>(string channel, string queueName, T queueData)
         {
-            var data = queueData?.Serialize();
-            await Publish(channel, queueName, data);
+            await Publish(channel, queueName, queueData.Serialize());
         }
 
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)
