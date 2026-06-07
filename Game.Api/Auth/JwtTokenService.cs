@@ -1,3 +1,4 @@
+using Game.Abstractions.Auth;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -12,7 +13,7 @@ namespace Game.Api.Auth
     /// user id (<c>sub</c>) and role claims, which the JWT bearer authentication handler validates and
     /// projects onto <see cref="ClaimsPrincipal"/> for the request.
     /// </summary>
-    public class JwtTokenService
+    public class JwtTokenService : IAccessTokenService
     {
         /// <summary>
         /// The claim type used for role claims. Matches the role claim type configured on the bearer
@@ -45,7 +46,7 @@ namespace Game.Api.Auth
                 Audience = _options.Audience,
                 Subject = new ClaimsIdentity(claims),
                 NotBefore = now,
-                Expires = now.Add(Constants.ACCESS_TOKEN_LIFETIME),
+                Expires = now.Add(AuthConstants.AccessTokenLifetime),
                 SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256),
             };
 

@@ -1,71 +1,43 @@
-using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
-using Game.Api.Auth;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Application.Services;
-using Game.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PlayerAttributeEntity = Game.Abstractions.Entities.PlayerAttribute;
-using PlayerEntity = Game.Abstractions.Entities.Player;
-using PlayerSkillEntity = Game.Abstractions.Entities.PlayerSkill;
 
 namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
     public class LoginController(
-        IUsers users,
-        IPlayerRepository playerRepo,
-        IEntityStore entityStore,
         SessionService sessionService,
-        JwtTokenService tokenService,
-        IRefreshTokenStore refreshTokenStore,
+        AccountService accountService,
         LoginTrackingService loginTrackingService) : ControllerBase
     {
-        private readonly IUsers _users = users;
-        private readonly IPlayerRepository _playerRepo = playerRepo;
-        private readonly IEntityStore _entityStore = entityStore;
         private readonly SessionService _sessionService = sessionService;
-        private readonly JwtTokenService _tokenService = tokenService;
-        private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
+        private readonly AccountService _accountService = accountService;
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
         public async Task<ApiResponse<LoginResult>> Login([FromBody] LoginCredentials creds)
         {
-            var user = await _users.GetUser(creds.Username);
-            if (user is null || !creds.Password.VerifyHash(user.Salt.ToString(), user.PassHash))
+            var result = await _accountService.Login(creds.Username, creds.Password);
+            if (!result.Success)
             {
-                return ApiResponse.Error("Invalid username or password");
+                return ApiResponse.Error(LoginErrorMessage(result.Status));
             }
 
-            var player = user.Players.FirstOrDefault();
-            if (player is null)
-            {
-                return ApiResponse.Error("User has no player characters");
-            }
-
-            var playerData = await _playerRepo.GetPlayer(player.Id);
-            if (playerData is null)
-            {
-                return ApiResponse.Error("Player data not found");
-            }
-
-            _sessionService.CreateSession(user.Id, player.Id);
-
-            var roles = user.Roles.Select(role => role.Name).ToList();
-            var tokens = await IssueTokens(user.Id, roles);
+            // Session identity is a request-scoped presentation concern, so it is wired here rather than
+            // in the application service.
+            _sessionService.CreateSession(result.UserId, result.Player.Id);
 
             return ApiResponse.Success(new LoginResult
             {
-                Tokens = tokens,
-                Player = PlayerData.FromPlayer(playerData),
+                Tokens = ToAuthTokens(result.Tokens),
+                Player = PlayerData.FromPlayer(result.Player),
             });
         }
 
@@ -73,82 +45,27 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse<AuthTokens>> Refresh([FromBody] RefreshRequest request)
         {
-            var session = await _refreshTokenStore.Consume(request.RefreshToken);
-            if (session is null)
-            {
-                return ApiResponse.Error("Invalid or expired refresh token");
-            }
-
-            var tokens = await IssueTokens(session.UserId, session.Roles);
-            return ApiResponse.Success(tokens);
+            var tokens = await _accountService.Refresh(request.RefreshToken);
+            return tokens is null
+                ? ApiResponse.Error("Invalid or expired refresh token")
+                : ApiResponse.Success(ToAuthTokens(tokens));
         }
 
         [AllowAnonymous]
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {
-            var usernameTaken = await _users.CheckIfUsernameExists(creds.Username);
-            if (usernameTaken)
-            {
-                return ApiResponse.Error("There is already an account with this username.");
-            }
-
-            var salt = Guid.NewGuid();
-            var passHash = creds.Password.Hash(salt.ToString());
-            var user = new User
-            {
-                Username = creds.Username,
-                PassHash = passHash,
-                Salt = salt,
-                LastLogin = DateTime.UtcNow,
-            };
-
-            _entityStore.Insert(user);
-
-            var playerEntity = new PlayerEntity
-            {
-                User = user,
-                Name = creds.Username,
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPointsGained = 0,
-                StatPointsUsed = 0,
-            };
-
-            playerEntity.PlayerSkills = Enumerable.Range(0, 3).Select(id => new PlayerSkillEntity
-            {
-                Player = playerEntity,
-                Selected = true,
-                SkillId = id,
-            }).ToList();
-
-            playerEntity.PlayerAttributes = Enumerable.Range(0, 6).Select(id => new PlayerAttributeEntity
-            {
-                Player = playerEntity,
-                AttributeId = id,
-                Amount = 5m
-            }).ToList();
-
-            playerEntity.LogPreferences = [
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Damage, Enabled = false, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Debug, Enabled = false, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.Exp, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.LevelUp, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.ItemFound, Enabled = true, },
-                new() { Player = playerEntity, LogTypeId = (int)ELogType.EnemyDefeated, Enabled = true, },
-            ];
-
-            _entityStore.Insert(playerEntity);
-
-            return ApiResponse.Success();
+            var status = await _accountService.CreateAccount(creds.Username, creds.Password);
+            return status == CreateAccountStatus.UsernameTaken
+                ? ApiResponse.Error("There is already an account with this username.")
+                : ApiResponse.Success();
         }
 
         [AllowAnonymous]
         [HttpPost]
         public async Task<ApiResponse> Logout([FromBody] RefreshRequest request)
         {
-            await _refreshTokenStore.Revoke(request.RefreshToken);
+            await _accountService.Logout(request.RefreshToken);
             _sessionService.ClearSession();
             return ApiResponse.Success();
         }
@@ -192,19 +109,23 @@ namespace Game.Api.Controllers
             return ApiResponse.Success();
         }
 
-        /// <summary>
-        /// Issues a fresh access/refresh token pair for the given user. The refresh token is rotated on
-        /// every use (login and refresh both call this), so a previously issued refresh token is never
-        /// reused.
-        /// </summary>
-        private async Task<AuthTokens> IssueTokens(int userId, IReadOnlyList<string> roles)
+        private static string LoginErrorMessage(LoginStatus status)
         {
-            var accessToken = _tokenService.CreateAccessToken(userId, roles);
-            var refreshToken = await _refreshTokenStore.Issue(userId, roles, Constants.REFRESH_TOKEN_LIFETIME);
+            return status switch
+            {
+                LoginStatus.InvalidCredentials => "Invalid username or password",
+                LoginStatus.NoPlayer => "User has no player characters",
+                LoginStatus.PlayerDataNotFound => "Player data not found",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static AuthTokens ToAuthTokens(AuthTokenPair tokens)
+        {
             return new AuthTokens
             {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
+                AccessToken = tokens.AccessToken,
+                RefreshToken = tokens.RefreshToken,
             };
         }
     }
