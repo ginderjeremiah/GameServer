@@ -1,5 +1,6 @@
 using Game.Abstractions.Entities;
 using Game.Abstractions.Infrastructure;
+using Game.Core;
 using Game.Core.Players.Events;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -46,7 +47,7 @@ namespace Game.DataAccess
             {
                 try
                 {
-                    var envelope = JsonSerializer.Deserialize<DomainEventEnvelope>(next);
+                    var envelope = next.Deserialize<DomainEventEnvelope>();
                     if (envelope is not null)
                     {
                         await HandleEvent(envelope);
@@ -272,6 +273,6 @@ namespace Game.DataAccess
             await context.SaveChangesAsync();
         }
 
-        private static T Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json)!;
+        private static T Deserialize<T>(string json) => json.Deserialize<T>()!;
     }
 }

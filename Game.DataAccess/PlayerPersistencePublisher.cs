@@ -1,7 +1,7 @@
 using Game.Abstractions.Infrastructure;
+using Game.Core;
 using Game.Core.Events;
 using Game.Core.Players.Events;
-using System.Text.Json;
 
 namespace Game.DataAccess
 {
@@ -34,12 +34,12 @@ namespace Game.DataAccess
         public Task HandleAsync(ModRemovedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(LogPreferenceChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
 
-        private async Task PublishAsync(IDomainEvent domainEvent)
+        private async Task PublishAsync<T>(T domainEvent) where T : IDomainEvent
         {
             var envelope = new DomainEventEnvelope
             {
                 Type = domainEvent.GetType().Name,
-                Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
+                Payload = domainEvent.Serialize(),
             };
 
             await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope);

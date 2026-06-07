@@ -6,7 +6,8 @@ export default defineConfig({
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		environment: 'jsdom',
-		setupFiles: ['./src/tests/setup.ts']
+		setupFiles: ['./src/tests/setup.ts'],
+		execArgv: ['--no-experimental-webstorage']
 	},
 	resolve: {
 		conditions: ['browser']

@@ -1,14 +1,13 @@
 using Game.Abstractions.Infrastructure;
+using Game.Core;
 using Game.Core.Players.Events;
 using Game.DataAccess;
-using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -93,9 +92,10 @@ namespace Game.Application.Tests.DataAccess
             var envelope = new DomainEventEnvelope
             {
                 Type = nameof(PlayerCoreUpdatedEvent),
-                Payload = JsonSerializer.Serialize(evt),
+                Payload = evt.Serialize(),
             };
-            return JsonSerializer.Serialize(envelope);
+
+            return envelope.Serialize();
         }
 
         /// <summary>

@@ -34,7 +34,7 @@
 	</div>
 
 	{#if view.loading}
-		<Loading />
+		<Loading delay={100} />
 	{/if}
 </div>
 
