@@ -16,12 +16,14 @@ namespace Game.DataAccess
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
         private readonly ILogger<DataProviderSynchronizer> _logger;
+        private readonly PlayerUpdateRetryPolicy _retryPolicy;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger)
+        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy)
         {
             _services = services;
             _pubsub = pubsub;
             _logger = logger;
+            _retryPolicy = retryPolicy;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -42,29 +44,72 @@ namespace Game.DataAccess
 
         internal async Task ProcessQueue(IPubSubQueue queue)
         {
+            var deadLetterQueue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
+
             var next = await queue.GetNextAsync();
             while (next is not null)
             {
+                await ProcessMessage(next, deadLetterQueue);
+                next = await queue.GetNextAsync();
+            }
+        }
+
+        /// <summary>
+        /// Processes a single queued message. Malformed payloads (which can never succeed) are dead-lettered
+        /// immediately, while a valid event that fails on an unexpected error (e.g. a transient database error)
+        /// is retried with exponential backoff per <see cref="PlayerUpdateRetryPolicy"/> and dead-lettered only
+        /// once the retries are exhausted, so the change is never silently dropped.
+        /// </summary>
+        private async Task ProcessMessage(string message, IPubSubQueue deadLetterQueue)
+        {
+            DomainEventEnvelope? envelope;
+            try
+            {
+                envelope = message.Deserialize<DomainEventEnvelope>();
+            }
+            catch (JsonException ex)
+            {
+                // A malformed payload can never be parsed successfully, so it is dead-lettered for inspection rather than retried.
+                _logger.LogWarning(ex, "Dead-lettering malformed player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, message);
+                await deadLetterQueue.AddToQueueAsync(message);
+                return;
+            }
+
+            if (envelope is null)
+            {
+                // A null payload deserialized cleanly but carries no event to apply; dead-letter it rather than silently dropping it.
+                _logger.LogWarning("Dead-lettering empty player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, message);
+                await deadLetterQueue.AddToQueueAsync(message);
+                return;
+            }
+
+            for (var attempt = 1; attempt <= _retryPolicy.MaxAttempts; attempt++)
+            {
                 try
                 {
-                    var envelope = next.Deserialize<DomainEventEnvelope>();
-                    if (envelope is not null)
-                    {
-                        await HandleEvent(envelope);
-                    }
+                    await HandleEvent(envelope);
+                    return;
                 }
                 catch (JsonException ex)
                 {
-                    // A malformed payload can never be parsed successfully, so it is logged and skipped.
-                    _logger.LogWarning(ex, "Skipping malformed player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, next);
+                    // A malformed inner payload is a poison message that no retry can fix, so it is dead-lettered immediately.
+                    _logger.LogWarning(ex, "Dead-lettering player data event '{EventType}' with a malformed payload from queue '{Queue}'. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, message);
+                    await deadLetterQueue.AddToQueueAsync(message);
+                    return;
+                }
+                catch (Exception ex) when (attempt < _retryPolicy.MaxAttempts)
+                {
+                    // An unexpected failure (e.g. a transient database error) may succeed on a retry.
+                    _logger.LogWarning(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' on attempt {Attempt} of {MaxAttempts}; retrying.", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, attempt, _retryPolicy.MaxAttempts);
+                    await Task.Delay(_retryPolicy.DelayAfterAttempt(attempt));
                 }
                 catch (Exception ex)
                 {
-                    // An unexpected failure (e.g. a database error) means the player change may not have been persisted.
-                    _logger.LogError(ex, "Failed to process player data event from queue '{Queue}'. The player change may not have been persisted. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, next);
+                    // Retries exhausted: the change could not be persisted, so the event is dead-lettered for later inspection/replay instead of being dropped.
+                    _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; dead-lettering. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
+                    await deadLetterQueue.AddToQueueAsync(message);
+                    return;
                 }
-
-                next = await queue.GetNextAsync();
             }
         }
 

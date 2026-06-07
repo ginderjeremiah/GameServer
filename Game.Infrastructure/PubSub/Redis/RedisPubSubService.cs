@@ -29,8 +29,15 @@ namespace Game.Infrastructure.PubSub.Redis
             await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget);
         }
 
+        public IPubSubQueue GetQueue(string queueName)
+        {
+            return new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
+        }
+
         public async Task Publish(string channel, string queueName, string? queueData)
         {
+            // Uses the concrete RedisQueue (whose overload tolerates a null payload) rather than the
+            // IPubSubQueue-typed GetQueue, whose AddToQueueAsync contract is non-null.
             var queue = new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
             await queue.AddToQueueAsync(queueData);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "");
@@ -64,7 +71,7 @@ namespace Game.Infrastructure.PubSub.Redis
         public async Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null)
         {
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}' with queue '{QueueName}'.", channel, queueName);
-            var queue = new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
+            var queue = GetQueue(queueName);
             var worker = new BackgroundWorker(_loggerFactory.CreateLogger<BackgroundWorker>(), () => action((queue, channel)))
             {
                 Name = $"RedisSubWorker_{queueName}"
@@ -90,7 +97,7 @@ namespace Game.Infrastructure.PubSub.Redis
         public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
         {
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}' with queue '{QueueName}'.", channel, queueName);
-            var queue = new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
+            var queue = GetQueue(queueName);
             var worker = new BackgroundWorker(_loggerFactory.CreateLogger<BackgroundWorker>(), async () => await action((queue, channel)))
             {
                 Name = $"RedisSubWorker_{queueName}"

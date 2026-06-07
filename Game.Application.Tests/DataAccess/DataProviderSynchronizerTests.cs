@@ -13,17 +13,21 @@ using Xunit;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Verifies that <see cref="DataProviderSynchronizer"/> no longer silently swallows exceptions while draining the
-    /// player update queue: malformed payloads are logged as warnings and unexpected failures as errors, and in both
-    /// cases the failing message does not stop the remaining queued events from being processed.
+    /// Verifies that <see cref="DataProviderSynchronizer"/> no longer silently swallows or drops events while draining
+    /// the player update queue: malformed payloads are dead-lettered, an unexpected failure is retried with backoff and
+    /// dead-lettered only once the retries are exhausted, a transient failure that later succeeds is persisted, and in
+    /// every case the failing message does not stop the remaining queued events from being processed.
     /// </summary>
     [Collection("Integration")]
     public class DataProviderSynchronizerTests : ApplicationIntegrationTestBase
     {
+        // A zero-delay policy keeps the retry loop fast in tests while still exercising the full attempt count.
+        private static readonly PlayerUpdateRetryPolicy TestRetryPolicy = new(maxAttempts: 3, baseDelay: TimeSpan.Zero);
+
         public DataProviderSynchronizerTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task ProcessQueue_MalformedEventBeforeValidEvent_LogsWarningAndStillPersistsValidEvent()
+        public async Task ProcessQueue_MalformedEventBeforeValidEvent_DeadLettersItAndStillPersistsValidEvent()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -41,9 +45,9 @@ namespace Game.Application.Tests.DataAccess
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
-            // The malformed message is dequeued first; the synchronizer must skip it and still apply the valid one.
+            // The malformed message is dequeued first; the synchronizer must dead-letter it and still apply the valid one.
             var queue = new InMemoryPubSubQueue("this is not a valid envelope", Serialize(validEvent));
 
             await synchronizer.ProcessQueue(queue);
@@ -51,6 +55,10 @@ namespace Game.Application.Tests.DataAccess
             // The malformed payload is surfaced as a warning rather than silently swallowed.
             Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            // The malformed message lands on the dead-letter queue rather than being dropped.
+            var deadLettered = await DrainDeadLetterQueue(pubsub);
+            Assert.Equal(["this is not a valid envelope"], deadLettered);
 
             // The whole queue was drained, and the valid event after the malformed one was still persisted.
             Assert.Null(await queue.GetNextAsync());
@@ -64,16 +72,16 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task ProcessQueue_UnexpectedFailureDuringHandling_LogsErrorAndContinues()
+        public async Task ProcessQueue_UnexpectedFailureDuringHandling_RetriesThenDeadLettersAndContinues()
         {
             // An empty provider has no GameContext registered, so HandleEvent throws InvalidOperationException —
-            // standing in for any unexpected failure (e.g. a database error) while persisting a player change.
+            // standing in for an unexpected failure (e.g. a database error) that persists across every retry.
             var brokenServices = new ServiceCollection().BuildServiceProvider();
 
             using var scope = CreateScope();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
-            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger);
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
 
             var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100);
             var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100);
@@ -81,10 +89,97 @@ namespace Game.Application.Tests.DataAccess
 
             await synchronizer.ProcessQueue(queue);
 
-            // Both unexpected failures are logged as errors (not warnings), and the first failure did not stop the second.
+            // Each event is attempted MaxAttempts times: the non-final attempts log a "retrying" warning and the
+            // final attempt logs an error before dead-lettering, and the first failure did not stop the second.
+            Assert.Equal((TestRetryPolicy.MaxAttempts - 1) * 2, logger.Entries.Count(e => e.Level == LogLevel.Warning));
             Assert.Equal(2, logger.Entries.Count(e => e.Level == LogLevel.Error));
-            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning);
             Assert.Null(await queue.GetNextAsync());
+
+            // Both events that exhausted their retries are preserved on the dead-letter queue rather than dropped.
+            var deadLettered = await DrainDeadLetterQueue(pubsub);
+            Assert.Equal(2, deadLettered.Count);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_TransientFailureThatLaterSucceeds_RetriesAndPersistsWithoutDeadLettering()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 12,
+                Exp: 4321,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+
+            // The first scope creation throws (a simulated transient failure); the retry creates a real scope and persists.
+            var flakyServices = new FlakyServiceProvider(scope.ServiceProvider, failuresBeforeSuccess: 1);
+            var synchronizer = new DataProviderSynchronizer(flakyServices, pubsub, logger, TestRetryPolicy);
+
+            var queue = new InMemoryPubSubQueue(Serialize(validEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            // The transient failure was retried (one warning) and ultimately succeeded (no error, nothing dead-lettered).
+            Assert.Equal(2, flakyServices.ScopeCreations);
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(12, persisted.Level);
+            Assert.Equal(4321, persisted.Exp);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_WellFormedEnvelopeWithMalformedInnerPayload_DeadLettersWithoutRetrying()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The envelope parses cleanly (known event type), but its inner payload is not valid JSON, so
+            // HandleEvent throws a JsonException — a poison message that must be dead-lettered without retrying.
+            var envelope = new DomainEventEnvelope
+            {
+                Type = nameof(PlayerCoreUpdatedEvent),
+                Payload = "this is not valid json",
+            };
+            var message = envelope.Serialize();
+            var queue = new InMemoryPubSubQueue(message);
+
+            await synchronizer.ProcessQueue(queue);
+
+            // A poison inner payload is surfaced as a warning (not retried, so no error) and dead-lettered verbatim.
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
+        }
+
+        private static async Task<List<string>> DrainDeadLetterQueue(IPubSubService pubsub)
+        {
+            var deadLetterQueue = pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
+            var drained = new List<string>();
+            var next = await deadLetterQueue.GetNextAsync();
+            while (next is not null)
+            {
+                drained.Add(next);
+                next = await deadLetterQueue.GetNextAsync();
+            }
+
+            return drained;
         }
 
         private static string Serialize(PlayerCoreUpdatedEvent evt)
@@ -125,6 +220,38 @@ namespace Game.Application.Tests.DataAccess
             public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Wraps a real <see cref="IServiceProvider"/> but makes the first <paramref name="failuresBeforeSuccess"/>
+        /// scope creations throw, simulating a transient failure that succeeds on a later retry. Scopes are created by
+        /// <see cref="ServiceProviderServiceExtensions.CreateScope"/>, which resolves this provider as the
+        /// <see cref="IServiceScopeFactory"/>, so failing here mirrors a transient error setting up the unit of work.
+        /// </summary>
+        private sealed class FlakyServiceProvider(IServiceProvider inner, int failuresBeforeSuccess) : IServiceProvider, IServiceScopeFactory
+        {
+            public int ScopeCreations { get; private set; }
+
+            public object? GetService(Type serviceType)
+            {
+                if (serviceType == typeof(IServiceScopeFactory))
+                {
+                    return this;
+                }
+
+                return inner.GetService(serviceType);
+            }
+
+            public IServiceScope CreateScope()
+            {
+                ScopeCreations++;
+                if (ScopeCreations <= failuresBeforeSuccess)
+                {
+                    throw new InvalidOperationException("Simulated transient failure creating a scope.");
+                }
+
+                return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
+            }
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
