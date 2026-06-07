@@ -763,6 +763,24 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(tag.Id, associated.Id);
         }
 
+        [Fact]
+        public async Task SetTagsForItemMod_UnknownItemMod_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                Id = 999999,
+                TagIds = Array.Empty<int>()
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item mod not found.", result.ErrorMessage);
+        }
+
         private async Task<List<Tag>> GetTagsForItem(int itemId)
         {
             using var scope = CreateScope();
