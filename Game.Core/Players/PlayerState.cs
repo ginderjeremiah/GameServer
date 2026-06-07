@@ -14,6 +14,19 @@ namespace Game.Core.Players
 
         public int? ActiveEnemyLevel { get; set; }
 
+        /// <summary>
+        /// The ids of the enemy's selected battle skills captured at battle start. Snapshotting the
+        /// loadout (rather than re-rolling it at validation time) is what guarantees the server
+        /// validates against the exact same skills the client received and simulated with.
+        /// </summary>
+        public List<int>? ActiveEnemySkillIds { get; set; }
+
+        /// <summary>
+        /// The RNG seed for the battle simulation, shared with the client so both sides' simulations
+        /// stay in lock-step. It is reserved for the simulation's randomness and is deliberately not
+        /// consumed by battle setup (level roll / skill selection), so the client and server begin
+        /// the simulation from the identical RNG state.
+        /// </summary>
         public uint? BattleSeed { get; set; }
 
         /// <summary>
@@ -25,10 +38,11 @@ namespace Game.Core.Players
 
         public bool HasActiveBattle => ActiveEnemyId.HasValue;
 
-        public void SetActiveBattle(int enemyId, int level, uint seed, DateTime startTime, BattleSnapshot snapshot)
+        public void SetActiveBattle(int enemyId, int level, List<int> enemySkillIds, uint seed, DateTime startTime, BattleSnapshot snapshot)
         {
             ActiveEnemyId = enemyId;
             ActiveEnemyLevel = level;
+            ActiveEnemySkillIds = enemySkillIds;
             BattleSeed = seed;
             BattleStartTime = startTime;
             Snapshot = snapshot;
@@ -48,6 +62,7 @@ namespace Game.Core.Players
         {
             ActiveEnemyId = null;
             ActiveEnemyLevel = null;
+            ActiveEnemySkillIds = null;
             BattleSeed = null;
             BattleStartTime = DateTime.UnixEpoch;
             Snapshot = null;

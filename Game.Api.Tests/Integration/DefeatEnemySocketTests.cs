@@ -75,6 +75,7 @@ namespace Game.Api.Tests.Integration
                 state.SetActiveBattle(
                     state.ActiveEnemyId!.Value,
                     state.ActiveEnemyLevel!.Value,
+                    state.ActiveEnemySkillIds!,
                     state.BattleSeed!.Value,
                     startTime: DateTime.UtcNow.AddMinutes(-30), // pretend battle started 30 minutes ago
                     state.Snapshot!

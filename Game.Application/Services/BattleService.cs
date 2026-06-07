@@ -10,12 +10,14 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
-        BattleSnapshotService battleSnapshotService)
+        BattleSnapshotService battleSnapshotService,
+        BattleFactory battleFactory)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
         private readonly BattleSnapshotService _battleSnapshotService = battleSnapshotService;
+        private readonly BattleFactory _battleFactory = battleFactory;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
         {
@@ -34,19 +36,18 @@ namespace Game.Application.Services
             var zoneEntity = _zones.GetZone(zoneId)
                 ?? throw new InvalidOperationException($"Zone {zoneId} not found");
 
-            var rng = new Random();
-            var level = rng.Next(zoneEntity.LevelMin, zoneEntity.LevelMax + 1);
-
-            var enemy = _enemies.GetRandomDomainEnemy(zoneId, level);
-
-            var battleRng = new Mulberry32((uint)rng.Next());
-            enemy.Skills = enemy.GetRandomSkills(battleRng);
-
             var now = DateTime.UtcNow;
             var seed = (uint)(now.Ticks % uint.MaxValue);
+
+            var enemy = _battleFactory.CreateBattleEnemy(
+                zoneEntity.LevelMin,
+                zoneEntity.LevelMax,
+                level => _enemies.GetRandomDomainEnemy(zoneId, level));
+
+            var enemySkillIds = enemy.Skills.Select(skill => skill.Id).ToList();
             var snapshot = _battleSnapshotService.CreateSnapshot(player);
 
-            state.SetActiveBattle(enemy.Id, level, seed, now, snapshot);
+            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot);
 
             return new BattleStartResult
             {
@@ -64,12 +65,12 @@ namespace Game.Application.Services
 
             var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
-            var seed = state.BattleSeed ?? 0;
+            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
             var enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
-            var result = SimulateBattle(enemy, seed, state.Snapshot);
+            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot);
 
             if (!result.Victory)
             {
@@ -113,12 +114,12 @@ namespace Game.Application.Services
 
             var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
-            var seed = state.BattleSeed ?? 0;
+            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
             var enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
-            var result = SimulateBattle(enemy, seed, state.Snapshot);
+            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot);
 
             if (result.Victory)
             {
@@ -145,7 +146,7 @@ namespace Game.Application.Services
 
             var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
-            var seed = state.BattleSeed ?? 0;
+            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
             var enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
@@ -157,7 +158,7 @@ namespace Game.Application.Services
                 return;
             }
 
-            var result = SimulateBattle(enemy, seed, state.Snapshot, elapsedMs);
+            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, elapsedMs);
 
             player.RecordBattleCompleted(enemy, result);
 
@@ -166,11 +167,9 @@ namespace Game.Application.Services
             await _playerRepo.SavePlayer(player);
         }
 
-        private BattleResult SimulateBattle(CoreEnemy enemy, uint seed, BattleSnapshot snapshot, int? maxMs = null)
+        private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
         {
-
-            var battleRng = new Mulberry32(seed);
-            enemy.Skills = enemy.GetRandomSkills(battleRng);
+            enemy.SetBattleSkills(enemySkillIds);
 
             var playerBattler = _battleSnapshotService.CreateFromSnapshot(snapshot);
             var enemyBattler = new Battler(

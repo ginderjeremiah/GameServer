@@ -46,6 +46,53 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_SnapshotsEnemyLoadoutSentToClient()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // An enemy with more skills than fit a battle loadout, so the selection actually narrows.
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            for (var i = 0; i < 6; i++)
+            {
+                var enemySkill = await TestDataSeeder.CreateSkillAsync(context, name: $"EnemySkill{i}");
+                await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            }
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The loadout is capped and snapshotted; the snapshot must equal what the client received,
+            // so the server validates the battle against the exact same skills the client simulated with.
+            Assert.Equal(4, result.Enemy.Skills.Count);
+            Assert.NotNull(state.ActiveEnemySkillIds);
+            Assert.Equal(result.Enemy.Skills.Select(s => s.Id), state.ActiveEnemySkillIds);
+
+            // Reconstructing a fresh enemy from the snapshot reproduces the same loadout (the validation path).
+            var reconstructed = enemies.GetDomainEnemy(result.Enemy.Id, result.Enemy.Level);
+            Assert.NotNull(reconstructed);
+            reconstructed.SetBattleSkills(state.ActiveEnemySkillIds);
+
+            Assert.Equal(
+                result.Enemy.Skills.Select(s => s.Id),
+                reconstructed.Skills.Select(s => s.Id));
+        }
+
+        [Fact]
         public async Task StartBattle_InvalidZone_Throws()
         {
             using var scope = CreateScope();
