@@ -76,16 +76,18 @@ SELECT setval(pg_get_serial_sequence('"Zones"', 'Id'), (SELECT MAX("Id") FROM "Z
 -- admin endpoint. The e2e suite creates fresh accounts through the real signup flow, which builds
 -- the full user+player graph but grants no roles. Rather than hand-seed an admin user (whose
 -- password hash and entire player graph would have to be kept in sync with the app), this trigger
--- auto-attaches the seeded Admin role (id 1) to any account whose username marks it as an admin
--- fixture ('e2eadmin…'). The admin-area tests can then sign in as a genuine admin while still using
--- a unique account per test, keeping them parallel-safe.
+-- auto-attaches the seeded Admin role to any account whose username marks it as an admin fixture
+-- ('e2eadmin…'). The admin-area tests can then sign in as a genuine admin while still using a unique
+-- account per test, keeping them parallel-safe. The role is resolved by name (not a hardcoded id),
+-- so it stays correct if the enum is ever renumbered and simply no-ops if the role is absent.
 --
 -- e2e-only: this lives solely in this seed script, which never touches production/local databases.
 -- Idempotent: CREATE OR REPLACE + DROP ... IF EXISTS make re-running safe.
 CREATE OR REPLACE FUNCTION e2e_grant_admin_role() RETURNS TRIGGER AS $$
 BEGIN
   IF NEW."Username" LIKE 'e2eadmin%' THEN
-    INSERT INTO "UserRoles" ("RolesId", "UsersId") VALUES (1, NEW."Id")
+    INSERT INTO "UserRoles" ("RolesId", "UsersId")
+    SELECT "Id", NEW."Id" FROM "Roles" WHERE "Name" = 'Admin'
     ON CONFLICT DO NOTHING;
   END IF;
   RETURN NULL;
