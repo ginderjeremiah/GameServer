@@ -9,8 +9,8 @@ vi.mock('$lib/common', () => ({
 	routeTo: vi.fn()
 }));
 vi.mock('$lib/api', () => ({
-	ApiRequest: {
-		get: vi.fn().mockResolvedValue([])
+	apiSocket: {
+		sendSocketCommand: vi.fn().mockResolvedValue({ data: [] })
 	}
 }));
 vi.mock('$stores', () => ({

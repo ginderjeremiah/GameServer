@@ -7,8 +7,10 @@
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { ApiRequest } from '$lib/api';
+import { apiSocket } from '$lib/api';
+import type { ApiSocketCommandNoRequest, ApiSocketResponseTypes } from '$lib/api/types/api-socket-type-map';
 import { staticData } from '$stores';
+import { readReferenceCache, writeReferenceCache } from './reference-cache';
 
 export type ItemStatus = 'pending' | 'loading' | 'done' | 'error';
 export type Phase = 'checking' | 'loading' | 'done' | 'error';
@@ -29,90 +31,129 @@ const TITLES: Record<Phase, string> = {
 	done: 'Ready.'
 };
 
-/* One row per reference-data set the loading screen pulls. `loaded` reports
-   whether the in-memory store slot is already populated (so a refresh can skip
-   it) and `load` performs the typed fetch + store assignment. Keeping them in a
-   single table keeps the manifest definition DRY. */
+/* The socket has no built-in per-command timeout; without one a dead or unreachable backend
+   would leave the loading screen hanging on a command that never resolves. Bounding each socket
+   call surfaces the error/retry UI instead. */
+const SOCKET_TIMEOUT_MS = 15000;
+
+const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
+	new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error('Timed out waiting for the server.')), SOCKET_TIMEOUT_MS);
+		promise.then(
+			(value) => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			(error) => {
+				clearTimeout(timer);
+				reject(error);
+			}
+		);
+	});
+
+/* One row per reference-data set the loading screen pulls. Each set is loaded over
+   the authenticated socket via its `Get*` command and cached in local storage keyed
+   by the backend-supplied content version, so a refresh only re-downloads the sets
+   whose version changed. Keeping them in a single table keeps the manifest DRY. */
 interface RefDataSource {
 	key: string;
 	label: string;
+	// The socket command that loads this set; also the key its version is reported under.
+	command: ApiSocketCommandNoRequest;
+	// Whether the in-memory store slot is already populated (so a same-session re-mount can skip it).
 	loaded: () => boolean;
+	// Fetch over the socket and populate the in-memory store.
 	load: () => Promise<void>;
+	// Populate the in-memory store from a cached payload.
+	hydrate: (data: unknown) => void;
+	// The current in-memory value, to write to the cache after a fresh load.
+	current: () => unknown;
+}
+
+/* Builds a typed reference-data source from a store getter/setter and its socket command,
+   so each row stays type-checked against the command's response type. */
+function refSource<C extends ApiSocketCommandNoRequest>(
+	key: string,
+	label: string,
+	command: C,
+	read: () => ApiSocketResponseTypes[C],
+	write: (data: ApiSocketResponseTypes[C]) => void
+): RefDataSource {
+	return {
+		key,
+		label,
+		command,
+		loaded: () => read() != null,
+		load: async () => write((await withTimeout(apiSocket.sendSocketCommand(command))).data),
+		hydrate: (data) => write(data as ApiSocketResponseTypes[C]),
+		current: () => read()
+	};
 }
 
 const REFERENCE_DATA: RefDataSource[] = [
-	{
-		key: 'zones',
-		label: 'Zones',
-		loaded: () => staticData.zones != null,
-		load: async () => {
-			staticData.zones = await ApiRequest.get('Zones');
-		}
-	},
-	{
-		key: 'enemies',
-		label: 'Enemies',
-		loaded: () => staticData.enemies != null,
-		load: async () => {
-			staticData.enemies = await ApiRequest.get('Enemies');
-		}
-	},
-	{
-		key: 'items',
-		label: 'Items',
-		loaded: () => staticData.items != null,
-		load: async () => {
-			staticData.items = await ApiRequest.get('Items');
-		}
-	},
-	{
-		key: 'skills',
-		label: 'Skills',
-		loaded: () => staticData.skills != null,
-		load: async () => {
-			staticData.skills = await ApiRequest.get('Skills');
-		}
-	},
-	{
-		key: 'itemMods',
-		label: 'Item Mods',
-		loaded: () => staticData.itemMods != null,
-		load: async () => {
-			staticData.itemMods = await ApiRequest.get('ItemMods');
-		}
-	},
-	{
-		key: 'attributes',
-		label: 'Attributes',
-		loaded: () => staticData.attributes != null,
-		load: async () => {
-			staticData.attributes = await ApiRequest.get('Attributes');
-		}
-	},
-	{
-		key: 'challenges',
-		label: 'Challenges',
-		loaded: () => staticData.challenges != null,
-		load: async () => {
-			staticData.challenges = await ApiRequest.get('Challenges');
-		}
-	},
-	{
-		key: 'challengeTypes',
-		label: 'Challenge Types',
-		loaded: () => staticData.challengeTypes != null,
-		load: async () => {
-			staticData.challengeTypes = await ApiRequest.get('Challenges/ChallengeTypes');
-		}
-	},
-	{
-		key: 'statisticTypes',
-		label: 'Statistic Types',
-		loaded: () => staticData.statisticTypes != null,
-		load: async () => {
-			staticData.statisticTypes = await ApiRequest.get('Statistics/StatisticTypes');
-		}
-	}
+	refSource(
+		'zones',
+		'Zones',
+		'GetZones',
+		() => staticData.zones,
+		(d) => (staticData.zones = d)
+	),
+	refSource(
+		'enemies',
+		'Enemies',
+		'GetEnemies',
+		() => staticData.enemies,
+		(d) => (staticData.enemies = d)
+	),
+	refSource(
+		'items',
+		'Items',
+		'GetItems',
+		() => staticData.items,
+		(d) => (staticData.items = d)
+	),
+	refSource(
+		'skills',
+		'Skills',
+		'GetSkills',
+		() => staticData.skills,
+		(d) => (staticData.skills = d)
+	),
+	refSource(
+		'itemMods',
+		'Item Mods',
+		'GetItemMods',
+		() => staticData.itemMods,
+		(d) => (staticData.itemMods = d)
+	),
+	refSource(
+		'attributes',
+		'Attributes',
+		'GetAttributes',
+		() => staticData.attributes,
+		(d) => (staticData.attributes = d)
+	),
+	refSource(
+		'challenges',
+		'Challenges',
+		'GetChallenges',
+		() => staticData.challenges,
+		(d) => (staticData.challenges = d)
+	),
+	refSource(
+		'challengeTypes',
+		'Challenge Types',
+		'GetChallengeTypes',
+		() => staticData.challengeTypes,
+		(d) => (staticData.challengeTypes = d)
+	),
+	refSource(
+		'statisticTypes',
+		'Statistic Types',
+		'GetStatisticTypes',
+		() => staticData.statisticTypes,
+		(d) => (staticData.statisticTypes = d)
+	)
 ];
 
 /* How long the "checking cache" beat lingers before loading starts, and the
@@ -148,6 +189,11 @@ export class LoadingView {
 	phase = $state<Phase>('checking');
 	activeIndex = $state(-1);
 
+	// Server-reported content version per set (keyed by socket command), or null when the version
+	// check couldn't be reached — in which case the cache is bypassed and every set is fetched fresh.
+	// Not reactive: it only drives load orchestration, nothing renders from it.
+	private versions: Map<string, string> | null = null;
+
 	readonly completed = $derived(this.items.filter((i) => i.status === 'done').length);
 	readonly progressPct = $derived(this.items.length ? (this.completed / this.items.length) * 100 : 0);
 	readonly currentItem = $derived(
@@ -166,17 +212,67 @@ export class LoadingView {
 			fetch: () => dedupedFetch(src.key, src.load)
 		}));
 
-		// Everything already cached — skip straight to done.
+		// Everything already in memory (same-session re-mount) — no version check needed.
 		if (this.items.every((i) => i.status === 'done')) {
 			this.finish();
 			return;
 		}
 
+		// Ask the server for the current version of every set, then resolve from the local-storage
+		// cache anything whose version still matches, leaving only genuinely stale sets to fetch.
 		this.phase = 'checking';
+		this.versions = await this.fetchVersions();
+		this.resolveCached();
+
+		if (this.items.every((i) => i.status === 'done')) {
+			this.finish();
+			return;
+		}
+
 		await delay(CHECKING_DELAY_MS);
 
 		this.phase = 'loading';
 		await this.loadFrom(0);
+	}
+
+	/**
+	 * Fetches the per-set content versions over the socket. Returns null (cache disabled, fetch
+	 * everything fresh) if the call fails, so a transient version-check error never serves stale data.
+	 */
+	private async fetchVersions(): Promise<Map<string, string> | null> {
+		try {
+			const response = await withTimeout(apiSocket.sendSocketCommand('GetReferenceDataVersions'));
+			// Plain Map: this only drives load orchestration and is never rendered, so it needn't be reactive.
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			return new Map(response.data.map((v) => [v.command, v.version]));
+		} catch {
+			return null;
+		}
+	}
+
+	/** Hydrates from the local-storage cache every not-yet-loaded set whose cached version is current. */
+	private resolveCached(): void {
+		if (!this.versions) {
+			return;
+		}
+
+		for (let i = 0; i < REFERENCE_DATA.length; i++) {
+			if (this.items[i].status === 'done') {
+				continue;
+			}
+
+			const source = REFERENCE_DATA[i];
+			const serverVersion = this.versions.get(source.command);
+			if (serverVersion == null) {
+				continue;
+			}
+
+			const cached = readReferenceCache(source.key);
+			if (cached && cached.version === serverVersion) {
+				source.hydrate(cached.data);
+				this.items[i].status = 'done';
+			}
+		}
 	}
 
 	/** Re-run the failed (current) set and continue from there. */
@@ -214,6 +310,7 @@ export class LoadingView {
 			try {
 				this.items[i].durationMs = await this.items[i].fetch();
 				this.items[i].status = 'done';
+				this.cacheLoaded(i);
 			} catch (e) {
 				this.items[i].status = 'error';
 				this.items[i].error = e instanceof Error ? e.message : 'Network error — could not reach server.';
@@ -225,5 +322,14 @@ export class LoadingView {
 		}
 
 		this.finish();
+	}
+
+	/** Persists a freshly-loaded set under the version the server reported for it (if known). */
+	private cacheLoaded(index: number): void {
+		const source = REFERENCE_DATA[index];
+		const version = this.versions?.get(source.command);
+		if (version != null) {
+			writeReferenceCache(source.key, version, source.current());
+		}
 	}
 }

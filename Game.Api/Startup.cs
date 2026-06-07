@@ -4,6 +4,7 @@ using Game.Api.CodeGen;
 using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
+using Game.Api.Sockets.Commands;
 using Game.Application.DependencyInjection;
 using Game.Core;
 using Game.Core.Events;
@@ -76,6 +77,7 @@ namespace Game.Api
                 .AddSingleton<JwtTokenService>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
+                .AddReferenceDataCommands()
                 .AddSingleton<ApiCodeGenerator>()
                 .AddScoped<AdminCacheInvalidationFilter>()
                 .AddScoped<AdminRoleAuthorizationFilter>();
