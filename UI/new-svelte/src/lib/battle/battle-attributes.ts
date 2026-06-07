@@ -1,5 +1,12 @@
 import { IBattlerAttribute, EAttribute } from '$lib/api';
 import { normalizeText } from '$lib/common';
+import {
+	STATIC_ATTRIBUTE_MODIFIERS,
+	EModifierType,
+	EAttributeModifierSource,
+	type AttributeModifier
+} from './attribute-modifier';
+import { computeAttributes } from './attribute-collection';
 
 const attributesMaxId = Object.values(EAttribute)[Object.values(EAttribute).length - 1] as number;
 
@@ -13,12 +20,28 @@ export class BattleAttributes {
 
 	public setData(attList: IBattlerAttribute[] = [], calcDerivedStats: boolean = true) {
 		this.attributes.fill(0, 0, attributesMaxId + 1);
-		for (const att of attList) {
-			this.attributes[att.attributeId] += att.amount;
-		}
 
 		if (calcDerivedStats) {
-			this.calculateDerivedStats();
+			const modifiers: AttributeModifier[] = [
+				...attList.map((att) => ({
+					attribute: att.attributeId,
+					amount: att.amount,
+					type: EModifierType.Additive,
+					source: EAttributeModifierSource.AttributeDistribution
+				})),
+				...STATIC_ATTRIBUTE_MODIFIERS
+			];
+			const computed = computeAttributes(modifiers);
+			for (const [attr, result] of computed) {
+				this.attributes[attr] = result.total;
+			}
+			// DropBonus uses log10(Luck), which cannot be expressed as a constant
+			// modifier in the pipeline; computed as a post-step once Luck is resolved.
+			this.attributes[EAttribute.DropBonus] += Math.log10(this.attributes[EAttribute.Luck]);
+		} else {
+			for (const att of attList) {
+				this.attributes[att.attributeId] += att.amount;
+			}
 		}
 	}
 
@@ -30,20 +53,5 @@ export class BattleAttributes {
 		return this.attributes
 			.map((att, i) => ({ name: normalizeText(EAttribute[i]), value: att }))
 			.filter((att) => att.value != 0 || includeZeroes);
-	};
-
-	private calculateDerivedStats = () => {
-		this.attributes[EAttribute.MaxHealth] +=
-			50 + 20 * this.attributes[EAttribute.Endurance] + 5 * this.attributes[EAttribute.Strength];
-		this.attributes[EAttribute.Defense] +=
-			2 + this.attributes[EAttribute.Endurance] + 0.5 * this.attributes[EAttribute.Agility];
-		this.attributes[EAttribute.CooldownRecovery] +=
-			0.4 * this.attributes[EAttribute.Agility] + 0.1 * this.attributes[EAttribute.Dexterity];
-		this.attributes[EAttribute.DropBonus] += Math.log10(this.attributes[EAttribute.Luck]);
-		// this.attributes[EAttribute.CriticalChance] = 0;
-		// this.attributes[EAttribute.CriticalDamage] = 0;
-		// this.attributes[EAttribute.DodgeChance] = 0;
-		// this.attributes[EAttribute.BlockChance] = 0;
-		// this.attributes[EAttribute.BlockReduction] = 0;
 	};
 }
