@@ -148,6 +148,60 @@ namespace Game.Application.Tests.Services
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
         }
 
+        [Fact]
+        public async Task LoadPlayer_PersistedAppliedMod_IncludesModAttributesInEquippedModifiers()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var modSlot = new Abstractions.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+                Index = 0,
+            };
+            context.ItemModSlots.Add(modSlot);
+            context.UnlockedItems.Add(new Abstractions.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
+            });
+
+            // A Prefix mod granting Dexterity +7, unlocked for the player.
+            var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
+            context.UnlockedMods.Add(new Abstractions.Entities.UnlockedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            // Persist the applied mod as if it had been applied in a previous session, so the
+            // player is loaded fresh from the DB with it already in place (the #90 scenario).
+            context.AppliedMods.Add(new Abstractions.Entities.AppliedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                ItemModSlotId = modSlot.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var modifiers = player.Inventory.GetEquippedAttributeModifiers().ToList();
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 5.0 && m.Source == EAttributeModifierSource.Item);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
+        }
+
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
     }
 }
