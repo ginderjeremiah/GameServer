@@ -87,15 +87,13 @@ namespace Game.Core.Tests.Attributes
         // ── Unsupported modifier type ───────────────────────────────────────
 
         [Fact]
-        public void Apply_UnsupportedModifierType_ReturnsCurrentValueUnchanged()
+        public void Apply_UnsupportedModifierType_ThrowsModifierTypeNotSupportedException()
         {
             // EModifierType only defines Additive(1) and Multiplicative(2); an out-of-range value
-            // exercises the defensive default branch, which is a no-op.
+            // represents a programming error and must surface loudly rather than silently no-op.
             var modifier = MakeModifier((EModifierType)99, amount: 5.0);
 
-            var result = modifier.Apply(10.0, EmptyStore());
-
-            Assert.Equal(10.0, result);
+            Assert.Throws<ModifierTypeNotSupportedException>(() => modifier.Apply(10.0, EmptyStore()));
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

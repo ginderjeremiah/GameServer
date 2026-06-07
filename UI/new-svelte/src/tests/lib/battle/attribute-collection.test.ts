@@ -77,6 +77,18 @@ describe('computeAttributes', () => {
 		// Intellect was never referenced, so it is simply absent.
 		expect(computed.get(EAttribute.Intellect)).toBeUndefined();
 	});
+
+	it('throws for an unsupported modifier type', () => {
+		// EModifierType only defines Additive(1) and Multiplicative(2); an out-of-range value
+		// represents a programming error and must surface loudly rather than silently no-op.
+		const modifier: AttributeModifier = {
+			attribute: EAttribute.Strength,
+			amount: 5,
+			type: 99 as EModifierType,
+			source: EAttributeModifierSource.Item
+		};
+		expect(() => computeAttributes([modifier])).toThrow('Unsupported EModifierType: 99');
+	});
 });
 
 describe('groupBySource', () => {
