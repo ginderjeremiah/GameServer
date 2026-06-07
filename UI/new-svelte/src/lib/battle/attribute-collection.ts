@@ -83,8 +83,17 @@ export function computeAttributes<T extends AttributeModifier>(
 		inProgress.add(attr);
 
 		const list = byAttr.get(attr) ?? [];
-		const adds = list.filter((m) => m.type === EModifierType.Additive);
-		const mults = list.filter((m) => m.type === EModifierType.Multiplicative);
+		const adds: T[] = [];
+		const mults: T[] = [];
+		for (const mod of list) {
+			if (mod.type === EModifierType.Additive) {
+				adds.push(mod);
+			} else if (mod.type === EModifierType.Multiplicative) {
+				mults.push(mod);
+			} else {
+				throw new Error(`Unsupported EModifierType: ${mod.type}`);
+			}
+		}
 
 		let running = 0;
 		const lines: AppliedModifier<T>[] = [];
