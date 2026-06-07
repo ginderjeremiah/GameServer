@@ -28,7 +28,7 @@ namespace Game.Core.Battle
         }
 
         public Battler(Enemy enemy)
-            : this(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.Skills, enemy.Level)
+            : this(new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level)
         {
         }
 

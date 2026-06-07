@@ -271,7 +271,7 @@ namespace Game.Core.Tests.Players
             Level = 1,
             IsBoss = false,
             AttributeDistributions = [],
-            Skills = [],
+            AvailableSkills = [],
         };
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
             List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null) => new()

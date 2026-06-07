@@ -78,9 +78,9 @@ namespace Game.Application.Tests.Services
 
             // The loadout is capped and snapshotted; the snapshot must equal what the client received,
             // so the server validates the battle against the exact same skills the client simulated with.
-            Assert.Equal(4, result.Enemy.Skills.Count);
+            Assert.Equal(4, result.Enemy.BattleSkills.Count);
             Assert.NotNull(state.ActiveEnemySkillIds);
-            Assert.Equal(result.Enemy.Skills.Select(s => s.Id), state.ActiveEnemySkillIds);
+            Assert.Equal(result.Enemy.BattleSkills.Select(s => s.Id), state.ActiveEnemySkillIds);
 
             // Reconstructing a fresh enemy from the snapshot reproduces the same loadout (the validation path).
             var reconstructed = enemies.GetDomainEnemy(result.Enemy.Id, result.Enemy.Level);
@@ -88,8 +88,8 @@ namespace Game.Application.Tests.Services
             reconstructed.SetBattleSkills(state.ActiveEnemySkillIds);
 
             Assert.Equal(
-                result.Enemy.Skills.Select(s => s.Id),
-                reconstructed.Skills.Select(s => s.Id));
+                result.Enemy.BattleSkills.Select(s => s.Id),
+                reconstructed.BattleSkills.Select(s => s.Id));
         }
 
         [Fact]

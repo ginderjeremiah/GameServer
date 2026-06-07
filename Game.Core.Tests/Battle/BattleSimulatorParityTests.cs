@@ -220,7 +220,7 @@ namespace Game.Core.Tests.Battle
         {
             var defaultSkills = skills ?? [];
 
-            return new Enemy
+            var enemy = new Enemy
             {
                 Id = 1,
                 Name = "Test Enemy",
@@ -241,8 +241,10 @@ namespace Game.Core.Tests.Battle
                         AmountPerLevel = 0,
                     },
                 ],
-                Skills = defaultSkills,
+                AvailableSkills = defaultSkills,
             };
+            enemy.SetBattleSkills(defaultSkills.Select(s => s.Id).ToList());
+            return enemy;
         }
     }
 }

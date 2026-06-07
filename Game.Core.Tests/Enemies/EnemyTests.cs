@@ -13,7 +13,7 @@ namespace Game.Core.Tests.Enemies
 
             enemy.SelectBattleSkills();
 
-            Assert.Equal(4, enemy.Skills.Count);
+            Assert.Equal(4, enemy.BattleSkills.Count);
         }
 
         [Fact]
@@ -23,7 +23,7 @@ namespace Game.Core.Tests.Enemies
 
             enemy.SelectBattleSkills();
 
-            Assert.Equal([0, 1, 2], enemy.Skills.Select(s => s.Id).OrderBy(id => id));
+            Assert.Equal([0, 1, 2], enemy.BattleSkills.Select(s => s.Id).OrderBy(id => id));
         }
 
         [Fact]
@@ -35,8 +35,18 @@ namespace Game.Core.Tests.Enemies
 
             enemy.SelectBattleSkills();
 
-            Assert.All(enemy.Skills, s => Assert.Contains(s.Id, availableIds));
-            Assert.Equal(enemy.Skills.Count, enemy.Skills.Select(s => s.Id).Distinct().Count());
+            Assert.All(enemy.BattleSkills, s => Assert.Contains(s.Id, availableIds));
+            Assert.Equal(enemy.BattleSkills.Count, enemy.BattleSkills.Select(s => s.Id).Distinct().Count());
+        }
+
+        [Fact]
+        public void SelectBattleSkills_DoesNotMutateAvailableSkills()
+        {
+            var enemy = MakeEnemy(Skills(6));
+
+            enemy.SelectBattleSkills();
+
+            Assert.Equal(6, enemy.AvailableSkills.Count);
         }
 
         [Fact]
@@ -46,7 +56,17 @@ namespace Game.Core.Tests.Enemies
 
             enemy.SetBattleSkills([5, 1, 7]);
 
-            Assert.Equal([5, 1, 7], enemy.Skills.Select(s => s.Id));
+            Assert.Equal([5, 1, 7], enemy.BattleSkills.Select(s => s.Id));
+        }
+
+        [Fact]
+        public void SetBattleSkills_DoesNotMutateAvailableSkills()
+        {
+            var enemy = MakeEnemy(Skills(8));
+
+            enemy.SetBattleSkills([5, 1, 7]);
+
+            Assert.Equal(8, enemy.AvailableSkills.Count);
         }
 
         [Fact]
@@ -54,13 +74,21 @@ namespace Game.Core.Tests.Enemies
         {
             var enemy = MakeEnemy(Skills(8));
             enemy.SelectBattleSkills();
-            var selectedIds = enemy.Skills.Select(s => s.Id).ToList();
+            var selectedIds = enemy.BattleSkills.Select(s => s.Id).ToList();
 
             // A freshly-built enemy restored from the snapshot reproduces the same loadout.
             var restored = MakeEnemy(Skills(8));
             restored.SetBattleSkills(selectedIds);
 
-            Assert.Equal(selectedIds, restored.Skills.Select(s => s.Id));
+            Assert.Equal(selectedIds, restored.BattleSkills.Select(s => s.Id));
+        }
+
+        [Fact]
+        public void BattleSkills_BeforeSelection_ThrowsInvalidOperation()
+        {
+            var enemy = MakeEnemy(Skills(3));
+
+            Assert.Throws<InvalidOperationException>(() => _ = enemy.BattleSkills);
         }
 
         private static List<Skill> Skills(int count) =>
@@ -83,7 +111,7 @@ namespace Game.Core.Tests.Enemies
             IsBoss = false,
             Level = 1,
             AttributeDistributions = [],
-            Skills = skills,
+            AvailableSkills = skills,
         };
     }
 }

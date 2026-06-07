@@ -105,7 +105,7 @@ namespace Game.Core.Tests.Battle
                     AmountPerLevel = 0,
                 },
             ],
-            Skills = [],
+            AvailableSkills = [],
         };
     }
 }
