@@ -28,6 +28,7 @@ When creating follow-up issues, add any of the follow tags (if applicable):
 - bug: This issue addresses an actual defect in the application. Do no use this for partially complete or otherwise unimplemented code.
 - tech debt: This issue is for refactoring or cleanup of existing code to increase code maintainability. In other words, there should be no tangible user-facing effect from the change.
 - enhancement: The issue implements new or previously unimplemented functionality.
+- spike: This issue is for researching a large-scale problem or refactor and creating new issues to resolve it
 
 # Overall Project Guidelines
 

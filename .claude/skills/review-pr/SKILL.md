@@ -17,13 +17,12 @@ description: >-
 
 # Review a Pull Request
 
-Review a GitHub pull request the way a careful maintainer of *this* project would: understand the
+Review a GitHub pull request the way a careful maintainer of _this_ project would: understand the
 problem it solves, judge the change against the project's own standards (not generic taste), and
 leave a fair, actionable review on GitHub.
 
-This is a **static** review — read the PR diff, the changed files, and the surrounding code, and
-reason about correctness and coverage. You don't build, run the test suite, or launch the app.
-Judging whether tests are *adequate* is done by reading them, not executing them.
+You don't need to launch the app and manually validate the UI. Test failure checks are also performed
+automatically by the CI pipeline, so manually checking they pass is not required.
 
 The review runs unattended: it pulls everything it needs, forms a verdict, and submits a formal
 GitHub review on its own. Because the verdict can gate the PR — a `REQUEST_CHANGES` blocks merge —
@@ -64,7 +63,7 @@ wrong PR wastes a real, published review.
 
 ### 2. Gather the full context
 
-A good review starts from the *problem*, not the diff. Pull, in this order:
+A good review starts from the _problem_, not the diff. Pull, in this order:
 
 - **The PR** — pull it with `mcp__github__pull_request_read`. Its `method:` arg picks what comes
   back; the read methods this skill uses — `get`, `get_files`, `get_diff`, `get_reviews`,
@@ -87,7 +86,7 @@ A good review starts from the *problem*, not the diff. Pull, in this order:
   **Re-reviews** below.
 - **Your reviewer identity** — resolve your own GitHub login with `get_me`, up front. It decides
   whether your verdict can gate at all: GitHub only accepts `APPROVE` / `REQUEST_CHANGES` when you
-  are **not** the PR's author. If `get_me` equals the author, your review can go out *only* as
+  are **not** the PR's author. If `get_me` equals the author, your review can go out _only_ as
   `COMMENT`, so you'll state the intended verdict in the body (step 5) — settle that now rather than
   discovering it at submit time. The same login is what tells your own review threads from a human
   reviewer's on a re-review.
@@ -100,7 +99,7 @@ Make sure you understand the full scope and the problem before you start judging
 
 ### 3. Read the right guideline docs
 
-The whole point of this skill is to hold the PR to *this project's* standards, which live in the
+The whole point of this skill is to hold the PR to _this project's_ standards, which live in the
 docs. `CLAUDE.md` is the always-on source of truth; then read the doc for each area the PR touches,
 because the project requires it:
 
@@ -138,7 +137,7 @@ project-specific checks crowd them out.
 
 **Does it meet the guideline docs for the area it touches?**
 
-- *Backend (DDD / layering):* domain logic belongs in `Game.Core`; the application layer only
+- _Backend (DDD / layering):_ domain logic belongs in `Game.Core`; the application layer only
   orchestrates; the API layer only handles HTTP/WebSocket requests, validates input, and returns
   responses. Flag domain or orchestration logic leaking into controllers/handlers or repositories.
   Repositories create/persist domain objects and dispatch domain events before persisting — they
@@ -146,7 +145,7 @@ project-specific checks crowd them out.
   `Game.DataAccess/Mappers`). Watch the reference-data gotchas in `backend.md`: zero-based Ids,
   `IEntityStore.Update` vs `DbContext.Update`, and not mutating cached `AsNoTracking().Include(...)`
   graphs.
-- *Frontend (theming / organization):* components stay small — large or complex ones should be
+- _Frontend (theming / organization):_ components stay small — large or complex ones should be
   broken into subcomponents (in their own folder when there are several). Prefer making logic
   reactive with `statify` over adding new Svelte stores. New UI should use the theme tokens
   documented in `frontend.md` (rarity palette, themeable accent palettes / `tintColor`,
@@ -160,14 +159,14 @@ roles), input validation, injection, secrets committed to the repo, and over-exp
 **Is test coverage sufficient and following the guidelines?** This project takes testing
 seriously, so under-testing is a real (often blocking) finding, not a nit:
 
-- *Frontend:* every touched page, component, and lib module has unit tests under `tests/` mirroring
+- _Frontend:_ every touched page, component, and lib module has unit tests under `tests/` mirroring
   the source path. E2e (Playwright) only for critical user flows.
-- *Backend:* all domain logic is thoroughly unit-tested for edge and error cases, classical
+- _Backend:_ all domain logic is thoroughly unit-tested for edge and error cases, classical
   (Detroit) style with minimal test doubles — the project has no unmanaged dependencies.
   Interactions with out-of-process dependencies (Postgres, Redis) are covered by integration tests,
   and logic-bearing classes shouldn't depend on those dependencies in the first place (if one does,
   that's a refactor finding). E2e covers critical paths.
-- *Battle logic:* the same scenarios and expected results must exist in **both** the frontend and
+- _Battle logic:_ the same scenarios and expected results must exist in **both** the frontend and
   backend suites — a change on one side without the mirrored test on the other is a finding.
 
 You do **not** need to run the app or the tests for any of this — read the added/changed tests and
@@ -186,9 +185,9 @@ Tag every finding so the author can tell what's mandatory from what's optional:
 Then map to a GitHub verdict (`event`). **Identity decides this before your judgment does:** if you
 are the PR's author (the `get_me` check from step 2), GitHub won't accept a gating verdict on your
 own PR, so the `event` is **always `COMMENT`** — put your real call (approve / request changes) in
-the body so the intent is unambiguous. When you are *not* the author, map your judgment to the event:
+the body so the intent is unambiguous. When you are _not_ the author, map your judgment to the event:
 
-- **`REQUEST_CHANGES`** — there is at least one *blocking* finding.
+- **`REQUEST_CHANGES`** — there is at least one _blocking_ finding.
 - **`APPROVE`** — no blocking findings. Should-fixes and nits are fine to approve over; just call
   them out so they're not lost.
 - **`COMMENT`** — for a non-author, reserve this for when a real verdict isn't appropriate: the PR is
@@ -233,18 +232,23 @@ empty section:
 **Verdict:** <Approve | Request changes> — <one-sentence reason>
 
 ### Blocking
+
 - <finding — file:line — why it blocks, citing the rule/doc>
 
 ### Should-fix
+
 - <finding — file:line>
 
 ### Nits
+
 - <finding — file:line>
 
 ### Test coverage
+
 - <what's covered, what's missing, against the project's testing rules>
 
 ### What's good
+
 - <genuinely call out solid work, briefly>
 ```
 
@@ -258,7 +262,7 @@ approval, not invented criticism.
 If step 2 turned up existing reviews or threads, the PR has been looked at before and most likely
 had new commits pushed in response. Reviewing it from scratch is the wrong move — it re-flags issues
 already raised, duplicates inline comments on the same lines, and buries the thing the author most
-wants to know: did their fixes land? Review *incrementally* instead.
+wants to know: did their fixes land? Review _incrementally_ instead.
 
 **Scope the delta.** Anchor on the commit the last review was submitted against and concentrate on
 what changed since — that's what the new round is about. Keep a light pass over the whole PR so a new
@@ -272,7 +276,7 @@ that drew no findings.
   restate it as a brand-new finding).
 - **Regressed** — was fine, a later commit broke it again. Call it out as a new finding.
 
-**Don't duplicate comments.** Only genuinely *new* findings on newly-changed lines get new inline
+**Don't duplicate comments.** Only genuinely _new_ findings on newly-changed lines get new inline
 comments, posted through the normal review flow (step 6). Anything already raised lives on its
 existing thread or in the summary — never re-post it. The thread replies and resolves below are
 separate standalone calls, not part of the submitted review.
@@ -281,13 +285,13 @@ separate standalone calls, not part of the submitted review.
 human reviewer's, and skip any thread already marked `isResolved`. Then, for threads **you raised
 yourself**:
 
-- Reply with `add_reply_to_pull_request_comment` (it takes the *comment's* `commentId`, from the
+- Reply with `add_reply_to_pull_request_comment` (it takes the _comment's_ `commentId`, from the
   thread's comments) — a short status note: what the new commits fixed, or what's still needed.
 - If you've **verified** the finding is genuinely addressed — read the new code; `isOutdated` only
   means the line moved, not that it's fixed — resolve the thread with `pull_request_review_write`
   `method: "resolve_thread"` and the thread's `threadId` (the `PRRT_…` node ID from
-  `get_review_comments`). Mind the two identifiers: replies key off the *comment* id, resolving keys
-  off the *thread* id.
+  `get_review_comments`). Mind the two identifiers: replies key off the _comment_ id, resolving keys
+  off the _thread_ id.
 - Leave still-open threads unresolved.
 
 Leave threads raised by **other** reviewers alone — don't reply on or resolve someone else's thread;
@@ -303,11 +307,13 @@ the prior round before any new findings:
 **Verdict:** <Approve | Request changes> — <e.g. "all blocking items from the last review are resolved">
 
 ### Since the last review
+
 - ✅ <prior finding> — addressed in <where>
 - ⚠️ <prior finding> — still open: <what's missing>
 - 🔁 <prior finding> — regressed in <where>
 
 ### New findings
+
 - <only issues introduced by the new commits, severity-tagged>
 ```
 
