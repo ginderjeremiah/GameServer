@@ -1,15 +1,16 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.Core.Probability;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
+using Contracts = Game.Abstractions.Contracts;
 using CoreEnemy = Game.Core.Enemies.Enemy;
 
 using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(GameContext context, ISkills skills, IZones zones) : IEnemies
+    internal class Enemies(GameContext context, ISkillEntityCache skills, IZones zones) : IEnemies
     {
         private static List<Enemy>? _enemyList;
         // Per-zone enemy spawn tables keyed by zone id. Derived from the in-memory enemy list
@@ -17,7 +18,7 @@ namespace Game.DataAccess.Repositories
         private static Dictionary<int, ProbabilityTable<int>>? _zoneEnemyTables;
 
         private readonly GameContext _context = context;
-        private readonly ISkills _skills = skills;
+        private readonly ISkillEntityCache _skills = skills;
         private readonly IZones _zones = zones;
 
         public void InvalidateCache()
@@ -26,7 +27,7 @@ namespace Game.DataAccess.Repositories
             _zoneEnemyTables = null;
         }
 
-        public List<Enemy> All(bool refreshCache = false)
+        private List<Enemy> AllEntities(bool refreshCache = false)
         {
             if (_enemyList is null || refreshCache)
             {
@@ -43,9 +44,14 @@ namespace Game.DataAccess.Repositories
             return _enemyList;
         }
 
+        public List<Contracts.Enemy> All(bool refreshCache = false)
+        {
+            return [.. AllEntities(refreshCache).Select(EnemyMapper.ToContract)];
+        }
+
         public Enemy? GetEnemy(int enemyId)
         {
-            var enemies = All();
+            var enemies = AllEntities();
             return enemies.Count <= enemyId ? null : enemies[enemyId];
         }
 
@@ -56,7 +62,7 @@ namespace Game.DataAccess.Repositories
                 throw new ArgumentOutOfRangeException(nameof(zoneId), zoneId, $"No zone exists with Id {zoneId}.");
             }
 
-            var enemies = All();
+            var enemies = AllEntities();
             var zoneEnemyTables = _zoneEnemyTables ??= BuildZoneEnemyTables(enemies);
 
             if (!zoneEnemyTables.TryGetValue(zoneId, out var table))
@@ -72,18 +78,18 @@ namespace Game.DataAccess.Repositories
             var entity = GetEnemy(enemyId);
             return entity is null
                 ? null
-                : EnemyMapper.ToCore(entity, level, _skills.AllSkills());
+                : EnemyMapper.ToCore(entity, level, _skills.AllSkillEntities());
         }
 
         public CoreEnemy GetRandomDomainEnemy(int zoneId, int level)
         {
             var entity = GetRandomEnemy(zoneId);
-            return EnemyMapper.ToCore(entity, level, _skills.AllSkills());
+            return EnemyMapper.ToCore(entity, level, _skills.AllSkillEntities());
         }
 
         /// <summary>
         /// Builds the per-zone enemy spawn tables from the in-memory enemy list. The ZoneEnemy weights are
-        /// already eager-loaded by <see cref="All"/>, so no database query (and no lock) is required, and
+        /// already eager-loaded by <see cref="AllEntities"/>, so no database query (and no lock) is required, and
         /// keying by zone id avoids the previous unbounded list growth for arbitrary or invalid ids.
         /// </summary>
         private static Dictionary<int, ProbabilityTable<int>> BuildZoneEnemyTables(IEnumerable<Enemy> enemies)

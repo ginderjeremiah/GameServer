@@ -1,6 +1,7 @@
-﻿using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.DataAccess.Repositories
 {
@@ -13,9 +14,11 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public IAsyncEnumerable<ItemCategory> All()
+        public IAsyncEnumerable<Contracts.ItemCategory> All()
         {
-            return _context.ItemCategories.AsAsyncEnumerable();
+            return _context.ItemCategories
+                .Select(c => new Contracts.ItemCategory { Id = c.Id, Name = c.Name })
+                .AsAsyncEnumerable();
         }
     }
 }

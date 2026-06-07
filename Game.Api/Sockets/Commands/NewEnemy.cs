@@ -1,4 +1,4 @@
-﻿using Game.Api.Models.Attributes;
+﻿using Game.Abstractions.Contracts;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Application.Services;

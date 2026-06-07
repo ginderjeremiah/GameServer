@@ -1,4 +1,4 @@
-﻿using Game.Api.Models.Attributes;
+﻿using Game.Abstractions.Contracts;
 using Game.Api.Models.InventoryItems;
 using CorePlayer = Game.Core.Players.Player;
 

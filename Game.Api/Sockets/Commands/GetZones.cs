@@ -1,5 +1,5 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
-using Game.Api.Models.Zones;
 
 namespace Game.Api.Sockets.Commands
 {
@@ -20,7 +20,7 @@ namespace Game.Api.Sockets.Commands
 
         protected override IEnumerable<Zone> GetReferenceData()
         {
-            return _zones.All().To().Model<Zone>();
+            return _zones.All();
         }
     }
 }

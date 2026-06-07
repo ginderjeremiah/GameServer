@@ -1,7 +1,7 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
-using Game.Api.Models.Skills;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers.Admin

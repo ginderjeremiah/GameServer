@@ -1,8 +1,9 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 using CoreItemMod = Game.Core.Items.ItemMod;
 
 namespace Game.DataAccess.Repositories
@@ -10,8 +11,6 @@ namespace Game.DataAccess.Repositories
     internal class ItemMods : IItemMods
     {
         private static List<ItemMod>? _allMods;
-        private static readonly List<Dictionary<int, IEnumerable<ItemMod>>?> _itemModsByType = [];
-        private static readonly object _lockForItem = new();
 
         private readonly GameContext _context;
 
@@ -20,13 +19,9 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public void InvalidateCache()
-        {
-            _allMods = null;
-            lock (_lockForItem) { _itemModsByType.Clear(); }
-        }
+        public void InvalidateCache() => _allMods = null;
 
-        public List<ItemMod> All(bool refreshCache = false)
+        private List<ItemMod> AllEntities(bool refreshCache = false)
         {
             if (_allMods is null || refreshCache)
             {
@@ -34,59 +29,26 @@ namespace Game.DataAccess.Repositories
                     .Include(im => im.ItemModAttributes)
                     .Include(im => im.Tags)
                     .AsNoTracking()
+                    .OrderBy(im => im.Id)
                     .ToList();
             }
             return _allMods;
         }
 
-        public Dictionary<int, IEnumerable<ItemMod>> GetModsForItemByType(int itemId)
+        public List<Contracts.ItemMod> All(bool refreshCache = false)
         {
-            var mods = itemId >= _itemModsByType.Count ? null : _itemModsByType[itemId];
-            if (mods is null)
-            {
-                lock (_lockForItem)
-                {
-                    for (int i = _itemModsByType.Count; i <= itemId + 1; i++)
-                    {
-                        _itemModsByType.Add(null);
-                    }
-
-                    mods = _itemModsByType[itemId];
-                    if (mods is null)
-                    {
-                        mods = ModsForItemByType(itemId);
-                        _itemModsByType[itemId] = mods;
-                        return mods;
-                    }
-                }
-            }
-
-            return mods;
+            return [.. AllEntities(refreshCache).Select(ItemMapper.ModToContract)];
         }
 
         public ItemMod? LookupItemMod(int itemModId)
         {
-            var itemMods = All();
+            var itemMods = AllEntities();
             return itemMods.Count <= itemModId || itemModId < 0 ? null : itemMods[itemModId];
         }
 
         public CoreItemMod GetItemMod(int itemModId)
         {
-            var itemMods = All();
-            return ItemMapper.ModToCore(itemMods[itemModId]);
-        }
-
-        private Dictionary<int, IEnumerable<ItemMod>> ModsForItemByType(int itemId)
-        {
-            return _context.Items
-                .Where(i => i.Id == itemId)
-                .Include(i => i.Tags)
-                    .ThenInclude(t => t.ItemMods)
-                .SelectMany(i => i.Tags.SelectMany(t => t.ItemMods))
-                .Distinct()
-                .GroupBy(im => im.ItemModTypeId)
-                .AsNoTracking()
-                .ToDictionary(grp => grp.Key, grp => grp.AsEnumerable());
+            return ItemMapper.ModToCore(AllEntities()[itemModId]);
         }
     }
 }

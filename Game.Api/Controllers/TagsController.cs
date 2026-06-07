@@ -1,6 +1,6 @@
-﻿using Game.Api.Models.Common;
-using Game.Api.Models.Tags;
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -15,25 +15,25 @@ namespace Game.Api.Controllers
         [HttpGet("/api/[controller]")]
         public ApiAsyncEnumerableResponse<Tag> Tags()
         {
-            return ApiResponse.Success(_tags.All().To().Model<Tag>());
+            return ApiResponse.Success(_tags.All());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<TagCategory> TagCategories()
         {
-            return ApiResponse.Success(_tagCategories.All().To().Model<TagCategory>());
+            return ApiResponse.Success(_tagCategories.All());
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<Tag> TagsForItem(int itemId)
         {
-            return ApiResponse.Success(_tags.GetTagsForItem(itemId).To().Model<Tag>());
+            return ApiResponse.Success(_tags.GetTagsForItem(itemId));
         }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<Tag> TagsForItemMod(int itemModId)
         {
-            return ApiResponse.Success(_tags.GetTagsForItemMod(itemModId).To().Model<Tag>());
+            return ApiResponse.Success(_tags.GetTagsForItemMod(itemModId));
         }
     }
 }

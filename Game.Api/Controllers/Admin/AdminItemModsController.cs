@@ -1,7 +1,7 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
-using Game.Api.Models.Items;
 using Game.Api.Models.Tags;
 using Microsoft.AspNetCore.Mvc;
 
@@ -112,7 +112,7 @@ namespace Game.Api.Controllers.Admin
             if (itemMod is not null)
             {
                 _entityStore.Track(itemMod);
-                var currentTags = await _tags.GetTagsForItemMod(setTagsData.Id).ToListAsync();
+                var currentTags = await _tags.GetTagEntitiesForItemMod(setTagsData.Id).ToListAsync();
                 foreach (var currentTag in currentTags)
                 {
                     if (!setTagsData.TagIds.Contains(currentTag.Id))

@@ -1,6 +1,6 @@
-﻿using Game.Api.Models.Common;
-using Game.Api.Models.Items;
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -14,13 +14,11 @@ namespace Game.Api.Controllers
         [HttpGet]
         public ApiEnumerableResponse<ItemModSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
-            if (refreshCache)
-            {
-                _items.All(refreshCache);
-            }
-
-            var item = _items.LookupItem(itemId);
-            return ApiResponse.Success((item?.ItemModSlots).To().Model<ItemModSlot>());
+            var allItems = _items.All(refreshCache);
+            IEnumerable<ItemModSlot> slots = itemId >= 0 && itemId < allItems.Count
+                ? allItems[itemId].ModSlots
+                : [];
+            return ApiResponse.Success(slots);
         }
     }
 }

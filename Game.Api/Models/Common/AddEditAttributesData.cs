@@ -1,4 +1,4 @@
-﻿using Game.Api.Models.Attributes;
+﻿using Game.Abstractions.Contracts;
 
 namespace Game.Api.Models.Common
 {
