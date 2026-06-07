@@ -7,16 +7,9 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
-    public class ItemModsController(IItemMods itemMods, IItemModTypes itemModTypes) : ControllerBase
+    public class ItemModsController(IItemModTypes itemModTypes) : ControllerBase
     {
-        private readonly IItemMods _itemMods = itemMods;
         private readonly IItemModTypes _itemModTypes = itemModTypes;
-
-        [HttpGet("/api/[controller]")]
-        public ApiEnumerableResponse<ItemMod> ItemMods(bool refreshCache = false)
-        {
-            return ApiResponse.Success(_itemMods.All(refreshCache).To().Model<ItemMod>());
-        }
 
         [HttpGet]
         public ApiAsyncEnumerableResponse<ItemModType> ItemModTypes()

@@ -37,7 +37,7 @@ function createMockWebSocket(url?: string): MockWebSocket {
 const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
-import { ApiSocket } from '$lib/api/api-socket';
+import { ApiSocket, fetchSocketData } from '$lib/api/api-socket';
 import { setTokens } from '$lib/api/token-store';
 
 describe('ApiSocket', () => {
@@ -192,6 +192,31 @@ describe('ApiSocket', () => {
 			expect(badListener).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalled();
 			consoleSpy.mockRestore();
+		});
+	});
+
+	// fetchSocketData wraps the module-level `apiSocket` singleton (not the per-test instance above),
+	// driving it through the same mocked WebSocket. It mirrors ApiRequest.get's throw-on-error contract.
+	describe('fetchSocketData', () => {
+		it('resolves with the response data when the command succeeds', async () => {
+			const promise = fetchSocketData('GetZones');
+			const ws = lastWs();
+			const sent = JSON.parse(ws.send.mock.calls[0][0]);
+			expect(sent.name).toBe('GetZones');
+
+			receive(ws, JSON.stringify({ id: sent.id, name: 'GetZones', data: [{ id: 0, name: 'Zone' }] }));
+
+			await expect(promise).resolves.toEqual([{ id: 0, name: 'Zone' }]);
+		});
+
+		it('throws when the server reports an error', async () => {
+			const promise = fetchSocketData('GetZones');
+			const ws = lastWs();
+			const sent = JSON.parse(ws.send.mock.calls[0][0]);
+
+			receive(ws, JSON.stringify({ id: sent.id, name: 'GetZones', error: 'Server boom' }));
+
+			await expect(promise).rejects.toThrow('Server boom');
 		});
 	});
 

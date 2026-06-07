@@ -194,3 +194,19 @@ export class ApiSocket {
 }
 
 export const apiSocket = new ApiSocket();
+
+/**
+ * Sends a no-request socket command and returns its data, throwing if the server reported an error.
+ * Mirrors the throw-on-error contract of `ApiRequest.get` (the socket transport otherwise resolves
+ * with an `error` field rather than rejecting), so socket-backed callers such as the admin Workbench
+ * surface failures the same way the HTTP client did instead of silently treating an error as success.
+ */
+export async function fetchSocketData<T extends ApiSocketCommandNoRequest>(
+	command: T
+): Promise<ApiSocketResponseTypes[T]> {
+	const response = await apiSocket.sendSocketCommand(command);
+	if (response.error) {
+		throw new Error(response.error);
+	}
+	return response.data;
+}

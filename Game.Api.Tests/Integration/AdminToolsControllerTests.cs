@@ -1,3 +1,4 @@
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Api.Models.Items;
@@ -63,12 +64,8 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            // Verify the enemy was created by fetching enemies
-            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, enemiesResponse.StatusCode);
-            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
-            Assert.NotNull(enemiesResult?.Data);
-            Assert.Contains(enemiesResult.Data, e => e.Name == "New Dragon");
+            // Verify the enemy was created — the admin write invalidates the cache, so a fresh read sees it.
+            Assert.Contains(GetEnemies(), e => e.Name == "New Dragon");
         }
 
         [Fact]
@@ -101,10 +98,7 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.ErrorMessage);
 
             // Verify
-            var zonesResponse = await authClient.GetAsync("/api/Zones", CancellationToken);
-            var zonesResult = await zonesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Zone>>(CancellationToken);
-            Assert.NotNull(zonesResult?.Data);
-            Assert.Contains(zonesResult.Data, z => z.Name == "Crystal Caves");
+            Assert.Contains(GetZones(), z => z.Name == "Crystal Caves");
         }
 
         [Fact]
@@ -192,10 +186,7 @@ namespace Game.Api.Tests.Integration
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
-            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
-            Assert.NotNull(enemiesResult?.Data);
-            var boss = Assert.Single(enemiesResult.Data, e => e.Name == "Ancient Wyrm");
+            var boss = Assert.Single(GetEnemies(), e => e.Name == "Ancient Wyrm");
             Assert.True(boss.IsBoss);
         }
 
@@ -229,10 +220,7 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.ErrorMessage);
 
             // The enemy's embedded spawns now include the zone with the assigned weight.
-            var enemiesResponse = await authClient.GetAsync("/api/Enemies", CancellationToken);
-            var enemiesResult = await enemiesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Enemy>>(CancellationToken);
-            Assert.NotNull(enemiesResult?.Data);
-            var saved = Assert.Single(enemiesResult.Data, e => e.Id == enemy.Id);
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
             var spawn = Assert.Single(saved.Spawns);
             Assert.Equal(zone.Id, spawn.ZoneId);
             Assert.Equal(42, spawn.Weight);
@@ -266,7 +254,7 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball"); // Id 0, Strength x1.0
 
             using var authClient = await SetupAuthenticatedClientAsync();
-            var before = await GetSkillsAsync(authClient);
+            var before = GetSkills();
 
             var data = new
             {
@@ -290,7 +278,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            var after = await GetSkillsAsync(authClient);
+            var after = GetSkills();
             Assert.Equal(before.Count, after.Count);
             var edited = Assert.Single(after, s => s.Id == skill.Id);
             var multiplier = Assert.Single(edited.DamageMultipliers);
@@ -306,7 +294,7 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context, "Original"); // Id 0
 
             using var authClient = await SetupAuthenticatedClientAsync();
-            var before = await GetSkillsAsync(authClient);
+            var before = GetSkills();
 
             var changes = new[]
             {
@@ -333,7 +321,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            var after = await GetSkillsAsync(authClient);
+            var after = GetSkills();
             Assert.Equal(before.Count, after.Count); // editing record 0 must not insert a new skill
             var edited = Assert.Single(after, s => s.Id == skill.Id);
             Assert.Equal("Renamed", edited.Name);
@@ -372,24 +360,39 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.ErrorMessage);
 
             // Verify the challenge was created — and its statistic/entity were derived from the type.
-            var challengesResponse = await authClient.GetAsync("/api/Challenges", CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, challengesResponse.StatusCode);
-            var challengesResult = await challengesResponse.Content.ReadFromJsonAsync<ApiEnumerableResponse<Challenge>>(CancellationToken);
-            Assert.NotNull(challengesResult?.Data);
-            var created = Assert.Single(challengesResult.Data, c => c.Name == "First Blood");
+            var created = Assert.Single(GetChallenges(), c => c.Name == "First Blood");
             Assert.Equal(EChallengeType.EnemiesKilled, created.ChallengeTypeId);
             Assert.Equal(EStatisticType.EnemiesKilled, created.StatisticType);
             Assert.Equal(EEntityType.Enemy, created.EntityType);
             Assert.Equal(10m, created.ProgressGoal);
         }
 
-        private async Task<List<Skill>> GetSkillsAsync(HttpClient client)
+        // The reference-data HTTP GET endpoints were removed (#64); reads now go over the socket, which
+        // serves the same in-memory caches these repositories expose. The admin write filter invalidates
+        // those caches, so reading through the repository after a write returns the freshly-persisted data
+        // — the same guarantee the Workbench relies on — while keeping these assertions transport-agnostic.
+        private List<Skill> GetSkills()
         {
-            var response = await client.GetAsync("/api/Skills", CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Skill>>(CancellationToken);
-            Assert.NotNull(result?.Data);
-            return result.Data.ToList();
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<ISkills>().AllSkills().To().Model<Skill>().ToList();
+        }
+
+        private List<Enemy> GetEnemies()
+        {
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IEnemies>().All().To().Model<Enemy>().ToList();
+        }
+
+        private List<Zone> GetZones()
+        {
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IZones>().All().To().Model<Zone>().ToList();
+        }
+
+        private List<Challenge> GetChallenges()
+        {
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IChallenges>().All().To().Model<Challenge>().ToList();
         }
 
         [Fact]
@@ -418,7 +421,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            var saved = Assert.Single(await GetItemsAsync(authClient), i => i.Id == item.Id);
+            var saved = Assert.Single(GetItems(), i => i.Id == item.Id);
             Assert.Equal(2, saved.Attributes.Count());
             Assert.Equal(12.5m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
             Assert.Equal(7m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Endurance).Amount);
@@ -436,7 +439,7 @@ namespace Game.Api.Tests.Integration
             var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", delete, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
-            var afterDelete = Assert.Single(await GetItemsAsync(authClient), i => i.Id == item.Id);
+            var afterDelete = Assert.Single(GetItems(), i => i.Id == item.Id);
             var remaining = Assert.Single(afterDelete.Attributes);
             Assert.Equal(EAttribute.Strength, remaining.AttributeId);
             Assert.Equal(12.5m, remaining.Amount);
@@ -467,7 +470,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            var saved = Assert.Single(await GetItemModsAsync(authClient), m => m.Id == itemMod.Id);
+            var saved = Assert.Single(GetItemMods(), m => m.Id == itemMod.Id);
             Assert.Equal(2, saved.Attributes.Count());
             Assert.Equal(9m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
             Assert.Equal(3m, saved.Attributes.Single(a => a.AttributeId == EAttribute.Agility).Amount);
@@ -484,28 +487,22 @@ namespace Game.Api.Tests.Integration
             var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModAttributes", delete, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
-            var afterDelete = Assert.Single(await GetItemModsAsync(authClient), m => m.Id == itemMod.Id);
+            var afterDelete = Assert.Single(GetItemMods(), m => m.Id == itemMod.Id);
             var remaining = Assert.Single(afterDelete.Attributes);
             Assert.Equal(EAttribute.Strength, remaining.AttributeId);
             Assert.Equal(9m, remaining.Amount);
         }
 
-        private async Task<List<Item>> GetItemsAsync(HttpClient client)
+        private List<Item> GetItems()
         {
-            var response = await client.GetAsync("/api/Items", CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<Item>>(CancellationToken);
-            Assert.NotNull(result?.Data);
-            return result.Data.ToList();
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IItems>().All().To().Model<Item>().ToList();
         }
 
-        private async Task<List<ItemMod>> GetItemModsAsync(HttpClient client)
+        private List<ItemMod> GetItemMods()
         {
-            var response = await client.GetAsync("/api/ItemMods", CancellationToken);
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<ItemMod>>(CancellationToken);
-            Assert.NotNull(result?.Data);
-            return result.Data.ToList();
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IItemMods>().All().To().Model<ItemMod>().ToList();
         }
 
         [Fact]

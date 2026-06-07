@@ -1,4 +1,4 @@
-import { ApiRequest, type ISkill } from '$lib/api';
+import { ApiRequest, fetchSocketData, type ISkill } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, persistEntity } from '../save-helpers';
@@ -6,7 +6,7 @@ import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
 const refresh = async (): Promise<ISkill[]> => {
-	const skills = await ApiRequest.get('Skills', { refreshCache: true });
+	const skills = await fetchSocketData('GetSkills');
 	staticData.skills = skills;
 	return skills;
 };

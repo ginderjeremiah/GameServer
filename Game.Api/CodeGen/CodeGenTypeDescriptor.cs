@@ -87,6 +87,21 @@ namespace Game.Api.CodeGen
             }
         }
 
+        /// <summary>
+        /// This descriptor together with every type reachable through its generic arguments
+        /// (recursively). A rendered type's text references all of these — e.g. <c>IChange&lt;IItem&gt;[]</c>
+        /// names both <c>IChange</c> and <c>IItem</c> — so the map writers use this to collect the full
+        /// import set rather than only the outermost type.
+        /// </summary>
+        public IEnumerable<CodeGenTypeDescriptor> GetSelfAndGenericArgumentReferences()
+        {
+            yield return this;
+            foreach (var reference in GetGenericArgumentReferences())
+            {
+                yield return reference;
+            }
+        }
+
         private IEnumerable<CodeGenTypeDescriptor> GetGenericArgumentReferences()
         {
             foreach (var genericArg in GenericArgumentDescriptors)

@@ -5,6 +5,7 @@ import {
 	EItemCategory,
 	EItemModType,
 	ERarity,
+	fetchSocketData,
 	type IChallengeType,
 	type IItem,
 	type IItemMod,
@@ -37,15 +38,19 @@ class WorkbenchReference {
 	loaded = $state(false);
 
 	async load() {
+		// Reference data is read over the socket (the loading screen's transport); the admin's
+		// post-save reads stay fresh because every admin write invalidates these in-memory caches
+		// server-side (AdminCacheInvalidationFilter). Tags have no socket command yet, so they
+		// remain on HTTP.
 		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes] = await Promise.all([
-			ApiRequest.get('Enemies', { refreshCache: true }),
-			ApiRequest.get('Skills', { refreshCache: true }),
-			ApiRequest.get('Zones', { refreshCache: true }),
-			ApiRequest.get('Items', { refreshCache: true }),
-			ApiRequest.get('ItemMods', { refreshCache: true }),
+			fetchSocketData('GetEnemies'),
+			fetchSocketData('GetSkills'),
+			fetchSocketData('GetZones'),
+			fetchSocketData('GetItems'),
+			fetchSocketData('GetItemMods'),
 			ApiRequest.get('Tags'),
 			ApiRequest.get('Tags/TagCategories'),
-			ApiRequest.get('Challenges/ChallengeTypes')
+			fetchSocketData('GetChallengeTypes')
 		]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;

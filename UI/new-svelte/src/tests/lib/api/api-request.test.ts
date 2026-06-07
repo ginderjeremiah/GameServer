@@ -71,10 +71,10 @@ describe('ApiRequest', () => {
 
 	describe('get (instance)', () => {
 		it('sends a GET request to /api/{endpoint}', async () => {
-			await new ApiRequest('Items').get();
+			await new ApiRequest('Statistics').get();
 
 			expect(lastCall().method).toBe('GET');
-			expect(lastCall().url).toBe('/api/Items');
+			expect(lastCall().url).toBe('/api/Statistics');
 		});
 
 		it('appends URL params when provided', async () => {
@@ -87,19 +87,19 @@ describe('ApiRequest', () => {
 		it('attaches the bearer access token when one is stored', async () => {
 			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh' });
 
-			await new ApiRequest('Items').get();
+			await new ApiRequest('Statistics').get();
 
 			expect(authHeader(lastCall())).toMatch(/^Bearer header\./);
 		});
 
 		it('sends no Authorization header when not logged in', async () => {
-			await new ApiRequest('Items').get();
+			await new ApiRequest('Statistics').get();
 
 			expect(authHeader(lastCall())).toBeUndefined();
 		});
 
 		it('returns an ApiResponse with parsed data', async () => {
-			const response = await new ApiRequest('Items').get();
+			const response = await new ApiRequest('Statistics').get();
 
 			const data: unknown = response.data;
 			expect(data).toBe('test-result');
@@ -110,7 +110,7 @@ describe('ApiRequest', () => {
 				throw new Error('Network error');
 			};
 
-			const response = await new ApiRequest('Items').get();
+			const response = await new ApiRequest('Statistics').get();
 			expect(response).toBeDefined();
 			expect(response.status).toBe(0);
 		});
@@ -165,7 +165,7 @@ describe('ApiRequest', () => {
 
 	describe('static get', () => {
 		it('creates a request and returns data directly', async () => {
-			const data: unknown = await ApiRequest.get('Items');
+			const data: unknown = await ApiRequest.get('Statistics');
 			expect(data).toBe('test-result');
 		});
 	});
@@ -195,10 +195,10 @@ describe('ApiRequest', () => {
 					: { status: 200, body: JSON.stringify({ data: 'retried' }) };
 			};
 
-			const response = await new ApiRequest('Items').get();
+			const response = await new ApiRequest('Statistics').get();
 
 			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
-			const itemsRequests = callsTo('/api/Items');
+			const itemsRequests = callsTo('/api/Statistics');
 			expect(itemsRequests).toHaveLength(2);
 			expect(response.status).toBe(200);
 			expect(response.data as unknown).toBe('retried');

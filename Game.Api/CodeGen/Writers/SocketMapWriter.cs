@@ -24,6 +24,7 @@ namespace Game.Api.CodeGen.Writers
             var allTypes = orderedData
                 .SelectNotNull(c => c.ResponseDescriptor)
                 .Concat(orderedData.SelectNotNull(c => c.ParameterDescriptor))
+                .SelectMany(d => d.GetSelfAndGenericArgumentReferences())
                 .Where(d => d.NeedsInterface);
 
             if (allTypes.Any())
