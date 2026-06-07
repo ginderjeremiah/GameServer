@@ -110,6 +110,26 @@ namespace Game.Core.Tests.Players
             Assert.NotNull(oldSlot.Item);
         }
 
+        [Fact]
+        public void TryEquipItem_TargetSlotOccupied_ReplacesPreviousItem()
+        {
+            var inventory = new Inventory();
+            var itemA = MakeItem(1, EItemCategory.Accessory);
+            var itemB = MakeItem(2, EItemCategory.Accessory);
+            AddUnlockedItem(inventory, itemA);
+            AddUnlockedItem(inventory, itemB);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+
+            var result = inventory.TryEquipItem(2, EEquipmentSlot.AccessorySlot);
+
+            Assert.True(result);
+            var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
+            Assert.Equal(2, slot.ItemId);
+            Assert.Equal(itemB, slot.Item);
+            // The previously equipped item must no longer occupy any slot.
+            Assert.DoesNotContain(inventory.EquipmentSlots, s => s.ItemId == 1);
+        }
+
         // ── TryUnequipItem ──────────────────────────────────────────────────
 
         [Fact]
@@ -224,6 +244,55 @@ namespace Game.Core.Tests.Players
             Assert.False(result);
         }
 
+        [Fact]
+        public void TryApplyMod_SlotAlreadyHasMod_ReplacesExistingMod()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.UnlockMod(11);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            var result = inventory.TryApplyMod(1, 11, 0, MakeMod(11, EItemModType.Prefix));
+
+            Assert.True(result);
+            var applied = inventory.UnlockedItems[0].AppliedMods;
+            Assert.Single(applied);
+            Assert.Equal(11, applied[0].ItemModId);
+        }
+
+        [Fact]
+        public void TryApplyMod_ItemNotUnlocked_ReturnsFalse()
+        {
+            var inventory = new Inventory();
+            inventory.UnlockMod(10);
+
+            var result = inventory.TryApplyMod(999, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void TryApplyMod_ModSlotIndexNotFound_ReturnsFalse()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+
+            // The item has only slot index 0; index 5 does not exist.
+            var result = inventory.TryApplyMod(1, 10, 5, MakeMod(10, EItemModType.Prefix));
+
+            Assert.False(result);
+        }
+
         // ── TryRemoveMod ────────────────────────────────────────────────────
 
         [Fact]
@@ -263,6 +332,53 @@ namespace Game.Core.Tests.Players
             AddUnlockedItem(inventory, item);
 
             var result = inventory.TryRemoveMod(1, 0);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void TryRemoveMod_ItemNotUnlocked_ReturnsFalse()
+        {
+            var inventory = new Inventory();
+
+            var result = inventory.TryRemoveMod(999, 0);
+
+            Assert.False(result);
+        }
+
+        // ── TrySetFavorite ──────────────────────────────────────────────────
+
+        [Fact]
+        public void TrySetFavorite_UnlockedItem_SetsFavorite()
+        {
+            var inventory = new Inventory();
+            AddUnlockedItem(inventory, MakeItem(1));
+
+            var result = inventory.TrySetFavorite(1, true);
+
+            Assert.True(result);
+            Assert.True(inventory.UnlockedItems[0].Favorite);
+        }
+
+        [Fact]
+        public void TrySetFavorite_CanUnsetFavorite()
+        {
+            var inventory = new Inventory();
+            AddUnlockedItem(inventory, MakeItem(1));
+            inventory.TrySetFavorite(1, true);
+
+            var result = inventory.TrySetFavorite(1, false);
+
+            Assert.True(result);
+            Assert.False(inventory.UnlockedItems[0].Favorite);
+        }
+
+        [Fact]
+        public void TrySetFavorite_ItemNotUnlocked_ReturnsFalse()
+        {
+            var inventory = new Inventory();
+
+            var result = inventory.TrySetFavorite(999, true);
 
             Assert.False(result);
         }
