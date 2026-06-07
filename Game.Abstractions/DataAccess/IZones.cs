@@ -1,13 +1,15 @@
-﻿using Game.Abstractions.Entities;
+using Contracts = Game.Abstractions.Contracts;
+using ZoneEntity = Game.Abstractions.Entities.Zone;
 
 namespace Game.Abstractions.DataAccess
 {
     public interface IZones
     {
         public void InvalidateCache();
-        public List<Zone> All(bool refreshCache = false);
-        public Zone? GetZone(int zoneId);
+        public List<Contracts.Zone> All(bool refreshCache = false);
+        // Returns the EF entity for the admin write path (#135) and battle setup (#137); the read path uses the contracts.
+        public ZoneEntity? GetZone(int zoneId);
         public bool ValidateZoneId(int zoneId);
-        public IAsyncEnumerable<ZoneEnemy> ZoneEnemies(int zoneId);
+        public IAsyncEnumerable<Contracts.ZoneEnemy> ZoneEnemies(int zoneId);
     }
 }

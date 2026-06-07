@@ -1,9 +1,9 @@
-﻿using Game.Abstractions.Entities;
+using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Abstractions.DataAccess
 {
     public interface ITagCategories
     {
-        public IAsyncEnumerable<TagCategory> All();
+        public IAsyncEnumerable<Contracts.TagCategory> All();
     }
 }

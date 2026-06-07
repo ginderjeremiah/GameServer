@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts;
 using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;

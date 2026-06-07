@@ -1,4 +1,6 @@
-﻿namespace Game.Api.Models.Zones
+﻿using Game.Abstractions.Contracts;
+
+namespace Game.Api.Models.Zones
 {
     public class SetZoneEnemiesData
     {

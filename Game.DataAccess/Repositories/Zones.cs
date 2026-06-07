@@ -1,6 +1,8 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
+using Contracts = Game.Abstractions.Contracts;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +21,7 @@ namespace Game.DataAccess.Repositories
 
         public void InvalidateCache() => _zoneList = null;
 
-        public List<Zone> All(bool refreshCache = false)
+        private List<Zone> AllEntities(bool refreshCache = false)
         {
             if (_zoneList is null || refreshCache)
             {
@@ -32,22 +34,28 @@ namespace Game.DataAccess.Repositories
             return _zoneList;
         }
 
+        public List<Contracts.Zone> All(bool refreshCache = false)
+        {
+            return [.. AllEntities(refreshCache).Select(ZoneMapper.ToContract)];
+        }
+
         public Zone? GetZone(int zoneId)
         {
             return ValidateZoneId(zoneId)
-                ? All()[zoneId]
+                ? AllEntities()[zoneId]
                 : throw new ArgumentOutOfRangeException(nameof(zoneId));
         }
 
         public bool ValidateZoneId(int zoneId)
         {
-            return zoneId >= 0 && zoneId < All().Count;
+            return zoneId >= 0 && zoneId < AllEntities().Count;
         }
 
-        public IAsyncEnumerable<ZoneEnemy> ZoneEnemies(int zoneId)
+        public IAsyncEnumerable<Contracts.ZoneEnemy> ZoneEnemies(int zoneId)
         {
             return _context.ZoneEnemies
                 .Where(ze => ze.ZoneId == zoneId)
+                .Select(ze => new Contracts.ZoneEnemy { EnemyId = ze.EnemyId, Weight = ze.Weight })
                 .AsAsyncEnumerable();
         }
     }

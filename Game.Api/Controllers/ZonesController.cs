@@ -1,6 +1,6 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.Contracts;
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
-using Game.Api.Models.Zones;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -14,7 +14,7 @@ namespace Game.Api.Controllers
         [HttpGet]
         public ApiAsyncEnumerableResponse<ZoneEnemy> ZoneEnemies(int zoneId)
         {
-            return ApiResponse.Success(_zones.ZoneEnemies(zoneId).To().Model<ZoneEnemy>());
+            return ApiResponse.Success(_zones.ZoneEnemies(zoneId));
         }
     }
 }

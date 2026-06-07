@@ -48,7 +48,11 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IItemMods, ItemMods>()
                 .AddScoped<IItemModTypes, ItemModTypes>()
                 .AddScoped<IItemCategories, ItemCategories>()
-                .AddScoped<ISkills, Skills>()
+                // Skills serves both the public read contract (ISkills) and the internal entity cache
+                // (ISkillEntityCache, used by Enemies to build domain enemies); share one scoped instance.
+                .AddScoped<Skills>()
+                .AddScoped<ISkills>(sp => sp.GetRequiredService<Skills>())
+                .AddScoped<ISkillEntityCache>(sp => sp.GetRequiredService<Skills>())
                 .AddScoped<ITags, Tags>()
                 .AddScoped<ITagCategories, TagCategories>()
                 .AddScoped<IZones, Zones>()

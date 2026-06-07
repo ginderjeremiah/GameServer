@@ -1,12 +1,19 @@
-﻿using Game.Abstractions.Entities;
+using Contracts = Game.Abstractions.Contracts;
+using TagEntity = Game.Abstractions.Entities.Tag;
 
 namespace Game.Abstractions.DataAccess
 {
     public interface ITags
     {
-        public IAsyncEnumerable<Tag> All();
-        public IAsyncEnumerable<Tag> GetTags(IEnumerable<int> tagIds);
-        public IAsyncEnumerable<Tag> GetTagsForItem(int itemId);
-        public IAsyncEnumerable<Tag> GetTagsForItemMod(int itemModId);
+        // Read contracts (the published reference-data read language).
+        public IAsyncEnumerable<Contracts.Tag> All();
+        public IAsyncEnumerable<Contracts.Tag> GetTagsForItem(int itemId);
+        public IAsyncEnumerable<Contracts.Tag> GetTagsForItemMod(int itemModId);
+
+        // EF entity access for the admin Content Authoring write path (#135), which mutates the
+        // tag <-> item/item-mod join navigations directly. Kept distinct from the read contracts above.
+        public IAsyncEnumerable<TagEntity> GetTags(IEnumerable<int> tagIds);
+        public IAsyncEnumerable<TagEntity> GetTagEntitiesForItem(int itemId);
+        public IAsyncEnumerable<TagEntity> GetTagEntitiesForItemMod(int itemModId);
     }
 }

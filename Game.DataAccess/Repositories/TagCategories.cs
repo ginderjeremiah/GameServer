@@ -1,6 +1,7 @@
-﻿using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 
 
 namespace Game.DataAccess.Repositories
@@ -14,9 +15,11 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public IAsyncEnumerable<TagCategory> All()
+        public IAsyncEnumerable<Contracts.TagCategory> All()
         {
-            return _context.TagCategories.AsAsyncEnumerable();
+            return _context.TagCategories
+                .Select(tc => new Contracts.TagCategory { Id = tc.Id, Name = tc.Name })
+                .AsAsyncEnumerable();
         }
     }
 }

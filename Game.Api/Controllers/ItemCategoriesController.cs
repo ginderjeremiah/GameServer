@@ -1,6 +1,6 @@
-﻿using Game.Api.Models.Common;
-using Game.Api.Models.Items;
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -14,7 +14,7 @@ namespace Game.Api.Controllers
         [HttpGet("/api/[controller]")]
         public ApiAsyncEnumerableResponse<ItemCategory> ItemCategories()
         {
-            return ApiResponse.Success(_itemCategories.All().To().Model<ItemCategory>());
+            return ApiResponse.Success(_itemCategories.All());
         }
     }
 }

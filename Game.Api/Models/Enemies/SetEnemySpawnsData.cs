@@ -1,3 +1,5 @@
+using Game.Abstractions.Contracts;
+
 namespace Game.Api.Models.Enemies
 {
     public class SetEnemySpawnsData

@@ -1,9 +1,6 @@
-using Game.Api.Models.Enemies;
-using Game.Api.Models.Items;
+using Game.Abstractions.Contracts;
 using Game.Api.Models.Progress;
 using Game.Api.Models.ReferenceData;
-using Game.Api.Models.Skills;
-using Game.Api.Models.Zones;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;

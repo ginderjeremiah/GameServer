@@ -1,8 +1,9 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 using CoreItem = Game.Core.Items.Item;
 
 namespace Game.DataAccess.Repositories
@@ -20,7 +21,7 @@ namespace Game.DataAccess.Repositories
 
         public void InvalidateCache() => _allItems = null;
 
-        public List<Item> All(bool refreshCache = false)
+        private List<Item> AllEntities(bool refreshCache = false)
         {
             if (_allItems is null || refreshCache)
             {
@@ -34,16 +35,20 @@ namespace Game.DataAccess.Repositories
             return _allItems;
         }
 
+        public List<Contracts.Item> All(bool refreshCache = false)
+        {
+            return [.. AllEntities(refreshCache).Select(ItemMapper.ToContract)];
+        }
+
         public Item? LookupItem(int itemId)
         {
-            var items = All();
+            var items = AllEntities();
             return items.Count <= itemId || itemId < 0 ? null : items[itemId];
         }
 
         public CoreItem GetItem(int itemId)
         {
-            var items = All();
-            return ItemMapper.ToCore(items[itemId]);
+            return ItemMapper.ToCore(AllEntities()[itemId]);
         }
     }
 }

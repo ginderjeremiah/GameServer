@@ -1,6 +1,7 @@
-﻿using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 
 
 namespace Game.DataAccess.Repositories
@@ -14,9 +15,11 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public IAsyncEnumerable<ItemModType> All()
+        public IAsyncEnumerable<Contracts.ItemModType> All()
         {
-            return _context.ItemModTypes.AsAsyncEnumerable();
+            return _context.ItemModTypes
+                .Select(t => new Contracts.ItemModType { Id = t.Id, Name = t.Name })
+                .AsAsyncEnumerable();
         }
     }
 }

@@ -1,10 +1,7 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
-using Game.Api.Models.Enemies;
-using Game.Api.Models.Items;
 using Game.Api.Models.Progress;
-using Game.Api.Models.Skills;
-using Game.Api.Models.Zones;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
@@ -374,19 +371,19 @@ namespace Game.Api.Tests.Integration
         private List<Skill> GetSkills()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<ISkills>().AllSkills().To().Model<Skill>().ToList();
+            return scope.ServiceProvider.GetRequiredService<ISkills>().AllSkills().ToList();
         }
 
         private List<Enemy> GetEnemies()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IEnemies>().All().To().Model<Enemy>().ToList();
+            return scope.ServiceProvider.GetRequiredService<IEnemies>().All().ToList();
         }
 
         private List<Zone> GetZones()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IZones>().All().To().Model<Zone>().ToList();
+            return scope.ServiceProvider.GetRequiredService<IZones>().All().ToList();
         }
 
         private List<Challenge> GetChallenges()
@@ -496,13 +493,13 @@ namespace Game.Api.Tests.Integration
         private List<Item> GetItems()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IItems>().All().To().Model<Item>().ToList();
+            return scope.ServiceProvider.GetRequiredService<IItems>().All().ToList();
         }
 
         private List<ItemMod> GetItemMods()
         {
             using var scope = CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IItemMods>().All().To().Model<ItemMod>().ToList();
+            return scope.ServiceProvider.GetRequiredService<IItemMods>().All().ToList();
         }
 
         [Fact]

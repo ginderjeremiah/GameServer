@@ -1,13 +1,14 @@
-﻿using Game.Abstractions.DataAccess;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Contracts = Game.Abstractions.Contracts;
 using CoreSkill = Game.Core.Skills.Skill;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Skills : ISkills
+    internal class Skills : ISkills, ISkillEntityCache
     {
         private static List<Skill>? _skillDataList;
 
@@ -20,7 +21,7 @@ namespace Game.DataAccess.Repositories
 
         public void InvalidateCache() => _skillDataList = null;
 
-        public List<Skill> AllSkills(bool refreshCache = false)
+        public IReadOnlyList<Skill> AllSkillEntities(bool refreshCache = false)
         {
             if (_skillDataList is null || refreshCache)
             {
@@ -33,16 +34,20 @@ namespace Game.DataAccess.Repositories
             return _skillDataList;
         }
 
+        public List<Contracts.Skill> AllSkills(bool refreshCache = false)
+        {
+            return [.. AllSkillEntities(refreshCache).Select(SkillMapper.ToContract)];
+        }
+
         public Skill? LookupSkill(int skillId)
         {
-            var skills = AllSkills();
+            var skills = AllSkillEntities();
             return skills.Count <= skillId || skillId < 0 ? null : skills[skillId];
         }
 
         public CoreSkill GetSkill(int skillId)
         {
-            var skills = AllSkills();
-            return SkillMapper.ToCore(skills[skillId]);
+            return SkillMapper.ToCore(AllSkillEntities()[skillId]);
         }
     }
 }

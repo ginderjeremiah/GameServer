@@ -1,5 +1,5 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
-using Game.Api.Models.Skills;
 
 namespace Game.Api.Sockets.Commands
 {
@@ -20,7 +20,7 @@ namespace Game.Api.Sockets.Commands
 
         protected override IEnumerable<Skill> GetReferenceData()
         {
-            return _skills.AllSkills().To().Model<Skill>();
+            return _skills.AllSkills();
         }
     }
 }

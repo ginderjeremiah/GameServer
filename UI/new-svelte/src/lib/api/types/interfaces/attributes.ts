@@ -9,23 +9,7 @@ export interface IAttribute {
 	description: string;
 }
 
-export interface IAttributeDistribution {
-	attributeId: EAttribute;
-	baseAmount: number;
-	amountPerLevel: number;
-}
-
-export interface IAttributeMultiplier {
-	attributeId: EAttribute;
-	multiplier: number;
-}
-
 export interface IAttributeUpdate {
 	attributeId: number;
-	amount: number;
-}
-
-export interface IBattlerAttribute {
-	attributeId: EAttribute;
 	amount: number;
 }
