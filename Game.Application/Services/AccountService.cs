@@ -64,28 +64,26 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<AccountLoginResult> Login(string username, string password)
         {
-            var user = await _users.GetUser(username);
-            if (user is null || !password.VerifyHash(user.Salt.ToString(), user.PassHash))
+            var account = await _users.GetUser(username);
+            if (account is null || !password.VerifyHash(account.Salt.ToString(), account.PassHash))
             {
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
-            var playerRef = user.Players.FirstOrDefault();
-            if (playerRef is null)
+            if (account.PlayerIds.Count == 0)
             {
                 return AccountLoginResult.Failed(LoginStatus.NoPlayer);
             }
 
-            var player = await _playerRepo.GetPlayer(playerRef.Id);
+            var player = await _playerRepo.GetPlayer(account.PlayerIds[0]);
             if (player is null)
             {
                 return AccountLoginResult.Failed(LoginStatus.PlayerDataNotFound);
             }
 
-            var roles = user.Roles.Select(role => role.Name).ToList();
-            var tokens = await IssueTokens(user.Id, roles);
+            var tokens = await IssueTokens(account.Id, account.Roles);
 
-            return AccountLoginResult.Succeeded(tokens, player, user.Id);
+            return AccountLoginResult.Succeeded(tokens, player, account.Id);
         }
 
         /// <summary>

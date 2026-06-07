@@ -1,4 +1,4 @@
-using Game.Abstractions.Entities;
+using Game.Abstractions.Contracts.Identity;
 
 namespace Game.Abstractions.DataAccess
 {

@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
@@ -43,7 +44,7 @@ namespace Game.Api.Controllers.Admin
 
             return ApiResponse.Success(new AdminUserSearchResults
             {
-                Users = matches.Select(AdminUser.FromSource).ToList(),
+                Users = matches,
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize,
@@ -53,7 +54,7 @@ namespace Game.Api.Controllers.Admin
         [HttpGet]
         public ApiEnumerableResponse<Role> GetRoles()
         {
-            return ApiResponse.Success(_roles.GetRoles().Select(Role.FromSource).ToList());
+            return ApiResponse.Success(_roles.GetRoles());
         }
 
         [HttpPost]

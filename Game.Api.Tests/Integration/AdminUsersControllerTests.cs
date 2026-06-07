@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;
-using ApiRole = Game.Api.Models.Users.Role;
+using ApiRole = Game.Abstractions.Contracts.Identity.Role;
 
 namespace Game.Api.Tests.Integration
 {

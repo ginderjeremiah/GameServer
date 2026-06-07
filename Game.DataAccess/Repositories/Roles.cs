@@ -1,5 +1,5 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
 using Game.Core;
 
 namespace Game.DataAccess.Repositories

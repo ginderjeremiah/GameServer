@@ -1,13 +1,15 @@
-using Game.Abstractions.Entities;
+using Game.Abstractions.Contracts.Identity;
 
 namespace Game.Abstractions.DataAccess
 {
     public interface IUsers
     {
         /// <summary>
-        /// Loads the active (non-archived) user with the given username, including their players and roles.
+        /// Loads the credentials of the active (non-archived) account with the given username — the data
+        /// the login use case needs to authenticate and establish a session. Returns <see langword="null"/>
+        /// when no active account matches.
         /// </summary>
-        Task<User?> GetUser(string username);
+        Task<AccountCredentials?> GetUser(string username);
 
         /// <summary>
         /// Determines whether the username is taken by an active (non-archived) account. Archived users
@@ -16,14 +18,14 @@ namespace Game.Abstractions.DataAccess
         Task<bool> CheckIfUsernameExists(string userName);
 
         /// <summary>
-        /// Returns a page of non-archived users (including their players and roles), optionally filtered
-        /// by a case-insensitive search matched against the username and the names of the user's players,
-        /// and/or membership in a given role.
+        /// Returns a page of users (with their roles and player summaries), optionally filtered by a
+        /// case-insensitive search matched against the username and the names of the user's players,
+        /// and/or membership in a given role and/or archived state.
         /// </summary>
-        Task<List<User>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take);
+        Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take);
 
         /// <summary>
-        /// Counts the non-archived users matching the same filters as <see cref="SearchUsers"/>.
+        /// Counts the users matching the same filters as <see cref="SearchUsers"/>.
         /// </summary>
         Task<int> CountUsers(string? search, int? roleId, bool? archived);
 

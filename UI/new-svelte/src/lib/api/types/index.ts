@@ -7,6 +7,7 @@ export * from './interfaces/attributes.ts';
 export * from './interfaces/auth.ts';
 export * from './interfaces/contracts.ts';
 export * from './interfaces/enemies.ts';
+export * from './interfaces/identity.ts';
 export * from './interfaces/inventory-items.ts';
 export * from './interfaces/player.ts';
 export * from './interfaces/progress.ts';
