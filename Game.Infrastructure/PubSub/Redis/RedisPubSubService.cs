@@ -43,7 +43,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public async Task Publish<T>(string channel, string queueName, T queueData)
         {
-            await Publish(channel, queueName, queueData!.Serialize());
+            await Publish(channel, queueName, queueData.Serialize());
         }
 
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)

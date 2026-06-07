@@ -1,5 +1,5 @@
-﻿using Game.Core;
-using Game.Abstractions.Infrastructure;
+﻿using Game.Abstractions.Infrastructure;
+using Game.Core;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -60,7 +60,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public void AddToQueue<T>(T value)
         {
-            AddToQueue(value!.Serialize());
+            AddToQueue(value.Serialize());
         }
 
         public Task AddToQueueAsync(string value)
@@ -71,7 +71,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public Task AddToQueueAsync<T>(T value)
         {
-            return AddToQueueAsync(value!.Serialize());
+            return AddToQueueAsync(value.Serialize());
         }
     }
 }
