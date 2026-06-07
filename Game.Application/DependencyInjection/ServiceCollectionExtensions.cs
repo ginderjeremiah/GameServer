@@ -3,6 +3,7 @@ using Game.Application.Services;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
 using Game.Core.Events;
+using Game.Core.Players;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.Application.DependencyInjection
@@ -13,8 +14,10 @@ namespace Game.Application.DependencyInjection
         {
             RegisterDomainEventHandlers();
             return services
-                // BattleFactory is a stateless domain service with no dependencies, so it is shared.
+                // BattleFactory and NewPlayerFactory are stateless domain services with no
+                // dependencies, so they are shared.
                 .AddSingleton<BattleFactory>()
+                .AddSingleton<NewPlayerFactory>()
                 .AddScoped<AccountService>()
                 .AddScoped<BattleSnapshotService>()
                 .AddScoped<BattleService>()

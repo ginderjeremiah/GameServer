@@ -11,6 +11,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using NewPlayerFactory = Game.Core.Players.NewPlayerFactory;
 
 namespace Game.Application.Tests.Services
 {
@@ -52,18 +53,36 @@ namespace Game.Application.Tests.Services
             var createdPlayer = Assert.Single(createdUser.Players);
             Assert.Equal("newaccount", createdPlayer.Name);
             Assert.Equal(1, createdPlayer.Level);
+            Assert.Equal(0, createdPlayer.Exp);
+            Assert.Equal(0, createdPlayer.CurrentZoneId);
+            Assert.Equal(0, createdPlayer.StatPointsGained);
+            Assert.Equal(0, createdPlayer.StatPointsUsed);
 
-            var skillCount = await verifyContext.Set<PlayerSkill>()
-                .CountAsync(skill => skill.PlayerId == createdPlayer.Id, CancellationToken);
-            Assert.Equal(3, skillCount);
+            // Assert the persisted values, not just the row counts: PlayerMapper.ToEntity's per-field
+            // translation (skill Selected, attribute id/amount, log type/enabled) is exactly where a
+            // mapper regression that preserved counts but flipped a value would otherwise slip through.
+            var skills = await verifyContext.Set<PlayerSkill>()
+                .Where(skill => skill.PlayerId == createdPlayer.Id)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(new[] { 0, 1, 2 }, skills.Select(skill => skill.SkillId).OrderBy(id => id));
+            Assert.All(skills, skill => Assert.True(skill.Selected));
 
-            var attributeCount = await verifyContext.Set<PlayerAttribute>()
-                .CountAsync(attribute => attribute.PlayerId == createdPlayer.Id, CancellationToken);
-            Assert.Equal(6, attributeCount);
+            var attributes = await verifyContext.Set<PlayerAttribute>()
+                .Where(attribute => attribute.PlayerId == createdPlayer.Id)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(new[] { 0, 1, 2, 3, 4, 5 }, attributes.Select(attribute => attribute.AttributeId).OrderBy(id => id));
+            Assert.All(attributes, attribute => Assert.Equal(5m, attribute.Amount));
 
-            var logPreferenceCount = await verifyContext.Set<LogPreference>()
-                .CountAsync(preference => preference.PlayerId == createdPlayer.Id, CancellationToken);
-            Assert.Equal(6, logPreferenceCount);
+            var logPreferencesByType = await verifyContext.Set<LogPreference>()
+                .Where(preference => preference.PlayerId == createdPlayer.Id)
+                .ToDictionaryAsync(preference => preference.LogTypeId, preference => preference.Enabled, CancellationToken);
+            Assert.Equal(6, logPreferencesByType.Count);
+            Assert.False(logPreferencesByType[(int)ELogType.Damage]);
+            Assert.False(logPreferencesByType[(int)ELogType.Debug]);
+            Assert.True(logPreferencesByType[(int)ELogType.Exp]);
+            Assert.True(logPreferencesByType[(int)ELogType.LevelUp]);
+            Assert.True(logPreferencesByType[(int)ELogType.ItemFound]);
+            Assert.True(logPreferencesByType[(int)ELogType.EnemyDefeated]);
         }
 
         [Fact]
@@ -211,7 +230,8 @@ namespace Game.Application.Tests.Services
                 provider.GetRequiredService<IPlayerRepository>(),
                 provider.GetRequiredService<IEntityStore>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
-                new StubAccessTokenService());
+                new StubAccessTokenService(),
+                new NewPlayerFactory());
         }
 
         /// <summary>

@@ -1,0 +1,22 @@
+namespace Game.Core.Players
+{
+    /// <summary>
+    /// A blueprint describing the initial state of a freshly created player — the game's answer to
+    /// "what does a new player look like?" (starter skills, base attribute spread, and the default
+    /// log preferences). Produced by <see cref="NewPlayerFactory"/> and translated into a persisted
+    /// entity graph by the data-access layer; it deliberately carries no identity or resolved
+    /// reference-data objects, only the raw defaults.
+    /// </summary>
+    public class NewPlayer
+    {
+        public required string Name { get; init; }
+        public required int Level { get; init; }
+        public required int Exp { get; init; }
+        public required int CurrentZoneId { get; init; }
+        public required int StatPointsGained { get; init; }
+        public required int StatPointsUsed { get; init; }
+        public required IReadOnlyList<NewPlayerSkill> Skills { get; init; }
+        public required IReadOnlyList<StatAllocation> Attributes { get; init; }
+        public required IReadOnlyList<LogPreference> LogPreferences { get; init; }
+    }
+}

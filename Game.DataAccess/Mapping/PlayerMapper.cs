@@ -1,12 +1,61 @@
 using Game.Abstractions.DataAccess;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
+using EntityLogPreference = Game.Abstractions.Entities.LogPreference;
 using EntityPlayer = Game.Abstractions.Entities.Player;
+using EntityPlayerAttribute = Game.Abstractions.Entities.PlayerAttribute;
+using EntityPlayerSkill = Game.Abstractions.Entities.PlayerSkill;
+using EntityUser = Game.Abstractions.Entities.User;
 
 namespace Game.DataAccess.Mapping
 {
     internal static class PlayerMapper
     {
+        /// <summary>
+        /// Builds the persisted entity graph for a brand-new player from its domain
+        /// <see cref="NewPlayer"/> blueprint, linking it to the owning <paramref name="user"/> via the
+        /// navigation property (so EF resolves the foreign key without the user's store-generated id).
+        /// </summary>
+        public static EntityPlayer ToEntity(NewPlayer newPlayer, EntityUser user)
+        {
+            var player = new EntityPlayer
+            {
+                User = user,
+                Name = newPlayer.Name,
+                Level = newPlayer.Level,
+                Exp = newPlayer.Exp,
+                CurrentZoneId = newPlayer.CurrentZoneId,
+                StatPointsGained = newPlayer.StatPointsGained,
+                StatPointsUsed = newPlayer.StatPointsUsed,
+            };
+
+            player.PlayerSkills = newPlayer.Skills
+                .Select(skill => new EntityPlayerSkill
+                {
+                    Player = player,
+                    SkillId = skill.SkillId,
+                    Selected = skill.Selected,
+                }).ToList();
+
+            player.PlayerAttributes = newPlayer.Attributes
+                .Select(attribute => new EntityPlayerAttribute
+                {
+                    Player = player,
+                    AttributeId = (int)attribute.Attribute,
+                    Amount = (decimal)attribute.Amount,
+                }).ToList();
+
+            player.LogPreferences = newPlayer.LogPreferences
+                .Select(preference => new EntityLogPreference
+                {
+                    Player = player,
+                    LogTypeId = (int)preference.LogType,
+                    Enabled = preference.Enabled,
+                }).ToList();
+
+            return player;
+        }
+
         /// <summary>
         /// Maps a player entity (carrying only player-specific relational data) to a domain
         /// <see cref="Player"/>, resolving the reference-data portion (items, item mods, skills)
