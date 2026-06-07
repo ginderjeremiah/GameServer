@@ -16,6 +16,7 @@ import type {
 	INewEnemyRequest,
 	ISetItemFavoriteRequest,
 	ISkill,
+	IStatisticType,
 	IZone
 } from './';
 
@@ -29,6 +30,7 @@ export type ApiSocketResponseTypes = {
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
 	'GetSkills': ISkill[];
+	'GetStatisticTypes': IStatisticType[];
 	'GetZones': IZone[];
 	'NewEnemy': INewEnemyModel;
 	'SaveLogPreferences': undefined;

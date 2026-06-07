@@ -22,7 +22,8 @@ vi.mock('$stores', () => ({
 		itemMods: undefined,
 		attributes: undefined,
 		challenges: undefined,
-		challengeTypes: undefined
+		challengeTypes: undefined,
+		statisticTypes: undefined
 	}
 }));
 

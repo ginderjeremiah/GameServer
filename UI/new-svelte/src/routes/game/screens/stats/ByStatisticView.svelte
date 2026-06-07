@@ -14,7 +14,7 @@
 <script lang="ts">
 import UnderlineTabs, { type Tab } from './UnderlineTabs.svelte';
 import StatCard from './StatCard.svelte';
-import { STAT_CATEGORIES, STAT_TYPES, type StatCategory, type StatisticsView } from './statistics-view.svelte';
+import { STAT_CATEGORIES, type StatCategory, type StatisticsView } from './statistics-view.svelte';
 import { statCategoryColor } from './statistics-display';
 
 interface Props {
@@ -23,15 +23,17 @@ interface Props {
 
 let { view }: Props = $props();
 
-const tabs: Tab[] = [
-	{ key: 'all', label: 'All', color: 'var(--accent)', count: STAT_TYPES.length },
+// Counts come from the live catalogue (server-sourced), so the tabs stay in sync
+// with whichever statistic types the backend exposes.
+const tabs = $derived<Tab[]>([
+	{ key: 'all', label: 'All', color: 'var(--accent)', count: view.data.statTypes.length },
 	...STAT_CATEGORIES.map((c) => ({
 		key: c.key,
 		label: c.label,
 		color: statCategoryColor(c.key),
-		count: STAT_TYPES.filter((s) => s.cat === c.key).length
+		count: view.data.statsInCategory(c.key).length
 	}))
-];
+]);
 </script>
 
 <style lang="scss">

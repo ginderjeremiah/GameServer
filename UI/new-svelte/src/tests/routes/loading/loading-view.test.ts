@@ -22,7 +22,17 @@ const loadView = async () => {
 	return new mod.LoadingView();
 };
 
-const SETS = ['zones', 'enemies', 'items', 'skills', 'itemMods', 'attributes', 'challenges', 'challengeTypes'];
+const SETS = [
+	'zones',
+	'enemies',
+	'items',
+	'skills',
+	'itemMods',
+	'attributes',
+	'challenges',
+	'challengeTypes',
+	'statisticTypes'
+];
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -33,7 +43,7 @@ beforeEach(() => {
 });
 
 describe('LoadingView', () => {
-	it('builds the eight-set manifest and loads everything to done', async () => {
+	it('builds the manifest and loads every set to done', async () => {
 		const view = await loadView();
 		vi.useFakeTimers();
 		const run = view.start();
@@ -44,12 +54,13 @@ describe('LoadingView', () => {
 		expect(view.items.map((i) => i.key)).toEqual(SETS);
 		expect(view.phase).toBe('done');
 		expect(view.items.every((i) => i.status === 'done')).toBe(true);
-		expect(view.completed).toBe(8);
+		expect(view.completed).toBe(SETS.length);
 		expect(view.progressPct).toBe(100);
-		expect(get).toHaveBeenCalledTimes(8);
+		expect(get).toHaveBeenCalledTimes(SETS.length);
 		// Each set populated its store slot.
 		expect(staticData.zones).toEqual([]);
 		expect(staticData.challengeTypes).toEqual([]);
+		expect(staticData.statisticTypes).toEqual([]);
 	});
 
 	it('skips straight to done without fetching when everything is cached', async () => {
@@ -60,7 +71,7 @@ describe('LoadingView', () => {
 		await view.start();
 
 		expect(view.phase).toBe('done');
-		expect(view.activeIndex).toBe(8);
+		expect(view.activeIndex).toBe(SETS.length);
 		expect(get).not.toHaveBeenCalled();
 	});
 

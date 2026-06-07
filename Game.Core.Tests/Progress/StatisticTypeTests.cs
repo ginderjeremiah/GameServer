@@ -11,6 +11,7 @@ namespace Game.Core.Tests.Progress
         [InlineData(EStatisticType.EnemiesEncountered, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesWon, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesLost, EEntityType.Enemy)]
+        [InlineData(EStatisticType.FastestVictory, EEntityType.Enemy)]
         [InlineData(EStatisticType.ZonesCleared, EEntityType.Zone)]
         [InlineData(EStatisticType.DamageDealt, EEntityType.Skill)]
         [InlineData(EStatisticType.HighestSingleAttackDamage, EEntityType.Skill)]
@@ -29,7 +30,6 @@ namespace Game.Core.Tests.Progress
         [InlineData(EStatisticType.DamageHealed)]
         [InlineData(EStatisticType.PlayerDeaths)]
         [InlineData(EStatisticType.TotalBattleTime)]
-        [InlineData(EStatisticType.FastestVictory)]
         public void GlobalStatistics_HaveNoEntityType(EStatisticType type)
         {
             var statisticType = new StatisticType(type);

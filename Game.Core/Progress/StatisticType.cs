@@ -29,6 +29,9 @@ namespace Game.Core.Progress
                 EnemiesEncountered => Enemy,
                 BattlesWon => Enemy,
                 BattlesLost => Enemy,
+                // FastestVictory is recorded per enemy (and as a global min) in
+                // PlayerProgress.RecordBattleCompleted, so its declared breakdown is by enemy.
+                FastestVictory => Enemy,
                 SkillsUsed => Skill,
                 _ => None
             };

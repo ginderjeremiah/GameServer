@@ -1,4 +1,14 @@
-import { IAttribute, IChallenge, IChallengeType, IEnemy, IItem, IItemMod, ISkill, IZone } from '$lib/api';
+import {
+	IAttribute,
+	IChallenge,
+	IChallengeType,
+	IEnemy,
+	IItem,
+	IItemMod,
+	ISkill,
+	IStatisticType,
+	IZone
+} from '$lib/api';
 
 let zones = $state<IZone[]>();
 let enemies = $state<IEnemy[]>();
@@ -8,6 +18,7 @@ let itemMods = $state<IItemMod[]>();
 let attributes = $state<IAttribute[]>();
 let challenges = $state<IChallenge[]>();
 let challengeTypes = $state<IChallengeType[]>();
+let statisticTypes = $state<IStatisticType[]>();
 
 export const staticData = {
 	get zones() {
@@ -58,7 +69,15 @@ export const staticData = {
 	set challengeTypes(value) {
 		challengeTypes = value;
 	},
+	get statisticTypes() {
+		return statisticTypes as IStatisticType[];
+	},
+	set statisticTypes(value) {
+		statisticTypes = value;
+	},
 	get loaded() {
-		return zones && enemies && items && skills && itemMods && attributes && challenges && challengeTypes;
+		return (
+			zones && enemies && items && skills && itemMods && attributes && challenges && challengeTypes && statisticTypes
+		);
 	}
 };

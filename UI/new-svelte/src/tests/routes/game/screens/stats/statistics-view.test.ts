@@ -1,11 +1,24 @@
-import { describe, it, expect } from 'vitest';
-import { EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
+
+// StatisticsView reads the statistic-type catalogue + entity lists from the
+// in-memory staticData store, so it is mocked here.
+const { staticData } = vi.hoisted(() => ({
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	staticData: {} as any
+}));
+vi.mock('$stores', () => ({ staticData }));
+
 import {
+	buildStatTypes,
 	StatisticsData,
 	StatisticsView,
-	STAT_TYPES,
-	type StatEntity
+	type StatEntity,
+	type StatType
 } from '$routes/game/screens/stats/statistics-view.svelte';
+import { SERVER_STAT_TYPES } from './stat-fixtures';
+
+const statTypes: StatType[] = buildStatTypes(SERVER_STAT_TYPES);
 
 const entities: Record<'enemy' | 'zone' | 'skill', StatEntity[]> = {
 	enemy: [
@@ -25,7 +38,72 @@ const stats: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 7 }
 ];
 
-const data = () => new StatisticsData(stats, entities);
+const data = () => new StatisticsData(statTypes, stats, entities);
+
+/** Populates the mocked staticData with the reference data the view needs. */
+function seedStaticData(): void {
+	staticData.statisticTypes = SERVER_STAT_TYPES;
+	staticData.enemies = [
+		{ id: 0, name: 'Cave Bat', isBoss: false },
+		{ id: 1, name: 'Goblin', isBoss: true }
+	];
+	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 1 }];
+	staticData.skills = [{ id: 0, name: 'Cleave' }];
+}
+
+/** A view seeded with the standard stats fixture (loading already finished). */
+function seededView(): StatisticsView {
+	const view = new StatisticsView();
+	view.stats = stats;
+	view.loading = false;
+	return view;
+}
+
+beforeEach(() => {
+	seedStaticData();
+});
+
+describe('buildStatTypes', () => {
+	it('builds one entry per presented statistic with names from the server', () => {
+		expect(statTypes).toHaveLength(14);
+		expect(statTypes.find((s) => s.id === EStatisticType.HighestSingleAttackDamage)!.name).toBe(
+			'Highest Single Attack Damage'
+		);
+	});
+
+	it('sources the entity-kind breakdown from the server entityType', () => {
+		const fastest = statTypes.find((s) => s.id === EStatisticType.FastestVictory)!;
+		expect(fastest.kind).toBe('enemy');
+		// Presentation concerns stay on the frontend.
+		expect(fastest.comp).toBe('AtMost');
+		expect(fastest.agg).toBe('min');
+
+		expect(statTypes.find((s) => s.id === EStatisticType.ZonesCleared)!.kind).toBe('zone');
+		expect(statTypes.find((s) => s.id === EStatisticType.DamageDealt)!.kind).toBe('skill');
+	});
+
+	it('treats None entity types as total-only (no per-entity breakdown)', () => {
+		for (const id of [EStatisticType.PlayerDeaths, EStatisticType.DamageTaken, EStatisticType.TotalBattleTime]) {
+			expect(statTypes.find((s) => s.id === id)!.kind).toBe('none');
+		}
+	});
+
+	it('is server-driven: a changed entityType changes the kind (not hard-coded)', () => {
+		// If the backend declared FastestVictory as None, the frontend follows suit.
+		const overridden = SERVER_STAT_TYPES.map((s) =>
+			s.id === EStatisticType.FastestVictory ? { ...s, entityType: EEntityType.None } : s
+		);
+		const fastest = buildStatTypes(overridden).find((s) => s.id === EStatisticType.FastestVictory)!;
+		expect(fastest.kind).toBe('none');
+	});
+
+	it('skips statistics the server does not return', () => {
+		const partial = SERVER_STAT_TYPES.filter((s) => s.id !== EStatisticType.SkillsUsed);
+		const built = buildStatTypes(partial);
+		expect(built).toHaveLength(13);
+		expect(built.find((s) => s.id === EStatisticType.SkillsUsed)).toBeUndefined();
+	});
+});
 
 describe('StatisticsData.rowsForStat', () => {
 	it('sorts a sum/max statistic best-first (descending)', () => {
@@ -44,7 +122,11 @@ describe('StatisticsData.rowsForStat', () => {
 	});
 
 	it('drops rows whose entity cannot be resolved', () => {
-		const d = new StatisticsData([{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 99, value: 5 }], entities);
+		const d = new StatisticsData(
+			statTypes,
+			[{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 99, value: 5 }],
+			entities
+		);
 		expect(d.rowsForStat(EStatisticType.EnemiesKilled)).toEqual([]);
 	});
 });
@@ -57,6 +139,7 @@ describe('StatisticsData.statHeadline', () => {
 
 	it('falls back to aggregating per-entity rows when there is no total row', () => {
 		const d = new StatisticsData(
+			statTypes,
 			[
 				{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 100 },
 				{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 }
@@ -82,9 +165,16 @@ describe('StatisticsData.statsForEntity', () => {
 	});
 });
 
+describe('StatisticsData.isEmpty', () => {
+	it('is true when there are no recorded statistics', () => {
+		expect(new StatisticsData(statTypes, [], entities).isEmpty).toBe(true);
+		expect(data().isEmpty).toBe(false);
+	});
+});
+
 describe('StatisticsView navigation', () => {
 	it('initialises to the by-statistic view on the first enemy', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		expect(view.mode).toBe('stat');
 		expect(view.statCat).toBe('combat');
 		expect(view.entKind).toBe('enemy');
@@ -92,14 +182,14 @@ describe('StatisticsView navigation', () => {
 	});
 
 	it('filters the shown statistics by the active category', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		expect(view.shownStats.every((s) => s.cat === 'combat')).toBe(true);
 		view.setStatCat('time');
 		expect(view.shownStats.map((s) => s.id)).toContain(EStatisticType.FastestVictory);
 	});
 
 	it('switchKind resets the selection and query to the new kind', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		view.setQuery('bat');
 		view.switchKind('skill');
 		expect(view.entKind).toBe('skill');
@@ -108,7 +198,7 @@ describe('StatisticsView navigation', () => {
 	});
 
 	it('goEntity pivots into an entity dossier', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		view.goEntity('enemy', 1);
 		expect(view.mode).toBe('entity');
 		expect(view.selectedEntity?.id).toBe(1);
@@ -116,7 +206,7 @@ describe('StatisticsView navigation', () => {
 	});
 
 	it('goStat jumps back to a statistic category', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		view.goEntity('enemy', 0);
 		view.goStat('exploration');
 		expect(view.mode).toBe('stat');
@@ -124,35 +214,26 @@ describe('StatisticsView navigation', () => {
 	});
 
 	it('filters entities by the search query', () => {
-		const view = new StatisticsView(data());
+		const view = seededView();
 		view.setQuery('gob');
 		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
 	});
 });
 
-describe('STAT_TYPES catalogue', () => {
-	it('covers all 14 EStatisticType values', () => {
-		expect(STAT_TYPES).toHaveLength(14);
-	});
-
-	it('keys FastestVictory to enemies and treats it as lower-is-better', () => {
-		const fastest = STAT_TYPES.find((s) => s.id === EStatisticType.FastestVictory)!;
-		expect(fastest.kind).toBe('enemy');
-		expect(fastest.comp).toBe('AtMost');
-		expect(fastest.agg).toBe('min');
-	});
-
-	it('treats deaths / damage-taken / total-time as total-only (none)', () => {
-		for (const id of [EStatisticType.PlayerDeaths, EStatisticType.DamageTaken, EStatisticType.TotalBattleTime]) {
-			expect(STAT_TYPES.find((s) => s.id === id)!.kind).toBe('none');
-		}
-	});
-});
-
-describe('default mock data source', () => {
-	it('builds a usable view without injected data', () => {
+describe('StatisticsView data wiring', () => {
+	it('starts empty and loading until statistics are fetched', () => {
 		const view = new StatisticsView();
-		expect(view.data.entityList('enemy').length).toBeGreaterThan(0);
-		expect(view.data.statHeadline(EStatisticType.EnemiesKilled)).toBeGreaterThan(0);
+		expect(view.loading).toBe(true);
+		expect(view.data.isEmpty).toBe(true);
+	});
+
+	it('builds the catalogue + entities from staticData once stats arrive', () => {
+		const view = seededView();
+		expect(view.data.statTypes).toHaveLength(14);
+		expect(view.data.entityList('enemy').map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
+		// isBoss / order are resolved from the raw reference data.
+		expect(view.data.entity('enemy', 1)?.boss).toBe(true);
+		expect(view.data.entity('zone', 0)?.zoneNum).toBe(1);
+		expect(view.data.statHeadline(EStatisticType.EnemiesKilled)).toBe(120);
 	});
 });
