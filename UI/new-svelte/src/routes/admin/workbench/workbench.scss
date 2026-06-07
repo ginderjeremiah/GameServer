@@ -911,7 +911,11 @@
 		padding: 16px 18px;
 		border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 		border-radius: 8px;
-		background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), color-mix(in srgb, var(--accent) 2%, transparent));
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--accent) 7%, transparent),
+			color-mix(in srgb, var(--accent) 2%, transparent)
+		);
 		display: flex;
 		align-items: center;
 		gap: 14px;

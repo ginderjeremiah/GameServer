@@ -75,7 +75,6 @@ interface Props {
 	item: Item;
 	size?: number;
 	glow?: boolean;
-	accentBorders?: boolean;
 	selected?: boolean;
 	onSelect?: (item: Item) => void;
 	onToggleEquip?: (item: Item) => void;
@@ -91,7 +90,6 @@ const {
 	item,
 	size = 64,
 	glow = true,
-	accentBorders = true,
 	selected = false,
 	onSelect,
 	onToggleEquip,
@@ -110,13 +108,9 @@ const level = $derived(rarityLevel(item.rarityId));
 const catColor = $derived(itemCategoryColor(item.itemCategoryId));
 const modCount = $derived(item.appliedMods.length);
 
-const bg = $derived(accentBorders ? rarityTint(item.rarityId, 0.05 + level * 0.012) : tintColor('var(--white)', 0.03));
+const bg = $derived(rarityTint(item.rarityId, 0.05 + level * 0.012));
 const borderColor = $derived(
-	selected
-		? 'var(--accent)'
-		: accentBorders
-			? rarityTint(item.rarityId, Math.min(0.85, 0.34 + level * 0.09))
-			: 'var(--border-light)'
+	selected ? 'var(--accent)' : rarityTint(item.rarityId, Math.min(0.85, 0.34 + level * 0.09))
 );
 // Glow intensity is a themeable CSS var, so the blur radius and alpha are derived in-CSS via calc().
 const glowShadow = $derived(
@@ -133,8 +127,11 @@ const boxShadow = $derived(
 );
 
 const handleClick = (e: MouseEvent) => {
-	if (e.metaKey || e.ctrlKey) onToggleEquip?.(item);
-	else onSelect?.(item);
+	if (e.metaKey || e.ctrlKey) {
+		onToggleEquip?.(item);
+	} else {
+		onSelect?.(item);
+	}
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
@@ -146,7 +143,9 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 const handleDragStart = (e: DragEvent) => {
 	e.dataTransfer?.setData('text/plain', String(item.itemId));
-	if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+	if (e.dataTransfer) {
+		e.dataTransfer.effectAllowed = 'move';
+	}
 	onDragStart?.(item);
 };
 </script>

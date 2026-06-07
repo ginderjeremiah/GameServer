@@ -37,7 +37,9 @@ let seenId = $state(0);
 const isNew = $derived(newestId !== seenId);
 
 const onScroll = () => {
-	if (scrollEl) atTop = scrollEl.scrollTop <= 4;
+	if (scrollEl) {
+		atTop = scrollEl.scrollTop <= 4;
+	}
 };
 
 // When a new entry arrives: if the user is pinned at the top, keep them there
