@@ -227,6 +227,67 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        public static async Task<Challenge> CreateChallengeAsync(
+            GameContext context,
+            string name = "Test Challenge",
+            EChallengeType challengeTypeId = EChallengeType.EnemiesKilled,
+            decimal progressGoal = 10m,
+            int? targetEntityId = null,
+            int? rewardItemId = null,
+            int? rewardItemModId = null)
+        {
+            var challenge = new Challenge
+            {
+                Name = name,
+                Description = "",
+                ChallengeTypeId = (int)challengeTypeId,
+                ProgressGoal = progressGoal,
+                TargetEntityId = targetEntityId,
+                RewardItemId = rewardItemId,
+                RewardItemModId = rewardItemModId,
+            };
+
+            context.Challenges.Add(challenge);
+            await context.SaveChangesAsync();
+            return challenge;
+        }
+
+        public static async Task AddPlayerStatisticAsync(
+            GameContext context,
+            int playerId,
+            EStatisticType statisticType,
+            decimal value,
+            int? entityId = null)
+        {
+            context.PlayerStatistics.Add(new PlayerStatistic
+            {
+                PlayerId = playerId,
+                StatisticTypeId = (int)statisticType,
+                EntityId = entityId,
+                Value = value,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        public static async Task AddPlayerChallengeAsync(
+            GameContext context,
+            int playerId,
+            int challengeId,
+            decimal progress = 0m,
+            bool completed = false,
+            DateTime? completedAt = null)
+        {
+            context.PlayerChallenges.Add(new PlayerChallenge
+            {
+                PlayerId = playerId,
+                ChallengeId = challengeId,
+                Progress = progress,
+                Completed = completed,
+                CompletedAt = completedAt,
+            });
+            await context.SaveChangesAsync();
+        }
+
         public static async Task<Enemy> CreateStrongEnemyAsync(GameContext context)
         {
             return await CreateEnemyAsync(context, "Strong Enemy",

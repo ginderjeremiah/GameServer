@@ -43,6 +43,7 @@ namespace Game.Api.Tests.Integration
             scope.ServiceProvider.GetRequiredService<ISkills>().InvalidateCache();
             scope.ServiceProvider.GetRequiredService<IItems>().InvalidateCache();
             scope.ServiceProvider.GetRequiredService<IItemMods>().InvalidateCache();
+            scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
         }
 
         public async ValueTask DisposeAsync()

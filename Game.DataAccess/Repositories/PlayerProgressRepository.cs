@@ -1,7 +1,7 @@
 using Game.Abstractions.DataAccess;
-using Game.Core;
 using Game.Core.Players;
 using Game.Core.Progress;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
@@ -41,21 +41,34 @@ namespace Game.DataAccess.Repositories
                     e => e.ChallengeId);
             }
 
-            var coreStats = _loadedStats.Values.Select(e => new CoreStat
-            {
-                Type = (EStatisticType)e.StatisticTypeId,
-                EntityId = e.EntityId,
-                Value = e.Value,
-            });
+            var coreStats = _loadedStats.Values.Select(PlayerProgressMapper.ToCore);
 
-            var coreChallenges = _loadedChallenges.Values.Select(e => new CoreChallenge(
-                _challenges.GetChallenge(e.ChallengeId),
-                e.Progress,
-                e.Completed,
-                e.CompletedAt
-            ));
+            var coreChallenges = _loadedChallenges.Values
+                .Select(e => PlayerProgressMapper.ToCore(e, _challenges.GetChallenge(e.ChallengeId)));
 
             return new PlayerProgress(player, coreStats, coreChallenges);
+        }
+
+        public async Task<List<CoreStat>> GetStatistics(int playerId)
+        {
+            var entities = await _context.PlayerStatistics
+                .AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId)
+                .ToListAsync();
+
+            return entities.Select(PlayerProgressMapper.ToCore).ToList();
+        }
+
+        public async Task<List<CoreChallenge>> GetChallenges(int playerId)
+        {
+            var entities = await _context.PlayerChallenges
+                .AsNoTracking()
+                .Where(pc => pc.PlayerId == playerId)
+                .ToListAsync();
+
+            return entities
+                .Select(e => PlayerProgressMapper.ToCore(e, _challenges.GetChallenge(e.ChallengeId)))
+                .ToList();
         }
 
         public void Save(PlayerProgress progress)
