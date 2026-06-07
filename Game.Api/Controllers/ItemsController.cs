@@ -15,7 +15,9 @@ namespace Game.Api.Controllers
         public ApiEnumerableResponse<ItemModSlot> SlotsForItem(int itemId, bool refreshCache = false)
         {
             if (refreshCache)
+            {
                 _items.All(refreshCache);
+            }
 
             var item = _items.LookupItem(itemId);
             return ApiResponse.Success((item?.ItemModSlots).To().Model<ItemModSlot>());

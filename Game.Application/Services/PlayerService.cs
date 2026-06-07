@@ -17,7 +17,9 @@ namespace Game.Application.Services
         public async Task<bool> TryUpdateAttributes(Player player, IEnumerable<IAttributeUpdate> updates)
         {
             if (!player.TryUpdateAttributes(updates))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;
@@ -26,7 +28,9 @@ namespace Game.Application.Services
         public async Task<bool> EquipItem(Player player, int itemId, EEquipmentSlot slot)
         {
             if (!player.TryEquipItem(itemId, slot))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;
@@ -35,7 +39,9 @@ namespace Game.Application.Services
         public async Task<bool> UnequipItem(Player player, EEquipmentSlot slot)
         {
             if (!player.TryUnequipItem(slot))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;
@@ -44,7 +50,9 @@ namespace Game.Application.Services
         public async Task<bool> SetFavorite(Player player, int itemId, bool favorite)
         {
             if (!player.TrySetFavorite(itemId, favorite))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;
@@ -63,12 +71,16 @@ namespace Game.Application.Services
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId)
         {
             if (_itemMods.LookupItemMod(itemModId) is null)
+            {
                 return false;
+            }
 
             var mod = _itemMods.GetItemMod(itemModId);
 
             if (!player.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;
@@ -77,7 +89,9 @@ namespace Game.Application.Services
         public async Task<bool> RemoveMod(Player player, int itemId, int itemModSlotId)
         {
             if (!player.TryRemoveMod(itemId, itemModSlotId))
+            {
                 return false;
+            }
 
             await _playerRepo.SavePlayer(player);
             return true;

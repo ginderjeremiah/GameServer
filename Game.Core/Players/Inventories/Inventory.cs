@@ -53,14 +53,20 @@ namespace Game.Core.Players.Inventories
         {
             var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
             if (unlocked is null)
+            {
                 return false;
+            }
 
             var equipSlot = EquipmentSlots.FirstOrDefault(s => s.Value == slot);
             if (equipSlot is null)
+            {
                 return false;
+            }
 
             if (equipSlot.ItemCategory != unlocked.Item.Category)
+            {
                 return false;
+            }
 
             // Unequip from any other slot first
             var currentSlot = EquipmentSlots.FirstOrDefault(s => s.ItemId == itemId);
@@ -86,7 +92,9 @@ namespace Game.Core.Players.Inventories
         {
             var equipSlot = EquipmentSlots.FirstOrDefault(s => s.Value == slot);
             if (equipSlot is null || !equipSlot.ItemId.HasValue)
+            {
                 return false;
+            }
 
             equipSlot.ItemId = null;
             equipSlot.Item = null;
@@ -96,24 +104,34 @@ namespace Game.Core.Players.Inventories
         public bool TryApplyMod(int itemId, int itemModId, int itemModSlotId, ItemMod mod)
         {
             if (!UnlockedMods.Contains(itemModId))
+            {
                 return false;
+            }
 
             var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
             if (unlocked is null)
+            {
                 return false;
+            }
 
             var modSlot = unlocked.Item.ModSlots.FirstOrDefault(s => s.Index == itemModSlotId);
             if (modSlot is null)
+            {
                 return false;
+            }
 
             // Verify mod type matches slot type
             if (modSlot.Type != mod.Type)
+            {
                 return false;
+            }
 
             // Replace any existing mod in the slot
             var existing = unlocked.AppliedMods.FirstOrDefault(a => a.ItemModSlotId == itemModSlotId);
             if (existing is not null)
+            {
                 unlocked.AppliedMods.Remove(existing);
+            }
 
             unlocked.AppliedMods.Add(new AppliedModSlot
             {
@@ -129,11 +147,15 @@ namespace Game.Core.Players.Inventories
         {
             var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
             if (unlocked is null)
+            {
                 return false;
+            }
 
             var applied = unlocked.AppliedMods.FirstOrDefault(a => a.ItemModSlotId == itemModSlotId);
             if (applied is null)
+            {
                 return false;
+            }
 
             return unlocked.AppliedMods.Remove(applied);
         }
@@ -142,7 +164,9 @@ namespace Game.Core.Players.Inventories
         {
             var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
             if (unlocked is null)
+            {
                 return false;
+            }
 
             unlocked.Favorite = favorite;
             return true;

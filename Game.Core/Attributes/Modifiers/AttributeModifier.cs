@@ -46,7 +46,7 @@ namespace Game.Core.Attributes.Modifiers
             {
                 Additive => currentValue + modifierAmount,
                 Multiplicative => currentValue * modifierAmount,
-                _ => currentValue,
+                _ => throw new ModifierTypeNotSupportedException(Type),
             };
         }
     }

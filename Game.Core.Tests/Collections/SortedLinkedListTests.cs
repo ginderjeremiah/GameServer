@@ -306,7 +306,9 @@ namespace Game.Core.Tests.Collections
             var values = Enumerable.Range(0, 100).Select(_ => random.Next(1000)).ToArray();
 
             foreach (var v in values)
+            {
                 list.Add(v);
+            }
 
             var result = list.ToList();
             Assert.Equal(100, result.Count);
