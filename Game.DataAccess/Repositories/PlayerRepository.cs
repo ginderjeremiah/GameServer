@@ -15,12 +15,24 @@ namespace Game.DataAccess.Repositories
         private readonly GameContext _context;
         private readonly ICacheService _cache;
         private readonly IDomainEventDispatcher _dispatcher;
+        private readonly IItems _items;
+        private readonly IItemMods _itemMods;
+        private readonly ISkills _skills;
 
-        public PlayerRepository(GameContext context, ICacheService cache, IDomainEventDispatcher dispatcher)
+        public PlayerRepository(
+            GameContext context,
+            ICacheService cache,
+            IDomainEventDispatcher dispatcher,
+            IItems items,
+            IItemMods itemMods,
+            ISkills skills)
         {
             _context = context;
             _cache = cache;
             _dispatcher = dispatcher;
+            _items = items;
+            _itemMods = itemMods;
+            _skills = skills;
         }
 
         public async Task<Player?> GetPlayer(int playerId)
@@ -50,28 +62,21 @@ namespace Game.DataAccess.Repositories
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
         {
-            //TODO: remove a lot of these sub-includes and utilize the in-memory cached reference data where it's actually needed.
+            // Only the player-specific relational data is fetched here; the reference-data portion
+            // (item/skill/mod definitions and their attributes) is resolved from the in-memory cached
+            // catalogs in PlayerMapper.ToCore, avoiding redundant deep joins on every player load.
             var entity = await _context.Players
                 .AsNoTracking()
                 .Include(p => p.PlayerAttributes)
                 .Include(p => p.PlayerSkills)
-                    .ThenInclude(ps => ps.Skill)
-                        .ThenInclude(s => s.SkillDamageMultipliers)
                 .Include(p => p.UnlockedItems)
-                    .ThenInclude(ui => ui.Item)
-                        .ThenInclude(i => i.ItemAttributes)
-                .Include(p => p.UnlockedItems)
-                    .ThenInclude(ui => ui.Item)
-                        .ThenInclude(i => i.ItemModSlots)
                 .Include(p => p.UnlockedMods)
                 .Include(p => p.AppliedMods)
-                    .ThenInclude(am => am.ItemMod)
-                        .ThenInclude(im => im.ItemModAttributes)
                 .Include(p => p.LogPreferences)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == playerId);
 
-            return entity is null ? null : PlayerMapper.ToCore(entity);
+            return entity is null ? null : PlayerMapper.ToCore(entity, _items, _itemMods, _skills);
         }
     }
 

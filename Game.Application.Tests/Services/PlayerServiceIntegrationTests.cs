@@ -202,6 +202,78 @@ namespace Game.Application.Tests.Services
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
         }
 
+        [Fact]
+        public async Task LoadPlayer_ResolvesReferenceDataFromCache()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Reference data (skill, item with attribute + mod slot, mod) authored independently of
+            // the player; PlayerRepository must stitch these in from the in-memory catalogs.
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Fireball", baseDamage: 12m, cooldownMs: 1500);
+            var item = await TestDataSeeder.CreateItemAsync(context, name: "Sword", attributeId: EAttribute.Strength, attributeAmount: 5m);
+            var modSlot = new Abstractions.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+                Index = 0,
+            };
+            context.ItemModSlots.Add(modSlot);
+            var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id, selected: true);
+            context.UnlockedItems.Add(new Abstractions.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
+            });
+            context.UnlockedMods.Add(new Abstractions.Entities.UnlockedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemModId = mod.Id,
+            });
+            context.AppliedMods.Add(new Abstractions.Entities.AppliedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                ItemModSlotId = modSlot.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // Skill definition resolved from the cached catalog
+            var loadedSkill = Assert.Single(player.Skills);
+            Assert.Equal("Fireball", loadedSkill.Name);
+            Assert.Equal(12.0, loadedSkill.BaseDamage);
+            Assert.Equal(1500, loadedSkill.CooldownMs);
+            Assert.NotEmpty(loadedSkill.DamageMultipliers);
+            var selectedSkill = Assert.Single(player.SelectedSkills);
+            Assert.Equal(loadedSkill.Id, selectedSkill.Id);
+
+            // Item definition (with its attributes and mod slots) resolved from the cached catalog
+            var unlocked = Assert.Single(player.Inventory.UnlockedItems);
+            Assert.Equal("Sword", unlocked.Item.Name);
+            Assert.Contains(unlocked.Item.Attributes, a => a.Attribute == EAttribute.Strength && a.Amount == 5.0);
+            Assert.NotEmpty(unlocked.Item.ModSlots);
+
+            // Applied mod resolved with its attributes, and folded into the equipped modifiers
+            var appliedMod = Assert.Single(unlocked.AppliedMods);
+            Assert.Equal(mod.Id, appliedMod.ItemModId);
+            Assert.Contains(appliedMod.ItemMod.Attributes, a => a.Attribute == EAttribute.Dexterity && a.Amount == 7.0);
+
+            var modifiers = player.Inventory.GetEquippedAttributeModifiers().ToList();
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 5.0 && m.Source == EAttributeModifierSource.Item);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
+        }
+
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
     }
 }
