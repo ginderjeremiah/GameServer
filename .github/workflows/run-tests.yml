@@ -78,6 +78,9 @@ jobs:
     - name: Build solution
       run: dotnet build
 
+    - name: Run formatter (verify only)
+      run: dotnet format --verify-no-changes 
+
     - name: Execute full test suite
       # The build above already restored and compiled everything; reuse those binaries instead of
       # letting `dotnet test` trigger a redundant restore + rebuild.

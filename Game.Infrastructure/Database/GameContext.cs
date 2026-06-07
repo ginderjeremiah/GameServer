@@ -15,6 +15,7 @@ namespace Game.Infrastructure.Database
         /// <inheritdoc cref="DbContext(DbContextOptions)"/>
         public GameContext(DbContextOptions<GameContext> options) : base(options) { }
 
+#nullable disable
         public DbSet<AppliedMod> AppliedMods { get; set; }
         public DbSet<AttributeDistribution> AttributeDistributions { get; set; }
         public DbSet<BrowserInfo> BrowserInfos { get; set; }
@@ -52,6 +53,7 @@ namespace Game.Infrastructure.Database
         public DbSet<UserLogin> UserLogins { get; set; }
         public DbSet<ZoneEnemy> ZoneEnemies { get; set; }
         public DbSet<Zone> Zones { get; set; }
+#nullable restore
 
         /// <inheritdoc/>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
