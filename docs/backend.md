@@ -14,7 +14,7 @@ The game is structured is similar to an onion architecture with multiple project
 
 # General Backend Guidelines
 
-- Repositories should create and persist domain objects and are responsible for dispatching domain events before persisting changes. They should not contain any domain logic nor should they directly return entity models or database DTOs. Mappers should be used to convert between domain objects, entity models, and database DTOs and placed in the Mappers folder in the root of the `Game.DataAccess` project.
+- Repositories should create and persist domain objects and are responsible for dispatching domain events before persisting changes. They should not contain any domain logic nor should they directly return entity models or database DTOs. Mappers should be used to convert between domain objects, entity models, and database DTOs and placed in the Mapping folder in the root of the `Game.DataAccess` project.
 - All domain logic should be implemented in the `Game.Core` project, and the application layer should only be responsible for orchestrating calls to the repositories and domain objects/services to fulfill the use case. The API layer should only be responsible for handling HTTP/websocket requests, validating input, and returning responses, and should not contain any domain or orchestration logic.
 
 ## Testing Guidelines
