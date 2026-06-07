@@ -21,34 +21,34 @@ import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
 
 interface Row extends Identified {
-	id: number;
-	name: string;
 	value: number;
 }
 
-const makeConfig = (): EntityConfig<Row> => ({
-	key: 'rows',
-	label: 'Skills',
-	singular: 'Skill',
-	glyph: 'box',
-	blankName: 'Unnamed',
-	newItem: (id) => ({ id, name: '', value: 0 }),
-	meta: () => [],
-	sections: [
-		{
-			key: 'identity',
-			label: 'Identity',
-			glyph: 'box',
-			kind: 'fields',
-			fields: [
-				{ key: 'name', label: 'Name', type: 'text' },
-				{ key: 'value', label: 'Value', type: 'number' }
-			]
-		}
-	],
-	refresh: async () => [],
-	persist: async () => []
-});
+const makeConfig = (): EntityConfig<Identified> =>
+	({
+		key: 'rows',
+		label: 'Skills',
+		singular: 'Skill',
+		glyph: 'box',
+		blankName: 'Unnamed',
+		newItem: (id: number) => ({ id, name: '', value: 0 }),
+		meta: () => [],
+		sections: [
+			{
+				key: 'identity',
+				label: 'Identity',
+				glyph: 'box',
+				kind: 'fields',
+				fields: [
+					{ key: 'name', label: 'Name', type: 'text' },
+					{ key: 'value', label: 'Value', type: 'number' }
+				]
+			}
+		],
+		listBadge: (rec: Row) => rec.name ?? null,
+		refresh: async () => [],
+		persist: async () => []
+	}) as unknown as EntityConfig<Identified>;
 
 const seed: Row[] = [{ id: 1, name: 'Fireball', value: 50 }];
 
