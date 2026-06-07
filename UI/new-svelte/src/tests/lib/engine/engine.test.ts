@@ -10,12 +10,12 @@ const { goto } = vi.hoisted(() => ({ goto: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-// Use the real toast store (so the full show → dismiss → onDismiss flow is exercised) but stub
+// Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
 const { staticDataStub } = vi.hoisted(() => ({ staticDataStub: { loaded: true } }));
 vi.mock('$stores', async () => {
-	const toast = await vi.importActual<typeof import('$stores/toast.svelte')>('$stores/toast.svelte');
-	return { ...toast, staticData: staticDataStub };
+	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
+	return { ...modal, staticData: staticDataStub };
 });
 
 const { listenCommand } = vi.hoisted(() => ({ listenCommand: vi.fn() }));
@@ -60,30 +60,29 @@ vi.mock('$lib/engine/player/inventory-manager', () => ({
 import {
 	startGame,
 	handleSocketReplaced,
-	SESSION_REPLACED_MESSAGE,
+	SESSION_REPLACED_TITLE,
+	SESSION_REPLACED_BODY,
 	logicEngine,
 	renderEngine,
 	enemyManager,
 	battleEngine,
 	inventoryManager
 } from '$lib/engine/engine';
-import { toasts, clearToasts, dismissToast } from '$stores/toast.svelte';
-
-const currentToasts = () => [...toasts.data];
+import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	clearToasts();
+	clearModals();
 	staticDataStub.loaded = true;
 });
 
 afterEach(() => {
-	clearToasts();
+	clearModals();
 });
 
 describe('handleSocketReplaced', () => {
 	it('stops every engine and manager', () => {
-		handleSocketReplaced();
+		void handleSocketReplaced();
 
 		expect(logicEngine.stop).toHaveBeenCalledTimes(1);
 		expect(renderEngine.stop).toHaveBeenCalledTimes(1);
@@ -91,22 +90,23 @@ describe('handleSocketReplaced', () => {
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows a single sticky warning toast with the disconnect message', () => {
-		handleSocketReplaced();
+	it('shows an acknowledgement modal with the session-replaced title and body', () => {
+		void handleSocketReplaced();
 
-		const active = currentToasts();
-		expect(active).toHaveLength(1);
-		expect(active[0].type).toBe('warning');
-		expect(active[0].message).toBe(SESSION_REPLACED_MESSAGE);
-		// Sticky: it survives well past any default auto-dismiss window.
-		expect(active[0].onDismiss).toBeTypeOf('function');
+		const modal = activeModal.current;
+		expect(modal).not.toBeNull();
+		expect(modal?.kind).toBe('acknowledge');
+		expect(modal?.title).toBe(SESSION_REPLACED_TITLE);
+		expect(modal?.body).toBe(SESSION_REPLACED_BODY);
 	});
 
-	it('does not navigate until the toast is dismissed', () => {
-		handleSocketReplaced();
+	it('does not navigate until the modal is acknowledged', async () => {
+		const promise = handleSocketReplaced();
 		expect(goto).not.toHaveBeenCalled();
 
-		dismissToast(currentToasts()[0].id);
+		confirmActiveModal();
+		await promise;
+
 		expect(goto).toHaveBeenCalledWith('/');
 	});
 });
@@ -132,13 +132,13 @@ describe('startGame', () => {
 		expect(listenCommand).not.toHaveBeenCalled();
 	});
 
-	it('the wired SocketReplaced handler stops the engines and shows the disconnect toast', () => {
+	it('the wired SocketReplaced handler stops the engines and shows the disconnect modal', () => {
 		startGame();
 		const handler = listenCommand.mock.calls[0][1] as () => void;
 
-		handler();
+		void handler();
 
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
-		expect(currentToasts()[0].message).toBe(SESSION_REPLACED_MESSAGE);
+		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
 	});
 });
