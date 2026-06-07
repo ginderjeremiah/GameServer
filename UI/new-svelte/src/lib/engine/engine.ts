@@ -30,14 +30,7 @@ export const startGame = () => {
 	}
 };
 
-/**
- * The backend allows a player only one active connection at a time and emits `SocketReplaced` to the
- * losing client when a second session opens. Rather than yanking the player away with no explanation,
- * we stop the game engines so no further state mutates, then surface a sticky warning toast.
- * Dismissing it returns the player to the login screen via a client-side navigation — deliberately not
- * a full page reload, which would re-run the boot gate and bounce a still-authenticated client back
- * through the loading screen.
- */
+// Use goto() not location.href — a reload re-runs the boot gate and bounces an authenticated client back into the game.
 export const handleSocketReplaced = () => {
 	stopGame();
 	toastWarning(SESSION_REPLACED_MESSAGE, {

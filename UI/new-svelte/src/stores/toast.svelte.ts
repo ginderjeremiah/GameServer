@@ -64,8 +64,7 @@ const scheduleDismiss = (id: number, duration: number) => {
 export const dismissToast = (id: number) => {
 	clearTimer(id);
 	const toast = toastData.get(id);
-	// Remove the toast before running its callback so a callback that navigates or
-	// re-renders never observes the dismissed toast still in the collection.
+	// Remove before calling back so a re-rendering callback never observes a stale dismissed toast.
 	toastData.delete(id);
 	toast?.onDismiss?.();
 };
@@ -86,6 +85,7 @@ export const showToast = (message: string, options: ToastOptions = {}): number =
 	// stacking identical messages on top of each other.
 	for (const toast of toastData.values()) {
 		if (toast.message === message && toast.type === type) {
+			// Collapsing keeps the existing toast's onDismiss; a differing callback on a duplicate is ignored.
 			scheduleDismiss(toast.id, duration);
 			return toast.id;
 		}
