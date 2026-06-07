@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, waitFor } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import ModalHost from '$components/ModalHost.svelte';
-import { confirmModal, acknowledgeModal, clearModals, activeModal } from '$stores/modal.svelte';
+import { confirmModal, acknowledgeModal, dangerModal, clearModals, activeModal } from '$stores/modal.svelte';
 
 beforeEach(() => clearModals());
 
@@ -98,5 +98,63 @@ describe('ModalHost', () => {
 		await first;
 
 		expect(activeModal.current?.title).toBe('Second');
+	});
+});
+
+describe('ModalHost focus management', () => {
+	it('moves focus to the primary action when a confirm modal opens', async () => {
+		const { getByText } = render(ModalHost);
+		void confirmModal({ title: 'Proceed?', body: 'Body', confirmLabel: 'Go' });
+		flushSync();
+
+		await waitFor(() => expect(document.activeElement).toBe(getByText('Go')));
+	});
+
+	it('focuses the safe (cancel) action for a destructive modal so a stray Enter cannot confirm', async () => {
+		const { getByText } = render(ModalHost);
+		void dangerModal({ title: 'Delete?', body: 'Body', confirmLabel: 'Delete', cancelLabel: 'Keep' });
+		flushSync();
+
+		await waitFor(() => expect(document.activeElement).toBe(getByText('Keep')));
+	});
+
+	it('restores focus to the previously focused element when the modal closes', async () => {
+		const trigger = document.createElement('button');
+		trigger.textContent = 'Open';
+		document.body.appendChild(trigger);
+		trigger.focus();
+		expect(document.activeElement).toBe(trigger);
+
+		const { getByText } = render(ModalHost);
+		const result = confirmModal({ title: 'Proceed?', body: 'Body', confirmLabel: 'Go' });
+		flushSync();
+		// Focus has moved into the dialog.
+		await waitFor(() => expect(document.activeElement).toBe(getByText('Go')));
+
+		await fireEvent.click(getByText('Go'));
+		flushSync();
+		await result;
+
+		await waitFor(() => expect(document.activeElement).toBe(trigger));
+		trigger.remove();
+	});
+
+	it('traps Tab within the dialog, wrapping between first and last controls', async () => {
+		const { getByText } = render(ModalHost);
+		void confirmModal({ title: 'Proceed?', body: 'Body', confirmLabel: 'Go', cancelLabel: 'Nope' });
+		flushSync();
+
+		const cancel = getByText('Nope');
+		const primary = getByText('Go');
+		// Opens with focus on the primary (the last control in DOM order).
+		await waitFor(() => expect(document.activeElement).toBe(primary));
+
+		// Tab off the last control wraps to the first.
+		await fireEvent.keyDown(window, { key: 'Tab' });
+		expect(document.activeElement).toBe(cancel);
+
+		// Shift+Tab off the first wraps back to the last.
+		await fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+		expect(document.activeElement).toBe(primary);
 	});
 });

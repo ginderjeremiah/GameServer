@@ -10,15 +10,19 @@
 	<div class="modal-layer">
 		<button class="backdrop" type="button" tabindex="-1" aria-label="Dismiss dialog" onclick={dismiss}></button>
 		<div class="shell" tabindex="-1" bind:this={shell}>
-			<Modal
-				title={active.title}
-				body={active.body}
-				kind={active.kind}
-				confirmLabel={active.confirmLabel}
-				cancelLabel={active.cancelLabel}
-				onConfirm={confirmActiveModal}
-				onCancel={cancelActiveModal}
-			/>
+			<!-- Key on the modal id so a queued modal remounts and replays the entrance animation
+			     rather than just swapping its props in place. -->
+			{#key active.id}
+				<Modal
+					title={active.title}
+					body={active.body}
+					kind={active.kind}
+					confirmLabel={active.confirmLabel}
+					cancelLabel={active.cancelLabel}
+					onConfirm={confirmActiveModal}
+					onCancel={cancelActiveModal}
+				/>
+			{/key}
 		</div>
 	</div>
 {/if}

@@ -64,7 +64,7 @@ let { title, body, kind = 'confirm', confirmLabel, cancelLabel, onConfirm, onCan
 		var(--surface-alpha) 60%
 	);
 	box-shadow:
-		0 20px 50px rgba(0, 0, 0, 0.6),
+		0 20px 50px color-mix(in srgb, var(--black) 60%, transparent),
 		0 0 18px -10px var(--modal-accent);
 	// Entrance: rise + settle in. Collapsed to ~instant under `prefers-reduced-motion`.
 	animation: modal-in 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;

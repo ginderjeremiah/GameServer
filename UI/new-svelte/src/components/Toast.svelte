@@ -95,7 +95,7 @@ const runAction = () => {
 		var(--surface-alpha) 65%
 	);
 	box-shadow:
-		0 6px 18px rgba(0, 0, 0, 0.5),
+		0 6px 18px color-mix(in srgb, var(--black) 50%, transparent),
 		0 0 14px -10px var(--toast-accent),
 		inset 0 1px 0 color-mix(in srgb, var(--white) 3%, transparent);
 
