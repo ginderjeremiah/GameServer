@@ -18,7 +18,11 @@ vi.mock('$lib/api', () => ({ getTokens, onSocketError }));
 vi.mock('$lib/engine', () => ({ playerManager }));
 vi.mock('$lib/engine/session', () => ({ resumeSession }));
 vi.mock('$stores', () => ({ toastError: vi.fn() }));
-vi.mock('$components', () => ({ TooltipBase: () => {}, ToastContainer: () => {} }));
+vi.mock('$components', () => ({
+	TooltipBase: () => {},
+	ToastContainer: () => {},
+	ModalHost: () => {}
+}));
 
 import Layout from '../../routes/+layout.svelte';
 

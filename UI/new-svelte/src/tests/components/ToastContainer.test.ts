@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/svelte';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import ToastContainer from '$components/ToastContainer.svelte';
 import { showToast, clearToasts, toasts } from '$stores/toast.svelte';
@@ -28,7 +28,7 @@ describe('ToastContainer', () => {
 		expect(await findAllByRole('alert')).toHaveLength(2);
 	});
 
-	it('removes a toast from the DOM when its dismiss button is clicked', async () => {
+	it('removes a dismissed toast from the store immediately and from the DOM after its exit animation', async () => {
 		const { getByLabelText, queryByText } = render(ToastContainer);
 		showToast('Dismiss me', { duration: 0 });
 		flushSync();
@@ -36,7 +36,26 @@ describe('ToastContainer', () => {
 		await fireEvent.click(getByLabelText('Dismiss notification'));
 		flushSync();
 
-		expect(queryByText('Dismiss me')).toBeNull();
+		// The store is the synchronous source of truth: the toast is gone from it immediately, but the
+		// container keeps the node briefly so it can animate out.
+		expect([...toasts.data]).toHaveLength(0);
+		await waitFor(() => {
+			flushSync();
+			expect(queryByText('Dismiss me')).toBeNull();
+		});
+	});
+
+	it('wires an inline action through to the toast', async () => {
+		const onClick = vi.fn();
+		const { getByText } = render(ToastContainer);
+		showToast('Sync failed', { duration: 0, action: { label: 'Retry', onClick } });
+		flushSync();
+
+		await fireEvent.click(getByText('Retry →'));
+		flushSync();
+
+		expect(onClick).toHaveBeenCalledTimes(1);
+		// Acting on the toast also dismisses it from the store.
 		expect([...toasts.data]).toHaveLength(0);
 	});
 });

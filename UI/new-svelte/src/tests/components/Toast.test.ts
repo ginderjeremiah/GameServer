@@ -21,6 +21,11 @@ describe('Toast', () => {
 		expect(getByRole('alert').classList.contains('error')).toBe(true);
 	});
 
+	it('shows the status label matching the type', () => {
+		const { getByText } = render(Toast, { props: { message: 'Boom', type: 'warning' } });
+		expect(getByText('Warning')).toBeTruthy();
+	});
+
 	it('fires onDismiss when the dismiss button is clicked', async () => {
 		const onDismiss = vi.fn();
 		const { getByLabelText } = render(Toast, { props: { message: 'Close me', onDismiss } });
@@ -34,5 +39,22 @@ describe('Toast', () => {
 			props: { message: 'No close', dismissible: false }
 		});
 		expect(queryByLabelText('Dismiss notification')).toBeNull();
+	});
+
+	it('renders no action button when no action is provided', () => {
+		const { container } = render(Toast, { props: { message: 'No action' } });
+		expect(container.querySelector('.action')).toBeNull();
+	});
+
+	it('runs the action then dismisses when the inline action is clicked', async () => {
+		const onClick = vi.fn();
+		const onDismiss = vi.fn();
+		const { getByText } = render(Toast, {
+			props: { message: 'Retry me', action: { label: 'Retry', onClick }, onDismiss }
+		});
+
+		await fireEvent.click(getByText('Retry →'));
+		expect(onClick).toHaveBeenCalledTimes(1);
+		expect(onDismiss).toHaveBeenCalledTimes(1);
 	});
 });
