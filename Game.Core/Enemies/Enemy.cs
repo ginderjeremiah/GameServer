@@ -19,7 +19,7 @@ namespace Game.Core.Enemies
         public required int Level { get; init; }
         public required bool IsBoss { get; init; }
         public required List<AttributeDistribution> AttributeDistributions { get; init; }
-        public required List<Skill> AvailableSkills { get; init; }
+        public required IReadOnlyList<Skill> AvailableSkills { get; init; }
 
         /// <summary>
         /// The battle loadout selected for an encounter. Only available after
