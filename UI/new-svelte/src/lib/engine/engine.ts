@@ -7,7 +7,7 @@ import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
-import { staticData, toastWarning } from '$stores';
+import { staticData, acknowledgeModal } from '$stores';
 import { apiSocket } from '$lib/api';
 
 export const inventoryManager = statify(new InventoryManager());
@@ -17,8 +17,9 @@ export const logicEngine = statify(new LogicalEngine());
 export const renderEngine = statify(new RenderEngine());
 export const battleEngine = statify(new BattleEngine());
 
-/** Message shown when the backend reports the player's session was taken over by another connection. */
-export const SESSION_REPLACED_MESSAGE = 'Another session has started elsewhere. You have been disconnected.';
+export const SESSION_REPLACED_TITLE = 'Session Replaced';
+export const SESSION_REPLACED_BODY =
+	'Another session has started elsewhere. You have been disconnected. You will be taken to the login screen.';
 
 export const startGame = () => {
 	if (staticData.loaded) {
@@ -31,14 +32,14 @@ export const startGame = () => {
 };
 
 // Use goto() not location.href — a reload re-runs the boot gate and bounces an authenticated client back into the game.
-export const handleSocketReplaced = () => {
+export const handleSocketReplaced = async () => {
 	stopGame();
-	toastWarning(SESSION_REPLACED_MESSAGE, {
-		duration: 0,
-		onDismiss: () => {
-			void goto(resolve('/'));
-		}
+	await acknowledgeModal({
+		title: SESSION_REPLACED_TITLE,
+		body: SESSION_REPLACED_BODY,
+		confirmLabel: 'Go to Login'
 	});
+	void goto(resolve('/'));
 };
 
 const stopGame = () => {
