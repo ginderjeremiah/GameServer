@@ -2,15 +2,13 @@
 // Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 
 export * from './enums.ts';
+export * from './interfaces/admin.ts';
 export * from './interfaces/attributes.ts';
 export * from './interfaces/auth.ts';
-export * from './interfaces/common.ts';
 export * from './interfaces/contracts.ts';
 export * from './interfaces/enemies.ts';
 export * from './interfaces/inventory-items.ts';
 export * from './interfaces/player.ts';
 export * from './interfaces/progress.ts';
 export * from './interfaces/reference-data.ts';
-export * from './interfaces/tags.ts';
 export * from './interfaces/users.ts';
-export * from './interfaces/zones.ts';

@@ -1,11 +1,9 @@
 using Game.Abstractions;
-using Game.Api;
-using Game.Api.Controllers.Admin;
-using Game.Api.Models;
-using Game.Api.Models.Common;
+using Game.Abstractions.Contracts.Admin;
+using Game.DataAccess.Repositories.Admin;
 using Xunit;
 
-namespace Game.Api.Tests.Unit
+namespace Game.Application.Tests.DataAccess
 {
     public class ChangeSetProcessorTests
     {

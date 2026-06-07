@@ -143,6 +143,19 @@ namespace Game.TestInfrastructure.Helpers
             return itemMod;
         }
 
+        // TagCategories are intrinsic, migration-seeded reference data (preserved across test
+        // truncation), so tags reference an existing seeded category rather than creating one.
+        public static async Task<Tag> CreateTagAsync(
+            GameContext context,
+            string name = "Test Tag",
+            ETagCategory category = ETagCategory.Accessory)
+        {
+            var tag = new Tag { Name = name, TagCategoryId = (int)category };
+            context.Tags.Add(tag);
+            await context.SaveChangesAsync();
+            return tag;
+        }
+
         public static async Task<Enemy> CreateEnemyAsync(
             GameContext context,
             string name = "Test Enemy",

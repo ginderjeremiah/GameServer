@@ -1,160 +1,56 @@
 using Game.Abstractions.Contracts;
-using Game.Abstractions.DataAccess;
+using Game.Abstractions.Contracts.Admin;
+using Game.Abstractions.DataAccess.Admin;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
-using Game.Api.Models.Enemies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers.Admin
 {
     /// <summary>
-    /// Admin Workbench endpoints for persisting enemies and their related collections
-    /// (attribute distributions, skill pools, and zone spawns). The route prefix is shared
-    /// across every admin controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
+    /// Admin Workbench endpoints for persisting enemies and their related collections (attribute
+    /// distributions, skill pools, and zone spawns). A thin HTTP adapter over <see cref="IAdminEnemies"/>
+    /// — the Content Authoring persistence shape (EF entities) is an implementation detail of the data
+    /// tier and never surfaces here. The route prefix is shared across every admin controller so the
+    /// existing <c>/api/AdminTools/*</c> contract is preserved.
     /// </summary>
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
     [ServiceFilter(typeof(AdminCacheInvalidationFilter))]
-    public class AdminEnemiesController(
-        IEnemies enemies,
-        IEntityStore entityStore) : ControllerBase
+    public class AdminEnemiesController(IAdminEnemies adminEnemies) : ControllerBase
     {
-        private readonly IEnemies _enemies = enemies;
-        private readonly IEntityStore _entityStore = entityStore;
+        private readonly IAdminEnemies _adminEnemies = adminEnemies;
 
         [HttpPost]
         public ApiResponse AddEditEnemies([FromBody] List<Change<Enemy>> changes)
         {
-            ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Abstractions.Entities.Enemy
-                {
-                    Name = item.Name,
-                    IsBoss = item.IsBoss,
-                }),
-                edit: item => _entityStore.Update(new Abstractions.Entities.Enemy
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    IsBoss = item.IsBoss,
-                }),
-                delete: item => _entityStore.Delete(new Abstractions.Entities.Enemy
-                {
-                    Id = item.Id,
-                    Name = "",
-                }));
-
+            _adminEnemies.SaveEnemies(changes);
             return ApiResponse.Success();
         }
 
         [HttpPost]
         public ApiResponse SetEnemyAttributeDistributions([FromBody] SetEnemyAttributeDistributions distributionsData)
         {
-            var enemy = _enemies.GetEnemy(distributionsData.EnemyId);
-            if (enemy is not null)
-            {
-                var newIds = distributionsData.AttributeDistributions.Select(ad => (int)ad.AttributeId).ToList();
-                foreach (var dist in enemy.AttributeDistributions.Where(ad => !newIds.Contains(ad.AttributeId)))
-                {
-                    _entityStore.Delete(dist);
-                }
-
-                foreach (var dist in enemy.AttributeDistributions.Where(ad => newIds.Contains(ad.AttributeId)))
-                {
-                    var newData = distributionsData.AttributeDistributions.First(ad => (int)ad.AttributeId == dist.AttributeId);
-                    _entityStore.Update(new Abstractions.Entities.AttributeDistribution
-                    {
-                        EnemyId = enemy.Id,
-                        AttributeId = dist.AttributeId,
-                        BaseAmount = newData.BaseAmount,
-                        AmountPerLevel = newData.AmountPerLevel
-                    });
-                }
-
-                var existingIds = enemy.AttributeDistributions.Select(ad => ad.AttributeId).ToList();
-                var newDistributions = distributionsData.AttributeDistributions
-                    .Where(ad => !existingIds.Contains((int)ad.AttributeId))
-                    .Select(ad => new Abstractions.Entities.AttributeDistribution
-                    {
-                        EnemyId = enemy.Id,
-                        AttributeId = (int)ad.AttributeId,
-                        BaseAmount = ad.BaseAmount,
-                        AmountPerLevel = ad.AmountPerLevel
-                    }).ToList();
-
-                _entityStore.InsertAll(newDistributions);
-                return ApiResponse.Success();
-            }
-
-            return ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetAttributeDistributions(distributionsData)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Enemy not found.");
         }
 
         [HttpPost]
         public ApiResponse SetEnemySkills([FromBody] SetEnemySkillsData enemySkillsData)
         {
-            var enemy = _enemies.GetEnemy(enemySkillsData.EnemyId);
-            if (enemy is not null)
-            {
-                var newIds = enemySkillsData.SkillIds;
-                foreach (var skill in enemy.EnemySkills.Where(e => !newIds.Contains(e.SkillId)))
-                {
-                    _entityStore.Delete(skill);
-                }
-
-                var existingIds = enemy.EnemySkills.Select(ze => ze.SkillId).ToList();
-                var enemySkills = enemySkillsData.SkillIds
-                    .Where(id => !existingIds.Contains(id))
-                    .Select(id => new Abstractions.Entities.EnemySkill
-                    {
-                        EnemyId = enemy.Id,
-                        SkillId = id,
-                    }).ToList();
-
-                _entityStore.InsertAll(enemySkills);
-                return ApiResponse.Success();
-            }
-
-            return ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetSkills(enemySkillsData)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Enemy not found.");
         }
 
         [HttpPost]
         public ApiResponse SetEnemySpawns([FromBody] SetEnemySpawnsData spawnsData)
         {
-            var enemy = _enemies.GetEnemy(spawnsData.EnemyId);
-            if (enemy is not null)
-            {
-                var newZoneIds = spawnsData.Spawns.Select(s => s.ZoneId).ToList();
-                foreach (var spawn in enemy.ZoneEnemies.Where(ze => !newZoneIds.Contains(ze.ZoneId)))
-                {
-                    _entityStore.Delete(spawn);
-                }
-
-                foreach (var spawn in enemy.ZoneEnemies.Where(ze => newZoneIds.Contains(ze.ZoneId)))
-                {
-                    var newData = spawnsData.Spawns.First(s => s.ZoneId == spawn.ZoneId);
-                    _entityStore.Update(new Abstractions.Entities.ZoneEnemy
-                    {
-                        ZoneId = spawn.ZoneId,
-                        EnemyId = enemy.Id,
-                        Weight = newData.Weight,
-                    });
-                }
-
-                var existingZoneIds = enemy.ZoneEnemies.Select(ze => ze.ZoneId).ToList();
-                var newSpawns = spawnsData.Spawns
-                    .Where(s => !existingZoneIds.Contains(s.ZoneId))
-                    .Select(s => new Abstractions.Entities.ZoneEnemy
-                    {
-                        ZoneId = s.ZoneId,
-                        EnemyId = enemy.Id,
-                        Weight = s.Weight,
-                    }).ToList();
-
-                _entityStore.InsertAll(newSpawns);
-                return ApiResponse.Success();
-            }
-
-            return ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetSpawns(spawnsData)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Enemy not found.");
         }
     }
 }

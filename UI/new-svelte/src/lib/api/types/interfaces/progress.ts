@@ -8,19 +8,6 @@ import type {
 	EStatisticType
 } from '../';
 
-export interface IChallenge {
-	id: number;
-	name: string;
-	description: string;
-	challengeTypeId: EChallengeType;
-	statisticType?: EStatisticType;
-	entityType: EEntityType;
-	targetEntityId?: number;
-	progressGoal: number;
-	rewardItemId?: number;
-	rewardItemModId?: number;
-}
-
 export interface IChallengeType {
 	id: EChallengeType;
 	statisticType?: IStatisticType;

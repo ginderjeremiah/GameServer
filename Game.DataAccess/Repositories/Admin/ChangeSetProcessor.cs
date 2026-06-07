@@ -1,18 +1,19 @@
-using Game.Api.Models;
-using Game.Api.Models.Common;
+using Game.Abstractions;
+using Game.Abstractions.Contracts.Admin;
 
-namespace Game.Api.Controllers.Admin
+namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
-    /// Applies a batch of <see cref="Change{T}"/> records in the canonical admin order and
-    /// dispatches each to the matching handler. Changes are processed by descending
-    /// <see cref="EChangeType"/> (Delete, then Edit, then Add) so that removals are flushed before
-    /// insertions, mirroring the ordering every admin <c>AddEdit*</c> endpoint relied on.
+    /// Applies a batch of <see cref="Change{T}"/> records in the canonical admin order and dispatches
+    /// each to the matching handler. Changes are processed by descending <see cref="EChangeType"/>
+    /// (Delete, then Edit, then Add) so that removals are flushed before insertions, mirroring the
+    /// ordering every admin write path relied on.
     /// </summary>
     /// <remarks>
-    /// The processor owns the boilerplate (ordering + dispatch) that every admin change endpoint
-    /// shared; the supplied handlers own the only part that differs between endpoints: how an
-    /// incoming model maps to a persisted entity operation.
+    /// The processor owns the boilerplate (ordering + dispatch) shared by every admin change set; the
+    /// supplied handlers own the only part that differs: how an incoming contract maps to a persisted
+    /// entity operation. This is an implementation detail of the Content Authoring persistence layer —
+    /// it lives in <c>Game.DataAccess</c> alongside the admin repositories, not in <c>Game.Api</c>.
     /// </remarks>
     internal static class ChangeSetProcessor
     {
