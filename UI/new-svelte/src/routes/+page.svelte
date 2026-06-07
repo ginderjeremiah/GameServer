@@ -1,6 +1,6 @@
 <div class="login-screen" data-testid="login-screen">
 	<div class="login-form">
-		<DiamondMark />
+		<DiamondMark size={18} marginBottom={36} />
 
 		<div class="heading">
 			<h1 data-testid="login-heading">{mode === 'login' ? 'Welcome back.' : 'Begin a new run.'}</h1>
@@ -91,7 +91,7 @@ import { playerManager } from '$lib/engine';
 import { preventDefault } from '$lib/common/event-wrappers';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import DiamondMark from './login/DiamondMark.svelte';
+import DiamondMark from '$components/DiamondMark.svelte';
 import EyeIcon from './login/EyeIcon.svelte';
 import PasswordStrengthMeter from './login/PasswordStrengthMeter.svelte';
 import StatusLine, { type StatusType } from './login/StatusLine.svelte';

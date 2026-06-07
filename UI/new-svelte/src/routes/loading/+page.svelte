@@ -1,6 +1,6 @@
 <div class="loading-screen" data-testid="loading-screen">
 	<div class="loading-form">
-		<DiamondMark pulsing={view.phase !== 'done'} error={view.phase === 'error'} />
+		<DiamondMark pulsing={view.phase !== 'done'} error={view.phase === 'error'} marginBottom={26} />
 		<LoadingHeader {view} />
 		<ProgressBar {view} />
 		<ManifestWindow items={view.items} activeIndex={view.activeIndex} phase={view.phase} />
@@ -15,7 +15,7 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import DiamondMark from './DiamondMark.svelte';
+import DiamondMark from '$components/DiamondMark.svelte';
 import LoadingHeader from './LoadingHeader.svelte';
 import ProgressBar from './ProgressBar.svelte';
 import ManifestWindow from './ManifestWindow.svelte';

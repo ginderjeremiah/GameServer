@@ -1,28 +1,27 @@
-<div class="diamond-container">
-	<div class="diamond" class:pulsing class:error>
+<div class="diamond-container" style:margin-bottom={marginBottom != null ? `${marginBottom}px` : null}>
+	<div class="diamond" class:pulsing class:error style:width="{size}px" style:height="{size}px">
 		<div class="diamond-inner" class:error></div>
 	</div>
 </div>
 
 <script lang="ts">
 type Props = {
-	pulsing: boolean;
-	error: boolean;
+	pulsing?: boolean;
+	error?: boolean;
+	size?: number;
+	marginBottom?: number;
 };
 
-let { pulsing, error }: Props = $props();
+let { pulsing = false, error = false, size = 16, marginBottom }: Props = $props();
 </script>
 
 <style lang="scss">
 .diamond-container {
 	display: flex;
 	justify-content: center;
-	margin-bottom: 26px;
 }
 
 .diamond {
-	width: 16px;
-	height: 16px;
 	transform: rotate(45deg);
 	border: 1px solid var(--accent);
 	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);

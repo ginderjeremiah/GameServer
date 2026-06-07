@@ -1,4 +1,5 @@
 export { default as Button } from './Button.svelte';
+export { default as DiamondMark } from './DiamondMark.svelte';
 export { default as CheckBox } from './CheckBox.svelte';
 export { default as Loading } from './Loading.svelte';
 export { default as Select } from './Select.svelte';
