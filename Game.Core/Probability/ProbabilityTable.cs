@@ -7,7 +7,6 @@
     {
         private readonly ProbabilityData<T>[] _values;
         private readonly T[] _aliases;
-        private readonly Random _random = new();
 
         /// <summary>
         /// Generates a probability table based on a collection of <see cref="WeightedValue{T}"/> objects.
@@ -102,10 +101,14 @@
         /// <summary>
         /// Gets a random <typeparamref name="T"/> based on the weight distribution of the probability table.
         /// </summary>
+        /// <remarks>
+        /// Uses the thread-safe <see cref="Random.Shared"/> because table instances are cached in
+        /// process-wide static collections (e.g. per-zone enemy spawn tables) and drawn from concurrently.
+        /// </remarks>
         /// <returns>A random <typeparamref name="T"/>.</returns>
         public T GetRandomValue()
         {
-            var rand = _random.NextDouble() * _values.Length;
+            var rand = Random.Shared.NextDouble() * _values.Length;
             var randInt = (int)double.Floor(rand);
             var remainder = rand - randInt;
             var data = _values[randInt];
