@@ -1,3 +1,5 @@
+using Game.Abstractions.Contracts.Identity;
+
 namespace Game.Api.Models.Users
 {
     /// <summary>

@@ -1,12 +1,44 @@
+using System.Linq.Expressions;
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using UserEntity = Game.Abstractions.Entities.User;
 
 namespace Game.DataAccess.Repositories
 {
     internal class Users : IUsers
     {
+        // Single source of truth for the entity -> read-contract projections so EF translates them in
+        // SQL. The entity stays an implementation detail of the data tier; callers see only contracts.
+        private static readonly Expression<Func<UserEntity, AccountCredentials>> ToCredentials =
+            u => new AccountCredentials
+            {
+                Id = u.Id,
+                Salt = u.Salt,
+                PassHash = u.PassHash,
+                Roles = u.Roles.Select(r => r.Name).ToList(),
+                PlayerIds = u.Players.Select(p => p.Id).ToList(),
+            };
+
+        private static readonly Expression<Func<UserEntity, AdminUser>> ToAdminUser =
+            u => new AdminUser
+            {
+                Id = u.Id,
+                Username = u.Username,
+                LastLogin = u.LastLogin,
+                ArchivedAt = u.ArchivedAt,
+                BannedAt = u.BannedAt,
+                Roles = u.Roles.Select(r => new Role { Id = r.Id, Name = r.Name }).ToList(),
+                Players = u.Players.Select(p => new PlayerSummary
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Level = p.Level,
+                    LastActivity = p.LastActivity,
+                }).ToList(),
+            };
+
         private readonly GameContext _context;
 
         public Users(GameContext context)
@@ -14,12 +46,12 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public async Task<User?> GetUser(string username)
+        public Task<AccountCredentials?> GetUser(string username)
         {
-            return await _context.Users
-                .Include(u => u.Players)
-                .Include(u => u.Roles)
-                .FirstOrDefaultAsync(u => u.Username == username && u.ArchivedAt == null);
+            return _context.Users
+                .Where(u => u.Username == username && u.ArchivedAt == null)
+                .Select(ToCredentials)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<bool> CheckIfUsernameExists(string username)
@@ -27,15 +59,14 @@ namespace Game.DataAccess.Repositories
             return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
         }
 
-        public async Task<List<User>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take)
+        public async Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take)
         {
             return await FilteredUsers(search, roleId, archived)
-                .Include(u => u.Players)
-                .Include(u => u.Roles)
                 .OrderBy(u => u.Username)
                 .ThenBy(u => u.Id)
                 .Skip(skip)
                 .Take(take)
+                .Select(ToAdminUser)
                 .ToListAsync();
         }
 
@@ -77,7 +108,7 @@ namespace Game.DataAccess.Repositories
             return SetUserTimestamp(userId, user => user.BannedAt = DateTime.UtcNow);
         }
 
-        private async Task<bool> SetUserTimestamp(int userId, Action<User> setTimestamp)
+        private async Task<bool> SetUserTimestamp(int userId, Action<UserEntity> setTimestamp)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user is null)
@@ -89,7 +120,7 @@ namespace Game.DataAccess.Repositories
             return true;
         }
 
-        private IQueryable<User> FilteredUsers(string? search, int? roleId, bool? archived)
+        private IQueryable<UserEntity> FilteredUsers(string? search, int? roleId, bool? archived)
         {
             var query = _context.Users.AsQueryable();
 
