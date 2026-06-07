@@ -46,7 +46,9 @@ namespace Game.Core.Collections
         public bool Remove(T value)
         {
             if (_head is null)
+            {
                 return false;
+            }
 
             if (_comparer.Compare(_head.Value, value) == 0)
             {

@@ -35,7 +35,9 @@ namespace Game.Core.Players
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             if (!StatPoints.TryUpdateAttributes(changedAttributes))
+            {
                 return false;
+            }
 
             RaiseCoreUpdated();
             RaiseEvent(new AttributeAllocationsChangedEvent(
@@ -83,7 +85,9 @@ namespace Game.Core.Players
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)
         {
             if (!Inventory.TryEquipItem(itemId, slot))
+            {
                 return false;
+            }
 
             RaiseEvent(new ItemEquippedEvent(Id, itemId, (int)slot));
             return true;
@@ -93,11 +97,15 @@ namespace Game.Core.Players
         {
             var equipSlot = Inventory.EquipmentSlots.FirstOrDefault(s => s.Value == slot);
             if (equipSlot?.ItemId is null)
+            {
                 return false;
+            }
 
             var itemId = equipSlot.ItemId.Value;
             if (!Inventory.TryUnequipItem(slot))
+            {
                 return false;
+            }
 
             RaiseEvent(new ItemUnequippedEvent(Id, itemId));
             return true;
@@ -106,7 +114,9 @@ namespace Game.Core.Players
         public bool TryApplyMod(int itemId, int itemModId, int itemModSlotId, ItemMod mod)
         {
             if (!Inventory.TryApplyMod(itemId, itemModId, itemModSlotId, mod))
+            {
                 return false;
+            }
 
             RaiseEvent(new ModAppliedEvent(Id, itemId, itemModSlotId, itemModId));
             return true;
@@ -115,7 +125,9 @@ namespace Game.Core.Players
         public bool TryRemoveMod(int itemId, int itemModSlotId)
         {
             if (!Inventory.TryRemoveMod(itemId, itemModSlotId))
+            {
                 return false;
+            }
 
             RaiseEvent(new ModRemovedEvent(Id, itemId, itemModSlotId));
             return true;
