@@ -86,8 +86,7 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest, getTokens, reportDeviceInfo, setTokens } from '$lib/api';
-import { onMount } from 'svelte';
+import { ApiRequest, reportDeviceInfo, setTokens } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { preventDefault } from '$lib/common/event-wrappers';
 import { goto } from '$app/navigation';
@@ -218,27 +217,6 @@ const handleSubmit = async () => {
 		serverError = response.error ?? 'Incorrect username or password.';
 	}
 };
-
-onMount(async () => {
-	// "Stay logged in": if a token pair survived a refresh, resume the session without re-entering
-	// credentials. The request layer silently refreshes (and clears on failure) as needed, so an
-	// expired/revoked pair simply falls through and leaves the user on the login screen.
-	if (!getTokens()) {
-		return;
-	}
-
-	try {
-		const response = await new ApiRequest('Login/Status').get();
-		if (response.status === 200) {
-			// Fire-and-forget: refresh this device's capabilities on a resumed session too.
-			void reportDeviceInfo();
-			playerManager.initialize(response.data);
-			goto(resolve('/loading'));
-		}
-	} catch {
-		// Session check failed — stay on login page
-	}
-});
 </script>
 
 <style lang="scss">

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readReferenceCache, writeReferenceCache } from '$routes/loading/reference-cache';
+import { readReferenceCache, writeReferenceCache } from '$lib/engine/reference-cache';
 
 const STORAGE_KEY = 'gameserver.refdata.zones';
 

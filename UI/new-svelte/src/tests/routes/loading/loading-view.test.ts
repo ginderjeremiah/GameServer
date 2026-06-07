@@ -15,7 +15,7 @@ vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve }));
 vi.mock('$lib/api', () => ({ apiSocket: { sendSocketCommand } }));
 vi.mock('$stores', () => ({ staticData }));
-vi.mock('$routes/loading/reference-cache', () => ({ readReferenceCache, writeReferenceCache }));
+vi.mock('$lib/engine/reference-cache', () => ({ readReferenceCache, writeReferenceCache }));
 
 // The module keeps a process-wide in-flight cache; reset modules between tests
 // so a key resolved in one test doesn't satisfy another.
