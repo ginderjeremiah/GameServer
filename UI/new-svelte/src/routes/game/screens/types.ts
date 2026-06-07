@@ -5,9 +5,7 @@ import {
 	AttributeBreakdown,
 	Challenges,
 	Statistics,
-	Help,
 	Options,
-	CardGame,
 	PlaceholderScreen
 } from './';
 
@@ -18,9 +16,7 @@ export const screenMap = {
 	AttributeBreakdown,
 	Challenges,
 	Statistics,
-	Help,
 	Options,
-	CardGame,
 	PlaceholderScreen
 };
 
