@@ -19,7 +19,6 @@ namespace Game.Application.DependencyInjection
                 .AddSingleton<BattleFactory>()
                 .AddSingleton<NewPlayerFactory>()
                 .AddScoped<AccountService>()
-                .AddScoped<BattleSnapshotService>()
                 .AddScoped<BattleService>()
                 .AddScoped<LoginTrackingService>()
                 .AddScoped<PlayerService>();

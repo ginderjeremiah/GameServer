@@ -102,7 +102,7 @@ const { game }: Props = $props();
 	border-radius: 30px;
 	background: color-mix(in srgb, var(--white) 6%, transparent);
 	overflow: hidden;
-	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+	box-shadow: inset 0 1px 2px color-mix(in srgb, var(--black) 40%, transparent);
 
 	> i {
 		display: block;

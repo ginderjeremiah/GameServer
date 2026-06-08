@@ -42,10 +42,7 @@
 						<button
 							class="mod-remove"
 							title="Remove mod"
-							onclick={(e) => {
-								e.stopPropagation();
-								view.removeMod(item.itemId, slot.id);
-							}}>×</button
+							onclick={stopPropagation(() => view.removeMod(item.itemId, slot.id))}>×</button
 						>
 					{:else}
 						<span class="mod-add" style:color={accent}>+</span>
@@ -87,6 +84,7 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { modTypeColor, modTypeLabel, rarityColor } from '$lib/common';
+import { stopPropagation } from '$lib/common/event-wrappers';
 import type { InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();

@@ -43,5 +43,17 @@ namespace Game.Core.Items
         /// The tags that describe the item.
         /// </summary>
         public required List<Tag> Tags { get; set; }
+
+        /// <summary>
+        /// The attribute modifiers this item contributes when equipped: its own <see cref="Attributes"/>
+        /// plus the attributes of the given <paramref name="appliedMods"/>. Single source of truth for the
+        /// item + applied-mods composition rule, shared by the live
+        /// <see cref="Players.Inventories.Inventory.GetEquippedAttributeModifiers"/> path and the
+        /// battle-snapshot reconstruction (<see cref="Battle.BattleSnapshot.ToBattler"/>).
+        /// </summary>
+        public IEnumerable<AttributeModifier> GetAttributeModifiers(IEnumerable<ItemMod> appliedMods)
+        {
+            return Attributes.Concat(appliedMods.SelectMany(mod => mod.Attributes));
+        }
     }
 }
