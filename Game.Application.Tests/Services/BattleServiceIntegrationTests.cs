@@ -521,7 +521,10 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
-            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            // Pin the encounter level so the rolled enemy yields a deterministic, non-zero exp reward:
+            // the reward floors to 0 for an enemy whose total attributes are small relative to the
+            // player's stat pool (DefeatRewards.GetExpReward), so a random level would make this flaky.
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
             var user = await TestDataSeeder.CreateUserAsync(context);
