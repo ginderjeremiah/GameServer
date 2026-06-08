@@ -57,7 +57,7 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp)
         {
-            if (state.ActiveEnemyId is not { } enemyId || state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 return null;
             }
@@ -105,7 +105,7 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state)
         {
-            if (state.ActiveEnemyId is not { } enemyId || state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 return false;
             }
@@ -135,7 +135,7 @@ namespace Game.Application.Services
 
         private async Task AbandonBattle(Player player, PlayerState state)
         {
-            if (state.ActiveEnemyId is not { } enemyId || state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 state.ClearBattle();
                 return;
