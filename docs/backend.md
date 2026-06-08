@@ -2,7 +2,7 @@
 
 The game is structured is similar to an onion architecture with multiple projects. The backend projects (all in folders of the same name) are:
 
-- `Game.Abstractions`: This project contains shared abstractions and interfaces used across the backend, such as repository interfaces, infrastructure-service interfaces, and the read/write contracts (`Game.Abstractions.Contracts`). The EF entity models are **not** here — they live in `Game.Infrastructure` (see *Entity model location* below).
+- `Game.Abstractions`: This project contains shared abstractions and interfaces used across the backend, such as repository interfaces, infrastructure-service interfaces, and the read/write contracts (`Game.Abstractions.Contracts`). The EF entity models are **not** here — they live in `Game.Infrastructure` (see _Entity model location_ below).
 - `Game.Api`: This project contains the ASP.NET Core Web API controllers, models, and related code for handling HTTP requests from the frontend, as well as WebSocket command handlers for real-time communication. It also includes a reflection-based code generator for automatically generating API client interfaces for the frontend based on the API controllers and WebSocket handlers.
 - `Game.Api.Tests`: This project contains unit and integration tests for the `Game.Api` project, ensuring that all API endpoints and WebSocket handlers function correctly and that the battle logic is consistent with the frontend implementation.
 - `Game.Application`: This project contains the application layer of the backend, including services for orchestrating game logic.
@@ -165,7 +165,7 @@ dotnet run --project Game.Api -- codegen [outputDirectory]
 ```
 
 - **`CodeGenCommand`** (intercepted at the top of `Startup.Main`, before `WebApplication.CreateBuilder`) builds a throwaway console `ILogger`, resolves the target directory, runs `ApiCodeGenerator.GenerateCode`, and returns. Because it short-circuits before host construction, it is independent of `ASPNETCORE_ENVIRONMENT` and never touches an out-of-process dependency. An explicit output directory may be passed; otherwise it defaults to the committed frontend location.
-- **`CodeGenPaths`** centralizes path resolution so the dev-startup hook and the standalone command compute the same target directory. The default directory is found by walking up from the running assembly to the repository root (the directory containing `Game.sln`) and appending the canonical `UI/new-svelte/src/lib/api/types` segments. Resolving the root from the assembly rather than the current working directory keeps the command location-independent (the dev hook continues to derive the root from `ContentRootPath`).
+- **`CodeGenPaths`** centralizes path resolution so the dev-startup hook and the standalone command compute the same target directory. The default directory is found by walking up from the running assembly to the repository root (the directory containing `Game.sln`) and appending the canonical `UI/src/lib/api/types` segments. Resolving the root from the assembly rather than the current working directory keeps the command location-independent (the dev hook continues to derive the root from `ContentRootPath`).
 
 The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch api model/client drift.
 

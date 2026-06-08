@@ -172,7 +172,7 @@ Run what CI runs, scoped to what you changed. Integration tests reuse the Postgr
 Redis (`:6399`) containers the session-start hook already started (see `.container-info.json`).
 
 - **Backend** (repo root): `dotnet build`, then `dotnet test --no-build --no-restore`.
-- **Frontend** (`UI/new-svelte`, after `npm ci` if needed): `npm run lint` and `npm run test:unit:ci`.
+- **Frontend** (`UI` folder, after `npm ci` if needed): `npm run lint` and `npm run test:unit:ci`.
 - **E2E** (Playwright) is heavyweight — run it only for critical-path UI changes.
 
 Report failures honestly and fix them. Don't open a PR on red — a green local run is the whole

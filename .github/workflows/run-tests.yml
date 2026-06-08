@@ -46,7 +46,7 @@ jobs:
             - 'e2e-seed.sql'
             - '.dockerignore'
           frontend:
-            - 'UI/new-svelte/**'
+            - 'UI/**'
 
   test-backend:
     needs: [detect-changes]
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: UI/new-svelte
+        working-directory: UI
 
     steps:
     - name: Checkout
@@ -113,9 +113,9 @@ jobs:
     - name: Set up Node
       uses: actions/setup-node@v6
       with:
-        node-version-file: UI/new-svelte/.nvmrc
+        node-version-file: UI/.nvmrc
         cache: npm
-        cache-dependency-path: UI/new-svelte/package-lock.json
+        cache-dependency-path: UI/package-lock.json
 
     - name: Install node modules
       # Reproducible install. This is safe with `npm ci` because the Node/npm version is pinned via
@@ -137,7 +137,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: frontend-test-results
-        path: 'UI/new-svelte/unit-test-results.json'
+        path: 'UI/unit-test-results.json'
 
   test-e2e:
     needs: [detect-changes]
@@ -203,12 +203,12 @@ jobs:
     - name: Set up Node
       uses: actions/setup-node@v6
       with:
-        node-version-file: UI/new-svelte/.nvmrc
+        node-version-file: UI/.nvmrc
         cache: npm
-        cache-dependency-path: UI/new-svelte/package-lock.json
+        cache-dependency-path: UI/package-lock.json
 
     - name: Install node modules
-      working-directory: UI/new-svelte
+      working-directory: UI
       run: npm ci
 
     - name: Cache Playwright browser
@@ -216,10 +216,10 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('UI/new-svelte/package-lock.json') }}
+        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('UI/package-lock.json') }}
 
     - name: Install Playwright browser
-      working-directory: UI/new-svelte
+      working-directory: UI
       # Only this job's browser is needed. On a cache hit the binaries are already present, so just
       # (re)install the OS-level dependencies, which actions/cache can't carry. On a miss, install both.
       run: |
@@ -230,7 +230,7 @@ jobs:
         fi
 
     - name: Run Playwright e2e tests
-      working-directory: UI/new-svelte
+      working-directory: UI
       run: npx playwright test --project="${{ matrix.browser }}"
 
     - name: Dump container logs on failure
@@ -246,7 +246,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: playwright-report-${{ matrix.browser }}
-        path: UI/new-svelte/test-results
+        path: UI/test-results
         # On an all-green run Playwright writes nothing here (traces/screenshots are only kept on
         # failure or retry), so an empty directory is expected and not a problem.
         if-no-files-found: ignore
