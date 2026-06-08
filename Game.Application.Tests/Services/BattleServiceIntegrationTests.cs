@@ -165,7 +165,6 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(player);
 
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var snapshotService = scope.ServiceProvider.GetRequiredService<BattleSnapshotService>();
             var state = new PlayerState();
 
             await battleService.StartBattle(player, state, zoneId: zone.Id);
