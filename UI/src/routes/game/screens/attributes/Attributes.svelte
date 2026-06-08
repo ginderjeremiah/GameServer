@@ -12,7 +12,7 @@
 	<div class="budget-row">
 		<BudgetMeter remaining={view.remaining} budget={view.budget} />
 		<span class="hint">
-			{view.mode === 'theory' ? 'Marginal yield shown per attribute' : 'Click an axis or use − / + to spend'}
+			{view.mode === 'theory' ? 'Marginal yield shown per attribute' : 'Drag an axis or use − / + to spend'}
 		</span>
 	</div>
 
