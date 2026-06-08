@@ -10,6 +10,7 @@ afterEach(cleanup);
 
 const makeModSlot = (id: number, typeId: EItemModType = EItemModType.Component) => ({
 	id,
+	itemId: 0,
 	itemModSlotTypeId: typeId
 });
 
