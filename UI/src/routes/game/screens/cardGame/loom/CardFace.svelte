@@ -40,7 +40,7 @@ const { card, index, slot, view }: Props = $props();
 	border-left: 3px solid var(--attr-strength);
 	border-radius: 10px;
 	background: linear-gradient(180deg, color-mix(in srgb, var(--white) 7%, var(--surface)), var(--panel-2));
-	box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.8);
+	box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--black) 80%, transparent);
 	cursor: grab;
 	padding: 9px 9px 8px;
 	display: flex;
@@ -67,7 +67,7 @@ const { card, index, slot, view }: Props = $props();
 .card:hover {
 	transform: translateY(-8px);
 	box-shadow:
-		0 16px 30px -12px rgba(0, 0, 0, 0.85),
+		0 16px 30px -12px color-mix(in srgb, var(--black) 85%, transparent),
 		0 0 18px -6px var(--card-glow);
 	border-color: var(--border-medium);
 }

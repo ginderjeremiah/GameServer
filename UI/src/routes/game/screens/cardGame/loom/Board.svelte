@@ -122,7 +122,7 @@ onMount(() => {
 	background:
 		linear-gradient(180deg, color-mix(in srgb, var(--enemy-accent) 6%, transparent), transparent 42%),
 		linear-gradient(0deg, color-mix(in srgb, var(--log-enemy) 4%, transparent), transparent 42%), var(--surface);
-	box-shadow: inset 0 2px 18px rgba(0, 0, 0, 0.5);
+	box-shadow: inset 0 2px 18px color-mix(in srgb, var(--black) 50%, transparent);
 }
 
 .gridlayer {
@@ -235,9 +235,9 @@ onMount(() => {
 		color-mix(in srgb, var(--enemy-accent) 52%, var(--surface)),
 		color-mix(in srgb, var(--enemy-accent) 34%, var(--surface))
 	);
-	color: color-mix(in srgb, var(--enemy-accent) 12%, white);
+	color: color-mix(in srgb, var(--enemy-accent) 12%, var(--white));
 	box-shadow:
-		0 2px 10px rgba(0, 0, 0, 0.45),
+		0 2px 10px color-mix(in srgb, var(--black) 45%, transparent),
 		0 0 14px -4px color-mix(in srgb, var(--enemy-accent) 70%, transparent);
 
 	.tip {
@@ -254,7 +254,7 @@ onMount(() => {
 		color-mix(in srgb, var(--enemy-accent) 42%, var(--surface)),
 		color-mix(in srgb, var(--enemy-accent) 24%, var(--surface))
 	);
-	color: color-mix(in srgb, var(--enemy-accent) 12%, white);
+	color: color-mix(in srgb, var(--enemy-accent) 12%, var(--white));
 	letter-spacing: 0.04em;
 	box-shadow:
 		0 0 22px -2px color-mix(in srgb, var(--enemy-accent) 85%, transparent),
@@ -266,9 +266,9 @@ onMount(() => {
 		font-weight: 700;
 	}
 	.tip {
-		background: white;
+		background: var(--white);
 		box-shadow:
-			0 0 10px white,
+			0 0 10px var(--white),
 			0 0 18px var(--enemy-accent);
 	}
 }
@@ -281,11 +281,11 @@ onMount(() => {
 		color-mix(in srgb, var(--log-enemy) 46%, var(--surface)),
 		color-mix(in srgb, var(--log-enemy) 30%, var(--surface))
 	);
-	color: color-mix(in srgb, var(--log-enemy) 12%, white);
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+	color: color-mix(in srgb, var(--log-enemy) 12%, var(--white));
+	box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 45%, transparent);
 
 	.tip {
-		background: color-mix(in srgb, var(--log-enemy) 60%, white);
+		background: color-mix(in srgb, var(--log-enemy) 60%, var(--white));
 		box-shadow: 0 0 8px color-mix(in srgb, var(--log-enemy) 70%, transparent);
 	}
 }
@@ -298,9 +298,9 @@ onMount(() => {
 		color-mix(in srgb, var(--rarity-epic) 50%, var(--surface)),
 		color-mix(in srgb, var(--rarity-epic) 32%, var(--surface))
 	);
-	color: color-mix(in srgb, var(--rarity-epic) 12%, white);
+	color: color-mix(in srgb, var(--rarity-epic) 12%, var(--white));
 	box-shadow:
-		0 2px 10px rgba(0, 0, 0, 0.45),
+		0 2px 10px color-mix(in srgb, var(--black) 45%, transparent),
 		0 0 14px -4px color-mix(in srgb, var(--rarity-epic) 60%, transparent);
 
 	.tip {
@@ -320,7 +320,7 @@ onMount(() => {
 	border-color: color-mix(in srgb, var(--health-remaining-color) 50%, transparent);
 	background: color-mix(in srgb, var(--health-remaining-color) 12%, transparent);
 	box-shadow: inset 0 0 16px color-mix(in srgb, var(--health-remaining-color) 12%, transparent);
-	color: color-mix(in srgb, var(--health-remaining-color) 35%, white);
+	color: color-mix(in srgb, var(--health-remaining-color) 35%, var(--white));
 	font-size: 10px;
 	letter-spacing: 0.12em;
 }
@@ -373,7 +373,7 @@ onMount(() => {
 	padding-bottom: 4px;
 	font-family: var(--mono);
 	font-weight: 700;
-	color: color-mix(in srgb, var(--gold) 55%, white);
+	color: color-mix(in srgb, var(--gold) 55%, var(--white));
 	font-size: 12px;
 	text-shadow: 0 0 8px color-mix(in srgb, var(--gold) 90%, transparent);
 
@@ -424,7 +424,7 @@ onMount(() => {
 	padding-top: 3px;
 	border-color: color-mix(in srgb, var(--health-remaining-color) 70%, transparent);
 	background: color-mix(in srgb, var(--health-remaining-color) 10%, transparent);
-	color: color-mix(in srgb, var(--health-remaining-color) 35%, white);
+	color: color-mix(in srgb, var(--health-remaining-color) 35%, var(--white));
 }
 
 .preview.attack {
