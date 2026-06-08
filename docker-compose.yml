@@ -1,6 +1,6 @@
 # Backing stack for end-to-end (Playwright) runs: the Game.Api service plus its PostgreSQL and
 # Redis dependencies. The SvelteKit frontend is intentionally NOT included here — Playwright starts
-# the dev server itself (see UI/new-svelte/playwright.config.ts) and Vite proxies /api and /socket
+# the dev server itself (see UI/playwright.config.ts) and Vite proxies /api and /socket
 # to the API on localhost:5008.
 #
 # Networking: every service uses `network_mode: host`. This is deliberate. The constrained sandbox
@@ -57,7 +57,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # Bind the port the Vite dev-server proxy targets (UI/new-svelte/vite.config.ts).
+      # Bind the port the Vite dev-server proxy targets (UI/vite.config.ts).
       ASPNETCORE_HTTP_PORTS: ${API_PORT:-5008}
       # Secrets required at startup. These are throwaway values for CI / e2e only.
       HashPepper: docker-compose-e2e-pepper

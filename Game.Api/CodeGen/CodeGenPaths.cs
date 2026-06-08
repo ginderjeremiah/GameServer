@@ -10,7 +10,7 @@ namespace Game.Api.CodeGen
         // Path segments, relative to the repository root, of the frontend directory the generated
         // TypeScript API client is written into.
         private static readonly string[] TypesDirectorySegments =
-            ["UI", "new-svelte", "src", "lib", "api", "types"];
+            ["UI", "src", "lib", "api", "types"];
 
         /// <summary>
         /// Builds the absolute path of the generated-types directory under the given repository root.

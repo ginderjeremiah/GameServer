@@ -13,7 +13,7 @@ namespace Game.Core.Tests.Battle
     /// Cross-implementation parity matrix for the deterministic battle simulation.
     /// Every scenario here MUST be mirrored — with identical inputs and identical
     /// expected <c>totalMs</c>/outcome — in the frontend suite
-    /// <c>UI/new-svelte/src/tests/lib/battle/battle-simulation-parity.test.ts</c>.
+    /// <c>UI/src/tests/lib/battle/battle-simulation-parity.test.ts</c>.
     /// The two simulators run on both the client and the server (the anti-cheat
     /// replay depends on them agreeing), so any new battle behaviour added on one
     /// side should gain a matching row here on the other.

@@ -12,7 +12,7 @@ namespace Game.Api.Tests.CodeGen
 
             var result = CodeGenPaths.ResolveTargetDirectory(root);
 
-            var expected = Path.Combine(root, "UI", "new-svelte", "src", "lib", "api", "types");
+            var expected = Path.Combine(root, "UI", "src", "lib", "api", "types");
             Assert.Equal(expected, result);
         }
 

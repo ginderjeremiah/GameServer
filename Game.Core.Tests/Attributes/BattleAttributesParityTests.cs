@@ -8,7 +8,7 @@ namespace Game.Core.Tests.Attributes
     /// Parity guard for the shared derived-stat formulas. These cases mirror,
     /// with identical inputs and identical expected values, the
     /// "derived stat computation" block of the frontend suite
-    /// <c>UI/new-svelte/src/tests/lib/battle/battle-attributes.test.ts</c>.
+    /// <c>UI/src/tests/lib/battle/battle-attributes.test.ts</c>.
     /// The formula constants live in two hand-maintained places —
     /// <see cref="StaticAttributeModifiers"/> on the backend and
     /// <c>STATIC_ATTRIBUTE_MODIFIERS</c> on the frontend — and the battle
