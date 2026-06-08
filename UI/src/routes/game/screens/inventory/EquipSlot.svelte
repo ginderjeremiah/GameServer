@@ -38,11 +38,7 @@
 		{#if item}
 			<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={20} />
 			{#if hover}
-				<button
-					class="unequip"
-					title="Unequip"
-					onclick={stopPropagation(() => onUnequip?.(slot.id))}>×</button
-				>
+				<button class="unequip" title="Unequip" onclick={stopPropagation(() => onUnequip?.(slot.id))}>×</button>
 			{/if}
 			{#if item.appliedMods.length}
 				<span class="mod-count">{item.appliedMods.length}◈</span>
