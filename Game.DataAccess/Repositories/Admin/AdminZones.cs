@@ -74,7 +74,11 @@ namespace Game.DataAccess.Repositories.Admin
             var newIds = data.ZoneEnemies.Select(ze => ze.EnemyId).ToList();
             foreach (var enemy in zone.ZoneEnemies.Where(e => !newIds.Contains(e.EnemyId)))
             {
-                _entityStore.Delete(enemy);
+                _entityStore.Delete(new Entities.ZoneEnemy
+                {
+                    ZoneId = enemy.ZoneId,
+                    EnemyId = enemy.EnemyId,
+                });
             }
 
             foreach (var enemy in zone.ZoneEnemies.Where(e => newIds.Contains(e.EnemyId)))

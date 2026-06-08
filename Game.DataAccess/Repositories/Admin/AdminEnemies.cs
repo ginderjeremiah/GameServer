@@ -48,7 +48,11 @@ namespace Game.DataAccess.Repositories.Admin
             var newIds = data.AttributeDistributions.Select(ad => (int)ad.AttributeId).ToList();
             foreach (var dist in enemy.AttributeDistributions.Where(ad => !newIds.Contains(ad.AttributeId)))
             {
-                _entityStore.Delete(dist);
+                _entityStore.Delete(new Entities.AttributeDistribution
+                {
+                    EnemyId = enemy.Id,
+                    AttributeId = dist.AttributeId,
+                });
             }
 
             foreach (var dist in enemy.AttributeDistributions.Where(ad => newIds.Contains(ad.AttributeId)))
@@ -89,7 +93,11 @@ namespace Game.DataAccess.Repositories.Admin
             var newIds = data.SkillIds;
             foreach (var skill in enemy.EnemySkills.Where(e => !newIds.Contains(e.SkillId)))
             {
-                _entityStore.Delete(skill);
+                _entityStore.Delete(new Entities.EnemySkill
+                {
+                    EnemyId = enemy.Id,
+                    SkillId = skill.SkillId,
+                });
             }
 
             var existingIds = enemy.EnemySkills.Select(es => es.SkillId).ToList();
@@ -116,7 +124,11 @@ namespace Game.DataAccess.Repositories.Admin
             var newZoneIds = data.Spawns.Select(s => s.ZoneId).ToList();
             foreach (var spawn in enemy.ZoneEnemies.Where(ze => !newZoneIds.Contains(ze.ZoneId)))
             {
-                _entityStore.Delete(spawn);
+                _entityStore.Delete(new Entities.ZoneEnemy
+                {
+                    ZoneId = spawn.ZoneId,
+                    EnemyId = enemy.Id,
+                });
             }
 
             foreach (var spawn in enemy.ZoneEnemies.Where(ze => newZoneIds.Contains(ze.ZoneId)))

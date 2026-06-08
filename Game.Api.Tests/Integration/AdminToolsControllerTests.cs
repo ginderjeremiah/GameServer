@@ -239,6 +239,34 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SetEnemySkills_DropsUnlistedSkill_RemovesIt()
+        {
+            // Arrange — an enemy already linked to two skills.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Skilled");
+            var keptSkill = await TestDataSeeder.CreateSkillAsync(context, "Slash");
+            var removedSkill = await TestDataSeeder.CreateSkillAsync(context, "Bite");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, keptSkill.Id);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, removedSkill.Id);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Act — narrow the skill pool to a single skill, dropping the other.
+            var data = new
+            {
+                EnemyId = enemy.Id,
+                SkillIds = new[] { keptSkill.Id }
+            };
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySkills", data, CancellationToken);
+
+            // Assert — only the kept skill survives the delete path.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
+            Assert.Equal(keptSkill.Id, Assert.Single(saved.SkillPool));
+        }
+
+        [Fact]
         public async Task SetZoneEnemies_ValidZone_Succeeds()
         {
             // Arrange
@@ -268,6 +296,42 @@ namespace Game.Api.Tests.Integration
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetZoneEnemies_DropsUnlistedEnemy_RemovesIt()
+        {
+            // Arrange — a zone with two enemies assigned.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Crowded Zone");
+            var keptEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Resident");
+            var removedEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Evicted");
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, keptEnemy.Id, 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, removedEnemy.Id, 20);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Act — keep only one enemy assigned to the zone.
+            var data = new
+            {
+                ZoneId = zone.Id,
+                ZoneEnemies = new[]
+                {
+                    new { EnemyId = keptEnemy.Id, Weight = 10 }
+                }
+            };
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetZoneEnemies", data, CancellationToken);
+
+            // Assert — only the kept enemy remains linked to the zone.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var remaining = await verifyContext.Set<Game.Infrastructure.Entities.ZoneEnemy>()
+                .Where(ze => ze.ZoneId == zone.Id)
+                .Select(ze => ze.EnemyId)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(keptEnemy.Id, Assert.Single(remaining));
         }
 
         [Fact]
@@ -333,6 +397,37 @@ namespace Game.Api.Tests.Integration
             var spawn = Assert.Single(saved.Spawns);
             Assert.Equal(zone.Id, spawn.ZoneId);
             Assert.Equal(42, spawn.Weight);
+        }
+
+        [Fact]
+        public async Task SetEnemySpawns_DropsUnlistedSpawn_RemovesIt()
+        {
+            // Arrange — an enemy spawning in two zones.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Wanderer");
+            var keptZone = await TestDataSeeder.CreateZoneAsync(context, "Kept Zone");
+            var removedZone = await TestDataSeeder.CreateZoneAsync(context, "Removed Zone");
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, keptZone.Id, enemy.Id, 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, removedZone.Id, enemy.Id, 20);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Act — keep only one spawn, dropping the other zone.
+            var data = new
+            {
+                EnemyId = enemy.Id,
+                Spawns = new[]
+                {
+                    new { ZoneId = keptZone.Id, Weight = 10 }
+                }
+            };
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySpawns", data, CancellationToken);
+
+            // Assert — only the kept spawn survives the delete path.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
+            Assert.Equal(keptZone.Id, Assert.Single(saved.Spawns).ZoneId);
         }
 
         [Fact]
