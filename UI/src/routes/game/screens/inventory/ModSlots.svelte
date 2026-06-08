@@ -13,7 +13,9 @@
 					role="button"
 					tabindex="0"
 					onclick={() => {
-						if (!applied) togglePicker(slot.id);
+						if (!applied) {
+							togglePicker(slot.id);
+						}
 					}}
 					onkeydown={(e) => {
 						if (!applied && (e.key === 'Enter' || e.key === ' ')) {

@@ -77,7 +77,9 @@ let tooltipItem = $state<Item>();
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 const handleHoverEnter = (item: Item, ev: MouseEvent) => {
-	if (view.selectedId != null || view.dragItemId != null) return;
+	if (view.selectedId != null || view.dragItemId != null) {
+		return;
+	}
 	tooltipItem = item;
 	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
 	showTooltip();

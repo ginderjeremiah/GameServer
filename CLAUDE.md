@@ -17,7 +17,7 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 # General Coding Guidelines
 
 - Prefer writing DRY code whenever possible.
-- NEVER omit the {} when writing if/else or while blocks.
+- NEVER omit the {} when writing if/else, while, or for blocks.
 - AVOID using the null-forgiving operator (!) as much as possible. You should always attempt to appropriate handle nullable values and you should only reach for (!) if you ABSOLUTELY need it.
 - Keep in mind that the code already in the codebase may violate the rules/suggestions in the documentation, but that does NOT mean that the code is "ok". You should not copy the style or patterns of existing code if it contradicts the recommendations from documentation. In fact if you do see such code, you should mention it as a follow-up comment (or create a follow-up GitHub issue) and suggest refactoring it to align with the current guidelines. The documentation should be considered the source of truth for how code should be written in this project, and all code (new and old) should be held to those standards.
 - When you are altering existing code check that you are not leaving dead code behind. If you are removing or replacing functionality, make sure to remove any code that is no longer being used as well. This includes things like unused variables, functions, classes, and imports.

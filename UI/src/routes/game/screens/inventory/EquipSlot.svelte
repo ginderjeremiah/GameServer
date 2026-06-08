@@ -27,7 +27,9 @@
 		}}
 		onmouseenter={(e) => {
 			hover = true;
-			if (item) onHoverEnter?.(item, e);
+			if (item) {
+				onHoverEnter?.(item, e);
+			}
 		}}
 		onmousemove={(e) => item && onHoverMove?.(e)}
 		onmouseleave={() => {

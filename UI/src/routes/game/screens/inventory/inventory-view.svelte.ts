@@ -75,7 +75,9 @@ export class InventoryView {
 	readonly equippedBySlot = $derived.by(() => {
 		const map: Partial<Record<EEquipmentSlot, Item>> = {};
 		for (const it of this.items) {
-			if (it.equipmentSlotId != null) map[it.equipmentSlotId as EEquipmentSlot] = it;
+			if (it.equipmentSlotId != null) {
+				map[it.equipmentSlotId as EEquipmentSlot] = it;
+			}
 		}
 		return map;
 	});
@@ -94,14 +96,20 @@ export class InventoryView {
 			fav: this.items.filter((i) => i.favorite).length,
 			cats: {}
 		};
-		for (const it of this.items) c.cats[it.itemCategoryId] = (c.cats[it.itemCategoryId] ?? 0) + 1;
+		for (const it of this.items) {
+			c.cats[it.itemCategoryId] = (c.cats[it.itemCategoryId] ?? 0) + 1;
+		}
 		return c;
 	});
 
 	readonly visible = $derived.by(() => {
 		let list = this.items.slice();
-		if (this.favOnly) list = list.filter((i) => i.favorite);
-		if (this.filterCat != null) list = list.filter((i) => i.itemCategoryId === this.filterCat);
+		if (this.favOnly) {
+			list = list.filter((i) => i.favorite);
+		}
+		if (this.filterCat != null) {
+			list = list.filter((i) => i.itemCategoryId === this.filterCat);
+		}
 		return list.sort(SORTS[this.sort].cmp);
 	});
 
@@ -153,7 +161,10 @@ export class InventoryView {
 
 	toggleFavorite(itemId: number) {
 		const item = this.items.find((i) => i.itemId === itemId);
-		if (!item) return;
+		if (!item) {
+			return;
+		}
+
 		item.favorite = !item.favorite;
 		inventoryManager.setFavorite(itemId, item.favorite);
 	}
@@ -170,7 +181,10 @@ export class InventoryView {
 	applyMod(itemId: number, slotId: number, modId: number) {
 		const item = this.items.find((i) => i.itemId === itemId);
 		const modData = staticData.itemMods?.[modId];
-		if (!item || !modData) return;
+		if (!item || !modData) {
+			return;
+		}
+
 		item.appliedMods = [
 			...item.appliedMods.filter((m) => m.itemModSlotId !== slotId),
 			{ ...modData, itemModSlotId: slotId }
@@ -180,7 +194,10 @@ export class InventoryView {
 
 	removeMod(itemId: number, slotId: number) {
 		const item = this.items.find((i) => i.itemId === itemId);
-		if (!item) return;
+		if (!item) {
+			return;
+		}
+
 		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== slotId);
 		inventoryManager.removeMod(itemId, slotId);
 	}

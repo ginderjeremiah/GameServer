@@ -115,7 +115,9 @@ export class InventoryManager {
 
 	public async unequipItem(slotId: EEquipmentSlot) {
 		const item = this.equippedSlots[slotId];
-		if (!item) return false;
+		if (!item) {
+			return false;
+		}
 
 		const req = new ApiRequest('Player/UnequipItem');
 		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
@@ -152,7 +154,9 @@ export class InventoryManager {
 	}
 
 	public async removeMod(itemId: number, itemModSlotId: number) {
-		if (!this.unlockedItems.has(itemId)) return false;
+		if (!this.unlockedItems.has(itemId)) {
+			return false;
+		}
 
 		const req = new ApiRequest('Player/RemoveMod');
 		const response = await req.post({ itemId, itemModSlotId });
