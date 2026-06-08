@@ -47,18 +47,32 @@ export class LogPanelView {
 	private startHeight = DEFAULT_LOG_PANEL_HEIGHT;
 	private maxHeight = DEFAULT_LOG_PANEL_HEIGHT;
 
+	/** Upper bound for a given container height — its share minus the screen reserve.
+	 *  `undefined` (no measurement yet, e.g. SSR) leaves the height unbounded above. */
+	private maxFor(available: number | undefined): number {
+		return available === undefined ? Number.POSITIVE_INFINITY : available - MIN_SCREEN_HEIGHT;
+	}
+
 	/** Load any persisted height. Call after mount so the initial client render
 	 *  matches the SSR markup (which has no storage) and avoids a hydration
-	 *  mismatch on the inline height. */
-	hydrate(): void {
+	 *  mismatch on the inline height. `available` (the live container height, once
+	 *  measured) caps the restored value so a size saved on a larger viewport can't
+	 *  overflow a smaller one. */
+	hydrate(available?: number): void {
 		const raw = storage()?.getItem(STORAGE_KEY);
 		if (raw === null || raw === undefined) {
 			return;
 		}
 		const parsed = Number(raw);
 		if (Number.isFinite(parsed)) {
-			this.height = clampLogPanelHeight(parsed, Number.POSITIVE_INFINITY);
+			this.height = clampLogPanelHeight(parsed, this.maxFor(available));
 		}
+	}
+
+	/** Re-clamp the current height to fit a (possibly shrunken) container — e.g. on
+	 *  window resize — so it can never overflow the space it shares with the screen. */
+	clampToAvailable(available: number): void {
+		this.height = clampLogPanelHeight(this.height, this.maxFor(available));
 	}
 
 	/** Begin a resize. `available` is the height of the container the panel shares
@@ -66,7 +80,7 @@ export class LogPanelView {
 	beginResize(clientY: number, available: number): void {
 		this.startY = clientY;
 		this.startHeight = this.height;
-		this.maxHeight = available - MIN_SCREEN_HEIGHT;
+		this.maxHeight = this.maxFor(available);
 		this.dragging = true;
 	}
 

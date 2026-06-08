@@ -42,12 +42,13 @@ const rowHeight = 30;
 const view = new LogPanelView();
 let panelEl: HTMLDivElement | undefined;
 
+// The panel shares `.main-content` with the screen above it; that container's
+// height caps how far the log can grow.
+const availableHeight = () => panelEl?.parentElement?.clientHeight;
+
 const onHandleDown = (e: PointerEvent) => {
 	e.preventDefault();
-	// The panel shares `.main-content` with the screen above it; its height caps
-	// how far the log can grow.
-	const available = panelEl?.parentElement?.clientHeight ?? view.height;
-	view.beginResize(e.clientY, available);
+	view.beginResize(e.clientY, availableHeight() ?? view.height);
 	document.body.classList.add('log-resizing');
 };
 
@@ -88,8 +89,9 @@ $effect(() => {
 
 onMount(() => {
 	// Restore the persisted height after mount so SSR markup and the first client
-	// render agree (no hydration mismatch on the inline height).
-	view.hydrate();
+	// render agree (no hydration mismatch on the inline height). Clamp it against
+	// the live container so a height saved on a larger viewport can't overflow here.
+	view.hydrate(availableHeight());
 
 	// The gesture is tracked on `window` so it keeps following the pointer once it
 	// leaves the thin handle (mirrors the card-game board's drag).
@@ -102,11 +104,21 @@ onMount(() => {
 			document.body.classList.remove('log-resizing');
 		}
 	};
+	// Shrinking the window can leave the log taller than the space it shares with
+	// the screen — re-clamp so it stays within bounds without needing a drag.
+	const onResize = () => {
+		const available = availableHeight();
+		if (available !== undefined) {
+			view.clampToAvailable(available);
+		}
+	};
 	window.addEventListener('pointermove', onMove);
 	window.addEventListener('pointerup', onUp);
+	window.addEventListener('resize', onResize);
 	return () => {
 		window.removeEventListener('pointermove', onMove);
 		window.removeEventListener('pointerup', onUp);
+		window.removeEventListener('resize', onResize);
 		document.body.classList.remove('log-resizing');
 	};
 });

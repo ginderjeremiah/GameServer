@@ -74,6 +74,21 @@ describe('LogPanelView resize gesture', () => {
 		view.moveResize(100);
 		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT);
 	});
+
+	it('re-clamps the current height down to fit a shrunken container', () => {
+		view.beginResize(500, 800);
+		view.moveResize(200); // grow to 300px (within the 800-container bounds)
+		view.endResize();
+		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT + 300);
+
+		view.clampToAvailable(400); // now only 240px fits
+		expect(view.height).toBe(400 - MIN_SCREEN_HEIGHT);
+	});
+
+	it('leaves the height untouched when it still fits the container', () => {
+		view.clampToAvailable(800);
+		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT);
+	});
 });
 
 describe('LogPanelView persistence', () => {
@@ -97,6 +112,13 @@ describe('LogPanelView persistence', () => {
 		const view = new LogPanelView();
 		view.hydrate();
 		expect(view.height).toBe(260);
+	});
+
+	it('clamps a hydrated height to the live container so a large-viewport size cannot overflow', () => {
+		localStorage.setItem(STORAGE_KEY, '600');
+		const view = new LogPanelView();
+		view.hydrate(400); // available − reserve = 240
+		expect(view.height).toBe(400 - MIN_SCREEN_HEIGHT);
 	});
 
 	it('ignores a stored height below the minimum', () => {
