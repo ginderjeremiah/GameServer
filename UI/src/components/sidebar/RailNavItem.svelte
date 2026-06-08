@@ -1,10 +1,4 @@
-<button
-	class="side-item"
-	class:active
-	data-testid={testid}
-	title={!expanded ? title : undefined}
-	{onclick}
->
+<button class="side-item" class:active data-testid={testid} title={!expanded ? title : undefined} {onclick}>
 	<div class="glyph-slot">
 		{@render glyph(active)}
 	</div>
