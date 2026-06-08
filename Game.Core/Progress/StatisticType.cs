@@ -23,6 +23,9 @@ namespace Game.Core.Progress
             return id switch
             {
                 EnemiesKilled => Enemy,
+                // BossesDefeated is recorded per-boss (and as a global total) in
+                // PlayerProgress.RecordBattleCompleted, so its declared breakdown is by enemy.
+                BossesDefeated => Enemy,
                 ZonesCleared => Zone,
                 DamageDealt => Skill,
                 HighestSingleAttackDamage => Skill,

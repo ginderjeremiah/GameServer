@@ -8,6 +8,7 @@ namespace Game.Core.Tests.Progress
     {
         [Theory]
         [InlineData(EStatisticType.EnemiesKilled, EEntityType.Enemy)]
+        [InlineData(EStatisticType.BossesDefeated, EEntityType.Enemy)]
         [InlineData(EStatisticType.EnemiesEncountered, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesWon, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesLost, EEntityType.Enemy)]
@@ -25,7 +26,6 @@ namespace Game.Core.Tests.Progress
         }
 
         [Theory]
-        [InlineData(EStatisticType.BossesDefeated)]
         [InlineData(EStatisticType.DamageTaken)]
         [InlineData(EStatisticType.DamageHealed)]
         [InlineData(EStatisticType.PlayerDeaths)]

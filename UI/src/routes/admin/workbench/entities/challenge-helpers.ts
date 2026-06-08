@@ -90,7 +90,9 @@ export function challengeSentence(c: IChallenge, resolveEntityName: EntityNameRe
 		case EChallengeType.EnemiesKilled:
 			return tgt ? `Defeat ${fmtNum(g)} ${tgt}` : `Defeat ${fmtNum(g)} enemies`;
 		case EChallengeType.BossesDefeated:
-			return `Defeat ${fmtNum(g)} ${g === 1 ? 'boss' : 'bosses'}`;
+			return tgt
+				? `Defeat ${tgt} ${fmtNum(g)} ${g === 1 ? 'time' : 'times'}`
+				: `Defeat ${fmtNum(g)} ${g === 1 ? 'boss' : 'bosses'}`;
 		case EChallengeType.ZonesCleared:
 			return tgt
 				? `Clear ${tgt} ${fmtNum(g)} ${g === 1 ? 'time' : 'times'}`
