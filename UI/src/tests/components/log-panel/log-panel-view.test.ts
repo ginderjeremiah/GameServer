@@ -4,7 +4,8 @@ import {
 	clampLogPanelHeight,
 	MIN_LOG_PANEL_HEIGHT,
 	DEFAULT_LOG_PANEL_HEIGHT,
-	MIN_SCREEN_HEIGHT
+	MIN_SCREEN_HEIGHT,
+	LOG_PANEL_KEYBOARD_STEP
 } from '../../../components/log-panel/log-panel-view.svelte';
 
 const STORAGE_KEY = 'gameserver.logPanelHeight';
@@ -88,6 +89,84 @@ describe('LogPanelView resize gesture', () => {
 	it('leaves the height untouched when it still fits the container', () => {
 		view.clampToAvailable(800);
 		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT);
+	});
+});
+
+describe('LogPanelView keyboard step', () => {
+	let view: LogPanelView;
+
+	beforeEach(() => {
+		view = new LogPanelView();
+	});
+
+	it('grows the log by one step on a positive delta', () => {
+		view.stepResize(LOG_PANEL_KEYBOARD_STEP, 800);
+		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT + LOG_PANEL_KEYBOARD_STEP);
+	});
+
+	it('shrinks the log by one step on a negative delta', () => {
+		view.stepResize(-LOG_PANEL_KEYBOARD_STEP, 800);
+		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT - LOG_PANEL_KEYBOARD_STEP);
+	});
+
+	it('never shrinks below the minimum height when stepped repeatedly', () => {
+		for (let i = 0; i < 50; i++) {
+			view.stepResize(-LOG_PANEL_KEYBOARD_STEP, 800);
+		}
+		expect(view.height).toBe(MIN_LOG_PANEL_HEIGHT);
+	});
+
+	it('never grows past the available container height minus the screen reserve', () => {
+		const available = 400; // max share = 240
+		for (let i = 0; i < 50; i++) {
+			view.stepResize(LOG_PANEL_KEYBOARD_STEP, available);
+		}
+		expect(view.height).toBe(available - MIN_SCREEN_HEIGHT);
+	});
+
+	it('persists the stepped height', () => {
+		view.stepResize(LOG_PANEL_KEYBOARD_STEP, 800);
+		expect(localStorage.getItem(STORAGE_KEY)).toBe(String(DEFAULT_LOG_PANEL_HEIGHT + LOG_PANEL_KEYBOARD_STEP));
+	});
+
+	it('jumps to the minimum height on a Home (min) request', () => {
+		view.resizeTo('min', 800);
+		expect(view.height).toBe(MIN_LOG_PANEL_HEIGHT);
+		expect(localStorage.getItem(STORAGE_KEY)).toBe(String(MIN_LOG_PANEL_HEIGHT));
+	});
+
+	it('jumps to the maximum available height on an End (max) request', () => {
+		view.resizeTo('max', 800);
+		expect(view.height).toBe(800 - MIN_SCREEN_HEIGHT);
+		expect(localStorage.getItem(STORAGE_KEY)).toBe(String(800 - MIN_SCREEN_HEIGHT));
+	});
+
+	it('leaves the height unchanged on a max request with no measured container', () => {
+		view.resizeTo('max'); // bound is unknown — no-op
+		expect(view.height).toBe(DEFAULT_LOG_PANEL_HEIGHT);
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+});
+
+describe('LogPanelView aria bounds', () => {
+	let view: LogPanelView;
+
+	beforeEach(() => {
+		view = new LogPanelView();
+	});
+
+	it('reports no maximum before a container has been measured', () => {
+		expect(view.ariaMax).toBeUndefined();
+	});
+
+	it('reports the container-derived maximum once measured', () => {
+		view.clampToAvailable(800);
+		expect(view.ariaMax).toBe(800 - MIN_SCREEN_HEIGHT);
+	});
+
+	it('floors the reported maximum at the minimum height for a tiny container', () => {
+		view.clampToAvailable(200); // raw max (40) is below the minimum
+		expect(view.ariaMax).toBe(MIN_LOG_PANEL_HEIGHT);
 	});
 });
 
