@@ -35,7 +35,8 @@ import {
 	feedsFor,
 	derivedShortLabel,
 	derivedUnit,
-	attributeName
+	attributeName,
+	radarValueAtPointer
 } from '$routes/game/screens/attributes/attributes-view.svelte';
 
 const allFives = (): IBattlerAttribute[] => CORE_ATTRIBUTES.map((id) => ({ attributeId: id, amount: 5 }));
@@ -132,6 +133,40 @@ describe('feedsFor', () => {
 	});
 });
 
+describe('radarValueAtPointer', () => {
+	// Geometry used by the guided radar: centre 215, axis length 155, scale 20.
+	const C = 215;
+	const R = 155;
+	const hexMax = 20;
+	// The first axis (Strength) points straight up: angle -90°.
+	const upAxis = (-90 * Math.PI) / 180;
+
+	it('maps a half-extent radial drag to half the radar scale', () => {
+		// Half of R out from centre along the "up" axis (smaller y) → half of hexMax.
+		expect(radarValueAtPointer(C, C - R / 2, C, upAxis, R, hexMax)).toBeCloseTo(hexMax / 2, 5);
+	});
+
+	it('maps the centre to zero and the rim to the full scale', () => {
+		expect(radarValueAtPointer(C, C, C, upAxis, R, hexMax)).toBeCloseTo(0, 5);
+		expect(radarValueAtPointer(C, C - R, C, upAxis, R, hexMax)).toBeCloseTo(hexMax, 5);
+	});
+
+	it('ignores perpendicular drift by projecting onto the axis', () => {
+		// Sideways offset on the up axis must not change the radial value.
+		const straight = radarValueAtPointer(C, C - R / 2, C, upAxis, R, hexMax);
+		const drifted = radarValueAtPointer(C + 60, C - R / 2, C, upAxis, R, hexMax);
+		expect(drifted).toBeCloseTo(straight, 5);
+	});
+
+	it('returns an unclamped value past the rim (the view-model clamps)', () => {
+		expect(radarValueAtPointer(C, C - R * 1.5, C, upAxis, R, hexMax)).toBeCloseTo(hexMax * 1.5, 5);
+	});
+
+	it('guards against a zero-length axis', () => {
+		expect(radarValueAtPointer(C, C, C, upAxis, 0, hexMax)).toBe(0);
+	});
+});
+
 describe('label helpers', () => {
 	it('provides compact labels and units for derived stats', () => {
 		expect(derivedShortLabel(EAttribute.MaxHealth)).toBe('HP');
@@ -197,6 +232,37 @@ describe('AttributesView allocation', () => {
 		expect(view.canDec(idx.str)).toBe(false);
 		view.dec(idx.str);
 		expect(view.values[idx.str]).toBe(0);
+	});
+
+	it('sets an attribute directly to a target value (drag)', () => {
+		view.setValue(idx.str, 8);
+		expect(view.values[idx.str]).toBe(8);
+		expect(view.remaining).toBe(7);
+
+		view.setValue(idx.str, 2);
+		expect(view.values[idx.str]).toBe(2);
+		expect(view.remaining).toBe(13);
+	});
+
+	it('clamps setValue to the remaining budget when increasing', () => {
+		view.setValue(idx.str, 100);
+		// Only the 10 available points can be spent on top of the saved 5.
+		expect(view.values[idx.str]).toBe(15);
+		expect(view.remaining).toBe(0);
+	});
+
+	it('clamps setValue to zero (and rounds) when decreasing', () => {
+		view.setValue(idx.str, -5);
+		expect(view.values[idx.str]).toBe(0);
+		view.setValue(idx.end, 4.7);
+		expect(view.values[idx.end]).toBe(5); // rounds to nearest, unchanged from baseline
+		expect(view.dirty).toBe(true); // STR refund still pending
+	});
+
+	it('setValue is a no-op when the target equals the current value', () => {
+		view.setValue(idx.str, 5);
+		expect(view.dirty).toBe(false);
+		expect(view.values).toEqual([5, 5, 5, 5, 5, 5]);
 	});
 
 	it('discard reverts the draft to the baseline', () => {

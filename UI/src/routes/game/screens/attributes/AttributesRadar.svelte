@@ -1,4 +1,12 @@
-<svg width={size} height={size} viewBox="0 0 {size} {size}" class="radar" role="img" aria-label="Attribute build radar">
+<svg
+	bind:this={svgEl}
+	width={size}
+	height={size}
+	viewBox="0 0 {size} {size}"
+	class="radar"
+	role="img"
+	aria-label="Attribute build radar"
+>
 	{#each rings as f (f)}
 		<polygon points={ringPoints(f)} class="ring" />
 	{/each}
@@ -14,11 +22,13 @@
 		{@const clickable = interactive && view.canInc()}
 		<g
 			class="vertex"
-			class:clickable
+			class:interactive
+			class:dragging={dragIndex === i}
 			role="button"
 			tabindex={clickable ? 0 : -1}
-			aria-label="Add a point to {attributeName(coreIds[i])}"
-			onclick={() => clickable && view.inc(i)}
+			aria-label="Adjust {attributeName(coreIds[i])} — drag to allocate, click to add a point"
+			onpointerdown={(e) => startDrag(e, i)}
+			onclick={() => onVertexClick(i)}
 			onkeydown={(e) => clickable && handleKey(e, i)}
 		>
 			<circle cx={vertex[0]} cy={vertex[1]} r="11" fill="transparent" />
@@ -46,9 +56,9 @@
 </svg>
 
 <script lang="ts">
-import { untrack } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import { attributeColor, attributeCode } from '$lib/common';
-import { CORE_ATTRIBUTES, attributeName, type AttributesView } from './attributes-view.svelte';
+import { CORE_ATTRIBUTES, attributeName, radarValueAtPointer, type AttributesView } from './attributes-view.svelte';
 
 interface Props {
 	view: AttributesView;
@@ -60,6 +70,13 @@ const { view, size = 430, interactive = true }: Props = $props();
 
 const coreIds = CORE_ATTRIBUTES;
 const rings = [0.25, 0.5, 0.75, 1];
+
+let svgEl: SVGSVGElement | undefined;
+// The axis currently being dragged (null when idle), and whether the active
+// gesture has moved — a moved gesture ends in a synthetic click we must ignore so
+// a drag isn't also counted as the quick +1 click.
+let dragIndex = $state<number | null>(null);
+let dragMoved = false;
 
 const C = $derived(size / 2);
 const R = $derived(size / 2 - (size > 340 ? 60 : 42));
@@ -126,6 +143,69 @@ function handleKey(e: KeyboardEvent, i: number): void {
 	}
 }
 
+/* ── drag-to-allocate ──────────────────────────────────────────────────────
+   Dragging a vertex radially sets its attribute directly: outward allocates
+   points (up to the remaining budget), inward refunds them (down to 0). The
+   move/up listeners live on the window so the gesture keeps tracking even when
+   the pointer leaves the small vertex hit-area. */
+function startDrag(e: PointerEvent, i: number): void {
+	if (!interactive) {
+		return;
+	}
+	dragIndex = i;
+	dragMoved = false;
+	// Suppress the native text/SVG selection a press-drag would otherwise start.
+	e.preventDefault();
+}
+
+function onVertexClick(i: number): void {
+	// A drag ends with a synthetic click; only a genuine, motion-free click counts
+	// as the quick +1 affordance.
+	if (dragMoved) {
+		dragMoved = false;
+		return;
+	}
+	if (interactive && view.canInc()) {
+		view.inc(i);
+	}
+}
+
+/** The attribute value the dragged axis should take for a pointer at the given
+ *  client coordinates, mapping screen space into the SVG's user space. */
+function valueAtClient(clientX: number, clientY: number, i: number): number {
+	const rect = svgEl?.getBoundingClientRect();
+	if (!rect) {
+		return view.values[i];
+	}
+	const sx = rect.width > 0 ? size / rect.width : 1;
+	const sy = rect.height > 0 ? size / rect.height : 1;
+	const px = (clientX - rect.left) * sx;
+	const py = (clientY - rect.top) * sy;
+	return radarValueAtPointer(px, py, C, ang(i), R, view.hexMax);
+}
+
+onMount(() => {
+	const onMove = (e: PointerEvent): void => {
+		if (dragIndex === null) {
+			return;
+		}
+		dragMoved = true;
+		e.preventDefault();
+		view.setValue(dragIndex, valueAtClient(e.clientX, e.clientY, dragIndex));
+	};
+	const onEnd = (): void => {
+		dragIndex = null;
+	};
+	window.addEventListener('pointermove', onMove);
+	window.addEventListener('pointerup', onEnd);
+	window.addEventListener('pointercancel', onEnd);
+	return () => {
+		window.removeEventListener('pointermove', onMove);
+		window.removeEventListener('pointerup', onEnd);
+		window.removeEventListener('pointercancel', onEnd);
+	};
+});
+
 function prefersReducedMotion(): boolean {
 	return (
 		typeof window !== 'undefined' &&
@@ -173,11 +253,18 @@ function prefersReducedMotion(): boolean {
 .vertex {
 	outline: none;
 
-	&.clickable {
-		cursor: pointer;
+	&.interactive {
+		cursor: grab;
+		// Keep a touch press-drag driving the gesture instead of scrolling the page.
+		touch-action: none;
 	}
 
-	&:focus-visible .dot {
+	&.dragging {
+		cursor: grabbing;
+	}
+
+	&:focus-visible .dot,
+	&.dragging .dot {
 		stroke: var(--accent);
 		stroke-width: 2.5;
 	}
