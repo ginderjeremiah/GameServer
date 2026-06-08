@@ -39,7 +39,7 @@ namespace Game.Application.Events
                 }
             }
 
-            _progressRepo.Save(progress);
+            await _progressRepo.Save(progress);
         }
     }
 }

@@ -6,7 +6,7 @@ namespace Game.Abstractions.DataAccess
     public interface IPlayerProgressRepository
     {
         Task<PlayerProgress> Load(Player player);
-        void Save(PlayerProgress progress);
+        Task Save(PlayerProgress progress);
 
         /// <summary>
         /// Returns the player's tracked statistics as domain models for read-only consumers.
