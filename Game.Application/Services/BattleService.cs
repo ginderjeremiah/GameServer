@@ -10,13 +10,17 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
-        BattleSnapshotService battleSnapshotService,
+        IItems items,
+        IItemMods itemMods,
+        ISkills skills,
         BattleFactory battleFactory)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
-        private readonly BattleSnapshotService _battleSnapshotService = battleSnapshotService;
+        private readonly IItems _items = items;
+        private readonly IItemMods _itemMods = itemMods;
+        private readonly ISkills _skills = skills;
         private readonly BattleFactory _battleFactory = battleFactory;
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
@@ -43,7 +47,7 @@ namespace Game.Application.Services
                 level => _enemies.GetRandomDomainEnemy(zone.Id, level));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
-            var snapshot = _battleSnapshotService.CreateSnapshot(player);
+            var snapshot = BattleSnapshot.FromPlayer(player);
 
             state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: false);
 
@@ -88,7 +92,7 @@ namespace Game.Application.Services
                         $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist."));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
-            var snapshot = _battleSnapshotService.CreateSnapshot(player);
+            var snapshot = BattleSnapshot.FromPlayer(player);
 
             state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: true);
 
@@ -236,7 +240,7 @@ namespace Game.Application.Services
         {
             enemy.SetBattleSkills(enemySkillIds);
 
-            var playerBattler = _battleSnapshotService.CreateFromSnapshot(snapshot);
+            var playerBattler = snapshot.ToBattler(_items.GetItem, _itemMods.GetItemMod, _skills.GetSkill);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.BattleSkills,

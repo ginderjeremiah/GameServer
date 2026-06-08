@@ -1,4 +1,7 @@
+using Game.Core.Attributes;
+using Game.Core.Items;
 using Game.Core.Players;
+using Game.Core.Skills;
 
 namespace Game.Core.Battle
 {
@@ -28,6 +31,64 @@ namespace Game.Core.Battle
         /// The IDs of the player's selected skills at battle start.
         /// </summary>
         public required List<int> SkillIds { get; set; }
+
+        /// <summary>
+        /// Captures a player's current battle-relevant state as a minimal ID-based snapshot. The
+        /// projection lives in the domain alongside <see cref="ToBattler"/> so the capture/reconstruct
+        /// pair stays a single, self-consistent unit.
+        /// </summary>
+        public static BattleSnapshot FromPlayer(Player player)
+        {
+            var equippedItems = player.Inventory.EquipmentSlots
+                .SelectNotNull(slot => slot.ItemId)
+                .Select(itemId =>
+                {
+                    // Applied mods live on the player's UnlockedItemSlot, so capture their IDs from there.
+                    var unlocked = player.Inventory.UnlockedItems
+                        .FirstOrDefault(u => u.ItemId == itemId);
+
+                    var modIds = unlocked?.AppliedMods
+                        .Select(m => m.ItemModId)
+                        .ToList() ?? [];
+
+                    return new EquippedItemSnapshot
+                    {
+                        ItemId = itemId,
+                        AppliedModIds = modIds,
+                    };
+                })
+                .ToList();
+
+            return new BattleSnapshot
+            {
+                Level = player.Level,
+                StatAllocations = player.StatPoints.StatAllocations,
+                EquippedItems = equippedItems,
+                SkillIds = player.SelectedSkills.Select(s => s.Id).ToList(),
+            };
+        }
+
+        /// <summary>
+        /// Reconstructs the player's <see cref="Battler"/> from this snapshot, resolving the captured IDs
+        /// against the in-memory catalogs via the supplied resolvers. The same modifier-composition rules the
+        /// live <see cref="Player.GetAllModifiers"/> path uses are reused here (<see cref="StatAllocation.ToModifier"/>
+        /// and <see cref="Item.GetAttributeModifiers"/>), so a battle validated from a snapshot is guaranteed to
+        /// match the player's live attributes — the frontend/backend battle-parity guarantee. The caller provides
+        /// the resolvers so the domain stays independent of the data-access layer that owns catalog lookups,
+        /// mirroring <see cref="BattleFactory"/>'s enemy resolver.
+        /// </summary>
+        public Battler ToBattler(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
+        {
+            var modifiers = StatAllocations.Select(allocation => allocation.ToModifier())
+                .Concat(EquippedItems.SelectMany(equipped =>
+                    resolveItem(equipped.ItemId)
+                        .GetAttributeModifiers(equipped.AppliedModIds.Select(resolveMod))));
+
+            var attributes = new AttributeCollection(modifiers);
+            var skills = SkillIds.Select(resolveSkill);
+
+            return new Battler(attributes, skills, Level);
+        }
     }
 
     /// <summary>

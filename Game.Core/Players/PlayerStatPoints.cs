@@ -61,13 +61,7 @@ namespace Game.Core.Players
         /// </summary>
         public IEnumerable<AttributeModifier> ToAttributeModifiers()
         {
-            return StatAllocations.Select(att => new AttributeModifier
-            {
-                Amount = att.Amount,
-                Attribute = att.Attribute,
-                Source = EAttributeModifierSource.PlayerStatPoints,
-                Type = EModifierType.Additive,
-            });
+            return StatAllocations.Select(allocation => allocation.ToModifier());
         }
     }
 }
