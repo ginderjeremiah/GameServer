@@ -66,6 +66,16 @@ describe('ItemDrawer', () => {
 		expect(getByText('Iron Sword')).toBeTruthy();
 	});
 
+	it('renders the category and rarity labels in the migrated TooltipTitle header', () => {
+		const { container, getByText } = render(ItemDrawer, {
+			props: { item: makeItem(), view: makeView() }
+		});
+		// Category label is owned by the shared TooltipTitle primitive.
+		expect((container.querySelector('.tt-category-label') as HTMLElement).textContent).toBe('Weapon');
+		// Rarity tag rides along in TooltipTitle's `trailing` snippet.
+		expect(getByText('Common')).toBeTruthy();
+	});
+
 	it('shows "Equip" for an unequipped item', () => {
 		const { getByText } = render(ItemDrawer, {
 			props: { item: makeItem({ equipmentSlotId: undefined }), view: makeView() }

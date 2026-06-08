@@ -50,6 +50,7 @@ const { label, name, diamondColor, labelColor, trailing, masked = false }: Props
 	width: 5px;
 	height: 5px;
 	transform: rotate(45deg);
+	flex-shrink: 0;
 }
 
 .tt-category-label {
