@@ -48,20 +48,21 @@ export interface StatType {
 	agg: StatAgg;
 	comp: StatComp;
 	cat: StatCategory;
-	/** Only the killing of boss enemies is counted (display hint). */
-	bossOnly?: boolean;
+	/** Only the killing of boss enemies is counted — sourced from the server's
+	 *  statistic-type metadata (`IStatisticType.bossOnly`), the single source of
+	 *  truth shared with the admin challenge editor. */
+	bossOnly: boolean;
 }
 
 /** Presentation metadata for a statistic type — the concerns the backend does
  *  not model (unit, aggregation, comparison, category) plus the display order.
- *  Merged with the server's `entityType` + `name` by {@link buildStatTypes}. */
+ *  Merged with the server's `entityType`, `bossOnly` + `name` by {@link buildStatTypes}. */
 interface StatPresentation {
 	id: EStatisticType;
 	unit: StatUnit;
 	agg: StatAgg;
 	comp: StatComp;
 	cat: StatCategory;
-	bossOnly?: boolean;
 }
 
 /** The presentation catalogue, ordered for the category-tab grouping. Covers
@@ -69,7 +70,7 @@ interface StatPresentation {
 const STAT_PRESENTATION: StatPresentation[] = [
 	// Combat
 	{ id: EStatisticType.EnemiesKilled, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
-	{ id: EStatisticType.BossesDefeated, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat', bossOnly: true },
+	{ id: EStatisticType.BossesDefeated, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.SkillsUsed, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.DamageDealt, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.HighestSingleAttackDamage, unit: 'damage', agg: 'max', comp: 'AtLeast', cat: 'combat' },
@@ -116,7 +117,7 @@ export function buildStatTypes(statisticTypes: IStatisticType[]): StatType[] {
 			agg: p.agg,
 			comp: p.comp,
 			cat: p.cat,
-			bossOnly: p.bossOnly
+			bossOnly: meta.bossOnly
 		});
 	}
 	return out;

@@ -48,7 +48,7 @@ import { EEntityType, type IChallenge } from '$lib/api';
 import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
-import { entityTypeName, trackedKind } from '../../entities/challenge-helpers';
+import { entityTypeName, trackedKind, typeBossOnly } from '../../entities/challenge-helpers';
 import SelectCaret from '../SelectCaret.svelte';
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
 
@@ -62,7 +62,10 @@ const { challenge, baseline, store }: Props = $props();
 
 const kind = $derived(trackedKind(challenge));
 const specific = $derived(challenge.targetEntityId != null);
-const options = $derived(reference.entityOptions(challenge.entityType));
+// A boss-only statistic (e.g. BossesDefeated) only ever increments for boss enemies,
+// so restrict the enemy target picker to bosses to keep the challenge authorable.
+const bossOnly = $derived(typeBossOnly(reference.challengeTypes, challenge.challengeTypeId));
+const options = $derived(reference.entityOptions(challenge.entityType, bossOnly));
 const dirty = $derived(baseline ? challenge.targetEntityId !== baseline.targetEntityId : false);
 
 const setGlobal = () => store.patch(challenge.id, (d) => ((d as unknown as IChallenge).targetEntityId = undefined));

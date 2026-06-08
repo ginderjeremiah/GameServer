@@ -34,6 +34,16 @@ export const typeEntityType = (types: IChallengeType[], id: EChallengeType): EEn
 export const goalComparisonOf = (types: IChallengeType[], id: EChallengeType): EChallengeGoalComparison =>
 	challengeTypeById(types, id)?.goalComparison ?? EChallengeGoalComparison.AtLeast;
 
+/**
+ * Whether a type's tracked statistic is only ever recorded for boss enemies
+ * (`IStatisticType.bossOnly`). When true, an enemy-scoped target must be a boss,
+ * so the editor's target-entity picker is restricted to bosses. Sourced from the
+ * backend statistic-type metadata so the rule has a single source of truth rather
+ * than being special-cased per challenge type.
+ */
+export const typeBossOnly = (types: IChallengeType[], id: EChallengeType): boolean =>
+	typeStatistic(types, id)?.bossOnly ?? false;
+
 export const entityTypeName = (etype: EEntityType): string => EEntityType[etype] ?? 'None';
 
 /** What a challenge tracks progress against: a statistic, the player's level, or nothing. */

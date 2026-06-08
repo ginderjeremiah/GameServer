@@ -39,6 +39,19 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void BossesDefeated_IsTheOnlyBossOnlyStatistic()
+        {
+            // BossesDefeated only ever increments on a dedicated-boss victory, so it is the
+            // sole boss-only statistic; this single source of truth drives the admin challenge
+            // editor's enemy target-picker filter. Asserted across every type so a future
+            // boss-only statistic must update this expectation deliberately.
+            foreach (var statisticType in StatisticType.GetAll())
+            {
+                Assert.Equal(statisticType.Id == EStatisticType.BossesDefeated, statisticType.BossOnly);
+            }
+        }
+
+        [Fact]
         public void Name_IsHumanReadableWithSpaces()
         {
             var statisticType = new StatisticType(EStatisticType.HighestSingleAttackDamage);
