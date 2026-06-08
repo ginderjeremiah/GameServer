@@ -31,7 +31,9 @@ describe('GroupToggle', () => {
 	});
 
 	it('sets data-testid when testId is provided', () => {
-		const { container } = render(GroupToggle, { props: { on: false, mixed: false, onClick: vi.fn(), testId: 'gt-combat' } });
+		const { container } = render(GroupToggle, {
+			props: { on: false, mixed: false, onClick: vi.fn(), testId: 'gt-combat' }
+		});
 		expect(container.querySelector('[data-testid="gt-combat"]')).toBeTruthy();
 	});
 

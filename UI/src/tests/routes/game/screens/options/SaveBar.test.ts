@@ -6,7 +6,9 @@ import SaveBar from '$routes/game/screens/options/SaveBar.svelte';
 
 afterEach(cleanup);
 
-const makeView = (overrides: Partial<{ saved: boolean; dirtyCount: number; isDirty: boolean; saving: boolean }>): OptionsView =>
+const makeView = (
+	overrides: Partial<{ saved: boolean; dirtyCount: number; isDirty: boolean; saving: boolean }>
+): OptionsView =>
 	({
 		saved: false,
 		dirtyCount: 0,

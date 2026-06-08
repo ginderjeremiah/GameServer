@@ -11,10 +11,20 @@ const group: LogGroupDef = { key: 'combat', label: 'Combat' };
 
 const types: LogTypeDef[] = [
 	{ id: ELogType.Damage, group: 'combat', name: 'Combat Damage', desc: 'Hits.', glyph: 'hit', color: '#aaa' },
-	{ id: ELogType.EnemyDefeated, group: 'combat', name: 'Enemy Defeated', desc: 'Victories.', glyph: 'kill', color: '#bbb' }
+	{
+		id: ELogType.EnemyDefeated,
+		group: 'combat',
+		name: 'Enemy Defeated',
+		desc: 'Victories.',
+		glyph: 'kill',
+		color: '#bbb'
+	}
 ];
 
-const makeView = (onMap: Partial<Record<ELogType, boolean>> = {}, dirtyMap: Partial<Record<ELogType, boolean>> = {}): OptionsView =>
+const makeView = (
+	onMap: Partial<Record<ELogType, boolean>> = {},
+	dirtyMap: Partial<Record<ELogType, boolean>> = {}
+): OptionsView =>
 	({
 		isOn: vi.fn((id: ELogType) => (id in onMap ? onMap[id] : true)),
 		isDirtyId: vi.fn((id: ELogType) => dirtyMap[id] ?? false),

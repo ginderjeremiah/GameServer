@@ -6,7 +6,9 @@ import CommitBar from '$routes/game/screens/attributes/CommitBar.svelte';
 
 afterEach(cleanup);
 
-const makeView = (overrides: Partial<{ saved: boolean; dirty: boolean; saving: boolean; changedCount: number }>): AttributesView =>
+const makeView = (
+	overrides: Partial<{ saved: boolean; dirty: boolean; saving: boolean; changedCount: number }>
+): AttributesView =>
 	({
 		saved: false,
 		dirty: false,
