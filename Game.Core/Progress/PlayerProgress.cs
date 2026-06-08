@@ -41,18 +41,26 @@ namespace Game.Core.Progress
                 Increment(EStatisticType.EnemiesKilled, null, 1);
                 Increment(EStatisticType.EnemiesKilled, enemy.Id, 1);
 
-                // A dedicated-boss victory clears the challenged zone. The boss-ness comes from the explicit
-                // challenge marker (threaded from PlayerState), not the enemy's IsBoss flag, so only the
-                // "Challenge Boss" path clears a zone — never a boss that happens to roll out of a spawn
-                // table. (The clear semantics here are still the #89 stop-gap; #188 refines them.)
+                // A dedicated-boss victory both farms the boss and (on the first clear) clears its zone. The
+                // boss-ness comes from the explicit challenge marker (threaded from PlayerState), not the
+                // enemy's IsBoss flag, so only the "Challenge Boss" path counts — never a boss that happens to
+                // roll out of a random spawn table.
                 if (isBossBattle)
                 {
+                    // BossesDefeated is the farm counter: it increments on every dedicated-boss victory,
+                    // tracked globally and per-boss so challenges can target either "defeat any boss" or a
+                    // specific boss repeatedly.
                     Increment(EStatisticType.BossesDefeated, null, 1);
+                    Increment(EStatisticType.BossesDefeated, enemy.Id, 1);
 
-                    // Tracked both globally and per-zone so challenges can target either "clear any zone" or
-                    // a specific zone.
-                    Increment(EStatisticType.ZonesCleared, null, 1);
-                    Increment(EStatisticType.ZonesCleared, zoneId, 1);
+                    // ZonesCleared counts distinct zones ever cleared, not boss-victory events. The per-zone
+                    // entry is a binary "cleared" flag, and the global counter only bumps on a zone's first
+                    // clear (its 0 -> 1 transition), so re-farming a boss never re-counts the zone.
+                    if (GetStatisticValue(EStatisticType.ZonesCleared, zoneId) == 0)
+                    {
+                        Increment(EStatisticType.ZonesCleared, null, 1);
+                        Increment(EStatisticType.ZonesCleared, zoneId, 1);
+                    }
                 }
             }
             else

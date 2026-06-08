@@ -96,25 +96,29 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_BossBattleVictory_IncrementsBossesDefeated()
+        public void RecordBattleCompleted_BossBattleVictory_IncrementsBossesDefeatedGloballyAndPerBoss()
         {
             var progress = MakeProgress();
+            var boss = MakeEnemy(id: 9);
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+            progress.RecordBattleCompleted(boss, victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
                 isBossBattle: true, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BossesDefeated, 9));
         }
 
         [Fact]
         public void RecordBattleCompleted_NonBossBattleVictory_DoesNotIncrementBossesDefeated()
         {
             var progress = MakeProgress();
+            var enemy = MakeEnemy(id: 9);
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
                 isBossBattle: false, zoneId: 0);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BossesDefeated, 9));
         }
 
         [Fact]
@@ -170,17 +174,39 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_RepeatedBossBattleVictoriesInSameZone_AccumulateZonesCleared()
+        public void RecordBattleCompleted_RefarmingSameZoneBoss_LeavesZonesClearedButAccumulatesBossesDefeated()
+        {
+            var progress = MakeProgress();
+            var boss = MakeEnemy(id: 9);
+
+            progress.RecordBattleCompleted(boss, victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 2);
+            progress.RecordBattleCompleted(boss, victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 2);
+
+            // ZonesCleared is a distinct-zones-ever-cleared count: re-farming the same boss leaves both the
+            // global counter and the zone's binary "cleared" flag at 1.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
+            // BossesDefeated is the farm counter: every victory bumps the global and per-boss totals.
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.BossesDefeated, 9));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_FirstClearsOfDifferentZones_AccumulateGlobalZonesCleared()
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+            progress.RecordBattleCompleted(MakeEnemy(id: 9), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
                 isBossBattle: true, zoneId: 2);
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
-                isBossBattle: true, zoneId: 2);
+            progress.RecordBattleCompleted(MakeEnemy(id: 10), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 3);
 
+            // Each distinct zone's first clear bumps the global counter; each zone's flag is set to 1.
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
-            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 3));
         }
 
         [Fact]

@@ -7,7 +7,7 @@ import { EEntityType, EStatisticType, type IStatisticType } from '$lib/api';
  *  `StatisticType.GetEntityType` + the `SpaceWords()` display names. */
 export const SERVER_STAT_TYPES: IStatisticType[] = [
 	{ id: EStatisticType.EnemiesKilled, entityType: EEntityType.Enemy, name: 'Enemies Killed' },
-	{ id: EStatisticType.BossesDefeated, entityType: EEntityType.None, name: 'Bosses Defeated' },
+	{ id: EStatisticType.BossesDefeated, entityType: EEntityType.Enemy, name: 'Bosses Defeated' },
 	{ id: EStatisticType.ZonesCleared, entityType: EEntityType.Zone, name: 'Zones Cleared' },
 	{ id: EStatisticType.DamageDealt, entityType: EEntityType.Skill, name: 'Damage Dealt' },
 	{ id: EStatisticType.HighestSingleAttackDamage, entityType: EEntityType.Skill, name: 'Highest Single Attack Damage' },

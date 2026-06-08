@@ -34,7 +34,7 @@ const TYPES: IChallengeType[] = [
 		id: EChallengeType.BossesDefeated,
 		name: 'Bosses Defeated',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.BossesDefeated, entityType: EEntityType.None, name: 'Bosses Defeated' }
+		statisticType: { id: EStatisticType.BossesDefeated, entityType: EEntityType.Enemy, name: 'Bosses Defeated' }
 	},
 	{
 		id: EChallengeType.ZonesCleared,
@@ -90,7 +90,7 @@ describe('type-derived metadata', () => {
 	it('reads the statistic + entity dimension off the type', () => {
 		expect(typeStatistic(TYPES, EChallengeType.DamageDealt)?.id).toBe(EStatisticType.DamageDealt);
 		expect(typeEntityType(TYPES, EChallengeType.DamageDealt)).toBe(EEntityType.Skill);
-		expect(typeEntityType(TYPES, EChallengeType.BossesDefeated)).toBe(EEntityType.None);
+		expect(typeEntityType(TYPES, EChallengeType.BossesDefeated)).toBe(EEntityType.Enemy);
 	});
 
 	it('treats a stat-less type as having no statistic', () => {
@@ -139,6 +139,15 @@ describe('challengeSentence', () => {
 		expect(challengeSentence(make({ challengeTypeId: EChallengeType.ZonesCleared, progressGoal: 3 }), resolve)).toBe(
 			'Clear 3 zones'
 		);
+	});
+
+	it('scopes bosses defeated to a specific boss when targeted', () => {
+		expect(
+			challengeSentence(
+				make({ challengeTypeId: EChallengeType.BossesDefeated, progressGoal: 10, targetEntityId: 4 }),
+				resolve
+			)
+		).toBe('Defeat Enemy#4 10 times');
 	});
 
 	it('renders the time-trial "in under" phrasing with a formatted duration', () => {
