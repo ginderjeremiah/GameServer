@@ -1,4 +1,19 @@
-<div class="log-panel" data-testid="log-panel">
+<div
+	class="log-panel"
+	class:resizing={view.dragging}
+	data-testid="log-panel"
+	style:height="{view.height}px"
+	bind:this={panelEl}
+>
+	<div
+		class="log-resize-handle"
+		role="separator"
+		aria-orientation="horizontal"
+		aria-label="Resize combat log"
+		data-testid="log-resize-handle"
+		onpointerdown={onHandleDown}
+	></div>
+
 	<div class="log-header">
 		<span class="log-title">Combat Log</span>
 		<div class="log-divider"></div>
@@ -16,11 +31,26 @@
 </div>
 
 <script lang="ts">
-import { untrack } from 'svelte';
+import { untrack, onMount } from 'svelte';
 import { logs } from '$stores';
 import LogRow from './LogRow.svelte';
+import { LogPanelView } from './log-panel-view.svelte';
 
 const rowHeight = 30;
+
+// Drives the draggable panel height (see log-panel-view for the clamping/persistence).
+const view = new LogPanelView();
+let panelEl: HTMLDivElement | undefined;
+
+// The panel shares `.main-content` with the screen above it; that container's
+// height caps how far the log can grow.
+const availableHeight = () => panelEl?.parentElement?.clientHeight;
+
+const onHandleDown = (e: PointerEvent) => {
+	e.preventDefault();
+	view.beginResize(e.clientY, availableHeight() ?? view.height);
+	document.body.classList.add('log-resizing');
+};
 
 // Logs are stored newest-first (unshifted), so index 0 is the newest entry.
 const allLogs = $derived(logs());
@@ -56,6 +86,42 @@ $effect(() => {
 	}
 	seenId = newestId; // mark this entry consumed (after positioning)
 });
+
+onMount(() => {
+	// Restore the persisted height after mount so SSR markup and the first client
+	// render agree (no hydration mismatch on the inline height). Clamp it against
+	// the live container so a height saved on a larger viewport can't overflow here.
+	view.hydrate(availableHeight());
+
+	// The gesture is tracked on `window` so it keeps following the pointer once it
+	// leaves the thin handle (mirrors the card-game board's drag).
+	const onMove = (e: PointerEvent) => {
+		view.moveResize(e.clientY);
+	};
+	const onUp = () => {
+		if (view.dragging) {
+			view.endResize();
+			document.body.classList.remove('log-resizing');
+		}
+	};
+	// Shrinking the window can leave the log taller than the space it shares with
+	// the screen — re-clamp so it stays within bounds without needing a drag.
+	const onResize = () => {
+		const available = availableHeight();
+		if (available !== undefined) {
+			view.clampToAvailable(available);
+		}
+	};
+	window.addEventListener('pointermove', onMove);
+	window.addEventListener('pointerup', onUp);
+	window.addEventListener('resize', onResize);
+	return () => {
+		window.removeEventListener('pointermove', onMove);
+		window.removeEventListener('pointerup', onUp);
+		window.removeEventListener('resize', onResize);
+		document.body.classList.remove('log-resizing');
+	};
+});
 </script>
 
 <style lang="scss">
@@ -66,6 +132,41 @@ $effect(() => {
 	position: relative;
 	display: flex;
 	flex-direction: column;
+	// Height is driven by the resize view-model via an inline style; never let the
+	// flex column squeeze the panel below it.
+	flex-shrink: 0;
+	min-height: 0;
+}
+
+// Thin grab strip straddling the panel's top edge — the ↕ resize affordance.
+.log-resize-handle {
+	position: absolute;
+	top: -4px;
+	left: 0;
+	right: 0;
+	height: 9px;
+	z-index: 2;
+	cursor: ns-resize;
+	touch-action: none;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 4px;
+		height: 1px;
+		background: transparent;
+		transition: background 120ms ease;
+	}
+
+	&:hover::after {
+		background: color-mix(in srgb, var(--accent) 55%, transparent);
+	}
+}
+
+.log-panel.resizing .log-resize-handle::after {
+	background: var(--accent);
 }
 
 .log-header {
@@ -98,7 +199,8 @@ $effect(() => {
 
 .log-body {
 	position: relative;
-	height: 132px;
+	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
 	overflow-x: hidden;
 	// Fade only the bottom — the newest row at the top stays fully prominent.

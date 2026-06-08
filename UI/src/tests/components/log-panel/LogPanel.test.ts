@@ -43,4 +43,14 @@ describe('LogPanel', () => {
 		render(LogPanel);
 		expect(screen.getByTestId('log-panel').textContent).toContain('No combat activity yet.');
 	});
+
+	it('renders a resize handle and applies the panel height inline', () => {
+		render(LogPanel);
+		const handle = screen.getByTestId('log-resize-handle');
+		expect(handle).toBeTruthy();
+		expect(handle.getAttribute('role')).toBe('separator');
+		// The panel height is driven by an inline style from the resize view-model.
+		const panel = screen.getByTestId('log-panel');
+		expect(panel.style.height).toMatch(/\d+px/);
+	});
 });

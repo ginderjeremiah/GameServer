@@ -117,6 +117,26 @@ export function feedsFor(coreIndex: number): EAttribute[] {
 	return CORE_FEEDS[coreIndex] ?? [];
 }
 
+/** Maps a pointer position (in the radar's SVG user space) to the attribute
+ *  value its axis vertex would represent if dragged there: projects the pointer
+ *  onto the axis direction (so sideways drift is ignored and only the radial
+ *  component counts) and scales by the radar geometry. The result is unclamped —
+ *  {@link AttributesView.setValue} applies the budget/zero limits. */
+export function radarValueAtPointer(
+	px: number,
+	py: number,
+	centre: number,
+	axisAngleRad: number,
+	axisLength: number,
+	hexMax: number
+): number {
+	if (axisLength <= 0) {
+		return 0;
+	}
+	const projection = (px - centre) * Math.cos(axisAngleRad) + (py - centre) * Math.sin(axisAngleRad);
+	return (projection / axisLength) * hexMax;
+}
+
 /** The display name for an attribute, preferring the live reference data and
  *  falling back to a normalised enum key (e.g. `MaxHealth` → `Max Health`). */
 export function attributeName(id: EAttribute): string {
@@ -229,6 +249,20 @@ export class AttributesView {
 		next[i] -= sub;
 		this.draft = next;
 		this.saved = false;
+	}
+
+	/** Set the attribute at `i` directly to `target`, clamped to the available
+	 *  budget (when increasing) and to 0 (when decreasing). Backs the radar drag:
+	 *  the pointer position maps to an absolute target, which this reconciles into
+	 *  the same bounded inc/dec the steppers use. */
+	setValue(i: number, target: number): void {
+		const clamped = Math.max(0, Math.round(target));
+		const delta = clamped - this.draft[i];
+		if (delta > 0) {
+			this.inc(i, delta);
+		} else if (delta < 0) {
+			this.dec(i, -delta);
+		}
 	}
 
 	setMode(mode: AttributeMode): void {

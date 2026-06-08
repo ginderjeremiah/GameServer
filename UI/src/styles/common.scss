@@ -7,6 +7,15 @@ body {
 	margin: 0;
 }
 
+// While the combat-log panel is being resized, lock the cursor to the resize
+// affordance everywhere and suppress text selection, so the gesture stays clean
+// even as the pointer moves over the screen content above the handle.
+body.log-resizing,
+body.log-resizing * {
+	cursor: ns-resize !important;
+	user-select: none !important;
+}
+
 * {
 	box-sizing: border-box;
 }
