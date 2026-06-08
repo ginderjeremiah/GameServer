@@ -1,7 +1,7 @@
 using Game.Abstractions.Contracts;
 using Game.Api.Models.Progress;
-using Game.Core;
 using Game.Api.Models.ReferenceData;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
