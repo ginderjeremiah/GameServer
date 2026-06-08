@@ -13,7 +13,7 @@
 			role="button"
 			tabindex="0"
 			title="Remove"
-			onclick={(e) => (e.stopPropagation(), onRemove?.())}
+			onclick={stopPropagation(() => onRemove?.())}
 			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onRemove?.())}
 		>
 			<WorkbenchIcon kind="x" size={10} />
@@ -24,6 +24,7 @@
 <script lang="ts">
 import type { ITag } from '$lib/api';
 import { reference } from '../reference.svelte';
+import { stopPropagation } from '$lib/common/event-wrappers';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 
 interface Props {

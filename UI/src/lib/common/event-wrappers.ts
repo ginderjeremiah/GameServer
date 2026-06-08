@@ -5,9 +5,9 @@ export const preventDefault = (fn: (event: Event) => void) => {
 	};
 };
 
-export const stopPropagation = (fn: (event: Event) => void) => {
+export const stopPropagation = (fn: () => void) => {
 	return (event: Event) => {
 		event.stopPropagation();
-		fn(event);
+		fn();
 	};
 };
