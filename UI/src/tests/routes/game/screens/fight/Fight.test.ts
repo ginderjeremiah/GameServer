@@ -20,7 +20,9 @@ beforeEach(() => {
 	mockBattleEngine.player = makeBattler({ name: 'Aelara' });
 	mockBattleEngine.enemy = makeBattler({ name: 'Dire Wolf' });
 	mockPlayerManager.currentZone = 10;
-	staticData.zones = [{ id: 10, name: 'Verdant Hollow', description: '', order: 1, levelMin: 1, levelMax: 10 }];
+	staticData.zones = [
+		{ id: 10, name: 'Verdant Hollow', description: '', order: 1, levelMin: 1, levelMax: 10, bossLevel: 1 }
+	];
 });
 
 afterEach(cleanup);

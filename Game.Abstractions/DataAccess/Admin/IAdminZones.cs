@@ -9,8 +9,12 @@ namespace Game.Abstractions.DataAccess.Admin
     /// </summary>
     public interface IAdminZones
     {
-        /// <summary>Applies an identity-level Add/Edit/Delete change set to the zone catalogue.</summary>
-        void SaveZones(IReadOnlyList<Change<Zone>> changes);
+        /// <summary>
+        /// Applies an identity-level Add/Edit/Delete change set to the zone catalogue. Returns <c>false</c>
+        /// (applying nothing) when an Add/Edit sets a <see cref="Zone.BossEnemyId"/> that does not reference
+        /// an existing boss enemy.
+        /// </summary>
+        bool SaveZones(IReadOnlyList<Change<Zone>> changes);
 
         /// <summary>Replaces a zone's enemy spawns. Returns <c>false</c> if the zone does not exist.</summary>
         bool SetEnemies(SetZoneEnemiesData data);

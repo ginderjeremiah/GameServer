@@ -20,7 +20,8 @@ const zone = (id: number, order: number, name: string): IZone => ({
 	description: '',
 	order,
 	levelMin: 1,
-	levelMax: 10
+	levelMax: 10,
+	bossLevel: 1
 });
 
 beforeEach(() => {

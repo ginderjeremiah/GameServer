@@ -481,6 +481,16 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(z => z.Name)
                     .HasMaxLength(50);
+
+                entity.Property(z => z.BossLevel)
+                    .HasDefaultValue(1);
+
+                // The dedicated boss is an optional reference to an enemy. Navigation-less FK: deleting the
+                // referenced enemy clears the zone's boss (SetNull) rather than blocking the delete.
+                entity.HasOne<Enemy>()
+                    .WithMany()
+                    .HasForeignKey(z => z.BossEnemyId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ZoneEnemy>()
