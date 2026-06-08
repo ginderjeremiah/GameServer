@@ -102,6 +102,30 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 40 * 10000),
 
+                // A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout
+                // (3 skills, more than the random 4-skill cap would force a narrowing on) against a player
+                // who out-tanks it. Exercises the multi-skill enemy path that the boss challenge introduces.
+                //   Player: Str=60, End=40 → MaxHealth=1150, Def=42, cdMult=1.
+                //     skill: 10 + 60*2.0 = 130 raw, after boss def 62 → 68, fires every 25 ticks.
+                //   Boss:   Str=20, End=60 → MaxHealth=1350, Def=62, cdMult=1.
+                //     3 skills (50/20/30 raw): only the 50 pierces the player's def (8 dmg), the rest clamp to 0.
+                //   20 player hits reach 1360 ≥ 1350 at tick 500 → 20000ms; the boss never threatens the player.
+                ["bossFullLoadout"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 60, endurance: 40,
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1000, mult: EAttribute.Strength, multAmount: 2.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 20, endurance: 60,
+                        skills:
+                        [
+                            MakeSkill(2, baseDamage: 50, cooldownMs: 1000),
+                            MakeSkill(3, baseDamage: 20, cooldownMs: 1000),
+                            MakeSkill(4, baseDamage: 30, cooldownMs: 1000),
+                        ]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 20000),
+
                 // The cooldownRecovery matchup capped well before either skill fires:
                 // the simulation stops at maxMs with no winner.
                 ["maxMsCap"] = new ParityScenario(

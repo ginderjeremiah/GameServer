@@ -83,6 +83,54 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetDomainZone_ReturnsZoneAsDomainModelWithBossFields()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Catacomb Lich", isBoss: true);
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Forgotten Catacombs", levelMin: 8, levelMax: 11, bossEnemyId: boss.Id, bossLevel: 18);
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var result = zones.GetDomainZone(zone.Id);
+
+            Assert.Equal(zone.Id, result.Id);
+            Assert.Equal("Forgotten Catacombs", result.Name);
+            Assert.Equal(8, result.LevelMin);
+            Assert.Equal(11, result.LevelMax);
+            Assert.Equal(boss.Id, result.BossEnemyId);
+            Assert.Equal(18, result.BossLevel);
+            Assert.True(result.HasBoss);
+        }
+
+        [Fact]
+        public async Task GetDomainZone_WithoutBoss_HasNoBoss()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Glade");
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var result = zones.GetDomainZone(zone.Id);
+
+            Assert.Null(result.BossEnemyId);
+            Assert.False(result.HasBoss);
+        }
+
+        [Fact]
+        public void GetDomainZone_InvalidId_Throws()
+        {
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => zones.GetDomainZone(99999));
+        }
+
+        [Fact]
         public void LookupZone_InvalidId_ReturnsNull()
         {
             using var scope = CreateScope();

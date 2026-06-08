@@ -46,6 +46,13 @@ namespace Game.DataAccess.Repositories
                 : throw new ArgumentOutOfRangeException(nameof(zoneId));
         }
 
+        public Core.Zones.Zone GetDomainZone(int zoneId)
+        {
+            return ValidateZoneId(zoneId)
+                ? ZoneMapper.ToCore(AllEntities()[zoneId])
+                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+        }
+
         public Zone? LookupZone(int zoneId)
         {
             return ValidateZoneId(zoneId) ? AllEntities()[zoneId] : null;

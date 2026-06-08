@@ -10,5 +10,7 @@ namespace Game.Core.Battle.Events
         bool Victory,
         bool PlayerDied,
         int TotalMs,
-        BattleStats Stats) : IDomainEvent;
+        BattleStats Stats,
+        bool IsBossBattle,
+        int ZoneId) : IDomainEvent;
 }

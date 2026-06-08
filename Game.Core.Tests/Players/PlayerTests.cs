@@ -222,7 +222,7 @@ namespace Game.Core.Tests.Players
             var stats = new BattleStats { PlayerDamageDealt = 42.0 };
             var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 3200, Stats: stats);
 
-            player.RecordBattleCompleted(enemy, result);
+            player.RecordBattleCompleted(enemy, result, isBossBattle: true, zoneId: 7);
 
             var evt = player.DomainEvents.OfType<BattleCompletedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -232,6 +232,8 @@ namespace Game.Core.Tests.Players
             Assert.False(evt.PlayerDied);
             Assert.Equal(3200, evt.TotalMs);
             Assert.Equal(stats, evt.Stats);
+            Assert.True(evt.IsBossBattle);
+            Assert.Equal(7, evt.ZoneId);
         }
 
         // ── ClearEvents ──────────────────────────────────────────────────────

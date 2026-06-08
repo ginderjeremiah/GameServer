@@ -78,7 +78,9 @@ namespace Game.Api.Tests.Integration
                     state.ActiveEnemySkillIds!,
                     state.BattleSeed!.Value,
                     startTime: DateTime.UtcNow.AddMinutes(-30), // pretend battle started 30 minutes ago
-                    state.Snapshot!
+                    state.Snapshot!,
+                    zoneId: state.BattleZoneId ?? 0,
+                    isBossBattle: state.IsBossBattle
                 );
             });
 

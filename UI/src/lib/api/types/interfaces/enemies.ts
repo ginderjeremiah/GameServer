@@ -7,6 +7,10 @@ export interface IBattleLostResponse {
 	cooldown: number;
 }
 
+export interface IChallengeBossRequest {
+	zoneId?: number;
+}
+
 export interface IDefeatEnemyRequest {
 	timestamp: number;
 }

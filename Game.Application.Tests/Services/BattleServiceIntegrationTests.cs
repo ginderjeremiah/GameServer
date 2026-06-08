@@ -309,6 +309,115 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBossBattle_ZoneWithBoss_StartsDeterministicBossBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The boss gets more skills than fit a random loadout, so "full authored loadout" is observable.
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            for (var i = 0; i < 6; i++)
+            {
+                var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: $"BossSkill{i}");
+                await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            }
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", levelMin: 1, levelMax: 3, bossEnemyId: boss.Id, bossLevel: 18);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(boss.Id, result.Enemy.Id);
+            // Deterministic: fought at the fixed boss level with its full authored loadout (no 4-skill cap).
+            Assert.Equal(18, result.Enemy.Level);
+            Assert.Equal(6, result.Enemy.BattleSkills.Count);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+            Assert.Equal(zone.Id, state.BattleZoneId);
+            Assert.Equal(result.Enemy.BattleSkills.Select(s => s.Id), state.ActiveEnemySkillIds);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_ZoneWithoutBoss_ReturnsNullAndStartsNoBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Zone");
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.Null(result);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_ActiveBattleInProgress_AbandonsItBeforeStarting()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Idle Enemy");
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, name: "IdleSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // Start a random idle battle, then challenge the boss without resolving it.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.False(state.IsBossBattle);
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(boss.Id, result.Enemy.Id);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+        }
+
+        [Fact]
         public async Task StartBattle_WithNewZoneId_ChangesPlayerZone()
         {
             using var scope = CreateScope();

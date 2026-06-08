@@ -23,7 +23,8 @@ namespace Game.Core.Progress
             _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
         }
 
-        public void RecordBattleCompleted(Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats)
+        public void RecordBattleCompleted(
+            Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats, bool isBossBattle, int zoneId)
         {
             Increment(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
             SetMax(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
@@ -40,14 +41,18 @@ namespace Game.Core.Progress
                 Increment(EStatisticType.EnemiesKilled, null, 1);
                 Increment(EStatisticType.EnemiesKilled, enemy.Id, 1);
 
-                if (enemy.IsBoss)
+                // A dedicated-boss victory clears the challenged zone. The boss-ness comes from the explicit
+                // challenge marker (threaded from PlayerState), not the enemy's IsBoss flag, so only the
+                // "Challenge Boss" path clears a zone — never a boss that happens to roll out of a spawn
+                // table. (The clear semantics here are still the #89 stop-gap; #188 refines them.)
+                if (isBossBattle)
                 {
                     Increment(EStatisticType.BossesDefeated, null, 1);
 
-                    // Defeating a boss clears the zone it was fought in. Tracked both globally and
-                    // per-zone so challenges can target either "clear any zone" or a specific zone.
+                    // Tracked both globally and per-zone so challenges can target either "clear any zone" or
+                    // a specific zone.
                     Increment(EStatisticType.ZonesCleared, null, 1);
-                    Increment(EStatisticType.ZonesCleared, Player.CurrentZoneId, 1);
+                    Increment(EStatisticType.ZonesCleared, zoneId, 1);
                 }
             }
             else
