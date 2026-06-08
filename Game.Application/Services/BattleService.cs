@@ -3,6 +3,7 @@ using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Players;
 using CoreEnemy = Game.Core.Enemies.Enemy;
+using CoreZone = Game.Core.Zones.Zone;
 
 namespace Game.Application.Services
 {
@@ -10,6 +11,7 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IEnemies enemies,
         IZones zones,
+        IPlayerProgressRepository progressRepo,
         IItems items,
         IItemMods itemMods,
         ISkills skills,
@@ -18,6 +20,7 @@ namespace Game.Application.Services
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
         private readonly IZones _zones = zones;
+        private readonly IPlayerProgressRepository _progressRepo = progressRepo;
         private readonly IItems _items = items;
         private readonly IItemMods _itemMods = itemMods;
         private readonly ISkills _skills = skills;
@@ -30,11 +33,19 @@ namespace Game.Application.Services
                 await AbandonBattle(player, state);
             }
 
-            if (newZoneId.HasValue)
+            // A real zone change is gated on the target being unlocked (anti-cheat). A legitimate client
+            // never navigates into a locked zone — the UI gates it — so a locked target is ignored and the
+            // battle simply proceeds in the player's current zone. Same-zone re-requests skip the check (and
+            // the redundant save) entirely.
+            if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
             {
-                player.ChangeZone(newZoneId.Value);
-                zoneId = newZoneId.Value;
-                await _playerRepo.SavePlayer(player);
+                var targetZone = _zones.GetDomainZone(newZoneId.Value);
+                if (await IsZoneUnlocked(player.Id, targetZone))
+                {
+                    player.ChangeZone(newZoneId.Value);
+                    zoneId = newZoneId.Value;
+                    await _playerRepo.SavePlayer(player);
+                }
             }
 
             var zone = _zones.GetDomainZone(zoneId);
@@ -70,9 +81,16 @@ namespace Game.Application.Services
             var zone = _zones.GetDomainZone(zoneId);
 
             // Validate the challenge before touching the active battle: abandoning is not a cheap no-op
-            // (it force-resolves and persists the current battle), so a challenge against a bossless zone
-            // must be a true no-op rather than silently ending the player's in-progress fight.
+            // (it force-resolves and persists the current battle), so a challenge against a bossless or
+            // locked zone must be a true no-op rather than silently ending the player's in-progress fight.
             if (zone.BossEnemyId is not int bossEnemyId)
+            {
+                return null;
+            }
+
+            // Anti-cheat: a locked zone's boss cannot be challenged. A legitimate client can never be in a
+            // locked zone to begin with, so this only blocks tampered requests.
+            if (!await IsZoneUnlocked(player.Id, zone))
             {
                 return null;
             }
@@ -230,6 +248,20 @@ namespace Game.Application.Services
             player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
             return rewards;
+        }
+
+        // Whether a zone is unlocked for the player. An ungated zone is always open and pays no read cost;
+        // a gated zone costs one indexed completion lookup, incurred only on a real zone transition or a
+        // boss challenge (not per idle tick). The unlock rule itself lives on the domain Zone.
+        private async Task<bool> IsZoneUnlocked(int playerId, CoreZone zone)
+        {
+            if (zone.UnlockChallengeId is null)
+            {
+                return true;
+            }
+
+            var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(playerId);
+            return zone.IsUnlocked(completedChallengeIds);
         }
 
         // Derives the simulation RNG seed from the battle-start timestamp. Shared by both start paths so

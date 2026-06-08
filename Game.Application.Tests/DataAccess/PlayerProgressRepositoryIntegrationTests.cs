@@ -197,6 +197,33 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public async Task GetCompletedChallengeIds_ReturnsOnlyCompletedChallenges()
+        {
+            var playerId = await SeedPlayerAsync();
+            int completedId;
+            int incompleteId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var completed = await TestDataSeeder.CreateChallengeAsync(context, "Completed");
+                var incomplete = await TestDataSeeder.CreateChallengeAsync(context, "Incomplete");
+                completedId = completed.Id;
+                incompleteId = incomplete.Id;
+                await TestDataSeeder.AddPlayerChallengeAsync(context, playerId, completedId, progress: 10m, completed: true);
+                await TestDataSeeder.AddPlayerChallengeAsync(context, playerId, incompleteId, progress: 4m, completed: false);
+            }
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+                var ids = await repo.GetCompletedChallengeIds(playerId);
+
+                Assert.Equal(new HashSet<int> { completedId }, ids);
+            }
+        }
+
         private async Task<int> SeedPlayerAsync()
         {
             using var scope = CreateScope();

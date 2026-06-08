@@ -491,6 +491,14 @@ namespace Game.Infrastructure.Database
                     .WithMany()
                     .HasForeignKey(z => z.BossEnemyId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                // The unlock challenge is an optional reference to a challenge. Navigation-less FK: deleting
+                // the referenced challenge clears the gate (SetNull), leaving the zone always open, rather
+                // than blocking the delete.
+                entity.HasOne<Challenge>()
+                    .WithMany()
+                    .HasForeignKey(z => z.UnlockChallengeId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ZoneEnemy>()

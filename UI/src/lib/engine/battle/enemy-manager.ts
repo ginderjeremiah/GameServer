@@ -1,6 +1,6 @@
 import { apiSocket, ELogType, IApiSocketResponse, IEnemyInstance } from '$lib/api';
-import { Action, createHook, delay } from '$lib/common';
-import { staticData, statistics } from '$stores';
+import { Action, createHook, delay, isZoneUnlocked, nextZoneByOrder } from '$lib/common';
+import { staticData, statistics, playerChallenges } from '$stores';
 import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
 import { logMessage } from '../log';
 
@@ -39,6 +39,9 @@ export class EnemyManager {
 	public autoFight = false;
 	/** Set briefly after a boss victory to drive the fight screen's Zone-Cleared overlay. */
 	public bossOutcome: 'victory' | undefined;
+	/** Whether the most recent boss victory unlocked the next zone (the gating challenge flipped from
+	 *  incomplete to complete). Drives the Zone-Cleared overlay's "Next zone unlocked" line. */
+	public bossUnlockedNextZone = false;
 
 	private newEnemyPromise: Promise<IApiSocketResponse<'NewEnemy'>> | undefined;
 	private battleStageUnhook?: Action;
@@ -98,6 +101,7 @@ export class EnemyManager {
 		this.transitioning = true;
 		this.mode = 'boss';
 		this.bossOutcome = undefined;
+		this.bossUnlockedNextZone = false;
 		// Freeze the outgoing battle for the duration of the swap so it can't resolve mid-transition.
 		battleEngine.pause();
 		try {
@@ -143,6 +147,7 @@ export class EnemyManager {
 		this.mode = 'idle';
 		this.autoFight = false;
 		this.bossOutcome = undefined;
+		this.bossUnlockedNextZone = false;
 	}
 
 	private async watchBattleStage(stage: BattleStage) {
@@ -180,9 +185,23 @@ export class EnemyManager {
 
 	private async resolveBossVictory() {
 		await this.claimVictory();
+		const clearedZoneId = playerManager.currentZone;
 		// A dedicated-boss victory clears its zone; surface the "Cleared" seal immediately while the
 		// authoritative per-zone statistic is reconciled on the next statistics load.
-		statistics.markZoneCleared(playerManager.currentZone);
+		statistics.markZoneCleared(clearedZoneId);
+
+		// Did this clear unlock the next zone? Capture the next zone's locked state now (before the clear
+		// is reconciled), then — only if it was actually locked — refresh challenge completion (the backend
+		// completes the gating challenge during claimVictory) and check whether it flipped open. Skipping
+		// the refresh when nothing could change keeps auto-fight re-farming from spamming the endpoint.
+		const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
+		const nextZone = nextZoneByOrder(staticData.zones ?? [], clearedZoneId);
+		const nextWasLocked = nextZone != null && !isZoneUnlocked(nextZone, completed);
+		if (nextWasLocked) {
+			await playerChallenges.load(true);
+		}
+		this.bossUnlockedNextZone = nextWasLocked && nextZone != null && isZoneUnlocked(nextZone, completed);
+
 		this.bossOutcome = 'victory';
 
 		await delay(BOSS_VICTORY_OVERLAY_MS);

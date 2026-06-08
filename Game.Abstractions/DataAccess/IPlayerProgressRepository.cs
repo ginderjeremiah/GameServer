@@ -17,5 +17,11 @@ namespace Game.Abstractions.DataAccess
         /// Returns the player's challenge progress as domain models for read-only consumers.
         /// </summary>
         Task<List<PlayerChallenge>> GetChallenges(int playerId);
+
+        /// <summary>
+        /// Returns the ids of the challenges the player has completed. A lean read for gating checks (e.g.
+        /// zone-unlock enforcement) that only need completion, not full progress.
+        /// </summary>
+        Task<HashSet<int>> GetCompletedChallengeIds(int playerId);
     }
 }

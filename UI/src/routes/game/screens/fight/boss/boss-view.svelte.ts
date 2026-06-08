@@ -42,6 +42,9 @@ export class BossView {
 	/** Whether the Zone-Cleared victory overlay should show. */
 	readonly victory = $derived(this.engaged && enemyManager.bossOutcome === 'victory');
 
+	/** Whether this clear unlocked the next zone (drives the overlay's "Next zone unlocked" line). */
+	readonly unlockedNextZone = $derived(enemyManager.bossUnlockedNextZone);
+
 	/** Whether auto-fight (re-challenge on each victory) is enabled. */
 	readonly autoFight = $derived(enemyManager.autoFight);
 

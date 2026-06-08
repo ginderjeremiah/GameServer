@@ -1,5 +1,6 @@
 using Game.Abstractions;
 using Game.Abstractions.Contracts.Admin;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
@@ -11,21 +12,39 @@ namespace Game.DataAccess.Repositories.Admin
     /// entity lookups (<see cref="IZoneEntityCache.LookupZone"/>, <see cref="IEnemyEntityCache.GetEnemy"/>)
     /// for existence/diff and builds fresh, navigation-free entities for every write.
     /// </summary>
-    internal class AdminZones(IZoneEntityCache zones, IEnemyEntityCache enemies, IEntityStore entityStore) : IAdminZones
+    internal class AdminZones(
+        IZoneEntityCache zones,
+        IEnemyEntityCache enemies,
+        IChallenges challenges,
+        IEntityStore entityStore) : IAdminZones
     {
         private readonly IZoneEntityCache _zones = zones;
         private readonly IEnemyEntityCache _enemies = enemies;
+        private readonly IChallenges _challenges = challenges;
         private readonly IEntityStore _entityStore = entityStore;
 
         public bool SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
-            // A zone's dedicated boss must reference an existing enemy flagged IsBoss. Validate the whole
-            // change set up front so an invalid reference rejects the batch rather than partially applying.
+            // A zone's dedicated boss must reference an existing enemy flagged IsBoss, and its unlock gate
+            // must reference an existing challenge. Validate the whole change set up front so an invalid
+            // reference rejects the batch rather than partially applying.
+            var challengeCount = _challenges.All().Count;
             foreach (var change in changes)
             {
-                if (change.ChangeType != EChangeType.Delete
-                    && change.Item.BossEnemyId is int bossEnemyId
+                if (change.ChangeType == EChangeType.Delete)
+                {
+                    continue;
+                }
+
+                if (change.Item.BossEnemyId is int bossEnemyId
                     && _enemies.GetEnemy(bossEnemyId) is not { IsBoss: true })
+                {
+                    return false;
+                }
+
+                // Challenges are zero-based-id reference data, so a valid id is an in-range index.
+                if (change.Item.UnlockChallengeId is int unlockChallengeId
+                    && (unlockChallengeId < 0 || unlockChallengeId >= challengeCount))
                 {
                     return false;
                 }
@@ -41,6 +60,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Order = item.Order,
                     BossEnemyId = item.BossEnemyId,
                     BossLevel = item.BossLevel,
+                    UnlockChallengeId = item.UnlockChallengeId,
                 }),
                 edit: item => _entityStore.Update(new Entities.Zone
                 {
@@ -52,6 +72,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Order = item.Order,
                     BossEnemyId = item.BossEnemyId,
                     BossLevel = item.BossLevel,
+                    UnlockChallengeId = item.UnlockChallengeId,
                 }),
                 delete: item => _entityStore.Delete(new Entities.Zone
                 {

@@ -20,6 +20,7 @@ namespace Game.DataAccess.Mapping
                 LevelMax = entity.LevelMax,
                 BossEnemyId = entity.BossEnemyId,
                 BossLevel = entity.BossLevel,
+                UnlockChallengeId = entity.UnlockChallengeId,
             };
         }
 
@@ -35,6 +36,7 @@ namespace Game.DataAccess.Mapping
                 LevelMax = entity.LevelMax,
                 BossEnemyId = entity.BossEnemyId,
                 BossLevel = entity.BossLevel,
+                UnlockChallengeId = entity.UnlockChallengeId,
             };
         }
     }

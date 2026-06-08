@@ -196,7 +196,8 @@ namespace Game.TestInfrastructure.Helpers
             int levelMax = 10,
             int order = 0,
             int? bossEnemyId = null,
-            int bossLevel = 1)
+            int bossLevel = 1,
+            int? unlockChallengeId = null)
         {
             var zone = new Zone
             {
@@ -207,6 +208,7 @@ namespace Game.TestInfrastructure.Helpers
                 LevelMax = levelMax,
                 BossEnemyId = bossEnemyId,
                 BossLevel = bossLevel,
+                UnlockChallengeId = unlockChallengeId,
             };
 
             context.Zones.Add(zone);

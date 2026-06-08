@@ -7,7 +7,7 @@ import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
-import { staticData, statistics, acknowledgeModal } from '$stores';
+import { staticData, statistics, playerChallenges, acknowledgeModal } from '$stores';
 import { apiSocket } from '$lib/api';
 
 export const inventoryManager = statify(new InventoryManager());
@@ -27,6 +27,9 @@ export const startGame = () => {
 		// Fire-and-forget: the per-zone ZonesCleared values back the fight screen's
 		// boss "Cleared" seal; a failed load just leaves the seal hidden.
 		void statistics.load();
+		// Challenge completion gates zone navigation (a zone unlocks once its gating challenge is
+		// completed); a failed load just leaves zones gated as-is until the next load.
+		void playerChallenges.load();
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
@@ -51,6 +54,7 @@ const stopGame = () => {
 	enemyManager.stop();
 	battleEngine.stop();
 	statistics.reset();
+	playerChallenges.reset();
 };
 
 const startLogicEngine = () => {

@@ -1,0 +1,64 @@
+/* Player challenge-completion store — which challenges the player has completed
+   (`GET /api/Challenges/Player`), shared across screens so the source is fetched once and
+   stays consistent. The Challenges screen renders the full progress breakdown from it; the
+   Fight screen reads completion to gate zone navigation (a zone unlocks once its gating
+   challenge is completed). */
+
+import { ApiRequest, type IPlayerChallenge } from '$lib/api';
+
+let challenges = $state<IPlayerChallenge[]>([]);
+let loaded = $state(false);
+let error = $state(false);
+/** Coalesces concurrent callers (game boot + screen mount) onto one request. */
+let inFlight: Promise<void> | undefined;
+
+const fetchChallenges = async () => {
+	try {
+		challenges = (await ApiRequest.get('Challenges/Player')) ?? [];
+		error = false;
+		loaded = true;
+	} catch {
+		// A failed load is not a genuine empty result; leave zones gated as-is and let the next
+		// load retry. The Challenges screen surfaces the error to the user.
+		error = true;
+	}
+};
+
+export const playerChallenges = {
+	get all() {
+		return challenges;
+	},
+	get loaded() {
+		return loaded;
+	},
+	get error() {
+		return error;
+	},
+
+	/** Fetch the player's challenge progress. Idempotent — only hits the network the first
+	 *  time unless `force` re-fetches the latest values (e.g. on the challenges screen). */
+	async load(force = false) {
+		if (loaded && !force) {
+			return;
+		}
+		if (!inFlight) {
+			inFlight = fetchChallenges().finally(() => {
+				inFlight = undefined;
+			});
+		}
+		await inFlight;
+	},
+
+	/** Whether the player has completed the given challenge. */
+	isChallengeCompleted(challengeId: number) {
+		return challenges.some((c) => c.challengeId === challengeId && c.completed);
+	},
+
+	/** Reset to the unloaded state (e.g. on logout / session replacement). */
+	reset() {
+		challenges = [];
+		loaded = false;
+		error = false;
+		inFlight = undefined;
+	}
+};

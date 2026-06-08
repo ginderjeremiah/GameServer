@@ -17,5 +17,9 @@ namespace Game.Abstractions.Contracts
         /// <summary>The fixed level the dedicated boss is fought at. Only meaningful when
         /// <see cref="BossEnemyId"/> is set.</summary>
         public int BossLevel { get; set; }
+
+        /// <summary>The challenge that gates entry to this zone, or null when the zone is always open. The
+        /// zone unlocks once the player completes this challenge.</summary>
+        public int? UnlockChallengeId { get; set; }
     }
 }
