@@ -15,9 +15,9 @@
 				<div class="line">
 					<span class="line-label">
 						{#if line.source === EAttributeModifierSource.Derived}
-							{attributeName(line.derivedSource!)} ({line.amount}× of {fmtNum(line.derivedValue ?? 0, 1)})
-						{:else if line.source === EAttributeModifierSource.ItemMod}
-							{modifierLabel(line)} · {modTypeLabel(line.modType!)}
+							{attributeName(line.derivedSource)} ({line.amount}× of {fmtNum(line.derivedValue ?? 0, 1)})
+						{:else if line.source === EAttributeModifierSource.ItemMod && line.modType !== undefined}
+							{modifierLabel(line)} · {modTypeLabel(line.modType)}
 						{:else}
 							{modifierLabel(line)}
 						{/if}

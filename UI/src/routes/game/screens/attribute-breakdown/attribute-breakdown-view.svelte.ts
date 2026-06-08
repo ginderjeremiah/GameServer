@@ -36,7 +36,7 @@ import { staticData } from '$stores';
  *  breakdown can label each contribution (which item/mod it came from). The core
  *  domain fields still mirror the backend exactly; the extra fields are ignored
  *  by the aggregation and simply flow through onto the computed lines. */
-export interface LabeledModifier extends AttributeModifier {
+export type LabeledModifier = AttributeModifier & {
 	/** The equipped item or applied mod name; absent for base/points/derived,
 	 *  which are labelled by their source. */
 	label?: string;
@@ -44,7 +44,7 @@ export interface LabeledModifier extends AttributeModifier {
 	slot?: EEquipmentSlot;
 	/** The mod type (Component/Prefix/Suffix) for an `ItemMod` contribution. */
 	modType?: EItemModType;
-}
+};
 
 export type AttributeGroup = 'core' | 'derived';
 
@@ -123,7 +123,7 @@ export function slotLabel(slot: number | undefined): string {
 export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
-			return attributeName(line.derivedSource!);
+			return attributeName(line.derivedSource);
 		case EAttributeModifierSource.PlayerStatPoints:
 			return 'Allocated stat points';
 		case EAttributeModifierSource.BaseValue:
@@ -138,7 +138,7 @@ export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
 export function traceLabel(line: AppliedModifier<LabeledModifier>): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
-			return attributeName(line.derivedSource!);
+			return attributeName(line.derivedSource);
 		case EAttributeModifierSource.PlayerStatPoints:
 			return 'Stat points';
 		case EAttributeModifierSource.BaseValue:

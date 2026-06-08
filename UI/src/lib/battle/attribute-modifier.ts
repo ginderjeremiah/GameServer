@@ -28,18 +28,27 @@ export enum EAttributeModifierSource {
 	ItemMod = 6
 }
 
-/** Mirrors `Game.Core.Attributes.Modifiers.AttributeModifier`. A `Derived`
- *  modifier's {@link amount} is multiplied by the final value of
- *  {@link derivedSource} before being applied. */
-export interface AttributeModifier {
+/** A modifier whose amount is scaled by the final value of another attribute. */
+export interface DerivedAttributeModifier {
 	attribute: EAttribute;
 	amount: number;
 	type: EModifierType;
-	source: EAttributeModifierSource;
-	/** Only meaningful when `source === Derived`: the attribute whose final value
-	 *  scales this modifier's amount. */
-	derivedSource?: EAttribute;
+	source: EAttributeModifierSource.Derived;
+	/** The attribute whose final value scales this modifier's amount. */
+	derivedSource: EAttribute;
 }
+
+/** A modifier with a fixed amount not derived from another attribute. */
+export interface BaseAttributeModifier {
+	attribute: EAttribute;
+	amount: number;
+	type: EModifierType;
+	source: Exclude<EAttributeModifierSource, EAttributeModifierSource.Derived>;
+}
+
+/** Mirrors `Game.Core.Attributes.Modifiers.AttributeModifier`. Discriminated on
+ *  `source`: only `Derived` modifiers carry a non-optional `derivedSource`. */
+export type AttributeModifier = DerivedAttributeModifier | BaseAttributeModifier;
 
 /** Mirrors `Game.Core.Attributes.Modifiers.StaticAttributeModifiers` plus
  *  `AttributeCollection.AddStaticModifiers` — the engine base values and derived

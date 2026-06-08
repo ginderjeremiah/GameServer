@@ -4,7 +4,8 @@ import {
 	STATIC_ATTRIBUTE_MODIFIERS,
 	EModifierType,
 	EAttributeModifierSource,
-	type AttributeModifier
+	type AttributeModifier,
+	type BaseAttributeModifier
 } from './attribute-modifier';
 import { computeAttributes } from './attribute-collection';
 
@@ -23,12 +24,14 @@ export class BattleAttributes {
 
 		if (calcDerivedStats) {
 			const modifiers: AttributeModifier[] = [
-				...attList.map((att) => ({
-					attribute: att.attributeId,
-					amount: att.amount,
-					type: EModifierType.Additive,
-					source: EAttributeModifierSource.AttributeDistribution
-				})),
+				...attList.map(
+					(att): BaseAttributeModifier => ({
+						attribute: att.attributeId,
+						amount: att.amount,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.AttributeDistribution
+					})
+				),
 				...STATIC_ATTRIBUTE_MODIFIERS
 			];
 			const computed = computeAttributes(modifiers);
