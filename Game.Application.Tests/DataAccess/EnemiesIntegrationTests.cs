@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -31,7 +32,7 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneA.Id, enemyA2.Id, weight: 3);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneB.Id, enemyB.Id, weight: 1);
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
             var zoneAEnemyIds = new HashSet<int> { enemyA1.Id, enemyA2.Id };
 
@@ -58,7 +59,7 @@ namespace Game.Application.Tests.DataAccess
             var zone = await TestDataSeeder.CreateZoneAsync(context);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
             Assert.Throws<ArgumentOutOfRangeException>(() => enemies.GetRandomEnemy(invalidZoneId));
         }
@@ -74,7 +75,7 @@ namespace Game.Application.Tests.DataAccess
             var emptyZone = await TestDataSeeder.CreateZoneAsync(context, "Empty");
             await TestDataSeeder.LinkEnemyToZoneAsync(context, populatedZone.Id, enemy.Id);
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
             Assert.Throws<InvalidOperationException>(() => enemies.GetRandomEnemy(emptyZone.Id));
         }

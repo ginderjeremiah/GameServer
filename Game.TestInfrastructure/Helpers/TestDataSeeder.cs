@@ -1,4 +1,4 @@
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;

@@ -1,5 +1,5 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Core.Probability;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(GameContext context, ISkillEntityCache skills, IZones zones) : IEnemies
+    internal class Enemies(GameContext context, ISkillEntityCache skills, IZones zones) : IEnemies, IEnemyEntityCache
     {
         private static List<Enemy>? _enemyList;
         // Per-zone enemy spawn tables keyed by zone id. Derived from the in-memory enemy list

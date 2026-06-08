@@ -1,13 +1,13 @@
 using System.Linq.Expressions;
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Tags : ITags
+    internal class Tags : ITags, ITagEntityQueries
     {
         // Single source of truth for the entity -> read-contract projection so EF can translate it in SQL.
         private static readonly Expression<Func<Tag, Contracts.Tag>> ToContract =

@@ -1,5 +1,5 @@
 using Contracts = Game.Abstractions.Contracts;
-using EntityZone = Game.Abstractions.Entities.Zone;
+using EntityZone = Game.Infrastructure.Entities.Zone;
 
 namespace Game.DataAccess.Mapping
 {

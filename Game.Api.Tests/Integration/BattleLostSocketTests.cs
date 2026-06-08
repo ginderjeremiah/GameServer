@@ -38,13 +38,13 @@ namespace Game.Api.Tests.Integration
             var existingAttrs = context.PlayerAttributes.Where(pa => pa.PlayerId == player.Id);
             context.PlayerAttributes.RemoveRange(existingAttrs);
             context.PlayerAttributes.AddRange(
-                new Game.Abstractions.Entities.PlayerAttribute
+                new Game.Infrastructure.Entities.PlayerAttribute
                 {
                     PlayerId = player.Id,
                     AttributeId = (int)Game.Core.EAttribute.Strength,
                     Amount = 1m
                 },
-                new Game.Abstractions.Entities.PlayerAttribute
+                new Game.Infrastructure.Entities.PlayerAttribute
                 {
                     PlayerId = player.Id,
                     AttributeId = (int)Game.Core.EAttribute.Endurance,

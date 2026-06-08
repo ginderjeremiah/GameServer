@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;
-using ItemModSlotEntity = Game.Abstractions.Entities.ItemModSlot;
+using ItemModSlotEntity = Game.Infrastructure.Entities.ItemModSlot;
 
 namespace Game.Api.Tests.Integration
 {

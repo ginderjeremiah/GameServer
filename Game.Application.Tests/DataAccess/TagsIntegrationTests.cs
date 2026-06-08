@@ -6,7 +6,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using TagEntity = Game.Abstractions.Entities.Tag;
+using TagEntity = Game.Infrastructure.Entities.Tag;
 
 namespace Game.Application.Tests.DataAccess
 {

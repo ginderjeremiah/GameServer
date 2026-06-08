@@ -1,7 +1,7 @@
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Core;
 using Microsoft.EntityFrameworkCore;
-using Attribute = Game.Abstractions.Entities.Attribute;
+using Attribute = Game.Infrastructure.Entities.Attribute;
 
 namespace Game.Infrastructure.Database
 {

@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -12,7 +13,7 @@ namespace Game.Application.Tests.DataAccess
     /// Verifies the <see cref="IZones"/> read paths: <see cref="IZones.ZoneEnemies"/> returns the spawn
     /// read contracts for the requested zone (and only that zone), <see cref="IZones.GetZone"/> projects a
     /// zone to its read contract, and the two not-found contracts the rename settled (<see
-    /// cref="IZones.GetZone"/> throws on a bad id; <see cref="IZones.LookupZone"/> returns <c>null</c>).
+    /// cref="IZones.GetZone"/> throws on a bad id; <see cref="IZoneEntityCache.LookupZone"/> returns <c>null</c>).
     /// </summary>
     [Collection("Integration")]
     public class ZonesIntegrationTests : ApplicationIntegrationTestBase
@@ -52,7 +53,7 @@ namespace Game.Application.Tests.DataAccess
         public void LookupZone_InvalidId_ReturnsNull()
         {
             using var scope = CreateScope();
-            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+            var zones = scope.ServiceProvider.GetRequiredService<IZoneEntityCache>();
 
             // LookupZone (the admin/data-tier entity lookup) reports a missing zone as null — matching the
             // LookupItemMod convention — so AdminZones.SetEnemies can return false rather than throwing.

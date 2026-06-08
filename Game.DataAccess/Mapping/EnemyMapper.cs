@@ -2,8 +2,8 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Enemies;
 using Contracts = Game.Abstractions.Contracts;
-using EntityEnemy = Game.Abstractions.Entities.Enemy;
-using EntitySkill = Game.Abstractions.Entities.Skill;
+using EntityEnemy = Game.Infrastructure.Entities.Enemy;
+using EntitySkill = Game.Infrastructure.Entities.Skill;
 
 namespace Game.DataAccess.Mapping
 {

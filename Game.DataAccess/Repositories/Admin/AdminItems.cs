@@ -1,22 +1,21 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Microsoft.EntityFrameworkCore;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for items and their related collections. Reuses the cached entity
-    /// lookup (<see cref="IItems.LookupItem"/>) for existence/diff and the tag-graph queries on
-    /// <see cref="ITags"/>; all writes go through the entity store. Changes are staged on the unit of
-    /// work; the per-action commit filter persists them.
+    /// lookup (<see cref="IItemEntityCache.LookupItem"/>) for existence/diff and the tag-graph queries on
+    /// <see cref="ITagEntityQueries"/>; all writes go through the entity store. Changes are staged on the
+    /// unit of work; the per-action commit filter persists them.
     /// </summary>
-    internal class AdminItems(IItems items, ITags tags, IEntityStore entityStore) : IAdminItems
+    internal class AdminItems(IItemEntityCache items, ITagEntityQueries tags, IEntityStore entityStore) : IAdminItems
     {
-        private readonly IItems _items = items;
-        private readonly ITags _tags = tags;
+        private readonly IItemEntityCache _items = items;
+        private readonly ITagEntityQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)

@@ -114,13 +114,13 @@ namespace Game.Application.Tests.Services
 
             // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.ItemModSlots.Add(new Abstractions.Entities.ItemModSlot
+            context.ItemModSlots.Add(new Infrastructure.Entities.ItemModSlot
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
                 Index = 0,
             });
-            context.UnlockedItems.Add(new Abstractions.Entities.UnlockedItem
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
             {
                 PlayerId = playerEntity.Id,
                 ItemId = item.Id,
@@ -129,7 +129,7 @@ namespace Game.Application.Tests.Services
 
             // A Prefix mod granting Dexterity +7, unlocked for the player.
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Abstractions.Entities.UnlockedMod
+            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
             {
                 PlayerId = playerEntity.Id,
                 ItemModId = mod.Id,
@@ -179,14 +179,14 @@ namespace Game.Application.Tests.Services
 
             // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            var modSlot = new Abstractions.Entities.ItemModSlot
+            var modSlot = new Infrastructure.Entities.ItemModSlot
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
                 Index = 0,
             };
             context.ItemModSlots.Add(modSlot);
-            context.UnlockedItems.Add(new Abstractions.Entities.UnlockedItem
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
             {
                 PlayerId = playerEntity.Id,
                 ItemId = item.Id,
@@ -195,7 +195,7 @@ namespace Game.Application.Tests.Services
 
             // A Prefix mod granting Dexterity +7, unlocked for the player.
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Abstractions.Entities.UnlockedMod
+            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
             {
                 PlayerId = playerEntity.Id,
                 ItemModId = mod.Id,
@@ -204,7 +204,7 @@ namespace Game.Application.Tests.Services
 
             // Persist the applied mod as if it had been applied in a previous session, so the
             // player is loaded fresh from the DB with it already in place (the #90 scenario).
-            context.AppliedMods.Add(new Abstractions.Entities.AppliedMod
+            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
             {
                 PlayerId = playerEntity.Id,
                 ItemId = item.Id,
@@ -232,7 +232,7 @@ namespace Game.Application.Tests.Services
             // the player; PlayerRepository must stitch these in from the in-memory catalogs.
             var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Fireball", baseDamage: 12m, cooldownMs: 1500);
             var item = await TestDataSeeder.CreateItemAsync(context, name: "Sword", attributeId: EAttribute.Strength, attributeAmount: 5m);
-            var modSlot = new Abstractions.Entities.ItemModSlot
+            var modSlot = new Infrastructure.Entities.ItemModSlot
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
@@ -245,18 +245,18 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id, selected: true);
-            context.UnlockedItems.Add(new Abstractions.Entities.UnlockedItem
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
             {
                 PlayerId = playerEntity.Id,
                 ItemId = item.Id,
                 EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
             });
-            context.UnlockedMods.Add(new Abstractions.Entities.UnlockedMod
+            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
             {
                 PlayerId = playerEntity.Id,
                 ItemModId = mod.Id,
             });
-            context.AppliedMods.Add(new Abstractions.Entities.AppliedMod
+            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
             {
                 PlayerId = playerEntity.Id,
                 ItemId = item.Id,

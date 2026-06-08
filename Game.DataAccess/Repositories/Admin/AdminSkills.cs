@@ -1,19 +1,18 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for skills and their damage multipliers. Reuses the cached entity
-    /// lookup (<see cref="ISkills.LookupSkill"/>) for existence/diff and builds fresh, navigation-free
-    /// entities for every write.
+    /// lookup (<see cref="ISkillEntityCache.LookupSkill"/>) for existence/diff and builds fresh,
+    /// navigation-free entities for every write.
     /// </summary>
-    internal class AdminSkills(ISkills skills, IEntityStore entityStore) : IAdminSkills
+    internal class AdminSkills(ISkillEntityCache skills, IEntityStore entityStore) : IAdminSkills
     {
-        private readonly ISkills _skills = skills;
+        private readonly ISkillEntityCache _skills = skills;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveSkills(IReadOnlyList<Change<Contracts.Skill>> changes)

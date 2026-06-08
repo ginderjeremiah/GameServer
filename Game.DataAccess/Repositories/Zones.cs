@@ -1,5 +1,5 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Contracts = Game.Abstractions.Contracts;
@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Zones : IZones
+    internal class Zones : IZones, IZoneEntityCache
     {
         private static List<Zone>? _zoneList;
 

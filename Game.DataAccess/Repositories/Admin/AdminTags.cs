@@ -1,8 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {

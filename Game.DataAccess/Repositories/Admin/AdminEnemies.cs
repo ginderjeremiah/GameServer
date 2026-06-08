@@ -1,20 +1,19 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for enemies. Reuses the cached entity lookup
-    /// (<see cref="IEnemies.GetEnemy"/>) for existence/diff and builds fresh, navigation-free
+    /// (<see cref="IEnemyEntityCache.GetEnemy"/>) for existence/diff and builds fresh, navigation-free
     /// entities for every write so a cached <c>Include(...)</c> graph is never dragged into the
     /// change tracker. Changes are staged on the unit of work; the per-action commit filter persists them.
     /// </summary>
-    internal class AdminEnemies(IEnemies enemies, IEntityStore entityStore) : IAdminEnemies
+    internal class AdminEnemies(IEnemyEntityCache enemies, IEntityStore entityStore) : IAdminEnemies
     {
-        private readonly IEnemies _enemies = enemies;
+        private readonly IEnemyEntityCache _enemies = enemies;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)

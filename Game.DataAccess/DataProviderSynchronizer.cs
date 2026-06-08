@@ -1,4 +1,4 @@
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Abstractions.Infrastructure;
 using Game.Core;
 using Game.Core.Players.Events;

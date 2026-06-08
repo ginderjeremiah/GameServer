@@ -1,5 +1,5 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +8,7 @@ using CoreItem = Game.Core.Items.Item;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Items : IItems
+    internal class Items : IItems, IItemEntityCache
     {
         private static List<Item>? _allItems;
 
