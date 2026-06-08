@@ -36,10 +36,7 @@
 		class:on={item.favorite}
 		class:show={hover}
 		title={item.favorite ? 'Unfavorite' : 'Favorite'}
-		onclick={(e) => {
-			e.stopPropagation();
-			onToggleFav?.(item);
-		}}
+		onclick={stopPropagation(() => onToggleFav?.(item))}
 	>
 		<svg
 			width="12"
@@ -69,6 +66,7 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
+import { stopPropagation } from '$lib/common/event-wrappers';
 import CategoryGlyph from './CategoryGlyph.svelte';
 
 interface Props {
