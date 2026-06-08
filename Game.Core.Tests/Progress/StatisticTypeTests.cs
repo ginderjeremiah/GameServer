@@ -12,6 +12,7 @@ namespace Game.Core.Tests.Progress
         [InlineData(EStatisticType.EnemiesEncountered, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesWon, EEntityType.Enemy)]
         [InlineData(EStatisticType.BattlesLost, EEntityType.Enemy)]
+        [InlineData(EStatisticType.BattlesAbandoned, EEntityType.Enemy)]
         [InlineData(EStatisticType.FastestVictory, EEntityType.Enemy)]
         [InlineData(EStatisticType.ZonesCleared, EEntityType.Zone)]
         [InlineData(EStatisticType.DamageDealt, EEntityType.Skill)]

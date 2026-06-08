@@ -60,6 +60,7 @@ const STAT_UNIT: Record<EStatisticType, string> = {
 	[EStatisticType.EnemiesEncountered]: 'encounters',
 	[EStatisticType.BattlesWon]: 'wins',
 	[EStatisticType.BattlesLost]: 'losses',
+	[EStatisticType.BattlesAbandoned]: 'abandons',
 	[EStatisticType.PlayerDeaths]: 'deaths',
 	[EStatisticType.TotalBattleTime]: 'ms',
 	[EStatisticType.FastestVictory]: 'ms',

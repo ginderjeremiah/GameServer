@@ -34,6 +34,16 @@ Challenges and Statistics are relatively new additions to the game, and their de
 
 Not all Challenges are tied to Statistics and vice versa, but many will be. Statistics are tracked metrics that can be used to gate content and progression in the game. For example, a Challenge may require a player to have a certain number of kills with a specific weapon type, which would be tracked as a Statistic.
 
+## Battle Outcomes (`BattlesWon` / `BattlesLost` / `BattlesAbandoned`)
+
+Every completed battle is classified by its **outcome**, and the three outcomes are mutually exclusive so they partition all battles:
+
+- **`BattlesWon`** — the enemy died (the player won).
+- **`BattlesLost`** — the player died.
+- **`BattlesAbandoned`** — neither combatant died; the player walked away from an unfinished fight (e.g. retreating from a boss or switching zones mid-battle). Abandoning is deliberately **not** counted as a loss, since the player never actually fell (#202).
+
+The classification keys off the simulated outcome (`victory` / `playerDied`), not which code path ended the battle — a battle abandoned via `AbandonBattle` in which the player had in fact already died is still a loss. All three are recorded both globally and per-enemy. Like `BattlesLost`, `BattlesAbandoned` is a "lower is better" statistic on the Statistics screen.
+
 ## Challenge Goal Comparison Direction
 
 Most challenges are _accumulating_ goals: the tracked statistic increases over time and the challenge is completed once it reaches **at least** the goal (e.g. "defeat 100 enemies"). However, some statistics are minimized rather than maximized — for example, `FastestVictory` records the lowest victory time, where lower is better. A `TimeTrial` challenge ("win a battle within N seconds") is therefore satisfied when the tracked value is **at or below** the goal, which is the opposite comparison. For **at or below** goals, a tracked value of `0` is treated as "no data yet" (e.g. the player has not won a qualifying battle) and does **not** complete the challenge — otherwise a brand-new player with no victories would instantly satisfy every time trial. This matches how `FastestVictory` is stored, where `0` is the sentinel for "no victory recorded".

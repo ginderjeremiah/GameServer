@@ -82,6 +82,7 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.EnemiesEncountered, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },
 	{ id: EStatisticType.BattlesWon, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },
 	{ id: EStatisticType.BattlesLost, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'exploration' },
+	{ id: EStatisticType.BattlesAbandoned, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'exploration' },
 	// Time
 	{ id: EStatisticType.TotalBattleTime, unit: 'time', agg: 'sum', comp: 'AtLeast', cat: 'time' },
 	{ id: EStatisticType.FastestVictory, unit: 'time', agg: 'min', comp: 'AtMost', cat: 'time' }
