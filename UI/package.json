@@ -19,6 +19,8 @@
 		"test:unit:ci": "vitest --run --reporter=minimal --reporter=json --outputFile.json=./unit-test-results.json"
 	},
 	"devDependencies": {
+		"@emnapi/core": "^1.10.0",
+		"@emnapi/runtime": "^1.10.0",
 		"@playwright/test": "^1.49.1",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.11.1",
