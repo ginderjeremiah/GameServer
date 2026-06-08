@@ -15,11 +15,16 @@ namespace Game.TestInfrastructure.Base
     {
         private readonly IntegrationTestContainers _containers;
         private readonly ITestOutputHelper _testOutputHelper;
+        private readonly IEnumerable<ILoggerProvider> _additionalLoggerProviders;
 
-        public GameServerFactory(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+        public GameServerFactory(
+            IntegrationTestContainers containers,
+            ITestOutputHelper testOutputHelper,
+            IEnumerable<ILoggerProvider>? additionalLoggerProviders = null)
         {
             _containers = containers;
             _testOutputHelper = testOutputHelper;
+            _additionalLoggerProviders = additionalLoggerProviders ?? [];
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -46,7 +51,14 @@ namespace Game.TestInfrastructure.Base
 
             builder.ConfigureServices(services =>
             {
-                services.AddLogging(builder => builder.ClearProviders().AddProvider(new XunitLoggerProvider(_testOutputHelper)));
+                services.AddLogging(loggingBuilder =>
+                {
+                    loggingBuilder.ClearProviders().AddProvider(new XunitLoggerProvider(_testOutputHelper));
+                    foreach (var provider in _additionalLoggerProviders)
+                    {
+                        loggingBuilder.AddProvider(provider);
+                    }
+                });
 
                 var hostedServiceDescriptors = services
                     .Where(d => d.ServiceType == typeof(IHostedService))
