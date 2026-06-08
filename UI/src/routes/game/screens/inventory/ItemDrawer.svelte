@@ -1,15 +1,19 @@
 <div class="drawer-header" style:border-left-color={accent}>
-	<div class="header-top">
-		<span class="cat-diamond" style:background={accent} style:box-shadow="0 0 6px {tintColor(accent, 0.67)}"></span>
-		<span class="cat-label" style:color={accent}>{itemCategoryName(item.itemCategoryId)}</span>
-		<span class="rarity-tag">
-			<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
-			></span>
-			<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
-		</span>
-		<button class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
-	</div>
-	<div class="item-name">{item.name}</div>
+	<TooltipTitle
+		label={itemCategoryName(item.itemCategoryId)}
+		name={item.name}
+		diamondColor={accent}
+		labelColor={accent}
+	>
+		{#snippet trailing()}
+			<span class="rarity-tag">
+				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
+				></span>
+				<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
+			</span>
+			<button class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
+		{/snippet}
+	</TooltipTitle>
 </div>
 
 <div class="drawer-body">
@@ -44,8 +48,9 @@
 <script lang="ts">
 import StatList from './StatList.svelte';
 import ModSlots from './ModSlots.svelte';
+import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
 import { BattleAttributes, type Item } from '$lib/battle';
-import { itemCategoryColor, itemCategoryName, rarityColor, rarityLabel, rarityTint, tintColor } from '$lib/common';
+import { itemCategoryColor, itemCategoryName, rarityColor, rarityLabel, rarityTint } from '$lib/common';
 import { type InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
@@ -62,31 +67,10 @@ const stats = $derived(
 </script>
 
 <style lang="scss">
+// Padding + the category-row/name chrome now come from the shared TooltipTitle
+// primitive; the drawer keeps only its category-coloured left-accent stripe.
 .drawer-header {
-	padding: 16px 18px 14px;
-	border-bottom: 1px solid var(--border-subtle);
 	border-left: 3px solid;
-}
-
-.header-top {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 6px;
-}
-
-.cat-diamond {
-	width: 5px;
-	height: 5px;
-	transform: rotate(45deg);
-	flex-shrink: 0;
-}
-
-.cat-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.8px;
-	text-transform: uppercase;
 }
 
 .rarity-tag {
@@ -118,13 +102,6 @@ const stats = $derived(
 	line-height: 1;
 	padding: 0;
 	margin-left: 4px;
-}
-
-.item-name {
-	font-size: 18px;
-	font-weight: 400;
-	letter-spacing: -0.2px;
-	color: var(--text-primary);
 }
 
 .drawer-body {
