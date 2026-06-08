@@ -3,6 +3,10 @@
 
 import type { IPlayerData } from '../';
 
+export interface IActiveSessionResult {
+	active: boolean;
+}
+
 export interface IAuthTokens {
 	accessToken: string;
 	refreshToken: string;

@@ -41,6 +41,16 @@ namespace Game.Api.Services
             return socketContext;
         }
 
+        /// <summary>
+        /// Returns whether the player currently has a live socket registered, without opening or
+        /// touching one. The login flow uses this to warn the user before a new connection takes over
+        /// an existing session.
+        /// </summary>
+        public async Task<bool> HasActiveSocket(int playerId)
+        {
+            return await CurrentSocketId(playerId) is not null;
+        }
+
         public async Task UnRegisterSocket(SocketContext context)
         {
             await UnRegisterSocketCommandListener(context.SocketId);

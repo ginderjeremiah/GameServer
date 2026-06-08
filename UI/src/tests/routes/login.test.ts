@@ -17,8 +17,10 @@ vi.mock('$lib/api', () => ({
 	},
 	getTokens: vi.fn(() => null),
 	setTokens: vi.fn(),
-	reportDeviceInfo: vi.fn()
+	reportDeviceInfo: vi.fn(),
+	logout: vi.fn()
 }));
+vi.mock('$stores', () => ({ confirmModal: vi.fn() }));
 vi.mock('$lib/engine', () => ({
 	playerManager: { name: '', initialize: vi.fn() }
 }));
