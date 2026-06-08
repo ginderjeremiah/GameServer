@@ -65,7 +65,7 @@ beforeEach(() => {
 
 describe('buildStatTypes', () => {
 	it('builds one entry per presented statistic with names from the server', () => {
-		expect(statTypes).toHaveLength(14);
+		expect(statTypes).toHaveLength(15);
 		expect(statTypes.find((s) => s.id === EStatisticType.HighestSingleAttackDamage)!.name).toBe(
 			'Highest Single Attack Damage'
 		);
@@ -100,7 +100,7 @@ describe('buildStatTypes', () => {
 	it('skips statistics the server does not return', () => {
 		const partial = SERVER_STAT_TYPES.filter((s) => s.id !== EStatisticType.SkillsUsed);
 		const built = buildStatTypes(partial);
-		expect(built).toHaveLength(13);
+		expect(built).toHaveLength(14);
 		expect(built.find((s) => s.id === EStatisticType.SkillsUsed)).toBeUndefined();
 	});
 });
@@ -229,7 +229,7 @@ describe('StatisticsView data wiring', () => {
 
 	it('builds the catalogue + entities from staticData once stats arrive', () => {
 		const view = seededView();
-		expect(view.data.statTypes).toHaveLength(14);
+		expect(view.data.statTypes).toHaveLength(15);
 		expect(view.data.entityList('enemy').map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
 		// isBoss / order are resolved from the raw reference data.
 		expect(view.data.entity('enemy', 1)?.boss).toBe(true);

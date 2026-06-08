@@ -63,10 +63,19 @@ namespace Game.Core.Progress
                     }
                 }
             }
-            else
+            else if (playerDied)
             {
+                // The player died, so the battle was genuinely lost.
                 Increment(EStatisticType.BattlesLost, null, 1);
                 Increment(EStatisticType.BattlesLost, enemy.Id, 1);
+            }
+            else
+            {
+                // Neither combatant died — the battle was abandoned mid-fight (e.g. the player retreated
+                // from a boss or switched zones). Tracked separately from a loss so the two are distinct
+                // numbers (#202).
+                Increment(EStatisticType.BattlesAbandoned, null, 1);
+                Increment(EStatisticType.BattlesAbandoned, enemy.Id, 1);
             }
 
             if (playerDied)

@@ -97,4 +97,5 @@ export enum EStatisticType {
 	TotalBattleTime = 12,
 	FastestVictory = 13,
 	SkillsUsed = 14,
+	BattlesAbandoned = 15,
 }

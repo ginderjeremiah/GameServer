@@ -16,6 +16,7 @@ export const SERVER_STAT_TYPES: IStatisticType[] = [
 	{ id: EStatisticType.EnemiesEncountered, entityType: EEntityType.Enemy, name: 'Enemies Encountered' },
 	{ id: EStatisticType.BattlesWon, entityType: EEntityType.Enemy, name: 'Battles Won' },
 	{ id: EStatisticType.BattlesLost, entityType: EEntityType.Enemy, name: 'Battles Lost' },
+	{ id: EStatisticType.BattlesAbandoned, entityType: EEntityType.Enemy, name: 'Battles Abandoned' },
 	{ id: EStatisticType.PlayerDeaths, entityType: EEntityType.None, name: 'Player Deaths' },
 	{ id: EStatisticType.TotalBattleTime, entityType: EEntityType.None, name: 'Total Battle Time' },
 	{ id: EStatisticType.FastestVictory, entityType: EEntityType.Enemy, name: 'Fastest Victory' },

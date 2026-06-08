@@ -325,6 +325,7 @@ namespace Game.Core
         TotalBattleTime = 12,
         FastestVictory = 13,
         SkillsUsed = 14,
+        BattlesAbandoned = 15,
     }
 
     /// <summary>

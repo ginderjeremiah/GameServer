@@ -85,7 +85,8 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             var enemy = MakeEnemy(id: 3);
 
-            progress.RecordBattleCompleted(enemy, victory: false, playerDied: false, totalMs: 6000, new BattleStats(),
+            // A loss is a battle the player died in (not merely a non-victory).
+            progress.RecordBattleCompleted(enemy, victory: false, playerDied: true, totalMs: 6000, new BattleStats(),
                 isBossBattle: false, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesLost, null));
@@ -93,6 +94,28 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BattlesWon, null));
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.FastestVictory, null));
+            // A loss is not an abandon.
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BattlesAbandoned, null));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Abandon_TracksAbandonedNotLostWonOrKill()
+        {
+            var progress = MakeProgress();
+            var enemy = MakeEnemy(id: 3);
+
+            // Neither combatant died — the battle was abandoned mid-fight (#202).
+            progress.RecordBattleCompleted(enemy, victory: false, playerDied: false, totalMs: 6000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+
+            // Abandons are tracked globally and per-enemy, distinct from losses.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesAbandoned, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesAbandoned, 3));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BattlesLost, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BattlesWon, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
+            // An abandon without a player death does not count as a death.
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.PlayerDeaths, null));
         }
 
         [Fact]

@@ -557,6 +557,62 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandoningAnUnresolvedBattle_RecordsAbandonedNotLost()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Both combatants wield a skill with an effectively infinite cooldown, so neither lands a hit
+            // within the abandon window — the re-simulation resolves as neither a win nor a death, i.e. an
+            // incomplete abandon.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            // Pin the encounter level so the abandoned enemy is deterministic.
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            var abandonedEnemyId = state.ActiveEnemyId;
+
+            // Let some wall-clock time elapse for the abandon, but far less than the skills' cooldowns, so the
+            // re-simulation completes no actions and resolves as neither a win nor a death.
+            state.BattleStartTime = DateTime.UtcNow.AddSeconds(-1);
+
+            // Starting a new battle abandons the in-progress one.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The write-behind progress handler stages the abandon; commit the unit of work and read it back.
+            await unitOfWork.CommitAsync();
+            var stats = await progressRepo.GetStatistics(playerEntity.Id);
+
+            decimal StatValue(EStatisticType type, int? entityId) =>
+                stats.FirstOrDefault(s => s.Type == type && s.EntityId == entityId)?.Value ?? 0m;
+
+            // The abandon is tracked as BattlesAbandoned (global + per-enemy) and never as a loss or a win.
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesLost, null));
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
+            Assert.Equal(0m, StatValue(EStatisticType.PlayerDeaths, null));
+        }
+
+        [Fact]
         public async Task StartBattle_WithNewZoneId_ChangesPlayerZone()
         {
             using var scope = CreateScope();
