@@ -8,7 +8,7 @@
 		<span class="tt-category-label" style:color={labelColor}>{label}</span>
 		{@render trailing?.()}
 	</div>
-	<div class="tt-title-name">{name}</div>
+	<div class="tt-title-name" class:masked>{name}</div>
 </div>
 
 <script lang="ts">
@@ -26,9 +26,11 @@ interface Props {
 	labelColor: string;
 	/** Optional trailing content on the category row (e.g. a cooldown pill or equipped badge). */
 	trailing?: Snippet;
+	/** Render the name as a dimmed, wide-tracked placeholder (sealed/teaser tooltips). */
+	masked?: boolean;
 }
 
-const { label, name, diamondColor, labelColor, trailing }: Props = $props();
+const { label, name, diamondColor, labelColor, trailing, masked = false }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -63,5 +65,10 @@ const { label, name, diamondColor, labelColor, trailing }: Props = $props();
 	color: var(--text-primary);
 	letter-spacing: -0.2px;
 	line-height: 1.15;
+
+	&.masked {
+		color: color-mix(in srgb, var(--text-primary) 45%, transparent);
+		letter-spacing: 2px;
+	}
 }
 </style>
