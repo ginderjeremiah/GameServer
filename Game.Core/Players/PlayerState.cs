@@ -15,6 +15,20 @@ namespace Game.Core.Players
         public int? ActiveEnemyLevel { get; set; }
 
         /// <summary>
+        /// Whether the active battle is a dedicated-boss challenge (started via <c>ChallengeBoss</c>) rather
+        /// than a random idle encounter. Captured at battle start so the resolve path knows a victory is a
+        /// dedicated-boss clear, instead of inferring it from the enemy's <c>IsBoss</c> flag.
+        /// </summary>
+        public bool IsBossBattle { get; set; }
+
+        /// <summary>
+        /// The id of the zone the active battle takes place in, captured at battle start. For a boss
+        /// challenge this is the challenged zone (which need not equal the player's current zone), so the
+        /// clear is recorded against the correct zone.
+        /// </summary>
+        public int? BattleZoneId { get; set; }
+
+        /// <summary>
         /// The ids of the enemy's selected battle skills captured at battle start. Snapshotting the
         /// loadout (rather than re-rolling it at validation time) is what guarantees the server
         /// validates against the exact same skills the client received and simulated with.
@@ -38,7 +52,15 @@ namespace Game.Core.Players
 
         public bool HasActiveBattle => ActiveEnemyId.HasValue;
 
-        public void SetActiveBattle(int enemyId, int level, List<int> enemySkillIds, uint seed, DateTime startTime, BattleSnapshot snapshot)
+        public void SetActiveBattle(
+            int enemyId,
+            int level,
+            List<int> enemySkillIds,
+            uint seed,
+            DateTime startTime,
+            BattleSnapshot snapshot,
+            int zoneId,
+            bool isBossBattle)
         {
             ActiveEnemyId = enemyId;
             ActiveEnemyLevel = level;
@@ -46,6 +68,8 @@ namespace Game.Core.Players
             BattleSeed = seed;
             BattleStartTime = startTime;
             Snapshot = snapshot;
+            BattleZoneId = zoneId;
+            IsBossBattle = isBossBattle;
         }
 
         public void SetCooldown(DateTime cooldownUntil)
@@ -66,6 +90,8 @@ namespace Game.Core.Players
             BattleSeed = null;
             BattleStartTime = DateTime.UnixEpoch;
             Snapshot = null;
+            BattleZoneId = null;
+            IsBossBattle = false;
         }
     }
 }

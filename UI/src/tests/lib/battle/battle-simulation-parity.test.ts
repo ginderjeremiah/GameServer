@@ -185,6 +185,32 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
 	},
 
+	// A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout (3 skills)
+	// against a player who out-tanks it. Mirrors the backend `bossFullLoadout` scenario.
+	//   Player: Str=60, End=40 → MaxHealth=1150, Def=42; skill 130 raw → 68 after boss def, every 25 ticks.
+	//   Boss:   Str=20, End=60 → MaxHealth=1350, Def=62; only the 50-dmg skill pierces (8 dmg), rest clamp to 0.
+	//   20 player hits reach 1360 ≥ 1350 at tick 500 → 20000ms; the boss never threatens the player.
+	{
+		name: 'bossFullLoadout',
+		player: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 60 },
+					{ id: EAttribute.Endurance, amount: 40 }
+				],
+				[makeSkill(10, 1000, [{ attributeId: EAttribute.Strength, amount: 2.0 }])]
+			),
+		enemy: () =>
+			makeBattlerFromRaw(
+				[
+					{ id: EAttribute.Strength, amount: 20 },
+					{ id: EAttribute.Endurance, amount: 60 }
+				],
+				[makeSkill(50, 1000), makeSkill(20, 1000), makeSkill(30, 1000)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 20000 }
+	},
+
 	// The cooldownRecovery matchup capped before either skill fires: stops at maxMs.
 	{
 		name: 'maxMsCap',

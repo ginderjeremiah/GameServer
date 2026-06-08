@@ -18,7 +18,9 @@ namespace Game.Application.Events
         {
             var progress = await _progressRepo.Load(domainEvent.Player);
 
-            progress.RecordBattleCompleted(domainEvent.Enemy, domainEvent.Victory, domainEvent.PlayerDied, domainEvent.TotalMs, domainEvent.Stats);
+            progress.RecordBattleCompleted(
+                domainEvent.Enemy, domainEvent.Victory, domainEvent.PlayerDied, domainEvent.TotalMs,
+                domainEvent.Stats, domainEvent.IsBossBattle, domainEvent.ZoneId);
 
             var completed = progress.EvaluateChallenges(_challengeRepo.All());
 

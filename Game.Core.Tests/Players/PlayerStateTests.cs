@@ -14,7 +14,8 @@ namespace Game.Core.Tests.Players
             var snapshot = MakeSnapshot();
             var enemySkillIds = new List<int> { 1, 2, 3 };
 
-            state.SetActiveBattle(enemyId: 7, level: 3, enemySkillIds: enemySkillIds, seed: 42u, startTime: startTime, snapshot: snapshot);
+            state.SetActiveBattle(enemyId: 7, level: 3, enemySkillIds: enemySkillIds, seed: 42u, startTime: startTime,
+                snapshot: snapshot, zoneId: 9, isBossBattle: true);
 
             Assert.Equal(7, state.ActiveEnemyId);
             Assert.Equal(3, state.ActiveEnemyLevel);
@@ -22,6 +23,8 @@ namespace Game.Core.Tests.Players
             Assert.Equal(42u, state.BattleSeed);
             Assert.Equal(startTime, state.BattleStartTime);
             Assert.Same(snapshot, state.Snapshot);
+            Assert.Equal(9, state.BattleZoneId);
+            Assert.True(state.IsBossBattle);
         }
 
         [Fact]
@@ -36,7 +39,7 @@ namespace Game.Core.Tests.Players
         public void HasActiveBattle_WithActiveBattle_ReturnsTrue()
         {
             var state = new PlayerState();
-            state.SetActiveBattle(1, 1, [], 0u, DateTime.UtcNow, MakeSnapshot());
+            state.SetActiveBattle(1, 1, [], 0u, DateTime.UtcNow, MakeSnapshot(), zoneId: 0, isBossBattle: false);
 
             Assert.True(state.HasActiveBattle);
         }
@@ -63,7 +66,7 @@ namespace Game.Core.Tests.Players
         public void ClearBattle_ResetsActiveFields()
         {
             var state = new PlayerState();
-            state.SetActiveBattle(5, 2, [10, 11], 99u, DateTime.UtcNow, MakeSnapshot());
+            state.SetActiveBattle(5, 2, [10, 11], 99u, DateTime.UtcNow, MakeSnapshot(), zoneId: 3, isBossBattle: true);
 
             state.ClearBattle();
 
@@ -73,6 +76,8 @@ namespace Game.Core.Tests.Players
             Assert.Null(state.BattleSeed);
             Assert.Equal(DateTime.UnixEpoch, state.BattleStartTime);
             Assert.Null(state.Snapshot);
+            Assert.Null(state.BattleZoneId);
+            Assert.False(state.IsBossBattle);
             Assert.False(state.HasActiveBattle);
         }
 
@@ -81,7 +86,7 @@ namespace Game.Core.Tests.Players
         {
             var state = new PlayerState();
             var cooldown = DateTime.UtcNow.AddSeconds(5);
-            state.SetActiveBattle(5, 2, [], 99u, DateTime.UtcNow, MakeSnapshot());
+            state.SetActiveBattle(5, 2, [], 99u, DateTime.UtcNow, MakeSnapshot(), zoneId: 0, isBossBattle: false);
             state.SetCooldown(cooldown);
 
             state.ClearBattle();

@@ -33,20 +33,64 @@ namespace Game.Application.Services
                 await _playerRepo.SavePlayer(player);
             }
 
-            var zone = _zones.GetZone(zoneId);
+            var zone = _zones.GetDomainZone(zoneId);
 
             var now = DateTime.UtcNow;
-            var seed = (uint)(now.Ticks % uint.MaxValue);
+            var seed = CreateBattleSeed(now);
 
             var enemy = _battleFactory.CreateBattleEnemy(
-                zone.LevelMin,
-                zone.LevelMax,
-                level => _enemies.GetRandomDomainEnemy(zoneId, level));
+                zone,
+                level => _enemies.GetRandomDomainEnemy(zone.Id, level));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var snapshot = _battleSnapshotService.CreateSnapshot(player);
 
-            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot);
+            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: false);
+
+            return new BattleStartResult
+            {
+                Enemy = enemy,
+                Seed = seed,
+            };
+        }
+
+        /// <summary>
+        /// Starts a deterministic battle against the zone's dedicated boss (the "Challenge Boss" action),
+        /// separate from the random idle spawn. The boss is fought at the zone's fixed level with its full
+        /// authored skill loadout. Returns <c>null</c> when the zone has no dedicated boss authored. Unlike
+        /// <see cref="StartBattle"/> there is no cooldown gate — the boss challenge is always available — and
+        /// challenging does not change the player's current zone.
+        /// </summary>
+        public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId)
+        {
+            var zone = _zones.GetDomainZone(zoneId);
+
+            // Validate the challenge before touching the active battle: abandoning is not a cheap no-op
+            // (it force-resolves and persists the current battle), so a challenge against a bossless zone
+            // must be a true no-op rather than silently ending the player's in-progress fight.
+            if (zone.BossEnemyId is not int bossEnemyId)
+            {
+                return null;
+            }
+
+            if (state.HasActiveBattle)
+            {
+                await AbandonBattle(player, state);
+            }
+
+            var now = DateTime.UtcNow;
+            var seed = CreateBattleSeed(now);
+
+            var enemy = _battleFactory.CreateBossEnemy(
+                zone,
+                level => _enemies.GetDomainEnemy(bossEnemyId, level)
+                    ?? throw new InvalidOperationException(
+                        $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist."));
+
+            var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
+            var snapshot = _battleSnapshotService.CreateSnapshot(player);
+
+            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: true);
 
             return new BattleStartResult
             {
@@ -87,7 +131,7 @@ namespace Game.Application.Services
             var rewards = new DefeatRewards(player, enemy);
 
             player.GrantExp(rewards.ExpReward);
-            player.RecordBattleCompleted(enemy, result);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
             state.SetCooldown(claimedTimestamp.AddSeconds(5));
             state.ClearBattle();
@@ -125,7 +169,7 @@ namespace Game.Application.Services
                 return false;
             }
 
-            player.RecordBattleCompleted(enemy, result);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
             state.SetCooldown(DateTime.UtcNow.AddSeconds(5));
             state.ClearBattle();
@@ -159,12 +203,16 @@ namespace Game.Application.Services
 
             var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, elapsedMs);
 
-            player.RecordBattleCompleted(enemy, result);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
         }
+
+        // Derives the simulation RNG seed from the battle-start timestamp. Shared by both start paths so
+        // seed generation stays in one place if it ever changes.
+        private static uint CreateBattleSeed(DateTime now) => (uint)(now.Ticks % uint.MaxValue);
 
         private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
         {

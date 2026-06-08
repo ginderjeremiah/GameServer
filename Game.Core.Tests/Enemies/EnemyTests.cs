@@ -50,6 +50,28 @@ namespace Game.Core.Tests.Enemies
         }
 
         [Fact]
+        public void SelectAllBattleSkills_KeepsEveryAvailableSkillInAuthoredOrder()
+        {
+            // The dedicated-boss loadout is the full authored set — neither capped at MaxBattleSkills (4)
+            // nor shuffled — so a 6-skill boss brings all 6 in order.
+            var enemy = MakeEnemy(Skills(6));
+
+            enemy.SelectAllBattleSkills();
+
+            Assert.Equal([0, 1, 2, 3, 4, 5], enemy.BattleSkills.Select(s => s.Id));
+        }
+
+        [Fact]
+        public void SelectAllBattleSkills_DoesNotMutateAvailableSkills()
+        {
+            var enemy = MakeEnemy(Skills(6));
+
+            enemy.SelectAllBattleSkills();
+
+            Assert.Equal(6, enemy.AvailableSkills.Count);
+        }
+
+        [Fact]
         public void SetBattleSkills_NarrowsToGivenLoadoutInOrder()
         {
             var enemy = MakeEnemy(Skills(8));

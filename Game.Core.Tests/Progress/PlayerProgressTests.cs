@@ -23,7 +23,8 @@ namespace Game.Core.Tests.Progress
                 HighestPlayerAttack = 33.25,
             };
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4000, stats);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4000, stats,
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(120.5m, progress.GetStatisticValue(EStatisticType.DamageDealt, null));
             Assert.Equal(40.0m, progress.GetStatisticValue(EStatisticType.DamageTaken, null));
@@ -36,7 +37,8 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             var enemy = MakeEnemy(id: 7);
 
-            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.EnemiesEncountered, null));
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.EnemiesEncountered, 7));
@@ -48,7 +50,8 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             var stats = new BattleStats { PlayerSkillsUsed = 5 };
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4500, stats);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4500, stats,
+                isBossBattle: false, zoneId: 0);
 
             // TotalBattleTime is tracked in seconds (ms / 1000).
             Assert.Equal(4.5m, progress.GetStatisticValue(EStatisticType.TotalBattleTime, null));
@@ -61,9 +64,10 @@ namespace Game.Core.Tests.Progress
         public void RecordBattleCompleted_Victory_TracksWinKillAndFastestVictory()
         {
             var progress = MakeProgress();
-            var enemy = MakeEnemy(id: 3, isBoss: false);
+            var enemy = MakeEnemy(id: 3);
 
-            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 6000, new BattleStats());
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 6000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesWon, null));
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesWon, 3));
@@ -81,7 +85,8 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             var enemy = MakeEnemy(id: 3);
 
-            progress.RecordBattleCompleted(enemy, victory: false, playerDied: false, totalMs: 6000, new BattleStats());
+            progress.RecordBattleCompleted(enemy, victory: false, playerDied: false, totalMs: 6000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesLost, null));
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BattlesLost, 3));
@@ -91,45 +96,49 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_BossVictory_IncrementsBossesDefeated()
+        public void RecordBattleCompleted_BossBattleVictory_IncrementsBossesDefeated()
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
         }
 
         [Fact]
-        public void RecordBattleCompleted_NonBossVictory_DoesNotIncrementBossesDefeated()
+        public void RecordBattleCompleted_NonBossBattleVictory_DoesNotIncrementBossesDefeated()
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: false), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
         }
 
         [Fact]
-        public void RecordBattleCompleted_BossLoss_DoesNotIncrementBossesDefeated()
+        public void RecordBattleCompleted_BossBattleLoss_DoesNotIncrementBossesDefeated()
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: false, playerDied: true, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: false, playerDied: true, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 0);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.BossesDefeated, null));
         }
 
-        // ── RecordBattleCompleted: zone clears (boss victory) ────────────────
+        // ── RecordBattleCompleted: zone clears (boss-battle victory) ─────────
 
         [Fact]
-        public void RecordBattleCompleted_BossVictory_IncrementsZonesClearedGloballyAndForCurrentZone()
+        public void RecordBattleCompleted_BossBattleVictory_IncrementsZonesClearedGloballyAndForBattleZone()
         {
-            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+            var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 4);
 
-            // A boss victory clears the player's current zone, tracked globally and per-zone.
+            // A boss-battle victory clears the challenged zone, tracked globally and per-zone.
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
             // A different zone is unaffected — per-zone isolation.
@@ -137,34 +146,38 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_NonBossVictory_DoesNotIncrementZonesCleared()
+        public void RecordBattleCompleted_NonBossBattleVictory_DoesNotIncrementZonesCleared()
         {
-            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+            var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: false), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: false, zoneId: 4);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
         }
 
         [Fact]
-        public void RecordBattleCompleted_BossLoss_DoesNotIncrementZonesCleared()
+        public void RecordBattleCompleted_BossBattleLoss_DoesNotIncrementZonesCleared()
         {
-            var progress = MakeProgress(player: MakePlayer(currentZoneId: 4));
+            var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: false, playerDied: true, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: false, playerDied: true, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 4);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 4));
         }
 
         [Fact]
-        public void RecordBattleCompleted_RepeatedBossVictoriesInSameZone_AccumulateZonesCleared()
+        public void RecordBattleCompleted_RepeatedBossBattleVictoriesInSameZone_AccumulateZonesCleared()
         {
-            var progress = MakeProgress(player: MakePlayer(currentZoneId: 2));
+            var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 2);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 2);
 
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
@@ -175,7 +188,8 @@ namespace Game.Core.Tests.Progress
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: false, playerDied: true, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: false, playerDied: true, totalMs: 1000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.PlayerDeaths, null));
         }
@@ -185,7 +199,8 @@ namespace Game.Core.Tests.Progress
         {
             var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.PlayerDeaths, null));
         }
@@ -206,7 +221,8 @@ namespace Game.Core.Tests.Progress
                 },
             };
 
-            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.SkillsUsed, 10));
             Assert.Equal(60m, progress.GetStatisticValue(EStatisticType.DamageDealt, 10));
@@ -225,9 +241,9 @@ namespace Game.Core.Tests.Progress
             var enemy = MakeEnemy(id: 1);
 
             progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 2000,
-                new BattleStats { PlayerDamageDealt = 50.0 });
+                new BattleStats { PlayerDamageDealt = 50.0 }, isBossBattle: false, zoneId: 0);
             progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 3000,
-                new BattleStats { PlayerDamageDealt = 70.0 });
+                new BattleStats { PlayerDamageDealt = 70.0 }, isBossBattle: false, zoneId: 0);
 
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.EnemiesEncountered, null));
@@ -241,9 +257,9 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
 
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
-                new BattleStats { HighestPlayerAttack = 40.0 });
+                new BattleStats { HighestPlayerAttack = 40.0 }, isBossBattle: false, zoneId: 0);
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
-                new BattleStats { HighestPlayerAttack = 25.0 });
+                new BattleStats { HighestPlayerAttack = 25.0 }, isBossBattle: false, zoneId: 0);
 
             Assert.Equal(40m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
         }
@@ -254,9 +270,12 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             var enemy = MakeEnemy(id: 1);
 
-            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 5000, new BattleStats());
-            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 3000, new BattleStats());
-            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 8000, new BattleStats());
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 5000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 3000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 8000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
 
             Assert.Equal(3m, progress.GetStatisticValue(EStatisticType.FastestVictory, null));
         }
@@ -366,9 +385,10 @@ namespace Game.Core.Tests.Progress
             // ZonesCleared challenge could never complete. A boss victory in the target zone
             // should now satisfy it.
             var challenge = MakeChallenge(id: 0, EChallengeType.ZonesCleared, goal: 1, targetEntityId: 3);
-            var progress = MakeProgress(player: MakePlayer(currentZoneId: 3));
+            var progress = MakeProgress();
 
-            progress.RecordBattleCompleted(MakeEnemy(isBoss: true), victory: true, playerDied: false, totalMs: 1000, new BattleStats());
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
+                isBossBattle: true, zoneId: 3);
             var completed = progress.EvaluateChallenges([challenge]);
 
             Assert.Single(completed);
@@ -485,23 +505,25 @@ namespace Game.Core.Tests.Progress
                 RewardItemModId = rewardItemModId,
             };
 
-        private static Enemy MakeEnemy(int id = 1, bool isBoss = false) => new()
+        // Boss-ness is now driven by the explicit isBossBattle marker passed to RecordBattleCompleted,
+        // not the enemy's IsBoss flag, so the test enemy is always built as a plain enemy.
+        private static Enemy MakeEnemy(int id = 1) => new()
         {
             Id = id,
             Name = "Test Enemy",
             Level = 1,
-            IsBoss = isBoss,
+            IsBoss = false,
             AttributeDistributions = [],
             AvailableSkills = [],
         };
 
-        private static Player MakePlayer(int level = 1, int currentZoneId = 0) => new()
+        private static Player MakePlayer(int level = 1) => new()
         {
             Id = 1,
             Name = "Test",
             Level = level,
             Exp = 0,
-            CurrentZoneId = currentZoneId,
+            CurrentZoneId = 0,
             StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],

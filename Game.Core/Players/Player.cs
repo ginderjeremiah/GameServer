@@ -155,9 +155,10 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result)
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId)
         {
-            RaiseEvent(new BattleCompletedEvent(this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats));
+            RaiseEvent(new BattleCompletedEvent(
+                this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId));
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()

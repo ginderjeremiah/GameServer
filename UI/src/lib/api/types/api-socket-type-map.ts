@@ -5,6 +5,7 @@ import type {
 	IAttribute,
 	IBattleLostResponse,
 	IChallenge,
+	IChallengeBossRequest,
 	IChallengeType,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
@@ -23,6 +24,7 @@ import type {
 
 export type ApiSocketResponseTypes = {
 	'BattleLost': IBattleLostResponse;
+	'ChallengeBoss': INewEnemyModel;
 	'DefeatEnemy': IDefeatEnemyResponse;
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];
@@ -41,6 +43,7 @@ export type ApiSocketResponseTypes = {
 };
 
 export type ApiSocketRequestTypes = {
+	'ChallengeBoss': IChallengeBossRequest;
 	'DefeatEnemy': IDefeatEnemyRequest;
 	'NewEnemy': INewEnemyRequest;
 	'SaveLogPreferences': ILogPreference[];

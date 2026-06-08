@@ -47,6 +47,18 @@ namespace Game.Core.Enemies
         }
 
         /// <summary>
+        /// Selects this enemy's <em>full</em> authored loadout — every available skill, in authored order —
+        /// for a deterministic encounter (the dedicated-boss challenge). Unlike <see cref="SelectBattleSkills"/>
+        /// this neither caps the count at <see cref="MaxBattleSkills"/> nor shuffles, so the loadout is fixed.
+        /// The chosen loadout is the source of truth — it is snapshotted and sent to the client — so both
+        /// sides simulate the boss with the identical skill set.
+        /// </summary>
+        public void SelectAllBattleSkills()
+        {
+            _battleSkills = [.. AvailableSkills];
+        }
+
+        /// <summary>
         /// Restores a previously-selected battle loadout from its <paramref name="skillIds"/> (in order),
         /// resolved against this enemy's available skills. Used to reconstruct the exact same encounter
         /// when a battle's result is validated server-side.
