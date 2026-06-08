@@ -2,14 +2,9 @@
 	<SealedHeader rarityAccent={accent} catAccent={itemCategoryColor(item.itemCategoryId)} typeLabel={categoryName} />
 
 	<div class="tt-body">
-		{#if statRows.length}
+		{#if statCount}
 			<TooltipSection label="Stats">
-				<div class="masked-grid">
-					{#each statRows as i (i)}
-						<MaskBar {accent} width={STAT_BAR_WIDTHS[i % STAT_BAR_WIDTHS.length]} />
-						<div class="qmark-cell"><span class="qmark" style:color={tintColor(accent, 0.7)}>???</span></div>
-					{/each}
-				</div>
+				<MaskedStatsGrid {accent} rows={statCount} barWidths={STAT_BAR_WIDTHS} />
 			</TooltipSection>
 		{/if}
 
@@ -30,10 +25,7 @@
 		{/if}
 
 		<TooltipSection label="Description" last>
-			<div class="masked-desc">
-				<MaskBar {accent} width={236} height={7} />
-				<MaskBar {accent} width={188} height={7} />
-			</div>
+			<MaskedDescription {accent} lineWidths={[236, 188]} />
 		</TooltipSection>
 	</div>
 </div>
@@ -41,9 +33,10 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, itemCategoryName, rarityColor, tintColor } from '$lib/common';
-import MaskBar from './MaskBar.svelte';
 import SealedHeader from './SealedHeader.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
+import MaskedStatsGrid from '$components/tooltip/MaskedStatsGrid.svelte';
+import MaskedDescription from '$components/tooltip/MaskedDescription.svelte';
 
 interface Props {
 	item: Item;
@@ -54,7 +47,7 @@ const { item }: Props = $props();
 const accent = $derived(rarityColor(item.rarityId));
 const categoryName = $derived(itemCategoryName(item.itemCategoryId));
 // One masked row per non-zero stat bonus, so the *count* still reads true.
-const statRows = $derived(item.totalAttributes.getAttributeMap().map((_, i) => i));
+const statCount = $derived(item.totalAttributes.getAttributeMap().length);
 
 const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 </script>
@@ -68,24 +61,6 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 
 .tt-body {
 	padding: 12px 16px 14px;
-}
-
-.masked-grid {
-	display: grid;
-	grid-template-columns: 1fr auto;
-	row-gap: 6px;
-	column-gap: 12px;
-	align-items: center;
-}
-
-.qmark-cell {
-	text-align: right;
-}
-
-.qmark {
-	font-family: var(--mono);
-	font-size: 11.5px;
-	letter-spacing: 1px;
 }
 
 .sealed-slots {
@@ -106,11 +81,5 @@ const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 	font-size: 11.5px;
 	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 	font-style: italic;
-}
-
-.masked-desc {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
 }
 </style>
