@@ -1,7 +1,9 @@
+using Game.Api;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
@@ -15,9 +17,9 @@ namespace Game.Api.Tests.Integration
         public SocketConnectionTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         /// <summary>
-        /// Seeds test data, logs in via HTTP, and returns the userId for WebSocket auth.
+        /// Seeds test data, logs in via HTTP, and returns the userId (for WebSocket auth) and playerId.
         /// </summary>
-        private async Task<int> SeedAndLoginAsync(string username = "socketuser", string password = "socketpass")
+        private async Task<(int UserId, int PlayerId)> SeedAndLoginAsync(string username = "socketuser", string password = "socketpass")
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -31,13 +33,20 @@ namespace Game.Api.Tests.Integration
                 new { Username = username, Password = password });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
-            return user.Id;
+            return (user.Id, player.Id);
+        }
+
+        /// <summary>Reads the live TTL on the player's socket-presence key directly from Redis.</summary>
+        private async Task<TimeSpan?> GetPresenceTtlAsync(int playerId)
+        {
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            return await multiplexer.GetDatabase().KeyTimeToLiveAsync($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}");
         }
 
         [Fact]
         public async Task Connect_Authenticated_Succeeds()
         {
-            var userId = await SeedAndLoginAsync();
+            var (userId, _) = await SeedAndLoginAsync();
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
@@ -56,6 +65,53 @@ namespace Game.Api.Tests.Integration
             // With no session in Redis, the middleware should reject the connection
             await Assert.ThrowsAnyAsync<Exception>(
                 () => socketClient.ConnectAsync(wsClient, 99999));
+        }
+
+        [Fact]
+        public async Task Connect_SetsPresenceKeyWithTtl()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+            // Round-trip a command so registration (which sets the presence key + TTL) has completed.
+            await socketClient.SendCommandAsync<object>("GetStatisticTypes");
+
+            var ttl = await GetPresenceTtlAsync(playerId);
+
+            // The presence key carries a TTL, so a connection that vanishes without a clean close can't
+            // leave the key lingering forever.
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.Zero, $"Expected a positive TTL but got {ttl}.");
+            Assert.True(ttl <= TimeSpan.FromSeconds(30), $"Expected TTL <= 30s but got {ttl}.");
+        }
+
+        [Fact]
+        public async Task SocketActivity_RefreshesPresenceTtl()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+            await socketClient.SendCommandAsync<object>("GetStatisticTypes");
+
+            var initial = await GetPresenceTtlAsync(playerId);
+
+            // Let the TTL decay (the test client sends no heartbeat of its own), then prove a fresh
+            // inbound message bumps it back up.
+            await Task.Delay(2000, CancellationToken);
+            var decayed = await GetPresenceTtlAsync(playerId);
+
+            await socketClient.SendCommandAsync<object>("GetStatisticTypes");
+            var refreshed = await GetPresenceTtlAsync(playerId);
+
+            Assert.NotNull(initial);
+            Assert.NotNull(decayed);
+            Assert.NotNull(refreshed);
+            Assert.True(decayed < initial, $"Expected the TTL to decay below {initial} but it was {decayed}.");
+            Assert.True(refreshed > decayed, $"Expected activity to refresh the TTL above {decayed} but it was {refreshed}.");
         }
     }
 }

@@ -70,6 +70,11 @@ namespace Game.Infrastructure.Cache.Redis
             await Set(key, value?.Serialize(), expiry);
         }
 
+        public async Task Expire(string key, TimeSpan expiry)
+        {
+            await Redis.KeyExpireAsync(key, expiry);
+        }
+
         public void SetAndForget(string key, string? value)
         {
             StringSet(key, value, CommandFlags.FireAndForget);

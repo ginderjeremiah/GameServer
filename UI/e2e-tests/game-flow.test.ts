@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createAccountAndLogin, TEST_PASSWORD, waitForLoginReady } from './helpers';
+import { createAccountAndLogin, loginExistingUser, waitForLoginReady } from './helpers';
 
 test.describe('Game flow', () => {
 	test.describe.configure({ mode: 'serial' });
@@ -15,11 +15,7 @@ test.describe('Game flow', () => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
-		await page.getByTestId('username-input').fill(username);
-		await page.getByTestId('password-input').fill(TEST_PASSWORD);
-		await page.getByTestId('submit-button').click();
-
-		await expect(page).toHaveURL('/loading', { timeout: 10000 });
+		await loginExistingUser(page, username);
 
 		const enterButton = page.getByTestId('enter-button');
 		await expect(enterButton).toBeEnabled({ timeout: 10000 });
@@ -32,11 +28,8 @@ test.describe('Game flow', () => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
-		await page.getByTestId('username-input').fill(username);
-		await page.getByTestId('password-input').fill(TEST_PASSWORD);
-		await page.getByTestId('submit-button').click();
+		await loginExistingUser(page, username);
 
-		await expect(page).toHaveURL('/loading', { timeout: 10000 });
 		const enterButton = page.getByTestId('enter-button');
 		await expect(enterButton).toBeEnabled({ timeout: 10000 });
 		await enterButton.click();
@@ -53,11 +46,8 @@ test.describe('Game flow', () => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
-		await page.getByTestId('username-input').fill(username);
-		await page.getByTestId('password-input').fill(TEST_PASSWORD);
-		await page.getByTestId('submit-button').click();
+		await loginExistingUser(page, username);
 
-		await expect(page).toHaveURL('/loading', { timeout: 10000 });
 		// Let the loading screen finish so every reference-data set is written to the localStorage cache.
 		await expect(page.getByTestId('enter-button')).toBeEnabled({ timeout: 10000 });
 

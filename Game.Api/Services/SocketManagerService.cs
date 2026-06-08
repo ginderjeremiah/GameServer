@@ -14,6 +14,16 @@ namespace Game.Api.Services
         private readonly ILogger<SocketManagerService> _logger;
         private readonly SocketCommandFactory _commandFactory;
 
+        /// <summary>
+        /// Time-to-live on the per-player socket-presence key. The client heartbeats every 10s
+        /// (<c>api-socket.ts</c>), and every inbound message refreshes this TTL, so a live connection
+        /// keeps its key fresh while a non-gracefully-closed one (a tab/device that vanished without a
+        /// close frame) lets the key expire within this window instead of lingering until the 60s
+        /// inactivity check. That keeps the <see cref="HasActiveSocket"/> presence signal honest — the
+        /// 30s budget tolerates two missed heartbeats before a live session is mistaken for gone.
+        /// </summary>
+        private static readonly TimeSpan SocketPresenceTtl = TimeSpan.FromSeconds(30);
+
         public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory)
         {
             _pubSub = pubSub;
@@ -28,8 +38,10 @@ namespace Game.Api.Services
         {
             var playerId = sessionService.SelectedPlayerId;
             var socketContext = new SocketContext(socket, playerId, sessionService, _loggerFactory.CreateLogger<SocketContext>());
-            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>());
-            var oldSocketId = await _cache.GetSet(CurrentSocketKey(playerId), socketContext.SocketId);
+            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId));
+            var presenceKey = CurrentSocketKey(playerId);
+            var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId);
+            await _cache.Expire(presenceKey, SocketPresenceTtl);
             if (oldSocketId is not null)
             {
                 await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
@@ -49,6 +61,17 @@ namespace Game.Api.Services
         public async Task<bool> HasActiveSocket(int playerId)
         {
             return await CurrentSocketId(playerId) is not null;
+        }
+
+        /// <summary>
+        /// Extends the player's socket-presence TTL on connection activity, so a live socket keeps its
+        /// presence key from expiring (see <see cref="SocketPresenceTtl"/>). Uses an expire (not a
+        /// re-set) so it only ever prolongs the currently-registered socket's key and never resurrects a
+        /// key a newer connection has since taken over.
+        /// </summary>
+        private async Task RefreshSocketPresence(int playerId)
+        {
+            await _cache.Expire(CurrentSocketKey(playerId), SocketPresenceTtl);
         }
 
         public async Task UnRegisterSocket(SocketContext context)
