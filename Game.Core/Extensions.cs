@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using static Game.Core.EAttribute;
 
 namespace Game.Core
 {
@@ -21,16 +20,6 @@ namespace Game.Core
         public static string ToBase64<T>(this T obj)
         {
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(obj?.ToString() ?? ""));
-        }
-
-        /// <summary>
-        /// Converts this string from base64 to a UTF8 encoding representation.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns>This string in a UTF8 representation.</returns>
-        public static string FromBase64(this string str)
-        {
-            return Encoding.UTF8.GetString(Convert.FromBase64String(str));
         }
 
         /// <summary>
@@ -157,17 +146,6 @@ namespace Game.Core
         public static string SnakeCase(this string str)
         {
             return WordBreakRegex().Replace(str, "$1-$2").ToLower();
-        }
-
-        /// <summary>
-        /// Returns true if this is one of the core attributes: <see cref="Strength"/>, <see cref="Endurance"/>, <see cref="Intellect"/>,
-        /// <see cref="Agility"/>, <see cref="Dexterity"/>, or <see cref="Luck"/>.
-        /// </summary>
-        /// <param name="att"></param>
-        /// <returns></returns>
-        public static bool IsCoreAttribute(this EAttribute att)
-        {
-            return att is Strength or Endurance or Intellect or Agility or Dexterity or Luck;
         }
 
         [GeneratedRegex("([a-z])([A-Z])")]
