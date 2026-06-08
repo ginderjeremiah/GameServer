@@ -72,6 +72,11 @@ class WorkbenchReference {
 	zoneOptions = (): SelectOption[] =>
 		staticData.zones.map((z) => ({ value: z.id, text: `${z.name} · L${z.levelMin}–${z.levelMax}` }));
 	enemyOptions = (): SelectOption[] => staticData.enemies.map((e) => ({ value: e.id, text: e.name }));
+	/** Dedicated-boss picker options: a "None" sentinel (-1) plus every enemy flagged as a boss. */
+	bossEnemyOptions = (): SelectOption[] => [
+		{ value: -1, text: 'None' },
+		...staticData.enemies.filter((e) => e.isBoss).map((e) => ({ value: e.id, text: e.name }))
+	];
 	skillCatalogue = () => staticData.skills.map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
 
 	// ── Challenges ──

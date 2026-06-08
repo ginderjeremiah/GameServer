@@ -1,3 +1,4 @@
+using Game.Abstractions;
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
@@ -7,16 +8,29 @@ namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for zones and their enemy spawn assignments. Reuses the cached
-    /// entity lookup (<see cref="IZoneEntityCache.LookupZone"/>) for existence/diff and builds fresh,
-    /// navigation-free entities for every write.
+    /// entity lookups (<see cref="IZoneEntityCache.LookupZone"/>, <see cref="IEnemyEntityCache.GetEnemy"/>)
+    /// for existence/diff and builds fresh, navigation-free entities for every write.
     /// </summary>
-    internal class AdminZones(IZoneEntityCache zones, IEntityStore entityStore) : IAdminZones
+    internal class AdminZones(IZoneEntityCache zones, IEnemyEntityCache enemies, IEntityStore entityStore) : IAdminZones
     {
         private readonly IZoneEntityCache _zones = zones;
+        private readonly IEnemyEntityCache _enemies = enemies;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public void SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
+        public bool SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
+            // A zone's dedicated boss must reference an existing enemy flagged IsBoss. Validate the whole
+            // change set up front so an invalid reference rejects the batch rather than partially applying.
+            foreach (var change in changes)
+            {
+                if (change.ChangeType != EChangeType.Delete
+                    && change.Item.BossEnemyId is int bossEnemyId
+                    && _enemies.GetEnemy(bossEnemyId) is not { IsBoss: true })
+                {
+                    return false;
+                }
+            }
+
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Zone
                 {
@@ -25,6 +39,8 @@ namespace Game.DataAccess.Repositories.Admin
                     LevelMin = item.LevelMin,
                     LevelMax = item.LevelMax,
                     Order = item.Order,
+                    BossEnemyId = item.BossEnemyId,
+                    BossLevel = item.BossLevel,
                 }),
                 edit: item => _entityStore.Update(new Entities.Zone
                 {
@@ -34,6 +50,8 @@ namespace Game.DataAccess.Repositories.Admin
                     LevelMin = item.LevelMin,
                     LevelMax = item.LevelMax,
                     Order = item.Order,
+                    BossEnemyId = item.BossEnemyId,
+                    BossLevel = item.BossLevel,
                 }),
                 delete: item => _entityStore.Delete(new Entities.Zone
                 {
@@ -41,6 +59,8 @@ namespace Game.DataAccess.Repositories.Admin
                     Name = "",
                     Description = "",
                 }));
+
+            return true;
         }
 
         public bool SetEnemies(SetZoneEnemiesData data)

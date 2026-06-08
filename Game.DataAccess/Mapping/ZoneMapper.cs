@@ -17,6 +17,8 @@ namespace Game.DataAccess.Mapping
                 Order = entity.Order,
                 LevelMin = entity.LevelMin,
                 LevelMax = entity.LevelMax,
+                BossEnemyId = entity.BossEnemyId,
+                BossLevel = entity.BossLevel,
             };
         }
     }

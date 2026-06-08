@@ -120,6 +120,8 @@ export interface IZone {
 	order: number;
 	levelMin: number;
 	levelMax: number;
+	bossEnemyId?: number;
+	bossLevel: number;
 }
 
 export interface IZoneEnemy {

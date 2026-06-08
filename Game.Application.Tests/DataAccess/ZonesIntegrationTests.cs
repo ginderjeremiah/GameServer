@@ -41,6 +41,39 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetZone_WithDedicatedBoss_ReturnsBossFields()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Catacomb Lich", isBoss: true);
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Forgotten Catacombs", levelMin: 8, levelMax: 11, bossEnemyId: boss.Id, bossLevel: 18);
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var result = zones.GetZone(zone.Id);
+
+            Assert.Equal(boss.Id, result.BossEnemyId);
+            Assert.Equal(18, result.BossLevel);
+        }
+
+        [Fact]
+        public async Task GetZone_WithoutBoss_ReturnsNullBossEnemyId()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Glade");
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var result = zones.GetZone(zone.Id);
+
+            Assert.Null(result.BossEnemyId);
+        }
+
+        [Fact]
         public void GetZone_InvalidId_Throws()
         {
             using var scope = CreateScope();

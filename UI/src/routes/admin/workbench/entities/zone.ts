@@ -16,6 +16,8 @@ const refresh = async (): Promise<WorkbenchZone[]> => {
 	staticData.enemies = enemies;
 	return zones.map((zone) => ({
 		...zone,
+		// Normalise the optional boss FK to the select's "None" sentinel (-1) so the picker stays consistent.
+		bossEnemyId: zone.bossEnemyId ?? -1,
 		zoneEnemies: enemies
 			.filter((enemy) => enemy.spawns.some((spawn) => spawn.zoneId === zone.id))
 			.map((enemy) => ({
@@ -31,11 +33,28 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 	singular: 'Zone',
 	glyph: 'map',
 	blankName: 'Unnamed zone',
-	newItem: (id) => ({ id, name: '', description: '', order: 0, levelMin: 1, levelMax: 10, zoneEnemies: [] }),
+	newItem: (id) => ({
+		id,
+		name: '',
+		description: '',
+		order: 0,
+		levelMin: 1,
+		levelMax: 10,
+		bossEnemyId: -1,
+		bossLevel: 1,
+		zoneEnemies: []
+	}),
 	meta: (z) => [
 		['', `L${z.levelMin}–${z.levelMax}`],
 		['enemy', z.zoneEnemies.length]
 	],
+	headline: (z) => {
+		if (z.bossEnemyId == null || z.bossEnemyId < 0) {
+			return '';
+		}
+		const boss = staticData.enemies.find((e) => e.id === z.bossEnemyId);
+		return boss ? `Boss: ${boss.name} · LV ${z.bossLevel}` : '';
+	},
 	sections: [
 		{
 			key: 'identity',
@@ -56,6 +75,14 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				{ key: 'order', label: 'Order', type: 'number', width: 110 },
 				{ key: 'levelMin', label: 'Level Min', type: 'number', suffix: 'lv', width: 130 },
 				{ key: 'levelMax', label: 'Level Max', type: 'number', suffix: 'lv', width: 130 },
+				{
+					key: 'bossEnemyId',
+					label: 'Dedicated Boss',
+					type: 'select',
+					options: reference.bossEnemyOptions,
+					width: 220
+				},
+				{ key: 'bossLevel', label: 'Boss Level', type: 'number', suffix: 'lv', width: 130 },
 				{
 					key: 'description',
 					label: 'Description',
@@ -98,13 +125,16 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: ({ id, name, description, order, levelMin, levelMax }) => ({
+			toPrimaryDto: ({ id, name, description, order, levelMin, levelMax, bossEnemyId, bossLevel }) => ({
 				id,
 				name,
 				description,
 				order,
 				levelMin,
-				levelMax
+				levelMax,
+				// Map the "None" sentinel (-1) back to an absent boss for the API.
+				bossEnemyId: bossEnemyId === -1 ? undefined : bossEnemyId,
+				bossLevel
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),
 			refresh,

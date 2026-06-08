@@ -162,9 +162,10 @@ namespace Game.TestInfrastructure.Helpers
             decimal strengthBase = 5m,
             decimal strengthPerLevel = 1m,
             decimal enduranceBase = 5m,
-            decimal endurancePerLevel = 1m)
+            decimal endurancePerLevel = 1m,
+            bool isBoss = false)
         {
-            var enemy = new Enemy { Name = name };
+            var enemy = new Enemy { Name = name, IsBoss = isBoss };
             context.Enemies.Add(enemy);
             await context.SaveChangesAsync();
 
@@ -193,7 +194,9 @@ namespace Game.TestInfrastructure.Helpers
             string name = "Test Zone",
             int levelMin = 1,
             int levelMax = 10,
-            int order = 0)
+            int order = 0,
+            int? bossEnemyId = null,
+            int bossLevel = 1)
         {
             var zone = new Zone
             {
@@ -202,6 +205,8 @@ namespace Game.TestInfrastructure.Helpers
                 Order = order,
                 LevelMin = levelMin,
                 LevelMax = levelMax,
+                BossEnemyId = bossEnemyId,
+                BossLevel = bossLevel,
             };
 
             context.Zones.Add(zone);

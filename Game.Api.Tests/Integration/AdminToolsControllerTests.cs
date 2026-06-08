@@ -100,6 +100,117 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditZones_WithDedicatedBoss_PersistsBossEnemyAndLevel()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Catacomb Lich", isBoss: true);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Forgotten Catacombs",
+                        Description = "Endless night.",
+                        Order = 3,
+                        LevelMin = 8,
+                        LevelMax = 11,
+                        BossEnemyId = (int?)boss.Id,
+                        BossLevel = 18
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var saved = Assert.Single(GetZones(), z => z.Name == "Forgotten Catacombs");
+            Assert.Equal(boss.Id, saved.BossEnemyId);
+            Assert.Equal(18, saved.BossLevel);
+        }
+
+        [Fact]
+        public async Task AddEditZones_BossEnemyNotMarkedAsBoss_ReturnsErrorAndPersistsNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var normalEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Plague Rat"); // isBoss: false
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Rejected Zone",
+                        Description = "x",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5,
+                        BossEnemyId = (int?)normalEnemy.Id,
+                        BossLevel = 5
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Contains("boss", result.ErrorMessage ?? "", StringComparison.OrdinalIgnoreCase);
+
+            // The rejected batch must not have been partially applied.
+            Assert.DoesNotContain(GetZones(), z => z.Name == "Rejected Zone");
+        }
+
+        [Fact]
+        public async Task AddEditZones_NonexistentBossEnemy_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Zone",
+                        Description = "x",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5,
+                        BossEnemyId = (int?)999999,
+                        BossLevel = 5
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.DoesNotContain(GetZones(), z => z.Name == "Ghost Zone");
+        }
+
+        [Fact]
         public async Task SetEnemySkills_ValidEnemy_Succeeds()
         {
             // Arrange — seed enemy and skills
