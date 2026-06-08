@@ -207,7 +207,10 @@ export class EnemyManager {
 			logMessage(ELogType.Debug, 'There was an error recording the boss loss: ' + lostResponse.error);
 		}
 		this.returnToIdle();
-		const cooldown = lostResponse.data.cooldown;
+		// An error response carries no `data` (e.g. a transient socket failure), so guard the
+		// dereference the same way `getNewEnemy` does — otherwise a failed BattleLost would throw
+		// before `getNewEnemy` runs and strand the player with no new enemy after a boss loss.
+		const cooldown = lostResponse.data?.cooldown ?? 0;
 		if (cooldown > 0) {
 			await battleEngine.startLoading(cooldown);
 		}
@@ -223,11 +226,13 @@ export class EnemyManager {
 			logMessage(ELogType.EnemyDefeated, staticData.enemies[this.currentEnemy.id].name + ' was defeated!');
 		}
 		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: Date.now() });
-		if (!defeatResponse.error && defeatResponse.data.rewards) {
+		if (!defeatResponse.error && defeatResponse.data?.rewards) {
 			playerManager.grantExp(defeatResponse.data.rewards.expReward);
 		} else {
 			logMessage(ELogType.Debug, 'There was an error defeating the enemy: ' + defeatResponse.error);
 		}
-		return defeatResponse.data.cooldown;
+		// Guard `data` for a possible error response (absent `data`), now that this is the shared
+		// victory path for both the idle and boss loops.
+		return defeatResponse.data?.cooldown ?? 0;
 	}
 }

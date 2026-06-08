@@ -157,6 +157,25 @@ describe('EnemyManager boss mode', () => {
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
 	});
 
+	it('survives a failed BattleLost response (no data) and still resumes the idle loop', async () => {
+		await manager.challengeBoss();
+		// A failed socket command returns no `data` — dereferencing the cooldown must not throw and
+		// strand the player before getNewEnemy runs.
+		send.mockImplementation((name: string) =>
+			name === 'BattleLost'
+				? Promise.resolve({ id: '1', name: 'BattleLost', error: 'boom' } as IApiSocketResponse<'BattleLost'>)
+				: Promise.resolve(newEnemyResponse)
+		);
+
+		await fireStage(h.BattleStage.Defeated);
+
+		expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, 'There was an error recording the boss loss: boom');
+		expect(manager.mode).toBe('idle');
+		// Absent data ⇒ cooldown defaults to 0 ⇒ no loading step, but the idle loop still resumes.
+		expect(h.battleEngine.startLoading).not.toHaveBeenCalled();
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+	});
+
 	it('retreats from a boss fight back to the idle loop', async () => {
 		await manager.challengeBoss();
 		expect(manager.mode).toBe('boss');
