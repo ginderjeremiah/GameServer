@@ -513,6 +513,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandoningAWonBattle_GrantsExpForTheVictory()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            var expBefore = player.Exp;
+
+            // Backdate the battle start so the elapsed wall-clock time exceeds the simulated victory's
+            // duration — the abandon (triggered by starting the next battle) resolves as a real win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Starting a new battle abandons the in-progress one. Because that one would already have been
+            // won, the victory must pay out its exp (mirroring EndBattleVictory) rather than be booked
+            // exp-less (#206).
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            Assert.True(player.Exp > expBefore);
+            Assert.True(state.HasActiveBattle);
+        }
+
+        [Fact]
         public async Task StartBattle_WithNewZoneId_ChangesPlayerZone()
         {
             using var scope = CreateScope();

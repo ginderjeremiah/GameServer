@@ -127,10 +127,7 @@ namespace Game.Application.Services
                 return null;
             }
 
-            var rewards = new DefeatRewards(player, enemy);
-
-            player.GrantExp(rewards.ExpReward);
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+            var rewards = RecordVictory(player, enemy, result, state);
 
             state.SetCooldown(claimedTimestamp.AddSeconds(5));
             state.ClearBattle();
@@ -200,11 +197,35 @@ namespace Game.Application.Services
 
             var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, elapsedMs);
 
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+            if (result.Victory)
+            {
+                // The enemy died within the elapsed wall-clock time, so this abandon resolved as a real
+                // victory. Pay it out exactly like EndBattleVictory (exp + win/clear/challenge credit)
+                // rather than booking the win while silently withholding the earned exp (#206).
+                RecordVictory(player, enemy, result, state);
+            }
+            else
+            {
+                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+            }
 
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player);
+        }
+
+        // Books a victory: grants the earned exp and records the win (kills, zone clears, and the
+        // challenge rewards driven off BattleCompletedEvent). Shared by the explicit victory path and
+        // the won-abandon path so the two cannot drift — a battle that resolved as a win always pays
+        // out the same way, regardless of how the battle was ended.
+        private static DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state)
+        {
+            var rewards = new DefeatRewards(player, enemy);
+
+            player.GrantExp(rewards.ExpReward);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+
+            return rewards;
         }
 
         // Derives the simulation RNG seed from the battle-start timestamp. Shared by both start paths so
