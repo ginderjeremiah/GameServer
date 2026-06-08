@@ -4,13 +4,13 @@ An idle incremental RPG where players progress through zones, defeat monsters, a
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | Svelte 5 / SvelteKit |
-| Backend | C# ASP.NET Core (.NET 10) |
-| Database | PostgreSQL (Entity Framework Core, code-first) |
-| Cache / Pub-Sub | Redis |
-| Real-time | WebSockets (with a Redis backplane for multi-instance support) |
+| Layer           | Technology                                                     |
+| --------------- | -------------------------------------------------------------- |
+| Frontend        | Svelte 5 / SvelteKit                                           |
+| Backend         | C# ASP.NET Core (.NET 10)                                      |
+| Database        | PostgreSQL (Entity Framework Core, code-first)                 |
+| Cache / Pub-Sub | Redis                                                          |
+| Real-time       | WebSockets (with a Redis backplane for multi-instance support) |
 
 ## Prerequisites
 
@@ -149,10 +149,10 @@ This writes the generated files directly to `UI/src/lib/api/types`. After changi
 
 Two compose files are provided depending on the environment:
 
-| File | Networking | Use when |
-|---|---|---|
-| [`docker-compose.local.yml`](docker-compose.local.yml) | Bridge (Docker Desktop) | Local development on Windows/Mac or standard Linux |
-| [`docker-compose.yml`](docker-compose.yml) | Host | CI (GitHub Actions) or constrained environments without bridge networking |
+| File                                                   | Networking              | Use when                                                                  |
+| ------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------------- |
+| [`docker-compose.local.yml`](docker-compose.local.yml) | Bridge (Docker Desktop) | Local development on Windows/Mac or standard Linux                        |
+| [`docker-compose.yml`](docker-compose.yml)             | Host                    | CI (GitHub Actions) or constrained environments without bridge networking |
 
 Both start the API, PostgreSQL, and Redis (the SvelteKit frontend is started separately by Playwright or `npm run dev`). See [`docs/backend.md`](docs/backend.md#dockerized-api-stack-for-end-to-end-playwright-runs) for configuration details and environment variable overrides.
 
@@ -179,6 +179,7 @@ GameServer/
 │   │   └── styles/           # Global SCSS and theming
 │   └── e2e-tests/            # Playwright end-to-end tests
 ├── docs/                     # Architecture and design documentation
+│   └── spikes/               # Research spikes for large scale effor
 ├── docker-compose.local.yml  # Local dev stack (Docker Desktop, bridge networking)
 ├── docker-compose.yml        # CI / constrained-environment stack (host networking)
 ├── e2e-seed.sql              # Minimal seed data for Playwright runs
