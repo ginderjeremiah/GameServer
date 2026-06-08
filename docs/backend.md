@@ -11,6 +11,7 @@ The game is structured is similar to an onion architecture with multiple project
 - `Game.Core.Tests`: This project contains unit tests for the core domain logic, ensuring that all game mechanics, including battle simulation, character progression, and item logic, are correctly implemented and consistent with the frontend.
 - `Game.DataAccess`: This project contains the data access layer, including implementations of repositories from `Game.Abstractions` that interact with the database using Entity Framework and the cache and pub/sub implementations provided by `Game.Infrastructure`.
 - `Game.Infrastructure`: This project contains the implementation of the cache and pub/sub interfaces defined in `Game.Abstractions` (currently using Redis), as well as the database context, the **EF entity models** (`Game.Infrastructure.Entities`), and migrations for EF Core.
+- `Game.Infrastructure.Tests`: This project contains classical unit tests for the in-process logic in `Game.Infrastructure` that has no out-of-process dependency (currently the `BackgroundWorker` Start/Kill lifecycle). It is deliberately lightweight — it references only `Game.Infrastructure`, not `Game.TestInfrastructure` — because, per the testing guidelines below, anything coupled to Redis or the database is covered by integration tests instead of here.
 
 # General Backend Guidelines
 
