@@ -22,7 +22,10 @@ const withStatics = (contribs: AttributeModifier[]): AttributeModifier[] => [
 const additive = (
 	attribute: EAttribute,
 	amount: number,
-	source = EAttributeModifierSource.PlayerStatPoints
+	source: Exclude<
+		EAttributeModifierSource,
+		EAttributeModifierSource.Derived
+	> = EAttributeModifierSource.PlayerStatPoints
 ): AttributeModifier => ({ attribute, amount, type: EModifierType.Additive, source });
 
 describe('computeAttributes', () => {
@@ -47,7 +50,9 @@ describe('computeAttributes', () => {
 		const hp = computed.get(EAttribute.MaxHealth)!;
 		expect(hp.total).toBe(50 + 20 * 12 + 5 * 14);
 
-		const enduranceLine = hp.lines.find((l) => l.derivedSource === EAttribute.Endurance)!;
+		const enduranceLine = hp.lines.find(
+			(l) => l.source === EAttributeModifierSource.Derived && l.derivedSource === EAttribute.Endurance
+		)!;
 		expect(enduranceLine.derivedValue).toBe(12);
 		expect(enduranceLine.applied).toBe(240);
 	});

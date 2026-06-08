@@ -99,7 +99,7 @@ export function computeAttributes<T extends AttributeModifier>(
 		const lines: AppliedModifier<T>[] = [];
 
 		for (const mod of adds) {
-			const derivedValue = mod.source === EAttributeModifierSource.Derived ? valueOf(mod.derivedSource!) : undefined;
+			const derivedValue = mod.source === EAttributeModifierSource.Derived ? valueOf(mod.derivedSource) : undefined;
 			const applied = derivedValue === undefined ? mod.amount : mod.amount * derivedValue;
 			running += applied;
 			lines.push({ ...mod, applied, running, multiplied: false, derivedValue });
@@ -108,7 +108,7 @@ export function computeAttributes<T extends AttributeModifier>(
 		const additiveSubtotal = running;
 
 		for (const mod of mults) {
-			const derivedValue = mod.source === EAttributeModifierSource.Derived ? valueOf(mod.derivedSource!) : undefined;
+			const derivedValue = mod.source === EAttributeModifierSource.Derived ? valueOf(mod.derivedSource) : undefined;
 			const factor = derivedValue === undefined ? mod.amount : mod.amount * derivedValue;
 			const before = running;
 			running *= factor;

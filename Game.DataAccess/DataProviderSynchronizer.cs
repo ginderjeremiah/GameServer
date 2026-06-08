@@ -318,6 +318,7 @@ namespace Game.DataAccess
             await context.SaveChangesAsync();
         }
 
-        private static T Deserialize<T>(string json) => json.Deserialize<T>()!;
+        private static T Deserialize<T>(string json)
+            => json.Deserialize<T>() ?? throw new JsonException($"Deserialized '{typeof(T).Name}' payload was null.");
     }
 }

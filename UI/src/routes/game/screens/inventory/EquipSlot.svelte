@@ -12,31 +12,31 @@
 		style:border-color={tileBorder}
 		style:background={over
 			? tintColor('var(--accent)', 0.14)
-			: filled
-				? rarityTint(item!.rarityId, 0.07)
+			: item
+				? rarityTint(item.rarityId, 0.07)
 				: tintColor('var(--white)', 0.03)}
 		ondragover={handleDragOver}
 		ondragleave={() => (over = false)}
 		ondrop={handleDrop}
-		onclick={() => filled && onSelect?.(item!)}
+		onclick={() => item && onSelect?.(item)}
 		onkeydown={(e) => {
-			if (filled && (e.key === 'Enter' || e.key === ' ')) {
+			if (item && (e.key === 'Enter' || e.key === ' ')) {
 				e.preventDefault();
-				onSelect?.(item!);
+				onSelect?.(item);
 			}
 		}}
 		onmouseenter={(e) => {
 			hover = true;
-			if (filled) onHoverEnter?.(item!, e);
+			if (item) onHoverEnter?.(item, e);
 		}}
-		onmousemove={(e) => filled && onHoverMove?.(e)}
+		onmousemove={(e) => item && onHoverMove?.(e)}
 		onmouseleave={() => {
 			hover = false;
 			onHoverLeave?.();
 		}}
 	>
-		{#if filled}
-			<CategoryGlyph cat={item!.itemCategoryId} color={itemCategoryColor(item!.itemCategoryId)} size={20} />
+		{#if item}
+			<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={20} />
 			{#if hover}
 				<button
 					class="unequip"
@@ -47,8 +47,8 @@
 					}}>×</button
 				>
 			{/if}
-			{#if item!.appliedMods.length}
-				<span class="mod-count">{item!.appliedMods.length}◈</span>
+			{#if item.appliedMods.length}
+				<span class="mod-count">{item.appliedMods.length}◈</span>
 			{/if}
 		{:else}
 			<CategoryGlyph cat={slot.category} color={tintColor('var(--text-primary)', 0.18)} size={19} />
@@ -56,12 +56,12 @@
 	</div>
 
 	<div class="row-info">
-		{#if filled}
-			<div class="item-name">{item!.name}</div>
+		{#if item}
+			<div class="item-name">{item.name}</div>
 			<div class="rarity-tag">
-				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item!.rarityId, 0.65)}"
+				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
 				></span>
-				<span class="rarity-label" style:color={rc}>{rarityLabel(item!.rarityId)}</span>
+				<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
 			</div>
 		{:else}
 			<div class="empty-label">Empty</div>
@@ -101,8 +101,8 @@ const canAccept = $derived(!!dragItem && dragItem.itemCategoryId === slot.catego
 const tileBorder = $derived(
 	over || selected
 		? 'var(--accent)'
-		: filled
-			? rarityTint(item!.rarityId, 0.6)
+		: item
+			? rarityTint(item.rarityId, 0.6)
 			: canAccept
 				? tintColor('var(--accent)', 0.5)
 				: 'var(--border-light)'

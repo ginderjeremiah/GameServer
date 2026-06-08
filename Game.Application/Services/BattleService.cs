@@ -101,12 +101,11 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp)
         {
-            if (!state.HasActiveBattle || state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 return null;
             }
 
-            var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
             var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
@@ -150,12 +149,11 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state)
         {
-            if (!state.HasActiveBattle || state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 return false;
             }
 
-            var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
             var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
@@ -181,13 +179,12 @@ namespace Game.Application.Services
 
         private async Task AbandonBattle(Player player, PlayerState state)
         {
-            if (state.Snapshot is null)
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 state.ClearBattle();
                 return;
             }
 
-            var enemyId = state.ActiveEnemyId!.Value;
             var level = state.ActiveEnemyLevel ?? 1;
             var enemySkillIds = state.ActiveEnemySkillIds ?? [];
 
