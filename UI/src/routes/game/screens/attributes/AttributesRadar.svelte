@@ -26,7 +26,9 @@
 			class:dragging={dragIndex === i}
 			role="button"
 			tabindex={clickable ? 0 : -1}
-			aria-label="Adjust {attributeName(coreIds[i])} — drag to allocate, click to add a point"
+			aria-label={clickable
+				? `Adjust ${attributeName(coreIds[i])} — drag to allocate or click to add a point`
+				: `Adjust ${attributeName(coreIds[i])} — drag to refund points`}
 			onpointerdown={(e) => startDrag(e, i)}
 			onclick={() => onVertexClick(i)}
 			onkeydown={(e) => clickable && handleKey(e, i)}
@@ -73,10 +75,18 @@ const rings = [0.25, 0.5, 0.75, 1];
 
 let svgEl: SVGSVGElement | undefined;
 // The axis currently being dragged (null when idle), and whether the active
-// gesture has moved — a moved gesture ends in a synthetic click we must ignore so
-// a drag isn't also counted as the quick +1 click.
+// gesture has crossed the movement dead-zone — a moved gesture ends in a
+// synthetic click we must ignore so a drag isn't also counted as the quick +1
+// click. `dragStart` is the pointerdown position the dead-zone is measured from.
 let dragIndex = $state<number | null>(null);
 let dragMoved = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+// A press only becomes a drag once it travels past this many CSS pixels from the
+// pointerdown point. Below it, the gesture stays a tap — so the finger jitter a
+// real tap carries can't suppress the +1 click or refund a point.
+const DRAG_THRESHOLD_PX = 5;
 
 const C = $derived(size / 2);
 const R = $derived(size / 2 - (size > 340 ? 60 : 42));
@@ -154,6 +164,8 @@ function startDrag(e: PointerEvent, i: number): void {
 	}
 	dragIndex = i;
 	dragMoved = false;
+	dragStartX = e.clientX;
+	dragStartY = e.clientY;
 	// Suppress the native text/SVG selection a press-drag would otherwise start.
 	e.preventDefault();
 }
@@ -189,7 +201,16 @@ onMount(() => {
 		if (dragIndex === null) {
 			return;
 		}
-		dragMoved = true;
+		if (!dragMoved) {
+			// Stay a tap until the pointer leaves the dead-zone, so a jittery tap
+			// keeps its +1 click instead of being mistaken for a (no-op) drag.
+			const dx = e.clientX - dragStartX;
+			const dy = e.clientY - dragStartY;
+			if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+				return;
+			}
+			dragMoved = true;
+		}
 		e.preventDefault();
 		view.setValue(dragIndex, valueAtClient(e.clientX, e.clientY, dragIndex));
 	};

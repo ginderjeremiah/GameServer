@@ -122,6 +122,19 @@ describe('AttributesRadar — drag interaction', () => {
 		expect(view.setValue).not.toHaveBeenCalled();
 	});
 
+	it('keeps a jittery tap as a +1 click when movement stays within the dead-zone', async () => {
+		const { view, vertices } = setup();
+		// Press at a known point, then jitter a couple of pixels — under the 5px
+		// dead-zone, so it must remain a tap, not a (no-op/refunding) drag.
+		await fireEvent.pointerDown(vertices[0], { clientX: C, clientY: 60 });
+		await fireEvent.pointerMove(window, { clientX: C + 2, clientY: 61 });
+		await fireEvent.pointerUp(window);
+		await fireEvent.click(vertices[0]);
+
+		expect(view.setValue).not.toHaveBeenCalled();
+		expect(view.inc).toHaveBeenCalledWith(0);
+	});
+
 	it('suppresses the synthetic click that follows a drag', async () => {
 		const { view, vertices } = setup();
 		await fireEvent.pointerDown(vertices[0]);
