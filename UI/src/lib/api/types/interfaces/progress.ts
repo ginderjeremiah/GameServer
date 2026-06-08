@@ -31,5 +31,6 @@ export interface IPlayerStatistic {
 export interface IStatisticType {
 	id: EStatisticType;
 	entityType: EEntityType;
+	bossOnly: boolean;
 	name: string;
 }

@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts;
 using Game.Api.Models.Progress;
 using Game.Api.Models.ReferenceData;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -173,6 +174,11 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.NotEmpty(response.Data);
+            // BossOnly flows through the socket command's API model so the admin challenge
+            // editor can restrict a boss-only statistic's target-entity picker to bosses.
+            var bossesDefeated = Assert.Single(response.Data, s => s.Id == EStatisticType.BossesDefeated);
+            Assert.True(bossesDefeated.BossOnly);
+            Assert.All(response.Data.Where(s => s.Id != EStatisticType.BossesDefeated), s => Assert.False(s.BossOnly));
         }
 
         [Fact]

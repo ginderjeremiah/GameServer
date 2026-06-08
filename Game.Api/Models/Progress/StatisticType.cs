@@ -6,6 +6,7 @@ namespace Game.Api.Models.Progress
     {
         public EStatisticType Id { get; init; }
         public EEntityType EntityType { get; init; }
+        public bool BossOnly { get; init; }
         public required string Name { get; init; }
 
         public static StatisticType FromSource(Core.Progress.StatisticType source)
@@ -14,6 +15,7 @@ namespace Game.Api.Models.Progress
             {
                 Id = source.Id,
                 EntityType = source.EntityType,
+                BossOnly = source.BossOnly,
                 Name = source.Name
             };
         }

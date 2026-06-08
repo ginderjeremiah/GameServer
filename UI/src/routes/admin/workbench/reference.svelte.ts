@@ -91,11 +91,16 @@ class WorkbenchReference {
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));
 	challengeTypeById = (id: number) => this.challengeTypes.find((t) => t.id === id);
 
-	/** Target-entity catalogue for a statistic's entity dimension (Enemy / Zone / Skill). */
-	entityCatalog = (entityType: EEntityType): { id: number; name: string }[] => {
+	/**
+	 * Target-entity catalogue for a statistic's entity dimension (Enemy / Zone / Skill).
+	 * When `bossOnly` is set (a boss-only statistic such as BossesDefeated) the Enemy
+	 * dimension is restricted to enemies flagged `isBoss`, so the editor can't author a
+	 * challenge against a non-boss that the statistic would never increment for.
+	 */
+	entityCatalog = (entityType: EEntityType, bossOnly = false): { id: number; name: string }[] => {
 		const source =
 			entityType === EEntityType.Enemy
-				? staticData.enemies
+				? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss)
 				: entityType === EEntityType.Zone
 					? staticData.zones
 					: entityType === EEntityType.Skill
@@ -103,8 +108,8 @@ class WorkbenchReference {
 						: [];
 		return (source ?? []).map((e) => ({ id: e.id, name: e.name }));
 	};
-	entityOptions = (entityType: EEntityType): SelectOption[] =>
-		this.entityCatalog(entityType).map((e) => ({ value: e.id, text: e.name }));
+	entityOptions = (entityType: EEntityType, bossOnly = false): SelectOption[] =>
+		this.entityCatalog(entityType, bossOnly).map((e) => ({ value: e.id, text: e.name }));
 	entityName = (entityType: EEntityType, id: number): string | null =>
 		this.entityCatalog(entityType).find((e) => e.id === id)?.name ?? null;
 

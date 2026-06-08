@@ -18,6 +18,7 @@ import {
 	goalUnit,
 	trackedKind,
 	trackedLabel,
+	typeBossOnly,
 	typeEntityType,
 	typeStatistic
 } from '../../../../routes/admin/workbench/entities/challenge-helpers';
@@ -28,25 +29,45 @@ const TYPES: IChallengeType[] = [
 		id: EChallengeType.EnemiesKilled,
 		name: 'Enemies Killed',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.EnemiesKilled, entityType: EEntityType.Enemy, name: 'Enemies Killed' }
+		statisticType: {
+			id: EStatisticType.EnemiesKilled,
+			entityType: EEntityType.Enemy,
+			bossOnly: false,
+			name: 'Enemies Killed'
+		}
 	},
 	{
 		id: EChallengeType.BossesDefeated,
 		name: 'Bosses Defeated',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.BossesDefeated, entityType: EEntityType.Enemy, name: 'Bosses Defeated' }
+		statisticType: {
+			id: EStatisticType.BossesDefeated,
+			entityType: EEntityType.Enemy,
+			bossOnly: true,
+			name: 'Bosses Defeated'
+		}
 	},
 	{
 		id: EChallengeType.ZonesCleared,
 		name: 'Zones Cleared',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.ZonesCleared, entityType: EEntityType.Zone, name: 'Zones Cleared' }
+		statisticType: {
+			id: EStatisticType.ZonesCleared,
+			entityType: EEntityType.Zone,
+			bossOnly: false,
+			name: 'Zones Cleared'
+		}
 	},
 	{
 		id: EChallengeType.TimeTrial,
 		name: 'Time Trial',
 		goalComparison: EChallengeGoalComparison.AtMost,
-		statisticType: { id: EStatisticType.FastestVictory, entityType: EEntityType.None, name: 'Fastest Victory' }
+		statisticType: {
+			id: EStatisticType.FastestVictory,
+			entityType: EEntityType.None,
+			bossOnly: false,
+			name: 'Fastest Victory'
+		}
 	},
 	{
 		id: EChallengeType.LevelReached,
@@ -58,13 +79,23 @@ const TYPES: IChallengeType[] = [
 		id: EChallengeType.DamageDealt,
 		name: 'Damage Dealt',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.DamageDealt, entityType: EEntityType.Skill, name: 'Damage Dealt' }
+		statisticType: {
+			id: EStatisticType.DamageDealt,
+			entityType: EEntityType.Skill,
+			bossOnly: false,
+			name: 'Damage Dealt'
+		}
 	},
 	{
 		id: EChallengeType.SkillsUsed,
 		name: 'Skills Used',
 		goalComparison: EChallengeGoalComparison.AtLeast,
-		statisticType: { id: EStatisticType.SkillsUsed, entityType: EEntityType.Skill, name: 'Skills Used' }
+		statisticType: {
+			id: EStatisticType.SkillsUsed,
+			entityType: EEntityType.Skill,
+			bossOnly: false,
+			name: 'Skills Used'
+		}
 	}
 ];
 
@@ -101,6 +132,13 @@ describe('type-derived metadata', () => {
 	it('exposes the goal comparison (Time Trial completes at most)', () => {
 		expect(goalComparisonOf(TYPES, EChallengeType.EnemiesKilled)).toBe(EChallengeGoalComparison.AtLeast);
 		expect(goalComparisonOf(TYPES, EChallengeType.TimeTrial)).toBe(EChallengeGoalComparison.AtMost);
+	});
+
+	it('flags a boss-only statistic so the editor can restrict the enemy target picker', () => {
+		expect(typeBossOnly(TYPES, EChallengeType.BossesDefeated)).toBe(true);
+		expect(typeBossOnly(TYPES, EChallengeType.EnemiesKilled)).toBe(false);
+		// A stat-less type carries no boss-only flag.
+		expect(typeBossOnly(TYPES, EChallengeType.LevelReached)).toBe(false);
 	});
 });
 

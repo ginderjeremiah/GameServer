@@ -88,6 +88,16 @@ describe('buildStatTypes', () => {
 		}
 	});
 
+	it('sources the boss-only flag from the server, not a frontend hard-coding', () => {
+		expect(statTypes.find((s) => s.id === EStatisticType.BossesDefeated)!.bossOnly).toBe(true);
+		expect(statTypes.find((s) => s.id === EStatisticType.EnemiesKilled)!.bossOnly).toBe(false);
+		// Following the server: clearing BossesDefeated's flag clears it on the built type too.
+		const overridden = SERVER_STAT_TYPES.map((s) =>
+			s.id === EStatisticType.BossesDefeated ? { ...s, bossOnly: false } : s
+		);
+		expect(buildStatTypes(overridden).find((s) => s.id === EStatisticType.BossesDefeated)!.bossOnly).toBe(false);
+	});
+
 	it('is server-driven: a changed entityType changes the kind (not hard-coded)', () => {
 		// If the backend declared FastestVictory as None, the frontend follows suit.
 		const overridden = SERVER_STAT_TYPES.map((s) =>
