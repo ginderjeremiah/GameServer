@@ -77,7 +77,7 @@ describe('ItemTooltip', () => {
 
 	it('builds the item name from prefix and suffix mods', () => {
 		const { container } = render(ItemTooltip, { props: { item: makeItem() } });
-		const name = container.querySelector('.tt-item-name') as HTMLElement;
+		const name = container.querySelector('.tt-title-name') as HTMLElement;
 		expect(name.textContent).toBe('Flaming Sword of the Bear');
 	});
 

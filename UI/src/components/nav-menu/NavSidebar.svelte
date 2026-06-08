@@ -1,98 +1,38 @@
-<div
-	class="sidebar"
-	class:expanded
-	data-testid="sidebar"
-	role="complementary"
-	onmouseenter={() => (hovering = true)}
-	onmouseleave={() => (hovering = false)}
->
-	<!-- Wordmark / pin -->
-	<div class="sidebar-header">
-		<div class="glyph-slot">
-			<div class="game-diamond pulse">
-				<div class="game-diamond-inner"></div>
-			</div>
-		</div>
+<CollapsibleRail testid="sidebar" pinTestid="pin-button" bind:pinned>
+	{#snippet brand(expanded)}
 		<div class="wordmark" class:show={expanded}>Tactic Foundry</div>
-		{#if expanded}
-			<button
-				class="pin-button"
-				class:pinned
-				data-testid="pin-button"
-				title={pinned ? 'Unpin' : 'Keep open'}
-				onclick={() => (pinned = !pinned)}
-			>
-				<svg
-					width="13"
-					height="13"
-					viewBox="0 0 14 14"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.4"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					{#if pinned}
-						<path d="M9 1.5l3.5 3.5-2 2L7 3.5z" />
-						<path d="M7 3.5l-3 3 3.5 3.5 3-3" />
-						<path d="M4 6.5L1.5 12.5" />
-					{:else}
-						<path d="M10.5 1.5L12.5 3.5l-1.5 1.5L9 3z" />
-						<path d="M9 3l-2.5 2.5 3 3 2.5-2.5" />
-						<path d="M6.5 5.5L2 10" />
-					{/if}
-				</svg>
-			</button>
-		{/if}
-	</div>
+	{/snippet}
 
-	<!-- Nav body -->
-	<div class="sidebar-body">
+	{#snippet body(expanded)}
 		{#each groups as group, gi (group.key)}
 			{@const groupItems = screens.filter((s) => s.group === group.key)}
 			{#if groupItems.length}
-				<div class="nav-group">
-					<!-- Group header -->
-					<div class="group-header" class:first={gi === 0}>
-						{#if expanded}
-							<span class="group-label" class:show={expanded}>{group.label}</span>
-						{:else if gi > 0}
-							<div class="glyph-slot">
-								<div class="group-divider"></div>
-							</div>
-						{/if}
-					</div>
-
+				<RailNavGroup label={group.label} first={gi === 0} {expanded}>
 					{#each groupItems as screen (screen.key)}
-						<button
-							class="side-item"
-							class:active={active === screen.key}
-							data-testid="sidebar-item-{screen.key}"
-							title={!expanded ? screen.label : undefined}
-							onclick={() => handleClick(screen)}
+						<RailNavItem
+							active={active === screen.key}
+							label={screen.label}
+							title={screen.label}
+							testid="sidebar-item-{screen.key}"
+							{expanded}
+							onclick={() => onNavigate(screen.key)}
 						>
-							<div class="glyph-slot">
-								<SideGlyph kind={screen.key} active={active === screen.key} />
-							</div>
-							<span class="item-label" class:show={expanded}>{screen.label}</span>
-							{#if !screen.built}
-								<span class="wip-badge" class:show={expanded}>wip</span>
-							{/if}
-							{#if active === screen.key}
-								<span class="active-bar"></span>
-							{/if}
-						</button>
+							{#snippet glyph(isActive)}
+								<SideGlyph kind={screen.key} active={isActive} />
+							{/snippet}
+							{#snippet trailing()}
+								{#if !screen.built}
+									<span class="wip-badge" class:show={expanded}>wip</span>
+								{/if}
+							{/snippet}
+						</RailNavItem>
 					{/each}
-				</div>
+				</RailNavGroup>
 			{/if}
 		{/each}
-	</div>
+	{/snippet}
 
-	<!-- Footer: tick counter -->
-	<div class="sidebar-footer">
-		<div class="glyph-slot">
-			<div class="pulse-dot"></div>
-		</div>
+	{#snippet footer(expanded)}
 		<div class="tick-display" class:show={expanded}>
 			<span title="Logic tick rate">L {logicRate}</span>
 			<span class="tick-sep">·</span>
@@ -100,12 +40,15 @@
 			<span class="tick-sep">·</span>
 			<span title="Server Ping">{parseFloat(ping.toFixed(3)).toString()} ms</span>
 		</div>
-	</div>
-</div>
+	{/snippet}
+</CollapsibleRail>
 
 <script lang="ts">
 import { onPingMeasured } from '$lib/api';
 import { logicEngine, renderEngine } from '$lib/engine';
+import CollapsibleRail from '../sidebar/CollapsibleRail.svelte';
+import RailNavGroup from '../sidebar/RailNavGroup.svelte';
+import RailNavItem from '../sidebar/RailNavItem.svelte';
 import SideGlyph from './SideGlyph.svelte';
 
 interface ScreenDef {
@@ -125,12 +68,9 @@ interface Props {
 
 let { screens, active, onNavigate, pinned = $bindable(false) }: Props = $props();
 
-let hovering = $state(false);
 let ping = $state(0);
 
 onPingMeasured((p) => (ping = p));
-
-const expanded = $derived(pinned || hovering);
 
 const groups = [
 	{ key: 'combat', label: 'Combat' },
@@ -141,74 +81,9 @@ const groups = [
 
 const logicRate = $derived(logicEngine.tickRate);
 const renderRate = $derived(renderEngine.tickRate);
-
-const handleClick = (screen: ScreenDef) => {
-	onNavigate(screen.key);
-};
 </script>
 
 <style lang="scss">
-$collapsed: 60px;
-$expanded-width: 240px;
-
-.sidebar {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	left: 0;
-	width: $collapsed;
-	background: var(--surface);
-	border-right: 1px solid var(--border-subtle);
-	transition:
-		width 220ms cubic-bezier(0.4, 0, 0.2, 1),
-		box-shadow 220ms ease;
-	display: flex;
-	flex-direction: column;
-	z-index: 10;
-	overflow: hidden;
-
-	&.expanded {
-		width: $expanded-width;
-		box-shadow: 6px 0 28px color-mix(in srgb, var(--black) 55%, transparent);
-	}
-}
-
-.sidebar-header {
-	padding: 18px 0;
-	border-bottom: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
-	position: relative;
-	display: flex;
-	align-items: center;
-	height: 58px;
-}
-
-.glyph-slot {
-	width: $collapsed;
-	flex-shrink: 0;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-}
-
-.game-diamond {
-	width: 13px;
-	height: 13px;
-	transform: rotate(45deg);
-	border: 1px solid var(--accent);
-	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
-	position: relative;
-
-	&.pulse {
-		animation: pulse-glow 1.8s ease-in-out infinite;
-	}
-}
-
-.game-diamond-inner {
-	position: absolute;
-	inset: 3px;
-	background: var(--accent);
-}
-
 .wordmark {
 	font-family: var(--mono);
 	font-size: 11px;
@@ -218,122 +93,6 @@ $expanded-width: 240px;
 	white-space: nowrap;
 	opacity: 0;
 	transition: opacity 180ms ease;
-	transition-delay: 0ms;
-
-	&.show {
-		opacity: 1;
-		transition-delay: 90ms;
-	}
-}
-
-.pin-button {
-	position: absolute;
-	right: 12px;
-	top: 50%;
-	transform: translateY(-50%);
-	background: transparent;
-	border: none;
-	padding: 6px;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: color-mix(in srgb, var(--text-primary) 50%, transparent);
-	transition: color 140ms;
-
-	&:hover {
-		color: var(--text-primary);
-	}
-
-	&.pinned {
-		color: var(--accent);
-	}
-}
-
-.sidebar-body {
-	flex: 1;
-	overflow-y: auto;
-	overflow-x: hidden;
-	padding: 12px 0;
-}
-
-.nav-group {
-	margin-bottom: 8px;
-}
-
-.group-header {
-	display: flex;
-	align-items: center;
-	// Reserve the expanded label's height in the collapsed state too, so the nav buttons keep the
-	// same vertical position whether the rail is collapsed or expanded — only the label (expanded)
-	// or divider (collapsed) swaps within this fixed slot. Previously the header was ~0px collapsed
-	// and ~23px expanded, sliding every button below it down when the rail opened.
-	height: 23px;
-
-	&:not(.first) {
-		margin-top: 6px;
-	}
-}
-
-.group-label {
-	padding: 0 22px;
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.8px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	white-space: nowrap;
-	opacity: 0;
-	transition: opacity 160ms ease;
-	transition-delay: 0ms;
-
-	&.show {
-		opacity: 1;
-		transition-delay: 80ms;
-	}
-}
-
-.group-divider {
-	width: 18px;
-	height: 1px;
-	background: color-mix(in srgb, var(--text-primary) 12%, transparent);
-}
-
-.side-item {
-	position: relative;
-	width: 100%;
-	background: transparent;
-	border: none;
-	color: color-mix(in srgb, var(--text-primary) 65%, transparent);
-	font-family: inherit;
-	font-size: 13px;
-	padding: 0;
-	cursor: pointer;
-	text-align: left;
-	display: flex;
-	align-items: center;
-	height: 38px;
-	transition:
-		color 140ms,
-		background 140ms;
-	white-space: nowrap;
-	overflow: hidden;
-
-	&:hover {
-		background: color-mix(in srgb, var(--white) 3%, transparent);
-		color: var(--text-primary);
-	}
-
-	&.active {
-		background: color-mix(in srgb, var(--accent) 8%, transparent);
-		color: var(--text-primary);
-	}
-}
-
-.item-label {
-	flex: 1;
-	opacity: 0;
-	transition: opacity 160ms ease;
 	transition-delay: 0ms;
 
 	&.show {
@@ -360,33 +119,6 @@ $expanded-width: 240px;
 		opacity: 1;
 		transition-delay: 110ms;
 	}
-}
-
-.active-bar {
-	position: absolute;
-	left: 0;
-	top: 5px;
-	bottom: 5px;
-	width: 2px;
-	background: var(--accent);
-	box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 75%, transparent);
-}
-
-.sidebar-footer {
-	border-top: 1px solid color-mix(in srgb, var(--white) 6%, transparent);
-	display: flex;
-	align-items: center;
-	height: 44px;
-	flex-shrink: 0;
-}
-
-.pulse-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--accent);
-	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
-	animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
 .tick-display {

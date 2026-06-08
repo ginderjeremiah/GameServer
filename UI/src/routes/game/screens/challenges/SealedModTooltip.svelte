@@ -31,7 +31,7 @@ import type { IItemMod } from '$lib/api';
 import { modTypeColor, modTypeLabel, rarityColor, tintColor } from '$lib/common';
 import MaskBar from './MaskBar.svelte';
 import SealedHeader from './SealedHeader.svelte';
-import TooltipSection from './TooltipSection.svelte';
+import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 
 interface Props {
 	mod: IItemMod;

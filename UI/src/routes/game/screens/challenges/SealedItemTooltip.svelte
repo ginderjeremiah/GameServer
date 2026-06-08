@@ -43,7 +43,7 @@ import type { Item } from '$lib/battle';
 import { itemCategoryColor, itemCategoryName, rarityColor, tintColor } from '$lib/common';
 import MaskBar from './MaskBar.svelte';
 import SealedHeader from './SealedHeader.svelte';
-import TooltipSection from './TooltipSection.svelte';
+import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 
 interface Props {
 	item: Item;

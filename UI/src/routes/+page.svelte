@@ -2,12 +2,7 @@
 	<div class="login-form">
 		<DiamondMark size={18} marginBottom={36} />
 
-		<div class="heading">
-			<h1 data-testid="login-heading">{mode === 'login' ? 'Welcome back.' : 'Begin a new run.'}</h1>
-			<p class="subtitle">
-				{mode === 'login' ? 'Sign in to continue.' : 'Pick a name. Forge ahead.'}
-			</p>
-		</div>
+		<LoginHeading {mode} />
 
 		<form onsubmit={preventDefault(handleSubmit)}>
 			<UnderlineInput
@@ -76,12 +71,7 @@
 			<SubmitButton ready={formValid} {submitting} label={mode === 'login' ? 'Sign In' : 'Create'} />
 		</form>
 
-		<div class="mode-toggle">
-			{mode === 'login' ? 'No account yet?' : 'Already a hero?'}
-			<button class="mode-link" data-testid="mode-toggle" onclick={toggleMode}>
-				{mode === 'login' ? 'Create one' : 'Sign in'}
-			</button>
-		</div>
+		<ModeToggle {mode} onToggle={toggleMode} />
 	</div>
 </div>
 
@@ -93,12 +83,15 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import DiamondMark from '$components/DiamondMark.svelte';
 import EyeIcon from './login/EyeIcon.svelte';
+import LoginHeading from './login/LoginHeading.svelte';
+import ModeToggle from './login/ModeToggle.svelte';
 import PasswordStrengthMeter from './login/PasswordStrengthMeter.svelte';
-import StatusLine, { type StatusType } from './login/StatusLine.svelte';
+import StatusLine from './login/StatusLine.svelte';
 import SubmitButton from './login/SubmitButton.svelte';
 import UnderlineInput from './login/UnderlineInput.svelte';
 import ValidationIcon from './login/ValidationIcon.svelte';
 import {
+	deriveStatusLine,
 	passwordStrength,
 	validateConfirm,
 	validatePassword,
@@ -134,36 +127,21 @@ const confirmError = $derived(showErr('confirm') && !confirmValid ? confirmValid
 
 const formValid = $derived(usernameValid && passwordValid && (mode === 'login' || confirmValid));
 
-const statusLine = $derived.by((): { type: StatusType; text: string } => {
-	if (serverError) {
-		return { type: 'err', text: serverError };
-	}
-	if (success) {
-		return {
-			type: 'ok',
-			text: mode === 'login' ? 'Signed in — loading world…' : 'Account created — entering…'
-		};
-	}
-	if (usernameError) {
-		return { type: 'err', text: 'Username · ' + usernameError.toLowerCase() };
-	}
-	if (passwordError) {
-		return { type: 'err', text: 'Password · ' + passwordError.toLowerCase() };
-	}
-	if (confirmError) {
-		return { type: 'err', text: 'Confirm · ' + confirmError.toLowerCase() };
-	}
-	if (capsLock) {
-		return { type: 'warn', text: 'Caps Lock is on' };
-	}
-	if (mode === 'signup' && password) {
-		return { type: 'info', text: `Strength · ${strength.label.toLowerCase()}` };
-	}
-	if (formValid && username) {
-		return { type: 'ok', text: 'Ready' };
-	}
-	return { type: 'idle', text: ' ' };
-});
+const statusLine = $derived(
+	deriveStatusLine({
+		serverError,
+		success,
+		mode,
+		usernameError,
+		passwordError,
+		confirmError,
+		capsLock,
+		password,
+		strengthLabel: strength.label,
+		formValid,
+		username
+	})
+);
 
 const detectCapsLock = (e: KeyboardEvent) => {
 	if (typeof e.getModifierState === 'function') {
@@ -235,55 +213,11 @@ const handleSubmit = async () => {
 	max-width: 100%;
 }
 
-.heading {
-	text-align: center;
-	margin-bottom: 42px;
-
-	h1 {
-		margin: 0;
-		padding: 0;
-		font-size: 32px;
-		font-weight: 400;
-		letter-spacing: -0.5px;
-		line-height: 1.1;
-		color: var(--text-primary);
-	}
-
-	.subtitle {
-		margin: 10px 0 0;
-		font-size: 12.5px;
-		color: var(--text-secondary);
-		font-family: var(--mono);
-		letter-spacing: 0.6px;
-	}
-}
-
 .eye-button {
 	border: none;
 	background: transparent;
 	cursor: pointer;
 	padding: 6px;
 	display: flex;
-}
-
-.mode-toggle {
-	margin-top: 28px;
-	text-align: center;
-	font-family: var(--mono);
-	font-size: 11px;
-	color: var(--text-secondary);
-	letter-spacing: 0.4px;
-}
-
-.mode-link {
-	color: var(--accent-light);
-	cursor: pointer;
-	background: none;
-	border: none;
-	border-bottom: 1px solid color-mix(in srgb, var(--accent-light) 55%, transparent);
-	padding: 0 0 1px;
-	font-family: inherit;
-	font-size: inherit;
-	letter-spacing: inherit;
 }
 </style>

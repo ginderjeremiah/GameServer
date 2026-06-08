@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+	deriveStatusLine,
 	passwordStrength,
 	validateConfirm,
 	validatePassword,
-	validateUsername
+	validateUsername,
+	type StatusLineState
 } from '../../../routes/login/login-validation';
 
 describe('validateUsername', () => {
@@ -107,5 +109,75 @@ describe('passwordStrength', () => {
 	it('keeps the score and label in step for a mid-strength password', () => {
 		// length>=8 (1) + digit (1) = 2 points.
 		expect(passwordStrength('abcde123')).toEqual({ score: 2, label: 'Fair' });
+	});
+});
+
+describe('deriveStatusLine', () => {
+	const base: StatusLineState = {
+		serverError: null,
+		success: false,
+		mode: 'login',
+		usernameError: '',
+		passwordError: '',
+		confirmError: '',
+		capsLock: false,
+		password: '',
+		strengthLabel: '—',
+		formValid: false,
+		username: ''
+	};
+
+	it('surfaces a server error above everything else', () => {
+		expect(deriveStatusLine({ ...base, serverError: 'Nope', usernameError: 'Required' })).toEqual({
+			type: 'err',
+			text: 'Nope'
+		});
+	});
+
+	it('reports the mode-specific success message', () => {
+		expect(deriveStatusLine({ ...base, success: true, mode: 'login' })).toEqual({
+			type: 'ok',
+			text: 'Signed in — loading world…'
+		});
+		expect(deriveStatusLine({ ...base, success: true, mode: 'signup' })).toEqual({
+			type: 'ok',
+			text: 'Account created — entering…'
+		});
+	});
+
+	it('prefixes field errors and lowercases the message in username/password/confirm precedence', () => {
+		expect(deriveStatusLine({ ...base, usernameError: 'Required', passwordError: 'Required' })).toEqual({
+			type: 'err',
+			text: 'Username · required'
+		});
+		expect(deriveStatusLine({ ...base, passwordError: 'At least 8 characters' })).toEqual({
+			type: 'err',
+			text: 'Password · at least 8 characters'
+		});
+		expect(deriveStatusLine({ ...base, confirmError: "Passwords don't match" })).toEqual({
+			type: 'err',
+			text: "Confirm · passwords don't match"
+		});
+	});
+
+	it('warns about caps lock when there are no field errors', () => {
+		expect(deriveStatusLine({ ...base, capsLock: true })).toEqual({ type: 'warn', text: 'Caps Lock is on' });
+	});
+
+	it('shows password strength only while signing up with a password entered', () => {
+		expect(deriveStatusLine({ ...base, mode: 'signup', password: 'abc', strengthLabel: 'Weak' })).toEqual({
+			type: 'info',
+			text: 'Strength · weak'
+		});
+		// Same inputs in login mode fall through to the resting state.
+		expect(deriveStatusLine({ ...base, mode: 'login', password: 'abc' })).toEqual({ type: 'idle', text: ' ' });
+	});
+
+	it('reports Ready once the form validates with a username', () => {
+		expect(deriveStatusLine({ ...base, formValid: true, username: 'hero' })).toEqual({ type: 'ok', text: 'Ready' });
+	});
+
+	it('falls back to an idle placeholder when nothing applies', () => {
+		expect(deriveStatusLine(base)).toEqual({ type: 'idle', text: ' ' });
 	});
 });

@@ -6,6 +6,9 @@
 
 export type LoginMode = 'login' | 'signup';
 
+/** The five visual states the login status line can take. */
+export type StatusType = 'ok' | 'err' | 'warn' | 'info' | 'idle';
+
 export interface FieldValidity {
 	/** Whether the field currently satisfies its rules. */
 	ok: boolean;
@@ -103,4 +106,61 @@ export const passwordStrength = (password: string): PasswordStrength => {
 	}
 
 	return { score: Math.min(points, 4), label: STRENGTH_LABELS[points] };
+};
+
+/** The form state the status line summarises, in priority order of what it surfaces. */
+export interface StatusLineState {
+	/** Server-side error from the most recent submit, if any. */
+	serverError: string | null;
+	/** Whether the submit succeeded and we're entering the world. */
+	success: boolean;
+	mode: LoginMode;
+	/** Per-field messages, already gated by touched/submitted state ('' when not shown). */
+	usernameError: string;
+	passwordError: string;
+	confirmError: string;
+	capsLock: boolean;
+	password: string;
+	/** Current password-strength label (signup only). */
+	strengthLabel: string;
+	/** Whether every field currently validates. */
+	formValid: boolean;
+	username: string;
+}
+
+/**
+ * Resolves the single status-line message shown beneath the form. The branches are
+ * ordered by priority: a server error or success outcome wins, then field errors,
+ * then advisory states (caps lock, password strength), and finally a "Ready" / idle
+ * resting state. Kept pure so the precedence rules can be unit-tested directly.
+ */
+export const deriveStatusLine = (state: StatusLineState): { type: StatusType; text: string } => {
+	if (state.serverError) {
+		return { type: 'err', text: state.serverError };
+	}
+	if (state.success) {
+		return {
+			type: 'ok',
+			text: state.mode === 'login' ? 'Signed in — loading world…' : 'Account created — entering…'
+		};
+	}
+	if (state.usernameError) {
+		return { type: 'err', text: 'Username · ' + state.usernameError.toLowerCase() };
+	}
+	if (state.passwordError) {
+		return { type: 'err', text: 'Password · ' + state.passwordError.toLowerCase() };
+	}
+	if (state.confirmError) {
+		return { type: 'err', text: 'Confirm · ' + state.confirmError.toLowerCase() };
+	}
+	if (state.capsLock) {
+		return { type: 'warn', text: 'Caps Lock is on' };
+	}
+	if (state.mode === 'signup' && state.password) {
+		return { type: 'info', text: `Strength · ${state.strengthLabel.toLowerCase()}` };
+	}
+	if (state.formValid && state.username) {
+		return { type: 'ok', text: 'Ready' };
+	}
+	return { type: 'idle', text: ' ' };
 };

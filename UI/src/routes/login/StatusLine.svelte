@@ -7,8 +7,7 @@
 
 <script lang="ts">
 import ValidationIcon from './ValidationIcon.svelte';
-
-export type StatusType = 'ok' | 'err' | 'warn' | 'info' | 'idle';
+import type { StatusType } from './login-validation';
 
 const COLORS: Record<StatusType, string> = {
 	err: 'var(--error)',

@@ -36,7 +36,7 @@
 <script lang="ts">
 import { EAttribute, type IItemMod } from '$lib/api';
 import { modTypeColor, modTypeLabel, normalizeText, rarityColor, tintColor } from '$lib/common';
-import TooltipSection from './TooltipSection.svelte';
+import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 
 interface Props {
 	mod: IItemMod;
