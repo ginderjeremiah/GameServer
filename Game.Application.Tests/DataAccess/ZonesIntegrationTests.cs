@@ -97,7 +97,6 @@ namespace Game.Application.Tests.DataAccess
             var result = zones.GetDomainZone(zone.Id);
 
             Assert.Equal(zone.Id, result.Id);
-            Assert.Equal("Forgotten Catacombs", result.Name);
             Assert.Equal(8, result.LevelMin);
             Assert.Equal(11, result.LevelMax);
             Assert.Equal(boss.Id, result.BossEnemyId);

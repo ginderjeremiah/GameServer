@@ -36,7 +36,7 @@ namespace Game.Application.Services
             var zone = _zones.GetDomainZone(zoneId);
 
             var now = DateTime.UtcNow;
-            var seed = (uint)(now.Ticks % uint.MaxValue);
+            var seed = CreateBattleSeed(now);
 
             var enemy = _battleFactory.CreateBattleEnemy(
                 zone,
@@ -63,20 +63,23 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId)
         {
-            if (state.HasActiveBattle)
-            {
-                await AbandonBattle(player, state);
-            }
-
             var zone = _zones.GetDomainZone(zoneId);
 
+            // Validate the challenge before touching the active battle: abandoning is not a cheap no-op
+            // (it force-resolves and persists the current battle), so a challenge against a bossless zone
+            // must be a true no-op rather than silently ending the player's in-progress fight.
             if (zone.BossEnemyId is not int bossEnemyId)
             {
                 return null;
             }
 
+            if (state.HasActiveBattle)
+            {
+                await AbandonBattle(player, state);
+            }
+
             var now = DateTime.UtcNow;
-            var seed = (uint)(now.Ticks % uint.MaxValue);
+            var seed = CreateBattleSeed(now);
 
             var enemy = _battleFactory.CreateBossEnemy(
                 zone,
@@ -206,6 +209,10 @@ namespace Game.Application.Services
 
             await _playerRepo.SavePlayer(player);
         }
+
+        // Derives the simulation RNG seed from the battle-start timestamp. Shared by both start paths so
+        // seed generation stays in one place if it ever changes.
+        private static uint CreateBattleSeed(DateTime now) => (uint)(now.Ticks % uint.MaxValue);
 
         private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
         {

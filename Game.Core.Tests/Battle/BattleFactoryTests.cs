@@ -109,7 +109,6 @@ namespace Game.Core.Tests.Battle
         private static Zone MakeZone(int levelMin, int levelMax, int? bossEnemyId = null, int bossLevel = 1) => new()
         {
             Id = 0,
-            Name = "Test Zone",
             LevelMin = levelMin,
             LevelMax = levelMax,
             BossEnemyId = bossEnemyId,

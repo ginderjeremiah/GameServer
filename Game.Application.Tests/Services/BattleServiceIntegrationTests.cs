@@ -1,5 +1,7 @@
 using Game.Abstractions.DataAccess;
+using Game.Application;
 using Game.Application.Services;
+using Game.Core;
 using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -415,6 +417,99 @@ namespace Game.Application.Tests.Services
             Assert.Equal(boss.Id, result.Enemy.Id);
             Assert.True(state.HasActiveBattle);
             Assert.True(state.IsBossBattle);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_BosslessZoneWithActiveBattle_ReturnsNullAndLeavesBattleUntouched()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Idle Enemy");
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, name: "IdleSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var bosslessZone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Zone");
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, bosslessZone.Id, enemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: bosslessZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // Start a normal idle battle in the bossless zone.
+            await battleService.StartBattle(player, state, zoneId: bosslessZone.Id);
+            Assert.True(state.HasActiveBattle);
+            var activeEnemyId = state.ActiveEnemyId;
+
+            // Challenging that zone's non-existent boss must be a true no-op: it returns null and leaves the
+            // in-progress idle battle completely untouched (validation happens before AbandonBattle).
+            var result = await battleService.StartBossBattle(player, state, bosslessZone.Id);
+
+            Assert.Null(result);
+            Assert.True(state.HasActiveBattle);
+            Assert.False(state.IsBossBattle);
+            Assert.Equal(activeEnemyId, state.ActiveEnemyId);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_ChallengingBossInDifferentZone_RecordsClearForChallengedZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The player stands in one zone but challenges the dedicated boss of a *different* zone.
+            var currentZone = await TestDataSeeder.CreateZoneAsync(context, "Current Zone");
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Distant Boss", isBoss: true,
+                strengthBase: 1m, strengthPerLevel: 0m, enduranceBase: 1m, endurancePerLevel: 0m);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossPoke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var bossZone = await TestDataSeeder.CreateZoneAsync(context, "Distant Zone", bossEnemyId: boss.Id, bossLevel: 1);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSmash", baseDamage: 1000m, cooldownMs: 500);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: currentZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+            Assert.Equal(currentZone.Id, player.CurrentZoneId);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var state = new PlayerState();
+
+            var startResult = await battleService.StartBossBattle(player, state, bossZone.Id);
+            Assert.NotNull(startResult);
+            Assert.Equal(bossZone.Id, state.BattleZoneId);
+            // Challenging a boss does not move the player out of their current zone.
+            Assert.Equal(currentZone.Id, player.CurrentZoneId);
+
+            // Backdate so the simulated victory's elapsed time has already passed, making the claim valid.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var defeat = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            Assert.NotNull(defeat);
+
+            // The write-behind progress handler stages the clear; commit the unit of work and read it back.
+            await unitOfWork.CommitAsync();
+            var stats = await progressRepo.GetStatistics(playerEntity.Id);
+
+            decimal ZonesCleared(int? zoneId) =>
+                stats.FirstOrDefault(s => s.Type == EStatisticType.ZonesCleared && s.EntityId == zoneId)?.Value ?? 0m;
+
+            // The clear lands on the challenged zone (global + per-zone) — never the player's current zone.
+            Assert.Equal(1m, ZonesCleared(null));
+            Assert.Equal(1m, ZonesCleared(bossZone.Id));
+            Assert.Equal(0m, ZonesCleared(currentZone.Id));
         }
 
         [Fact]

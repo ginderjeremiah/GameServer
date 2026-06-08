@@ -10,7 +10,6 @@ namespace Game.Core.Zones
     public class Zone
     {
         public required int Id { get; init; }
-        public required string Name { get; init; }
         public required int LevelMin { get; init; }
         public required int LevelMax { get; init; }
 

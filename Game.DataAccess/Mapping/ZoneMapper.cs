@@ -24,14 +24,13 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>Maps an entity <see cref="EntityZone"/> to the lean gameplay <see cref="CoreZone"/>
-        /// domain model used for battle setup. Display-only fields (description, order) stay on the read
-        /// contract; the domain model carries only what the encounter rules need.</summary>
+        /// domain model used for battle setup. Display-only fields (name, description, order) stay on the
+        /// read contract; the domain model carries only what the encounter rules need.</summary>
         public static CoreZone ToCore(EntityZone entity)
         {
             return new CoreZone
             {
                 Id = entity.Id,
-                Name = entity.Name,
                 LevelMin = entity.LevelMin,
                 LevelMax = entity.LevelMax,
                 BossEnemyId = entity.BossEnemyId,

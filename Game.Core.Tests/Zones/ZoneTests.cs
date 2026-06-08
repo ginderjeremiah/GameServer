@@ -48,7 +48,6 @@ namespace Game.Core.Tests.Zones
             int levelMin = 1, int levelMax = 10, int? bossEnemyId = null, int bossLevel = 1) => new()
             {
                 Id = 0,
-                Name = "Test Zone",
                 LevelMin = levelMin,
                 LevelMax = levelMax,
                 BossEnemyId = bossEnemyId,
