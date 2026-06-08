@@ -40,9 +40,8 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { ApiRequest } from '$lib/api';
 import { Loading } from '$components';
-import { toastError } from '$stores';
+import { statistics, toastError } from '$stores';
 import ViewToggle from './ViewToggle.svelte';
 import ByStatisticView from './ByStatisticView.svelte';
 import ByEntityView from './ByEntityView.svelte';
@@ -52,13 +51,14 @@ import { StatisticsView } from './statistics-view.svelte';
 const view = new StatisticsView();
 
 onMount(async () => {
-	try {
-		view.stats = (await ApiRequest.get('Statistics')) ?? [];
-		view.error = false;
-	} catch {
+	// Force a fresh fetch so values reflect play since the store was last loaded
+	// (it is loaded once at game boot to back the fight screen's boss seal).
+	await statistics.load(true);
+	view.stats = statistics.stats;
+	view.error = statistics.error;
+	if (statistics.error) {
 		// Don't conflate a failed load with a genuine empty result (the
 		// new-player empty state) — surface the failure instead.
-		view.error = true;
 		toastError('Your statistics could not be loaded. Please try again later.');
 	}
 	view.loading = false;

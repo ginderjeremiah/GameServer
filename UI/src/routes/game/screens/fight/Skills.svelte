@@ -1,4 +1,4 @@
-<div class="skills-row" class:reversed={side === 'enemy'} role="grid">
+<div class="skills-row" class:reversed={side === 'enemy'} style:--ready-accent={readyAccent} role="grid">
 	{#each battler.skills as skill, index (skill?.id ?? -index - 1)}
 		<div class="skill-column">
 			<div
@@ -37,17 +37,20 @@ import SkillTooltip from './SkillTooltip.svelte';
 type Props = {
 	battler: Battler;
 	side: 'player' | 'enemy';
+	/** Overrides the "ready" accent (border/glow/label). Defaults to the brand accent
+	 *  so existing player/enemy cards are unchanged; the boss card passes its gold accent. */
+	accent?: string;
 };
 
-const { battler, side }: Props = $props();
+const { battler, side, accent }: Props = $props();
 
 let tooltip = $state<TooltipComponent>();
 let tooltipSkillIndex = $state(-1);
 
 const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
-const pulseColor = $derived(
-	side === 'player' ? tintColor('var(--accent)', 0.6) : tintColor('var(--enemy-accent)', 0.6)
-);
+/** The accent the "ready" border/glow/label resolve to (CSS var, theme-overridable). */
+const readyAccent = $derived(accent ?? 'var(--accent)');
+const pulseColor = $derived(tintColor(accent ?? (side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)'), 0.6));
 
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
@@ -119,8 +122,8 @@ const isReady = (skill: Skill) => {
 		box-shadow 140ms;
 
 	&.ready {
-		border-color: color-mix(in srgb, var(--accent) 53%, transparent);
-		box-shadow: inset 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+		border-color: color-mix(in srgb, var(--ready-accent) 53%, transparent);
+		box-shadow: inset 0 0 8px color-mix(in srgb, var(--ready-accent) 35%, transparent);
 	}
 }
 
@@ -159,7 +162,7 @@ const isReady = (skill: Skill) => {
 	white-space: nowrap;
 
 	&.ready-label {
-		color: var(--accent);
+		color: var(--ready-accent);
 	}
 }
 </style>

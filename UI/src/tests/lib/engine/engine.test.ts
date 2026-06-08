@@ -12,10 +12,13 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 // Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
-const { staticDataStub } = vi.hoisted(() => ({ staticDataStub: { loaded: true } }));
+const { staticDataStub, statisticsStub } = vi.hoisted(() => ({
+	staticDataStub: { loaded: true },
+	statisticsStub: { load: vi.fn(), reset: vi.fn() }
+}));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
-	return { ...modal, staticData: staticDataStub };
+	return { ...modal, staticData: staticDataStub, statistics: statisticsStub };
 });
 
 const { listenCommand } = vi.hoisted(() => ({ listenCommand: vi.fn() }));

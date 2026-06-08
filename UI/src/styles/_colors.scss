@@ -27,6 +27,11 @@ $hp-green-dark: #5da66a;
 // own semantic token even though it shares a hue with $rarity-legendary, so a
 // theme can restyle "timing reward" gold without disturbing rarity surfaces.
 $gold: #e8c878;
+// Boss accent — the heightened gold treatment of the Challenge Boss fight (trigger,
+// boss card, phase pips, Zone-Cleared overlay, atmosphere). Its own semantic token
+// even though it currently shares $gold's hue, so a theme can restyle the boss
+// fight independently of the card-game "timing reward" gold.
+$boss-accent: #e8c878;
 $hp-red-bg: rgba(224, 138, 120, 0.18);
 $hp-red-disappearing: rgba(224, 138, 120, 0.55);
 $enemy-accent: #e08778;

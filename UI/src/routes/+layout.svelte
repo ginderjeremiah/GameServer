@@ -146,6 +146,10 @@ $effect(() => {
 	--enemy-accent: #{colors.$enemy-accent};
 	// Gold reward/timing accent — card-game crit ticks and the draw-timer fill.
 	--gold: #{colors.$gold};
+	// Boss accent — the heightened gold treatment of the Challenge Boss fight. A
+	// distinct functional token (see $boss-accent) so a theme can restyle boss
+	// fights independently of the card-game timing gold.
+	--boss-accent: #{colors.$boss-accent};
 
 	// Editor change-state accents. The admin table editor and Workbench signal a
 	// pending add / edit (unsaved) / remove with these hues. They currently match
