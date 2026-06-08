@@ -42,6 +42,29 @@ test.describe('Game flow', () => {
 		await expect(page.getByTestId('log-panel')).toBeVisible();
 	});
 
+	test('locks the next zone until the current zone is cleared', async ({ page }) => {
+		await page.goto('/');
+		await waitForLoginReady(page);
+
+		await loginExistingUser(page, username);
+
+		const enterButton = page.getByTestId('enter-button');
+		await expect(enterButton).toBeEnabled({ timeout: 10000 });
+		await enterButton.click();
+
+		await expect(page).toHaveURL('/game', { timeout: 5000 });
+
+		// The fight screen is the default. The seeded second zone (Ashen Wastes) is gated behind
+		// clearing the starter zone, which a brand-new player has not done, so the forward arrow is
+		// locked and not navigable.
+		const zoneNav = page.getByTestId('zone-nav');
+		await expect(zoneNav).toBeVisible();
+		const forward = page.getByRole('button', { name: 'Next zone locked' });
+		await expect(forward).toBeVisible();
+		await expect(forward).toBeDisabled();
+		await expect(zoneNav).toContainText('Verdant Hollow');
+	});
+
 	test('resumes straight into the game on reload once the cache is warm', async ({ page }) => {
 		await page.goto('/');
 		await waitForLoginReady(page);

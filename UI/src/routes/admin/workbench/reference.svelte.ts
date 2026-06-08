@@ -42,21 +42,24 @@ class WorkbenchReference {
 		// post-save reads stay fresh because every admin write invalidates these in-memory caches
 		// server-side (AdminCacheInvalidationFilter). Tags have no socket command yet, so they
 		// remain on HTTP.
-		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes] = await Promise.all([
-			fetchSocketData('GetEnemies'),
-			fetchSocketData('GetSkills'),
-			fetchSocketData('GetZones'),
-			fetchSocketData('GetItems'),
-			fetchSocketData('GetItemMods'),
-			ApiRequest.get('Tags'),
-			ApiRequest.get('Tags/TagCategories'),
-			fetchSocketData('GetChallengeTypes')
-		]);
+		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes, challenges] =
+			await Promise.all([
+				fetchSocketData('GetEnemies'),
+				fetchSocketData('GetSkills'),
+				fetchSocketData('GetZones'),
+				fetchSocketData('GetItems'),
+				fetchSocketData('GetItemMods'),
+				ApiRequest.get('Tags'),
+				ApiRequest.get('Tags/TagCategories'),
+				fetchSocketData('GetChallengeTypes'),
+				fetchSocketData('GetChallenges')
+			]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;
 		staticData.zones = zones;
 		staticData.items = items;
 		staticData.itemMods = itemMods;
+		staticData.challenges = challenges;
 		this.tags = tags;
 		this.tagCategories = tagCategories;
 		this.challengeTypes = challengeTypes;
@@ -76,6 +79,11 @@ class WorkbenchReference {
 	bossEnemyOptions = (): SelectOption[] => [
 		{ value: -1, text: 'None' },
 		...staticData.enemies.filter((e) => e.isBoss).map((e) => ({ value: e.id, text: e.name }))
+	];
+	/** Zone unlock-gate picker options: a "None" sentinel (-1) plus every challenge. */
+	unlockChallengeOptions = (): SelectOption[] => [
+		{ value: -1, text: 'None (always open)' },
+		...(staticData.challenges ?? []).map((c) => ({ value: c.id, text: c.name }))
 	];
 	skillCatalogue = () => staticData.skills.map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
 

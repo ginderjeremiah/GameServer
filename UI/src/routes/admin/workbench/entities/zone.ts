@@ -18,6 +18,8 @@ const refresh = async (): Promise<WorkbenchZone[]> => {
 		...zone,
 		// Normalise the optional boss FK to the select's "None" sentinel (-1) so the picker stays consistent.
 		bossEnemyId: zone.bossEnemyId ?? -1,
+		// Likewise normalise the optional unlock-gate FK to the "None" sentinel (-1).
+		unlockChallengeId: zone.unlockChallengeId ?? -1,
 		zoneEnemies: enemies
 			.filter((enemy) => enemy.spawns.some((spawn) => spawn.zoneId === zone.id))
 			.map((enemy) => ({
@@ -42,6 +44,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 		levelMax: 10,
 		bossEnemyId: -1,
 		bossLevel: 1,
+		unlockChallengeId: -1,
 		zoneEnemies: []
 	}),
 	meta: (z) => [
@@ -84,6 +87,13 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				},
 				{ key: 'bossLevel', label: 'Boss Level', type: 'number', suffix: 'lv', width: 130 },
 				{
+					key: 'unlockChallengeId',
+					label: 'Unlock Challenge',
+					type: 'select',
+					options: reference.unlockChallengeOptions,
+					width: 220
+				},
+				{
 					key: 'description',
 					label: 'Description',
 					type: 'textarea',
@@ -125,7 +135,17 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: ({ id, name, description, order, levelMin, levelMax, bossEnemyId, bossLevel }) => ({
+			toPrimaryDto: ({
+				id,
+				name,
+				description,
+				order,
+				levelMin,
+				levelMax,
+				bossEnemyId,
+				bossLevel,
+				unlockChallengeId
+			}) => ({
 				id,
 				name,
 				description,
@@ -134,7 +154,9 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				levelMax,
 				// Map the "None" sentinel (-1) back to an absent boss for the API.
 				bossEnemyId: bossEnemyId === -1 ? undefined : bossEnemyId,
-				bossLevel
+				bossLevel,
+				// Likewise map the "None" sentinel (-1) back to an absent unlock gate.
+				unlockChallengeId: unlockChallengeId === -1 ? undefined : unlockChallengeId
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),
 			refresh,

@@ -32,7 +32,12 @@
 		{/if}
 
 		{#if boss.victory}
-			<ZoneClearedOverlay bossName={boss.bossName} zoneName={boss.zoneName} autoFight={boss.autoFight} />
+			<ZoneClearedOverlay
+				bossName={boss.bossName}
+				zoneName={boss.zoneName}
+				autoFight={boss.autoFight}
+				unlockedNextZone={boss.unlockedNextZone}
+			/>
 		{/if}
 	</div>
 </div>

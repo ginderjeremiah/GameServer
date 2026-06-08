@@ -59,9 +59,8 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest } from '$lib/api';
 import { Loading } from '$components';
-import { registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
+import { playerChallenges, registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
 import { onMount } from 'svelte';
 import { ChallengesView, type ResolvedReward } from './challenges-view.svelte';
 import { setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
@@ -97,14 +96,16 @@ const controller: RewardTooltipController = {
 setRewardTooltip(controller);
 
 onMount(async () => {
-	try {
-		view.playerChallenges = (await ApiRequest.get('Challenges/Player')) ?? [];
-		view.error = false;
-	} catch {
+	// Force a fresh fetch so progress reflects play since the store was last loaded (it is loaded
+	// once at game boot to gate zone navigation). The shared store is the single source of truth.
+	await playerChallenges.load(true);
+	view.error = playerChallenges.error;
+	if (playerChallenges.error) {
 		// Don't conflate a failed load with a genuine no-progress result — a
 		// dropped fetch would otherwise render every challenge as zero progress.
-		view.error = true;
 		toastError('Your challenge progress could not be loaded. Please try again later.');
+	} else {
+		view.playerChallenges = playerChallenges.all;
 	}
 	view.loading = false;
 });

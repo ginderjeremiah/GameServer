@@ -54,6 +54,17 @@ namespace Game.DataAccess.Repositories
                 .ToList();
         }
 
+        public async Task<HashSet<int>> GetCompletedChallengeIds(int playerId)
+        {
+            var ids = await _context.PlayerChallenges
+                .AsNoTracking()
+                .Where(pc => pc.PlayerId == playerId && pc.Completed)
+                .Select(pc => pc.ChallengeId)
+                .ToListAsync();
+
+            return [.. ids];
+        }
+
         public async Task Save(PlayerProgress progress)
         {
             var loadedStats = await GetLoadedStats(progress.Player.Id);

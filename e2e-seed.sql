@@ -31,9 +31,19 @@ INSERT INTO "SkillDamageMultipliers" ("SkillId", "AttributeId", "Multiplier") VA
   (2, 2, 1.0)
 ON CONFLICT ("SkillId", "AttributeId") DO NOTHING;
 
--- A starter zone for new players (Player.CurrentZoneId defaults to 0).
-INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax") VALUES
-  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10)
+-- A progression-gating challenge: "clear the starter zone" (ZonesCleared = 3 per EChallengeType,
+-- targeting zone 0, goal 1). The second zone below is gated behind it, so a brand-new player — who
+-- has not cleared anything — sees the forward zone-nav arrow locked. This exercises the locked path
+-- end-to-end; the unlock transition itself is covered by the unit/integration suites.
+INSERT INTO "Challenges" ("Id", "Name", "Description", "ChallengeTypeId", "TargetEntityId", "ProgressGoal") VALUES
+  (0, 'Clear Verdant Hollow', 'Clear the starter zone to press onward.', 3, 0, 1)
+ON CONFLICT ("Id") DO NOTHING;
+
+-- The starter zone (Player.CurrentZoneId defaults to 0) is always open; the next zone is gated
+-- behind the challenge above (UnlockChallengeId = 0).
+INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax", "UnlockChallengeId") VALUES
+  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10, NULL),
+  (1, 'Ashen Wastes', 'A scorched expanse — sealed until Verdant Hollow is cleared.', 1, 8, 18, 0)
 ON CONFLICT ("Id") DO NOTHING;
 
 -- A couple of low-level enemies to populate the zone (and the Enemies admin catalogue).
@@ -68,6 +78,7 @@ ON CONFLICT ("ZoneId", "EnemyId") DO NOTHING;
 SELECT setval(pg_get_serial_sequence('"Skills"', 'Id'), (SELECT MAX("Id") FROM "Skills"));
 SELECT setval(pg_get_serial_sequence('"Enemies"', 'Id'), (SELECT MAX("Id") FROM "Enemies"));
 SELECT setval(pg_get_serial_sequence('"Zones"', 'Id'), (SELECT MAX("Id") FROM "Zones"));
+SELECT setval(pg_get_serial_sequence('"Challenges"', 'Id'), (SELECT MAX("Id") FROM "Challenges"));
 
 -- e2e admin provisioning.
 --

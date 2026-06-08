@@ -44,14 +44,35 @@ namespace Game.Core.Tests.Zones
             Assert.False(zone.HasBoss);
         }
 
+        [Fact]
+        public void IsUnlocked_UngatedZone_IsAlwaysUnlocked()
+        {
+            var zone = MakeZone(unlockChallengeId: null);
+
+            Assert.True(zone.IsUnlocked(new HashSet<int>()));
+            Assert.True(zone.IsUnlocked(new HashSet<int> { 1, 2, 3 }));
+        }
+
+        [Fact]
+        public void IsUnlocked_GatedZone_RequiresTheGatingChallengeToBeCompleted()
+        {
+            var zone = MakeZone(unlockChallengeId: 7);
+
+            Assert.False(zone.IsUnlocked(new HashSet<int>()));
+            Assert.False(zone.IsUnlocked(new HashSet<int> { 6, 8 }));
+            Assert.True(zone.IsUnlocked(new HashSet<int> { 6, 7, 8 }));
+        }
+
         private static Zone MakeZone(
-            int levelMin = 1, int levelMax = 10, int? bossEnemyId = null, int bossLevel = 1) => new()
+            int levelMin = 1, int levelMax = 10, int? bossEnemyId = null, int bossLevel = 1,
+            int? unlockChallengeId = null) => new()
             {
                 Id = 0,
                 LevelMin = levelMin,
                 LevelMax = levelMax,
                 BossEnemyId = bossEnemyId,
                 BossLevel = bossLevel,
+                UnlockChallengeId = unlockChallengeId,
             };
     }
 }

@@ -1,6 +1,6 @@
-<!-- The "Zone Cleared" moment played over the arena after a dedicated-boss victory.
-     Zone-navigation locking is deferred (#190), so this celebrates the clear without
-     the mockup's (not-yet-truthful) "next zone unlocked" claim. -->
+<!-- The "Zone Cleared" moment played over the arena after a dedicated-boss victory. When this clear
+     unlocked the next zone (its gating challenge just completed), the "Next zone unlocked" line is
+     shown — now truthful with zone-progression locking (#190). -->
 <div class="zone-cleared" data-testid="zone-cleared-overlay">
 	<BossKicker size={11}>Zone Cleared</BossKicker>
 	<div class="headline">{bossName} defeated</div>
@@ -8,6 +8,9 @@
 		<ClearedSeal />
 		<span>{zoneName} cleared</span>
 	</div>
+	{#if unlockedNextZone}
+		<div class="unlocked" data-testid="next-zone-unlocked">Next zone unlocked</div>
+	{/if}
 	{#if autoFight}
 		<div class="re-engage">Auto-fight · re-engaging…</div>
 	{/if}
@@ -21,9 +24,10 @@ type Props = {
 	bossName: string;
 	zoneName: string;
 	autoFight: boolean;
+	unlockedNextZone: boolean;
 };
 
-const { bossName, zoneName, autoFight }: Props = $props();
+const { bossName, zoneName, autoFight, unlockedNextZone }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -64,6 +68,16 @@ const { bossName, zoneName, autoFight }: Props = $props();
 	font-size: 12px;
 	letter-spacing: 0.8px;
 	color: color-mix(in srgb, var(--text-primary) 78%, transparent);
+}
+
+.unlocked {
+	margin-top: 8px;
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: var(--success);
+	text-shadow: 0 0 16px color-mix(in srgb, var(--success) 45%, transparent);
 }
 
 .re-engage {

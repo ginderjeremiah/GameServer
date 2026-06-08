@@ -122,6 +122,7 @@ export interface IZone {
 	levelMax: number;
 	bossEnemyId?: number;
 	bossLevel: number;
+	unlockChallengeId?: number;
 }
 
 export interface IZoneEnemy {

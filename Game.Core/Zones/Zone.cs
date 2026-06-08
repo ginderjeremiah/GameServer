@@ -22,8 +22,24 @@ namespace Game.Core.Zones
         /// <see cref="BossEnemyId"/> is set.</summary>
         public required int BossLevel { get; init; }
 
+        /// <summary>The id of the challenge that gates entry to this zone, or <c>null</c> when the zone is
+        /// always open (e.g. the starting zone). The zone unlocks once the player completes that challenge
+        /// — see <see cref="IsUnlocked"/>. Gating on a challenge (rather than a fixed <c>Order - 1</c>
+        /// chain) keeps progression authorable and decoupled from zone ordering.</summary>
+        public required int? UnlockChallengeId { get; init; }
+
         /// <summary>Whether this zone has a dedicated boss that can be challenged.</summary>
         public bool HasBoss => BossEnemyId.HasValue;
+
+        /// <summary>
+        /// Whether this zone is unlocked for a player given the set of challenge ids they have completed.
+        /// An ungated zone (<see cref="UnlockChallengeId"/> is <c>null</c>) is always unlocked; a gated zone
+        /// unlocks once its gating challenge has been completed.
+        /// </summary>
+        public bool IsUnlocked(IReadOnlySet<int> completedChallengeIds)
+        {
+            return UnlockChallengeId is not int gateId || completedChallengeIds.Contains(gateId);
+        }
 
         /// <summary>
         /// Rolls a random encounter level within this zone's inclusive

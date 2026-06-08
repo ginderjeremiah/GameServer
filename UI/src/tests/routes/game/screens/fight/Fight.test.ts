@@ -5,27 +5,31 @@ import type { IAttribute, IEnemy, IZone } from '$lib/api';
 // Fight composes the screen from the live battle engine (the two battlers), the zone nav
 // (player manager + reference data) and the boss affordance (engine boss mode + the per-zone
 // cleared statistic); all data sources are mocked.
-const { mockBattleEngine, mockPlayerManager, mockEnemyManager, staticData, statistics } = vi.hoisted(() => ({
-	mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
-	mockPlayerManager: { currentZone: 0 },
-	mockEnemyManager: {
-		mode: 'idle' as 'idle' | 'boss',
-		autoFight: false,
-		bossOutcome: undefined as 'victory' | undefined,
-		challengeBoss: vi.fn(),
-		retreatFromBoss: vi.fn(),
-		setAutoFight: vi.fn()
-	},
-	staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
-	statistics: { isZoneCleared: vi.fn(() => false) }
-}));
+const { mockBattleEngine, mockPlayerManager, mockEnemyManager, staticData, statistics, playerChallenges } = vi.hoisted(
+	() => ({
+		mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
+		mockPlayerManager: { currentZone: 0 },
+		mockEnemyManager: {
+			mode: 'idle' as 'idle' | 'boss',
+			autoFight: false,
+			bossOutcome: undefined as 'victory' | undefined,
+			bossUnlockedNextZone: false,
+			challengeBoss: vi.fn(),
+			retreatFromBoss: vi.fn(),
+			setAutoFight: vi.fn()
+		},
+		staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
+		statistics: { isZoneCleared: vi.fn(() => false) },
+		playerChallenges: { isChallengeCompleted: vi.fn(() => false) }
+	})
+);
 
 vi.mock('$lib/engine', () => ({
 	battleEngine: mockBattleEngine,
 	playerManager: mockPlayerManager,
 	enemyManager: mockEnemyManager
 }));
-vi.mock('$stores', () => ({ staticData, statistics }));
+vi.mock('$stores', () => ({ staticData, statistics, playerChallenges }));
 
 import Fight from '$routes/game/screens/fight/Fight.svelte';
 import { makeBattler } from './fight-fixtures';
@@ -48,6 +52,7 @@ beforeEach(() => {
 	mockEnemyManager.mode = 'idle';
 	mockEnemyManager.autoFight = false;
 	mockEnemyManager.bossOutcome = undefined;
+	mockEnemyManager.bossUnlockedNextZone = false;
 	staticData.zones = [makeZone()];
 	staticData.enemies = [];
 	statistics.isZoneCleared.mockReturnValue(false);
@@ -125,8 +130,16 @@ describe('Fight', () => {
 			const overlay = screen.getByTestId('zone-cleared-overlay');
 			expect(overlay.textContent).toContain('Catacomb Lich defeated');
 			expect(overlay.textContent).toContain('Verdant Hollow');
-			// Truthfulness: zone-locking is deferred, so no "next zone unlocked" claim.
-			expect(overlay.textContent).not.toContain('unlocked');
+			// Truthfulness: this clear did not unlock a new zone, so no "next zone unlocked" claim.
+			expect(screen.queryByTestId('next-zone-unlocked')).toBeNull();
+		});
+
+		it('shows the "next zone unlocked" line when the clear unlocked the next zone', () => {
+			mockEnemyManager.mode = 'boss';
+			mockEnemyManager.bossOutcome = 'victory';
+			mockEnemyManager.bossUnlockedNextZone = true;
+			render(Fight);
+			expect(screen.getByTestId('next-zone-unlocked').textContent).toContain('Next zone unlocked');
 		});
 	});
 });

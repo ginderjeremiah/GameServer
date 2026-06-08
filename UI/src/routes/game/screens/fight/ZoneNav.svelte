@@ -1,34 +1,65 @@
 <div class="zone-nav" data-testid="zone-nav">
-	<button class="zone-btn" disabled={leftDisabled} onclick={handleClickLeft}>&#8249;</button>
+	<button
+		class="zone-btn"
+		class:locked={leftLocked}
+		disabled={leftDisabled}
+		aria-label={leftLocked ? 'Previous zone locked' : 'Previous zone'}
+		title={leftLocked ? LOCK_HINT : undefined}
+		onclick={handleClickLeft}
+	>
+		{#if leftLocked}<LockGlyph />{:else}&#8249;{/if}
+	</button>
 	<div class="zone-info">
 		<span class="zone-num">Zone · {String(zoneNum).padStart(2, '0')}</span>
 		<span class="zone-name">{current?.name}</span>
 	</div>
-	<button class="zone-btn" disabled={rightDisabled} onclick={handleClickRight}>&#8250;</button>
+	<button
+		class="zone-btn"
+		class:locked={rightLocked}
+		disabled={rightDisabled}
+		aria-label={rightLocked ? 'Next zone locked' : 'Next zone'}
+		title={rightLocked ? LOCK_HINT : undefined}
+		onclick={handleClickRight}
+	>
+		{#if rightLocked}<LockGlyph />{:else}&#8250;{/if}
+	</button>
 </div>
 
 <script lang="ts">
-import { staticData } from '$stores';
+import type { IZone } from '$lib/api';
+import { staticData, playerChallenges } from '$stores';
 import { playerManager } from '$lib/engine';
+import { isZoneUnlocked, zonesByOrder } from '$lib/common';
+import LockGlyph from './LockGlyph.svelte';
 
-const orderedZones = $derived(staticData.zones?.slice().sort((a, b) => a.order - b.order));
-const current = $derived(orderedZones?.find((z) => z.id === playerManager.currentZone) ?? orderedZones?.[0]);
-const zoneNum = $derived((orderedZones?.indexOf(current) ?? -1) + 1);
-const leftDisabled = $derived(zoneNum === 1);
-const rightDisabled = $derived(zoneNum === orderedZones?.length);
+const LOCK_HINT = "Clear this zone's boss to unlock";
 
-const changeZone = (amount: number) => {
-	const newZone = zoneNum + amount;
-	if (newZone >= 1 && newZone <= orderedZones.length) {
-		const zoneData = orderedZones[newZone - 1];
-		playerManager.currentZone = zoneData.id;
-		return true;
+const orderedZones = $derived(zonesByOrder(staticData.zones ?? []));
+const currentIndex = $derived(orderedZones.findIndex((z) => z.id === playerManager.currentZone));
+// Fall back to the first ordered zone when the current zone is unknown (e.g. before data loads).
+const resolvedIndex = $derived(currentIndex >= 0 ? currentIndex : 0);
+const current = $derived(orderedZones[resolvedIndex]);
+const zoneNum = $derived(resolvedIndex + 1);
+
+const prevZone = $derived(resolvedIndex > 0 ? orderedZones[resolvedIndex - 1] : undefined);
+const nextZone = $derived(resolvedIndex < orderedZones.length - 1 ? orderedZones[resolvedIndex + 1] : undefined);
+
+const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
+// A neighbouring zone that exists but hasn't been unlocked yet is "locked" — visibly distinct from
+// simply being at the first/last zone (no neighbour at all).
+const leftLocked = $derived(prevZone != null && !isZoneUnlocked(prevZone, completed));
+const rightLocked = $derived(nextZone != null && !isZoneUnlocked(nextZone, completed));
+const leftDisabled = $derived(prevZone == null || leftLocked);
+const rightDisabled = $derived(nextZone == null || rightLocked);
+
+const goToZone = (zone: IZone | undefined) => {
+	if (zone != null && isZoneUnlocked(zone, completed)) {
+		playerManager.currentZone = zone.id;
 	}
-	return false;
 };
 
-const handleClickLeft = () => changeZone(-1);
-const handleClickRight = () => changeZone(1);
+const handleClickLeft = () => goToZone(prevZone);
+const handleClickRight = () => goToZone(nextZone);
 </script>
 
 <style lang="scss">
@@ -64,6 +95,13 @@ const handleClickRight = () => changeZone(1);
 	&:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+
+	// A locked neighbour (boss not yet cleared) reads more clearly than a plain end-of-list disabled
+	// arrow, so the lock glyph stays legible.
+	&.locked:disabled {
+		opacity: 0.6;
+		color: color-mix(in srgb, var(--text-primary) 65%, transparent);
 	}
 }
 

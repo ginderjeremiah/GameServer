@@ -641,5 +641,144 @@ namespace Game.Application.Tests.Services
 
             Assert.Equal(zone2.Id, player.CurrentZoneId);
         }
+
+        [Fact]
+        public async Task StartBattle_TransitionToLockedZone_KeepsPlayerInCurrentZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            // zone2 is gated behind a challenge the player has not completed, so it is locked.
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Clear Zone 1");
+            var zone1 = await TestDataSeeder.CreateZoneAsync(context, "Zone 1");
+            var zone2 = await TestDataSeeder.CreateZoneAsync(context, "Zone 2", unlockChallengeId: gate.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone1.Id, enemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone2.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone1.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // A tampered request to move into the locked zone is ignored: the player stays put and the
+            // battle proceeds in their current (unlocked) zone.
+            var result = await battleService.StartBattle(player, state, zoneId: zone1.Id, newZoneId: zone2.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(zone1.Id, player.CurrentZoneId);
+            Assert.Equal(zone1.Id, state.BattleZoneId);
+        }
+
+        [Fact]
+        public async Task StartBattle_TransitionToLockedZone_AllowedOnceGatingChallengeCompleted()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Clear Zone 1");
+            var zone1 = await TestDataSeeder.CreateZoneAsync(context, "Zone 1");
+            var zone2 = await TestDataSeeder.CreateZoneAsync(context, "Zone 2", unlockChallengeId: gate.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone1.Id, enemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone2.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone1.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+            // The player has completed the gating challenge, so zone2 is unlocked for them.
+            await TestDataSeeder.AddPlayerChallengeAsync(context, playerEntity.Id, gate.Id, progress: 1m, completed: true);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone1.Id, newZoneId: zone2.Id);
+
+            Assert.Equal(zone2.Id, player.CurrentZoneId);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_LockedZone_ReturnsNullAndStartsNoBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+
+            // The zone has a boss but is gated behind a challenge the player has not completed.
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Reach the boss zone");
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Locked Boss Zone", bossEnemyId: boss.Id, bossLevel: 5, unlockChallengeId: gate.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.Null(result);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_LockedZone_AllowedOnceGatingChallengeCompleted()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Reach the boss zone");
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5, unlockChallengeId: gate.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+            await TestDataSeeder.AddPlayerChallengeAsync(context, playerEntity.Id, gate.Id, progress: 1m, completed: true);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(boss.Id, result.Enemy.Id);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+        }
     }
 }

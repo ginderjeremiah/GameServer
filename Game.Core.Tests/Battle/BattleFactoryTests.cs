@@ -113,6 +113,7 @@ namespace Game.Core.Tests.Battle
             LevelMax = levelMax,
             BossEnemyId = bossEnemyId,
             BossLevel = bossLevel,
+            UnlockChallengeId = null,
         };
 
         private static Enemy MakeEnemyAtLevel(int level) => MakeEnemyAtLevel(level, skillCount: 1);
