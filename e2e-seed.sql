@@ -12,7 +12,9 @@
 -- script seeds the minimal, coherent slice of static reference data the suite needs:
 --   * Skills 0/1/2          – required by new-player creation
 --   * one Zone with enemies – so the Enemies admin catalogue has rows and the fight screen is playable
+--   * a dedicated zone boss – so the "Challenge Boss" flow can be exercised end-to-end (#220)
 --
+-- Rows are inserted in dependency order (Enemies before the Zones that reference them as bosses).
 -- It is applied against the e2e Postgres AFTER the API has migrated (the CI workflow runs it once
 -- the API answers). Every statement is idempotent (ON CONFLICT DO NOTHING), so re-running is safe.
 -- It is intentionally separate from the app: production/local databases are never touched by it.
@@ -39,34 +41,50 @@ INSERT INTO "Challenges" ("Id", "Name", "Description", "ChallengeTypeId", "Targe
   (0, 'Clear Verdant Hollow', 'Clear the starter zone to press onward.', 3, 0, 1)
 ON CONFLICT ("Id") DO NOTHING;
 
--- The starter zone (Player.CurrentZoneId defaults to 0) is always open; the next zone is gated
--- behind the challenge above (UnlockChallengeId = 0).
-INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax", "UnlockChallengeId") VALUES
-  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10, NULL),
-  (1, 'Ashen Wastes', 'A scorched expanse — sealed until Verdant Hollow is cleared.', 1, 8, 18, 0)
-ON CONFLICT ("Id") DO NOTHING;
-
--- A couple of low-level enemies to populate the zone (and the Enemies admin catalogue).
+-- A couple of low-level enemies to populate the zone (and the Enemies admin catalogue), plus a
+-- dedicated zone boss (IsBoss). The boss is NOT part of the random ZoneEnemies spawn table — it is
+-- fought only via the zone's BossEnemyId (set below) through the deterministic "Challenge Boss"
+-- action. Inserted before the Zones so the FK_Zones_Enemies_BossEnemyId reference resolves.
 INSERT INTO "Enemies" ("Id", "Name", "IsBoss") VALUES
   (0, 'Forest Slime', false),
-  (1, 'Wild Boar', false)
+  (1, 'Wild Boar', false),
+  (2, 'Direboar Alpha', true)
 ON CONFLICT ("Id") DO NOTHING;
 
--- Enemy attribute distributions (Strength = 0, Endurance = 1 per EAttribute).
+-- Enemy attribute distributions (Strength = 0, Endurance = 1 per EAttribute). The boss (2) is a
+-- deliberately glass-cannon bruiser — Strength only — so at its fought level it hits hard but has
+-- modest health. That keeps the real-time e2e boss fight short while a fresh level-1 player still
+-- wins it deterministically (the boss never out-damages the player's health pool). These numbers
+-- are e2e scaffolding tuned for a quick, winnable fight, not gameplay balance.
 INSERT INTO "AttributeDistributions" ("EnemyId", "AttributeId", "BaseAmount", "AmountPerLevel") VALUES
   (0, 0, 5, 1.0),
   (0, 1, 5, 1.0),
   (1, 0, 7, 1.5),
-  (1, 1, 6, 1.0)
+  (1, 1, 6, 1.0),
+  (2, 0, 1, 1.0)
 ON CONFLICT ("EnemyId", "AttributeId") DO NOTHING;
 
--- Give the enemies a skill so battles resolve.
+-- Give the enemies a skill so battles resolve. The boss brings its full authored loadout (Strike +
+-- Cleave), which the deterministic "Challenge Boss" path fights it with in full (SelectAllBattleSkills).
 INSERT INTO "EnemySkills" ("EnemyId", "SkillId") VALUES
   (0, 0),
-  (1, 0)
+  (1, 0),
+  (2, 0),
+  (2, 1)
 ON CONFLICT ("EnemyId", "SkillId") DO NOTHING;
 
--- Place the enemies in the starter zone (equal spawn weight).
+-- The starter zone (Player.CurrentZoneId defaults to 0) is always open and hosts a dedicated boss
+-- (enemy 2, fought at the zone's top level via BossLevel), so a brand-new player sees the fight
+-- screen's "Challenge Boss" affordance light up. The next zone is gated behind the challenge above
+-- (UnlockChallengeId = 0) and has no boss (BossLevel = 1 is the column's NOT NULL default and is
+-- meaningless without a BossEnemyId).
+INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax", "BossEnemyId", "BossLevel", "UnlockChallengeId") VALUES
+  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10, 2, 10, NULL),
+  (1, 'Ashen Wastes', 'A scorched expanse — sealed until Verdant Hollow is cleared.', 1, 8, 18, NULL, 1, 0)
+ON CONFLICT ("Id") DO NOTHING;
+
+-- Place the (non-boss) enemies in the starter zone (equal spawn weight). The boss is excluded — it
+-- is challenged explicitly, not rolled into the random idle encounter table.
 INSERT INTO "ZoneEnemies" ("ZoneId", "EnemyId", "Weight") VALUES
   (0, 0, 1),
   (0, 1, 1)
