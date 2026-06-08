@@ -68,25 +68,6 @@ describe('challenges store', () => {
 		expect(playerChallenges.isChallengeCompleted(5)).toBe(false); // no row
 	});
 
-	it('optimistically marks a challenge completed by adding a row', async () => {
-		get.mockResolvedValue([]);
-		await playerChallenges.load();
-
-		playerChallenges.markChallengeCompleted(3);
-
-		expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
-	});
-
-	it('optimistically promotes an existing incomplete row without duplicating it', async () => {
-		get.mockResolvedValue([challenge(3, false)]);
-		await playerChallenges.load();
-
-		playerChallenges.markChallengeCompleted(3);
-
-		expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
-		expect(playerChallenges.all.filter((c) => c.challengeId === 3)).toHaveLength(1);
-	});
-
 	it('reset() clears state and allows a fresh load', async () => {
 		get.mockResolvedValue([challenge(3, true)]);
 		await playerChallenges.load();

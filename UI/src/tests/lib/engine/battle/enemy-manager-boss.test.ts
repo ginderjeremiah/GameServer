@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { apiSocket, ELogType, type IApiSocketResponse, type IEnemyInstance } from '$lib/api';
+import { apiSocket, ELogType, type IApiSocketResponse, type IEnemyInstance, type IZone } from '$lib/api';
+import { delay } from '$lib/common';
 import { logMessage } from '$lib/engine/log';
 import { EnemyManager, onNewEnemyLoaded } from '$lib/engine/battle/enemy-manager';
 
@@ -14,8 +15,15 @@ const h = vi.hoisted(() => ({
 	},
 	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5 },
 	playerManager: { currentZone: 3, grantExp: vi.fn() },
-	staticData: { enemies: [{ id: 0, name: 'Catacomb Lich', isBoss: true }] },
-	statistics: { markZoneCleared: vi.fn() }
+	staticData: {
+		enemies: [{ id: 0, name: 'Catacomb Lich', isBoss: true }],
+		zones: undefined as IZone[] | undefined
+	},
+	statistics: { markZoneCleared: vi.fn() },
+	playerChallenges: {
+		isChallengeCompleted: vi.fn<(id: number) => boolean>(() => false),
+		load: vi.fn(() => Promise.resolve())
+	}
 }));
 
 vi.mock('$lib/engine/log', () => ({ logMessage: vi.fn() }));
@@ -28,7 +36,11 @@ vi.mock('$lib/engine', () => ({
 	}),
 	playerManager: h.playerManager
 }));
-vi.mock('$stores', () => ({ staticData: h.staticData, statistics: h.statistics }));
+vi.mock('$stores', () => ({
+	staticData: h.staticData,
+	statistics: h.statistics,
+	playerChallenges: h.playerChallenges
+}));
 vi.mock('$lib/common', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/common')>()),
 	// Resolve the boss-victory overlay delay immediately.
@@ -79,6 +91,14 @@ describe('EnemyManager boss mode', () => {
 		h.battleEngine.pause.mockClear();
 		h.playerManager.grantExp.mockClear();
 		h.statistics.markZoneCleared.mockClear();
+		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
+		h.staticData.zones = undefined;
+		h.playerChallenges.isChallengeCompleted.mockReset();
+		h.playerChallenges.isChallengeCompleted.mockReturnValue(false);
+		h.playerChallenges.load.mockReset();
+		h.playerChallenges.load.mockResolvedValue(undefined);
+		vi.mocked(delay).mockReset();
+		vi.mocked(delay).mockResolvedValue(undefined);
 		send = vi.spyOn(apiSocket, 'sendSocketCommand');
 		send.mockReset();
 		send.mockImplementation(routeByName());
@@ -87,6 +107,29 @@ describe('EnemyManager boss mode', () => {
 	});
 
 	const fireStage = async (stage: number) => h.holder.stageCb?.(stage);
+
+	const zone = (id: number, order: number, unlockChallengeId?: number): IZone => ({
+		id,
+		name: `Zone ${id}`,
+		description: '',
+		order,
+		levelMin: 1,
+		levelMax: 10,
+		bossLevel: 1,
+		unlockChallengeId
+	});
+
+	// bossUnlockedNextZone is reset by returnToIdle/challengeBoss once the (mocked-immediate) overlay
+	// delay elapses, so capture it at the overlay moment — the instant `delay` is called, right after
+	// resolveBossVictory computes it.
+	const captureUnlockAtOverlay = () => {
+		const captured = { value: undefined as boolean | undefined };
+		vi.mocked(delay).mockImplementation(() => {
+			captured.value = manager.bossUnlockedNextZone;
+			return Promise.resolve();
+		});
+		return captured;
+	};
 
 	it('challenges the current zone boss and engages', async () => {
 		const loaded: IEnemyInstance[] = [];
@@ -140,6 +183,51 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.currentEnemy).toEqual(bossInstance);
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
 		expect(send).toHaveBeenCalledWith('ChallengeBoss', { zoneId: 3 });
+	});
+
+	it('on a boss victory that completes the next zone gate: refetches and flags the unlock', async () => {
+		// Cleared zone 3; zone 4 (next by order) is gated behind challenge 7. The gate is incomplete
+		// until the post-victory refetch flips it (mirroring the backend completing it on the clear).
+		h.staticData.zones = [zone(3, 0), zone(4, 1, 7)];
+		let gateComplete = false;
+		h.playerChallenges.isChallengeCompleted.mockImplementation((id: number) => id === 7 && gateComplete);
+		h.playerChallenges.load.mockImplementation(() => {
+			gateComplete = true;
+			return Promise.resolve();
+		});
+		const unlock = captureUnlockAtOverlay();
+
+		await manager.challengeBoss();
+		await fireStage(h.BattleStage.Victorious);
+
+		// The next zone was locked and this clear flipped its gate ⇒ the refetch ran and the unlock fired.
+		expect(h.playerChallenges.load).toHaveBeenCalledWith(true);
+		expect(unlock.value).toBe(true);
+	});
+
+	it('on a boss victory where the next zone is ungated: no refetch and no unlock flag', async () => {
+		// Zone 4 has no gate, so it was already open — nothing to unlock and no reason to refetch.
+		h.staticData.zones = [zone(3, 0), zone(4, 1)];
+		const unlock = captureUnlockAtOverlay();
+
+		await manager.challengeBoss();
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(h.playerChallenges.load).not.toHaveBeenCalled();
+		expect(unlock.value).toBe(false);
+	});
+
+	it('on a boss victory where the next zone gate is already complete: no refetch and no unlock flag', async () => {
+		// Re-farming a zone whose gate was already satisfied must not refetch or re-flag the unlock.
+		h.staticData.zones = [zone(3, 0), zone(4, 1, 7)];
+		h.playerChallenges.isChallengeCompleted.mockReturnValue(true);
+		const unlock = captureUnlockAtOverlay();
+
+		await manager.challengeBoss();
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(h.playerChallenges.load).not.toHaveBeenCalled();
+		expect(unlock.value).toBe(false);
 	});
 
 	it('on a boss loss: records it, turns auto-fight off, and returns to the idle loop honoring the cooldown', async () => {

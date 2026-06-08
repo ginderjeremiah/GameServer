@@ -2,7 +2,7 @@
    (`GET /api/Challenges/Player`), shared across screens so the source is fetched once and
    stays consistent. The Challenges screen renders the full progress breakdown from it; the
    Fight screen reads completion to gate zone navigation (a zone unlocks once its gating
-   challenge is completed) and marks a challenge completed optimistically on a boss clear. */
+   challenge is completed). */
 
 import { ApiRequest, type IPlayerChallenge } from '$lib/api';
 
@@ -52,20 +52,6 @@ export const playerChallenges = {
 	/** Whether the player has completed the given challenge. */
 	isChallengeCompleted(challengeId: number) {
 		return challenges.some((c) => c.challengeId === challengeId && c.completed);
-	},
-
-	/** Optimistically record a challenge completion so a zone unlock reflects immediately on a
-	 *  boss clear; the authoritative value is reconciled on the next load. */
-	markChallengeCompleted(challengeId: number) {
-		const idx = challenges.findIndex((c) => c.challengeId === challengeId);
-		if (idx >= 0) {
-			if (challenges[idx].completed) {
-				return;
-			}
-			challenges = challenges.map((c, i) => (i === idx ? { ...c, completed: true } : c));
-		} else {
-			challenges = [...challenges, { challengeId, progress: 0, completed: true }];
-		}
 	},
 
 	/** Reset to the unloaded state (e.g. on logout / session replacement). */
