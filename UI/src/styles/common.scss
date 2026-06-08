@@ -77,6 +77,34 @@ input::placeholder {
 	color: rgba(240, 240, 240, 0.55);
 }
 
+// Themed scrollbars. Without this the OS-default scrollbar renders as a bright bar
+// that clashes with the dark surfaces (most visible on the Statistics and Options
+// screens). A thin, neutral scrollbar driven by the --scrollbar-* tokens keeps every
+// scroll container on-theme. Components needing a different treatment (e.g. the compact
+// combat log panel) override these locally while still pulling colour from the tokens.
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
 @keyframes spin {
 	to {
 		transform: rotate(360deg);
