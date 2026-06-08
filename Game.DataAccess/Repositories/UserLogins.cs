@@ -1,5 +1,5 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,5 +1,4 @@
 using Contracts = Game.Abstractions.Contracts;
-using EnemyEntity = Game.Abstractions.Entities.Enemy;
 using CoreEnemy = Game.Core.Enemies.Enemy;
 
 namespace Game.Abstractions.DataAccess
@@ -8,9 +7,6 @@ namespace Game.Abstractions.DataAccess
     {
         public void InvalidateCache();
         public List<Contracts.Enemy> All(bool refreshCache = false);
-        // Returns the EF entity for the Content Authoring admin persistence (Game.DataAccess); the read path uses the contracts above.
-        public EnemyEntity? GetEnemy(int enemyId);
-        public EnemyEntity GetRandomEnemy(int zoneId);
 
         /// <summary>Maps the entity enemy with <paramref name="level"/> to a domain
         /// <see cref="CoreEnemy"/>, resolving skill and item references from the catalog.</summary>

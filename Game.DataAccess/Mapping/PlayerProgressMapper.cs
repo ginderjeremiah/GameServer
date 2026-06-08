@@ -2,8 +2,8 @@ using Game.Core;
 using Game.Core.Progress;
 using CorePlayerChallenge = Game.Core.Progress.PlayerChallenge;
 using CorePlayerStatistic = Game.Core.Progress.PlayerStatistic;
-using EntityPlayerChallenge = Game.Abstractions.Entities.PlayerChallenge;
-using EntityPlayerStatistic = Game.Abstractions.Entities.PlayerStatistic;
+using EntityPlayerChallenge = Game.Infrastructure.Entities.PlayerChallenge;
+using EntityPlayerStatistic = Game.Infrastructure.Entities.PlayerStatistic;
 
 namespace Game.DataAccess.Mapping
 {

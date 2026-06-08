@@ -1,21 +1,20 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Microsoft.EntityFrameworkCore;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for item mods and their related collections. Reuses the cached
-    /// entity lookup (<see cref="IItemMods.LookupItemMod"/>) for existence/diff and the tag-graph
-    /// queries on <see cref="ITags"/>; all writes go through the entity store.
+    /// entity lookup (<see cref="IItemModEntityCache.LookupItemMod"/>) for existence/diff and the
+    /// tag-graph queries on <see cref="ITagEntityQueries"/>; all writes go through the entity store.
     /// </summary>
-    internal class AdminItemMods(IItemMods itemMods, ITags tags, IEntityStore entityStore) : IAdminItemMods
+    internal class AdminItemMods(IItemModEntityCache itemMods, ITagEntityQueries tags, IEntityStore entityStore) : IAdminItemMods
     {
-        private readonly IItemMods _itemMods = itemMods;
-        private readonly ITags _tags = tags;
+        private readonly IItemModEntityCache _itemMods = itemMods;
+        private readonly ITagEntityQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)

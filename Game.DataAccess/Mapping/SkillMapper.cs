@@ -3,7 +3,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
-using EntitySkill = Game.Abstractions.Entities.Skill;
+using EntitySkill = Game.Infrastructure.Entities.Skill;
 
 namespace Game.DataAccess.Mapping
 {

@@ -1,1 +1,0 @@
-﻿global using Attribute = Game.Abstractions.Entities.Attribute;

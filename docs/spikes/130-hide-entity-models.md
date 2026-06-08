@@ -1,7 +1,7 @@
 # Spike #130 — Hide EF entity models from the API and Application layers
 
 - **Spike issue:** [#130](https://github.com/ginderjeremiah/GameServer/issues/130)
-- **Status:** Complete — approach decided, implementation issues filed (#133–#138).
+- **Status:** Complete — approach decided and fully implemented (#133–#138 merged; #142 folded into the #138 capstone).
 
 ## Goal
 
@@ -112,8 +112,9 @@ Tracked as sub-issues of #130:
 3. #135 — Content Authoring context: dedicated admin persistence for reference-data CRUD.
 4. #136 — Identity / User Admin context: entity-free user administration.
 5. #137 — Application-layer cleanup (`AccountService`, `BattleService`); coordinates with #126 and #118.
-6. #138 — **Capstone:** relocate entities into `Game.Infrastructure`, internalize
-   `IEntityStore`, add the architecture test. Must land last (the test fails until the others merge).
+6. #138 — **Capstone (done):** relocated entities into `Game.Infrastructure.Entities`, made
+   `IEntityStore` and the entity-returning reference lookups internal to `Game.DataAccess`, and added
+   the `EntityIsolationTests` architecture guard. Landed last, after #133–#137 merged.
 
 Issues 1–5 are largely independent; #138 is the capstone.
 
@@ -123,9 +124,8 @@ Issues 1–5 are largely independent; #138 is the capstone.
   (backend.md → *Reference-data caching and versioning*). Keeping the contract's serialized
   shape identical to today's DTOs avoids a re-download; otherwise it is a one-time,
   intentional cache bump.
-- **`PlayerState` entity may be vestigial.** Session state is the **domain** `PlayerState`
-  in Redis (`ISessionStore`, `SessionStore`); the `Game.Abstractions/Entities/PlayerState`
-  table looks unused at runtime. Worth verifying and possibly removing during #134/#138 —
-  not pursued in this spike.
+- **`PlayerState` entity was vestigial — removed (#142).** Session state is the **domain**
+  `PlayerState` in Redis (`ISessionStore`, `SessionStore`); the EF `PlayerState` entity was
+  unmapped and unreferenced, so it was deleted as part of the #138 capstone.
 - backend.md's *Admin Tools API surface* section should be updated once #135/#136 land to
   describe the bounded-context split.

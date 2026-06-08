@@ -2,8 +2,8 @@ using Game.Core;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Contracts = Game.Abstractions.Contracts;
-using EntityItem = Game.Abstractions.Entities.Item;
-using EntityItemMod = Game.Abstractions.Entities.ItemMod;
+using EntityItem = Game.Infrastructure.Entities.Item;
+using EntityItemMod = Game.Infrastructure.Entities.ItemMod;
 
 namespace Game.DataAccess.Mapping
 {

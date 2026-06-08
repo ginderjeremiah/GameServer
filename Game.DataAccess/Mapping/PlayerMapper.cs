@@ -1,11 +1,11 @@
 using Game.Abstractions.DataAccess;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
-using EntityLogPreference = Game.Abstractions.Entities.LogPreference;
-using EntityPlayer = Game.Abstractions.Entities.Player;
-using EntityPlayerAttribute = Game.Abstractions.Entities.PlayerAttribute;
-using EntityPlayerSkill = Game.Abstractions.Entities.PlayerSkill;
-using EntityUser = Game.Abstractions.Entities.User;
+using EntityLogPreference = Game.Infrastructure.Entities.LogPreference;
+using EntityPlayer = Game.Infrastructure.Entities.Player;
+using EntityPlayerAttribute = Game.Infrastructure.Entities.PlayerAttribute;
+using EntityPlayerSkill = Game.Infrastructure.Entities.PlayerSkill;
+using EntityUser = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Mapping
 {

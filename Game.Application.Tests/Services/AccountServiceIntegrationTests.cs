@@ -1,6 +1,6 @@
 using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.Application;
 using Game.Application.Services;
 using Game.Core;

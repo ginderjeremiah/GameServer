@@ -26,7 +26,7 @@ namespace Game.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Game.Abstractions.Entities.AppliedMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.AppliedMod", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -51,7 +51,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("AppliedMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Attribute", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -162,7 +162,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.AttributeDistribution", b =>
                 {
                     b.Property<int>("EnemyId")
                         .HasColumnType("integer");
@@ -185,7 +185,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("AttributeDistributions");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Challenge", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Challenge", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -240,7 +240,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Challenges");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Enemy", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -265,7 +265,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Enemies");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.EnemySkill", b =>
                 {
                     b.Property<int>("EnemyId")
                         .HasColumnType("integer");
@@ -280,7 +280,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("EnemySkills");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.EquipmentSlot", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.EquipmentSlot", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -338,7 +338,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Item", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -378,7 +378,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Items");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemAttribute", b =>
                 {
                     b.Property<int>("ItemId")
                         .HasColumnType("integer");
@@ -397,7 +397,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemAttributes");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemCategory", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemCategory", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -444,7 +444,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemMod", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -475,7 +475,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModAttribute", b =>
                 {
                     b.Property<int>("ItemModId")
                         .HasColumnType("integer");
@@ -494,7 +494,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemModAttributes");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModSlot", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModSlot", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -520,7 +520,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemModSlots");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModType", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -552,7 +552,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogPreference", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.LogPreference", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -570,7 +570,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("LogPreferences");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.LogType", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -626,7 +626,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Player", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -667,7 +667,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Players");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerAttribute", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -686,7 +686,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("PlayerAttributes");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerChallenge", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerChallenge", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -711,7 +711,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("PlayerChallenges");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerSkill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerSkill", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -729,7 +729,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("PlayerSkills");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerStatistic", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerStatistic", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -760,7 +760,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("PlayerStatistics");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Rarity", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -807,7 +807,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Skill", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -845,7 +845,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Skills");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.SkillDamageMultiplier", b =>
                 {
                     b.Property<int>("SkillId")
                         .HasColumnType("integer");
@@ -864,7 +864,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("SkillDamageMultipliers");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.StatisticType", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -968,7 +968,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Tag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -991,7 +991,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.TagCategory", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -1043,7 +1043,7 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedItem", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.UnlockedItem", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -1061,7 +1061,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("UnlockedItems");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.UnlockedMod", b =>
                 {
                     b.Property<int>("PlayerId")
                         .HasColumnType("integer");
@@ -1076,7 +1076,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("UnlockedMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.User", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1105,7 +1105,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Zone", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Zone", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1140,7 +1140,7 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("Zones");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ZoneEnemy", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ZoneEnemy", b =>
                 {
                     b.Property<int>("ZoneId")
                         .HasColumnType("integer");
@@ -1188,27 +1188,27 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("ItemTags", (string)null);
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.AppliedMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.AppliedMod", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                    b.HasOne("Game.Infrastructure.Entities.Item", "Item")
                         .WithMany()
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
+                    b.HasOne("Game.Infrastructure.Entities.ItemMod", "ItemMod")
                         .WithMany()
                         .HasForeignKey("ItemModId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.ItemModSlot", "ItemModSlot")
+                    b.HasOne("Game.Infrastructure.Entities.ItemModSlot", "ItemModSlot")
                         .WithMany()
                         .HasForeignKey("ItemModSlotId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("AppliedMods")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1223,15 +1223,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.AttributeDistribution", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.AttributeDistribution", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
                         .WithMany("AttributeDistributions")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Infrastructure.Entities.Enemy", "Enemy")
                         .WithMany("AttributeDistributions")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1242,17 +1242,17 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Enemy");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Challenge", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Challenge", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Item", "RewardItem")
+                    b.HasOne("Game.Infrastructure.Entities.Item", "RewardItem")
                         .WithMany()
                         .HasForeignKey("RewardItemId");
 
-                    b.HasOne("Game.Abstractions.Entities.ItemMod", "RewardItemMod")
+                    b.HasOne("Game.Infrastructure.Entities.ItemMod", "RewardItemMod")
                         .WithMany()
                         .HasForeignKey("RewardItemModId");
 
-                    b.HasOne("Game.Abstractions.Entities.StatisticType", "StatisticType")
+                    b.HasOne("Game.Infrastructure.Entities.StatisticType", "StatisticType")
                         .WithMany()
                         .HasForeignKey("StatisticTypeId");
 
@@ -1263,15 +1263,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("StatisticType");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.EnemySkill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.EnemySkill", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Infrastructure.Entities.Enemy", "Enemy")
                         .WithMany("EnemySkills")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
                         .WithMany("EnemySkills")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1282,9 +1282,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.EquipmentSlot", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.EquipmentSlot", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.ItemCategory", "ItemCategory")
+                    b.HasOne("Game.Infrastructure.Entities.ItemCategory", "ItemCategory")
                         .WithMany("EquipmentSlots")
                         .HasForeignKey("ItemCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1293,15 +1293,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemCategory");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Item", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.ItemCategory", "ItemCategory")
+                    b.HasOne("Game.Infrastructure.Entities.ItemCategory", "ItemCategory")
                         .WithMany("Items")
                         .HasForeignKey("ItemCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Rarity", "Rarity")
+                    b.HasOne("Game.Infrastructure.Entities.Rarity", "Rarity")
                         .WithMany("Items")
                         .HasForeignKey("RarityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1312,15 +1312,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Rarity");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemAttribute", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
                         .WithMany("ItemAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                    b.HasOne("Game.Infrastructure.Entities.Item", "Item")
                         .WithMany("ItemAttributes")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1331,9 +1331,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemMod", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.ItemModType", "ItemModType")
+                    b.HasOne("Game.Infrastructure.Entities.ItemModType", "ItemModType")
                         .WithMany("ItemMods")
                         .HasForeignKey("ItemModTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1342,15 +1342,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemModType");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModAttribute", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
                         .WithMany("ItemModAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
+                    b.HasOne("Game.Infrastructure.Entities.ItemMod", "ItemMod")
                         .WithMany("ItemModAttributes")
                         .HasForeignKey("ItemModId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1361,15 +1361,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemMod");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModSlot", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModSlot", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                    b.HasOne("Game.Infrastructure.Entities.Item", "Item")
                         .WithMany("ItemModSlots")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.ItemModType", "ItemModSlotType")
+                    b.HasOne("Game.Infrastructure.Entities.ItemModType", "ItemModSlotType")
                         .WithMany("ItemModSlots")
                         .HasForeignKey("ItemModSlotTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1380,15 +1380,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemModSlotType");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogPreference", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.LogPreference", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.LogType", "LogType")
+                    b.HasOne("Game.Infrastructure.Entities.LogType", "LogType")
                         .WithMany("LogPreferences")
                         .HasForeignKey("LogTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("LogPreferences")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1399,9 +1399,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Player", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.User", "User")
+                    b.HasOne("Game.Infrastructure.Entities.User", "User")
                         .WithMany("Players")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1410,15 +1410,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerAttribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerAttribute", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
                         .WithMany("PlayerAttributes")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("PlayerAttributes")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1429,15 +1429,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerChallenge", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerChallenge", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Challenge", "Challenge")
+                    b.HasOne("Game.Infrastructure.Entities.Challenge", "Challenge")
                         .WithMany()
                         .HasForeignKey("ChallengeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("PlayerChallenges")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1448,15 +1448,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerSkill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerSkill", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("PlayerSkills")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
                         .WithMany("PlayerSkills")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1467,15 +1467,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.PlayerStatistic", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerStatistic", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("PlayerStatistics")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.StatisticType", "StatisticType")
+                    b.HasOne("Game.Infrastructure.Entities.StatisticType", "StatisticType")
                         .WithMany("PlayerStatistics")
                         .HasForeignKey("StatisticTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1486,15 +1486,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("StatisticType");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.SkillDamageMultiplier", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.SkillDamageMultiplier", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Attribute", "Attribute")
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
                         .WithMany("SkillDamageMultipliers")
                         .HasForeignKey("AttributeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Skill", "Skill")
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
                         .WithMany("SkillDamageMultipliers")
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1505,9 +1505,9 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Tag", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Tag", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.TagCategory", "TagCategory")
+                    b.HasOne("Game.Infrastructure.Entities.TagCategory", "TagCategory")
                         .WithMany("Tags")
                         .HasForeignKey("TagCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1516,15 +1516,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("TagCategory");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedItem", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.UnlockedItem", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Item", "Item")
+                    b.HasOne("Game.Infrastructure.Entities.Item", "Item")
                         .WithMany("UnlockedItems")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("UnlockedItems")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1535,15 +1535,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.UnlockedMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.UnlockedMod", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.ItemMod", "ItemMod")
+                    b.HasOne("Game.Infrastructure.Entities.ItemMod", "ItemMod")
                         .WithMany("UnlockedMods")
                         .HasForeignKey("ItemModId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Player", "Player")
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
                         .WithMany("UnlockedMods")
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1554,15 +1554,15 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ZoneEnemy", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ZoneEnemy", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Enemy", "Enemy")
+                    b.HasOne("Game.Infrastructure.Entities.Enemy", "Enemy")
                         .WithMany("ZoneEnemies")
                         .HasForeignKey("EnemyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Zone", "Zone")
+                    b.HasOne("Game.Infrastructure.Entities.Zone", "Zone")
                         .WithMany("ZoneEnemies")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1575,13 +1575,13 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("ItemModTag", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.ItemMod", null)
+                    b.HasOne("Game.Infrastructure.Entities.ItemMod", null)
                         .WithMany()
                         .HasForeignKey("ItemModsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Tag", null)
+                    b.HasOne("Game.Infrastructure.Entities.Tag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1590,20 +1590,20 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("ItemTag", b =>
                 {
-                    b.HasOne("Game.Abstractions.Entities.Item", null)
+                    b.HasOne("Game.Infrastructure.Entities.Item", null)
                         .WithMany()
                         .HasForeignKey("ItemsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Game.Abstractions.Entities.Tag", null)
+                    b.HasOne("Game.Infrastructure.Entities.Tag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Attribute", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Attribute", b =>
                 {
                     b.Navigation("AttributeDistributions");
 
@@ -1616,7 +1616,7 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("SkillDamageMultipliers");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Enemy", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Enemy", b =>
                 {
                     b.Navigation("AttributeDistributions");
 
@@ -1625,7 +1625,7 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ZoneEnemies");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Item", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Item", b =>
                 {
                     b.Navigation("ItemAttributes");
 
@@ -1634,33 +1634,33 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("UnlockedItems");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemCategory", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemCategory", b =>
                 {
                     b.Navigation("EquipmentSlots");
 
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemMod", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemMod", b =>
                 {
                     b.Navigation("ItemModAttributes");
 
                     b.Navigation("UnlockedMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.ItemModType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.ItemModType", b =>
                 {
                     b.Navigation("ItemModSlots");
 
                     b.Navigation("ItemMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.LogType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.LogType", b =>
                 {
                     b.Navigation("LogPreferences");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Player", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Player", b =>
                 {
                     b.Navigation("AppliedMods");
 
@@ -1679,12 +1679,12 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("UnlockedMods");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Rarity", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Rarity", b =>
                 {
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Skill", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Skill", b =>
                 {
                     b.Navigation("EnemySkills");
 
@@ -1693,22 +1693,22 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("SkillDamageMultipliers");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.StatisticType", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.StatisticType", b =>
                 {
                     b.Navigation("PlayerStatistics");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.TagCategory", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.TagCategory", b =>
                 {
                     b.Navigation("Tags");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.User", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.User", b =>
                 {
                     b.Navigation("Players");
                 });
 
-            modelBuilder.Entity("Game.Abstractions.Entities.Zone", b =>
+            modelBuilder.Entity("Game.Infrastructure.Entities.Zone", b =>
                 {
                     b.Navigation("ZoneEnemies");
                 });

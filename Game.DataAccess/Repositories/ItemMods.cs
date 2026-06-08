@@ -1,5 +1,5 @@
 using Game.Abstractions.DataAccess;
-using Game.Abstractions.Entities;
+using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +8,7 @@ using CoreItemMod = Game.Core.Items.ItemMod;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class ItemMods : IItemMods
+    internal class ItemMods : IItemMods, IItemModEntityCache
     {
         private static List<ItemMod>? _allMods;
 

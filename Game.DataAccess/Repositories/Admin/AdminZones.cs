@@ -1,19 +1,18 @@
 using Game.Abstractions.Contracts.Admin;
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
-using Entities = Game.Abstractions.Entities;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for zones and their enemy spawn assignments. Reuses the cached
-    /// entity lookup (<see cref="IZones.LookupZone"/>) for existence/diff and builds fresh,
+    /// entity lookup (<see cref="IZoneEntityCache.LookupZone"/>) for existence/diff and builds fresh,
     /// navigation-free entities for every write.
     /// </summary>
-    internal class AdminZones(IZones zones, IEntityStore entityStore) : IAdminZones
+    internal class AdminZones(IZoneEntityCache zones, IEntityStore entityStore) : IAdminZones
     {
-        private readonly IZones _zones = zones;
+        private readonly IZoneEntityCache _zones = zones;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)

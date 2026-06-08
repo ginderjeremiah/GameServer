@@ -6,8 +6,8 @@ using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
 using CoreStat = Game.Core.Progress.PlayerStatistic;
-using EntityChallenge = Game.Abstractions.Entities.PlayerChallenge;
-using EntityStat = Game.Abstractions.Entities.PlayerStatistic;
+using EntityChallenge = Game.Infrastructure.Entities.PlayerChallenge;
+using EntityStat = Game.Infrastructure.Entities.PlayerStatistic;
 
 namespace Game.DataAccess.Repositories
 {

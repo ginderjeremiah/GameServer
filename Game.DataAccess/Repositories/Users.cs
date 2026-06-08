@@ -5,7 +5,7 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using UserEntity = Game.Abstractions.Entities.User;
+using UserEntity = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Repositories
 {
