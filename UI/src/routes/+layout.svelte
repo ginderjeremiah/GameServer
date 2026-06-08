@@ -131,6 +131,13 @@ $effect(() => {
 	// (color-mix(in srgb, var(--white|--black) N%, transparent)) flow from.
 	--white: #{colors.$white};
 	--black: #{colors.$black};
+	// Scrollbar theming. The OS-default scrollbar renders as a bright, off-theme
+	// bar on the dark surfaces (most noticeable on the Statistics and Options
+	// screens). These neutral translucent-white tokens drive the app-wide themed
+	// scrollbar (the global default in common.scss) and are reused by the combat
+	// log panel, so a theme can restyle every scrollbar by overriding them alone.
+	--scrollbar-thumb: color-mix(in srgb, var(--white) 16%, transparent);
+	--scrollbar-thumb-hover: color-mix(in srgb, var(--white) 28%, transparent);
 	--border-subtle: #{colors.$border-subtle};
 	--border-light: #{colors.$border-light};
 	--border-medium: #{colors.$border-medium};

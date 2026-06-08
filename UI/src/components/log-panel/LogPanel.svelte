@@ -104,20 +104,15 @@ $effect(() => {
 	// Fade only the bottom — the newest row at the top stays fully prominent.
 	mask-image: linear-gradient(to bottom, black 0%, black 78%, transparent 100%);
 	-webkit-mask-image: linear-gradient(to bottom, black 0%, black 78%, transparent 100%);
-	scrollbar-width: thin;
-	scrollbar-color: color-mix(in srgb, var(--white) 16%, transparent) transparent;
 
+	// Narrower than the global default for the compact log; colour, hover and track
+	// come from the shared --scrollbar-* tokens (common.scss).
 	&::-webkit-scrollbar {
 		width: 6px;
 	}
 
 	&::-webkit-scrollbar-thumb {
-		background: color-mix(in srgb, var(--white) 16%, transparent);
 		border-radius: 3px;
-	}
-
-	&::-webkit-scrollbar-track {
-		background: transparent;
 	}
 }
 
