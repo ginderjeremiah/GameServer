@@ -1,0 +1,81 @@
+# Local development stack for non-constrained environments (Docker Desktop on Windows/Mac, or
+# standard Linux with bridge networking). Runs Game.Api + PostgreSQL + Redis without requiring a
+# native database or cache installation.
+#
+# IMPORTANT: This file uses bridge networking (the Docker default). It requires Docker Desktop
+# (Windows/Mac) or a Linux Docker host with iptables/bridge networking enabled. It does NOT work
+# in the constrained sandbox environments used by Claude Code remote sessions or GitHub Actions —
+# use docker-compose.yml for those (which uses host networking). See docs/backend.md for context.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up -d --build
+#   # After the API is up, apply the reference data seed:
+#   docker compose -f docker-compose.local.yml exec -T postgres psql -U game -d game -f - < e2e-seed.sql
+#
+# Networking: services communicate over a Docker bridge network using Docker's built-in DNS
+# (service names as hostnames). Container ports are also published to localhost so the SvelteKit
+# dev server's Vite proxy and external tools (psql, redis-cli) can reach them from the host:
+#   - PostgreSQL: localhost:${POSTGRES_PORT:-5432}
+#   - Redis:      localhost:${REDIS_PORT:-6379}
+#   - API:        localhost:${API_PORT:-5008}  (the target the Vite dev-server proxy uses)
+#
+# Seeding: see docker-compose.yml for an explanation of the seeding requirement and e2e-seed.sql.
+#
+# Secrets: HashPepper and Jwt__SigningKey use placeholder values suitable for local development
+# only. Replace them with your own values if running the stack in a shared environment.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-game}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-game}
+      POSTGRES_DB: ${POSTGRES_DB:-game}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-game} -d ${POSTGRES_DB:-game}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Game.Api/Dockerfile
+    ports:
+      - "${API_PORT:-5008}:5008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Bind the port the Vite dev-server proxy targets (UI/vite.config.ts).
+      ASPNETCORE_HTTP_PORTS: "5008"
+      # Local-only placeholder secrets — do not use in production.
+      HashPepper: local-dev-pepper-change-me
+      Jwt__SigningKey: local-dev-jwt-signing-key-change-me-at-least-32-bytes-long
+      Jwt__Issuer: game-server-api
+      Jwt__Audience: game-server-api
+      # 1 = Postgres, 0 = Redis (see Game.Abstractions/Infrastructure/Enums.cs).
+      DataAccessOptions__DatabaseSystem: "1"
+      DataAccessOptions__CacheSystem: "0"
+      DataAccessOptions__PubSubSystem: "0"
+      # Apply EF migrations (which carry the seed reference data) on startup outside Development.
+      DataAccessOptions__MigrateOnStartup: "true"
+      # Use Docker service names for inter-container communication (bridge networking).
+      DataAccessOptions__DbConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-game};Username=${POSTGRES_USER:-game};Password=${POSTGRES_PASSWORD:-game}"
+      DataAccessOptions__CacheConnectionString: "redis:6379"
+      DataAccessOptions__PubSubConnectionString: "redis:6379"
