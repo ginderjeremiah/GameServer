@@ -7,7 +7,7 @@ import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
-import { staticData, acknowledgeModal } from '$stores';
+import { staticData, statistics, acknowledgeModal } from '$stores';
 import { apiSocket } from '$lib/api';
 
 export const inventoryManager = statify(new InventoryManager());
@@ -24,6 +24,9 @@ export const SESSION_REPLACED_BODY =
 export const startGame = () => {
 	if (staticData.loaded) {
 		inventoryManager.initialize();
+		// Fire-and-forget: the per-zone ZonesCleared values back the fight screen's
+		// boss "Cleared" seal; a failed load just leaves the seal hidden.
+		void statistics.load();
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
@@ -47,6 +50,7 @@ const stopGame = () => {
 	renderEngine.stop();
 	enemyManager.stop();
 	battleEngine.stop();
+	statistics.reset();
 };
 
 const startLogicEngine = () => {

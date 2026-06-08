@@ -1,45 +1,90 @@
 <div class="fight-screen" data-testid="fight-screen">
+	{#if boss.engaged}
+		<BossAtmosphere />
+	{/if}
+
 	<div class="zone-nav-wrapper">
 		<ZoneNav />
 	</div>
+
+	{#if boss.hasBoss}
+		<div class="boss-affordance-wrapper">
+			<div class="boss-affordance-inner">
+				<BossAffordanceSlot view={boss} />
+			</div>
+		</div>
+	{/if}
+
 	<div class="combatants">
 		<BattlerCard battler={battleEngine.player} side="player" />
 
 		<!-- VS badge -->
-		<div class="vs-badge" data-testid="vs-badge">
+		<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
 			<div class="vs-diamond"></div>
 			<div class="vs-diamond-inner"></div>
 			<span class="vs-text">vs</span>
 		</div>
 
-		<BattlerCard battler={battleEngine.enemy} side="enemy" />
+		{#if boss.engaged}
+			<BossBattlerCard battler={battleEngine.enemy} />
+		{:else}
+			<BattlerCard battler={battleEngine.enemy} side="enemy" />
+		{/if}
+
+		{#if boss.victory}
+			<ZoneClearedOverlay bossName={boss.bossName} zoneName={boss.zoneName} autoFight={boss.autoFight} />
+		{/if}
 	</div>
 </div>
 
 <script lang="ts">
 import ZoneNav from './ZoneNav.svelte';
 import BattlerCard from './BattlerCard.svelte';
+import BossAffordanceSlot from './boss/BossAffordanceSlot.svelte';
+import BossBattlerCard from './boss/BossBattlerCard.svelte';
+import BossAtmosphere from './boss/BossAtmosphere.svelte';
+import ZoneClearedOverlay from './boss/ZoneClearedOverlay.svelte';
+import { BossView } from './boss/boss-view.svelte';
 import { battleEngine } from '$lib/engine';
+
+const boss = new BossView();
 </script>
 
 <style lang="scss">
 .fight-screen {
 	width: 100%;
 	height: 100%;
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	overflow: auto;
 }
 
 .zone-nav-wrapper {
+	position: relative;
+	z-index: 1;
 	padding: 22px 32px 0;
 	display: flex;
 	justify-content: center;
 }
 
+.boss-affordance-wrapper {
+	position: relative;
+	z-index: 2;
+	padding: 12px 32px 0;
+	display: flex;
+	justify-content: center;
+}
+
+.boss-affordance-inner {
+	width: 100%;
+	max-width: 720px;
+}
+
 .combatants {
 	flex: 1;
 	position: relative;
+	z-index: 1;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -81,5 +126,23 @@ import { battleEngine } from '$lib/engine';
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: color-mix(in srgb, var(--text-primary) 85%, transparent);
+}
+
+// Gold "versus" treatment while a boss is engaged.
+.vs-badge.boss {
+	.vs-diamond {
+		border-color: color-mix(in srgb, var(--boss-accent) 33%, transparent);
+	}
+
+	.vs-diamond-inner {
+		inset: 12px;
+		background: none;
+		border: 1px solid color-mix(in srgb, var(--boss-accent) 53%, transparent);
+		box-shadow: inset 0 0 12px color-mix(in srgb, var(--boss-accent) 20%, transparent);
+	}
+
+	.vs-text {
+		color: var(--boss-accent);
+	}
 }
 </style>
