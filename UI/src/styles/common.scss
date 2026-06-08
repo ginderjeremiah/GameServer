@@ -83,7 +83,7 @@ h1 {
 }
 
 input::placeholder {
-	color: rgba(240, 240, 240, 0.55);
+	color: var(--text-tertiary);
 }
 
 // Themed scrollbars. Without this the OS-default scrollbar renders as a bright bar
@@ -123,10 +123,10 @@ input::placeholder {
 @keyframes pulse-glow {
 	0%,
 	100% {
-		box-shadow: 0 0 6px rgba(161, 194, 247, 0.35);
+		box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 	50% {
-		box-shadow: 0 0 14px rgba(161, 194, 247, 0.85);
+		box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 85%, transparent);
 	}
 }
 
@@ -155,10 +155,10 @@ input::placeholder {
 @keyframes ready-pulse {
 	0%,
 	100% {
-		box-shadow: 0 0 6px var(--pulse-color, rgba(161, 194, 247, 0.4));
+		box-shadow: 0 0 6px var(--pulse-color, color-mix(in srgb, var(--accent) 40%, transparent));
 	}
 	50% {
-		box-shadow: 0 0 14px var(--pulse-color, rgba(161, 194, 247, 0.8));
+		box-shadow: 0 0 14px var(--pulse-color, color-mix(in srgb, var(--accent) 80%, transparent));
 	}
 }
 
@@ -166,10 +166,10 @@ input::placeholder {
 	0%,
 	100% {
 		opacity: 0.6;
-		box-shadow: 0 0 6px rgba(161, 194, 247, 0.5);
+		box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
 	}
 	50% {
 		opacity: 1;
-		box-shadow: 0 0 12px rgba(161, 194, 247, 0.95);
+		box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 95%, transparent);
 	}
 }

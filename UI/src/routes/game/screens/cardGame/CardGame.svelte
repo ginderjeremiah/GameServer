@@ -170,8 +170,8 @@ onMount(() => {
 		color-mix(in srgb, var(--surface) 85%, black)
 	);
 	box-shadow:
-		0 0 0 1px rgba(0, 0, 0, 0.4),
-		0 30px 70px -30px rgba(0, 0, 0, 0.8),
+		0 0 0 1px color-mix(in srgb, var(--black) 40%, transparent),
+		0 30px 70px -30px color-mix(in srgb, var(--black) 80%, transparent),
 		inset 0 1px 0 color-mix(in srgb, var(--white) 4%, transparent);
 }
 
