@@ -135,6 +135,7 @@ namespace Game.Api
             //app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseSessionLoader();
+            app.UseRequestLogging();
             app.UseLoginTracking();
             app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
             app.UseSocketInterceptor();

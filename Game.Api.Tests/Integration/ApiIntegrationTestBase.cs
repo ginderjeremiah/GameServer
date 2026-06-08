@@ -25,7 +25,12 @@ namespace Game.Api.Tests.Integration
         protected ApiIntegrationTestBase(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
         {
             Containers = containers;
-            Factory = new GameServerFactory(containers, testOutputHelper);
+            Factory = CreateFactory(containers, testOutputHelper);
+        }
+
+        protected virtual GameServerFactory CreateFactory(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+        {
+            return new GameServerFactory(containers, testOutputHelper);
         }
 
         public async ValueTask InitializeAsync()
