@@ -14,11 +14,13 @@ namespace Game.Api.Controllers
     public class LoginController(
         SessionService sessionService,
         AccountService accountService,
-        LoginTrackingService loginTrackingService) : ControllerBase
+        LoginTrackingService loginTrackingService,
+        SocketManagerService socketManager) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly AccountService _accountService = accountService;
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
+        private readonly SocketManagerService _socketManager = socketManager;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
@@ -80,6 +82,23 @@ namespace Game.Api.Controllers
 
             var player = await _sessionService.LoadPlayer();
             return ApiResponse.Success(PlayerData.FromPlayer(player));
+        }
+
+        /// <summary>
+        /// Reports whether the authenticated player already has a live game connection open elsewhere.
+        /// The login flow calls this before entering the game (which would open a websocket and take over
+        /// any existing session) so it can warn the user first.
+        /// </summary>
+        [HttpGet]
+        public async Task<ApiResponse<ActiveSessionResult>> ActiveSession()
+        {
+            if (!_sessionService.SessionAvailable)
+            {
+                return ApiResponse.Error("Not logged in");
+            }
+
+            var active = await _socketManager.HasActiveSocket(_sessionService.SelectedPlayerId);
+            return ApiResponse.Success(new ActiveSessionResult { Active = active });
         }
 
         /// <summary>

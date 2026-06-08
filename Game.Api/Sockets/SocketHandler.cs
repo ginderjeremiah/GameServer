@@ -14,18 +14,20 @@ namespace Game.Api.Sockets
         private readonly SocketCommandFactory _commandFactory;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<SocketHandler> _logger;
+        private readonly Func<Task> _onActivity;
 
         private DateTime _lastResponse = DateTime.UtcNow;
 
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Func<Task> onActivity)
         {
             _context = context;
             _commandFactory = commandFactory;
             _scopeFactory = scopeFactory;
             _logger = logger;
+            _onActivity = onActivity;
         }
 
         public void Listen()
@@ -80,6 +82,9 @@ namespace Game.Api.Sockets
                     {
                         _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Message}", PlayerId, Id, message);
                         _lastResponse = DateTime.UtcNow;
+                        // Any inbound message (heartbeat ping or command) marks the connection live — keep its
+                        // presence key from expiring on the same signal the inactivity check uses above.
+                        await _onActivity();
                         await HandleMessage(message);
                     }
                 }

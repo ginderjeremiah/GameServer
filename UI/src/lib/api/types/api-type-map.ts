@@ -2,6 +2,7 @@
 // Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 
 import type {
+	IActiveSessionResult,
 	IAddEditAttributesData,
 	IAdminUserSearchResults,
 	IApplyModRequest,
@@ -69,6 +70,7 @@ export type ApiResponseTypes = {
 	'ItemMods/ItemModTypes': IItemModType[];
 	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
+	'Login/ActiveSession': IActiveSessionResult;
 	'Login/CreateAccount': undefined;
 	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;

@@ -163,6 +163,72 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ActiveSession_Unauthenticated_Returns401()
+        {
+            var response = await Client.GetAsync("/api/Login/ActiveSession", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task ActiveSession_NoOpenSocket_ReturnsFalse()
+        {
+            // Arrange — a logged-in user who has not opened a game connection.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "nosocketuser", "nosocketpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var (authClient, _) = await LoginAndBuildClientAsync("nosocketuser", "nosocketpass");
+
+            // Act
+            var result = await GetActiveSessionAsync(authClient);
+
+            // Assert — no live connection means no other session to warn about.
+            Assert.NotNull(result?.Data);
+            Assert.False(result.Data.Active);
+            authClient.Dispose();
+        }
+
+        [Fact]
+        public async Task ActiveSession_WithOpenSocket_ReturnsTrue()
+        {
+            // Arrange — a logged-in user with a live websocket connection registered.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "livesocketuser", "livesocketpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            var (authClient, _) = await LoginAndBuildClientAsync("livesocketuser", "livesocketpass");
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, user.Id);
+            // Round-trip a command so the connection is fully registered (the socket-presence key is set
+            // before the command listener, so any response guarantees registration completed).
+            await socketClient.SendCommandAsync<object>("GetStatisticTypes");
+
+            // Act
+            var result = await GetActiveSessionAsync(authClient);
+
+            // Assert — the open connection is reported as an active session.
+            Assert.NotNull(result?.Data);
+            Assert.True(result.Data.Active);
+            authClient.Dispose();
+        }
+
+        private static async Task<ApiResponse<ActiveSessionResult>?> GetActiveSessionAsync(HttpClient client)
+        {
+            var response = await client.GetAsync("/api/Login/ActiveSession", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
+        }
+
+        [Fact]
         public async Task Refresh_ValidToken_RotatesAndReturnsNewTokens()
         {
             // Arrange

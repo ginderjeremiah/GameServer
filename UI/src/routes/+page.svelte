@@ -98,6 +98,7 @@ import {
 	validateUsername,
 	type LoginMode
 } from './login/login-validation';
+import { confirmSessionTakeover } from './login/session-takeover';
 
 let mode = $state<LoginMode>('login');
 let username = $state('');
@@ -183,15 +184,22 @@ const handleSubmit = async () => {
 	}
 
 	const response = await new ApiRequest('Login').post({ username, password });
-	submitting = false;
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
+		// Warn before entering the game if the player is already connected elsewhere — entering would
+		// take over (disconnect) that session. Declining logs this freshly-issued session back out.
+		if (!(await confirmSessionTakeover())) {
+			submitting = false;
+			return;
+		}
 		// Fire-and-forget: report this device's capabilities now that we're authenticated.
 		void reportDeviceInfo();
 		enterWorld(response.data.player);
 	} else if (mode === 'signup') {
+		submitting = false;
 		serverError = response.error ?? 'Account created but login failed.';
 	} else {
+		submitting = false;
 		serverError = response.error ?? 'Incorrect username or password.';
 	}
 };

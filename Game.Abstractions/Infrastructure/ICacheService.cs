@@ -12,6 +12,8 @@
         public Task Set<T>(string key, T value);
         public Task Set(string key, string value, TimeSpan expiry);
         public Task Set<T>(string key, T value, TimeSpan expiry);
+        /// <summary>Resets the time-to-live on an existing key. A no-op if the key does not exist.</summary>
+        public Task Expire(string key, TimeSpan expiry);
         public void SetAndForget(string key, string value);
         public void SetAndForget<T>(string key, T value);
         public Task SetNotExists(string key, string value);
