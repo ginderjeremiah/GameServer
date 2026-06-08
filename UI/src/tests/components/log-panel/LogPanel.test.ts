@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { ELogType } from '$lib/api';
 import type { LogMessage } from '$lib/engine/log';
+import { MIN_LOG_PANEL_HEIGHT, DEFAULT_LOG_PANEL_HEIGHT } from '../../../components/log-panel/log-panel-view.svelte';
 
 const logData: LogMessage[] = [];
 
@@ -52,5 +53,33 @@ describe('LogPanel', () => {
 		// The panel height is driven by an inline style from the resize view-model.
 		const panel = screen.getByTestId('log-panel');
 		expect(panel.style.height).toMatch(/\d+px/);
+	});
+
+	it('exposes the resize handle as a keyboard-operable separator', () => {
+		render(LogPanel);
+		const handle = screen.getByTestId('log-resize-handle');
+		expect(handle.getAttribute('tabindex')).toBe('0');
+		expect(handle.getAttribute('aria-orientation')).toBe('horizontal');
+		expect(handle.getAttribute('aria-valuenow')).toBe(String(DEFAULT_LOG_PANEL_HEIGHT));
+		expect(handle.getAttribute('aria-valuemin')).toBe(String(MIN_LOG_PANEL_HEIGHT));
+		// aria-valuemax is populated once the container is measured on mount.
+		expect(handle.getAttribute('aria-valuemax')).not.toBeNull();
+	});
+
+	it('resizes from the keyboard and reports the new height via aria-valuenow', async () => {
+		render(LogPanel);
+		const handle = screen.getByTestId('log-resize-handle');
+		const before = handle.getAttribute('aria-valuenow');
+		// ArrowDown is handled: it cancels the default page scroll and updates the value.
+		const notCancelled = await fireEvent.keyDown(handle, { key: 'ArrowDown' });
+		expect(notCancelled).toBe(false); // preventDefault was called
+		expect(handle.getAttribute('aria-valuenow')).not.toBe(before);
+	});
+
+	it('leaves keys it does not handle to their default behaviour', async () => {
+		render(LogPanel);
+		const handle = screen.getByTestId('log-resize-handle');
+		const notCancelled = await fireEvent.keyDown(handle, { key: 'a' });
+		expect(notCancelled).toBe(true); // default not prevented
 	});
 });

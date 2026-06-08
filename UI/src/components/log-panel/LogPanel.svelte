@@ -5,13 +5,26 @@
 	style:height="{view.height}px"
 	bind:this={panelEl}
 >
+	<!--
+		Keyboard-operable window splitter: a focusable ARIA separator with live
+		aria-value* and arrow/Home/End handling. Svelte's a11y heuristic treats
+		role="separator" as non-interactive and flags the tabindex + key handler, but
+		a focusable splitter is exactly the intended, spec-endorsed pattern here.
+	-->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		class="log-resize-handle"
 		role="separator"
+		tabindex="0"
 		aria-orientation="horizontal"
 		aria-label="Resize combat log"
+		aria-valuenow={Math.round(view.height)}
+		aria-valuemin={MIN_LOG_PANEL_HEIGHT}
+		aria-valuemax={view.ariaMax}
 		data-testid="log-resize-handle"
 		onpointerdown={onHandleDown}
+		onkeydown={onHandleKey}
 	></div>
 
 	<div class="log-header">
@@ -34,7 +47,7 @@
 import { untrack, onMount } from 'svelte';
 import { logs } from '$stores';
 import LogRow from './LogRow.svelte';
-import { LogPanelView } from './log-panel-view.svelte';
+import { LogPanelView, MIN_LOG_PANEL_HEIGHT, LOG_PANEL_KEYBOARD_STEP } from './log-panel-view.svelte';
 
 const rowHeight = 30;
 
@@ -50,6 +63,30 @@ const onHandleDown = (e: PointerEvent) => {
 	e.preventDefault();
 	view.beginResize(e.clientY, availableHeight() ?? view.height);
 	document.body.classList.add('log-resizing');
+};
+
+// Keyboard parity for the pointer drag: arrow keys step the height (Up grows the
+// log, mirroring an upward drag of the top edge), Home/End jump to min/max. The
+// same clamping/persistence as the drag is reused via the view-model.
+const onHandleKey = (e: KeyboardEvent) => {
+	const available = availableHeight();
+	switch (e.key) {
+		case 'ArrowUp':
+			view.stepResize(LOG_PANEL_KEYBOARD_STEP, available);
+			break;
+		case 'ArrowDown':
+			view.stepResize(-LOG_PANEL_KEYBOARD_STEP, available);
+			break;
+		case 'Home':
+			view.resizeTo('min', available);
+			break;
+		case 'End':
+			view.resizeTo('max', available);
+			break;
+		default:
+			return; // Leave other keys (Tab, etc.) to their default behaviour.
+	}
+	e.preventDefault(); // Only when handled — stops the key from also scrolling the page.
 };
 
 // Logs are stored newest-first (unshifted), so index 0 is the newest entry.
@@ -163,9 +200,16 @@ onMount(() => {
 	&:hover::after {
 		background: color-mix(in srgb, var(--accent) 55%, transparent);
 	}
+
+	// Keyboard focus reuses the accent line as a clearly visible, on-theme focus
+	// indicator (the thin strip has no border of its own to outline).
+	&:focus-visible {
+		outline: none;
+	}
 }
 
-.log-panel.resizing .log-resize-handle::after {
+.log-panel.resizing .log-resize-handle::after,
+.log-resize-handle:focus-visible::after {
 	background: var(--accent);
 }
 
