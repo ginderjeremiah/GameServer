@@ -1,9 +1,7 @@
-<div class="sealed-head">
-	<div class="head-top">
-		<!-- Diamond + category label are colour-matched to the (still-visible) category. -->
-		<div class="cat-diamond" style:background={catAccent} style:box-shadow="0 0 6px {tintColor(catAccent, 0.67)}"></div>
-		<div class="cat-label" style:color={catAccent}>{typeLabel}</div>
-		<!-- Sealed badge + border accent carry the rarity tier (the teaser). -->
+<!-- Diamond + category label stay colour-matched to the (still-visible) category, while the
+	sealed badge + masked name carry the rarity teaser — composed over the shared TooltipTitle. -->
+<TooltipTitle label={typeLabel} name="?????????" diamondColor={catAccent} labelColor={catAccent} masked>
+	{#snippet trailing()}
 		<div
 			class="sealed-badge"
 			style:background={tintColor(rarityAccent, 0.1)}
@@ -15,12 +13,12 @@
 			</svg>
 			<span style:color={rarityAccent}>Sealed</span>
 		</div>
-	</div>
-	<div class="masked-name">?????????</div>
-</div>
+	{/snippet}
+</TooltipTitle>
 
 <script lang="ts">
 import { tintColor } from '$lib/common';
+import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
 
 interface Props {
 	/** Rarity hue — drives the SEALED badge and the tooltip's left border. */
@@ -35,31 +33,6 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 </script>
 
 <style lang="scss">
-.sealed-head {
-	padding: 14px 16px 12px;
-	border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
-}
-
-.head-top {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 5px;
-}
-
-.cat-diamond {
-	width: 5px;
-	height: 5px;
-	transform: rotate(45deg);
-}
-
-.cat-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.8px;
-	text-transform: uppercase;
-}
-
 .sealed-badge {
 	margin-left: auto;
 	display: flex;
@@ -74,12 +47,5 @@ const { rarityAccent, catAccent, typeLabel }: Props = $props();
 		letter-spacing: 1.2px;
 		text-transform: uppercase;
 	}
-}
-
-.masked-name {
-	font-size: 18px;
-	font-weight: 400;
-	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
-	letter-spacing: 2px;
 }
 </style>
