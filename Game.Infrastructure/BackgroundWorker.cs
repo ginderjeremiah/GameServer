@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
-namespace Game.Core
+namespace Game.Infrastructure
 {
     /// <summary>
     /// A lightweight container for managing and repeatedly executing a delegate using a background <see cref="Task"/>.
@@ -24,18 +24,7 @@ namespace Game.Core
         public bool IsRunning { get; private set; } = false;
 
         /// <summary>
-        /// Initializes the <see cref="BackgroundWorker"/> with a synchronous delegate expecting an <see cref="ILogger"/> parameter. 
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="action"></param>
-        public BackgroundWorker(ILogger<BackgroundWorker> logger, Action<ILogger> action)
-        {
-            _logger = logger;
-            _workerHandle = RegisterWorker(CreateWorkerLoop(() => action(logger)));
-        }
-
-        /// <summary>
-        /// Initializes the <see cref="BackgroundWorker"/> with a synchronous delegate expecting no parameters. 
+        /// Initializes the <see cref="BackgroundWorker"/> with a synchronous delegate expecting no parameters.
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="action"></param>
@@ -46,18 +35,7 @@ namespace Game.Core
         }
 
         /// <summary>
-        /// Initializes the <see cref="BackgroundWorker"/> with an asynchronous delegate expecting an <see cref="ILogger"/> parameter. 
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="action"></param>
-        public BackgroundWorker(ILogger<BackgroundWorker> logger, Func<ILogger, Task> action)
-        {
-            _logger = logger;
-            _workerHandle = RegisterWorker(CreateAsyncWorkerLoop(async () => await action(logger)));
-        }
-
-        /// <summary>
-        /// Initializes the <see cref="BackgroundWorker"/> with an asynchronous delegate expecting no parameters. 
+        /// Initializes the <see cref="BackgroundWorker"/> with an asynchronous delegate expecting no parameters.
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="action"></param>
