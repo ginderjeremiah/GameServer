@@ -53,9 +53,6 @@ namespace Game.Api
                     options.TimestampFormat = "HH:mm:ss.fff";
                 });
 
-            //.AddConsole(options => options.FormatterName = nameof(LogFormatter))
-            //.AddConsoleFormatter<LogFormatter, LogFormatterOptions>();
-
             builder.Services.AddOptions<DataAccessOptions>()
                 .BindConfiguration(nameof(DataAccessOptions));
 
@@ -133,7 +130,6 @@ namespace Game.Api
                     .AllowCredentials();
             });
 
-            //app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseSessionLoader();
             app.UseRequestLogging();
