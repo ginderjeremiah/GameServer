@@ -78,8 +78,18 @@ jobs:
     - name: Build solution
       run: dotnet build
 
+    - name: Verify TypeScript codegen is up to date
+      # The generated frontend API client (UI/src/lib/api/types) must stay byte-identical to what the
+      # backend DTOs/controllers produce. Regenerate and assert a clean diff so a backend change that
+      # forgets to regenerate fails here instead of landing stale client types. The codegen command
+      # short-circuits before host construction (no Postgres/Redis/DI), so it's safe in CI; reuse the
+      # binaries from "Build solution" (--no-build --no-restore), mirroring the test step below.
+      run: |
+        dotnet run --project Game.Api --no-build --no-restore -- codegen
+        git diff --exit-code -- UI/src/lib/api/types
+
     - name: Run formatter (verify only)
-      run: dotnet format --verify-no-changes 
+      run: dotnet format --verify-no-changes
 
     - name: Execute full test suite
       # The build above already restored and compiled everything; reuse those binaries instead of
