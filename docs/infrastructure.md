@@ -17,6 +17,15 @@ dotnet run --project Game.Api -- codegen [outputDirectory]
 
 The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch api model/client drift.
 
+### Generated domain constants (not just DTOs)
+
+The codegen also emits a small amount of **static domain data** that the frontend would otherwise hand-mirror — closing a latent parity gap where a backend-only change could silently disagree with the frontend (#282). The first such case is the engine's static attribute-modifier table:
+
+- **`StaticModifierWriter`** emits `STATIC_ATTRIBUTE_MODIFIERS` (`UI/src/lib/api/types/attribute-modifiers.ts`) from the domain's single ordered source of truth, `Game.Core.Attributes.Modifiers.StaticAttributeModifiers.All` (the same list `AttributeCollection` seeds itself from). A `Derived` modifier renders its `derivedSource`; the others omit it, so the table matches the frontend's discriminated `AttributeModifier` union (where a base modifier carries no `derivedSource`). The frontend file `$lib/battle/attribute-modifier.ts` keeps only that union — a value-free, frontend-specific type — and re-exports the generated table typed as `readonly AttributeModifier[]`, which makes the assignment a compile-time check that the generated values still conform to the union.
+- **The two domain enums it references (`EModifierType`/`EAttributeModifierSource`) are emitted into `enums.ts`** even though no API/socket DTO reaches them (`ApiCodeGenerator.GetDomainEnumDescriptors`). The reflection walk only discovers types on the wire contract, so these are fed in explicitly, sourced from the `AttributeModifier` properties that use them.
+
+Because all of this lands under `UI/src/lib/api/types`, the existing CI codegen-drift check already guards it: a retune of a coefficient (or an enum value) that isn't regenerated fails the `git diff`, so the cross-implementation parity no longer rests on a human keeping the two files in step.
+
 ## Integration-Test Containers in Constrained Environments
 
 Integration tests get a real PostgreSQL + Redis via **Testcontainers** (`PostgresContainerFixture`, `RedisContainerFixture`, composed by `IntegrationTestContainers`). Testcontainers depends on Docker **bridge networking**, which is unavailable in constrained sandboxes such as the Claude Code web environment (old kernel, no iptables, no usable bridge). There, Testcontainers cannot create networks or map ports and every integration test fails before it runs. See [anthropics/claude-code#29515](https://github.com/anthropics/claude-code/issues/29515).

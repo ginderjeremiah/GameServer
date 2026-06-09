@@ -93,16 +93,10 @@ namespace Game.Core.Attributes
 
         private void AddStaticModifiers()
         {
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.CooldownRecoveryAgility);
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.CooldownRecoveryDexterity);
-
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DefenseBase);
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DefenseEndurance);
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.DefenseAgility);
-
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthBase);
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthEndurance);
-            AddModifierWithoutCacheInvalidation(StaticAttributeModifiers.MaxHealthStrength);
+            foreach (var modifier in StaticAttributeModifiers.All)
+            {
+                AddModifierWithoutCacheInvalidation(modifier);
+            }
         }
 
         private static List<AttributeCollectionNode> GetNodeList()

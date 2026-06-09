@@ -2,14 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { EAttribute } from '$lib/api';
 import { EModifierType, EAttributeModifierSource, STATIC_ATTRIBUTE_MODIFIERS } from '$lib/battle';
 
-/* `attribute-modifier.ts` is a hand-maintained frontend mirror of the C# domain
-   (`Game.Core` `EModifierType`/`EAttributeModifierSource` and
-   `Game.Core.Attributes.Modifiers.StaticAttributeModifiers`). It carries no
-   behaviour, so these tests guard the mirror itself: the enum values must match
-   the backend (they are sent/compared by value via the parity suite) and the
-   static base/derived modifier table must encode the exact formulas the battle
-   simulation builds on. A drift here would silently desync the attribute
-   breakdown from the numbers the engine produces. */
+/* The `EModifierType`/`EAttributeModifierSource` enums and the
+   `STATIC_ATTRIBUTE_MODIFIERS` table are generated from the C# domain by
+   `Game.Api.CodeGen` (`Game.Core` `EModifierType`/`EAttributeModifierSource` and
+   `Game.Core.Attributes.Modifiers.StaticAttributeModifiers.All`), and the CI
+   codegen-drift check is the cross-implementation guard against a backend-only
+   change going un-mirrored. These cases pin the canonical values on the frontend
+   side — mirroring the backend `StaticAttributeModifiersTests` (same scenarios,
+   same expected numbers) — so the generated table and enums are also anchored by
+   an explicit, human-readable expectation rather than the diff check alone. */
 
 describe('EModifierType', () => {
 	it('matches the backend Game.Core.EModifierType values', () => {
