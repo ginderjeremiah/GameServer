@@ -192,12 +192,16 @@ namespace Game.Infrastructure.Tests
             // The fix this characterizes is the release of the AutoResetEvent's OS wait handle, which the class
             // previously left to the SafeWaitHandle finalizer. There is no public seam exposing it, so the disposal
             // is verified directly on the private field — the one deliberate white-box assertion in this suite.
-            var resetEvent = GetResetEvent(worker);
-            Assert.False(resetEvent.SafeWaitHandle.IsClosed);
+            var handle = GetResetEvent(worker).SafeWaitHandle;
+            Assert.False(handle.IsClosed);
 
             worker.Dispose();
 
-            Assert.True(resetEvent.SafeWaitHandle.IsClosed);
+            // Dispose() implies Kill(), whose Unregister(null) requests cancellation without blocking for the thread
+            // pool to drop its reference on the handle. The SafeWaitHandle is reference-counted, so its count can
+            // reach zero (closing the handle) a short, non-deterministic time after Dispose() returns — poll rather
+            // than assert synchronously to absorb that window.
+            WaitUntil(() => handle.IsClosed);
         }
 
         [Theory]
@@ -241,10 +245,14 @@ namespace Game.Infrastructure.Tests
 
             // Kill() and Dispose() are distinct steps; disposing an already-killed worker still releases the handle
             // and must not throw.
+            var handle = GetResetEvent(worker).SafeWaitHandle;
             worker.Kill();
             worker.Dispose();
 
-            Assert.True(GetResetEvent(worker).SafeWaitHandle.IsClosed);
+            // Unregister(null) does not block for the thread pool to drop its reference on the reference-counted
+            // handle, so its closure settles asynchronously after Dispose() returns — poll rather than assert
+            // synchronously to absorb that window.
+            WaitUntil(() => handle.IsClosed);
             Assert.Throws<ObjectDisposedException>(worker.Start);
         }
 
