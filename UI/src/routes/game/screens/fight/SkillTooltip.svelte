@@ -1,33 +1,27 @@
-<div
-	class="skill-tooltip"
-	bind:this={container}
-	style={skill ? '' : 'display: none;'}
-	style:border-left="3px solid var(--accent)"
->
-	{#if skill}
-		<TooltipTitle label="Skill" name={skill.name} diamondColor="var(--accent)" labelColor="var(--accent)">
+<TooltipShell accent="var(--accent)" glow hidden={!skill} bind:base={container}>
+	{#snippet header()}
+		<TooltipTitle label="Skill" name={skill?.name ?? ''} diamondColor="var(--accent)" labelColor="var(--accent)">
 			{#snippet trailing()}
 				<CooldownPill progress={cooldownProgress} ready={isReady} remainingFormatted={remainingCdFormatted} />
 			{/snippet}
 		</TooltipTitle>
+	{/snippet}
 
-		<div class="tt-body">
-			<TooltipSection label="Damage breakdown">
-				<DamageBreakdown base={baseDamage} {multipliers} enemyDefense={opponent ? enemyDefense : undefined} {total} />
-			</TooltipSection>
+	<TooltipSection label="Damage breakdown">
+		<DamageBreakdown base={baseDamage} {multipliers} enemyDefense={opponent ? enemyDefense : undefined} {total} />
+	</TooltipSection>
 
-			<TooltipSection label="Tempo" last>
-				<TempoMetrics cooldown={adjustedCd} dps={total / adjustedCd} />
-			</TooltipSection>
-		</div>
-	{/if}
-</div>
+	<TooltipSection label="Tempo" last>
+		<TempoMetrics cooldown={adjustedCd} dps={total / adjustedCd} />
+	</TooltipSection>
+</TooltipShell>
 
 <script lang="ts">
 import { EAttribute, type IAttributeMultiplier } from '$lib/api';
 import { type Skill } from '$lib/battle';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
+import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
 import CooldownPill from './skill-tooltip/CooldownPill.svelte';
@@ -42,7 +36,9 @@ type Props = {
 
 const { skill }: Props = $props();
 
-let container: HTMLDivElement;
+// Bound to the shell's root element and relocated into the global tooltip container
+// by getBaseNode(); reactive so the relocation runs once the shell has mounted.
+let container = $state<HTMLDivElement>();
 
 const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) : undefined);
 
@@ -72,15 +68,3 @@ const attributeName = (attrId: number) => {
 	return staticData.attributes?.[attrId]?.name ?? EAttribute[attrId] ?? 'Unknown';
 };
 </script>
-
-<style lang="scss">
-.skill-tooltip {
-	width: 280px;
-	border-radius: 3px;
-	box-shadow: -4px 0 16px color-mix(in srgb, var(--accent) 13%, transparent);
-}
-
-.tt-body {
-	padding: 12px 16px 14px;
-}
-</style>
