@@ -21,7 +21,13 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		{ attributeId: EAttribute.Strength, amount: 10 },
 		{ attributeId: EAttribute.Endurance, amount: 8 }
 	],
-	selectedSkills: [0, 1, 2],
+	unlockedSkills: [
+		{ skillId: 0, selected: true, order: 1 },
+		{ skillId: 1, selected: true, order: 0 },
+		{ skillId: 2, selected: false },
+		{ skillId: 3, selected: true, order: 2 }
+	],
+	maxSelectedSkills: 4,
 	logPreferences: [
 		{ id: ELogType.Damage, enabled: false },
 		{ id: ELogType.Exp, enabled: true }
@@ -67,9 +73,17 @@ describe('PlayerManager', () => {
 			expect(manager.statPointsGained).toBe(30);
 			expect(manager.statPointsUsed).toBe(24);
 			expect(manager.attributes).toEqual(data.attributes);
-			expect(manager.selectedSkills).toEqual([0, 1, 2]);
+			expect(manager.unlockedSkills).toEqual(data.unlockedSkills);
+			expect(manager.maxSelectedSkills).toBe(4);
 			expect(manager.logPreferences).toEqual(data.logPreferences);
 			expect(manager.inventoryData).toEqual(data.inventoryData);
+		});
+
+		it('derives selectedSkills as the equipped ids in loadout order', () => {
+			manager.initialize(makePlayerData());
+
+			// Equipped skills 1 (order 0), 0 (order 1), 3 (order 2); skill 2 is unequipped.
+			expect(manager.selectedSkills).toEqual([1, 0, 3]);
 		});
 
 		it('overwrites previous state on re-initialize', () => {
@@ -133,6 +147,8 @@ describe('PlayerManager', () => {
 			expect(manager.level).toBe(0);
 			expect(manager.exp).toBe(0);
 			expect(manager.attributes).toEqual([]);
+			expect(manager.unlockedSkills).toEqual([]);
+			expect(manager.maxSelectedSkills).toBe(0);
 			expect(manager.selectedSkills).toEqual([]);
 			expect(manager.logPreferences).toEqual([]);
 			expect(manager.inventoryData).toEqual({

@@ -18,10 +18,17 @@ export interface IPlayerData {
 	level: number;
 	exp: number;
 	attributes: IBattlerAttribute[];
-	selectedSkills: number[];
+	unlockedSkills: IUnlockedSkill[];
+	maxSelectedSkills: number;
 	currentZone: number;
 	statPointsGained: number;
 	statPointsUsed: number;
 	logPreferences: ILogPreference[];
 	inventoryData: IInventoryData;
+}
+
+export interface IUnlockedSkill {
+	skillId: number;
+	selected: boolean;
+	order?: number;
 }
