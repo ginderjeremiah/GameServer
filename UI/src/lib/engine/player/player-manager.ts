@@ -1,4 +1,4 @@
-import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData } from '$lib/api';
+import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData, IUnlockedSkill } from '$lib/api';
 import { formatNum, statify } from '$lib/common';
 import { logMessage } from '../log';
 
@@ -13,12 +13,25 @@ export class PlayerManager implements IPlayerData {
 	public statPointsGained = 0;
 	public statPointsUsed = 0;
 	public attributes: IBattlerAttribute[] = [];
-	public selectedSkills: number[] = [];
+	public unlockedSkills: IUnlockedSkill[] = [];
+	public maxSelectedSkills = 0;
 	public logPreferences: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
 		unlockedMods: []
 	};
+
+	/**
+	 * The equipped skill ids in loadout order, derived from the unlocked set. The wire payload
+	 * carries only the richer {@link unlockedSkills}; the ordered equipped list is its single
+	 * source of truth (parallel to deriving equipped items from inventoryData.unlockedItems).
+	 */
+	public get selectedSkills(): number[] {
+		return this.unlockedSkills
+			.filter((skill) => skill.selected)
+			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+			.map((skill) => skill.skillId);
+	}
 
 	public initialize(data: IPlayerData) {
 		this.name = data.name;
@@ -28,7 +41,8 @@ export class PlayerManager implements IPlayerData {
 		this.statPointsGained = data.statPointsGained;
 		this.statPointsUsed = data.statPointsUsed;
 		this.attributes = data.attributes;
-		this.selectedSkills = data.selectedSkills;
+		this.unlockedSkills = data.unlockedSkills;
+		this.maxSelectedSkills = data.maxSelectedSkills;
 		this.logPreferences = data.logPreferences;
 		this.inventoryData = data.inventoryData;
 	}
