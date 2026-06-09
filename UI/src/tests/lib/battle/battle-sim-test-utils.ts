@@ -3,9 +3,9 @@ import type { EAttribute, IAttributeMultiplier, ISkill } from '$lib/api';
 
 /**
  * Shared helpers for the battle-simulation tests. They build the **real**
- * production {@link Battler}/{@link Skill} objects (the same ones the live
- * BattleEngine drives) from raw scenario inputs, so the tests exercise the
- * actual per-tick arithmetic instead of a hand-rolled copy.
+ * production `Battler`/`Skill` objects (the same ones the live BattleEngine
+ * drives) from raw scenario inputs, so the tests exercise the actual per-tick
+ * arithmetic instead of a hand-rolled copy.
  *
  * Each test file must `vi.mock('$stores')` with a `staticData.skills` getter
  * returning its own mock registry array, then pass that array to
