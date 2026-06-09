@@ -32,9 +32,19 @@ describe('SkillTooltip', () => {
 	it('renders only the hidden anchor when no skill is provided', () => {
 		const { container, queryByText } = render(SkillTooltip, { props: { skill: undefined } });
 		expect(queryByText('Damage breakdown')).toBeNull();
-		// The container stays mounted (hidden) so the tooltip system can still anchor to it.
-		const panel = container.querySelector('.skill-tooltip') as HTMLElement;
-		expect(panel.getAttribute('style')).toContain('display: none');
+		// The shell stays mounted (hidden) so the tooltip system can still anchor to it.
+		const panel = container.querySelector('.tt-shell') as HTMLElement;
+		expect(panel.style.display).toBe('none');
+	});
+
+	it('composes the tooltip shell with an accent-tinted glow', () => {
+		const skill = makeSkill(owner, { name: 'Cleave', cooldownMs: 1000 });
+		const { container } = render(SkillTooltip, { props: { skill } });
+		const shell = container.querySelector('.tt-shell') as HTMLElement;
+		expect(shell).not.toBeNull();
+		// Migrated to TooltipShell: accent left border + opt-in accent-tinted glow.
+		expect(shell.classList.contains('glow')).toBe(true);
+		expect(shell.getAttribute('style')).toContain('border-left: 3px solid var(--accent)');
 	});
 
 	it('shows the damage breakdown: base, per-attribute multiplier, enemy defense and total', () => {

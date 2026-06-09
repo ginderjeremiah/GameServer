@@ -41,6 +41,21 @@ describe('TooltipShell', () => {
 		expect(container.querySelector('.tt-body')).not.toBeNull();
 	});
 
+	it('keeps the neutral shadow with no glow opt-in by default', () => {
+		const { container } = render(TooltipShell, { props: { accent: 'var(--accent)' } });
+		const shell = container.querySelector('.tt-shell') as HTMLElement;
+		expect(shell.classList.contains('glow')).toBe(false);
+		expect(shell.getAttribute('style') ?? '').not.toContain('--tt-glow');
+	});
+
+	it('opts into an accent-tinted glow when glow is set', () => {
+		const { container } = render(TooltipShell, { props: { accent: 'var(--accent)', glow: true } });
+		const shell = container.querySelector('.tt-shell') as HTMLElement;
+		expect(shell.classList.contains('glow')).toBe(true);
+		// The glow tint flows from the same accent that paints the left border.
+		expect(shell.getAttribute('style')).toContain('--tt-glow: var(--accent)');
+	});
+
 	it('hides the panel and renders no contents when hidden', () => {
 		const { container } = render(TooltipShell, {
 			props: { accent: 'var(--accent)', hidden: true, header, children: body }
