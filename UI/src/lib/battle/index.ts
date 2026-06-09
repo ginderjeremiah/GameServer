@@ -1,4 +1,6 @@
 export * from './battler.ts';
+export * from './battle-step';
+export * from './battle-simulator';
 export * from './battle-attributes';
 export * from './attribute-modifier';
 export * from './attribute-collection';

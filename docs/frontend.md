@@ -30,6 +30,15 @@ Unit tests should be written for all UI logic (pages/components) and lib code in
 
 # Important Architectural Design Decisions
 
+## Battle simulation & parity
+
+The frontend simulates battles in real time as an anti-cheat measure: the backend replays the battle the client reports, so the two simulators must agree tick-for-tick (see [game-design.md](./game-design.md) and the backend parity notes). The per-tick arithmetic has a **single source** on the frontend — the pure `battleStep` (`$lib/battle/battle-step.ts`): the player's ready skills fire at the enemy, then (only if the enemy survives) the enemy fires back, operating on the real `Battler`/`Skill` objects and returning the resulting skill activations. Two consumers drive that one stepper:
+
+- **`BattleEngine.logicalUpdate`** — the live, render-driven loop. It calls `battleStep` once per 40ms logical tick and layers the UI concerns (combat-log messages, stage transitions) on top of the returned activations.
+- **`BattleSimulator`** (`$lib/battle/battle-simulator.ts`) — a headless runner, the frontend analogue of the backend's `Game.Core.Battle.BattleSimulator`, that drives `battleStep` over fixed ticks until one side dies or a time cap is hit.
+
+The cross-implementation parity suite (`battle-simulation-parity.test.ts`) drives the production `BattleSimulator` (not a hand-rolled copy), so a change to `Battler.advanceCooldowns`, `Skill.calculateDamage` or `Battler.takeDamage` that diverged from the backend would fail parity rather than silently weaken the replay. Keep its scenario matrix row-for-row aligned with the backend's `BattleSimulatorParityTests`.
+
 ## Authentication (JWT bearer + rotating refresh tokens)
 
 The frontend authenticates against the backend's JWT scheme (see the backend doc for the server side). All of the token handling lives in the API client layer (`lib/api`) so the rest of the app never touches tokens directly:
