@@ -21,6 +21,14 @@ namespace Game.Core.Players
         /// <summary>The number of stat points awarded on each level-up.</summary>
         private const int StatPointsPerLevel = 6;
 
+        /// <summary>
+        /// The maximum number of skills a player may equip in their battle loadout. Fixed at the
+        /// enemy loadout cap (<see cref="Enemies.Enemy"/> brings ≤ 4 skills into a battle) for
+        /// player/enemy symmetry. This is the single source of truth for the cap; enforcement of a
+        /// loadout change against it is added with the set-loadout command (#263).
+        /// </summary>
+        public const int MaxSelectedSkills = 4;
+
         public required int Id { get; set; }
         public required string Name { get; set; }
         public required int Level { get; set; }

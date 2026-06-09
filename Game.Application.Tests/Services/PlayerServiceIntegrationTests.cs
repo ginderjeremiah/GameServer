@@ -300,6 +300,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task LoadPlayer_OrdersSelectedSkillsByOrderThenSkillId()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // CreateSkillAsync assigns sequential ids, so these five skills have ascending ids.
+            var skillA = await TestDataSeeder.CreateSkillAsync(context, name: "A");
+            var skillB = await TestDataSeeder.CreateSkillAsync(context, name: "B");
+            var skillC = await TestDataSeeder.CreateSkillAsync(context, name: "C");
+            var skillD = await TestDataSeeder.CreateSkillAsync(context, name: "D");
+            var skillE = await TestDataSeeder.CreateSkillAsync(context, name: "E");
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Linked in a deliberately scrambled order so the assertion proves the mapper sorts rather
+            // than echoing insertion order. skillA and skillC share Order = 2 to exercise the SkillId
+            // tie-break (which also covers legacy rows that all default to Order = 0).
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillC.Id, selected: true, order: 2);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillA.Id, selected: true, order: 2);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillD.Id, selected: true, order: 0);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillB.Id, selected: true, order: 1);
+            // An unlocked-but-unselected skill must stay out of the equipped loadout.
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillE.Id, selected: false, order: 0);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // Equipped set is a stable total order by (Order, SkillId): D (0), B (1), then A and C
+            // tie at 2 → A before C because its SkillId is lower.
+            Assert.Equal(
+                new[] { skillD.Id, skillB.Id, skillA.Id, skillC.Id },
+                player.SelectedSkills.Select(skill => skill.Id));
+
+            // The unselected skill is still unlocked but never equipped.
+            Assert.Contains(player.Skills, skill => skill.Id == skillE.Id);
+            Assert.DoesNotContain(player.SelectedSkills, skill => skill.Id == skillE.Id);
+        }
+
+        [Fact]
         public async Task SetFavorite_PersistsFavoriteFlagToDatabase()
         {
             using var scope = CreateScope();

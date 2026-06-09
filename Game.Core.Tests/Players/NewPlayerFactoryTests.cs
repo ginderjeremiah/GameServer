@@ -33,6 +33,16 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
+        public void Create_AssignsSequentialLoadoutOrderToStarterSkills()
+        {
+            var newPlayer = _factory.Create("hero");
+
+            Assert.Equal(
+                Enumerable.Range(0, NewPlayerFactory.StarterSkillCount),
+                newPlayer.Skills.Select(skill => skill.Order));
+        }
+
+        [Fact]
         public void Create_GrantsEachCoreAttributeAtStartingAmount()
         {
             var newPlayer = _factory.Create("hero");

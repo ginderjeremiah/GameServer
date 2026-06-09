@@ -241,13 +241,14 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
-        public static async Task LinkSkillToPlayerAsync(GameContext context, int playerId, int skillId, bool selected = true)
+        public static async Task LinkSkillToPlayerAsync(GameContext context, int playerId, int skillId, bool selected = true, int order = 0)
         {
             context.PlayerSkills.Add(new PlayerSkill
             {
                 PlayerId = playerId,
                 SkillId = skillId,
                 Selected = selected,
+                Order = order,
             });
             await context.SaveChangesAsync();
         }

@@ -68,6 +68,8 @@ namespace Game.Application.Tests.Services
                 .ToListAsync(CancellationToken);
             Assert.Equal(new[] { 0, 1, 2 }, skills.Select(skill => skill.SkillId).OrderBy(id => id));
             Assert.All(skills, skill => Assert.True(skill.Selected));
+            // Starter skills carry a sequential loadout order (0..n-1), persisted by PlayerMapper.ToEntity.
+            Assert.Equal(new[] { 0, 1, 2 }, skills.OrderBy(skill => skill.SkillId).Select(skill => skill.Order));
 
             var attributes = await verifyContext.Set<PlayerAttribute>()
                 .Where(attribute => attribute.PlayerId == createdPlayer.Id)
