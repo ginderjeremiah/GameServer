@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
+using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -78,6 +79,65 @@ namespace Game.Application.Tests.DataAccess
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
             Assert.Throws<InvalidOperationException>(() => enemies.GetRandomEnemy(emptyZone.Id));
+        }
+
+        [Fact]
+        public async Task GetRandomEnemy_ExcludesRetiredEnemiesButKeepsThemResolvable()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var active = await TestDataSeeder.CreateEnemyAsync(context, "Active");
+            var retired = await TestDataSeeder.CreateEnemyAsync(context, "Retired");
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, active.Id, weight: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, retired.Id, weight: 1);
+
+            // Retire one of the two zone enemies: out of the spawn rolls, but kept at its slot.
+            retired.RetiredAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+
+            // Every random draw avoids the retired enemy...
+            for (int i = 0; i < 100; i++)
+            {
+                Assert.Equal(active.Id, enemies.GetRandomEnemy(zone.Id).Id);
+            }
+
+            // ...but the retired enemy still resolves by id, so existing references stay valid.
+            Assert.Equal(retired.Id, enemies.GetEnemy(retired.Id)?.Id);
+        }
+
+        [Fact]
+        public async Task GetEnemy_RetiringNonTerminalEnemy_DoesNotMisResolveHigherIds()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Contiguous zero-based ids 0..4 (truncation's RESTART IDENTITY seeds the next id at 0).
+            var seeded = new List<Enemy>();
+            for (int i = 0; i < 5; i++)
+            {
+                seeded.Add(await TestDataSeeder.CreateEnemyAsync(context, $"Enemy {i}"));
+            }
+
+            // Retire a NON-terminal record. A hard delete here would open an id gap and shift every
+            // higher index down by one; retiring keeps the slot so index-based lookups stay correct.
+            var target = seeded[2];
+            target.RetiredAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+
+            // The retired record still resolves to itself (not null, not a neighbour).
+            Assert.Equal(target.Id, enemies.GetEnemy(target.Id)?.Id);
+
+            // Every higher id resolves to its own record — no off-by-one mis-resolution.
+            foreach (var enemy in seeded.Where(e => e.Id > target.Id))
+            {
+                Assert.Equal(enemy.Id, enemies.GetEnemy(enemy.Id)?.Id);
+            }
         }
 
         [Fact]

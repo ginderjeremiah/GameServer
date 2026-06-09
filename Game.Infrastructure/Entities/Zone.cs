@@ -22,6 +22,9 @@
         /// optional FK, like <see cref="BossEnemyId"/>.</summary>
         public int? UnlockChallengeId { get; set; }
 
+        /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
+        public DateTime? RetiredAt { get; set; }
+
         public virtual List<ZoneEnemy> ZoneEnemies { get => field ?? throw new NotLoadedException(nameof(ZoneEnemies)); set; }
     }
 }

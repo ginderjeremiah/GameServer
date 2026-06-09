@@ -130,4 +130,40 @@ describe('EntityStore', () => {
 		await store.save();
 		expect(persist).not.toHaveBeenCalled();
 	});
+
+	describe('retire', () => {
+		it('isRetired reflects the retiredAt field', () => {
+			const store = new EntityStore(makeConfig(), [
+				{ id: 0, name: 'Alpha', value: 1 },
+				{ id: 1, name: 'Beta', value: 2, retiredAt: '2026-01-01T00:00:00Z' }
+			]);
+			expect(store.isRetired(store.items.find((r) => r.id === 0)!)).toBe(false);
+			expect(store.isRetired(store.items.find((r) => r.id === 1)!)).toBe(true);
+		});
+
+		it('setRetired stamps retiredAt as an ordinary edit and keeps the record at its slot', () => {
+			const store = new EntityStore(makeConfig(), seed);
+			store.setRetired(0, true);
+
+			const record = store.items.find((r) => r.id === 0)!;
+			expect(store.isRetired(record)).toBe(true);
+			expect(record.retiredAt).toBeTruthy();
+			// A retire is a modify, never a delete — the slot is preserved so index lookups can't shift.
+			expect(store.status(record)).toBe('modified');
+			expect(store.counts.deleted).toBe(0);
+			expect(store.items).toHaveLength(2);
+		});
+
+		it('reinstating clears retiredAt back to the active (null) shape', () => {
+			const store = new EntityStore(makeConfig(), [
+				{ id: 0, name: 'Alpha', value: 1, retiredAt: '2026-01-01T00:00:00Z' }
+			]);
+			store.setRetired(0, false);
+
+			const record = store.items.find((r) => r.id === 0)!;
+			expect(store.isRetired(record)).toBe(false);
+			expect(record.retiredAt).toBeNull();
+			expect(store.status(record)).toBe('modified');
+		});
+	});
 });

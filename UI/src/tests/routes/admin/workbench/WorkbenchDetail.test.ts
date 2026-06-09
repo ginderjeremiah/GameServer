@@ -24,13 +24,14 @@ interface Row extends Identified {
 	value: number;
 }
 
-const makeConfig = (): EntityConfig<Identified> =>
+const makeConfig = (retireable = false): EntityConfig<Identified> =>
 	({
 		key: 'rows',
 		label: 'Skills',
 		singular: 'Skill',
 		glyph: 'box',
 		blankName: 'Unnamed',
+		retireable,
 		newItem: (id: number) => ({ id, name: '', value: 0 }),
 		meta: () => [],
 		sections: [
@@ -175,5 +176,57 @@ describe('WorkbenchDetail — with a record', () => {
 		});
 		await fireEvent.click(screen.getByText('Delete'));
 		expect(s.status(rec)).toBe('deleted');
+	});
+});
+
+describe('WorkbenchDetail — retire lifecycle', () => {
+	const renderWith = (s: EntityStore<Identified>, rec: Identified) =>
+		render(WorkbenchDetail, {
+			props: {
+				entity: makeConfig(true),
+				store: s,
+				record: rec,
+				baseline: s.baselineOf(rec.id),
+				tab: 'identity',
+				onTab: vi.fn(),
+				onNew: vi.fn()
+			}
+		});
+
+	it('offers Retire (not Delete) for a saved active record and retires on click', async () => {
+		const s = new EntityStore(makeConfig(true), seed);
+		const rec = s.items[0];
+		renderWith(s, rec);
+
+		// Reference entities are retired, not deleted.
+		expect(screen.queryByText('Delete')).toBeNull();
+		await fireEvent.click(screen.getByText('Retire'));
+
+		const updated = s.items.find((r) => r.id === rec.id)!;
+		expect(s.isRetired(updated)).toBe(true);
+		expect(s.status(updated)).toBe('modified');
+	});
+
+	it('shows a retired badge and offers Reinstate for a retired record', async () => {
+		const retiredSeed: Row[] = [{ id: 1, name: 'Fireball', value: 50, retiredAt: '2026-01-01T00:00:00Z' }];
+		const s = new EntityStore(makeConfig(true), retiredSeed);
+		const rec = s.items[0];
+		const { container } = renderWith(s, rec);
+
+		expect(container.querySelector('.spill.retired')?.textContent).toBe('retired');
+		await fireEvent.click(screen.getByText('Reinstate'));
+
+		expect(s.isRetired(s.items.find((r) => r.id === rec.id)!)).toBe(false);
+	});
+
+	it('offers Remove (not Retire) for a never-saved record and drops it on click', async () => {
+		const s = new EntityStore(makeConfig(true), seed);
+		const newId = s.addItem();
+		const rec = s.items.find((r) => r.id === newId)!;
+		renderWith(s, rec);
+
+		expect(screen.queryByText('Retire')).toBeNull();
+		await fireEvent.click(screen.getByText('Remove'));
+		expect(s.items.find((r) => r.id === newId)).toBeUndefined();
 	});
 });

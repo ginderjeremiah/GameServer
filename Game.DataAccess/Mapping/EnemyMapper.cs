@@ -32,6 +32,7 @@ namespace Game.DataAccess.Mapping
                         ZoneId = ze.ZoneId,
                         Weight = ze.Weight,
                     }).ToList(),
+                RetiredAt = entity.RetiredAt,
             };
         }
 

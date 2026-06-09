@@ -18,6 +18,7 @@ export const itemEntity: EntityConfig<IItem> = {
 	singular: 'Item',
 	glyph: 'box',
 	blankName: 'Unnamed item',
+	retireable: true,
 	newItem: (id) => ({
 		id,
 		name: '',

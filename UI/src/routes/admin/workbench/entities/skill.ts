@@ -17,6 +17,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 	singular: 'Skill',
 	glyph: 'bolt',
 	blankName: 'Unnamed skill',
+	retireable: true,
 	newItem: (id) => ({
 		id,
 		name: '',

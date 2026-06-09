@@ -34,13 +34,7 @@ namespace Game.DataAccess.Repositories.Admin
                     CooldownMs = item.CooldownMs,
                     Description = item.Description,
                     IconPath = item.IconPath,
-                }),
-                delete: item => _entityStore.Delete(new Entities.Skill
-                {
-                    Id = item.Id,
-                    Name = "",
-                    Description = "",
-                    IconPath = "",
+                    RetiredAt = item.RetiredAt,
                 }));
         }
 

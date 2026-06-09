@@ -9,6 +9,10 @@
         public required string IconPath { get; set; }
         public int RarityId { get; set; }
 
+        /// <summary>When set, the record is <em>retired</em>: out of circulation for new acquisition but
+        /// kept at its slot and resolvable by id so existing references stay valid. Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
+
         public virtual ItemCategory ItemCategory { get => field ?? throw new NotLoadedException(nameof(ItemCategory)); set; }
         public virtual Rarity Rarity { get => field ?? throw new NotLoadedException(nameof(Rarity)); set; }
 

@@ -33,6 +33,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 	singular: 'Zone',
 	glyph: 'map',
 	blankName: 'Unnamed zone',
+	retireable: true,
 	newItem: (id) => ({
 		id,
 		name: '',
@@ -142,7 +143,8 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				levelMax,
 				bossEnemyId,
 				bossLevel,
-				unlockChallengeId
+				unlockChallengeId,
+				retiredAt
 			}) => ({
 				id,
 				name,
@@ -154,7 +156,8 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				bossEnemyId: bossEnemyId === -1 ? undefined : bossEnemyId,
 				bossLevel,
 				// Likewise map the "None" sentinel (-1) back to an absent unlock gate.
-				unlockChallengeId: unlockChallengeId === -1 ? undefined : unlockChallengeId
+				unlockChallengeId: unlockChallengeId === -1 ? undefined : unlockChallengeId,
+				retiredAt
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),
 			refresh,

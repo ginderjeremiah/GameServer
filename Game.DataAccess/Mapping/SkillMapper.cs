@@ -27,6 +27,7 @@ namespace Game.DataAccess.Mapping
                         AttributeId = (EAttribute)sdm.AttributeId,
                         Multiplier = sdm.Multiplier,
                     }).ToList(),
+                RetiredAt = entity.RetiredAt,
             };
         }
 

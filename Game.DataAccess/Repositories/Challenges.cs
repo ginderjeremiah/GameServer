@@ -27,6 +27,7 @@ namespace Game.DataAccess.Repositories
                     RewardItemId = c.RewardItemId,
                     RewardItemModId = c.RewardItemModId,
                     RewardSkillId = c.RewardSkillId,
+                    RetiredAt = c.RetiredAt,
                 })];
 
             return _challengeList;

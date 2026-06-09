@@ -39,15 +39,8 @@ namespace Game.DataAccess.Repositories.Admin
                         existing.ItemCategoryId = (int)item.ItemCategoryId;
                         existing.RarityId = (int)item.RarityId;
                         existing.IconPath = item.IconPath;
+                        existing.RetiredAt = item.RetiredAt;
                         _entityStore.Update(existing);
-                    }
-                },
-                delete: item =>
-                {
-                    var existing = _items.LookupItem(item.Id);
-                    if (existing is not null)
-                    {
-                        _entityStore.Delete(existing);
                     }
                 });
         }
