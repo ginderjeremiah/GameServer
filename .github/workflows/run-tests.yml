@@ -40,6 +40,7 @@ jobs:
             - 'Game.Core.Tests/**'
             - 'Game.DataAccess/**'
             - 'Game.Infrastructure/**'
+            - 'Game.Infrastructure.Tests/**'
             - 'Game.TestInfrastructure/**'
             - 'Game.sln'
             - 'docker-compose.yml'
