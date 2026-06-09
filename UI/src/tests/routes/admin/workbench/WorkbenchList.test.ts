@@ -23,12 +23,13 @@ import WorkbenchList from '$routes/admin/workbench/components/WorkbenchList.svel
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
 
-const makeConfig = (): EntityConfig<Identified> => ({
+const makeConfig = (retireable = false): EntityConfig<Identified> => ({
 	key: 'rows',
 	label: 'Enemies',
 	singular: 'Enemy',
 	glyph: 'box',
 	blankName: 'Unnamed',
+	retireable,
 	newItem: (id) => ({ id, name: '' }),
 	meta: () => [],
 	sections: [],
@@ -100,5 +101,28 @@ describe('WorkbenchList', () => {
 			props: { entity: makeConfig(), store, selectedId: 1, onSelect: vi.fn(), onNew: vi.fn() }
 		});
 		expect(container.textContent).toContain('new');
+	});
+
+	it('marks a retired row with the retired class and badge for a retireable entity', () => {
+		const store = new EntityStore(makeConfig(true), [
+			{ id: 1, name: 'Goblin' },
+			{ id: 2, name: 'Orc', retiredAt: '2026-01-01T00:00:00Z' }
+		]);
+		const { container } = render(WorkbenchList, {
+			props: { entity: makeConfig(true), store, selectedId: 1, onSelect: vi.fn(), onNew: vi.fn() }
+		});
+		const rows = screen.getAllByTestId('workbench-row');
+		expect(rows[0].classList.contains('retired')).toBe(false);
+		expect(rows[1].classList.contains('retired')).toBe(true);
+		expect(container.querySelector('.spill.retired')?.textContent).toBe('retired');
+	});
+
+	it('does not show a retired badge for a non-retireable entity even with a retiredAt set', () => {
+		// Tags keep hard-delete and never carry the retired affordance.
+		const store = new EntityStore(makeConfig(false), [{ id: 1, name: 'Orc', retiredAt: '2026-01-01T00:00:00Z' }]);
+		const { container } = render(WorkbenchList, {
+			props: { entity: makeConfig(false), store, selectedId: 1, onSelect: vi.fn(), onNew: vi.fn() }
+		});
+		expect(container.querySelector('.spill.retired')).toBeNull();
 	});
 });
