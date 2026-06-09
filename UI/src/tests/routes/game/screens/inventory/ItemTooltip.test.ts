@@ -63,7 +63,7 @@ afterEach(cleanup);
 describe('ItemTooltip', () => {
 	it('accents the tooltip border by rarity, not category', () => {
 		const { container } = render(ItemTooltip, { props: { item: makeItem() } });
-		const tooltip = container.querySelector('.item-tooltip') as HTMLElement;
+		const tooltip = container.querySelector('.tt-shell') as HTMLElement;
 		expect(tooltip.getAttribute('style')).toContain('var(--rarity-epic)');
 		expect(tooltip.getAttribute('style')).not.toContain('var(--category-weapon)');
 	});
@@ -97,5 +97,15 @@ describe('ItemTooltip', () => {
 		expect(tiles).toHaveLength(2);
 		expect(tiles[0].getAttribute('style')).toContain('var(--rarity-legendary)');
 		expect(tiles[1].getAttribute('style')).toContain('var(--rarity-rare)');
+	});
+
+	it('hides the panel and renders nothing while no item is hovered', () => {
+		// The inventory keeps a single instance mounted (for the global tooltip to anchor
+		// to) but it must stay empty and hidden until an item is hovered.
+		const { container } = render(ItemTooltip, { props: { item: undefined } });
+		const shell = container.querySelector('.tt-shell') as HTMLElement;
+		expect(shell.style.display).toBe('none');
+		expect(container.querySelector('.tt-body')).toBeNull();
+		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
 });

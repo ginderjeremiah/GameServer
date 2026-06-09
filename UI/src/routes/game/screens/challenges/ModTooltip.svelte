@@ -1,29 +1,30 @@
-<div class="mod-tooltip" style:border-left="3px solid {rarityColor(mod.rarityId)}">
-	<TooltipTitle
-		label={modTypeLabel(mod.itemModTypeId)}
-		name={mod.name}
-		diamondColor={typeColor}
-		labelColor={typeColor}
-	/>
+<TooltipShell accent={rarityColor(mod.rarityId)}>
+	{#snippet header()}
+		<TooltipTitle
+			label={modTypeLabel(mod.itemModTypeId)}
+			name={mod.name}
+			diamondColor={typeColor}
+			labelColor={typeColor}
+		/>
+	{/snippet}
 
-	<div class="tt-body">
-		{#if effects.length}
-			<TooltipSection label="Effects" last={!mod.description}>
-				<TooltipStatsGrid entries={effects} />
-			</TooltipSection>
-		{/if}
+	{#if effects.length}
+		<TooltipSection label="Effects" last={!mod.description}>
+			<TooltipStatsGrid entries={effects} />
+		</TooltipSection>
+	{/if}
 
-		{#if mod.description}
-			<TooltipSection label="Description" last>
-				<div class="tt-description">{mod.description}</div>
-			</TooltipSection>
-		{/if}
-	</div>
-</div>
+	{#if mod.description}
+		<TooltipSection label="Description" last>
+			<div class="tt-description">{mod.description}</div>
+		</TooltipSection>
+	{/if}
+</TooltipShell>
 
 <script lang="ts">
 import { EAttribute, type IItemMod } from '$lib/api';
 import { modTypeColor, modTypeLabel, normalizeText, rarityColor } from '$lib/common';
+import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
@@ -41,16 +42,6 @@ const effects = $derived(
 </script>
 
 <style lang="scss">
-.mod-tooltip {
-	width: 280px;
-	border-radius: 3px;
-	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
-}
-
-.tt-body {
-	padding: 12px 16px 14px;
-}
-
 .tt-description {
 	font-size: 11.5px;
 	font-style: italic;

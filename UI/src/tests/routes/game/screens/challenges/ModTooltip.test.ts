@@ -26,7 +26,7 @@ afterEach(cleanup);
 describe('ModTooltip', () => {
 	it('accents the tooltip border by the mod rarity', () => {
 		const { container } = render(ModTooltip, { props: { mod: makeMod() } });
-		const tooltip = container.querySelector('.mod-tooltip') as HTMLElement;
+		const tooltip = container.querySelector('.tt-shell') as HTMLElement;
 		expect(tooltip.getAttribute('style')).toContain('var(--rarity-legendary)');
 	});
 
