@@ -13,7 +13,7 @@ export interface Item extends IItem {
 }
 
 export const newItem = (invItem: IInventoryItem): Item => {
-	const itemData = staticData.items[invItem.itemId];
+	const itemData = (staticData.items ?? [])[invItem.itemId];
 	const appliedMods = invItem.appliedMods.map((am) => newItemMod(am));
 	const allAttributes = [...itemData.attributes, ...appliedMods.flatMap((mod) => mod.attributes)];
 	const totalAttributes = new BattleAttributes(allAttributes, false);

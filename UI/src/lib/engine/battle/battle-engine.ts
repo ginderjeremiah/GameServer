@@ -68,7 +68,7 @@ export class BattleEngine {
 	};
 
 	public reset = (enemyInstance: IEnemyInstance) => {
-		const enemyData = staticData.enemies;
+		const enemyData = staticData.enemies ?? [];
 		this.timeElapsed = 0;
 		this.player.reset(playerManager, inventoryManager.equipmentStats);
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });

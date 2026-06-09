@@ -78,7 +78,7 @@ export class Battler {
 	}
 
 	private fillSelectedSkills(battlerData: BattlerData) {
-		const skillData = staticData.skills;
+		const skillData = staticData.skills ?? [];
 		const skills: (Skill | undefined)[] = battlerData.selectedSkills.map(
 			(skillId) => new Skill(skillData[skillId], this)
 		);

@@ -20,64 +20,69 @@ let challenges = $state<IChallenge[]>();
 let challengeTypes = $state<IChallengeType[]>();
 let statisticTypes = $state<IStatisticType[]>();
 
+/* The backing `$state` slots are genuinely `undefined` until the loading screen (or the silent
+   session-resume path) populates them, so the getters honestly expose `T[] | undefined` rather than
+   casting the pre-load `undefined` away. The `undefined` state is load-bearing — `loaded` and the
+   reference-data orchestration (`reference-data.ts`) detect "not yet loaded" by the slot being
+   null — so it must stay observable. Callers that may run before load already guard with `?.`/`?? []`. */
 export const staticData = {
-	get zones() {
-		return zones as IZone[];
+	get zones(): IZone[] | undefined {
+		return zones;
 	},
-	set zones(value) {
+	set zones(value: IZone[] | undefined) {
 		zones = value;
 	},
-	get enemies() {
-		return enemies as IEnemy[];
+	get enemies(): IEnemy[] | undefined {
+		return enemies;
 	},
-	set enemies(value) {
+	set enemies(value: IEnemy[] | undefined) {
 		enemies = value;
 	},
-	get items() {
-		return items as IItem[];
+	get items(): IItem[] | undefined {
+		return items;
 	},
-	set items(value) {
+	set items(value: IItem[] | undefined) {
 		items = value;
 	},
-	get skills() {
-		return skills as ISkill[];
+	get skills(): ISkill[] | undefined {
+		return skills;
 	},
-	set skills(value) {
+	set skills(value: ISkill[] | undefined) {
 		skills = value;
 	},
-	get itemMods() {
-		return itemMods as IItemMod[];
+	get itemMods(): IItemMod[] | undefined {
+		return itemMods;
 	},
-	set itemMods(value) {
+	set itemMods(value: IItemMod[] | undefined) {
 		itemMods = value;
 	},
-	get attributes() {
-		return attributes as IAttribute[];
+	get attributes(): IAttribute[] | undefined {
+		return attributes;
 	},
-	set attributes(value) {
+	set attributes(value: IAttribute[] | undefined) {
 		attributes = value;
 	},
-	get challenges() {
-		return challenges as IChallenge[];
+	get challenges(): IChallenge[] | undefined {
+		return challenges;
 	},
-	set challenges(value) {
+	set challenges(value: IChallenge[] | undefined) {
 		challenges = value;
 	},
-	get challengeTypes() {
-		return challengeTypes as IChallengeType[];
+	get challengeTypes(): IChallengeType[] | undefined {
+		return challengeTypes;
 	},
-	set challengeTypes(value) {
+	set challengeTypes(value: IChallengeType[] | undefined) {
 		challengeTypes = value;
 	},
-	get statisticTypes() {
-		return statisticTypes as IStatisticType[];
+	get statisticTypes(): IStatisticType[] | undefined {
+		return statisticTypes;
 	},
-	set statisticTypes(value) {
+	set statisticTypes(value: IStatisticType[] | undefined) {
 		statisticTypes = value;
 	},
-	get loaded() {
-		return (
-			zones && enemies && items && skills && itemMods && attributes && challenges && challengeTypes && statisticTypes
+	get loaded(): boolean {
+		return [zones, enemies, items, skills, itemMods, attributes, challenges, challengeTypes, statisticTypes].every(
+			(set) => set != null
 		);
 	}
 };
