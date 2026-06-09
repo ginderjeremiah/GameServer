@@ -545,12 +545,12 @@ namespace Game.Infrastructure.Database
 
         public override int SaveChanges()
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException("Synchronous SaveChanges is intentionally unavailable; use SaveChangesAsync.");
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException("Synchronous SaveChanges is intentionally unavailable; use SaveChangesAsync.");
         }
     }
 }

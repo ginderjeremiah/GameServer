@@ -15,6 +15,12 @@ namespace Game.Core.Players
     /// </summary>
     public class Player : AggregateRoot
     {
+        /// <summary>The experience required to advance a level scales linearly as <c>Level * <see cref="ExpPerLevel"/></c>.</summary>
+        private const int ExpPerLevel = 100;
+
+        /// <summary>The number of stat points awarded on each level-up.</summary>
+        private const int StatPointsPerLevel = 6;
+
         public required int Id { get; set; }
         public required string Name { get; set; }
         public required int Level { get; set; }
@@ -53,11 +59,11 @@ namespace Game.Core.Players
         public void GrantExp(int amount)
         {
             Exp += amount;
-            while (Exp > Level * 100)
+            while (Exp > Level * ExpPerLevel)
             {
-                Exp -= Level * 100;
+                Exp -= Level * ExpPerLevel;
                 Level++;
-                StatPoints.StatPointsGained += 6;
+                StatPoints.StatPointsGained += StatPointsPerLevel;
                 RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
             }
 

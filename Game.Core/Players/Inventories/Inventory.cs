@@ -70,21 +70,10 @@ namespace Game.Core.Players.Inventories
 
             // Unequip from any other slot first
             var currentSlot = EquipmentSlots.FirstOrDefault(s => s.ItemId == itemId);
-            if (currentSlot is not null)
-            {
-                currentSlot.ItemId = null;
-                currentSlot.Item = null;
-            }
+            currentSlot?.Clear();
 
-            // Unequip whatever is in the target slot
-            if (equipSlot.ItemId.HasValue)
-            {
-                equipSlot.ItemId = null;
-                equipSlot.Item = null;
-            }
-
-            equipSlot.ItemId = itemId;
-            equipSlot.Item = unlocked.Item;
+            // Equipping overwrites whatever already occupies the target slot.
+            equipSlot.Set(unlocked.Item);
             return true;
         }
 
@@ -96,8 +85,7 @@ namespace Game.Core.Players.Inventories
                 return false;
             }
 
-            equipSlot.ItemId = null;
-            equipSlot.Item = null;
+            equipSlot.Clear();
             return true;
         }
 

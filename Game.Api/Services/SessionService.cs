@@ -14,8 +14,6 @@ namespace Game.Api.Services
         private readonly ISessionStore _sessionStore = sessionStore;
         private Player? _player;
 
-        public string SessionId { get; set; } = string.Empty;
-
         public int UserId { get; private set; }
 
         public int SelectedPlayerId => PlayerState.PlayerId;
@@ -26,8 +24,6 @@ namespace Game.Api.Services
         /// The access roles granted to the authenticated user, sourced from the auth token claims.
         /// </summary>
         public IReadOnlyList<string> Roles { get; private set; } = [];
-
-        public bool SessionAvailable => UserId > 0;
 
         /// <summary>
         /// True when UserId is set to a valid authenticated user.
@@ -70,7 +66,7 @@ namespace Game.Api.Services
         /// </summary>
         public void ClearSession()
         {
-            if (SessionAvailable)
+            if (Authenticated)
             {
                 _sessionStore.Clear(UserId);
             }
@@ -97,11 +93,6 @@ namespace Game.Api.Services
         public void SavePlayerState()
         {
             _sessionStore.Update(PlayerState, UserId);
-        }
-
-        public void ClearPlayerDomainEvents()
-        {
-            _player?.ClearEvents();
         }
     }
 }

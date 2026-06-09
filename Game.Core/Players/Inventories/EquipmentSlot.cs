@@ -44,6 +44,24 @@ namespace Game.Core.Players.Inventories
         }
 
         /// <summary>
+        /// Equips the given <paramref name="item"/> into this slot.
+        /// </summary>
+        public void Set(Item item)
+        {
+            ItemId = item.Id;
+            Item = item;
+        }
+
+        /// <summary>
+        /// Empties this slot.
+        /// </summary>
+        public void Clear()
+        {
+            ItemId = null;
+            Item = null;
+        }
+
+        /// <summary>
         /// Gets the <see cref="EItemCategory"/> associated with the given <paramref name="slot"/>.
         /// </summary>
         /// <param name="slot"></param>

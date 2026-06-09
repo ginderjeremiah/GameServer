@@ -19,7 +19,7 @@ namespace Game.Api.Middleware
             {
                 await _next(context);
             }
-            else if (!sessionService.SessionAvailable)
+            else if (!sessionService.Authenticated)
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             }
