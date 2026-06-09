@@ -6,8 +6,8 @@ using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
+using Game.Application.Auth;
 using Game.Application.DependencyInjection;
-using Game.Core;
 using Game.Core.Events;
 using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
@@ -45,7 +45,15 @@ namespace Game.Api
             }
 
             var builder = WebApplication.CreateBuilder(args);
-            Hashing.SetPepper(builder.Configuration["HashPepper"] ?? throw new InvalidOperationException("HashPepper not set"));
+
+            // Password-hashing parameters: the work factor binds from the optional "PasswordHashing"
+            // section (default otherwise) and the required pepper from the top-level "HashPepper" secret.
+            // Validated on start so a missing pepper fails fast, as the old eager check did.
+            builder.Services.AddOptions<PasswordHashingOptions>()
+                .Bind(builder.Configuration.GetSection("PasswordHashing"))
+                .Configure(options => options.Pepper = builder.Configuration["HashPepper"] ?? string.Empty)
+                .Validate(options => !string.IsNullOrEmpty(options.Pepper), "HashPepper not set")
+                .ValidateOnStart();
 
             builder.Logging.ClearProviders()
                 .AddSimpleConsole(options =>

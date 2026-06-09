@@ -1,5 +1,4 @@
 using Game.Api.Auth;
-using Game.Core;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -14,11 +13,6 @@ namespace Game.TestInfrastructure.Helpers
         /// <c>GameServerFactory</c> and <c>appsettings.Testing.json</c>) so hand-built tokens validate.
         /// </summary>
         public const string TestSigningKey = "test-signing-key-for-integration-tests-at-least-32-bytes";
-
-        public static void EnsurePepperSet()
-        {
-            Hashing.SetPepper(TestPepper);
-        }
 
         public static string CreateAccessToken(int userId, params string[] roles)
         {

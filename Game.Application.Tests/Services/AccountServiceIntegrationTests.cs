@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Entities;
 using Game.Application;
+using Game.Application.Auth;
 using Game.Application.Services;
 using Game.Core;
 using Game.Infrastructure.Database;
@@ -10,6 +11,7 @@ using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 using NewPlayerFactory = Game.Core.Players.NewPlayerFactory;
 
@@ -26,7 +28,6 @@ namespace Game.Application.Tests.Services
         [Fact]
         public async Task CreateAccount_NewUsername_InsertsUserAndInitialPlayerGraph()
         {
-            Hashing.SetPepper(TestPepper);
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
@@ -118,6 +119,40 @@ namespace Game.Application.Tests.Services
             Assert.Equal(player.Name, result.Player.Name);
             Assert.False(string.IsNullOrEmpty(result.Tokens.AccessToken));
             Assert.False(string.IsNullOrEmpty(result.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task Login_LegacyCredentials_TransparentlyRehashesToCurrentScheme()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // CreateUserAsync seeds a legacy-format credential.
+            var user = await TestDataSeeder.CreateUserAsync(context, "legacyuser", "legacypass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            // Sanity: the seeded hash is in the legacy format (no PBKDF2 prefix).
+            Assert.False(user.PassHash.StartsWith("$pbkdf2-sha256$", StringComparison.Ordinal));
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var result = await accountService.Login("legacyuser", "legacypass");
+            Assert.True(result.Success);
+
+            // The credential was upgraded in place (same salt, new scheme) — the cache-flush equivalent is
+            // reading the row back from a fresh context.
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var migrated = await verifyContext.Users.AsNoTracking()
+                .FirstAsync(u => u.Id == user.Id, CancellationToken);
+            Assert.StartsWith("$pbkdf2-sha256$", migrated.PassHash);
+            Assert.Equal(user.Salt, migrated.Salt);
+
+            // Re-login against the upgraded credential still succeeds.
+            using var reloginScope = CreateScope();
+            var reloginResult = await CreateAccountService(reloginScope.ServiceProvider)
+                .Login("legacyuser", "legacypass");
+            Assert.True(reloginResult.Success);
         }
 
         [Fact]
@@ -225,11 +260,20 @@ namespace Game.Application.Tests.Services
 
         private static AccountService CreateAccountService(IServiceProvider provider)
         {
+            // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
+            // so legacy-seeded credentials verify and migrate exactly as they would in production.
+            var hasher = new Pbkdf2PasswordHasher(Options.Create(new PasswordHashingOptions
+            {
+                Pepper = TestPepper,
+                Iterations = 1000,
+            }));
+
             return new AccountService(
                 provider.GetRequiredService<IUsers>(),
                 provider.GetRequiredService<IPlayerRepository>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
                 new StubAccessTokenService(),
+                hasher,
                 new NewPlayerFactory());
         }
 

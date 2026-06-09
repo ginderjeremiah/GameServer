@@ -1,7 +1,6 @@
 using Game.Abstractions.Auth;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
-using Game.Core;
 using Game.Core.Players;
 
 namespace Game.Application.Services
@@ -16,12 +15,14 @@ namespace Game.Application.Services
         IPlayerRepository playerRepo,
         IRefreshTokenStore refreshTokenStore,
         IAccessTokenService accessTokenService,
+        IPasswordHasher passwordHasher,
         NewPlayerFactory newPlayerFactory)
     {
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
         private readonly IAccessTokenService _accessTokenService = accessTokenService;
+        private readonly IPasswordHasher _passwordHasher = passwordHasher;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
 
         /// <summary>
@@ -42,7 +43,7 @@ namespace Game.Application.Services
             var account = new NewAccount
             {
                 Username = username,
-                PassHash = password.Hash(salt.ToString()),
+                PassHash = _passwordHasher.Hash(password, salt),
                 Salt = salt,
             };
 
@@ -59,7 +60,13 @@ namespace Game.Application.Services
         public async Task<AccountLoginResult> Login(string username, string password)
         {
             var account = await _users.GetUser(username);
-            if (account is null || !password.VerifyHash(account.Salt.ToString(), account.PassHash))
+            if (account is null)
+            {
+                return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
+            }
+
+            var verification = _passwordHasher.Verify(password, account.Salt, account.PassHash);
+            if (verification == PasswordVerificationResult.Failed)
             {
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
@@ -73,6 +80,14 @@ namespace Game.Application.Services
             if (player is null)
             {
                 return AccountLoginResult.Failed(LoginStatus.PlayerDataNotFound);
+            }
+
+            // Transparently migrate a credential stored under the legacy scheme (or an outdated work
+            // factor) now that we have verified the plaintext, so existing accounts upgrade without a
+            // forced reset. The salt is reused; only the derived hash changes.
+            if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password, account.Salt));
             }
 
             var tokens = await IssueTokens(account.Id, account.Roles);

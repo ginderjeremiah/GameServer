@@ -1,4 +1,6 @@
-﻿using Game.Application.Events;
+﻿using Game.Abstractions.Auth;
+using Game.Application.Auth;
+using Game.Application.Events;
 using Game.Application.Services;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
@@ -18,6 +20,8 @@ namespace Game.Application.DependencyInjection
                 // dependencies, so they are shared.
                 .AddSingleton<BattleFactory>()
                 .AddSingleton<NewPlayerFactory>()
+                // Stateless (parameters come from injected options), so a single shared instance.
+                .AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>()
                 .AddScoped<AccountService>()
                 .AddScoped<BattleService>()
                 .AddScoped<LoginTrackingService>()
