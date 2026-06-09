@@ -7,12 +7,14 @@ namespace Game.Application.Events
     public class BattleStatisticsEventHandler(
         IPlayerProgressRepository progressRepo,
         IChallenges challengeRepo,
-        IItems items
+        IItems items,
+        ISkills skills
     ) : IDomainEventHandler<BattleCompletedEvent>
     {
         private readonly IPlayerProgressRepository _progressRepo = progressRepo;
         private readonly IChallenges _challengeRepo = challengeRepo;
         private readonly IItems _items = items;
+        private readonly ISkills _skills = skills;
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
@@ -37,6 +39,11 @@ namespace Game.Application.Events
                     if (c.RewardItemModId.HasValue)
                     {
                         player.UnlockMod(c.RewardItemModId.Value);
+                    }
+                    if (c.RewardSkillId.HasValue)
+                    {
+                        var skill = _skills.GetSkill(c.RewardSkillId.Value);
+                        player.UnlockSkill(skill);
                     }
                 }
             }

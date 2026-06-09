@@ -260,7 +260,8 @@ namespace Game.TestInfrastructure.Helpers
             decimal progressGoal = 10m,
             int? targetEntityId = null,
             int? rewardItemId = null,
-            int? rewardItemModId = null)
+            int? rewardItemModId = null,
+            int? rewardSkillId = null)
         {
             var challenge = new Challenge
             {
@@ -271,6 +272,7 @@ namespace Game.TestInfrastructure.Helpers
                 TargetEntityId = targetEntityId,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
+                RewardSkillId = rewardSkillId,
             };
 
             context.Challenges.Add(challenge);

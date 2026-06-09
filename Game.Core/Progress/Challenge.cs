@@ -1,7 +1,7 @@
 namespace Game.Core.Progress
 {
     /// <summary>
-    /// Represents a challenge that can be completed to unlock an item or modifier.
+    /// Represents a challenge that can be completed to unlock an item, modifier, and/or skill.
     /// </summary>
     public class Challenge
     {
@@ -13,6 +13,7 @@ namespace Game.Core.Progress
         public required decimal ProgressGoal { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
+        public int? RewardSkillId { get; set; }
 
         public void UpdateChallengeProgress(PlayerChallenge playerChallenge, PlayerProgress playerProgress)
         {

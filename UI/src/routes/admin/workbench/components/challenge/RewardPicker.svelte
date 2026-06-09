@@ -11,7 +11,7 @@
 			<input
 				class="inp"
 				autofocus
-				placeholder={`Search ${kind === 'item' ? 'items' : 'item mods'}…`}
+				placeholder={`Search ${kind === 'item' ? 'items' : kind === 'mod' ? 'item mods' : 'skills'}…`}
 				bind:value={query}
 			/>
 		</div>
@@ -56,7 +56,7 @@ export interface PickerRecord {
 }
 
 interface Props {
-	kind: 'item' | 'mod';
+	kind: 'item' | 'mod' | 'skill';
 	records: PickerRecord[];
 	currentId: number | undefined;
 	claimed: Map<number, IChallenge>;

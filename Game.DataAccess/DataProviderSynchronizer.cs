@@ -160,6 +160,11 @@ namespace Game.DataAccess
                     await HandleModRemoved(context, modRemoveEvt);
                     break;
 
+                case nameof(SkillUnlockedEvent):
+                    var skillUnlockEvt = Deserialize<SkillUnlockedEvent>(envelope.Payload);
+                    await HandleSkillUnlocked(context, skillUnlockEvt);
+                    break;
+
                 case nameof(ItemFavoriteChangedEvent):
                     var favoriteEvt = Deserialize<ItemFavoriteChangedEvent>(envelope.Payload);
                     await HandleItemFavoriteChanged(context, favoriteEvt);
@@ -271,6 +276,27 @@ namespace Game.DataAccess
                 {
                     PlayerId = evt.PlayerId,
                     ItemModId = evt.ItemModId,
+                });
+                await context.SaveChangesAsync();
+            }
+        }
+
+        private static async Task HandleSkillUnlocked(GameContext context, SkillUnlockedEvent evt)
+        {
+            var exists = await context.PlayerSkills
+                .AnyAsync(ps => ps.PlayerId == evt.PlayerId && ps.SkillId == evt.SkillId);
+
+            if (!exists)
+            {
+                // Earning a skill unlocks it without equipping it: Selected = false, Order = 0
+                // (the player chooses their loadout separately). Idempotent insert mirrors the
+                // item/mod unlock handlers so re-applying the event never duplicates the row.
+                context.PlayerSkills.Add(new PlayerSkill
+                {
+                    PlayerId = evt.PlayerId,
+                    SkillId = evt.SkillId,
+                    Selected = false,
+                    Order = 0,
                 });
                 await context.SaveChangesAsync();
             }

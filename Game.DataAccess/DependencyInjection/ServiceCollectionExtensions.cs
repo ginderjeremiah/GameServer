@@ -97,6 +97,7 @@ namespace Game.DataAccess.DependencyInjection
             DomainEventDispatcher.RegisterDomainEventHandler<ModUnlockedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<ModAppliedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<ModRemovedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<SkillUnlockedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<ItemFavoriteChangedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<LogPreferenceChangedEvent, PlayerPersistencePublisher>();
         }

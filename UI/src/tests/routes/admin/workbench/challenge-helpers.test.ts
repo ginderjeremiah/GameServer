@@ -11,6 +11,7 @@ import {
 	challengeSentence,
 	claimedItemMap,
 	claimedModMap,
+	claimedSkillMap,
 	deriveFromType,
 	fmtMs,
 	fmtNum,
@@ -209,9 +210,9 @@ describe('challengeSentence', () => {
 
 describe('reward exclusivity maps', () => {
 	const challenges: IChallenge[] = [
-		make({ id: 1, rewardItemId: 10, rewardItemModId: 100 }),
-		make({ id: 2, rewardItemId: 20, rewardItemModId: undefined }),
-		make({ id: 3, rewardItemId: undefined, rewardItemModId: 300 })
+		make({ id: 1, rewardItemId: 10, rewardItemModId: 100, rewardSkillId: 1000 }),
+		make({ id: 2, rewardItemId: 20, rewardItemModId: undefined, rewardSkillId: 2000 }),
+		make({ id: 3, rewardItemId: undefined, rewardItemModId: 300, rewardSkillId: undefined })
 	];
 
 	it('maps every claimed reward to its owning challenge, excluding the edited one', () => {
@@ -221,6 +222,9 @@ describe('reward exclusivity maps', () => {
 		const mods = claimedModMap(challenges, 1);
 		expect(mods.get(300)?.id).toBe(3);
 		expect(mods.has(100)).toBe(false);
+		const skills = claimedSkillMap(challenges, 1);
+		expect(skills.get(2000)?.id).toBe(2);
+		expect(skills.has(1000)).toBe(false); // challenge 1 is excluded so its own skill reward stays selectable
 	});
 });
 

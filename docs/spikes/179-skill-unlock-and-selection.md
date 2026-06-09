@@ -81,7 +81,7 @@ Settled with the project owner during the spike:
 
 Tracked as sub-issues of #179:
 
-1. **[#261](https://github.com/ginderjeremiah/GameServer/issues/261) — Skills unlockable via challenge rewards (`RewardSkillId`)** *(independent)*: area **A** above, end to end (entity/contract/domain, repo + admin authoring + Workbench picker, `Player.UnlockSkill` + event + write-behind handler, migration, tests).
+1. **[#261](https://github.com/ginderjeremiah/GameServer/issues/261) — Skills unlockable via challenge rewards (`RewardSkillId`)** *(independent — ✅ landed)*: area **A** above, end to end (entity/contract/domain, repo + admin authoring + Workbench picker, `Player.UnlockSkill` + `SkillUnlockedEvent` + write-behind handler, migration, tests).
 2. **[#260](https://github.com/ginderjeremiah/GameServer/issues/260) — Persist skill loadout order + loadout-cap foundation** *(foundation)*: area **B** (`PlayerSkill.Order` + migration, ordered mapping, starter-skill order, cap constant).
 3. **[#262](https://github.com/ginderjeremiah/GameServer/issues/262) — Expose unlocked skills to the client via `PlayerData`** *(depends on #260)*: area **C** (contract + codegen + `player-manager`).
 4. **[#263](https://github.com/ginderjeremiah/GameServer/issues/263) — `SetSelectedSkills` socket command + loadout orchestration** *(depends on #260)*: area **D** (domain mutation + validation/cap, `PlayerService`, socket command, write-behind handler, tests).

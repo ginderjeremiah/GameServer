@@ -1,11 +1,13 @@
 using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Game.Core.Events;
 using Game.Core.Players.Events;
 using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -168,6 +170,41 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
         }
 
+        [Fact]
+        public async Task ProcessQueue_SkillUnlockedEvent_InsertsUnselectedPlayerSkillIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+
+            var evt = new SkillUnlockedEvent(player.Id, skill.Id);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The same unlock is delivered twice (e.g. a retry, or two challenges granting the same skill);
+            // the idempotent insert must leave exactly one row, unselected and at order 0.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills
+                .Where(ps => ps.PlayerId == player.Id && ps.SkillId == skill.Id)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.False(row.Selected);
+            Assert.Equal(0, row.Order);
+        }
+
         private static async Task<List<string>> DrainDeadLetterQueue(IPubSubService pubsub)
         {
             var deadLetterQueue = pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
@@ -182,11 +219,11 @@ namespace Game.Application.Tests.DataAccess
             return drained;
         }
 
-        private static string Serialize(PlayerCoreUpdatedEvent evt)
+        private static string Serialize<T>(T evt) where T : IDomainEvent
         {
             var envelope = new DomainEventEnvelope
             {
-                Type = nameof(PlayerCoreUpdatedEvent),
+                Type = typeof(T).Name,
                 Payload = evt.Serialize(),
             };
 
