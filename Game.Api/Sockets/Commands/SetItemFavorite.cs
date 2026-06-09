@@ -5,8 +5,9 @@ using Game.Application.Services;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Toggles whether an unlocked item is favorited. Persists the change on the
-    /// cached domain player (the source of truth for player data).
+    /// Toggles whether an unlocked item is favorited. Applies the change to the cached
+    /// domain player (the source of truth) and persists it to the database via the
+    /// write-behind <see cref="Game.Core.Players.Events.ItemFavoriteChangedEvent"/>.
     /// </summary>
     public class SetItemFavorite : AbstractSocketCommandWithParams<SetItemFavoriteRequest>
     {

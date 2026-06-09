@@ -171,6 +171,54 @@ namespace Game.Core.Tests.Players
             Assert.Equal(5, evt.ItemModId);
         }
 
+        // ── TrySetFavorite ───────────────────────────────────────────────────
+
+        [Fact]
+        public void TrySetFavorite_UnlockedItem_SetsFlagAndRaisesItemFavoriteChangedEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItem(id: 10));
+            player.ClearEvents();
+
+            var result = player.TrySetFavorite(10, true);
+
+            Assert.True(result);
+            Assert.True(player.Inventory.UnlockedItems.Single().Favorite);
+            var evt = player.DomainEvents.OfType<ItemFavoriteChangedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(10, evt.ItemId);
+            Assert.True(evt.Favorite);
+        }
+
+        [Fact]
+        public void TrySetFavorite_CanUnfavorite_RaisesEventWithFalse()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItem(id: 10));
+            player.TrySetFavorite(10, true);
+            player.ClearEvents();
+
+            var result = player.TrySetFavorite(10, false);
+
+            Assert.True(result);
+            Assert.False(player.Inventory.UnlockedItems.Single().Favorite);
+            var evt = player.DomainEvents.OfType<ItemFavoriteChangedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.False(evt.Favorite);
+        }
+
+        [Fact]
+        public void TrySetFavorite_ItemNotUnlocked_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayer();
+
+            var result = player.TrySetFavorite(999, true);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<ItemFavoriteChangedEvent>());
+        }
+
         // ── UpdateLogPreference ──────────────────────────────────────────────
 
         [Fact]

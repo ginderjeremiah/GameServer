@@ -160,6 +160,11 @@ namespace Game.DataAccess
                     await HandleModRemoved(context, modRemoveEvt);
                     break;
 
+                case nameof(ItemFavoriteChangedEvent):
+                    var favoriteEvt = Deserialize<ItemFavoriteChangedEvent>(envelope.Payload);
+                    await HandleItemFavoriteChanged(context, favoriteEvt);
+                    break;
+
                 case nameof(LogPreferenceChangedEvent):
                     var logEvt = Deserialize<LogPreferenceChangedEvent>(envelope.Payload);
                     await HandleLogPreferenceChanged(context, logEvt);
@@ -293,6 +298,14 @@ namespace Game.DataAccess
             await context.AppliedMods
                 .Where(am => am.PlayerId == evt.PlayerId && am.ItemId == evt.ItemId && am.ItemModSlotId == evt.ItemModSlotId)
                 .ExecuteDeleteAsync();
+        }
+
+        private static async Task HandleItemFavoriteChanged(GameContext context, ItemFavoriteChangedEvent evt)
+        {
+            // Idempotent absolute update: set the flag to the event's value for the player's unlocked item.
+            await context.UnlockedItems
+                .Where(ui => ui.PlayerId == evt.PlayerId && ui.ItemId == evt.ItemId)
+                .ExecuteUpdateAsync(s => s.SetProperty(ui => ui.Favorite, evt.Favorite));
         }
 
         private static async Task HandleLogPreferenceChanged(GameContext context, LogPreferenceChangedEvent evt)

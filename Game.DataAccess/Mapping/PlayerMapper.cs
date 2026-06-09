@@ -100,6 +100,7 @@ namespace Game.DataAccess.Mapping
                     ItemId = ui.ItemId,
                     Item = coreItem,
                     AppliedMods = appliedMods,
+                    Favorite = ui.Favorite,
                 };
 
                 inventory.UnlockedItems.Add(slot);
