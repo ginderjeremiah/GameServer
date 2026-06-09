@@ -46,8 +46,11 @@ jobs:
             - 'docker-compose.yml'
             - 'e2e-seed.sql'
             - '.dockerignore'
+            - '.github/workflows/**'
+            - 'UI/src/lib/api/types/**'
           frontend:
             - 'UI/**'
+            - '.github/workflows/**'
 
   test-backend:
     needs: [detect-changes]
@@ -183,10 +186,6 @@ jobs:
         for i in $(seq 1 90); do
           # Any HTTP response (even 401) means the server is up and has finished its
           # startup migration, which runs before Kestrel begins listening.
-          #
-          # curl's `-w '%{http_code}'` already prints 000 when it can't connect yet, so DON'T add a
-          # `|| echo 000` fallback — that appends a *second* 000, yielding "000000" which trips the
-          # "!= 000" check and reports the API ready on the first attempt (before it has migrated).
           # `|| true` keeps `bash -e` from aborting on curl's non-zero exit while it's still starting.
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5008/api/Login/Status) || true
           if [ "${code:-000}" != "000" ]; then
