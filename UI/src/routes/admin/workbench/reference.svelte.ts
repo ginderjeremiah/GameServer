@@ -73,19 +73,19 @@ class WorkbenchReference {
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	tagCategoryOptions = (): SelectOption[] => this.tagCategories.map((c) => ({ value: c.id, text: c.name }));
 	zoneOptions = (): SelectOption[] =>
-		staticData.zones.map((z) => ({ value: z.id, text: `${z.name} · L${z.levelMin}–${z.levelMax}` }));
-	enemyOptions = (): SelectOption[] => staticData.enemies.map((e) => ({ value: e.id, text: e.name }));
+		(staticData.zones ?? []).map((z) => ({ value: z.id, text: `${z.name} · L${z.levelMin}–${z.levelMax}` }));
+	enemyOptions = (): SelectOption[] => (staticData.enemies ?? []).map((e) => ({ value: e.id, text: e.name }));
 	/** Dedicated-boss picker options: a "None" sentinel (-1) plus every enemy flagged as a boss. */
 	bossEnemyOptions = (): SelectOption[] => [
 		{ value: -1, text: 'None' },
-		...staticData.enemies.filter((e) => e.isBoss).map((e) => ({ value: e.id, text: e.name }))
+		...(staticData.enemies ?? []).filter((e) => e.isBoss).map((e) => ({ value: e.id, text: e.name }))
 	];
 	/** Zone unlock-gate picker options: a "None" sentinel (-1) plus every challenge. */
 	unlockChallengeOptions = (): SelectOption[] => [
 		{ value: -1, text: 'None (always open)' },
 		...(staticData.challenges ?? []).map((c) => ({ value: c.id, text: c.name }))
 	];
-	skillCatalogue = () => staticData.skills.map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
+	skillCatalogue = () => (staticData.skills ?? []).map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
 
 	// ── Challenges ──
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));

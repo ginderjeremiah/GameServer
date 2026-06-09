@@ -242,7 +242,7 @@ export class EnemyManager {
 	 */
 	private async claimVictory(): Promise<number> {
 		if (this.currentEnemy) {
-			logMessage(ELogType.EnemyDefeated, staticData.enemies[this.currentEnemy.id].name + ' was defeated!');
+			logMessage(ELogType.EnemyDefeated, (staticData.enemies ?? [])[this.currentEnemy.id].name + ' was defeated!');
 		}
 		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: Date.now() });
 		if (!defeatResponse.error && defeatResponse.data?.rewards) {

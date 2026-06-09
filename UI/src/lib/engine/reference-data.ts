@@ -55,7 +55,7 @@ function refSource<C extends ApiSocketCommandNoRequest>(
 	key: string,
 	label: string,
 	command: C,
-	read: () => ApiSocketResponseTypes[C],
+	read: () => ApiSocketResponseTypes[C] | undefined,
 	write: (data: ApiSocketResponseTypes[C]) => void
 ): RefDataSource {
 	return {
