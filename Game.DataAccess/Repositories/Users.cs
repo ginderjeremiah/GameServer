@@ -78,6 +78,15 @@ namespace Game.DataAccess.Repositories
             return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
         }
 
+        public Task UpdatePasswordHash(int userId, string passHash)
+        {
+            // A targeted, immediate update keyed on the id — independent of the per-action unit of work,
+            // since the credential upgrade is self-contained and re-applying it converges to the same state.
+            return _context.Users
+                .Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.PassHash, passHash));
+        }
+
         public async Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take)
         {
             return await FilteredUsers(search, roleId, archived)

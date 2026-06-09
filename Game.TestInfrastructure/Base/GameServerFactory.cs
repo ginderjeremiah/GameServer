@@ -36,6 +36,8 @@ namespace Game.TestInfrastructure.Base
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["HashPepper"] = "test-pepper-value-for-integration-tests",
+                    // Keep PBKDF2 cheap in tests; the production work factor is the default 600k.
+                    ["PasswordHashing:Iterations"] = "1000",
                     ["Jwt:SigningKey"] = TestAuthHelper.TestSigningKey,
                     ["Jwt:Issuer"] = Game.Api.Constants.SERVER_PRINCIPAL,
                     ["Jwt:Audience"] = Game.Api.Constants.SERVER_PRINCIPAL,
