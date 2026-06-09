@@ -2,6 +2,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Enemies;
+using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
@@ -139,6 +140,35 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 200,
                     MaxMs: 200),
+
+                // The only scenario whose player is built through the equipped-item + applied-mod
+                // attribute-composition path (the rest build the player from raw stat allocations).
+                // An item and two mods (prefix + suffix) each contribute Strength, so dropping any
+                // one source changes the kill count; the item's Agility and the prefix's Dexterity
+                // additionally feed CooldownRecovery, so the whole merge is exercised end to end.
+                //   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
+                //   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=10 → cdMult=1.10.
+                //   Player skill: 10 + 45*1.5 = 77.5 raw, after enemy def 17 → 60.5, fires every 28 ticks
+                //     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
+                //   Enemy: MaxHealth=400, Def=17; attack 5-32 clamps to 0, so the player never dies.
+                //   7 hits reach 423.5 ≥ 400 at tick 196 → 7840ms (vs 21600ms for the same allocations
+                //   with no equipment — proof the merged attributes change the outcome).
+                ["equippedItemWithMods"] = new ParityScenario(
+                    Player: () => MakeBattlerWithEquipment(
+                        strength: 20, endurance: 20,
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)],
+                        itemAttributes: [ItemAttr(EAttribute.Strength, 10), ItemAttr(EAttribute.Agility, 20)],
+                        mods:
+                        [
+                            MakeMod(10, EItemModType.Prefix, [ItemAttr(EAttribute.Strength, 8), ItemAttr(EAttribute.Dexterity, 20)]),
+                            MakeMod(11, EItemModType.Suffix, [ItemAttr(EAttribute.Strength, 7)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 15,
+                        skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 7840),
             };
 
         public static IEnumerable<object[]> ScenarioNames =>
@@ -186,6 +216,28 @@ namespace Game.Core.Tests.Battle
             // charge/tick = 47.2, fires every 26 ticks → 6240ms
             Assert.Equal(6240, result.TotalMs);
             Assert.True(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
+        }
+
+        /// <summary>
+        /// Pins down the merged attribute values for the <c>equippedItemWithMods</c> scenario so a
+        /// divergence in the stat + item + applied-mod attribute composition is reported directly
+        /// (rather than only surfacing as a different battle outcome). Mirrors the frontend
+        /// "composes the equippedItemWithMods stat + item + mod attributes" expectation.
+        /// </summary>
+        [Fact]
+        public void Parity_EquippedItemWithMods_ComposesMergedAttributes()
+        {
+            var player = Scenarios["equippedItemWithMods"].Player();
+
+            // Strength 20 (allocation) + 10 (item) + 8 (prefix) + 7 (suffix) = 45.
+            Assert.Equal(45, player.GetAttributeValue(EAttribute.Strength));
+            Assert.Equal(20, player.GetAttributeValue(EAttribute.Endurance));
+            Assert.Equal(20, player.GetAttributeValue(EAttribute.Agility));
+            Assert.Equal(20, player.GetAttributeValue(EAttribute.Dexterity));
+            Assert.Equal(675, player.GetAttributeValue(EAttribute.MaxHealth));
+            Assert.Equal(32, player.GetAttributeValue(EAttribute.Defense));
+            Assert.Equal(10, player.GetAttributeValue(EAttribute.CooldownRecovery));
+            Assert.Equal(1.10, player.GetCooldownMultiplier(), 10);
         }
 
         private static Skill MakeSkill(
@@ -250,6 +302,68 @@ namespace Game.Core.Tests.Battle
                 LogPreferences = [],
             };
         }
+
+        /// <summary>
+        /// Builds a player Battler whose attributes flow through the equipped-item + applied-mod
+        /// composition path (<see cref="Item.GetAttributeModifiers"/> via the live
+        /// <see cref="Player.GetAttributes"/>), layering the item's own attributes and every applied
+        /// mod's attributes on top of the raw stat allocations. The item is given one mod slot per
+        /// mod (index- and type-aligned) so each mod applies, mirroring how the frontend
+        /// <c>makeEquipment</c> helper feeds the same merged attributes to its Battler.
+        /// </summary>
+        private static Battler MakeBattlerWithEquipment(
+            double strength, double endurance,
+            List<Skill> skills,
+            List<AttributeModifier> itemAttributes,
+            List<ItemMod> mods)
+        {
+            var item = new Item
+            {
+                Id = 1,
+                Name = "Item 1",
+                Description = string.Empty,
+                Category = EItemCategory.Accessory,
+                Rarity = ERarity.Common,
+                Attributes = itemAttributes,
+                ModSlots = mods.Select((mod, index) => new ItemModSlot
+                {
+                    Id = index,
+                    Index = index,
+                    Type = mod.Type,
+                }).ToList(),
+                Tags = [],
+            };
+
+            var player = MakePlayer(strength, endurance, skills: skills);
+            player.UnlockItem(item);
+            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);
+            for (var index = 0; index < mods.Count; index++)
+            {
+                player.UnlockMod(mods[index].Id);
+                player.TryApplyMod(item.Id, mods[index].Id, index, mods[index]);
+            }
+
+            return new Battler(player);
+        }
+
+        private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier> attributes) => new()
+        {
+            Id = id,
+            Name = $"Mod {id}",
+            Description = string.Empty,
+            Type = type,
+            Rarity = ERarity.Common,
+            Attributes = attributes,
+            Tags = [],
+        };
+
+        private static AttributeModifier ItemAttr(EAttribute attribute, double amount) => new()
+        {
+            Attribute = attribute,
+            Amount = amount,
+            Type = EModifierType.Additive,
+            Source = EAttributeModifierSource.Item,
+        };
 
         /// <summary>
         /// Creates a player whose attributes mimic the frontend double-counting bug:

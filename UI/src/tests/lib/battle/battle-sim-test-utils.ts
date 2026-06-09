@@ -1,5 +1,16 @@
-import { Battler } from '$lib/battle';
-import type { EAttribute, IAttributeMultiplier, ISkill } from '$lib/api';
+import { Battler, newItem } from '$lib/battle';
+import {
+	EItemCategory,
+	ERarity,
+	type EAttribute,
+	type EItemModType,
+	type IAppliedModModel,
+	type IAttributeMultiplier,
+	type IBattlerAttribute,
+	type IItem,
+	type IItemMod,
+	type ISkill
+} from '$lib/api';
 
 /**
  * Shared helpers for the battle-simulation tests. They build the **real**
@@ -30,10 +41,18 @@ export const makeSkill = (
  * Binds a `makeBattler` builder to a mock skill registry (the array a test's
  * mocked `staticData.skills` returns). `makeBattler` registers each skill spec
  * into the registry, then builds a real Battler from raw stat allocations whose
- * `selectedSkills` reference those registered ids.
+ * `selectedSkills` reference those registered ids. The optional `equipment` is
+ * passed through as the Battler's additional attributes — exactly how the live
+ * game feeds `InventoryManager.equipmentStats` to the player Battler — so a
+ * scenario can layer equipped item + applied-mod attributes on top of the raw
+ * stat allocations before derived stats are computed.
  */
 export function battlerFactory(registry: ISkill[]) {
-	return (attrs: { id: EAttribute; amount: number }[], skills: SkillSpec[]): Battler => {
+	return (
+		attrs: { id: EAttribute; amount: number }[],
+		skills: SkillSpec[],
+		equipment?: IBattlerAttribute[]
+	): Battler => {
 		const selectedSkills = skills.map((spec) => {
 			const id = registry.length;
 			registry.push({
@@ -48,11 +67,72 @@ export function battlerFactory(registry: ISkill[]) {
 			return id;
 		});
 
-		return new Battler({
-			name: 'Battler',
-			level: 1,
-			selectedSkills,
-			attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+		return new Battler(
+			{
+				name: 'Battler',
+				level: 1,
+				selectedSkills,
+				attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+			},
+			equipment
+		);
+	};
+}
+
+/** A single applied mod's raw definition, before it is registered and given an id. */
+export interface ModSpec {
+	type: EItemModType;
+	attributes: IBattlerAttribute[];
+}
+
+/** An equipped item's raw definition, before it (and its mods) are registered. */
+export interface ItemSpec {
+	attributes: IBattlerAttribute[];
+	mods: ModSpec[];
+}
+
+/**
+ * Binds a `makeEquipment` builder to mock item + itemMod registries (the arrays a
+ * test's mocked `staticData.items` / `staticData.itemMods` return). It registers
+ * the item and each applied mod, builds the real production `Item` via
+ * {@link newItem} — exercising the item + applied-mod attribute merge — and
+ * returns the flattened equipment stats exactly as the live
+ * `InventoryManager.equipmentStats` does (the item's own attributes followed by
+ * every applied mod's attributes), ready to feed a Battler as its equipment.
+ */
+export function equipmentFactory(itemRegistry: IItem[], itemModRegistry: IItemMod[]) {
+	return (spec: ItemSpec): IBattlerAttribute[] => {
+		const appliedMods: IAppliedModModel[] = spec.mods.map((mod, slotIndex) => {
+			const id = itemModRegistry.length;
+			itemModRegistry.push({
+				id,
+				name: `Mod ${id}`,
+				description: '',
+				itemModTypeId: mod.type,
+				rarityId: ERarity.Common,
+				attributes: mod.attributes,
+				tags: []
+			});
+			return { itemModId: id, itemModSlotId: slotIndex };
 		});
+
+		const itemId = itemRegistry.length;
+		itemRegistry.push({
+			id: itemId,
+			name: `Item ${itemId}`,
+			description: '',
+			itemCategoryId: EItemCategory.Accessory,
+			rarityId: ERarity.Common,
+			iconPath: '',
+			attributes: spec.attributes,
+			modSlots: [],
+			tags: []
+		});
+
+		const item = newItem({ itemId, equipped: true, favorite: false, appliedMods });
+
+		// Mirror InventoryManager.equipmentStats: the equipped item's own
+		// attributes followed by every applied mod's attributes.
+		return [...item.attributes, ...item.appliedMods.flatMap((mod) => mod.attributes)];
 	};
 }
