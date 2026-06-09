@@ -135,9 +135,13 @@ namespace Game.Core.Players
 
         public bool TrySetFavorite(int itemId, bool favorite)
         {
-            // No domain event: the favorite flag lives on the cached domain
-            // player (the source of truth) and is persisted whole on save.
-            return Inventory.TrySetFavorite(itemId, favorite);
+            if (!Inventory.TrySetFavorite(itemId, favorite))
+            {
+                return false;
+            }
+
+            RaiseEvent(new ItemFavoriteChangedEvent(Id, itemId, favorite));
+            return true;
         }
 
         public void UpdateLogPreference(ELogType logType, bool enabled)

@@ -6,9 +6,10 @@ using LogPreferenceModel = Game.Api.Models.Player.LogPreference;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Persists the player's combat-log display preferences. Mirrors
-    /// <see cref="SetItemFavorite"/>: the change is applied to the cached domain
-    /// player (the source of truth for player data) and persisted from there.
+    /// Persists the player's combat-log display preferences. Like
+    /// <see cref="SetItemFavorite"/>, the change is applied to the cached domain player
+    /// (the source of truth) and persisted to the database via the write-behind
+    /// <see cref="Game.Core.Players.Events.LogPreferenceChangedEvent"/>.
     /// </summary>
     public class SaveLogPreferences : AbstractSocketCommandWithParams<List<LogPreferenceModel>>
     {

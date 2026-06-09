@@ -20,6 +20,7 @@ namespace Game.DataAccess
         IDomainEventHandler<ModUnlockedEvent>,
         IDomainEventHandler<ModAppliedEvent>,
         IDomainEventHandler<ModRemovedEvent>,
+        IDomainEventHandler<ItemFavoriteChangedEvent>,
         IDomainEventHandler<LogPreferenceChangedEvent>
     {
         private readonly IPubSubService _pubsub = pubsub;
@@ -32,6 +33,7 @@ namespace Game.DataAccess
         public Task HandleAsync(ModUnlockedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(ModAppliedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(ModRemovedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(ItemFavoriteChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(LogPreferenceChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
 
         private async Task PublishAsync<T>(T domainEvent) where T : IDomainEvent

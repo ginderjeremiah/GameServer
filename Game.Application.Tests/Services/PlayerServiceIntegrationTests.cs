@@ -1,13 +1,17 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Application.Services;
 using Game.Core;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Players;
+using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Game.Application.Tests.Services
@@ -293,6 +297,51 @@ namespace Game.Application.Tests.Services
             var modifiers = player.Inventory.GetEquippedAttributeModifiers().ToList();
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 5.0 && m.Source == EAttributeModifierSource.Item);
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
+        }
+
+        [Fact]
+        public async Task SetFavorite_PersistsFavoriteFlagToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.SetFavorite(player, item.Id, favorite: true);
+            Assert.True(success);
+
+            // The write-behind queue is drained by the synchronizer; run it directly (the hosted
+            // worker is disabled in the test harness) so the change reaches the database.
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            // Read the row from a fresh context (the cache-flush equivalent): the favorite flag must
+            // have been persisted to the database, not just the cached domain player.
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.UnlockedItems
+                .FirstOrDefaultAsync(ui => ui.PlayerId == playerEntity.Id && ui.ItemId == item.Id, CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.True(persisted.Favorite);
+        }
+
+        private async Task DrainPlayerUpdateQueue(IServiceProvider services)
+        {
+            var pubsub = services.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(
+                services, pubsub, NullLogger<DataProviderSynchronizer>.Instance, PlayerUpdateRetryPolicy.Default);
+            await synchronizer.ProcessQueue(pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
