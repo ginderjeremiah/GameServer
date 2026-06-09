@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Reflection;
 using Xunit;
 
 namespace Game.Infrastructure.Tests
@@ -69,6 +70,29 @@ namespace Game.Infrastructure.Tests
             probe.Release();
             // Once the action completes, the worker loop resets IsRunning back to false.
             WaitUntil(() => !worker.IsRunning);
+
+            worker.Kill();
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Start_PublishesIsRunningBeforeRunningTheAction(bool useAsync)
+        {
+            // Gate open so the action runs straight through. Start() publishes IsRunning = true *before* it signals
+            // the worker loop (issue #238 item 2), so when the action runs it is guaranteed to observe the worker as
+            // running. That happens-before is what stops a completed fast run from being left wedged 'true' by a
+            // late write — were the flag published after signaling, the action could run (and the loop reset it to
+            // false) before the 'true' landed.
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+            probe.RunningObserver = () => worker.IsRunning;
+
+            worker.Start();
+
+            AssertActionStarted(probe, "The action did not run after Start().");
+            WaitUntil(() => probe.Invocations == 1);
+            Assert.True(probe.ObservedRunningAtStart, "The action did not observe IsRunning == true when it ran.");
 
             worker.Kill();
         }
@@ -157,6 +181,96 @@ namespace Game.Infrastructure.Tests
             Assert.Throws<InvalidOperationException>(worker.Start);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Dispose_ReleasesResetEventHandle(bool useAsync)
+        {
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+
+            // The fix this characterizes is the release of the AutoResetEvent's OS wait handle, which the class
+            // previously left to the SafeWaitHandle finalizer. There is no public seam exposing it, so the disposal
+            // is verified directly on the private field — the one deliberate white-box assertion in this suite.
+            var resetEvent = GetResetEvent(worker);
+            Assert.False(resetEvent.SafeWaitHandle.IsClosed);
+
+            worker.Dispose();
+
+            Assert.True(resetEvent.SafeWaitHandle.IsClosed);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Dispose_PreventsFurtherStarts(bool useAsync)
+        {
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+
+            worker.Dispose();
+
+            // A disposed worker has released its wait handle, so starting it reports the disposed state.
+            Assert.Throws<ObjectDisposedException>(worker.Start);
+            Assert.Equal(0, probe.Invocations);
+            Assert.False(worker.IsRunning);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Dispose_IsIdempotent(bool useAsync)
+        {
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+
+            worker.Dispose();
+            // Disposing again must be a no-op rather than throwing on the already-released handle.
+            worker.Dispose();
+
+            Assert.Throws<ObjectDisposedException>(worker.Start);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Dispose_AfterKill_DoesNotThrow(bool useAsync)
+        {
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+
+            // Kill() and Dispose() are distinct steps; disposing an already-killed worker still releases the handle
+            // and must not throw.
+            worker.Kill();
+            worker.Dispose();
+
+            Assert.True(GetResetEvent(worker).SafeWaitHandle.IsClosed);
+            Assert.Throws<ObjectDisposedException>(worker.Start);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Dispose_DoesNotCancelAnInProgressAction(bool useAsync)
+        {
+            // Gate closed so the action is still in progress when Dispose() is called.
+            using var probe = new WorkerProbe();
+            var worker = CreateWorker(useAsync, probe);
+
+            worker.Start();
+            AssertActionStarted(probe, "The action did not start.");
+
+            // Like Kill(), Dispose() must not abort the in-flight action: it stops future scheduling and releases
+            // the handle, but the running delegate (which never touches the handle) is allowed to finish.
+            worker.Dispose();
+            probe.Release();
+
+            WaitUntil(() => !worker.IsRunning);
+            Assert.Equal(1, probe.Invocations);
+            // The worker is disposed, so it cannot be started again.
+            Assert.Throws<ObjectDisposedException>(worker.Start);
+        }
+
         private static BackgroundWorker CreateWorker(bool useAsync, WorkerProbe probe)
         {
             var logger = NullLogger<BackgroundWorker>.Instance;
@@ -167,6 +281,13 @@ namespace Game.Infrastructure.Tests
 
         private static void AssertActionStarted(WorkerProbe probe, string because) =>
             Assert.True(probe.Started.Wait(WaitTimeout, TestContext.Current.CancellationToken), because);
+
+        private static AutoResetEvent GetResetEvent(BackgroundWorker worker)
+        {
+            var field = typeof(BackgroundWorker).GetField("_resetEvent", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field);
+            return Assert.IsType<AutoResetEvent>(field.GetValue(worker));
+        }
 
         private static void WaitUntil(Func<bool> condition)
         {
@@ -218,6 +339,15 @@ namespace Game.Infrastructure.Tests
             /// <summary>When true, the action throws after starting, exercising the loop's swallow path.</summary>
             public bool ShouldThrow { get; set; }
 
+            /// <summary>
+            /// Optional callback invoked at the very start of each run to capture worker state the action can see at
+            /// that instant (used to verify IsRunning is published before the worker loop is signaled).
+            /// </summary>
+            public Func<bool>? RunningObserver { get; set; }
+
+            /// <summary>The value <see cref="RunningObserver"/> returned on the most recent run start.</summary>
+            public bool ObservedRunningAtStart { get; private set; }
+
             public Action SyncAction => () =>
             {
                 Begin();
@@ -250,6 +380,12 @@ namespace Game.Infrastructure.Tests
 
             private void Begin()
             {
+                // Capture observed state before the Interlocked.Increment so its release semantics publish the write
+                // to any thread that subsequently observes the incremented invocation count.
+                if (RunningObserver is not null)
+                {
+                    ObservedRunningAtStart = RunningObserver();
+                }
                 Interlocked.Increment(ref _invocations);
                 Started.Set();
             }

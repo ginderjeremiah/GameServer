@@ -4,14 +4,26 @@ namespace Game.Infrastructure
 {
     /// <summary>
     /// A lightweight container for managing and repeatedly executing a delegate using a background <see cref="Task"/>.
+    /// <para>
+    /// <see cref="Kill"/> and <see cref="Dispose"/> are distinct: <see cref="Kill"/> stops the worker from being
+    /// scheduled again while leaving the instance queryable (e.g. <see cref="IsRunning"/>), whereas
+    /// <see cref="Dispose"/> additionally releases the underlying OS wait handle and must be called once the worker
+    /// is no longer needed. <see cref="Dispose"/> implies <see cref="Kill"/>.
+    /// </para>
     /// </summary>
-    public class BackgroundWorker
+    public class BackgroundWorker : IDisposable
     {
         private readonly AutoResetEvent _resetEvent = new(false);
         private readonly ILogger<BackgroundWorker> _logger;
         private readonly string _uniqueId = Guid.NewGuid().ToString();
         private readonly RegisteredWaitHandle _workerHandle;
         private bool _hasBeenKilled = false;
+        private bool _disposed = false;
+
+        // Written on the Start() caller's thread and on the thread-pool worker-loop thread, and read from
+        // arbitrary threads, so it is volatile to guarantee writes are published and reads observe transitions
+        // promptly rather than relying on a non-synchronized field.
+        private volatile bool _isRunning = false;
 
         /// <summary>
         /// A custom name for the <see cref="BackgroundWorker"/> used for logging purposes.
@@ -21,7 +33,11 @@ namespace Game.Infrastructure
         /// <summary>
         /// True when the <see cref="BackgroundWorker"/> is actively processing its action, otherwise false.
         /// </summary>
-        public bool IsRunning { get; private set; } = false;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            private set => _isRunning = value;
+        }
 
         /// <summary>
         /// Initializes the <see cref="BackgroundWorker"/> with a synchronous delegate expecting no parameters.
@@ -47,24 +63,33 @@ namespace Game.Infrastructure
 
         /// <summary>
         /// Queues the delegate to be run again.
-        /// <para>Will throw and <see cref="InvalidOperationException"/> if the <see cref="BackgroundWorker"/> has been killed using <see cref="Kill"/>.</para>
+        /// <para>Will throw an <see cref="InvalidOperationException"/> if the <see cref="BackgroundWorker"/> has been killed using <see cref="Kill"/>,
+        /// or an <see cref="ObjectDisposedException"/> if it has been disposed.</para>
         /// </summary>
         /// <exception cref="InvalidOperationException"></exception>
+        /// <exception cref="ObjectDisposedException"></exception>
         public void Start()
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             if (_hasBeenKilled)
             {
                 _logger.LogError("The background worker '{Name}' ({UniqueId}) has been killed and cannot be started.", Name, _uniqueId);
                 throw new InvalidOperationException("The background worker has been killed and cannot be started.");
             }
 
+            // Publish IsRunning = true before signaling the worker loop. The loop's trailing IsRunning = false
+            // therefore always happens-after this write (the Set() / wait pairing establishes the ordering), so a
+            // fast run can never be left wedged 'true' by a late write — the bug this ordering guards against.
+            IsRunning = true;
             if (_resetEvent.Set())
             {
-                IsRunning = true;
                 _logger.LogTrace("Starting background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
             }
             else
             {
+                // Signaling failed, so no run was queued; undo the optimistic running state.
+                IsRunning = false;
                 _logger.LogError("Failed to start background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
             }
         }
@@ -75,7 +100,31 @@ namespace Game.Infrastructure
         public void Kill()
         {
             _hasBeenKilled = true;
-            _workerHandle.Unregister(_resetEvent);
+            // Pass null rather than the reset event: nothing waits on it once unregistered, and signaling it on
+            // completion would race a concurrent Dispose that releases the same handle.
+            _workerHandle.Unregister(null);
+        }
+
+        /// <summary>
+        /// Stops the worker from being scheduled again (see <see cref="Kill"/>) and releases the underlying OS wait handle.
+        /// Safe to call more than once. Like <see cref="Kill"/>, this does not cancel a delegate already in progress.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+
+            if (!_hasBeenKilled)
+            {
+                Kill();
+            }
+
+            // The worker loop never touches _resetEvent, and once Unregister has returned the thread pool no longer
+            // waits on it, so disposing it here is safe even if a delegate is still in progress.
+            _resetEvent.Dispose();
         }
 
         private RegisteredWaitHandle RegisterWorker(WaitOrTimerCallback callback)

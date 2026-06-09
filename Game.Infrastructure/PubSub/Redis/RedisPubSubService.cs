@@ -6,6 +6,10 @@ using System.Collections.Concurrent;
 
 namespace Game.Infrastructure.PubSub.Redis
 {
+    // Not IDisposable on purpose: the worker registry below is static (process-wide) while this service is
+    // registered transient, so disposing one instance would tear down workers owned by every other instance.
+    // Each worker is instead disposed at its own teardown point — when its subscription is removed (UnSubscribe)
+    // or when it is discarded because its id was already taken — which is the correct ownership boundary.
     internal class RedisPubSubService : IPubSubService
     {
         private static readonly ConcurrentDictionary<string, (Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
@@ -78,7 +82,7 @@ namespace Game.Infrastructure.PubSub.Redis
             {
                 if (!_handles.TryAdd(id, (handle, worker)))
                 {
-                    worker.Kill();
+                    worker.Dispose();
                     throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
                 }
             }
@@ -104,7 +108,7 @@ namespace Game.Infrastructure.PubSub.Redis
             {
                 if (!_handles.TryAdd(id, (handle, worker)))
                 {
-                    worker.Kill();
+                    worker.Dispose();
                     throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
                 }
             }
@@ -126,7 +130,7 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             if (_handles.TryRemove(id, out var handle))
             {
-                handle.worker?.Kill();
+                handle.worker?.Dispose();
                 await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel), handle.handler);
             }
         }
