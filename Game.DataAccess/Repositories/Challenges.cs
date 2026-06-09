@@ -26,6 +26,7 @@ namespace Game.DataAccess.Repositories
                     ProgressGoal = c.ProgressGoal,
                     RewardItemId = c.RewardItemId,
                     RewardItemModId = c.RewardItemModId,
+                    RewardSkillId = c.RewardSkillId,
                 })];
 
             return _challengeList;

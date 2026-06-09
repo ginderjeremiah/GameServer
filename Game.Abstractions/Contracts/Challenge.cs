@@ -20,5 +20,6 @@ namespace Game.Abstractions.Contracts
         public decimal ProgressGoal { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
+        public int? RewardSkillId { get; set; }
     }
 }

@@ -119,6 +119,7 @@ namespace Game.Core.Progress
                         ChallengeId = challenge.Id,
                         RewardItemId = challenge.RewardItemId,
                         RewardItemModId = challenge.RewardItemModId,
+                        RewardSkillId = challenge.RewardSkillId,
                     });
                 }
             }
@@ -179,5 +180,6 @@ namespace Game.Core.Progress
         public required int ChallengeId { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
+        public int? RewardSkillId { get; set; }
     }
 }

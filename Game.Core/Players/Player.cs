@@ -96,6 +96,22 @@ namespace Game.Core.Players
             RaiseEvent(new ModUnlockedEvent(Id, itemModId));
         }
 
+        /// <summary>
+        /// Unlocks a skill for the player and raises a <see cref="SkillUnlockedEvent"/>. The skill is
+        /// added to <see cref="Skills"/> unselected — earning a skill does not equip it (the player
+        /// chooses their loadout via the selection flow). Mirrors <see cref="UnlockItem"/>: the in-memory
+        /// set is de-duplicated and the event is raised for the idempotent write-behind insert to apply.
+        /// </summary>
+        public void UnlockSkill(Skill skill)
+        {
+            if (!Skills.Any(s => s.Id == skill.Id))
+            {
+                Skills.Add(skill);
+            }
+
+            RaiseEvent(new SkillUnlockedEvent(Id, skill.Id));
+        }
+
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)
         {
             if (!Inventory.TryEquipItem(itemId, slot))
