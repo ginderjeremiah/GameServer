@@ -1,90 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EAttribute } from '$lib/api';
-import { BattleAttributes } from '$lib/battle/battle-attributes';
+import type { ISkill } from '$lib/api';
+
+// Drive the REAL production simulation. The mocked `staticData.skills` is the
+// registry `makeBattler` registers each scenario's skills into, so the Battlers
+// resolve their skills exactly as the live game does.
+const mockSkills: ISkill[] = [];
+vi.mock('$stores', () => ({
+	staticData: {
+		get skills() {
+			return mockSkills;
+		}
+	}
+}));
+
+import { BattleSimulator, Battler } from '$lib/battle';
+import type { BattleResult } from '$lib/battle';
+import { battlerFactory, makeSkill } from './battle-sim-test-utils';
 
 /**
- * Pure simulation loop that mirrors the backend Game.Core.Battle.BattleSimulator
- * exactly. No runtime dependencies — just math. Returning the same shape as the
- * backend's BattleResult lets the parity matrix below assert the full outcome
- * (victory / playerDied / totalMs), not just the duration.
+ * The parity matrix below asserts the full outcome (victory / playerDied /
+ * totalMs) of the production `BattleSimulator` — the same code the live
+ * BattleEngine runs per tick — against the backend's. Building real Battlers and
+ * running the real simulator (rather than a hand-rolled copy) means a change to
+ * the per-tick arithmetic that diverges from the backend can no longer pass here.
  */
 const msPerTick = 40;
-const defaultMaxMs = msPerTick * 10000;
-
-interface SimResult {
-	victory: boolean;
-	playerDied: boolean;
-	totalMs: number;
-}
-
-function simulateBattle(player: SimBattler, enemy: SimBattler, maxMs: number = defaultMaxMs): SimResult {
-	let totalMs = msPerTick;
-	for (; totalMs <= maxMs; totalMs += msPerTick) {
-		updateBattler(player, enemy, msPerTick);
-		if (enemy.currentHealth <= 0) {
-			return { victory: true, playerDied: false, totalMs };
-		}
-
-		updateBattler(enemy, player, msPerTick);
-		if (player.currentHealth <= 0) {
-			return { victory: false, playerDied: true, totalMs };
-		}
-	}
-	// Mirror the backend's timeout return: the last simulated tick (maxMs), not maxMs + one tick.
-	return { victory: false, playerDied: false, totalMs: totalMs - msPerTick };
-}
-
-function updateBattler(attacker: SimBattler, defender: SimBattler, timeDelta: number) {
-	for (const skill of attacker.skills) {
-		skill.chargeTime += timeDelta * attacker.cdMultiplier;
-		if (skill.chargeTime >= skill.cooldownMs) {
-			skill.chargeTime = 0;
-			const rawDmg =
-				skill.baseDamage +
-				skill.multipliers.reduce((sum, m) => sum + attacker.attributes.getValue(m.attributeId) * m.amount, 0);
-			let dmg = rawDmg - defender.attributes.getValue(EAttribute.Defense);
-			if (dmg < 0) dmg = 0;
-			defender.currentHealth -= dmg;
-		}
-	}
-}
-
-interface SimSkill {
-	baseDamage: number;
-	cooldownMs: number;
-	chargeTime: number;
-	multipliers: { attributeId: EAttribute; amount: number }[];
-}
-
-interface SimBattler {
-	attributes: BattleAttributes;
-	currentHealth: number;
-	cdMultiplier: number;
-	skills: SimSkill[];
-}
-
-function makeSkill(
-	baseDamage: number,
-	cooldownMs: number,
-	multipliers: { attributeId: EAttribute; amount: number }[] = []
-): SimSkill {
-	return { baseDamage, cooldownMs, chargeTime: 0, multipliers };
-}
-
-/**
- * Creates a battler from RAW stat allocations (like the backend does).
- * Derived stats are calculated once by BattleAttributes.
- */
-function makeBattlerFromRaw(attrs: { id: EAttribute; amount: number }[], skills: SimSkill[]): SimBattler {
-	const battlerAttrs = attrs.map((a) => ({ attributeId: a.id, amount: a.amount }));
-	const ba = new BattleAttributes(battlerAttrs, true);
-	return {
-		attributes: ba,
-		currentHealth: ba.getValue(EAttribute.MaxHealth),
-		cdMultiplier: 1 + ba.getValue(EAttribute.CooldownRecovery) / 100,
-		skills
-	};
-}
+const makeBattler = battlerFactory(mockSkills);
 
 // ── Shared parity matrix ───────────────────────────────────────────────────────
 // Every scenario here MUST mirror — with identical inputs and identical expected
@@ -95,10 +37,10 @@ function makeBattlerFromRaw(attrs: { id: EAttribute; amount: number }[], skills:
 
 interface ParityScenario {
 	name: string;
-	player: () => SimBattler;
-	enemy: () => SimBattler;
+	player: () => Battler;
+	enemy: () => Battler;
 	maxMs?: number;
-	expected: SimResult;
+	expected: BattleResult;
 }
 
 const scenarios: ParityScenario[] = [
@@ -109,17 +51,17 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'cooldownRecovery',
 		player: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 50 },
 					{ id: EAttribute.Endurance, amount: 30 },
 					{ id: EAttribute.Agility, amount: 20 },
 					{ id: EAttribute.Dexterity, amount: 10 }
 				],
-				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])]
+				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])]
 			),
 		enemy: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.Endurance, amount: 15 }
@@ -136,15 +78,15 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'multiSkill',
 		player: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 30 },
 					{ id: EAttribute.Endurance, amount: 20 }
 				],
-				[makeSkill(20, 800, [{ attributeId: EAttribute.Strength, amount: 1.0 }]), makeSkill(25, 1200)]
+				[makeSkill(20, 800, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }]), makeSkill(25, 1200)]
 			),
 		enemy: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 20 },
 					{ id: EAttribute.Endurance, amount: 15 }
@@ -158,8 +100,8 @@ const scenarios: ParityScenario[] = [
 	//   Player/Enemy: Def=52 each; attacks 5 raw → 5-52 clamped to 0.
 	{
 		name: 'highDefenseFloor',
-		player: () => makeBattlerFromRaw([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
-		enemy: () => makeBattlerFromRaw([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
+		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
 		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
 	},
 
@@ -167,7 +109,7 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'noSkills',
 		player: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.Endurance, amount: 10 }
@@ -175,7 +117,7 @@ const scenarios: ParityScenario[] = [
 				[]
 			),
 		enemy: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.Endurance, amount: 10 }
@@ -193,15 +135,15 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'bossFullLoadout',
 		player: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 60 },
 					{ id: EAttribute.Endurance, amount: 40 }
 				],
-				[makeSkill(10, 1000, [{ attributeId: EAttribute.Strength, amount: 2.0 }])]
+				[makeSkill(10, 1000, [{ attributeId: EAttribute.Strength, multiplier: 2.0 }])]
 			),
 		enemy: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 20 },
 					{ id: EAttribute.Endurance, amount: 60 }
@@ -215,17 +157,17 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'maxMsCap',
 		player: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 50 },
 					{ id: EAttribute.Endurance, amount: 30 },
 					{ id: EAttribute.Agility, amount: 20 },
 					{ id: EAttribute.Dexterity, amount: 10 }
 				],
-				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])]
+				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])]
 			),
 		enemy: () =>
-			makeBattlerFromRaw(
+			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.Endurance, amount: 15 }
@@ -238,10 +180,17 @@ const scenarios: ParityScenario[] = [
 ];
 
 describe('Battle simulation parity with backend', () => {
+	beforeEach(() => {
+		mockSkills.length = 0;
+	});
+
 	for (const scenario of scenarios) {
 		it(`matches the backend for the ${scenario.name} scenario`, () => {
-			const result = simulateBattle(scenario.player(), scenario.enemy(), scenario.maxMs);
+			const sim = new BattleSimulator(scenario.player(), scenario.enemy());
+			const result = sim.simulate(scenario.maxMs);
+
 			expect(result).toEqual(scenario.expected);
+			expect(result.totalMs % msPerTick).toBe(0);
 		});
 	}
 
@@ -272,8 +221,8 @@ describe('Battle simulation parity with backend', () => {
 			{ id: EAttribute.Defense, amount: 42 }, // 2 + 30 + 0.5*20
 			{ id: EAttribute.CooldownRecovery, amount: 9 } // 0.4*20 + 0.1*10
 		];
-		const player = makeBattlerFromRaw(playerFinalAttrs, [
-			makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, amount: 1.5 }])
+		const player = makeBattler(playerFinalAttrs, [
+			makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])
 		]);
 		const enemy = scenarios[0].enemy();
 
@@ -283,7 +232,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(18);
 		expect(player.cdMultiplier).toBeCloseTo(1.18, 10);
 
-		const result = simulateBattle(player, enemy);
+		const result = new BattleSimulator(player, enemy).simulate();
 		expect(result.totalMs).toBe(6240);
 		expect(result.totalMs).toBeLessThan(6720);
 	});

@@ -1,4 +1,4 @@
-import { Battler } from '$lib/battle';
+import { Battler, battleStep } from '$lib/battle';
 import { staticData } from '$stores';
 import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
@@ -95,19 +95,12 @@ export class BattleEngine {
 
 	private logicalUpdate(timeDelta: number) {
 		if (this.stage === Active) {
-			const playerSkillsFired = this.player.advanceCooldowns(timeDelta);
-			playerSkillsFired.forEach((skill) => {
-				const dmg = skill.calculateDamage();
-				const finalDmg = this.enemy.takeDamage(dmg);
-				logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
-			});
-			if (!this.enemy.isDead) {
-				const enemySkillsFired = this.enemy.advanceCooldowns(timeDelta);
-				enemySkillsFired.forEach((skill) => {
-					const dmg = skill.calculateDamage();
-					const finalDmg = this.player.takeDamage(dmg);
-					logMessage(ELogType.Damage, `${this.enemy.name} used ${skill.name} and dealt ${formatNum(finalDmg)} damage!`);
-				});
+			for (const { skill, damage, byPlayer } of battleStep(this.player, this.enemy, timeDelta)) {
+				if (byPlayer) {
+					logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(damage)} damage!`);
+				} else {
+					logMessage(ELogType.Damage, `${this.enemy.name} used ${skill.name} and dealt ${formatNum(damage)} damage!`);
+				}
 			}
 			if (this.enemy.isDead) {
 				this.setBattleStage(Victorious);
