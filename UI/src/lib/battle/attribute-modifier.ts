@@ -1,32 +1,24 @@
-/* attribute-modifier.ts — a faithful frontend mirror of the backend attribute
-   modifier domain (`Game.Core/Attributes/Modifiers`).
+/* attribute-modifier.ts — the frontend's TypeScript type modeling for the backend
+   attribute-modifier domain (`Game.Core/Attributes/Modifiers`).
 
-   These enums and the static modifier list intentionally duplicate the C#
-   domain (`EModifierType`, `EAttributeModifierSource`, `StaticAttributeModifiers`)
-   rather than being produced by the API codegen: they are domain concepts, not
-   API DTOs, so nothing in the wire contract carries them. They are hand-kept in
-   sync with the backend and guarded by a parity test against `BattleAttributes`
-   (see the attribute-collection tests) so the breakdown can never silently
-   disagree with the numbers the battle simulation actually produces. */
+   The enum *values* (`EModifierType` / `EAttributeModifierSource`) and the static
+   modifier *table* (`STATIC_ATTRIBUTE_MODIFIERS`) are no longer hand-maintained
+   mirrors: they are generated from the C# domain by `Game.Api.CodeGen`, exactly
+   the way the API DTOs are — the enums into `$lib/api`'s `enums.ts`, the table into
+   `$lib/api/types/attribute-modifiers.ts` (from `StaticAttributeModifiers.All`). So
+   a backend-only change to a formula coefficient or an enum value can no longer
+   silently desync the two implementations: the CI codegen-drift check fails on a
+   stale committed table (see docs/infrastructure.md — issue #282).
 
-import { EAttribute } from '$lib/api';
+   This file declares only the discriminated-union *types* used to consume that
+   data (a frontend modeling choice that carries no values of its own) and pins the
+   generated table to that union at the import seam below — the typed re-export is a
+   compile-time conformance check that the generated values still satisfy the union. */
 
-/** Mirrors `Game.Core.EModifierType`. Additive modifiers are applied before
- *  multiplicative ones (the backend sorts modifiers by this value). */
-export enum EModifierType {
-	Additive = 1,
-	Multiplicative = 2
-}
+import { EAttribute, EModifierType, EAttributeModifierSource } from '$lib/api';
+import { STATIC_ATTRIBUTE_MODIFIERS as GENERATED_STATIC_ATTRIBUTE_MODIFIERS } from '$lib/api/types/attribute-modifiers';
 
-/** Mirrors `Game.Core.EAttributeModifierSource` — where a modifier originates. */
-export enum EAttributeModifierSource {
-	BaseValue = 1,
-	PlayerStatPoints = 2,
-	AttributeDistribution = 3,
-	Derived = 4,
-	Item = 5,
-	ItemMod = 6
-}
+export { EModifierType, EAttributeModifierSource };
 
 /** A modifier whose amount is scaled by the final value of another attribute. */
 export interface DerivedAttributeModifier {
@@ -50,68 +42,9 @@ export interface BaseAttributeModifier {
  *  `source`: only `Derived` modifiers carry a non-optional `derivedSource`. */
 export type AttributeModifier = DerivedAttributeModifier | BaseAttributeModifier;
 
-/** Mirrors `Game.Core.Attributes.Modifiers.StaticAttributeModifiers` plus
- *  `AttributeCollection.AddStaticModifiers` — the engine base values and derived
- *  formulas every attribute set is built on top of. Kept in the same order the
- *  backend adds them. */
-export const STATIC_ATTRIBUTE_MODIFIERS: readonly AttributeModifier[] = [
-	// CooldownRecovery
-	{
-		attribute: EAttribute.CooldownRecovery,
-		amount: 0.4,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Agility
-	},
-	{
-		attribute: EAttribute.CooldownRecovery,
-		amount: 0.1,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Dexterity
-	},
-
-	// Defense
-	{
-		attribute: EAttribute.Defense,
-		amount: 2.0,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.BaseValue
-	},
-	{
-		attribute: EAttribute.Defense,
-		amount: 1.0,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Endurance
-	},
-	{
-		attribute: EAttribute.Defense,
-		amount: 0.5,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Agility
-	},
-
-	// MaxHealth
-	{
-		attribute: EAttribute.MaxHealth,
-		amount: 50.0,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.BaseValue
-	},
-	{
-		attribute: EAttribute.MaxHealth,
-		amount: 20.0,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Endurance
-	},
-	{
-		attribute: EAttribute.MaxHealth,
-		amount: 5.0,
-		type: EModifierType.Additive,
-		source: EAttributeModifierSource.Derived,
-		derivedSource: EAttribute.Strength
-	}
-];
+/** The engine base values and derived formulas every attribute set is built on top
+ *  of, generated from `Game.Core.Attributes.Modifiers.StaticAttributeModifiers.All`
+ *  and kept in the same order the backend applies them. The explicit type both
+ *  documents the contract and verifies, at compile time, that the generated table
+ *  conforms to the {@link AttributeModifier} union. */
+export const STATIC_ATTRIBUTE_MODIFIERS: readonly AttributeModifier[] = GENERATED_STATIC_ATTRIBUTE_MODIFIERS;

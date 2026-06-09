@@ -20,6 +20,15 @@ export enum EAttribute {
 	BlockReduction = 14,
 }
 
+export enum EAttributeModifierSource {
+	BaseValue = 1,
+	PlayerStatPoints = 2,
+	AttributeDistribution = 3,
+	Derived = 4,
+	Item = 5,
+	ItemMod = 6,
+}
+
 export enum EChallengeGoalComparison {
 	AtLeast = 1,
 	AtMost = 2,
@@ -71,6 +80,11 @@ export enum ELogType {
 	LevelUp = 4,
 	ItemFound = 5,
 	EnemyDefeated = 6,
+}
+
+export enum EModifierType {
+	Additive = 1,
+	Multiplicative = 2,
 }
 
 export enum ERarity {
