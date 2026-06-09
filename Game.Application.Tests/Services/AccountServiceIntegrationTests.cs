@@ -11,6 +11,7 @@ using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 using NewPlayerFactory = Game.Core.Players.NewPlayerFactory;
@@ -274,7 +275,8 @@ namespace Game.Application.Tests.Services
                 provider.GetRequiredService<IRefreshTokenStore>(),
                 new StubAccessTokenService(),
                 hasher,
-                new NewPlayerFactory());
+                new NewPlayerFactory(),
+                NullLogger<AccountService>.Instance);
         }
 
         /// <summary>

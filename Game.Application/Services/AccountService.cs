@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Core.Players;
+using Microsoft.Extensions.Logging;
 
 namespace Game.Application.Services
 {
@@ -16,7 +17,8 @@ namespace Game.Application.Services
         IRefreshTokenStore refreshTokenStore,
         IAccessTokenService accessTokenService,
         IPasswordHasher passwordHasher,
-        NewPlayerFactory newPlayerFactory)
+        NewPlayerFactory newPlayerFactory,
+        ILogger<AccountService> logger)
     {
         private readonly IUsers _users = users;
         private readonly IPlayerRepository _playerRepo = playerRepo;
@@ -24,6 +26,7 @@ namespace Game.Application.Services
         private readonly IAccessTokenService _accessTokenService = accessTokenService;
         private readonly IPasswordHasher _passwordHasher = passwordHasher;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
+        private readonly ILogger<AccountService> _logger = logger;
 
         /// <summary>
         /// Creates a new account: validates the username is available, hashes the password, and hands the
@@ -84,10 +87,19 @@ namespace Game.Application.Services
 
             // Transparently migrate a credential stored under the legacy scheme (or an outdated work
             // factor) now that we have verified the plaintext, so existing accounts upgrade without a
-            // forced reset. The salt is reused; only the derived hash changes.
+            // forced reset. The salt is reused; only the derived hash changes. This is best-effort: an
+            // opportunistic upgrade must never cost the user an otherwise-valid login — if the write
+            // fails transiently the legacy hash still verifies, so the next login simply retries it.
             if (verification == PasswordVerificationResult.SuccessRehashNeeded)
             {
-                await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password, account.Salt));
+                try
+                {
+                    await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password, account.Salt));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to migrate password hash for user {UserId}; will retry on next login.", account.Id);
+                }
             }
 
             var tokens = await IssueTokens(account.Id, account.Roles);
