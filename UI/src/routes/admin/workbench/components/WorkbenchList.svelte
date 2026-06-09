@@ -27,12 +27,14 @@
 						: status === 'deleted'
 							? 'var(--change-removed)'
 							: 'transparent'}
+			{@const retired = (entity.retireable ?? false) && store.isRetired(record)}
 			<button
 				type="button"
 				class="list-row"
 				data-testid="workbench-row"
 				class:selected={record.id === selectedId}
 				class:deleted={status === 'deleted'}
+				class:retired
 				onclick={() => onSelect(record.id)}
 			>
 				<div
@@ -52,6 +54,7 @@
 						{/if}
 						{#if status === 'added'}<span class="spill added">new</span>{/if}
 						{#if status === 'modified'}<span class="spill modified">edited</span>{/if}
+						{#if retired}<span class="spill retired">retired</span>{/if}
 						<div class="spacer"></div>
 						{#if status !== 'deleted' && warns.length > 0}
 							<WarnTriangle title={warns.join(' · ')} />
@@ -144,6 +147,11 @@ const liveCount = $derived(store.items.filter((it) => store.status(it) !== 'dele
 	}
 	&.deleted {
 		opacity: 0.45;
+	}
+	// Retired records stay in the catalogue (still resolvable by id), just dimmed — distinct
+	// from the stronger fade + strikethrough of a pending hard-delete.
+	&.retired:not(.deleted) {
+		opacity: 0.6;
 	}
 }
 .row-body {

@@ -23,6 +23,7 @@
 				{#if status === 'added'}<span class="spill added">new</span>{/if}
 				{#if status === 'modified'}<span class="spill modified">edited</span>{/if}
 				{#if status === 'deleted'}<span class="spill deleted">removed</span>{/if}
+				{#if entity.retireable && store.isRetired(record)}<span class="spill retired">retired</span>{/if}
 				<div class="spacer"></div>
 				{#if status === 'deleted'}
 					<button type="button" class="hdr-action accent" onclick={() => store.restoreItem(record.id)}>
@@ -32,9 +33,26 @@
 					{#if status === 'modified'}
 						<button type="button" class="hdr-action reset" onclick={() => store.resetItem(record.id)}>Reset</button>
 					{/if}
-					<button type="button" class="hdr-action danger" onclick={() => store.removeItem(record.id)}>
-						<WorkbenchIcon kind="x" size={11} />Delete
-					</button>
+					{#if entity.retireable}
+						{#if record.id < 0}
+							<!-- Never-saved record: drop it locally (it was never persisted, so it's not "retired"). -->
+							<button type="button" class="hdr-action danger" onclick={() => store.removeItem(record.id)}>
+								<WorkbenchIcon kind="x" size={11} />Remove
+							</button>
+						{:else if store.isRetired(record)}
+							<button type="button" class="hdr-action accent" onclick={() => store.setRetired(record.id, false)}>
+								<WorkbenchIcon kind="check" size={11} sw={1.7} />Reinstate
+							</button>
+						{:else}
+							<button type="button" class="hdr-action danger" onclick={() => store.setRetired(record.id, true)}>
+								<WorkbenchIcon kind="archive" size={11} />Retire
+							</button>
+						{/if}
+					{:else}
+						<button type="button" class="hdr-action danger" onclick={() => store.removeItem(record.id)}>
+							<WorkbenchIcon kind="x" size={11} />Delete
+						</button>
+					{/if}
 				{/if}
 			</div>
 

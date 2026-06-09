@@ -36,15 +36,8 @@ namespace Game.DataAccess.Repositories.Admin
                         existing.Description = item.Description;
                         existing.ItemModTypeId = (int)item.ItemModTypeId;
                         existing.RarityId = (int)item.RarityId;
+                        existing.RetiredAt = item.RetiredAt;
                         _entityStore.Update(existing);
-                    }
-                },
-                delete: item =>
-                {
-                    var existing = _itemMods.LookupItemMod(item.Id);
-                    if (existing is not null)
-                    {
-                        _entityStore.Delete(existing);
                     }
                 });
         }

@@ -368,6 +368,13 @@
 			border: 1px solid color-mix(in srgb, var(--change-removed) 40%, transparent);
 			background: color-mix(in srgb, var(--change-removed) 10%, transparent);
 		}
+		// Retired is a lifecycle state, not a pending change — neutral/muted, distinct from the
+		// add/edit/remove change-state accents.
+		&.retired {
+			color: var(--text-muted);
+			border: 1px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+			background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+		}
 	}
 
 	/* skill / reference chips */

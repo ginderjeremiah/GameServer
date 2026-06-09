@@ -14,5 +14,9 @@ namespace Game.Abstractions.Contracts
         public required IEnumerable<BattlerAttribute> Attributes { get; set; }
         public required IEnumerable<ItemModSlot> ModSlots { get; set; }
         public required IEnumerable<int> Tags { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
+        /// Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
     }
 }

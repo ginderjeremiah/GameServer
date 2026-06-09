@@ -105,6 +105,25 @@ export class EntityStore<T extends Identified> {
 		this.deleted.delete(id);
 	}
 
+	/** True when a record is retired (out of circulation but kept at its slot and resolvable by id). */
+	isRetired(record: T): boolean {
+		return record.retiredAt != null;
+	}
+
+	/**
+	 * Retire or reinstate a saved reference record. Retiring stamps a timestamp; reinstating clears it
+	 * back to null (matching the server's serialized "active" shape). This is an ordinary edit — the
+	 * record reads as `modified` and persists through the normal Add/Edit path — never a hard delete.
+	 */
+	setRetired(id: number, retired: boolean) {
+		// Throwaway Date used only to format a one-shot ISO timestamp — not reactive state.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const retiredAt = retired ? new Date().toISOString() : null;
+		this.patch(id, (draft) => {
+			draft.retiredAt = retiredAt;
+		});
+	}
+
 	resetItem(id: number) {
 		const baseline = this.baseMap[id];
 		if (baseline) {

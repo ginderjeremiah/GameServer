@@ -39,6 +39,7 @@ export interface IChallenge {
 	rewardItemId?: number;
 	rewardItemModId?: number;
 	rewardSkillId?: number;
+	retiredAt?: string;
 }
 
 export interface IEnemy {
@@ -48,6 +49,7 @@ export interface IEnemy {
 	attributeDistribution: IAttributeDistribution[];
 	skillPool: number[];
 	spawns: IEnemySpawn[];
+	retiredAt?: string;
 }
 
 export interface IEnemySpawn {
@@ -65,6 +67,7 @@ export interface IItem {
 	attributes: IBattlerAttribute[];
 	modSlots: IItemModSlot[];
 	tags: number[];
+	retiredAt?: string;
 }
 
 export interface IItemCategory {
@@ -80,6 +83,7 @@ export interface IItemMod {
 	rarityId: ERarity;
 	attributes: IBattlerAttribute[];
 	tags: number[];
+	retiredAt?: string;
 }
 
 export interface IItemModSlot {
@@ -101,6 +105,7 @@ export interface ISkill {
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
+	retiredAt?: string;
 }
 
 export interface ITag {
@@ -124,6 +129,7 @@ export interface IZone {
 	bossEnemyId?: number;
 	bossLevel: number;
 	unlockChallengeId?: number;
+	retiredAt?: string;
 }
 
 export interface IZoneEnemy {

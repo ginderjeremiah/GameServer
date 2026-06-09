@@ -45,7 +45,8 @@ export type WorkbenchIconKind =
 	| 'trophy'
 	| 'target'
 	| 'gauge'
-	| 'gift';
+	| 'gift'
+	| 'archive';
 
 const PATHS: Record<WorkbenchIconKind, string> = {
 	skull:
@@ -70,7 +71,8 @@ const PATHS: Record<WorkbenchIconKind, string> = {
 		'M5 2.5h6v3a3 3 0 01-6 0z|M5 3.3H3.2a1.5 1.5 0 001.9 2.2M11 3.3h1.8a1.5 1.5 0 01-1.9 2.2|M8 8.5v2.2M6 13.5h4M6.6 11h2.8l.4 2.5H6.2z',
 	target: 'M8 2.5a5.5 5.5 0 100 11 5.5 5.5 0 100-11|M8 5.5a2.5 2.5 0 100 5 2.5 2.5 0 100-5',
 	gauge: 'M2.8 11.5a5.2 5.2 0 0110.4 0|M8 11.3l2.7-3',
-	gift: 'M2.6 6.4h10.8v2.2H2.6z|M3.6 8.6h8.8V14H3.6z|M8 6.4V14|M8 6.4c-2 0-3-.6-3-1.6S6.5 3.4 8 6.4c1.5-3 3-2 3-1.6s-1 1.6-3 1.6z'
+	gift: 'M2.6 6.4h10.8v2.2H2.6z|M3.6 8.6h8.8V14H3.6z|M8 6.4V14|M8 6.4c-2 0-3-.6-3-1.6S6.5 3.4 8 6.4c1.5-3 3-2 3-1.6s-1 1.6-3 1.6z',
+	archive: 'M2.5 3h11v3h-11z|M3.7 6h8.6v7H3.7z|M6.3 8.8h3.4'
 };
 </script>
 

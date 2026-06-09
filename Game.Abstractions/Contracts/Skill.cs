@@ -10,5 +10,9 @@ namespace Game.Abstractions.Contracts
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
+        /// Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
     }
 }

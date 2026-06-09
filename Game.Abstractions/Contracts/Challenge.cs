@@ -21,5 +21,9 @@ namespace Game.Abstractions.Contracts
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
         public int? RewardSkillId { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
+        /// Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
     }
 }

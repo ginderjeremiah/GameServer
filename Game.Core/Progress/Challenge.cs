@@ -15,6 +15,10 @@ namespace Game.Core.Progress
         public int? RewardItemModId { get; set; }
         public int? RewardSkillId { get; set; }
 
+        /// <summary>When set, the challenge is retired: out of circulation for new authoring but kept
+        /// resolvable by id so existing references (and completions) stay valid. Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
+
         public void UpdateChallengeProgress(PlayerChallenge playerChallenge, PlayerProgress playerProgress)
         {
             if (Type.StatisticType is not null)

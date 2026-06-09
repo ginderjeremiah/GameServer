@@ -86,6 +86,41 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void Apply_AddAndEdit_WithNoDeleteHandler_Succeeds()
+        {
+            // Reference repos omit the delete handler (their records are retired, not deleted), but
+            // add/edit must still flow through.
+            var added = new List<string>();
+            var edited = new List<string>();
+
+            var changes = new[]
+            {
+                Change(EChangeType.Add, "a"),
+                Change(EChangeType.Edit, "e"),
+            };
+
+            ChangeSetProcessor.Apply(changes,
+                add: item => added.Add(item.Tag),
+                edit: item => edited.Add(item.Tag));
+
+            Assert.Equal(["a"], added);
+            Assert.Equal(["e"], edited);
+        }
+
+        [Fact]
+        public void Apply_DeleteChange_WithNoDeleteHandler_Throws()
+        {
+            // A top-level Delete against a retire-only reference set must fail loud rather than open
+            // an id gap that silently mis-resolves index-based lookups.
+            var changes = new[] { Change(EChangeType.Delete, "d") };
+
+            Assert.Throws<InvalidOperationException>(() =>
+                ChangeSetProcessor.Apply(changes,
+                    add: _ => { },
+                    edit: _ => { }));
+        }
+
+        [Fact]
         public void Apply_EmptyChangeSet_InvokesNoHandlers()
         {
             var invoked = false;

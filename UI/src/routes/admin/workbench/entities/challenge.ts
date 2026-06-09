@@ -22,6 +22,7 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 	singular: 'Challenge',
 	glyph: 'trophy',
 	blankName: 'Untitled challenge',
+	retireable: true,
 	newItem: (id) => {
 		const challenge: IChallenge = {
 			id,

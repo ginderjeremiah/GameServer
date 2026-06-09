@@ -73,12 +73,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BossEnemyId = item.BossEnemyId,
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
-                }),
-                delete: item => _entityStore.Delete(new Entities.Zone
-                {
-                    Id = item.Id,
-                    Name = "",
-                    Description = "",
+                    RetiredAt = item.RetiredAt,
                 }));
 
             return true;
