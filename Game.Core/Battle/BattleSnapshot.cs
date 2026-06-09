@@ -62,7 +62,9 @@ namespace Game.Core.Battle
             return new BattleSnapshot
             {
                 Level = player.Level,
-                StatAllocations = player.StatPoints.StatAllocations,
+                // Copy each allocation so a later in-place stat reallocation on the live player cannot
+                // retroactively mutate this snapshot, consistent with the other projected fields.
+                StatAllocations = player.StatPoints.StatAllocations.Select(allocation => allocation.Copy()).ToList(),
                 EquippedItems = equippedItems,
                 SkillIds = player.SelectedSkills.Select(s => s.Id).ToList(),
             };

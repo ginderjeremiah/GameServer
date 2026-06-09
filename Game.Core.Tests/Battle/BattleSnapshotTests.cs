@@ -28,11 +28,31 @@ namespace Game.Core.Tests.Battle
             var snapshot = BattleSnapshot.FromPlayer(player);
 
             Assert.Equal(9, snapshot.Level);
-            Assert.Same(player.StatPoints.StatAllocations, snapshot.StatAllocations);
+            // The snapshot captures an independent copy of the allocations, not the live list/elements.
+            Assert.NotSame(player.StatPoints.StatAllocations, snapshot.StatAllocations);
+            var allocation = Assert.Single(snapshot.StatAllocations);
+            Assert.NotSame(player.StatPoints.StatAllocations[0], allocation);
+            Assert.Equal(EAttribute.Strength, allocation.Attribute);
+            Assert.Equal(4, allocation.Amount);
             Assert.Equal([2, 3], snapshot.SkillIds);
             var equipped = Assert.Single(snapshot.EquippedItems);
             Assert.Equal(1, equipped.ItemId);
             Assert.Equal([10], equipped.AppliedModIds);
+        }
+
+        [Fact]
+        public void FromPlayer_StatAllocations_AreImmuneToLaterLiveMutation()
+        {
+            var player = MakePlayer(allocations: [Alloc(EAttribute.Strength, 4)]);
+
+            var snapshot = BattleSnapshot.FromPlayer(player);
+
+            // Reallocating stats mutates StatAllocation.Amount in place on the live player; the snapshot
+            // is an immutable capture taken at battle start and must not be affected.
+            player.StatPoints.StatAllocations[0].Amount = 99;
+
+            var captured = Assert.Single(snapshot.StatAllocations);
+            Assert.Equal(4, captured.Amount);
         }
 
         [Fact]
