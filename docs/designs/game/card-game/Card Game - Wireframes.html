@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Card Game — Wireframes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f3efe6;
+    --paper-2: #ece6d8;
+    --ink: #2c2a26;
+    --ink-soft: #6a655c;
+    --ink-faint: #a8a092;
+    --blue: #4f73bd;
+    --blue-soft: #aebfe2;
+    --coral: #cc6f5d;
+    --coral-soft: #e3b3a8;
+    --gold: #c69a45;
+    --green: #6f9a52;
+    --line: #c7bfae;
+    --hand: 'Caveat', cursive;
+    --body: 'Kalam', cursive;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(0,0,0,0.015), transparent 60%),
+      radial-gradient(circle at 80% 90%, rgba(0,0,0,0.02), transparent 55%);
+    color: var(--ink);
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* faint paper grid */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(120,110,90,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120,110,90,0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 32px 28px 90px; }
+
+  /* ---- header ---- */
+  header h1 {
+    font-family: var(--hand);
+    font-weight: 700;
+    font-size: 44px;
+    margin: 0 0 2px;
+    letter-spacing: 0.5px;
+  }
+  header .sub { font-family: var(--body); font-size: 15px; color: var(--ink-soft); margin: 0; max-width: 760px; line-height: 1.5; }
+  .stamp {
+    display: inline-block; transform: rotate(-3deg);
+    border: 2px solid var(--coral); color: var(--coral);
+    font-family: var(--hand); font-weight: 700; font-size: 15px;
+    padding: 1px 10px; border-radius: 140px 8px 130px 8px/8px 130px 8px 140px;
+    margin-bottom: 10px; letter-spacing: 1px;
+  }
+
+  /* ---- tabs ---- */
+  .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 18px; }
+  .tab {
+    font-family: var(--hand); font-weight: 600; font-size: 21px;
+    background: var(--paper-2); color: var(--ink-soft);
+    border: 2px solid var(--ink); cursor: pointer;
+    padding: 7px 16px 5px;
+    border-radius: 130px 10px 120px 10px/10px 120px 10px 130px;
+    transition: transform .08s ease, background .12s ease, color .12s ease;
+    position: relative;
+  }
+  .tab:nth-child(even) { border-radius: 10px 130px 12px 120px/120px 10px 130px 10px; }
+  .tab .n {
+    font-size: 14px; color: var(--ink-faint); margin-right: 7px; vertical-align: 2px;
+  }
+  .tab:hover { transform: translateY(-2px) rotate(-0.6deg); }
+  .tab.active { background: var(--ink); color: var(--paper); }
+  .tab.active .n { color: var(--blue-soft); }
+
+  .toggles { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-family: var(--body); font-size: 14px; color: var(--ink-soft); cursor: pointer; user-select: none; white-space: nowrap; }
+  .toggle .box { width: 18px; height: 18px; flex-shrink: 0; border: 2px solid var(--ink); border-radius: 6px 2px 7px 2px/2px 7px 2px 6px; display: grid; place-items: center; }
+  .toggle .box::after { content: "✓"; font-family: var(--hand); font-weight: 700; font-size: 16px; color: var(--ink); opacity: 0; line-height: 1; }
+  .toggle.on .box::after { opacity: 1; }
+  .toggle .hint { color: var(--ink-faint); font-size: 12.5px; }
+
+  /* ---- panel layout ---- */
+  .view { display: none; }
+  .view.active { display: block; animation: fade .25s ease both; }
+  @keyframes fade { from { transform: translateY(6px); } to { transform: none; } }
+  .layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 26px; align-items: start; }
+  @media (max-width: 940px) { .layout { grid-template-columns: 1fr; } }
+
+  /* ---- the game-screen sketch frame ---- */
+  .screen {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--paper);
+    border: 2.5px solid var(--ink);
+    border-radius: 18px 6px 20px 6px/6px 20px 6px 18px;
+    box-shadow: 5px 6px 0 rgba(44,42,38,0.12);
+    padding: 14px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .screen .scr-label {
+    position: absolute; top: -13px; left: 18px;
+    background: var(--paper); padding: 0 8px;
+    font-family: var(--hand); font-weight: 600; font-size: 16px; color: var(--ink-soft);
+  }
+
+  /* sketch primitives */
+  .box {
+    border: 2px solid var(--ink);
+    border-radius: 120px 9px 110px 9px/9px 110px 9px 120px;
+    background: rgba(255,255,255,0.25);
+  }
+  .box.alt { border-radius: 9px 120px 11px 110px/110px 9px 120px 9px; }
+  .dash { border-style: dashed; border-color: var(--ink-faint); }
+  .lbl { font-family: var(--hand); font-weight: 600; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 10px; letter-spacing: .3px; color: var(--ink-soft); text-transform: uppercase; }
+
+  /* enemy / boss block */
+  .enemy {
+    align-self: center; width: 46%; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 9px 12px; border-color: var(--coral);
+    background: rgba(204,111,93,0.08);
+  }
+  .enemy .lbl { color: var(--coral); font-size: 19px; }
+  .intent { font-family: var(--hand); font-size: 15px; color: var(--coral); background: var(--paper); border: 1.5px dashed var(--coral); border-radius: 40px; padding: 0 9px; }
+
+  /* hand of cards */
+  .hand { display: flex; justify-content: center; align-items: flex-end; gap: -10px; height: 22%; margin-top: auto; }
+  .cardm {
+    width: 12%; min-width: 52px; aspect-ratio: 3/4.3;
+    border: 2px solid var(--ink); background: var(--paper);
+    border-radius: 8px; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; gap: 3px; padding: 6px 4px;
+    box-shadow: 2px 2px 0 rgba(44,42,38,0.1);
+  }
+  .cardm .t { font-family: var(--hand); font-weight: 600; font-size: 13px; line-height: 1; text-align: center; }
+  .cardm .art { width: 80%; height: 26%; border: 1.5px dashed var(--ink-faint); border-radius: 3px; }
+  .cardm .desc { width: 84%; height: 3px; background: var(--line); border-radius: 2px; box-shadow: 0 5px 0 var(--line), 0 10px 0 var(--line); }
+  .cardm.skill { border-color: var(--blue); background: rgba(79,115,189,0.07); box-shadow: 2px 2px 0 rgba(79,115,189,0.18); }
+  .cardm.skill .t { color: var(--blue); }
+  .fan > * { transform-origin: bottom center; }
+  .fan > *:nth-child(1){ transform: rotate(-9deg) translateY(8px); }
+  .fan > *:nth-child(2){ transform: rotate(-4deg) translateY(2px); }
+  .fan > *:nth-child(3){ transform: rotate(0deg); z-index: 3; }
+  .fan > *:nth-child(4){ transform: rotate(4deg) translateY(2px); }
+  .fan > *:nth-child(5){ transform: rotate(9deg) translateY(8px); }
+
+  /* resource pips / meters */
+  .pip { width: 13px; height: 13px; border: 2px solid var(--ink); border-radius: 50%; display: inline-block; }
+  .pip.f { background: var(--ink); }
+  .attr-row { display: flex; align-items: center; gap: 6px; }
+  .attr-tag { font-family: ui-monospace, monospace; font-size: 9.5px; width: 26px; color: var(--ink-soft); }
+
+  /* generic small button */
+  .btn-sk {
+    font-family: var(--hand); font-weight: 700; font-size: 15px;
+    border: 2px solid var(--ink); background: var(--paper-2);
+    padding: 4px 12px 2px; border-radius: 80px 8px 70px 8px/8px 70px 8px 80px;
+    box-shadow: 2px 2px 0 rgba(44,42,38,0.12);
+  }
+
+  /* callout numbers placed on the screen */
+  .cnum {
+    position: absolute; width: 26px; height: 26px; z-index: 6;
+    background: var(--blue); color: #fff; border: 2px solid var(--ink);
+    border-radius: 50%; display: grid; place-items: center;
+    font-family: var(--hand); font-weight: 700; font-size: 16px;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+  }
+  .anno-hidden .cnum { display: none; }
+
+  /* ---- annotation side panel ---- */
+  .notes h2 { font-family: var(--hand); font-weight: 700; font-size: 30px; margin: 2px 0 2px; }
+  .notes .tagline { font-family: var(--body); font-style: normal; font-size: 14.5px; color: var(--blue); margin: 0 0 4px; font-weight: 700; }
+  .notes .hook { font-size: 14px; color: var(--ink-soft); line-height: 1.55; margin: 0 0 16px; }
+  .anno-hidden .note-list { display: none; }
+  .note-list { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .note-list li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+  .note-list .num {
+    width: 26px; height: 26px; background: var(--blue); color: #fff; border: 2px solid var(--ink);
+    border-radius: 50%; display: grid; place-items: center; font-family: var(--hand); font-weight: 700; font-size: 15px;
+  }
+  .note-list .txt { font-size: 13.5px; line-height: 1.5; color: var(--ink); padding-top: 1px; }
+  .note-list .txt b { color: var(--ink); }
+
+  .mini-card {
+    border: 2px solid var(--ink); border-radius: 14px 5px 14px 5px/5px 14px 5px 14px;
+    padding: 12px 14px; margin-bottom: 12px; background: rgba(255,255,255,0.35);
+  }
+  .mini-card h3 { font-family: var(--hand); font-weight: 700; font-size: 19px; margin: 0 0 7px; display: flex; align-items: center; gap: 7px; }
+  .mini-card h3 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); display: inline-block; }
+  .map-row { display: grid; grid-template-columns: 78px 1fr; gap: 6px; font-size: 13px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .map-row:last-child { border-bottom: 0; }
+  .map-row .k { font-family: ui-monospace, monospace; font-size: 11px; color: var(--blue); text-transform: uppercase; letter-spacing: .4px; padding-top: 2px; }
+  .map-row .v { color: var(--ink-soft); line-height: 1.4; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
+  .chip {
+    font-family: var(--body); font-size: 11.5px; color: var(--ink-soft);
+    border: 1.5px solid var(--line); border-radius: 30px; padding: 2px 9px; background: rgba(255,255,255,0.4);
+  }
+  .chip b { color: var(--ink); font-weight: 700; }
+  .aes { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+  .aes .swatches { display: inline-flex; gap: 4px; vertical-align: middle; margin-left: 4px; }
+  .aes .sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2); display: inline-block; }
+
+  footer.foot { margin-top: 30px; padding-top: 18px; border-top: 2px dashed var(--line); color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; }
+  footer.foot b { color: var(--ink); }
+  .legend-inline { display: inline-flex; align-items: center; gap: 5px; margin: 0 4px; }
+  .legend-inline .cardm.tiny { width: 16px; min-width: 0; aspect-ratio: 3/4; padding: 0; box-shadow: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="stamp">ROUGH — v1 wireframes</span>
+    <h1>Card Minigame — Four Directions</h1>
+    <p class="sub">Low-fi sketches to map the design space before we commit. All four are Slay-the-Spire-flavored deckbuilders fought against dedicated card-bosses — but each one expresses your <b>attributes &amp; skills</b> through a different <i>core verb</i>. Pick a favorite (or mix), then we go deep &amp; pretty on one.</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="v1"><span class="n">01</span>Six Wells</button>
+    <button class="tab" data-view="v2"><span class="n">02</span>Initiative Loom</button>
+    <button class="tab" data-view="v3"><span class="n">03</span>The Mannequin</button>
+    <button class="tab" data-view="v4"><span class="n">04</span>The Ascent</button>
+  </nav>
+
+  <div class="toggles">
+    <label class="toggle on" id="annoToggle"><span class="box"></span> Show annotations</label>
+    <span class="hint">Tip: switch directions with the tabs above. Cards in <span style="color:var(--blue);font-weight:700;">blue</span> = your Skills; plain = basic attribute cards.</span>
+  </div>
+
+  <!-- ============================ VIEW 1 — SIX WELLS ============================ -->
+  <section class="view active" id="v1">
+    <div class="layout">
+      <div class="screen">
+        <span class="scr-label">screen — your turn</span>
+
+        <!-- relics top-left -->
+        <div style="position:absolute; top:12px; left:14px; display:flex; gap:6px;">
+          <div class="box" style="width:30px;height:30px;border-radius:50%;"></div>
+          <div class="box" style="width:30px;height:30px;border-radius:50%;"></div>
+          <div class="box dash" style="width:30px;height:30px;border-radius:50%;"></div>
+        </div>
+        <div class="mono" style="position:absolute; top:46px; left:14px;">relics = items</div>
+        <span class="cnum" style="top:8px; left:96px;">4</span>
+
+        <!-- enemy -->
+        <div class="box enemy" style="margin-top:6px;">
+          <span class="lbl">BOSS</span>
+          <span class="mono">own deck &amp; rules</span>
+          <span class="intent">⚔ drains your STR next turn</span>
+        </div>
+        <span class="cnum" style="top:30px; right:34%;">3</span>
+
+        <!-- SIX WELLS resource rail (right) -->
+        <div style="position:absolute; top:104px; right:14px; display:flex; flex-direction:column; gap:8px; width:118px;">
+          <div class="attr-row"><span class="attr-tag" style="color:var(--coral)">STR</span><span class="pip f"></span><span class="pip f"></span><span class="pip"></span></div>
+          <div class="attr-row"><span class="attr-tag" style="color:var(--green)">END</span><span class="pip f"></span><span class="pip f"></span><span class="pip f"></span></div>
+          <div class="attr-row"><span class="attr-tag" style="color:#7d6fb8">INT</span><span class="pip f"></span><span class="pip"></span><span class="pip"></span></div>
+          <div class="attr-row"><span class="attr-tag" style="color:var(--blue)">AGI</span><span class="pip f"></span><span class="pip f"></span><span class="pip"></span></div>
+          <div class="attr-row"><span class="attr-tag" style="color:var(--gold)">DEX</span><span class="pip f"></span><span class="pip"></span><span class="pip"></span></div>
+          <div class="attr-row"><span class="attr-tag" style="color:#3f9e8f">LCK</span><span class="pip f"></span><span class="pip"></span><span class="pip"></span></div>
+        </div>
+        <span class="cnum" style="top:96px; right:140px;">1</span>
+
+        <!-- player HP / block bottom-left -->
+        <div style="position:absolute; bottom:96px; left:14px; display:flex; flex-direction:column; gap:5px;">
+          <div class="box" style="width:120px;height:14px;border-radius:30px;background:rgba(111,154,82,0.25);border-color:var(--green)"></div>
+          <span class="mono">hp 64 / 80 · block 9</span>
+        </div>
+
+        <!-- hand -->
+        <div class="hand fan">
+          <div class="cardm"><div class="t">Cleave</div><div class="art"></div><div class="attr-row" style="margin-top:auto"><span class="pip f" style="border-color:var(--coral);background:var(--coral);width:9px;height:9px"></span><span class="pip f" style="border-color:var(--coral);background:var(--coral);width:9px;height:9px"></span></div></div>
+          <div class="cardm"><div class="t">Brace</div><div class="art"></div><div class="attr-row" style="margin-top:auto"><span class="pip f" style="border-color:var(--green);background:var(--green);width:9px;height:9px"></span></div></div>
+          <div class="cardm skill"><div class="t">Fire Bolt</div><div class="art"></div><div class="attr-row" style="margin-top:auto"><span class="pip f" style="border-color:#7d6fb8;background:#7d6fb8;width:9px;height:9px"></span><span class="pip f" style="border-color:#7d6fb8;background:#7d6fb8;width:9px;height:9px"></span></div></div>
+          <div class="cardm"><div class="t">Dart</div><div class="art"></div><div class="attr-row" style="margin-top:auto"><span class="pip f" style="border-color:var(--blue);background:var(--blue);width:9px;height:9px"></span></div></div>
+          <div class="cardm"><div class="t">Gamble</div><div class="art"></div><div class="attr-row" style="margin-top:auto"><span class="pip f" style="border-color:#3f9e8f;background:#3f9e8f;width:9px;height:9px"></span></div></div>
+        </div>
+        <span class="cnum" style="bottom:64px; left:50%; transform:translateX(-50%);">2</span>
+
+        <div style="position:absolute; bottom:18px; right:18px;"><span class="btn-sk">End Turn ↵</span></div>
+      </div>
+
+      <div class="notes" id="notes1">
+        <p class="tagline">multi-resource economy</p>
+        <h2>The Six Wells</h2>
+        <p class="hook">Forget a single "Energy" bar. Each turn you refill <b>six</b> attribute pools and cards cost specific colors. Your character build literally <i>is</i> your economy — a Strength build floods red, an Intellect build floods purple. The puzzle is juggling six curves at once.</p>
+        <ul class="note-list">
+          <li><span class="num">1</span><span class="txt"><b>Six Wells</b> refill from your Attributes every turn. STR/END/INT/AGI/DEX/LCK each give pips equal to (a fraction of) that stat.</span></li>
+          <li><span class="num">2</span><span class="txt"><b>Cards cost colored pips</b>, not generic energy. "Cleave" wants 2 STR; "Fire Bolt" (a Skill) wants 2 INT. Off-build cards are playable but starve you.</span></li>
+          <li><span class="num">3</span><span class="txt"><b>Bosses attack your economy</b> — drain, lock, or tax a Well — forcing you to improvise off your comfort colors.</span></li>
+          <li><span class="num">4</span><span class="txt"><b>Relics = equipped items.</b> They bend Well refills or let you convert one color into another.</span></li>
+        </ul>
+        <div class="mini-card">
+          <h3><span class="dot"></span>How your build shows up</h3>
+          <div class="map-row"><span class="k">str / end</span><span class="v">Fuel attack &amp; block cards (their pip color)</span></div>
+          <div class="map-row"><span class="k">int</span><span class="v">Fuels Skill cards — the "spell" Well</span></div>
+          <div class="map-row"><span class="k">agi</span><span class="v">+1 card you can afford to PLAY per turn</span></div>
+          <div class="map-row"><span class="k">dex</span><span class="v">+ cards DRAWN into hand</span></div>
+          <div class="map-row"><span class="k">luck</span><span class="v">Wild pips — spendable as any color</span></div>
+          <div class="map-row"><span class="k">skills</span><span class="v">Rare colored cards seeded into the deck</span></div>
+        </div>
+        <div class="meta">
+          <span class="chip"><b>Weird factor:</b> high — 6 currencies</span>
+          <span class="chip"><b>Build expression:</b> ★★★★★</span>
+          <span class="chip"><b>Session:</b> medium</span>
+        </div>
+        <p class="aes" style="margin-top:12px;"><b>Aesthetic seed —</b> "alchemist's ledger": six glowing reservoirs of liquid light down the margin, cards stamped like wax-sealed orders.
+          <span class="swatches"><span class="sw" style="background:#cc6f5d"></span><span class="sw" style="background:#6f9a52"></span><span class="sw" style="background:#7d6fb8"></span><span class="sw" style="background:#4f73bd"></span><span class="sw" style="background:#c69a45"></span><span class="sw" style="background:#3f9e8f"></span></span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ VIEW 2 — INITIATIVE LOOM ============================ -->
+  <section class="view" id="v2">
+    <div class="layout">
+      <div class="screen">
+        <span class="scr-label">screen — weaving the turn</span>
+
+        <!-- enemy small top right -->
+        <div class="box enemy" style="width:34%; align-self:flex-end; margin:0;">
+          <span class="lbl">BOSS</span>
+          <span class="intent">acts on tick 3 &amp; 7</span>
+        </div>
+
+        <!-- TIMELINE centerpiece -->
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:8px; margin:10px 0;">
+          <div class="mono" style="text-align:center;">⟵ the initiative track (time →)</div>
+          <div class="box" style="display:flex; align-items:stretch; height:84px; padding:0; overflow:hidden;">
+            <!-- ticks -->
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;"><span class="mono" style="position:absolute;bottom:3px;left:4px;">t1</span><div class="cardm" style="position:absolute;top:8px;left:6px;width:40px;transform:rotate(-3deg)"><div class="t" style="font-size:10px">Dart</div><div class="art" style="height:18%"></div></div></div>
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;"><span class="mono" style="position:absolute;bottom:3px;left:4px;">t2</span></div>
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;background:rgba(204,111,93,0.1);"><span class="mono" style="position:absolute;bottom:3px;left:4px;color:var(--coral)">t3</span><div class="box" style="position:absolute;top:10px;left:6px;right:6px;height:30px;border-color:var(--coral);background:rgba(204,111,93,0.15)"><span class="lbl" style="font-size:11px;color:var(--coral);padding-left:4px">strike 12</span></div></div>
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;"><span class="mono" style="position:absolute;bottom:3px;left:4px;">t4</span><div class="cardm" style="position:absolute;top:8px;left:6px;width:40px;transform:rotate(2deg)"><div class="t" style="font-size:10px">Cleave</div><div class="art" style="height:18%"></div></div></div>
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;"><span class="mono" style="position:absolute;bottom:3px;left:4px;">t5</span><div class="cardm skill" style="position:absolute;top:8px;left:6px;width:40px;transform:rotate(-2deg)"><div class="t" style="font-size:9px">F.Bolt</div><div class="art" style="height:18%"></div></div></div>
+            <div style="flex:1;border-right:1.5px dashed var(--line);position:relative;"><span class="mono" style="position:absolute;bottom:3px;left:4px;">t6</span></div>
+            <div style="flex:1;position:relative;background:rgba(204,111,93,0.1);"><span class="mono" style="position:absolute;bottom:3px;left:4px;color:var(--coral)">t7</span><div class="box" style="position:absolute;top:10px;left:6px;right:6px;height:30px;border-color:var(--coral);background:rgba(204,111,93,0.15)"></div></div>
+          </div>
+          <div class="mono" style="text-align:center; color:var(--coral)">red = enemy actions · you slot YOUR cards between them</div>
+        </div>
+        <span class="cnum" style="top:120px; left:8px;">1</span>
+        <span class="cnum" style="top:120px; left:42%;">2</span>
+        <span class="cnum" style="top:54px; right:10px;">3</span>
+
+        <!-- hand -->
+        <div class="hand fan" style="height:24%;">
+          <div class="cardm"><div class="t">Lunge</div><div class="art"></div><div class="mono" style="margin-top:auto">spd 1</div></div>
+          <div class="cardm"><div class="t">Parry</div><div class="art"></div><div class="mono" style="margin-top:auto">spd 2</div></div>
+          <div class="cardm skill"><div class="t">Quake</div><div class="art"></div><div class="mono" style="margin-top:auto">spd 4</div></div>
+          <div class="cardm"><div class="t">Feint</div><div class="art"></div><div class="mono" style="margin-top:auto">spd 1</div></div>
+        </div>
+        <span class="cnum" style="bottom:60px; left:50%; transform:translateX(-50%);">4</span>
+        <div style="position:absolute; bottom:18px; right:18px;"><span class="btn-sk">Resolve ▶ time</span></div>
+      </div>
+
+      <div class="notes">
+        <p class="tagline">timing &amp; initiative puzzle</p>
+        <h2>The Initiative Loom</h2>
+        <p class="hook">Leans straight into your engine's DNA — the battle sim already runs on <b>40ms ticks</b>. So instead of rigid "my turn / your turn," you place cards onto a shared <b>timeline</b>. The enemy's blows are already pinned to future ticks; you weave your attacks, blocks, and dodges in the gaps. Speed is everything.</p>
+        <ul class="note-list">
+          <li><span class="num">1</span><span class="txt"><b>You can see ahead</b> a number of ticks set by <b>Dexterity</b> — more foresight = read more of the enemy's plan.</span></li>
+          <li><span class="num">2</span><span class="txt"><b>Card "speed"</b> (lower = sooner) is reduced by <b>Agility</b>. A fast block can land <i>before</i> the enemy's strike on t3; a slow one arrives too late.</span></li>
+          <li><span class="num">3</span><span class="txt"><b>Enemy intents are pinned to ticks</b> (red). Bosses chain combos, leave bait windows, or speed up as they enrage.</span></li>
+          <li><span class="num">4</span><span class="txt"><b>Skills are powerful but slow</b> — high-impact cards you must set up several ticks in advance and protect.</span></li>
+        </ul>
+        <div class="mini-card">
+          <h3><span class="dot"></span>How your build shows up</h3>
+          <div class="map-row"><span class="k">agi</span><span class="v">Lowers card speed — act earlier on the track</span></div>
+          <div class="map-row"><span class="k">dex</span><span class="v">How many ticks of the future you can see</span></div>
+          <div class="map-row"><span class="k">str</span><span class="v">Scales damage of cards that land</span></div>
+          <div class="map-row"><span class="k">end</span><span class="v">Block persists across more ticks</span></div>
+          <div class="map-row"><span class="k">int / luck</span><span class="v">Relics that warp the timeline (delay, rewind)</span></div>
+        </div>
+        <div class="meta">
+          <span class="chip"><b>Weird factor:</b> very high</span>
+          <span class="chip"><b>Engine fit:</b> ★★★★★</span>
+          <span class="chip"><b>Session:</b> snackable–medium</span>
+        </div>
+        <p class="aes" style="margin-top:12px;"><b>Aesthetic seed —</b> "loom / clockwork": cards are shuttle-threads woven through a glowing warp of time; a sweeping play-head bar. Ticks hum like a metronome.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ VIEW 3 — THE MANNEQUIN ============================ -->
+  <section class="view" id="v3">
+    <div class="layout">
+      <div class="screen">
+        <span class="scr-label">screen — dressing the doll</span>
+
+        <!-- enemy -->
+        <div class="box enemy" style="width:40%; margin-top:2px;">
+          <span class="lbl">BOSS</span>
+          <span class="intent">targets your WEAPON slot</span>
+        </div>
+
+        <!-- center paper doll with slots -->
+        <div style="flex:1; display:flex; justify-content:center; align-items:center; gap:24px; margin:6px 0;">
+          <!-- left column slots -->
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div class="box dash" style="width:64px;height:46px;display:grid;place-items:center;"><span class="mono">HEAD</span></div>
+            <div class="box" style="width:64px;height:46px;display:grid;place-items:center;border-color:var(--coral);background:rgba(204,111,93,0.08)"><span class="lbl" style="font-size:13px;color:var(--coral)">Cleave</span></div>
+            <div class="box dash" style="width:64px;height:46px;display:grid;place-items:center;"><span class="mono">LEGS</span></div>
+          </div>
+          <!-- body silhouette -->
+          <div class="box" style="width:70px;height:170px;border-radius:50% 50% 46% 46%/22% 22% 14% 14%;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;background:rgba(79,115,189,0.06);border-color:var(--blue)">
+            <span class="mono" style="color:var(--blue)">YOU</span>
+          </div>
+          <!-- right column slots -->
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div class="box" style="width:64px;height:46px;display:grid;place-items:center;border-color:var(--blue);background:rgba(79,115,189,0.08)"><span class="lbl" style="font-size:12px;color:var(--blue)">Fire Bolt</span></div>
+            <div class="box dash" style="width:64px;height:46px;display:grid;place-items:center;"><span class="mono">OFF-HAND</span></div>
+            <div class="box dash" style="width:64px;height:46px;display:grid;place-items:center;"><span class="mono">TRINKET</span></div>
+          </div>
+        </div>
+        <span class="cnum" style="top:118px; left:30%;">1</span>
+        <span class="cnum" style="top:118px; right:30%;">2</span>
+        <span class="cnum" style="top:64px; right:30%;">3</span>
+
+        <!-- hand -->
+        <div class="hand fan" style="height:23%;">
+          <div class="cardm"><div class="t">Plate</div><div class="art"></div><div class="mono" style="margin-top:auto">→ body</div></div>
+          <div class="cardm"><div class="t">Spike</div><div class="art"></div><div class="mono" style="margin-top:auto">→ weapon</div></div>
+          <div class="cardm skill"><div class="t">Hex</div><div class="art"></div><div class="mono" style="margin-top:auto">→ head</div></div>
+          <div class="cardm"><div class="t">Sprint</div><div class="art"></div><div class="mono" style="margin-top:auto">→ legs</div></div>
+        </div>
+        <span class="cnum" style="bottom:58px; left:50%; transform:translateX(-50%);">4</span>
+        <div style="position:absolute; bottom:18px; right:18px;"><span class="btn-sk">Commit ✦</span></div>
+        <div style="position:absolute; bottom:18px; left:18px;"><span class="mono">hp 64/80 · armor 12</span></div>
+      </div>
+
+      <div class="notes">
+        <p class="tagline">spatial / positional deckbuilding</p>
+        <h2>The Mannequin</h2>
+        <p class="hook">Cards aren't just played — they're <b>equipped to body slots</b> on a paper-doll of your character. <i>Where</i> a card goes changes what it does: a damage card in the weapon slot strikes; the same card on the head becomes a counter. Your actual equipped items &amp; mods seed which slots start powered. Build is <b>literal and spatial.</b></p>
+        <ul class="note-list">
+          <li><span class="num">1</span><span class="txt"><b>Six equipment slots</b> (head, body, weapon, off-hand, legs, trinket). Each reframes a card's effect by its slot's "verb."</span></li>
+          <li><span class="num">2</span><span class="txt"><b>Skills snap to thematic slots</b> — Fire Bolt only fits a weapon/focus slot, so loadout matters before the fight even starts.</span></li>
+          <li><span class="num">3</span><span class="txt"><b>Bosses break your gear</b> — disable a slot, force-discard what's equipped there, or overload it.</span></li>
+          <li><span class="num">4</span><span class="txt"><b>Equipped items = passive slot relics.</b> Your real inventory loadout literally pre-arms the doll.</span></li>
+        </ul>
+        <div class="mini-card">
+          <h3><span class="dot"></span>How your build shows up</h3>
+          <div class="map-row"><span class="k">str</span><span class="v">Weapon-slot cards hit harder</span></div>
+          <div class="map-row"><span class="k">end</span><span class="v">Body/legs armor slots hold more</span></div>
+          <div class="map-row"><span class="k">int</span><span class="v">Head/focus slots — Skill power</span></div>
+          <div class="map-row"><span class="k">agi</span><span class="v">Re-equip / swap a slot mid-turn for free</span></div>
+          <div class="map-row"><span class="k">dex</span><span class="v">+ cards drawn to fill slots</span></div>
+          <div class="map-row"><span class="k">luck</span><span class="v">Trinket slot rolls a random buff</span></div>
+        </div>
+        <div class="meta">
+          <span class="chip"><b>Weird factor:</b> high</span>
+          <span class="chip"><b>Item synergy:</b> ★★★★★</span>
+          <span class="chip"><b>Session:</b> medium</span>
+        </div>
+        <p class="aes" style="margin-top:12px;"><b>Aesthetic seed —</b> "armory mannequin / tarot": an ink-drawn figure, cards slide into glowing harness slots like a paper doll crossed with a character sheet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ VIEW 4 — THE ASCENT ============================ -->
+  <section class="view" id="v4">
+    <div class="layout">
+      <div class="screen">
+        <span class="scr-label">screen — climbing the ladder</span>
+
+        <!-- house / boss top -->
+        <div class="box enemy" style="width:36%; margin-top:2px;">
+          <span class="lbl">THE WARDEN</span>
+          <span class="intent">raises the stakes each rung</span>
+        </div>
+
+        <!-- vertical ladder of fate cards in center -->
+        <div style="flex:1; display:flex; justify-content:center; align-items:center; gap:34px; margin:6px 0;">
+          <!-- ladder -->
+          <div style="display:flex; flex-direction:column-reverse; gap:7px; align-items:center;">
+            <div class="box" style="width:128px;height:24px;display:flex;align-items:center;padding:0 8px;gap:6px;"><span class="mono" style="color:var(--green)">rung 1 · safe</span><span style="margin-left:auto" class="lbl">+8</span></div>
+            <div class="box" style="width:128px;height:24px;display:flex;align-items:center;padding:0 8px;gap:6px;"><span class="mono" style="color:var(--green)">rung 2</span><span style="margin-left:auto" class="lbl">+20</span></div>
+            <div class="box" style="width:128px;height:26px;display:flex;align-items:center;padding:0 8px;gap:6px;border-color:var(--gold);background:rgba(198,154,69,0.12)"><span class="mono" style="color:var(--gold)">rung 3 · YOU</span><span style="margin-left:auto" class="lbl">+44</span></div>
+            <div class="box dash" style="width:128px;height:24px;display:flex;align-items:center;padding:0 8px;"><span class="mono">rung 4 · ??</span></div>
+            <div class="box dash" style="width:128px;height:24px;display:flex;align-items:center;padding:0 8px;"><span class="mono">rung 5 · ?? boss</span></div>
+          </div>
+          <!-- flip pile + odds -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div class="cardm" style="width:64px;"><div class="t" style="font-size:11px">FATE</div><div class="art" style="height:34%"></div><div class="mono" style="margin-top:auto">flip</div></div>
+            <div class="box" style="width:84px;padding:5px 6px;text-align:center;"><span class="mono">bust odds</span><div class="lbl" style="font-size:20px;color:var(--coral)">22%</div></div>
+            <div class="mono" style="color:#3f9e8f">LCK lowers this</div>
+          </div>
+        </div>
+        <span class="cnum" style="top:120px; left:24%;">1</span>
+        <span class="cnum" style="top:120px; right:26%;">2</span>
+
+        <!-- mitigation hand -->
+        <div class="hand fan" style="height:22%;">
+          <div class="cardm"><div class="t">Hedge</div><div class="art"></div><div class="mono" style="margin-top:auto">−bust</div></div>
+          <div class="cardm"><div class="t">Insure</div><div class="art"></div><div class="mono" style="margin-top:auto">keep ½</div></div>
+          <div class="cardm skill"><div class="t">Foresee</div><div class="art"></div><div class="mono" style="margin-top:auto">peek</div></div>
+          <div class="cardm"><div class="t">Double</div><div class="art"></div><div class="mono" style="margin-top:auto">2× rung</div></div>
+        </div>
+        <span class="cnum" style="bottom:58px; left:50%; transform:translateX(-50%);">3</span>
+        <div style="position:absolute; bottom:18px; right:18px; display:flex; gap:8px;">
+          <span class="btn-sk" style="border-color:var(--green);color:var(--green)">Cash out ✓</span>
+          <span class="btn-sk" style="border-color:var(--coral);color:var(--coral)">Push on ↑</span>
+        </div>
+      </div>
+
+      <div class="notes">
+        <p class="tagline">push-your-luck / risk ladder</p>
+        <h2>The Ascent</h2>
+        <p class="hook">The genuinely strange one. It's a <b>press-your-luck</b> climb: flip fate cards to ascend rungs, each worth more loot — but bust and you tumble. Your hand isn't attacks, it's <b>risk-manipulation</b>: hedge the odds, insure your winnings, peek ahead. <b>Luck</b> bends the deck itself. <i>You</i> decide when it ends — cash out for a quick win or push toward the boss rung.</p>
+        <ul class="note-list">
+          <li><span class="num">1</span><span class="txt"><b>The ladder</b> escalates reward per rung. Higher = exponentially better loot, exponentially riskier flips.</span></li>
+          <li><span class="num">2</span><span class="txt"><b>Luck literally reshuffles fate</b> — fewer bust cards, better peeks. The one attribute most players ignore becomes a headliner.</span></li>
+          <li><span class="num">3</span><span class="txt"><b>Hand = mitigation, not damage.</b> Spend cards to soften busts, lock partial winnings, or force a re-flip.</span></li>
+          <li><span class="num">4</span><span class="txt"><b>You choose the length.</b> Cash out = snackable. Push to the Warden's rung = a tense long haul. Variable by design.</span></li>
+        </ul>
+        <div class="mini-card">
+          <h3><span class="dot"></span>How your build shows up</h3>
+          <div class="map-row"><span class="k">luck</span><span class="v">★ Headliner — bends the fate deck's odds</span></div>
+          <div class="map-row"><span class="k">int</span><span class="v">See further up the ladder before deciding</span></div>
+          <div class="map-row"><span class="k">dex</span><span class="v">Bigger mitigation hand</span></div>
+          <div class="map-row"><span class="k">end</span><span class="v">Survive a bust without falling all the way</span></div>
+          <div class="map-row"><span class="k">str / agi</span><span class="v">"Force" rungs — skip a flip by paying HP</span></div>
+        </div>
+        <div class="meta">
+          <span class="chip"><b>Weird factor:</b> off the charts</span>
+          <span class="chip"><b>Idle-fit:</b> player sets the length</span>
+          <span class="chip"><b>Session:</b> 30s → very long</span>
+        </div>
+        <p class="aes" style="margin-top:12px;"><b>Aesthetic seed —</b> "tower of fortune / tarot ascent": a candle-lit ladder vanishing upward into dark, each flipped card a flash of an omen.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p><b>My read:</b> You leaned toward boss/challenge duels + "go weird." <b>Initiative Loom (02)</b> is the strongest marriage of novelty and your existing engine — it reuses the 40ms-tick simulation as an actual mechanic, which no off-the-shelf deckbuilder does. <b>Six Wells (01)</b> is the deepest expression of the attribute system. <b>The Ascent (04)</b> uniquely solves the idle-vs-active tension by letting the player set session length. <b>The Mannequin (03)</b> best ties the card game back to your item/loadout systems.</p>
+    <p style="margin-top:8px;">These aren't mutually exclusive — e.g. a Loom timeline could pair with Six-Wells resources. Tell me which hooks pull you and I'll develop one (or a hybrid) into a real hi-fi screen with the new card aesthetic. Cards in <span class="legend-inline"><span class="cardm tiny skill"></span></span> blue throughout = your Skills as rare cards.</p>
+  </footer>
+</div>
+
+<script>
+  // tab switching
+  const tabs = document.querySelectorAll('.tab');
+  const views = document.querySelectorAll('.view');
+  function show(id) {
+    views.forEach(v => v.classList.toggle('active', v.id === id));
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.view === id));
+    try { localStorage.setItem('cg_wf_view', id); } catch (e) {}
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.view)));
+  // restore
+  try {
+    const saved = localStorage.getItem('cg_wf_view');
+    if (saved && document.getElementById(saved)) { show(saved); }
+  } catch (e) {}
+
+  // annotation toggle
+  const annoToggle = document.getElementById('annoToggle');
+  function applyAnno(on) {
+    document.body.classList.toggle('anno-hidden', !on);
+    annoToggle.classList.toggle('on', on);
+    try { localStorage.setItem('cg_wf_anno', on ? '1' : '0'); } catch (e) {}
+  }
+  annoToggle.addEventListener('click', () => applyAnno(document.body.classList.contains('anno-hidden')));
+  try {
+    const a = localStorage.getItem('cg_wf_anno');
+    applyAnno(a === null ? true : a === '1');
+  } catch (e) { applyAnno(true); }
+</script>
+</body>
+</html>

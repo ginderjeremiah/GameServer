@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Loading Screen · Refined</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="login-shared.jsx"></script>
+<script type="text/babel" src="loading-shared.jsx"></script>
+<script type="text/babel" src="loading-refined.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  return (
+    <DesignCanvas
+      title="Loading Screen · Refined"
+      subtitle="Sliding manifest, count-based progress, real per-call states. Each artboard auto-loops its scenario so you can review the full motion. Click an artboard to focus it.">
+
+      <DCSection id="refined" title="Refined · Sliding manifest" subtitle="One direction, four real states. List cycles upward as each network call resolves.">
+        <DCArtboard id="fresh" label="Fresh · all 7 fetched" width={480} height={620}>
+          <LoadingRefined scenario="fresh" />
+        </DCArtboard>
+        <DCArtboard id="partial" label="Partial · 3 cached, 4 fetched" width={480} height={620}>
+          <LoadingRefined scenario="partial" />
+        </DCArtboard>
+        <DCArtboard id="cached" label="Cached · all up to date" width={480} height={620}>
+          <LoadingRefined scenario="cached" />
+        </DCArtboard>
+        <DCArtboard id="fail" label="Failure · network error + retry" width={480} height={620}>
+          <LoadingRefined scenario="failOnce" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="reference" title="Reference" subtitle="Earlier iteration and current state, for compare">
+        <DCArtboard id="progress" label="Previous · A · Progress + Steps" width={480} height={620}>
+          <LoadingProgressLegacy />
+        </DCArtboard>
+        <DCArtboard id="now" label="Current · Svelte source" width={480} height={620}>
+          <CurrentLoadingScreen />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+/* Wrap the previous A (time-based) so it still renders even though we no
+   longer drive it from loading-shared's old useSequentialLoader. */
+function LoadingProgressLegacy() {
+  // Recreate a minimal time-based loop so this reference artboard still
+  // animates — strictly for visual comparison.
+  const items = ['Zones', 'Enemies', 'Items', 'Skills', 'Item Mods', 'Attributes', 'Challenges'];
+  const [doneIdx, setDoneIdx] = React.useState(0);
+  React.useEffect(() => {
+    if (doneIdx > items.length) { const t = setTimeout(() => setDoneIdx(0), 1800); return () => clearTimeout(t); }
+    const t = setTimeout(() => setDoneIdx((d) => d + 1), 720);
+    return () => clearTimeout(t);
+  }, [doneIdx]);
+  const done = doneIdx >= items.length;
+  const pct = Math.min(100, Math.round((doneIdx / items.length) * 100));
+  const current = items[Math.min(doneIdx, items.length - 1)];
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(0deg, #000 0%, #3c3c3c 100%)',
+      fontFamily: 'Geist, Arial, Helvetica, sans-serif',
+      color: '#f0f0f0',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: 40, boxSizing: 'border-box',
+    }}>
+      <div style={{ width: 360, maxWidth: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 26 }}>
+          <div style={{
+            width: 16, height: 16, transform: 'rotate(45deg)',
+            border: '1px solid #a1c2f7', boxShadow: '0 0 8px rgba(161,194,247,0.4)',
+            position: 'relative',
+          }}>
+            <div style={{ position: 'absolute', inset: 4, background: '#a1c2f7' }} />
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 400, letterSpacing: -0.3 }}>{done ? 'Ready.' : 'Preparing the realm.'}</h1>
+          <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgba(240,240,240,0.78)', fontFamily: 'Geist Mono, monospace' }}>
+            {done ? 'All assets loaded.' : <>Loading <span style={{ color: '#c0d8ff' }}>{current.toLowerCase()}</span>…</>}
+          </p>
+        </div>
+        <div style={{ height: 3, background: 'rgba(240,240,240,0.12)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: '#a1c2f7', transition: 'width 240ms' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: 'Geist Mono, monospace', fontSize: 10.5, color: 'rgba(240,240,240,0.65)' }}>
+          <span>{Math.min(doneIdx, items.length)}/{items.length}</span>
+          <span>{pct.toString().padStart(2, '0')}%</span>
+        </div>
+        <div style={{ marginTop: 22 }}>
+          {items.map((label, i) => (
+            <div key={label} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '7px 2px',
+              borderBottom: '1px solid rgba(240,240,240,0.06)',
+              opacity: i > doneIdx ? 0.45 : 1,
+            }}>
+              <div style={{ width: 14, display: 'flex', justifyContent: 'center' }}>
+                {i < doneIdx && <IconCheck color="#bde0b4" size={14} />}
+                {i === doneIdx && !done && <div style={{ width: 11, height: 11, border: '1.5px solid rgba(161,194,247,0.25)', borderTopColor: '#a1c2f7', borderRadius: '50%', animation: 'lpl-spin 0.9s linear infinite' }} />}
+                {i > doneIdx && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(240,240,240,0.35)' }} />}
+              </div>
+              <div style={{ flex: 1, fontSize: 13.5 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+        <button disabled={!done} style={{ marginTop: 22, width: '100%', padding: '12px 0', background: done ? '#a1c2f7' : 'transparent', color: done ? '#111' : 'rgba(240,240,240,0.45)', border: `1px solid ${done ? '#a1c2f7' : 'rgba(240,240,240,0.25)'}`, borderRadius: 2, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', letterSpacing: 2, textTransform: 'uppercase' }}>
+          {done ? 'Enter Realm' : 'Loading…'}
+        </button>
+      </div>
+      <style>{`@keyframes lpl-spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function CurrentLoadingScreen() {
+  const items = ['Zones', 'Enemies', 'Items', 'Skills', 'Item Mods', 'Attributes', 'Challenges'];
+  const [doneIdx, setDoneIdx] = React.useState(0);
+  React.useEffect(() => {
+    if (doneIdx > items.length) { const t = setTimeout(() => setDoneIdx(0), 1800); return () => clearTimeout(t); }
+    const t = setTimeout(() => setDoneIdx((d) => d + 1), 700);
+    return () => clearTimeout(t);
+  }, [doneIdx]);
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(0deg, #000 0%, #3c3c3c 100%)',
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      padding: 24, boxSizing: 'border-box',
+    }}>
+      <h1 style={{ textAlign: 'center', color: '#f0f0f0', textShadow: '0 0 0.25rem #000', fontSize: 32, fontWeight: 700, margin: '12px 0 24px' }}>Loading</h1>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ background: '#f0f0f0', border: '1px solid #000', borderRadius: 5, boxShadow: '0 0 0.25rem #000', padding: '2rem', width: '11rem' }}>
+          {items.map((it, i) => (
+            <div key={it} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 16 }}>
+              <span>{it}</span>
+              {i < doneIdx
+                ? <span>Done</span>
+                : <div style={{ width: 14, height: 14, border: '2px solid #cfcfcf', borderTopColor: 'gray', borderRadius: '50%', animation: 'cl-spin 0.8s linear infinite' }} />}
+            </div>
+          ))}
+          <button disabled={doneIdx < items.length} style={{ width: '100%', marginTop: 12, padding: '0.2em 0.5em', background: doneIdx >= items.length ? '#a1c2f7' : '#cfcfcf', border: '1px solid #000', borderRadius: 5, fontSize: 16 }}>Start Game</button>
+        </div>
+      </div>
+      <style>{`@keyframes cl-spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

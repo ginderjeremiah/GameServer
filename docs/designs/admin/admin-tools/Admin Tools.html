@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Admin Tools · Sidebar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { height: 100vh; }
+
+  /* table cell inputs — design-system styling with accent focus glow */
+  .adm-input {
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    color: #f0f0f0;
+    font-size: 13px;
+    padding: 6px 8px;
+    outline: none;
+    transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  }
+  .adm-input:hover:not(:disabled) { border-color: rgba(255,255,255,0.2); }
+  .adm-input:focus {
+    border-color: #a1c2f7;
+    box-shadow: 0 0 0 1px rgba(161,194,247,0.4), 0 0 8px rgba(161,194,247,0.35);
+    background: rgba(161,194,247,0.04);
+  }
+  .adm-input:disabled { color: rgba(240,240,240,0.5); cursor: default; }
+  .adm-input.dirty { border-color: rgba(240,210,138,0.55); background: rgba(240,210,138,0.06); }
+  .adm-input.dirty:focus { border-color: #a1c2f7; background: rgba(161,194,247,0.04); }
+
+  .adm-select {
+    width: 100%;
+    appearance: none; -webkit-appearance: none;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    color: #f0f0f0;
+    font-family: Geist, sans-serif;
+    font-size: 13px;
+    padding: 6px 26px 6px 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  }
+  .adm-select:hover:not(:disabled) { border-color: rgba(255,255,255,0.2); }
+  .adm-select:focus {
+    border-color: #a1c2f7;
+    box-shadow: 0 0 0 1px rgba(161,194,247,0.4), 0 0 8px rgba(161,194,247,0.35);
+  }
+  .adm-select:disabled { color: rgba(240,240,240,0.5); cursor: default; }
+  .adm-select.dirty { border-color: rgba(240,210,138,0.55); background: rgba(240,210,138,0.06); }
+  .adm-select.dirty:focus { border-color: #a1c2f7; background: rgba(161,194,247,0.04); }
+  .adm-select--lg { padding: 8px 28px 8px 12px; font-size: 13.5px; }
+  .adm-select option { background: #14151b; color: #f0f0f0; }
+
+  /* slim scrollbars to match the dark surface */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); background-clip: padding-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="game-shared.jsx"></script>
+<script type="text/babel" src="admin-data.jsx"></script>
+<script type="text/babel" src="admin-sidebar.jsx"></script>
+<script type="text/babel" src="admin-workspace.jsx"></script>
+
+<script type="text/babel">
+function AdminApp() {
+  const [active, setActive] = React.useState('addItems');
+  const config = TOOL_CONFIGS[active];
+
+  const backToGame = () => { window.location.href = 'Game Screen.html'; };
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(0deg, #000 0%, #3c3c3c 100%)',
+      color: '#f0f0f0', display: 'flex', position: 'relative', overflow: 'hidden',
+      fontFamily: 'Geist, Arial, Helvetica, sans-serif',
+    }}>
+      {/* fixed spacer so content never shifts under the expanding rail */}
+      <div style={{ width: A_COLLAPSED, flexShrink: 0 }} />
+
+      {/* workspace */}
+      <div style={{
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+        padding: '34px 44px 28px',
+      }}>
+        <AdminTable key={active} config={config} />
+      </div>
+
+      <AdminSidebar active={active} onNavigate={setActive} onBackToGame={backToGame} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Fight Screen · Boss Mechanism</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="game-shared.jsx"></script>
+<script type="text/babel" src="nav-sidebar.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="fight-shared.jsx"></script>
+<script type="text/babel" src="fight-boss.jsx"></script>
+<script type="text/babel" src="fight-mirror.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "bossPhase": "available",
+  "bossTrigger": "banner",
+  "autoFight": false,
+  "accent": "#e8c878",
+  "heightened": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // base config carried into every fight (accent/intensity are global)
+  const base = {
+    accent: t.accent, heightened: t.heightened, autoFight: t.autoFight,
+    bossTrigger: t.bossTrigger, bossPhase: t.bossPhase,
+  };
+  const mk = (extra) => ({ ...base, ...extra });
+
+  return (
+    <React.Fragment>
+      <DesignCanvas
+        title="Fight Screen · Boss Mechanism"
+        subtitle="One boss per zone, challenged deliberately — no more random boss spawns. The boss is always available; a dedicated affordance sits between the zone nav and the arena. Engage it for a heightened, gold-accented boss fight; clear it to unlock the next zone. Bosses stay re-challengeable (farmable), and Auto-fight keeps re-engaging. Use the Tweaks panel to drive the playground and preview states.">
+
+        <DCSection id="trigger" title="Boss trigger · three directions"
+          subtitle="How the player starts a boss fight (normal field shown, boss always available). Click Challenge in any board to engage it live.">
+          <DCArtboard id="trig-banner" label="A · Banner — full-width strip" width={1040} height={560}>
+            <FightMirror cfg={mk({ bossTrigger: 'banner', bossPhase: 'available' })} />
+          </DCArtboard>
+          <DCArtboard id="trig-inline" label="B · Inline — compact header chip" width={1040} height={560}>
+            <FightMirror cfg={mk({ bossTrigger: 'inline', bossPhase: 'available' })} />
+          </DCArtboard>
+          <DCArtboard id="trig-plinth" label="C · Plinth — centered summon" width={1040} height={580}>
+            <FightMirror cfg={mk({ bossTrigger: 'plinth', bossPhase: 'available' })} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="lifecycle" title="Lifecycle"
+          subtitle="Available → engaged → defeated. The engaged board shows the heightened boss treatment (gold accent, boss card, phased HP). Once beaten, the boss carries a permanent 'Cleared' seal, the next zone unlocks, and it stays re-challengeable. Uses the current trigger style.">
+          <DCArtboard id="life-available" label="1 · Available — challenge anytime" width={1040} height={560}>
+            <FightMirror cfg={mk({ bossPhase: 'available' })} />
+          </DCArtboard>
+          <DCArtboard id="life-engaged" label="2 · Engaged — heightened boss fight → victory" width={1040} height={560}>
+            <FightMirror cfg={mk({ bossPhase: 'engaged' })} />
+          </DCArtboard>
+          <DCArtboard id="life-defeated" label="3 · Defeated — cleared, re-challengeable" width={1040} height={560}>
+            <FightMirror cfg={mk({ bossPhase: 'defeated' })} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="framed" title="In game frame · playground"
+          subtitle="Driven by the Tweaks panel — change phase, trigger style, accent and auto-fight, or click Challenge to engage live. Inside the existing sidebar + log chrome.">
+          <DCArtboard id="framed-mirror" label="Mirror — framed" width={1180} height={720}>
+            <NavSidebar fightScreen={<FightMirror cfg={base} />} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="current" title="Current" subtitle="Existing Fight screen for compare — bosses appeared at random here.">
+          <DCArtboard id="now" label="Now · Svelte source" width={1000} height={520}>
+            <CurrentFight />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Boss state" />
+        <TweakRadio label="Phase" value={t.bossPhase}
+          options={[{ value: 'available', label: 'Available' }, { value: 'engaged', label: 'Engaged' }, { value: 'defeated', label: 'Defeated' }]}
+          onChange={(v) => setTweak('bossPhase', v)} />
+        <TweakToggle label="Auto-fight (farm boss)" value={t.autoFight}
+          onChange={(v) => setTweak('autoFight', v)} />
+
+        <TweakSection label="Trigger affordance" />
+        <TweakRadio label="Style" value={t.bossTrigger}
+          options={[{ value: 'banner', label: 'Banner' }, { value: 'inline', label: 'Inline' }, { value: 'plinth', label: 'Plinth' }]}
+          onChange={(v) => setTweak('bossTrigger', v)} />
+
+        <TweakSection label="Boss visual" />
+        <TweakColor label="Accent" value={t.accent}
+          options={['#e8c878', '#e0875e', '#d96a6a', '#b08ad9']}
+          onChange={(v) => setTweak('accent', v)} />
+        <TweakToggle label="Heightened atmosphere" value={t.heightened}
+          onChange={(v) => setTweak('heightened', v)} />
+      </TweaksPanel>
+    </React.Fragment>
+  );
+}
+
+/* ── Current Fight (reference) — unchanged ───────────────────────────────── */
+function CurrentFight() {
+  const [hp, setHp] = React.useState({ player: 228, enemy: 92 });
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      setHp((h) => {
+        const t = Math.random() > 0.5 ? 'player' : 'enemy';
+        const next = { ...h, [t]: Math.max(0, h[t] - Math.floor(8 + Math.random() * 22)) };
+        if (next.player === 0 || next.enemy === 0) return { player: 228, enemy: 92 };
+        return next;
+      });
+    }, 1100);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(0deg, #000 0%, #3c3c3c 100%)',
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      padding: 24, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: 18,
+    }}>
+      <div style={{
+        alignSelf: 'center', background: '#f0f0f0', color: '#111',
+        border: '1px solid #000', borderRadius: 5, padding: '6px 14px',
+        display: 'flex', gap: 14, alignItems: 'center',
+      }}>
+        <button style={{ background: 'white', border: '1px solid #000', borderRadius: 5, padding: '2px 6px' }}>&lt;</button>
+        <span><strong>Zone 3:</strong> Forgotten Catacombs</span>
+        <button style={{ background: 'white', border: '1px solid #000', borderRadius: 5, padding: '2px 6px' }}>&gt;</button>
+      </div>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'space-around' }}>
+        <CurrentBattler name="Aelara" lvl={12} hp={hp.player} max={300} />
+        <CurrentBattler name="Skeleton Mage" lvl={11} hp={hp.enemy} max={220} />
+      </div>
+    </div>
+  );
+}
+
+function CurrentBattler({ name, lvl, hp, max }) {
+  const pct = (hp / max) * 100;
+  return (
+    <div style={{
+      width: '30vw', maxWidth: 360, background: '#f0f0f0', color: '#111',
+      border: '1px solid #000', borderRadius: 5, padding: 12, fontSize: 18,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, marginBottom: 10 }}>
+        <span>{name}</span><span>Level: {lvl}</span>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <label>Health: </label>
+        <div style={{ position: 'relative', height: 28, background: 'red', border: '1px solid #000', borderRadius: 5, padding: 4, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${pct}%`, background: 'green', transition: 'width 100ms' }} />
+          <span style={{ position: 'relative', color: '#fff' }}>{Math.round(hp)}/{max}</span>
+        </div>
+      </div>
+      <div style={{ background: 'white', border: '1px solid #000', borderRadius: 5, display: 'flex', height: 60 }}>
+        {[0,1,2,3].map((i) => (
+          <div key={i} style={{ flex: 1, borderRight: i < 3 ? '1px solid #000' : 'none' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

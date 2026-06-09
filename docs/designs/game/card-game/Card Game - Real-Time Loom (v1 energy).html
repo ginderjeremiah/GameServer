@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Real-Time Loom — rough playable sketch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper:#f3efe6; --paper-2:#ece6d8; --ink:#2c2a26; --ink-soft:#6a655c; --ink-faint:#a8a092;
+    --blue:#4f73bd; --blue-soft:#aebfe2; --coral:#cc6f5d; --coral-soft:#e3b3a8;
+    --gold:#c69a45; --green:#6f9a52; --purple:#7d6fb8; --teal:#3f9e8f; --line:#c7bfae;
+    --hand:'Caveat',cursive; --body:'Kalam',cursive;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 18% 8%,rgba(0,0,0,.015),transparent 60%),radial-gradient(circle at 82% 92%,rgba(0,0,0,.02),transparent 55%);
+  }
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(120,110,90,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,110,90,.05) 1px,transparent 1px);
+    background-size:26px 26px;}
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 24px 80px;}
+
+  .stamp{display:inline-block;transform:rotate(-3deg);border:2px solid var(--coral);color:var(--coral);
+    font-family:var(--hand);font-weight:700;font-size:14px;padding:1px 10px;letter-spacing:1px;
+    border-radius:140px 8px 130px 8px/8px 130px 8px 140px;margin-bottom:8px;}
+  h1{font-family:var(--hand);font-weight:700;font-size:40px;margin:0 0 2px;}
+  .sub{font-size:14.5px;color:var(--ink-soft);max-width:780px;line-height:1.5;margin:0 0 16px;}
+  .sub b{color:var(--ink);}
+  a.back{font-family:var(--body);font-size:13px;color:var(--blue);text-decoration:none;border-bottom:1px dashed var(--blue);}
+
+  /* ---------- the board ---------- */
+  .stage{
+    border:2.5px solid var(--ink); border-radius:18px 6px 20px 6px/6px 20px 6px 18px;
+    background:var(--paper); box-shadow:5px 6px 0 rgba(44,42,38,.12);
+    padding:12px 14px 14px; position:relative; margin-top:6px;
+  }
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+  .hpwrap{display:flex;flex-direction:column;gap:3px;min-width:180px;}
+  .hpwrap .row{display:flex;justify-content:space-between;font-family:var(--hand);font-size:15px;}
+  .bar{height:13px;border:2px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--paper-2);}
+  .bar > i{display:block;height:100%;transition:width .12s linear;}
+  .bar.enemy > i{background:var(--coral);}
+  .bar.player > i{background:var(--green);}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.3px;color:var(--ink-soft);text-transform:uppercase;}
+  .energy{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  .pip{width:14px;height:14px;border:2px solid var(--ink);border-radius:50%;}
+  .pip.f{background:var(--gold);border-color:var(--gold);}
+
+  .board{
+    position:relative; height:172px; overflow:hidden; border:2px solid var(--ink);
+    border-radius:10px; background:
+      repeating-linear-gradient(90deg, transparent 0 23px, rgba(0,0,0,.04) 23px 24px);
+    background-color:#f7f4ec;
+  }
+  .lane-label{position:absolute;left:6px;z-index:5;font-family:var(--hand);font-size:13px;pointer-events:none;}
+  .lane-label.enemy{top:3px;color:var(--coral);}
+  .lane-label.you{bottom:3px;color:var(--blue);}
+  .lanediv{position:absolute;left:0;right:0;top:50%;height:0;border-top:1.5px dashed var(--line);}
+  /* NOW line */
+  .nowline{position:absolute;top:0;bottom:0;width:0;border-left:3px solid var(--ink);z-index:6;}
+  .nowline::before{content:"NOW";position:absolute;top:-1px;left:6px;font-family:var(--hand);font-weight:700;font-size:13px;color:var(--ink);}
+  .nowline::after{content:"resolve →";position:absolute;bottom:1px;left:6px;}
+  .nowzone{position:absolute;top:0;bottom:0;background:rgba(79,115,189,.06);z-index:1;}
+
+  /* entities */
+  .ent{position:absolute;height:46px;border:2px solid var(--ink);border-radius:7px;
+    display:flex;align-items:center;justify-content:center;gap:5px;
+    font-family:var(--hand);font-weight:600;font-size:14px;will-change:transform;overflow:hidden;
+    box-shadow:1px 1px 0 rgba(0,0,0,.12);}
+  .ent .spd{font-size:9px;}
+  .ent.enemyhit{background:rgba(204,111,93,.18);border-color:var(--coral);color:var(--coral);top:14px;}
+  .ent.block{background:rgba(111,154,82,.16);border-color:var(--green);color:#46622f;bottom:18px;border-style:dashed;}
+  .ent.attack{background:rgba(204,111,93,.10);border-color:var(--ink);bottom:18px;}
+  .ent.attack .windup{position:absolute;left:0;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 5px,transparent 5px 10px);}
+  .ent.channel{background:rgba(79,115,189,.12);border-color:var(--blue);color:var(--blue);bottom:18px;}
+  .ent.resolved{opacity:.25;}
+  .ent.cancelled{opacity:.3;text-decoration:line-through;}
+
+  .flash{position:absolute;z-index:9;font-family:var(--hand);font-weight:700;font-size:30px;
+    transform:translate(-50%,-50%);pointer-events:none;animation:pop .55s ease forwards;}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6);}25%{opacity:1;}100%{opacity:0;transform:translate(-50%,-120%) scale(1.1);}}
+
+  .banner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    background:rgba(243,239,230,.86);z-index:12;font-family:var(--hand);}
+  .banner h2{font-size:48px;margin:0;}
+  .banner.win h2{color:var(--green);} .banner.lose h2{color:var(--coral);}
+  .banner.hidden{display:none;}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .seg{display:inline-flex;border:2px solid var(--ink);border-radius:80px 8px 70px 8px/8px 70px 8px 80px;overflow:hidden;}
+  .seg button{font-family:var(--hand);font-weight:600;font-size:15px;background:var(--paper-2);border:0;border-right:2px solid var(--ink);padding:5px 13px 3px;cursor:pointer;color:var(--ink-soft);}
+  .seg button:last-child{border-right:0;}
+  .seg button.on{background:var(--ink);color:var(--paper);}
+  .btn{font-family:var(--hand);font-weight:700;font-size:15px;border:2px solid var(--ink);background:var(--paper-2);
+    padding:5px 14px 3px;border-radius:80px 8px 70px 8px/8px 70px 8px 80px;cursor:pointer;box-shadow:2px 2px 0 rgba(44,42,38,.12);}
+  .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(44,42,38,.12);}
+  .btn.reflex.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .reflexmeter{width:84px;height:10px;border:2px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--paper-2);}
+  .reflexmeter > i{display:block;height:100%;background:var(--blue);}
+  .stepbtn{display:none;}
+  .mode-step .stepbtn{display:inline-block;}
+
+  /* ---------- hand ---------- */
+  .hand{display:flex;gap:12px;margin-top:14px;justify-content:center;flex-wrap:wrap;}
+  .card{
+    width:104px;height:142px;border:2px solid var(--ink);border-radius:9px;background:var(--paper);
+    box-shadow:2px 3px 0 rgba(44,42,38,.14);cursor:pointer;padding:8px 7px;
+    display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform .1s ease,box-shadow .1s ease;
+    position:relative;user-select:none;
+  }
+  .card:hover{transform:translateY(-5px) rotate(-1deg);box-shadow:3px 5px 0 rgba(44,42,38,.16);}
+  .card.disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:1px 1px 0 rgba(44,42,38,.1);}
+  .card .t{font-family:var(--hand);font-weight:700;font-size:19px;line-height:1;}
+  .card .art{width:100%;height:34px;border:1.5px dashed var(--ink-faint);border-radius:4px;}
+  .card .meta{font-size:12px;color:var(--ink-soft);text-align:center;line-height:1.25;margin-top:auto;}
+  .card .cost{position:absolute;top:-9px;right:-9px;width:26px;height:26px;border-radius:50%;background:var(--gold);
+    border:2px solid var(--ink);color:#3a2e10;display:grid;place-items:center;font-family:var(--hand);font-weight:700;font-size:15px;}
+  .card.skill{border-color:var(--blue);background:rgba(79,115,189,.06);}
+  .card.skill .t{color:var(--blue);}
+  .card .kindtag{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint);}
+
+  .hint{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:10px;}
+  .hint b{color:var(--ink);}
+
+  /* ---------- notes grid ---------- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px;}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;}}
+  .panel{border:2px solid var(--ink);border-radius:14px 5px 14px 5px/5px 14px 5px 14px;padding:14px 16px;background:rgba(255,255,255,.32);}
+  .panel h3{font-family:var(--hand);font-weight:700;font-size:22px;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+  .panel h3 .dot{width:10px;height:10px;border-radius:50%;background:var(--blue);}
+  .panel p{font-size:13.5px;line-height:1.55;margin:0 0 9px;color:var(--ink);}
+  .panel p b{color:var(--ink);}
+  .panel ul{margin:0;padding-left:18px;}
+  .panel li{font-size:13.5px;line-height:1.5;margin-bottom:6px;}
+  .attr-row{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .attr-row:last-child{border-bottom:0;}
+  .attr-row .k{font-family:var(--hand);font-weight:700;font-size:16px;}
+  .attr-row .v{font-size:13px;color:var(--ink-soft);line-height:1.4;}
+  .attr-row.hl{background:rgba(198,154,69,.14);border-radius:8px;padding:8px;border-bottom:0;}
+  .attr-row.hl .v{color:var(--ink);}
+  .badge{display:inline-block;font-family:var(--hand);font-weight:700;font-size:12px;padding:0 7px;border-radius:20px;border:1.5px solid;}
+  .badge.tempo{color:var(--teal);border-color:var(--teal);}
+  .badge.power{color:var(--coral);border-color:var(--coral);}
+  .forks{counter-reset:f;}
+  .forks li{list-style:none;margin-bottom:11px;padding-left:30px;position:relative;}
+  .forks li::before{counter-increment:f;content:"?"counter(f);position:absolute;left:0;top:-1px;
+    font-family:var(--hand);font-weight:700;color:#fff;background:var(--coral);border:2px solid var(--ink);
+    width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;}
+  .forks b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="stamp">ROUGH — playable sketch</span>
+  <h1>Initiative Loom — the Real-Time spin</h1>
+  <p class="sub">Time no longer waits for you. The board <b>advances on its own</b>, future scrolling in from the right toward the <b>NOW</b> line. Cards are multi-tick <b>spans</b> you lay down <i>ahead</i> of the present so they're active when NOW arrives. It's plan-a-little, react-fast. <b>This sketch is actually playable</b> — click cards to drop them, cover the incoming red strikes, land your hits. <a class="back" href="Card Game — Wireframes.html">← back to the 4 directions</a></p>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="hpwrap">
+        <div class="row"><span style="color:var(--coral)">⚔ Card-Boss</span><span class="mono" id="ehp">120 / 120</span></div>
+        <div class="bar enemy"><i id="ebar" style="width:100%"></i></div>
+      </div>
+      <div class="hpwrap">
+        <div class="row"><span style="color:var(--green)">❤ You</span><span class="mono" id="php">80 / 80</span></div>
+        <div class="bar player"><i id="pbar" style="width:100%"></i></div>
+      </div>
+      <div class="energy">
+        <span class="mono">energy</span>
+        <span class="pip f" data-e></span><span class="pip f" data-e></span><span class="pip f" data-e></span>
+        <span class="pip" data-e></span><span class="pip" data-e></span><span class="pip" data-e></span>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <span class="lane-label enemy">enemy intents →</span>
+      <span class="lane-label you">your spans →</span>
+      <div class="lanediv"></div>
+      <div class="nowzone" id="nowzone"></div>
+      <div class="nowline" id="nowline"></div>
+      <div class="banner hidden" id="banner"><h2 id="bannertxt"></h2><span class="mono" id="bannersub"></span></div>
+    </div>
+
+    <div class="controls">
+      <div class="seg" id="flowseg">
+        <button data-flow="continuous" class="on">▶ Continuous</button>
+        <button data-flow="beat">♩ Beat (auto-pause)</button>
+        <button data-flow="step">⏸ Step</button>
+      </div>
+      <button class="btn stepbtn" id="stepbtn">Step ▶▶</button>
+      <button class="btn reflex" id="reflexbtn">⏳ Reflex (slow)</button>
+      <div class="reflexmeter" title="Agility reserve"><i id="reflexmeter" style="width:100%"></i></div>
+      <button class="btn" id="resetbtn" style="margin-left:auto">↺ Reset</button>
+    </div>
+
+    <div class="hand" id="hand"></div>
+    <p class="hint">Drop a <b style="color:#46622f">Guard</b> so its span covers an incoming <b style="color:var(--coral)">red</b> strike · land <b>Slash</b>/<b style="color:var(--blue)">Channel</b> hits at NOW · hold <b style="color:var(--blue)">Reflex</b> to slow time (your <b>Agility</b>) · try <b>Beat</b> &amp; <b>Step</b> modes to feel the tempo range.</p>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3><span class="dot"></span>What makes it weird</h3>
+      <ul>
+        <li><b>The present is a moving deadline.</b> Strikes resolve the instant they touch NOW — you don't get a turn, you get a window.</li>
+        <li><b>Cards are spans, not points.</b> A Guard isn't "block 8," it's "block for these 7 ticks." You commit to <i>when</i>, then live with it as it scrolls in.</li>
+        <li><b>Lead time = the whole game.</b> Long, strong cards (Channel) must be laid far ahead and <i>protected</i>; cheap ones (Dodge) are last-second saves.</li>
+        <li><b>Reflex is your escape hatch.</b> Slow time to read a nasty pattern — but the reserve drains, so panicking has a cost. (Straight out of <i>Second Second</i>.)</li>
+        <li><b>Still your engine.</b> The 40ms tick is the literal grid; the boss's intents are pinned to ticks exactly like a real battle.</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--teal)"></span>Re-thought attributes <span class="badge power">power</span> <span class="badge tempo">tempo</span></h3>
+      <p style="margin-bottom:10px;">Split so a <b>specialised build never breaks the loom</b>. The skill of play lives in <span class="badge tempo">tempo</span> stats everyone owns; <span class="badge power">power</span> only flavours offense.</p>
+      <div class="attr-row hl">
+        <span class="k" style="color:var(--coral)">STR / INT</span>
+        <span class="v"><b>Offense scales off whichever is HIGHER.</b> Pure-Strength and pure-Intellect builds hit equally — STR paints your basics red &amp; physical, INT paints them purple &amp; arcane. You're never starved for not having both.</span>
+      </div>
+      <div class="attr-row"><span class="k" style="color:var(--blue)">Agility</span><span class="v">Reflex reserve — how much you can slow time. Also trims card cast-span (snappier).</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--gold)">Dexterity</span><span class="v">Hand size, draw rate &amp; placement snap. Your throughput on the board.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--green)">Endurance</span><span class="v">Block spans last longer &amp; absorb more · HP · channels harder to interrupt.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--teal)">Luck</span><span class="v">Spawns glowing <b>crit ticks</b> on the board — resolve a hit there to double it. Better draws.</span></div>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--gold)"></span>Open forks — let's decide</h3>
+      <ul class="forks">
+        <li><b>Default tempo:</b> ship it as twitchy <b>Continuous</b>, gentle <b>Beat</b> (auto-pauses to plan), or <b>Step</b> (you advance time)? Try all three above — which fits an "active break" in an idle game?</li>
+        <li><b>Drop point:</b> cards currently appear just right of NOW and scroll in. Should you instead place them <b>anywhere</b> on the visible future (more chess), or always at NOW (more reflex)?</li>
+        <li><b>Interrupts:</b> should an unblocked hit <b>cancel a Channel</b> mid-cast (high risk/reward), or just chip your HP?</li>
+        <li><b>How long is the board you can see?</b> Dexterity-gated foresight, or fixed?</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--coral)"></span>The card vocabulary (starter)</h3>
+      <ul>
+        <li><b>Guard</b> — wide block span, your bread-and-butter defense (Endurance ↑ width).</li>
+        <li><b>Dodge</b> — tiny, cheap block; a precise last-second negate (Agility ↑ window).</li>
+        <li><b>Slash</b> — short windup → strike. Your build's basic damage (max STR/INT).</li>
+        <li><b>Channel</b> <span class="kindtag" style="color:var(--blue)">skill</span> — long windup, big payoff, interruptible. Skills = rare cards seeded in.</li>
+      </ul>
+      <p class="mono" style="margin-top:6px;">these four are just a taste — real deck would be unlocked via Challenges.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const board = document.getElementById('board');
+const nowline = document.getElementById('nowline');
+const nowzone = document.getElementById('nowzone');
+const banner = document.getElementById('banner');
+const PXT = 24;                 // px per tick
+let BW, NOW_X;
+function measure(){ BW = board.clientWidth; NOW_X = Math.round(BW*0.30);
+  nowline.style.left = NOW_X+'px';
+  nowzone.style.left = NOW_X+'px'; nowzone.style.width = (PXT)+'px'; }
+measure(); window.addEventListener('resize', measure);
+
+const CARDS = {
+  guard:   {label:'Guard',  kind:'block',   span:7, cost:2, meta:'block 7 ticks'},
+  dodge:   {label:'Dodge',  kind:'block',   span:2, cost:1, meta:'block 2 ticks · cheap'},
+  slash:   {label:'Slash',  kind:'attack',  windup:3, dmg:16, cost:2, meta:'windup 3 → hit 16'},
+  channel: {label:'Channel',kind:'channel', windup:9, dmg:46, cost:3, meta:'windup 9 → hit 46', skill:true},
+};
+
+let state;
+function fresh(){
+  return {
+    playTick:0, prevTick:0, last:null,
+    enemyHP:120, enemyMax:120, playerHP:80, playerMax:80,
+    energy:3, energyMax:6, energyAcc:0,
+    flow:'continuous', baseRate:4.2,
+    slow:false, reflex:100,
+    beatRun:0, beatPause:0, stepRemaining:0,
+    nextEnemyScheduled:6, ents:[], over:false,
+  };
+}
+state = fresh();
+
+// ---- hand UI ----
+const hand = document.getElementById('hand');
+function buildHand(){
+  hand.innerHTML='';
+  Object.entries(CARDS).forEach(([key,c])=>{
+    const el=document.createElement('div');
+    el.className='card'+(c.skill?' skill':'');
+    el.dataset.key=key;
+    el.innerHTML=`<span class="cost">${c.cost}</span>
+      <div class="t">${c.label}</div>
+      <div class="art"></div>
+      <div class="kindtag">${c.kind}</div>
+      <div class="meta">${c.meta}</div>`;
+    el.addEventListener('click',()=>placeCard(key));
+    hand.appendChild(el);
+  });
+}
+buildHand();
+
+function makeEnt(cls){
+  const el=document.createElement('div');
+  el.className='ent '+cls;
+  board.appendChild(el);
+  return el;
+}
+
+function placeCard(key){
+  if(state.over) return;
+  const c=CARDS[key];
+  if(state.energy < c.cost){ flash(NOW_X, 120, 'no energy', 'var(--ink-faint)'); return; }
+  state.energy -= c.cost;
+  const start = Math.ceil(state.playTick)+1;
+  if(c.kind==='block'){
+    const e={type:'block', start, end:start+c.span, el:makeEnt('block')};
+    e.el.innerHTML = c.label;
+    state.ents.push(e);
+  } else {
+    const end = start + c.windup;
+    const cls = c.kind==='channel' ? 'channel' : 'attack';
+    const e={type:c.kind, start, end, resolve:end, dmg:c.dmg, resolved:false, el:makeEnt(cls)};
+    e.el.innerHTML = (cls==='attack'?'<div class="windup"></div>':'') + c.label;
+    state.ents.push(e);
+  }
+  updateEnergyUI();
+}
+
+function scheduleEnemy(){
+  // keep enemy intents populated ~34 ticks ahead
+  while(state.nextEnemyScheduled < state.playTick + 34){
+    const t = state.nextEnemyScheduled;
+    const dmg = 8 + Math.floor(Math.random()*9);
+    const e={type:'enemyhit', start:t, end:t+2, resolve:t+1, dmg, resolved:false, el:makeEnt('enemyhit')};
+    e.el.innerHTML = '⚔'+dmg;
+    state.ents.push(e);
+    state.nextEnemyScheduled += 7 + Math.floor(Math.random()*7);
+  }
+}
+
+function blockActiveAt(tick){
+  return state.ents.some(e=>e.type==='block' && tick>=e.start && tick<=e.end);
+}
+
+function flash(x,y,txt,color){
+  const f=document.createElement('div');
+  f.className='flash'; f.textContent=txt; f.style.color=color;
+  f.style.left=x+'px'; f.style.top=y+'px';
+  board.appendChild(f);
+  setTimeout(()=>f.remove(),560);
+}
+
+function resolveCrossings(){
+  const a=state.prevTick, b=state.playTick;
+  state.ents.forEach(e=>{
+    if(e.resolved) return;
+    const rt = e.resolve;
+    if(rt!=null && rt>a && rt<=b){
+      if(e.type==='enemyhit'){
+        e.resolved=true; e.el.classList.add('resolved');
+        if(blockActiveAt(rt)){
+          flash(NOW_X, 40, 'BLOCK', 'var(--green)');
+        } else {
+          state.playerHP = Math.max(0, state.playerHP - e.dmg);
+          flash(NOW_X, 40, '-'+e.dmg, 'var(--coral)');
+          // interrupt any in-progress channel
+          state.ents.forEach(ch=>{
+            if(ch.type==='channel' && !ch.resolved && rt>=ch.start && rt<ch.end){
+              ch.resolved=true; ch.cancelled=true; ch.el.classList.add('cancelled');
+              flash(NOW_X, 132, 'interrupted!', 'var(--blue)');
+            }
+          });
+        }
+      } else if(e.type==='attack' || e.type==='channel'){
+        if(!e.cancelled){
+          e.resolved=true; e.el.classList.add('resolved');
+          state.enemyHP = Math.max(0, state.enemyHP - e.dmg);
+          flash(NOW_X, 132, '-'+e.dmg, e.type==='channel'?'var(--blue)':'var(--ink)');
+        }
+      }
+    }
+  });
+}
+
+function cull(){
+  state.ents = state.ents.filter(e=>{
+    const x = NOW_X + (e.end - state.playTick)*PXT;
+    if(x < -50){ e.el.remove(); return false; }
+    return true;
+  });
+}
+
+function render(){
+  state.ents.forEach(e=>{
+    const x = NOW_X + (e.start - state.playTick)*PXT;
+    const w = Math.max((e.end - e.start)*PXT, 30);
+    e.el.style.width = w+'px';
+    e.el.style.transform = `translateX(${x}px)`;
+  });
+}
+
+function updateEnergyUI(){
+  document.querySelectorAll('[data-e]').forEach((p,i)=>{
+    p.classList.toggle('f', i < Math.floor(state.energy));
+  });
+}
+function updateBars(){
+  document.getElementById('ebar').style.width = (state.enemyHP/state.enemyMax*100)+'%';
+  document.getElementById('pbar').style.width = (state.playerHP/state.playerMax*100)+'%';
+  document.getElementById('ehp').textContent = state.enemyHP+' / '+state.enemyMax;
+  document.getElementById('php').textContent = state.playerHP+' / '+state.playerMax;
+  document.getElementById('reflexmeter').style.width = state.reflex+'%';
+}
+
+function endIf(){
+  if(state.over) return;
+  if(state.enemyHP<=0){ over('win','You wove it down. Loot drops.'); }
+  else if(state.playerHP<=0){ over('lose','The present caught you.'); }
+}
+function over(kind,sub){
+  state.over=true;
+  banner.className='banner '+kind;
+  document.getElementById('bannertxt').textContent = kind==='win'?'VICTORY':'DOWNED';
+  document.getElementById('bannersub').textContent = sub;
+}
+
+// rate by flow mode
+function currentRate(dt){
+  let r = state.baseRate;
+  if(state.flow==='step'){
+    if(state.stepRemaining>0){
+      const adv = Math.min(state.stepRemaining, r*1.6*dt);
+      state.stepRemaining -= adv;
+      r = adv/dt;
+    } else { r = 0; }
+  } else if(state.flow==='beat'){
+    if(state.beatPause>0){ state.beatPause -= dt; r = 0;
+      nowzone.style.background='rgba(198,154,69,.12)';
+    } else {
+      nowzone.style.background='rgba(79,115,189,.06)';
+      state.beatRun += r*dt;
+      if(state.beatRun>=7){ state.beatPause=1.1; state.beatRun=0; }
+    }
+  }
+  if(state.slow && state.reflex>0){ r *= 0.34; }
+  return r;
+}
+
+function loop(ts){
+  if(state.last==null) state.last=ts;
+  let dt=(ts-state.last)/1000; state.last=ts;
+  if(dt>0.05) dt=0.05;
+
+  if(!state.over){
+    // reflex meter
+    if(state.slow && state.reflex>0){ state.reflex=Math.max(0,state.reflex-22*dt); if(state.reflex===0) setReflex(false); }
+    else if(!state.slow && state.reflex<100){ state.reflex=Math.min(100,state.reflex+11*dt); }
+
+    const r=currentRate(dt);
+    state.prevTick=state.playTick;
+    state.playTick += r*dt;
+
+    // energy regen
+    state.energyAcc += dt;
+    if(state.energyAcc>=1.15){ state.energyAcc=0; if(state.energy<state.energyMax){ state.energy++; updateEnergyUI(); } }
+
+    scheduleEnemy();
+    resolveCrossings();
+    cull();
+    updateBars();
+    endIf();
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ---- controls ----
+const flowseg=document.getElementById('flowseg');
+flowseg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  state.flow=b.dataset.flow;
+  [...flowseg.children].forEach(c=>c.classList.toggle('on',c===b));
+  document.querySelector('.stage').classList.toggle('mode-step', state.flow==='step');
+  state.beatRun=0; state.beatPause=0; state.stepRemaining=0;
+  nowzone.style.background='rgba(79,115,189,.06)';
+});
+document.getElementById('stepbtn').addEventListener('click',()=>{ if(!state.over) state.stepRemaining=6; });
+
+const reflexbtn=document.getElementById('reflexbtn');
+function setReflex(on){ state.slow=on && state.reflex>0; reflexbtn.classList.toggle('on',state.slow); }
+reflexbtn.addEventListener('mousedown',()=>setReflex(true));
+reflexbtn.addEventListener('touchstart',e=>{e.preventDefault();setReflex(true);},{passive:false});
+window.addEventListener('mouseup',()=>setReflex(false));
+window.addEventListener('touchend',()=>setReflex(false));
+reflexbtn.addEventListener('click',e=>e.preventDefault());
+
+document.getElementById('resetbtn').addEventListener('click',()=>{
+  state.ents.forEach(e=>e.el.remove());
+  const flow=state.flow; state=fresh(); state.flow=flow;
+  banner.className='banner hidden';
+  document.querySelector('.stage').classList.toggle('mode-step', flow==='step');
+  updateEnergyUI(); updateBars();
+});
+updateEnergyUI(); updateBars();
+</script>
+</body>
+</html>

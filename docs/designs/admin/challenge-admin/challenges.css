@@ -1,0 +1,121 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Challenges tool — additions layered on admin.css. Reuses the same tokens,
+   inputs, chips, and section chrome; only the condition builder, sentence
+   preview, and reward slots need new structure.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* objective preview under the detail title */
+.ch-headline { margin-top: 8px; font-size: 14px; color: var(--text-secondary); letter-spacing: -.1px; }
+
+/* exploration switcher bar above the condition builder */
+.ch-explore-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.ch-explore-eye { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--text-muted); }
+.ch-explore-bar .eswitch { margin-left: auto; }
+
+/* ── plain-language sentence preview ─────────────────────────────────────── */
+.ch-sentence { margin-top: 22px; padding: 16px 18px; border: 1px solid rgba(161,194,247,.25); border-radius: 8px;
+	background: linear-gradient(180deg, rgba(161,194,247,.07), rgba(161,194,247,.02)); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ch-sentence-eye { font-family: var(--mono); font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent);
+	border: 1px solid rgba(161,194,247,.4); border-radius: 3px; padding: 3px 7px; white-space: nowrap; }
+.ch-sentence-text { font-size: 17px; font-weight: 500; color: var(--text-primary); letter-spacing: -.2px; }
+.ch-flag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .4px;
+	padding: 3px 8px; border-radius: 3px; margin-left: auto; white-space: nowrap; }
+.ch-flag.warn { color: var(--warning); border: 1px solid rgba(240,210,138,.35); background: rgba(240,210,138,.08); }
+.ch-flag.info { color: var(--accent-light); border: 1px solid rgba(161,194,247,.3); background: rgba(161,194,247,.07); }
+
+/* notes under fields */
+.ch-note { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; max-width: 420px; }
+.ch-note.info { color: var(--accent-light); }
+
+/* suggested-statistic quick-apply */
+.ch-suggest { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; font-family: var(--mono); font-size: 10.5px;
+	letter-spacing: .4px; color: var(--accent); background: rgba(161,194,247,.08); border: 1px solid rgba(161,194,247,.32);
+	border-radius: 3px; padding: 5px 10px; cursor: pointer; transition: all .13s; }
+.ch-suggest:hover { background: rgba(161,194,247,.16); box-shadow: 0 0 10px rgba(161,194,247,.3); }
+
+/* scope: global-only readout */
+.ch-scope-global { display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 13px; border: 1px dashed var(--border-light);
+	border-radius: 4px; font-size: 12.5px; color: var(--text-tertiary); background: rgba(255,255,255,.015); }
+
+/* ── Exploration A: guided steps ─────────────────────────────────────────── */
+.ch-guided { display: flex; flex-direction: column; }
+.ch-step { display: flex; gap: 16px; padding: 0 0 26px; position: relative; }
+.ch-step:not(:last-of-type)::before { content: ''; position: absolute; left: 15px; top: 34px; bottom: 6px; width: 1px; background: var(--border-subtle); }
+.ch-step-num { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--border-light);
+	background: var(--panel-2); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 12px;
+	color: var(--text-tertiary); z-index: 1; }
+.ch-step-num.done { border-color: var(--accent); color: var(--accent); background: rgba(161,194,247,.1); box-shadow: 0 0 10px rgba(161,194,247,.25); }
+.ch-step-head { display: flex; align-items: baseline; gap: 10px; }
+.ch-step-title { font-size: 14.5px; font-weight: 500; color: var(--text-primary); }
+.ch-step-hint { font-size: 11.5px; color: var(--text-muted); }
+
+/* objective-type cards */
+.ch-type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 720px; }
+.ch-type-card { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; text-align: left; padding: 12px 12px 11px;
+	background: rgba(255,255,255,.02); border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; position: relative;
+	transition: all .14s ease; color: var(--text-secondary); }
+.ch-type-card:hover { border-color: var(--border-light); background: rgba(255,255,255,.04); }
+.ch-type-card.active { border-color: var(--accent); background: rgba(161,194,247,.1); box-shadow: inset 0 0 0 1px rgba(161,194,247,.25); }
+.ch-type-ic { width: 30px; height: 30px; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+	background: rgba(255,255,255,.04); border: 1px solid var(--border-subtle); color: var(--text-tertiary); }
+.ch-type-card.active .ch-type-ic { background: rgba(161,194,247,.12); border-color: rgba(161,194,247,.4); color: var(--accent); }
+.ch-type-nm { font-size: 12.5px; font-weight: 500; color: var(--text-primary); }
+.ch-type-tag { position: absolute; top: 9px; right: 9px; font-family: var(--mono); font-size: 7.5px; letter-spacing: .8px;
+	text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 1px 4px; }
+
+/* ── Condition: compact form ─────────────────────────────────────────────── */
+.ch-compact { }
+.ch-compact-grid { display: flex; gap: 18px 20px; flex-wrap: wrap; align-items: flex-end; padding: 18px; border: 1px solid var(--border-subtle);
+	border-radius: 8px; background: rgba(255,255,255,.012); }
+
+/* read-only, type-derived statistic readout */
+.ch-stat-readout { display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 12px; border: 1px solid rgba(161,194,247,.22);
+	border-radius: 4px; background: rgba(161,194,247,.05); }
+.ch-stat-readout.none { border-color: var(--border-subtle); background: rgba(255,255,255,.02); }
+.ch-stat-readout .nm { font-size: 13px; color: var(--text-primary); white-space: nowrap; }
+.ch-stat-readout .nm.muted { color: var(--text-tertiary); }
+.ch-stat-readout .ch-stat-ent { margin-left: auto; font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+	color: var(--accent); border: 1px solid rgba(161,194,247,.35); border-radius: 3px; padding: 2px 6px; }
+
+/* caption beneath the compact grid */
+.ch-grid-cap { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .3px;
+	color: var(--text-muted); margin-top: 13px; }
+
+/* ── Reward slots ────────────────────────────────────────────────────────── */
+.ch-reward-intro { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--text-tertiary); line-height: 1.5;
+	margin-bottom: 18px; max-width: 760px; }
+.ch-reward-intro .ic { margin-top: 2px; flex-shrink: 0; }
+.ch-reward-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 760px; }
+.ch-reward-slot { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; background: var(--panel); transition: border-color .14s, box-shadow .14s; }
+.ch-reward-slot.filled { border-color: var(--border-light); }
+.ch-reward-slot.open { border-color: rgba(161,194,247,.4); box-shadow: 0 0 0 1px rgba(161,194,247,.15); }
+.ch-reward-head { display: flex; align-items: flex-start; gap: 12px; }
+.ch-reward-ic { width: 34px; height: 34px; flex-shrink: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+	background: rgba(255,255,255,.03); border: 1px solid var(--border-subtle); color: var(--text-tertiary); }
+.ch-reward-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-muted); }
+.ch-reward-name { font-size: 14.5px; font-weight: 500; color: var(--text-primary); margin-top: 5px; display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.ch-reward-sub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.ch-reward-empty { font-size: 13.5px; color: var(--text-muted); margin-top: 5px; font-style: italic; }
+
+/* ── Reward picker ───────────────────────────────────────────────────────── */
+.ch-picker { margin-top: 16px; border: 1px solid rgba(161,194,247,.3); border-radius: 8px; overflow: hidden; max-width: 760px;
+	box-shadow: 0 12px 36px rgba(0,0,0,.35); }
+.ch-picker-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--surface); }
+.ch-picker-count { font-family: var(--mono); font-size: 10.5px; color: var(--text-tertiary); white-space: nowrap; }
+.ch-picker-list { max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.ch-picker-row { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; text-align: left; background: transparent; border: 1px solid transparent;
+	border-radius: 5px; padding: 9px 11px; cursor: pointer; overflow: hidden; transition: background .12s, border-color .12s; }
+.ch-picker-row:hover:not(:disabled) { background: rgba(255,255,255,.04); border-color: var(--border-subtle); }
+.ch-picker-row .rare-tag { flex-shrink: 0; }
+.ch-picker-row.current { background: rgba(161,194,247,.1); border-color: rgba(161,194,247,.35); }
+.ch-picker-row.claimed { opacity: .5; cursor: not-allowed; }
+.ch-picker-nm { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+.ch-picker-row.claimed .ch-picker-nm { color: var(--text-tertiary); text-decoration: line-through; }
+.ch-picker-state { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .3px;
+	color: var(--text-muted); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.ch-picker-state.current { color: var(--accent); }
+
+@media (max-width: 900px) {
+	.ch-type-grid { grid-template-columns: repeat(2, 1fr); }
+	.ch-reward-grid { grid-template-columns: 1fr; }
+}

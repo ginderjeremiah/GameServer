@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Real-Time Loom v3 — aim, crits, dex</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper:#f3efe6; --paper-2:#ece6d8; --ink:#2c2a26; --ink-soft:#6a655c; --ink-faint:#a8a092;
+    --blue:#4f73bd; --blue-soft:#aebfe2; --coral:#cc6f5d; --coral-soft:#e3b3a8;
+    --gold:#c69a45; --green:#6f9a52; --purple:#7d6fb8; --teal:#3f9e8f; --line:#c7bfae;
+    --hand:'Caveat',cursive; --body:'Kalam',cursive;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--paper); color:var(--ink); font-family:var(--body); -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 18% 8%,rgba(0,0,0,.015),transparent 60%),radial-gradient(circle at 82% 92%,rgba(0,0,0,.02),transparent 55%);}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(120,110,90,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,110,90,.05) 1px,transparent 1px);background-size:26px 26px;}
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 24px 80px;}
+
+  .stamp{display:inline-block;transform:rotate(-3deg);border:2px solid var(--coral);color:var(--coral);
+    font-family:var(--hand);font-weight:700;font-size:14px;padding:1px 10px;letter-spacing:1px;
+    border-radius:140px 8px 130px 8px/8px 130px 8px 140px;margin-bottom:8px;}
+  h1{font-family:var(--hand);font-weight:700;font-size:40px;margin:0 0 2px;}
+  .sub{font-size:14.5px;color:var(--ink-soft);max-width:820px;line-height:1.5;margin:0 0 16px;}
+  .sub b{color:var(--ink);}
+  a.back{font-family:var(--body);font-size:13px;color:var(--blue);text-decoration:none;border-bottom:1px dashed var(--blue);}
+
+  .stage{border:2.5px solid var(--ink); border-radius:18px 6px 20px 6px/6px 20px 6px 18px;
+    background:var(--paper); box-shadow:5px 6px 0 rgba(44,42,38,.12); padding:12px 14px 14px; position:relative; margin-top:6px;}
+  .topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;}
+  .hpwrap{display:flex;flex-direction:column;gap:3px;min-width:190px;}
+  .hpwrap .row{display:flex;justify-content:space-between;font-family:var(--hand);font-size:15px;}
+  .bar{height:13px;border:2px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--paper-2);}
+  .bar > i{display:block;height:100%;transition:width .12s linear;}
+  .bar.enemy > i{background:var(--coral);} .bar.player > i{background:var(--green);}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.3px;color:var(--ink-soft);text-transform:uppercase;}
+  .drawcluster{display:flex;align-items:center;gap:9px;margin-left:auto;}
+  .drawcluster b{font-family:var(--hand);font-size:18px;color:var(--ink);}
+  .drawbar{width:64px;height:10px;border:2px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--paper-2);}
+  .drawbar > i{display:block;height:100%;background:var(--gold);width:0%;}
+
+  .build{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 10px;padding:7px 11px;
+    border:1.5px dashed var(--line);border-radius:10px;background:rgba(255,255,255,.25);}
+  .build .lab{font-family:var(--hand);font-size:15px;color:var(--ink-soft);}
+  .build .stat{display:flex;align-items:center;gap:8px;font-family:var(--hand);font-size:16px;color:var(--ink);}
+  .build .stat input[type=range]{width:96px;accent-color:var(--blue);}
+  .build .stat.luck input[type=range]{accent-color:var(--gold);}
+  .build .stat.agi input[type=range]{accent-color:var(--green);}
+  .build b{color:var(--ink);} .build .res{font-size:13px;color:var(--ink-soft);font-family:var(--body);}
+
+  .board{position:relative; height:202px; overflow:hidden; border:2px solid var(--ink); border-radius:10px;
+    background:repeating-linear-gradient(90deg, transparent 0 23px, rgba(0,0,0,.04) 23px 24px); background-color:#f7f4ec; cursor:crosshair;}
+  .lane-label{position:absolute;left:7px;z-index:5;font-family:var(--hand);font-size:13px;pointer-events:none;}
+  .lanediv{position:absolute;left:0;right:0;height:0;border-top:1.5px dashed var(--line);}
+  .nowline{position:absolute;top:0;bottom:0;width:0;border-left:3px solid var(--ink);z-index:7;}
+  .nowline::before{content:"NOW";position:absolute;top:-1px;left:6px;font-family:var(--hand);font-weight:700;font-size:13px;color:var(--ink);}
+  .nowzone{position:absolute;top:0;bottom:0;background:rgba(0,0,0,.05);z-index:1;}
+
+  .ent{position:absolute;height:42px;border:2px solid var(--ink);border-radius:7px;display:flex;align-items:center;justify-content:center;gap:5px;
+    font-family:var(--hand);font-weight:600;font-size:14px;will-change:transform;overflow:hidden;box-shadow:1px 1px 0 rgba(0,0,0,.12);z-index:3;}
+  .ent.enemyhit{background:rgba(204,111,93,.18);border-color:var(--coral);color:var(--coral);top:11px;}
+  .ent.attack{background:rgba(204,111,93,.10);border-color:var(--ink);top:78px;}
+  .ent.attack .windup{position:absolute;left:0;top:0;bottom:0;right:5px;background:repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 5px,transparent 5px 10px);}
+  .ent.channel{background:rgba(79,115,189,.12);border-color:var(--blue);color:var(--blue);top:78px;}
+  .ent.block{background:rgba(111,154,82,.18);border-color:var(--green);color:#46622f;top:145px;border-style:dashed;}
+  .ent.resolved{opacity:.22;} .ent.cancelled{opacity:.3;text-decoration:line-through;}
+  /* impact marker: leading edge that crosses NOW exactly on resolve */
+  .ent .tip{position:absolute;right:-1px;top:-2px;bottom:-2px;width:4px;background:currentColor;z-index:4;}
+  .ent.attack .tip{background:var(--ink);} .ent.enemyhit .tip{background:var(--coral);}
+
+  .critmark{position:absolute;top:78px;height:42px;width:24px;z-index:2;border-radius:5px;
+    background:radial-gradient(circle,rgba(198,154,69,.55),rgba(198,154,69,.1));border:2px dashed var(--gold);
+    box-shadow:0 0 11px rgba(198,154,69,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:var(--hand);font-weight:700;color:#7a5a12;font-size:11px;line-height:.9;will-change:transform;}
+  .critmark.used{opacity:.18;box-shadow:none;}
+
+  .preview{position:absolute;height:42px;border:2px dashed var(--ink);border-radius:7px;z-index:6;display:none;
+    align-items:center;justify-content:center;font-family:var(--hand);font-weight:600;font-size:14px;color:var(--ink-soft);
+    background:rgba(0,0,0,.05);pointer-events:none;}
+  .preview.block{top:145px;border-color:var(--green);background:rgba(111,154,82,.16);color:#46622f;}
+  .preview.attack{top:78px;}
+
+  .flash{position:absolute;z-index:9;font-family:var(--hand);font-weight:700;font-size:26px;transform:translate(-50%,-50%);pointer-events:none;animation:pop .55s ease forwards;}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6);}25%{opacity:1;}100%{opacity:0;transform:translate(-50%,-120%) scale(1.1);}}
+
+  .banner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    background:rgba(243,239,230,.86);z-index:12;font-family:var(--hand);}
+  .banner h2{font-size:46px;margin:0;} .banner.win h2{color:var(--green);} .banner.lose h2{color:var(--coral);}
+  .banner.hidden{display:none;}
+
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .seg{display:inline-flex;border:2px solid var(--ink);border-radius:80px 8px 70px 8px/8px 70px 8px 80px;overflow:hidden;}
+  .seg button{font-family:var(--hand);font-weight:600;font-size:15px;background:var(--paper-2);border:0;border-right:2px solid var(--ink);padding:5px 13px 3px;cursor:pointer;color:var(--ink-soft);}
+  .seg button:last-child{border-right:0;} .seg button.on{background:var(--ink);color:var(--paper);}
+  .btn{font-family:var(--hand);font-weight:700;font-size:15px;border:2px solid var(--ink);background:var(--paper-2);padding:5px 14px 3px;border-radius:80px 8px 70px 8px/8px 70px 8px 80px;cursor:pointer;box-shadow:2px 2px 0 rgba(44,42,38,.12);}
+  .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(44,42,38,.12);}
+  .btn.reflex.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .reflexmeter{width:84px;height:10px;border:2px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--paper-2);}
+  .reflexmeter > i{display:block;height:100%;background:var(--blue);}
+  .stepbtn{display:none;} .mode-step .stepbtn{display:inline-block;}
+
+  .handzone{display:flex;align-items:flex-end;justify-content:center;gap:14px;margin-top:14px;}
+  .pile{width:62px;height:88px;border:2px dashed var(--ink-faint);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink-soft);font-family:var(--hand);font-size:14px;flex-shrink:0;}
+  .pile b{font-size:22px;color:var(--ink);line-height:1;}
+  .hand{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;min-height:142px;align-items:flex-end;}
+  .card{width:100px;height:138px;border:2px solid var(--ink);border-radius:9px;background:var(--paper);box-shadow:2px 3px 0 rgba(44,42,38,.14);
+    cursor:grab;padding:8px 7px;display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform .1s ease,box-shadow .1s ease;position:relative;user-select:none;}
+  .card:hover{transform:translateY(-6px) rotate(-1deg);box-shadow:3px 6px 0 rgba(44,42,38,.16);}
+  .card:active{cursor:grabbing;}
+  .card .t{font-family:var(--hand);font-weight:700;font-size:19px;line-height:1;}
+  .card .art{width:100%;height:32px;border:1.5px dashed var(--ink-faint);border-radius:4px;}
+  .card .meta{font-size:12px;color:var(--ink-soft);text-align:center;line-height:1.2;margin-top:auto;}
+  .card .kindtag{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint);}
+  .card.skill{border-color:var(--blue);background:rgba(79,115,189,.06);} .card.skill .t{color:var(--blue);}
+  .card.lane-b .t{color:#46622f;} .card.dragging{opacity:.4;}
+  .ghost{width:100px;height:138px;border:2px dashed var(--line);border-radius:9px;opacity:.5;}
+
+  .hint{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:10px;}
+  .hint b{color:var(--ink);}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px;}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;}}
+  .panel{border:2px solid var(--ink);border-radius:14px 5px 14px 5px/5px 14px 5px 14px;padding:14px 16px;background:rgba(255,255,255,.32);}
+  .panel h3{font-family:var(--hand);font-weight:700;font-size:22px;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+  .panel h3 .dot{width:10px;height:10px;border-radius:50%;background:var(--blue);}
+  .panel p{font-size:13.5px;line-height:1.55;margin:0 0 9px;color:var(--ink);} .panel p b{color:var(--ink);}
+  .panel ul{margin:0;padding-left:18px;} .panel li{font-size:13.5px;line-height:1.5;margin-bottom:6px;}
+  .attr-row{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .attr-row:last-child{border-bottom:0;} .attr-row .k{font-family:var(--hand);font-weight:700;font-size:16px;} .attr-row .v{font-size:13px;color:var(--ink-soft);line-height:1.4;}
+  .attr-row.hl{background:rgba(198,154,69,.14);border-radius:8px;padding:8px;border-bottom:0;} .attr-row.hl .v{color:var(--ink);}
+  .badge{display:inline-block;font-family:var(--hand);font-weight:700;font-size:12px;padding:0 7px;border-radius:20px;border:1.5px solid;}
+  .badge.tempo{color:var(--teal);border-color:var(--teal);} .badge.power{color:var(--coral);border-color:var(--coral);}
+  .forks{counter-reset:f;} .forks li{list-style:none;margin-bottom:11px;padding-left:30px;position:relative;}
+  .forks li::before{counter-increment:f;content:"?"counter(f);position:absolute;left:0;top:-1px;font-family:var(--hand);font-weight:700;color:#fff;background:var(--coral);border:2px solid var(--ink);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;}
+  .forks b{color:var(--ink);} .panel .done{color:var(--green);font-weight:700;}
+  .tag{display:inline-block;font-family:var(--hand);font-weight:700;font-size:13px;color:var(--green);border:1.5px solid var(--green);border-radius:20px;padding:0 8px;margin-left:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="stamp">ROUGH — playable · v4</span>
+  <h1>Initiative Loom — aim, crits &amp; dex <span class="tag">continuous</span></h1>
+  <p class="sub"><b>Drag</b> a card onto the board to <b>aim</b> it anywhere up the lane (it snaps to a free slot — same-type cards never overlap); <b>single-click</b> still quick-casts to the tail. Land a strike on a glowing <b style="color:var(--gold)">✦ crit tick</b> (from Luck) to double it. Hand cap now scales with <b>Dexterity</b>. <a class="back" href="Card Game — Wireframes.html">← 4 directions</a> · <a class="back" href="Card Game — Real-Time Loom (v1 energy).html">v1 (energy)</a></p>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="hpwrap"><div class="row"><span style="color:var(--coral)">⚔ Card-Boss</span><span class="mono" id="ehp">120 / 120</span></div><div class="bar enemy"><i id="ebar" style="width:100%"></i></div></div>
+      <div class="hpwrap"><div class="row"><span style="color:var(--green)">❤ You</span><span class="mono" id="php">80 / 80</span></div><div class="bar player"><i id="pbar" style="width:100%"></i></div></div>
+      <div class="drawcluster"><span class="mono">deck <b id="deckct">0</b></span><div class="drawbar" title="time to next draw"><i id="drawfill"></i></div><span class="mono">used <b id="discardct">0</b></span></div>
+    </div>
+
+    <div class="build">
+      <span class="lab">build →</span>
+      <span class="stat agi">AGI <input type="range" id="agi" min="0" max="300" value="10"><b id="agiv">10</b></span>
+      <span class="res">draws every <b id="drawv">1.50</b>s</span>
+      <span class="stat">DEX <input type="range" id="dex" min="1" max="500" value="8"><b id="dexv">8</b></span>
+      <span class="res">hand cap = 4 + ⌊log₁₀ DEX⌋ = <b id="capv">4</b></span>
+      <span class="stat luck">LUCK <input type="range" id="luck" min="0" max="60" value="14"><b id="luckv">14</b></span>
+      <span class="res">✦ every <b id="critv">12</b> ticks</span>
+    </div>
+
+    <div class="board" id="board">
+      <span class="lane-label" style="top:3px;color:var(--coral)">enemy intents →</span>
+      <span class="lane-label" style="top:62px;color:var(--ink-soft)">your strikes → (queue)</span>
+      <span class="lane-label" style="top:128px;color:#46622f">your blocks → (queue)</span>
+      <div class="lanediv" style="top:67px"></div>
+      <div class="lanediv" style="top:134px"></div>
+      <div class="nowzone" id="nowzone"></div>
+      <div class="nowline" id="nowline"></div>
+      <div class="preview" id="preview"></div>
+      <div class="banner hidden" id="banner"><h2 id="bannertxt"></h2><span class="mono" id="bannersub"></span></div>
+    </div>
+
+    <div class="controls">
+      <div class="seg" id="flowseg"><button data-flow="continuous" class="on">▶ Continuous</button><button data-flow="beat">♩ Beat</button><button data-flow="step">⏸ Step</button></div>
+      <button class="btn stepbtn" id="stepbtn">Step ▶▶</button>
+      <button class="btn reflex" id="reflexbtn">⏳ Reflex (slow)</button>
+      <div class="reflexmeter" title="Agility reserve"><i id="reflexmeter" style="width:100%"></i></div>
+      <button class="btn" id="resetbtn" style="margin-left:auto">↺ Reset</button>
+    </div>
+
+    <div class="handzone">
+      <div class="pile" id="deckpile">deck<b id="deckct2">0</b></div>
+      <div class="hand" id="hand"></div>
+      <div class="pile" id="usedpile">used<b id="discardct2">0</b></div>
+    </div>
+    <p class="hint"><b>Drag</b> a card up the lane to aim · <b>click</b> = quick-cast to tail · strikes resolve at the <b>marker</b> on NOW · ✦ = ×2 strike · hold <b style="color:var(--blue)">Reflex</b> to slow time.</p>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3><span class="dot"></span>New in v4</h3>
+      <ul>
+        <li><b>Agility drives draw speed</b> now (was Dexterity): interval ≈ 2.0 − 0.005·AGI (min 1s). Dexterity keeps the hand-cap.</li>
+        <li><b>Crit ticks sit centred on the impact tick</b> — aim a strike so its end-marker lands dead-centre in the ✦ glow. No more guessing which edge.</li>
+        <li><b>One card at a time.</b> Drawing slides in a single card; your other cards (and a hovered lift) no longer reset — it stops feeling like a whole new hand.</li>
+        <li><b>Still here:</b> aimed drag placement · crit ×2 on attacks · resolution on the impact marker · Channel interrupts.</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--teal)"></span>Attributes <span class="badge power">power</span> <span class="badge tempo">tempo</span></h3>
+      <div class="attr-row hl"><span class="k" style="color:var(--coral)">STR / INT</span><span class="v"><b>Offense scales off whichever is HIGHER.</b> Pure-STR &amp; pure-INT hit equally — never starved for lacking one.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--blue)">Agility</span><span class="v"><b>Draw speed</b> (≈ 2.0 − 0.005·AGI s, min 1s) · Reflex reserve.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--gold)">Dexterity</span><span class="v"><b>Hand cap = 4 + ⌊log₁₀ DEX⌋.</b> Now live.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--green)">Endurance</span><span class="v">Block spans last longer &amp; absorb more · HP · channels harder to interrupt.</span></div>
+      <div class="attr-row"><span class="k" style="color:var(--teal)">Luck</span><span class="v"><b>Crit-tick frequency</b> — gap ≈ 26 − LUCK ticks. Better draws. Now live.</span></div>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--gold)"></span>Forks — where we are</h3>
+      <ul class="forks">
+        <li><span class="done">✓</span> continuous · <span class="done">✓</span> aim+snap · <span class="done">✓</span> interrupts · <span class="done">✓</span> shared draw · <span class="done">✓</span> crit ×2 attacks-only</li>
+        <li><span class="done">✓ Draw speed</span> scales with <b>Agility</b>; <span class="done">✓ hand cap</span> with Dexterity.</li>
+        <li><b>Next:</b> the verbs are locked — ready to <b>dress it in the dark atmospheric theme</b> whenever you are. Enemies get a single block lane in that pass.</li>
+        <li><b>Later:</b> hotkeys · full balance pass on numbers &amp; card text.</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--coral)"></span>Card vocabulary (starter)</h3>
+      <ul>
+        <li><b>Guard</b> — wide block span; your wall (Endurance ↑ width).</li>
+        <li><b>Dodge</b> — short block; precise plug, easy to slot into a gap (Agility ↑ window).</li>
+        <li><b>Slash</b> — short windup → strike. Aim it onto a ✦ for the crit.</li>
+        <li><b>Channel</b> <span class="kindtag" style="color:var(--blue)">skill</span> — long windup, big payoff, interruptible. Skills = rare cards seeded in.</li>
+      </ul>
+      <p class="mono" style="margin-top:6px;">hotkeys still to come — noted.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const board=document.getElementById('board');
+const nowline=document.getElementById('nowline');
+const nowzone=document.getElementById('nowzone');
+const banner=document.getElementById('banner');
+const previewEl=document.getElementById('preview');
+const PXT=24;
+let BW,NOW_X;
+function measure(){ BW=board.clientWidth; NOW_X=Math.round(BW*0.30); nowline.style.left=NOW_X+'px'; nowzone.style.left=NOW_X+'px'; nowzone.style.width=PXT+'px'; }
+measure(); window.addEventListener('resize',measure);
+
+const CARDS={
+  guard:{label:'Guard',kind:'block',span:7,meta:'block · 7 ticks'},
+  dodge:{label:'Dodge',kind:'block',span:3,meta:'block · 3 ticks'},
+  slash:{label:'Slash',kind:'attack',windup:3,dmg:16,meta:'windup 3 → 16'},
+  channel:{label:'Channel',kind:'channel',windup:9,dmg:46,meta:'windup 9 → 46',skill:true},
+};
+const STARTER=['guard','guard','guard','guard','dodge','dodge','slash','slash','slash','slash','slash','channel','channel','dodge'];
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+let drag=null;
+let state;
+function fresh(){
+  const s={
+    playTick:0,prevTick:0,last:null,
+    enemyHP:120,enemyMax:120,playerHP:80,playerMax:80,
+    flow:'continuous', baseRate:4.2,
+    slow:false, reflex:100,
+    beatRun:0,beatPause:0,stepRemaining:0,
+    nextEnemyScheduled:7, ents:[], blockTail:0, atkTail:0,
+    crits:[], nextCritScheduled:11,
+    deck:shuffle([...STARTER]), hand:[], discard:[], drawAcc:0, drawInterval:1.5,
+    dex:8, agi:10, luck:14, over:false,
+  };
+  for(let i=0;i<4;i++){ if(s.deck.length) s.hand.push(s.deck.pop()); }
+  return s;
+}
+state=fresh();
+
+function handCap(){ return 4 + Math.floor(Math.log10(Math.max(1,state.dex))); }
+function critGap(){ return Math.max(6, 26 - Math.floor(state.luck)); }
+function drawIntervalFor(){ return Math.max(1.0, 2.0 - 0.005*state.agi); }
+
+function makeEnt(cls){ const el=document.createElement('div'); el.className='ent '+cls; board.appendChild(el); return el; }
+
+function laneEntsOf(kind){ return kind==='block' ? state.ents.filter(e=>e.type==='block') : state.ents.filter(e=>e.type==='attack'||e.type==='channel'); }
+function freeStart(kind, desired, dur){
+  let s=Math.max(desired, Math.ceil(state.playTick));
+  const lane=laneEntsOf(kind).slice().sort((a,b)=>a.start-b.start);
+  let changed=true, guard=0;
+  while(changed && guard++<200){ changed=false; for(const e of lane){ if(s<e.end && e.start<s+dur){ s=e.end; changed=true; } } }
+  return s;
+}
+function cast(key, desiredStart){
+  const c=CARDS[key];
+  const dur = c.kind==='block'? c.span : c.windup;
+  const desired = (desiredStart!=null) ? desiredStart : Math.max(Math.ceil(state.playTick), c.kind==='block'?state.blockTail:state.atkTail);
+  const s=freeStart(c.kind, desired, dur);
+  const end=s+dur;
+  if(c.kind==='block'){
+    const e={type:'block',start:s,end,el:makeEnt('block')}; e.el.innerHTML=c.label+'<span class="tip"></span>';
+    state.blockTail=Math.max(state.blockTail,end); state.ents.push(e);
+  } else {
+    const cls=c.kind==='channel'?'channel':'attack';
+    const e={type:c.kind,start:s,end,resolve:end,dmg:c.dmg,resolved:false,el:makeEnt(cls)};
+    e.el.innerHTML=(cls==='attack'?'<div class="windup"></div>':'')+c.label+'<span class="tip"></span>';
+    state.atkTail=Math.max(state.atkTail,end); state.ents.push(e);
+  }
+}
+
+const handEl=document.getElementById('hand');
+function makeCardEl(key){
+  const c=CARDS[key];
+  const el=document.createElement('div');
+  el.className='card'+(c.skill?' skill':'')+(c.kind==='block'?' lane-b':'');
+  el.dataset.key=key;
+  el.innerHTML=`<div class="t">${c.label}</div><div class="art"></div><div class="kindtag">${c.kind}</div><div class="meta">${c.meta}</div>`;
+  el.addEventListener('mousedown',ev=>{ if(state.over)return; ev.preventDefault(); drag={el,key,started:false,sx:ev.clientX,sy:ev.clientY,lastX:ev.clientX}; el.classList.add('dragging'); });
+  return el;
+}
+function updateCounts(){
+  document.getElementById('deckct').textContent=state.deck.length;
+  document.getElementById('discardct').textContent=state.discard.length;
+  document.getElementById('deckct2').textContent=state.deck.length;
+  document.getElementById('discardct2').textContent=state.discard.length;
+}
+function syncGhosts(){
+  handEl.querySelectorAll('.ghost').forEach(g=>g.remove());
+  const cap=handCap(), cards=handEl.querySelectorAll('.card').length;
+  for(let i=cards;i<cap;i++){ const g=document.createElement('div'); g.className='ghost'; handEl.appendChild(g); }
+  updateCounts();
+}
+function renderHand(){
+  handEl.innerHTML='';
+  state.hand.forEach(key=>handEl.appendChild(makeCardEl(key)));
+  syncGhosts();
+}
+function drawOne(){
+  if(state.hand.length>=handCap()) return false;
+  if(!state.deck.length){ if(state.discard.length){ state.deck=shuffle(state.discard); state.discard=[]; } else return false; }
+  const key=state.deck.pop(); state.hand.push(key);
+  const el=makeCardEl(key); const firstGhost=handEl.querySelector('.ghost');
+  if(firstGhost) handEl.insertBefore(el, firstGhost); else handEl.appendChild(el);
+  syncGhosts(); return true;
+}
+function castFromHand(el, key, desiredStart){
+  const idx=[...handEl.querySelectorAll('.card')].indexOf(el);
+  if(idx<0) return;
+  cast(key, desiredStart);
+  state.discard.push(key); state.hand.splice(idx,1); el.remove(); syncGhosts();
+}
+
+// ---- drag-to-aim placement ----
+function previewFor(clientX){
+  if(!drag) return;
+  const rect=board.getBoundingClientRect(); const x=clientX-rect.left;
+  const c=CARDS[drag.key], dur=c.kind==='block'?c.span:c.windup;
+  const desired=Math.round((x-NOW_X)/PXT + state.playTick);
+  const s=freeStart(c.kind, desired, dur);
+  previewEl.className='preview '+(c.kind==='block'?'block':'attack');
+  previewEl.style.display='flex'; previewEl.style.width=(dur*PXT)+'px';
+  previewEl.style.transform=`translateX(${NOW_X+(s-state.playTick)*PXT}px)`;
+  previewEl.textContent=c.label;
+}
+window.addEventListener('mousemove',e=>{
+  if(!drag) return;
+  drag.lastX=e.clientX;
+  if(!drag.started && Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6) drag.started=true;
+  if(drag.started) previewFor(e.clientX);
+});
+window.addEventListener('mouseup',e=>{
+  if(!drag) return;
+  const d=drag; drag=null; previewEl.style.display='none';
+  document.querySelectorAll('.card.dragging').forEach(c=>c.classList.remove('dragging'));
+  if(state.over) return;
+  let idx=state.hand.indexOf(d.key); if(idx<0) return;
+  if(!d.started){ cast(d.key); state.discard.push(d.key); state.hand.splice(idx,1); renderHand(); return; }
+  const rect=board.getBoundingClientRect();
+  if(e.clientY>=rect.top-10 && e.clientY<=rect.bottom+50 && e.clientX>=rect.left && e.clientX<=rect.right){
+    const x=e.clientX-rect.left;
+    const desired=Math.round((x-NOW_X)/PXT + state.playTick);
+    cast(d.key, desired); state.discard.push(d.key); state.hand.splice(idx,1); renderHand();
+  }
+});
+
+function scheduleEnemy(){
+  while(state.nextEnemyScheduled < state.playTick+34){
+    const t=state.nextEnemyScheduled, dmg=8+Math.floor(Math.random()*9);
+    const e={type:'enemyhit',start:t,end:t+2,resolve:t+2,dmg,resolved:false,el:makeEnt('enemyhit')};
+    e.el.innerHTML='⚔'+dmg+'<span class="tip"></span>';
+    state.ents.push(e);
+    state.nextEnemyScheduled += 7+Math.floor(Math.random()*7);
+  }
+}
+function scheduleCrit(){
+  while(state.nextCritScheduled < state.playTick+34){
+    const t=state.nextCritScheduled;
+    const el=document.createElement('div'); el.className='critmark'; el.innerHTML='✦<span>×2</span>'; board.appendChild(el);
+    state.crits.push({tick:t, el, used:false});
+    state.nextCritScheduled += critGap();
+  }
+}
+function blockActiveAt(tick){ return state.ents.some(e=>e.type==='block'&&tick>=e.start&&tick<=e.end); }
+function flash(x,y,txt,color){ const f=document.createElement('div'); f.className='flash'; f.textContent=txt; f.style.color=color; f.style.left=x+'px'; f.style.top=y+'px'; board.appendChild(f); setTimeout(()=>f.remove(),560); }
+
+function resolveCrossings(){
+  const a=state.prevTick,b=state.playTick;
+  state.ents.forEach(e=>{
+    if(e.resolved||e.resolve==null) return;
+    if(e.resolve>a && e.resolve<=b){
+      if(e.type==='enemyhit'){
+        e.resolved=true; e.el.classList.add('resolved');
+        if(blockActiveAt(e.resolve)){ flash(NOW_X,34,'BLOCK','var(--green)'); }
+        else {
+          state.playerHP=Math.max(0,state.playerHP-e.dmg); flash(NOW_X,34,'-'+e.dmg,'var(--coral)');
+          state.ents.forEach(ch=>{ if(ch.type==='channel'&&!ch.resolved&&e.resolve>=ch.start&&e.resolve<ch.end){ ch.resolved=true; ch.cancelled=true; ch.el.classList.add('cancelled'); flash(NOW_X,98,'interrupted!','var(--blue)'); } });
+        }
+      } else {
+        if(!e.cancelled){
+          e.resolved=true; e.el.classList.add('resolved');
+          let dmg=e.dmg;
+          const crit=state.crits.find(cc=>!cc.used && Math.round(cc.tick)===Math.round(e.resolve));
+          if(crit){ dmg*=2; crit.used=true; crit.el.classList.add('used'); flash(NOW_X,62,'CRIT ×2','var(--gold)'); }
+          state.enemyHP=Math.max(0,state.enemyHP-dmg);
+          flash(NOW_X,98,'-'+dmg,e.type==='channel'?'var(--blue)':'var(--ink)');
+        }
+      }
+    }
+  });
+}
+function cull(){
+  state.ents=state.ents.filter(e=>{ const x=NOW_X+(e.end-state.playTick)*PXT; if(x<-50){ e.el.remove(); return false; } return true; });
+  state.crits=state.crits.filter(c=>{ const x=NOW_X+(c.tick-state.playTick)*PXT; if(x<-30){ c.el.remove(); return false; } return true; });
+}
+function render(){
+  state.ents.forEach(e=>{ const x=NOW_X+(e.start-state.playTick)*PXT, w=Math.max((e.end-e.start)*PXT,30); e.el.style.width=w+'px'; e.el.style.transform=`translateX(${x}px)`; });
+  state.crits.forEach(c=>{ c.el.style.transform=`translateX(${NOW_X+(c.tick-state.playTick)*PXT - PXT/2}px)`; });
+  if(drag && drag.started && drag.lastX!=null) previewFor(drag.lastX);
+}
+function updateBars(){
+  document.getElementById('ebar').style.width=(state.enemyHP/state.enemyMax*100)+'%';
+  document.getElementById('pbar').style.width=(state.playerHP/state.playerMax*100)+'%';
+  document.getElementById('ehp').textContent=state.enemyHP+' / '+state.enemyMax;
+  document.getElementById('php').textContent=state.playerHP+' / '+state.playerMax;
+  document.getElementById('reflexmeter').style.width=state.reflex+'%';
+  document.getElementById('drawfill').style.width=Math.min(100,state.drawAcc/state.drawInterval*100)+'%';
+}
+function endIf(){ if(state.over)return; if(state.enemyHP<=0)over('win','You wove it down. Loot drops.'); else if(state.playerHP<=0)over('lose','The present caught you.'); }
+function over(kind,sub){ state.over=true; banner.className='banner '+kind; document.getElementById('bannertxt').textContent=kind==='win'?'VICTORY':'DOWNED'; document.getElementById('bannersub').textContent=sub; }
+
+function currentRate(dt){
+  let r=state.baseRate;
+  if(state.flow==='step'){ if(state.stepRemaining>0){ const adv=Math.min(state.stepRemaining,r*1.6*dt); state.stepRemaining-=adv; r=adv/dt; } else r=0; }
+  else if(state.flow==='beat'){ if(state.beatPause>0){ state.beatPause-=dt; r=0; nowzone.style.background='rgba(198,154,69,.14)'; }
+    else { nowzone.style.background='rgba(0,0,0,.05)'; state.beatRun+=r*dt; if(state.beatRun>=7){ state.beatPause=1.0; state.beatRun=0; } } }
+  if(state.slow&&state.reflex>0) r*=0.34;
+  return r;
+}
+function loop(ts){
+  if(state.last==null) state.last=ts;
+  let dt=(ts-state.last)/1000; state.last=ts; if(dt>0.05)dt=0.05;
+  if(!state.over){
+    if(state.slow&&state.reflex>0){ state.reflex=Math.max(0,state.reflex-Math.max(8,28-state.agi)*dt); if(state.reflex===0)setReflex(false); }
+    else if(!state.slow&&state.reflex<100){ state.reflex=Math.min(100,state.reflex+11*dt); }
+    const r=currentRate(dt);
+    state.prevTick=state.playTick; state.playTick+=r*dt;
+    state.drawAcc+=dt; if(state.drawAcc>=state.drawInterval){ state.drawAcc=0; drawOne(); }
+    scheduleEnemy(); scheduleCrit(); resolveCrossings(); cull(); updateBars(); endIf();
+  }
+  render(); requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+const flowseg=document.getElementById('flowseg');
+flowseg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; state.flow=b.dataset.flow;
+  [...flowseg.children].forEach(c=>c.classList.toggle('on',c===b));
+  document.querySelector('.stage').classList.toggle('mode-step',state.flow==='step');
+  state.beatRun=0; state.beatPause=0; state.stepRemaining=0; nowzone.style.background='rgba(0,0,0,.05)'; });
+document.getElementById('stepbtn').addEventListener('click',()=>{ if(!state.over)state.stepRemaining=6; });
+
+const reflexbtn=document.getElementById('reflexbtn');
+function setReflex(on){ state.slow=on&&state.reflex>0; reflexbtn.classList.toggle('on',state.slow); }
+reflexbtn.addEventListener('mousedown',()=>setReflex(true));
+window.addEventListener('mouseup',()=>setReflex(false));
+
+const dexEl=document.getElementById('dex'), luckEl=document.getElementById('luck'), agiEl=document.getElementById('agi');
+function syncBuild(){ state.dex=+dexEl.value; state.luck=+luckEl.value; state.agi=+agiEl.value;
+  state.drawInterval=drawIntervalFor();
+  document.getElementById('dexv').textContent=state.dex;
+  document.getElementById('luckv').textContent=state.luck;
+  document.getElementById('agiv').textContent=state.agi;
+  document.getElementById('drawv').textContent=state.drawInterval.toFixed(2);
+  document.getElementById('capv').textContent=handCap();
+  document.getElementById('critv').textContent=critGap();
+  syncGhosts();
+}
+dexEl.addEventListener('input',syncBuild); luckEl.addEventListener('input',syncBuild); agiEl.addEventListener('input',syncBuild);
+
+document.getElementById('resetbtn').addEventListener('click',()=>{
+  state.ents.forEach(e=>e.el.remove()); state.crits.forEach(c=>c.el.remove());
+  const flow=state.flow; state=fresh(); state.flow=flow; syncBuild();
+  banner.className='banner hidden'; document.querySelector('.stage').classList.toggle('mode-step',flow==='step'); renderHand(); updateBars(); });
+
+syncBuild(); renderHand(); updateBars();
+</script>
+</body>
+</html>

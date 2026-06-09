@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Game Screen · Nav Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="game-shared.jsx"></script>
+<script type="text/babel" src="nav-topbar.jsx"></script>
+<script type="text/babel" src="nav-grouped.jsx"></script>
+<script type="text/babel" src="nav-sidebar.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  return (
+    <DesignCanvas
+      title="Game Screen · Nav Directions"
+      subtitle="Three takes on the in-game nav, each carrying the login/loading aesthetic. The Fight screen renders below for context — click other items to see the placeholder treatment for unbuilt screens. Items tagged 'wip' are not yet implemented.">
+
+      <DCSection id="modern" title="Modernized" subtitle="Pick a direction — click nav items in any artboard to switch screens.">
+        <DCArtboard id="topbar" label="A · Minimal Top Bar" width={1180} height={700}>
+          <NavTopbar />
+        </DCArtboard>
+        <DCArtboard id="grouped" label="B · Grouped Top Bar" width={1180} height={700}>
+          <NavGrouped />
+        </DCArtboard>
+        <DCArtboard id="sidebar" label="C · Sidebar Rail" width={1180} height={700}>
+          <NavSidebar />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="current" title="Current" subtitle="Existing in-game nav, for compare">
+        <DCArtboard id="now" label="Now · Svelte source" width={1180} height={700}>
+          <CurrentGame />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+/* Faithful re-render of the current navbar + a rough Fight content area. */
+function CurrentGame() {
+  const items = ['Fight', 'Inventory', 'Attributes', 'Challenges', 'Stats', 'Help', 'Options', 'Card Game', 'Quit', 'Admin'];
+  const [active, setActive] = React.useState('Fight');
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(0deg, #000 0%, #3c3c3c 100%)',
+      display: 'flex', flexDirection: 'column',
+      fontFamily: 'Arial, Helvetica, sans-serif',
+    }}>
+      <div style={{
+        background: '#56587a',
+        display: 'flex', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex' }}>
+          {items.map((it) => (
+            <CurrentNavItem key={it} text={it} active={active === it} onClick={() => setActive(it)} />
+          ))}
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px',
+          color: '#f0f0f0',
+          textShadow: '0 0 0.25rem #000', fontSize: '1.5rem',
+        }}>
+          <span>60</span>
+          <span>60</span>
+        </div>
+      </div>
+
+      {/* rough current Fight screen content (off-white cards) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 24 }}>
+        <div style={{
+          alignSelf: 'center',
+          background: '#f0f0f0', color: '#111',
+          border: '1px solid #000', borderRadius: 5,
+          padding: '6px 14px',
+          marginBottom: 24,
+          display: 'flex', gap: 14, alignItems: 'center',
+        }}>
+          <button style={{ background: 'white', border: '1px solid #000', borderRadius: 5, padding: '2px 6px', cursor: 'pointer' }}>&lt;</button>
+          <span><strong>Zone 3:</strong> Forgotten Catacombs</span>
+          <button style={{ background: 'white', border: '1px solid #000', borderRadius: 5, padding: '2px 6px', cursor: 'pointer' }}>&gt;</button>
+        </div>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start' }}>
+          <CurrentBattler name="Aelara" lvl={12} hp={228} max={300} />
+          <CurrentBattler name="Skeleton Mage" lvl={11} hp={92} max={220} />
+        </div>
+      </div>
+
+      <div style={{
+        background: '#f0f0f0', color: '#111',
+        margin: '0 5% 16px',
+        border: '1px solid #000', borderRadius: 5,
+        boxShadow: '0 0 0.25rem #000',
+        height: 110, overflow: 'auto', padding: 4,
+        fontSize: 12,
+      }}>
+        <div style={{ padding: 2, borderBottom: '1px solid #000' }}>Aelara casts Cleave on Skeleton Mage — 38 damage.</div>
+        <div style={{ padding: 2, borderBottom: '1px solid #000' }}>Skeleton Mage casts Hex on Aelara — 12 damage.</div>
+        <div style={{ padding: 2, borderBottom: '1px solid #000' }}>Aelara picked up: Sapphire Shard ×1.</div>
+        <div style={{ padding: 2, borderBottom: '1px solid #000' }}>Surge is ready.</div>
+        <div style={{ padding: 2, borderBottom: '1px solid #000' }}>Aelara casts Cleave on Skeleton Mage — 41 damage.</div>
+      </div>
+    </div>
+  );
+}
+
+function CurrentNavItem({ text, active, onClick }) {
+  const [hover, setHover] = React.useState(false);
+  const bg = active ? '#323347' : hover ? '#7b7eb0' : 'transparent';
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: bg, border: 'none', cursor: 'pointer',
+        color: '#f0f0f0', textShadow: '0 0 0.25rem #000',
+        fontSize: '1.5em', padding: '0.1rem 0.75rem',
+        fontFamily: 'inherit',
+      }}>{text}</button>
+  );
+}
+
+function CurrentBattler({ name, lvl, hp, max }) {
+  const pct = (hp / max) * 100;
+  return (
+    <div style={{
+      width: '30vw', maxWidth: 360,
+      background: '#f0f0f0', color: '#111',
+      border: '1px solid #000', borderRadius: 5,
+      padding: 12, fontSize: 18,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, marginBottom: 10 }}>
+        <span>{name}</span><span>Level: {lvl}</span>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <span>Health: </span>
+        <div style={{
+          position: 'relative', height: 28,
+          background: 'red', border: '1px solid #000', borderRadius: 5,
+          padding: 4, overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, height: '100%', width: `${pct}%`,
+            background: 'green',
+          }} />
+          <span style={{ position: 'relative', color: '#fff' }}>{hp}/{max}</span>
+        </div>
+      </div>
+      <div style={{
+        background: 'white', border: '1px solid #000', borderRadius: 5,
+        display: 'flex', height: 60,
+      }}>
+        {[0,1,2,3].map((i) => (
+          <div key={i} style={{ flex: 1, borderRight: i < 3 ? '1px solid #000' : 'none' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

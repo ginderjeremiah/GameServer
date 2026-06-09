@@ -1,5 +1,5 @@
 export { default as Fight } from './fight/Fight.svelte';
-export { default as CardGame } from './cardGame/CardGame.svelte';
+export { default as CardGame } from './card-game/CardGame.svelte';
 export { default as Attributes } from './attributes/Attributes.svelte';
 export { default as Challenges } from './challenges/Challenges.svelte';
 export { default as Inventory } from './inventory/Inventory.svelte';

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Challenge Screen · Type Rail</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0a; font-family: Geist, Arial, Helvetica, sans-serif; overflow: hidden; }
+  * { box-sizing: border-box; }
+
+  /* Motion — gated so print / reduced-motion / PDF show the calm end state. */
+  @media (prefers-reduced-motion: no-preference) {
+    /* sealed reward icon: a slow breathing rarity glow */
+    .chal-seal { animation: chalPulse 2.8s ease-in-out infinite; }
+    @keyframes chalPulse {
+      0%, 100% { box-shadow: 0 0 3px var(--rcol); }
+      50%      { box-shadow: 0 0 11px var(--rcol); }
+    }
+    /* a light sweep crossing the sealed tile — "waiting to be opened" */
+    .chal-sweep {
+      position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.16) 50%, transparent 62%);
+      transform: translateX(-130%);
+      animation: chalSweep 3.4s ease-in-out infinite;
+    }
+    @keyframes chalSweep {
+      0%   { transform: translateX(-130%); }
+      55%  { transform: translateX(130%); }
+      100% { transform: translateX(130%); }
+    }
+    /* hero underline shimmer */
+    .chal-rail-line { animation: chalLine 3.6s ease-in-out infinite; }
+    @keyframes chalLine { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+    /* next-up pulse dot */
+    .chal-dot { animation: chalDot 1.8s ease-in-out infinite; }
+    @keyframes chalDot {
+      0%,100% { box-shadow: 0 0 0 0 var(--acc); opacity: 1; }
+      70%     { box-shadow: 0 0 0 5px transparent; opacity: 0.7; }
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tooltip-shared.jsx"></script>
+<script type="text/babel" src="tooltip-final.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="inv-data.jsx"></script>
+<script type="text/babel" src="inv-shared.jsx"></script>
+<script type="text/babel" src="chal2-data.jsx"></script>
+<script type="text/babel" src="chal2-shared.jsx?v=3"></script>
+<script type="text/babel" src="chal3-shared.jsx?v=4"></script>
+<script type="text/babel" src="chal3-rail.jsx?v=3"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "mystery": "rarity",
+  "glow": true,
+  "density": "compact"
+}/*EDITMODE-END*/;
+
+const FRAME_W = 1360, FRAME_H = 900;
+
+function Stage({ children }) {
+  const [scale, setScale] = React.useState(1);
+  React.useEffect(() => {
+    const fit = () => setScale(Math.min(window.innerWidth / FRAME_W, window.innerHeight / FRAME_H));
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: FRAME_W, height: FRAME_H, flexShrink: 0, transform: `scale(${scale})`, transformOrigin: 'center', boxShadow: '0 24px 70px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const tweaks = { mystery: t.mystery, glow: t.glow, density: t.density };
+  return (
+    <>
+      <Stage>
+        <ChallengeRail3 tweaks={tweaks} />
+      </Stage>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Sealed rewards" />
+        <TweakRadio label="Teaser detail" value={t.mystery}
+          options={[{ value: 'category', label: 'Rarity + type' }, { value: 'rarity', label: 'Rarity only' }, { value: 'sealed', label: 'Fully sealed' }]}
+          onChange={(v) => setTweak('mystery', v)} />
+        <TweakToggle label="Rarity glow" value={t.glow} onChange={(v) => setTweak('glow', v)} />
+        <TweakSection label="Layout" />
+        <TweakRadio label="Detail density" value={t.density}
+          options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]}
+          onChange={(v) => setTweak('density', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

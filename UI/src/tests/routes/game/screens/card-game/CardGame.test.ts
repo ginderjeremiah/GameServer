@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import CardGame from '../../../../../routes/game/screens/cardGame/CardGame.svelte';
+import CardGame from '../../../../../routes/game/screens/card-game/CardGame.svelte';
 
 // jsdom lacks ResizeObserver, which Svelte 5 uses to back the board's
 // `bind:clientWidth`. Stub it so the component can mount under test (the real

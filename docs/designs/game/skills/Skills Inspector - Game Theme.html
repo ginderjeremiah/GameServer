@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skills — Inspector (game theme)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --white:#fff; --black:#000;
+    --surface:#14151b; --surface-2:#181921; --backdrop:#0c0d12;
+    --text-primary:#f0f0f0; --text-secondary:rgba(240,240,240,.78); --text-tertiary:rgba(240,240,240,.55); --text-muted:rgba(240,240,240,.4);
+    --text-on-accent:#111;
+    --accent:#a1c2f7; --accent-light:#c0d8ff;
+    --border-subtle:rgba(255,255,255,.08); --border-light:rgba(255,255,255,.14); --border-medium:rgba(255,255,255,.18);
+    --enemy-accent:#e08778; --success:#bde0b4; --warning:#f0d28a; --error:#f0a094;
+    --attr-strength:#e8b6a6; --attr-endurance:#bde0b4; --attr-intellect:#c4b6ec; --attr-agility:#a1c2f7; --attr-dexterity:#f0d28a; --attr-luck:#8fded0;
+    --sans:'Geist', system-ui, -apple-system, Arial, sans-serif;
+    --mono:'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--backdrop); color:var(--text-primary); font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  /* mock toolbar (scaffolding, not part of the game screen) */
+  .toolbar{ height:50px; display:flex; align-items:center; gap:16px; padding:0 20px; border-bottom:1px solid var(--border-subtle); background:#0a0b0f; position:relative; z-index:5; }
+  .tb-title{ font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); }
+  .spacer{ flex:1; }
+  .tw{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); }
+  .seg{ display:flex; border:1px solid var(--border-light); border-radius:4px; overflow:hidden; }
+  .seg button{ font-family:var(--mono); font-size:11px; border:none; background:transparent; padding:4px 10px; cursor:pointer; color:var(--text-tertiary); border-right:1px solid var(--border-light); }
+  .seg button:last-child{ border-right:none; }
+  .seg button.on{ background:var(--accent); color:var(--text-on-accent); }
+
+  #stage{ position:absolute; inset:50px 0 0 0; overflow:hidden; }
+  #scaler{ position:absolute; top:18px; left:50%; transform-origin:top center; }
+  .frame{
+    width:1180px; min-height:812px;
+    background:
+      radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%),
+      var(--surface);
+    border:1px solid var(--border-subtle); border-radius:6px;
+    padding:22px 26px 26px; position:relative;
+    box-shadow:0 24px 80px rgba(0,0,0,.5);
+  }
+
+  /* chrome */
+  .head{ display:flex; align-items:center; gap:13px; }
+  .diamond{ width:11px; height:11px; transform:rotate(45deg); background:var(--accent); box-shadow:0 0 8px color-mix(in srgb, var(--accent) 60%, transparent); flex-shrink:0; }
+  .scr-title{ font-size:21px; font-weight:500; letter-spacing:-0.3px; line-height:1; }
+  .eyebrow{ font-family:var(--mono); font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; color:var(--text-muted); }
+  .scr-sub{ font-size:13.5px; color:var(--text-tertiary); margin-top:3px; }
+  .label{ font-family:var(--mono); font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; color:var(--text-muted); }
+
+  .head-totals{ display:flex; gap:24px; align-items:center; padding:8px 16px; background:color-mix(in srgb, var(--white) 4%, transparent); border:1px solid var(--border-subtle); border-radius:4px; }
+  .stat{ display:flex; flex-direction:column; gap:2px; }
+  .stat .v{ font-weight:500; line-height:1; font-size:17px; }
+  .stat .v.accent{ color:var(--accent); }
+  .stat .k{ font-family:var(--mono); font-size:8px; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted); }
+
+  /* compare-vs bar */
+  .versus{ display:flex; align-items:center; gap:16px; margin-top:14px; padding:10px 14px; border:1px solid color-mix(in srgb, var(--enemy-accent) 26%, transparent); border-radius:4px; background:color-mix(in srgb, var(--enemy-accent) 6%, transparent); }
+  .vs-eyebrow{ font-family:var(--mono); font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:color-mix(in srgb, var(--enemy-accent) 80%, var(--text-primary)); flex-shrink:0; }
+  .enemy-pills{ display:flex; gap:7px; flex-wrap:wrap; }
+  .epill{ display:flex; flex-direction:column; align-items:flex-start; gap:1px; padding:5px 11px; border:1px solid var(--border-light); border-radius:3px; background:transparent; cursor:pointer; color:var(--text-secondary); font-family:var(--sans); }
+  .epill .en{ font-size:12px; }
+  .epill .ed{ font-family:var(--mono); font-size:8px; letter-spacing:.5px; color:var(--text-muted); }
+  .epill.on{ border-color:var(--enemy-accent); background:color-mix(in srgb, var(--enemy-accent) 16%, transparent); color:var(--text-primary); }
+  .epill.on .ed{ color:color-mix(in srgb, var(--enemy-accent) 85%, var(--text-primary)); }
+  .vs-slider{ display:flex; align-items:center; gap:10px; margin-left:auto; flex-shrink:0; }
+  .vs-defval{ font-family:var(--mono); font-size:11px; color:var(--text-tertiary); min-width:54px; }
+  .vs-defval b{ color:var(--enemy-accent); font-size:14px; font-weight:600; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:150px; height:4px; border-radius:3px; background:color-mix(in srgb, var(--white) 12%, transparent); outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%; background:var(--enemy-accent); cursor:pointer; box-shadow:0 0 8px color-mix(in srgb, var(--enemy-accent) 50%, transparent); }
+  input[type=range]::-moz-range-thumb{ width:14px; height:14px; border:none; border-radius:50%; background:var(--enemy-accent); cursor:pointer; }
+
+  /* columns */
+  .cols{ display:grid; grid-template-columns:288px 1fr; gap:16px; margin-top:14px; height:420px; }
+  .panel{ background:color-mix(in srgb, var(--white) 2.5%, transparent); border:1px solid var(--border-subtle); border-radius:4px; }
+
+  /* rail */
+  .rail{ display:flex; flex-direction:column; overflow:hidden; }
+  .rail-top{ padding:10px 10px 9px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--border-subtle); }
+  .searchrow{ display:flex; gap:7px; }
+  .search{ flex:1; display:flex; align-items:center; gap:7px; padding:7px 10px; font-family:var(--mono); font-size:10.5px; color:var(--text-muted); border:1px solid var(--border-light); border-radius:3px; }
+  .filt-btn{ display:flex; align-items:center; gap:6px; padding:7px 10px; font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; border:1px solid var(--border-light); border-radius:3px; background:transparent; color:var(--text-secondary); }
+  .filt-btn .badge{ background:var(--accent); color:var(--text-on-accent); border-radius:8px; font-size:8.5px; padding:0 5px; line-height:14px; }
+  .rail-meta{ display:flex; align-items:center; justify-content:space-between; }
+  .rail-list{ flex:1; padding:5px 7px 8px; overflow-y:auto; }
+  .grp{ font-family:var(--mono); font-size:8.5px; letter-spacing:1.4px; text-transform:uppercase; color:var(--text-muted); padding:9px 5px 5px; display:flex; justify-content:space-between; }
+  .row{ display:flex; align-items:center; gap:9px; padding:7px 7px; border-radius:3px; cursor:pointer; border:1px solid transparent; }
+  .row:hover{ background:color-mix(in srgb, var(--white) 4%, transparent); }
+  .row.sel{ background:color-mix(in srgb, var(--accent) 12%, transparent); border-color:color-mix(in srgb, var(--accent) 40%, transparent); }
+  .row.lock{ opacity:.5; }
+  .rowname{ font-size:13.5px; line-height:1.1; }
+  .rowmeta{ font-family:var(--mono); font-size:9px; color:var(--text-muted); margin-top:2px; }
+  .slotbadge{ font-family:var(--mono); font-size:9px; color:var(--text-on-accent); background:var(--accent); border-radius:3px; width:17px; height:17px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  /* skill icon tile */
+  .ico{ position:relative; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--white) 4%, transparent); border:1px solid var(--border-light); border-radius:3px; overflow:hidden; flex-shrink:0; }
+  .ico::before{ content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--ic, var(--accent)) 34%, transparent), transparent 72%); }
+  .ico .gl{ position:relative; font-family:var(--mono); font-weight:500; color:var(--text-secondary); }
+  .ico.locked .gl{ color:var(--text-muted); }
+
+  /* detail */
+  .detail{ padding:18px 22px; display:flex; flex-direction:column; }
+  .d-top{ display:flex; gap:15px; align-items:flex-start; }
+  .d-ico{ width:78px; height:78px; position:relative; }
+  .d-ico .gl{ font-size:20px; }
+  .d-ico .slotbadge{ position:absolute; top:-6px; left:-6px; }
+  .d-name{ font-size:25px; font-weight:500; letter-spacing:-0.4px; line-height:1.05; margin-top:2px; }
+  .d-cta{ margin-left:auto; display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0; }
+  .d-hint{ font-family:var(--mono); font-size:8.5px; letter-spacing:.4px; color:var(--text-muted); max-width:160px; text-align:right; line-height:1.5; }
+  .btn{ font-family:var(--sans); font-size:13px; font-weight:500; padding:8px 16px; cursor:pointer; background:var(--accent); color:var(--text-on-accent); border:1px solid var(--accent); border-radius:3px; white-space:nowrap; }
+  .btn.ghost{ background:transparent; color:var(--text-primary); border-color:var(--border-medium); }
+  .btn.danger{ background:color-mix(in srgb, var(--enemy-accent) 16%, transparent); color:var(--enemy-accent); border-color:color-mix(in srgb, var(--enemy-accent) 55%, transparent); }
+  .btn.dim{ background:transparent; color:var(--text-muted); border-color:var(--border-light); cursor:not-allowed; }
+
+  .bignums{ display:flex; gap:30px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-subtle); }
+  .bignums .v{ font-size:25px; }
+  .rawnote{ font-family:var(--mono); font-size:9.5px; color:var(--text-muted); margin-top:8px; letter-spacing:.3px; }
+  .rawnote .blocked{ color:var(--enemy-accent); }
+
+  .d-sec{ margin-top:16px; }
+  .scale{ display:flex; align-items:center; gap:11px; margin-top:8px; }
+  .achip{ font-family:var(--mono); font-size:10px; letter-spacing:.5px; padding:2px 8px; border-radius:3px; color:var(--ac, var(--accent)); border:1px solid color-mix(in srgb, var(--ac, var(--accent)) 38%, transparent); background:color-mix(in srgb, var(--ac, var(--accent)) 12%, transparent); white-space:nowrap; }
+  .scale .achip{ width:46px; text-align:center; }
+  .bar{ height:6px; flex:1; background:color-mix(in srgb, var(--white) 7%, transparent); border-radius:4px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:var(--ac, var(--accent)); border-radius:4px; }
+  .scale .contrib{ font-family:var(--mono); font-size:9.5px; color:var(--text-tertiary); white-space:nowrap; min-width:128px; }
+  .brk-line{ display:flex; justify-content:space-between; align-items:baseline; font-size:12px; padding:7px 0 0; }
+  .brk-line .brk-k{ color:var(--text-secondary); } .brk-line .brk-v{ font-family:var(--mono); font-size:11.5px; }
+  .brk-line.def .brk-k{ color:var(--enemy-accent); } .brk-line.def .brk-v{ color:var(--error); }
+  .brk-line.total{ margin-top:6px; padding-top:8px; border-top:1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); font-weight:600; }
+  .brk-line.total .brk-v{ color:var(--accent); font-size:13px; }
+
+  .d-foot{ margin-top:auto; padding-top:13px; display:flex; gap:30px; border-top:1px solid var(--border-subtle); }
+  .foot-item .fl{ font-family:var(--mono); font-size:8px; letter-spacing:1.4px; text-transform:uppercase; color:var(--text-muted); }
+  .foot-item .fv{ font-size:13px; color:var(--text-secondary); margin-top:3px; }
+
+  /* equipped band */
+  .band-head{ display:flex; align-items:center; gap:12px; margin:16px 0 9px; }
+  .band-chip{ font-family:var(--mono); font-size:9px; letter-spacing:1px; padding:2px 9px; border:1px solid var(--border-light); border-radius:20px; color:var(--text-tertiary); cursor:default; }
+  .band{ display:grid; grid-template-columns:repeat(var(--cap),1fr); gap:11px; }
+  .eqcard{ position:relative; background:color-mix(in srgb, var(--white) 3.5%, transparent); border:1px solid var(--border-light); border-radius:4px; padding:10px 11px; min-height:104px; display:flex; flex-direction:column; gap:7px; }
+  .eqcard .num{ position:absolute; top:7px; left:9px; font-family:var(--mono); font-size:9px; color:var(--text-muted); }
+  .eqcard .rm{ position:absolute; top:5px; right:6px; width:16px; height:16px; border-radius:2px; background:color-mix(in srgb, var(--black) 45%, transparent); color:var(--text-tertiary); font-size:11px; line-height:16px; text-align:center; cursor:pointer; }
+  .eqcard .en{ font-size:13.5px; font-weight:500; margin-top:9px; line-height:1.1; cursor:pointer; }
+  .eqcard .es{ display:flex; gap:13px; margin-top:auto; }
+  .eqcard .es .v{ font-size:15px; }
+  .eqcard .es .v.accent{ color:var(--accent); }
+  .eqcard .chips{ display:flex; gap:5px; }
+  .eqcard[draggable="true"]{ cursor:grab; }
+  .eqcard.dragging{ opacity:.4; }
+  .eqcard.dragover{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .eqcard.swap-target{ cursor:pointer; border-color:color-mix(in srgb, var(--enemy-accent) 55%, transparent); background:color-mix(in srgb, var(--enemy-accent) 10%, transparent); }
+  .eqcard.swap-target:hover{ box-shadow:0 0 0 1px var(--enemy-accent); }
+  .eqcard .rep{ position:absolute; top:7px; right:9px; font-family:var(--mono); font-size:8.5px; color:var(--enemy-accent); }
+  .eqcard.empty{ border-style:dashed; align-items:center; justify-content:center; color:var(--text-muted); cursor:pointer; gap:4px; }
+  .eqcard.empty .plus{ font-size:24px; font-weight:300; }
+  .eqcard.empty.dimmed{ opacity:.3; }
+
+  /* modal */
+  .modal-layer{ position:absolute; inset:0; z-index:40; display:none; }
+  .modal-layer.open{ display:block; }
+  .mbackdrop{ position:absolute; inset:0; background:color-mix(in srgb, var(--black) 55%, transparent); backdrop-filter:blur(3px); }
+  .modal{ position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:420px;
+    background:linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, var(--surface-2)), var(--surface-2));
+    border:1px solid var(--border-medium); border-radius:6px; padding:22px 24px 20px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 40px color-mix(in srgb, var(--accent) 10%, transparent); }
+  .modal h3{ font-size:19px; font-weight:500; letter-spacing:-0.3px; margin:2px 0 0; }
+  .modal .msub{ font-family:var(--mono); font-size:8.5px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); }
+  .mgroup{ margin-top:16px; }
+  .mgroup .gl{ font-family:var(--mono); font-size:9px; letter-spacing:1.4px; text-transform:uppercase; color:var(--text-muted); margin-bottom:9px; }
+  .opts{ display:flex; flex-wrap:wrap; gap:7px; }
+  .opt{ font-family:var(--sans); font-size:12.5px; padding:6px 13px; border:1px solid var(--border-light); border-radius:3px; cursor:pointer; background:transparent; color:var(--text-secondary); }
+  .opt.on{ background:var(--accent); color:var(--text-on-accent); border-color:var(--accent); }
+  .opt.attr.on{ background:color-mix(in srgb, var(--ac) 22%, transparent); color:var(--text-primary); border-color:var(--ac); }
+  .mrow{ display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border-subtle); }
+  .mrow .ml{ font-size:13.5px; white-space:nowrap; }
+  .switch{ width:40px; height:21px; border-radius:20px; border:1px solid var(--border-medium); background:transparent; position:relative; cursor:pointer; }
+  .switch::after{ content:''; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:var(--text-muted); transition:.12s; }
+  .switch.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 22%, transparent); }
+  .switch.on::after{ left:21px; background:var(--accent); }
+  .mfoot{ display:flex; justify-content:space-between; align-items:center; margin-top:20px; }
+  .mfoot .btn.dim{ cursor:pointer; color:var(--text-secondary); }
+
+  .legend{ position:absolute; right:26px; bottom:8px; font-family:var(--mono); font-size:8.5px; color:var(--text-muted); letter-spacing:.5px; }
+
+  .rail-list::-webkit-scrollbar{ width:7px; } .rail-list::-webkit-scrollbar-thumb{ background:color-mix(in srgb, var(--white) 14%, transparent); border-radius:7px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <span class="tb-title">Skills · game theme · mock</span>
+    <div class="spacer"></div>
+    <div class="tw">Loadout cap
+      <div class="seg" id="seg-cap"><button data-n="4">4</button><button data-n="5" class="on">5</button><button data-n="6">6</button></div>
+    </div>
+  </div>
+
+  <div id="stage"><div id="scaler"></div></div>
+
+<script>
+const PLAYER = { STR:45, END:30, INT:38, AGI:33, DEX:28, LUK:20 };
+const ATTRNAME = { STR:'Strength', END:'Endurance', INT:'Intellect', AGI:'Agility', DEX:'Dexterity', LUK:'Luck' };
+const ATTRVAR = { STR:'var(--attr-strength)', END:'var(--attr-endurance)', INT:'var(--attr-intellect)', AGI:'var(--attr-agility)', DEX:'var(--attr-dexterity)', LUK:'var(--attr-luck)' };
+
+const SKILLS = [
+  { id:1, name:'Ember Strike',  base:42, cd:1.2, scale:[['STR',0.8]], desc:'A searing overhead blow that ignites on impact.', source:'Starting skill' },
+  { id:2, name:'Frost Lance',   base:38, cd:1.6, scale:[['INT',0.7]], desc:'Conjures a spear of ice that pierces and chills.', source:'Reach level 5' },
+  { id:3, name:'Rend',          base:24, cd:0.8, scale:[['STR',0.5],['DEX',0.4]], desc:'A fast tearing slash — low damage, high tempo.', source:'Defeat 50 enemies' },
+  { id:4, name:'Venom Spit',    base:18, cd:1.0, scale:[['INT',0.6]], desc:'Coats the target in a stacking, lingering poison.', source:'Win 25 battles' },
+  { id:5, name:'Crushing Blow', base:70, cd:2.4, scale:[['STR',0.8]], desc:'Heavy, slow, devastating — your biggest single hit.', source:'Reach level 10' },
+  { id:6, name:'Quick Jab',     base:12, cd:0.5, scale:[['AGI',0.5]], desc:'A rapid, cheap poke that keeps pressure on.', source:'Starting skill' },
+  { id:7, name:'Arc Bolt',      base:30, cd:1.1, scale:[['INT',0.6]], desc:'A bolt of chained lightning that leaps to the foe.', source:'Clear the Tide Hollow' },
+  { id:8, name:'Bleed',         base:15, cd:1.0, scale:[['DEX',0.5]], desc:'Opens a wound that drains health over time.', source:'Defeat 100 enemies' },
+  { id:9, name:'Guard Break',   base:28, cd:1.4, scale:[['STR',0.6]], desc:'Shatters enemy defense, softening them up.', source:'Reach level 8' },
+  { id:10,name:'Riptide',       base:34, cd:1.5, scale:[['AGI',0.4],['INT',0.4]], desc:'A sweeping arc of water that drags foes in.', source:'Clear the Tide Hollow' },
+  { id:90,name:'Meteor',        base:120,cd:4.0, scale:[['INT',1.0]], desc:'Calls a burning rock from the sky. Huge, slow.', lock:'Clear the Ashen Vale' },
+  { id:91,name:'Soul Drain',    base:26, cd:1.8, scale:[['INT',0.7]], desc:'Siphons the enemy’s life into your own.', lock:'Defeat 250 enemies' },
+];
+// NOTE (future / not for this mock): the "Compare vs" enemies should be the
+// enemies that actually spawn in the zone the player is currently idling in,
+// plus that zone's dedicated boss — not this hardcoded sample list.
+const ENEMIES = [
+  { name:'Training Dummy', def:0 },
+  { name:'Marsh Crawler',  def:14 },
+  { name:'Iron Sentinel',  def:32 },
+  { name:'Ashen Golem',    def:55 },
+  { name:'Zone Boss',      def:80 },
+];
+
+const byId = id => SKILLS.find(s=>s.id===id);
+const initials = s => s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const primAttr = s => s.scale[0]?.[0] || 'STR';
+const contrib = s => s.scale.map(([a,m])=>({ a, m, val:Math.round(PLAYER[a]*m) }));
+const totalDmg = s => s.base + contrib(s).reduce((x,c)=>x+c.val,0);
+const dps = s => (totalDmg(s)/s.cd).toFixed(0);
+const MAX_DMG = Math.max(...SKILLS.map(totalDmg)); // slider ceiling: enough to fully block the biggest hit
+const ATTR_ORDER = ['STR','END','INT','AGI','DEX','LUK'];
+const USED_ATTRS = ATTR_ORDER.filter(a => SKILLS.some(s=>s.scale.some(([x])=>x===a)));
+
+/* enemy-defense comparison */
+const appliedDef = s => Math.min(state.def, totalDmg(s));
+const effective = s => Math.max(totalDmg(s)-state.def, 0);
+const effDps = s => (effective(s)/s.cd).toFixed(0);
+const combinedEffDps = () => state.equipped.reduce((x,id)=>x+ +effDps(byId(id)),0);
+const combinedEffBurst = () => state.equipped.reduce((x,id)=>x+ effective(byId(id)),0);
+const enemyLabel = () => state.enemyIdx>=0 ? ENEMIES[state.enemyIdx].name : 'Custom';
+const rawNote = s => {
+  if(state.def<=0) return `${totalDmg(s)} raw damage · target has no defense`;
+  if(effective(s)===0) return `${totalDmg(s)} raw − ${appliedDef(s)} def · fully blocked`;
+  return `${totalDmg(s)} raw − ${appliedDef(s)} def`;
+};
+
+const state = {
+  sel:5, equipped:[1,2,3,4,5], cap:5,
+  modal:false, sort:'dps', attrs:[], showLocked:false,
+  pendingSwap:null, dragIdx:null,
+  enemyIdx:2, def:32,
+};
+const SORTS = [['dps','DPS'],['dmg','Damage'],['cd','Cooldown'],['name','Name']];
+const isEq = id => state.equipped.includes(id);
+const slotOf = id => state.equipped.indexOf(id)+1;
+const activeFilters = () => state.attrs.length + (state.showLocked?1:0);
+
+function tile(s, size, cls){
+  return `<div class="ico ${cls||''} ${s.lock?'locked':''}" style="width:${size}px;height:${size}px;--ic:${ATTRVAR[primAttr(s)]}"><span class="gl">${s.lock?'🔒':initials(s)}</span></div>`;
+}
+
+function railRows(){
+  let list = SKILLS.filter(s=>{
+    if(!state.showLocked && s.lock) return false;
+    if(state.attrs.length && !s.scale.some(([a])=>state.attrs.includes(a))) return false;
+    return true;
+  });
+  const key=state.sort;
+  list.sort((a,b)=> key==='name'?a.name.localeCompare(b.name): key==='cd'?a.cd-b.cd: key==='dmg'?effective(b)-effective(a): (+effDps(b))-(+effDps(a)));
+  const eqList=list.filter(s=>isEq(s.id)).sort((a,b)=>slotOf(a.id)-slotOf(b.id));
+  const avList=list.filter(s=>!isEq(s.id));
+  const rowHtml=s=>`
+    <div class="row ${s.id===state.sel?'sel':''} ${s.lock?'lock':''}" data-pick="${s.id}">
+      ${tile(s,30)}
+      <div style="flex:1;min-width:0;">
+        <div class="rowname">${s.name}</div>
+        <div class="rowmeta" data-dyn="railmeta" data-sid="${s.id}">${effective(s)} dmg · ${s.cd}s · ${effDps(s)} dps</div>
+      </div>
+      ${isEq(s.id)?`<div class="slotbadge">${slotOf(s.id)}</div>`:''}
+    </div>`;
+  let html='';
+  if(eqList.length) html+=`<div class="grp"><span>◆ Equipped</span><span>${state.equipped.length}/${state.cap}</span></div>`+eqList.map(rowHtml).join('');
+  html+=`<div class="grp"><span>Available</span><span>${avList.length}</span></div>`+(avList.map(rowHtml).join('')||`<div class="rowmeta" style="padding:9px 6px;">none match the filter</div>`);
+  return html;
+}
+
+function detail(){
+  const s=byId(state.sel), eq=isEq(s.id), full=state.equipped.length>=state.cap, pending=state.pendingSwap===s.id;
+  let cta;
+  if(s.lock) cta=`<button class="btn dim" disabled>🔒 Locked</button><div class="d-hint">Unlock by completing<br><b style="color:var(--text-secondary);">${s.lock}</b></div>`;
+  else if(eq) cta=`<button class="btn danger" data-toggle="${s.id}">✓ In loadout · Remove</button><div class="d-hint">priority slot ${slotOf(s.id)} · drag below to reorder</div>`;
+  else if(pending) cta=`<button class="btn ghost" data-swapcancel="1">Cancel swap</button><div class="d-hint">pick an equipped card below to replace</div>`;
+  else if(full) cta=`<button class="btn ghost" data-toggle="${s.id}">Loadout full · Swap…</button><div class="d-hint">choose which slot to replace</div>`;
+  else cta=`<button class="btn" data-toggle="${s.id}">Equip ▸</button><div class="d-hint">${state.cap-state.equipped.length} slot(s) free</div>`;
+
+  const cs=contrib(s), maxC=Math.max(s.base,...cs.map(c=>c.val),1);
+  const scaleHtml=cs.map(c=>`
+    <div class="scale" style="--ac:${ATTRVAR[c.a]}">
+      <span class="achip">${c.a}</span>
+      <div class="bar"><i style="width:${Math.round(c.val/maxC*100)}%;"></i></div>
+      <span class="contrib">${ATTRNAME[c.a]} ×${c.m} = +${c.val}</span>
+    </div>`).join('');
+
+  return `
+    <div class="d-top">
+      <div style="position:relative;">
+        ${tile(s,78,'d-ico')}
+        ${eq?`<div class="slotbadge" style="position:absolute;top:-6px;left:-6px;">${slotOf(s.id)}</div>`:''}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="eyebrow">${s.scale.length?('Scales '+s.scale.map(([a])=>a).join(' · ')):'Active skill'}</div>
+        <div class="d-name">${s.name}</div>
+        <div class="scr-sub">${s.desc}</div>
+      </div>
+      <div class="d-cta">${cta}</div>
+    </div>
+
+    <div class="bignums">
+      <div class="stat"><span class="v accent" data-dyn="effdmg" data-sid="${s.id}">${effective(s)}</span><span class="k">effective dmg</span></div>
+      <div class="stat"><span class="v">${s.cd}s</span><span class="k">cooldown</span></div>
+      <div class="stat"><span class="v accent" data-dyn="effdps" data-sid="${s.id}">${effDps(s)}</span><span class="k">effective dps</span></div>
+      <div class="stat"><span class="v">${(10/s.cd).toFixed(1)}</span><span class="k">casts / 10s</span></div>
+    </div>
+    <div class="rawnote" data-dyn="rawnote" data-sid="${s.id}">${rawNote(s)}</div>
+
+    <div class="d-sec">
+      <div class="label">Damage breakdown · vs <span data-dyn="enemyname">${enemyLabel()}</span></div>
+      ${scaleHtml || '<div class="scr-sub">No attribute scaling.</div>'}
+      <div class="brk-line def"><span class="brk-k">Enemy defense</span><span class="brk-v" data-dyn="defline" data-sid="${s.id}">−${appliedDef(s)}</span></div>
+      <div class="brk-line total"><span class="brk-k">Effective hit</span><span class="brk-v" data-dyn="effhit" data-sid="${s.id}">${effective(s)}</span></div>
+    </div>
+
+    <div class="d-foot">
+      <div class="foot-item"><div class="fl">Scaling</div><div class="fv">${s.scale.length?s.scale.map(([a])=>a).join(' · '):'—'}</div></div>
+      <div class="foot-item"><div class="fl">Source</div><div class="fv">${s.lock?('🔒 '+s.lock):('✓ '+s.source)}</div></div>
+      <div class="foot-item"><div class="fl">Status</div><div class="fv">${eq?('Equipped · slot '+slotOf(s.id)):(s.lock?'Locked':'Available')}</div></div>
+    </div>`;
+}
+
+function band(){
+  const target=state.pendingSwap!=null, slots=[];
+  for(let i=0;i<state.cap;i++){
+    const id=state.equipped[i];
+    if(id!=null){
+      const s=byId(id);
+      slots.push(`<div class="eqcard ${target?'swap-target':''}" data-idx="${i}" draggable="${!target}">
+        <span class="num">${i+1}</span>${target?'<span class="rep">↪ replace</span>':`<span class="rm" data-toggle="${id}">✕</span>`}
+        <div class="en" data-pick="${id}">${s.name}</div>
+        <div class="es">
+          <div class="stat"><span class="v accent" data-dyn="effdmg" data-sid="${id}">${effective(s)}</span><span class="k">dmg</span></div>
+          <div class="stat"><span class="v">${s.cd}s</span><span class="k">cd</span></div>
+          <div class="stat"><span class="v accent" data-dyn="effdps" data-sid="${id}">${effDps(s)}</span><span class="k">dps</span></div>
+        </div>
+        <div class="chips">${s.scale.map(([a])=>`<span class="achip" style="--ac:${ATTRVAR[a]}">${a}</span>`).join('')}</div>
+      </div>`);
+    } else {
+      slots.push(`<div class="eqcard empty ${target?'dimmed':''}"><span class="plus">+</span><span class="label">add skill</span></div>`);
+    }
+  }
+  return slots.join('');
+}
+
+function modal(){
+  if(!state.modal) return '<div class="modal-layer"></div>';
+  const sortOpts=SORTS.map(([k,l])=>`<button class="opt ${state.sort===k?'on':''}" data-sort="${k}">${l}</button>`).join('');
+  const attrOpts=USED_ATTRS.map(a=>`<button class="opt attr ${state.attrs.includes(a)?'on':''}" style="--ac:${ATTRVAR[a]}" data-attr="${a}">${ATTRNAME[a]}</button>`).join('');
+  return `
+  <div class="modal-layer open">
+    <div class="mbackdrop" data-close="1"></div>
+    <div class="modal">
+      <div class="msub">Library</div>
+      <h3>Sort &amp; Filter</h3>
+      <div class="mgroup"><div class="gl">Sort by</div><div class="opts">${sortOpts}</div></div>
+      <div class="mgroup"><div class="gl">Filter by attribute</div><div class="opts">${attrOpts}</div></div>
+      <div class="mgroup"><div class="mrow"><span class="ml">Show locked skills</span><button class="switch ${state.showLocked?'on':''}" data-sw="showLocked"></button></div></div>
+      <div class="mfoot"><button class="btn dim" data-reset="1">Reset</button><button class="btn" data-close="1">Apply</button></div>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const nf=activeFilters();
+  const prevRail=document.querySelector('.rail-list');
+  const railScroll=prevRail?prevRail.scrollTop:0;
+  document.getElementById('scaler').innerHTML=`
+  <div class="frame" style="--cap:${state.cap};">
+    <div class="head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Equip the skills you fight with</div><div class="scr-title">Skills</div></div>
+      <div class="spacer" style="flex:1;"></div>
+      <div class="head-totals">
+        <div class="stat"><span class="v">${state.equipped.length}/${state.cap}</span><span class="k">equipped</span></div>
+        <div class="stat"><span class="v accent" data-dyn="cdps">${combinedEffDps()}</span><span class="k">eff. dps</span></div>
+        <div class="stat"><span class="v" data-dyn="burst">${combinedEffBurst()}</span><span class="k">eff. burst</span></div>
+      </div>
+    </div>
+
+    <div class="versus">
+      <span class="vs-eyebrow">Compare vs</span>
+      <div class="enemy-pills">${ENEMIES.map((en,i)=>`<button class="epill ${i===state.enemyIdx?'on':''}" data-enemy="${i}"><span class="en">${en.name}</span><span class="ed">DEF ${en.def}</span></button>`).join('')}</div>
+      <div class="vs-slider">
+        <span class="vs-eyebrow">Defense</span>
+        <input id="defSlider" type="range" min="0" max="${MAX_DMG}" value="${state.def}" />
+        <span class="vs-defval">DEF <b data-dyn="defval">${state.def}</b></span>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="rail panel">
+        <div class="rail-top">
+          <div class="searchrow">
+            <div class="search">⌕ search skills…</div>
+            <button class="filt-btn" id="open-filter">⇅ Sort·Filter ${nf?`<span class="badge">${nf}</span>`:''}</button>
+          </div>
+          <div class="rail-meta">
+            <span class="label">Sort: ${SORTS.find(x=>x[0]===state.sort)[1]}</span>
+            <span class="label">${state.attrs.length?('Attr: '+state.attrs.join(', ')):'All attributes'}${state.showLocked?' · +locked':''}</span>
+          </div>
+        </div>
+        <div class="rail-list">${railRows()}</div>
+      </div>
+      <div class="detail panel">${detail()}</div>
+    </div>
+
+    <div class="band-head">
+      ${state.pendingSwap!=null
+        ? `<span class="label" style="color:var(--enemy-accent);">Replacing with ${byId(state.pendingSwap).name} — click a slot to swap in</span><div style="flex:1;"></div><button class="band-chip" data-swapcancel="1" style="cursor:pointer;color:var(--text-primary);border-color:var(--border-medium);">Cancel</button>`
+        : `<span class="label">Equipped loadout — priority left → right · drag to reorder</span><div style="flex:1;"></div><span class="band-chip">${state.equipped.length}/${state.cap}</span>`}
+    </div>
+    <div class="band">${band()}</div>
+
+    <div class="legend">game theme · effective dmg/dps update with the Compare-vs enemy/defense</div>
+    ${modal()}
+  </div>`;
+  const newRail=document.querySelector('.rail-list');
+  if(newRail) newRail.scrollTop=railScroll;
+  fit();
+}
+
+/* live patch of all enemy-defense-dependent numbers (no full rebuild → slider stays smooth) */
+function updateDynamic(){
+  document.querySelectorAll('[data-dyn]').forEach(el=>{
+    const k=el.dataset.dyn, sid=el.dataset.sid?+el.dataset.sid:null, s=sid?byId(sid):null;
+    if(k==='defval') el.textContent=state.def;
+    else if(k==='enemyname') el.textContent=enemyLabel();
+    else if(k==='cdps') el.textContent=combinedEffDps();
+    else if(k==='burst') el.textContent=combinedEffBurst();
+    else if(k==='effdmg') el.textContent=effective(s);
+    else if(k==='effdps') el.textContent=effDps(s);
+    else if(k==='rawnote'){ el.textContent=rawNote(s); }
+    else if(k==='defline') el.textContent='−'+appliedDef(s);
+    else if(k==='effhit') el.textContent=effective(s);
+    else if(k==='railmeta') el.textContent=`${effective(s)} dmg · ${s.cd}s · ${effDps(s)} dps`;
+  });
+  document.querySelectorAll('[data-enemy]').forEach(p=> p.classList.toggle('on', +p.dataset.enemy===state.enemyIdx));
+}
+
+function fit(){
+  const stage=document.getElementById('stage'), frame=document.querySelector('.frame');
+  if(!frame) return;
+  const scale=Math.min(1,(stage.clientWidth-44)/frame.offsetWidth,(stage.clientHeight-40)/frame.offsetHeight);
+  document.getElementById('scaler').style.transform=`translateX(-50%) scale(${scale})`;
+}
+window.addEventListener('resize', fit);
+
+/* interactions */
+const stageEl=document.getElementById('stage');
+stageEl.addEventListener('click', e=>{
+  const pick=e.target.closest('[data-pick]'), tog=e.target.closest('[data-toggle]'),
+    open=e.target.closest('#open-filter'), close=e.target.closest('[data-close]'), reset=e.target.closest('[data-reset]'),
+    sortB=e.target.closest('[data-sort]'), attrB=e.target.closest('[data-attr]'), sw=e.target.closest('[data-sw]'),
+    enemyB=e.target.closest('[data-enemy]'), swapcancel=e.target.closest('[data-swapcancel]');
+  if(state.pendingSwap!=null){
+    if(swapcancel){ state.pendingSwap=null; render(); return; }
+    const card=e.target.closest('.eqcard[data-idx]');
+    if(card){ const idx=+card.dataset.idx, incoming=state.pendingSwap; state.equipped=state.equipped.map((x,i)=>i===idx?incoming:x); state.sel=incoming; state.pendingSwap=null; render(); return; }
+  }
+  if(enemyB){ state.enemyIdx=+enemyB.dataset.enemy; state.def=ENEMIES[state.enemyIdx].def; render(); return; }
+  if(tog){ const id=+tog.dataset.toggle, s=byId(id); if(s.lock) return;
+    if(isEq(id)) state.equipped=state.equipped.filter(x=>x!==id);
+    else if(state.equipped.length<state.cap) state.equipped=[...state.equipped,id];
+    else state.pendingSwap=id;
+    render(); return; }
+  if(pick){ state.sel=+pick.dataset.pick; state.pendingSwap=null; render(); return; }
+  if(open){ state.modal=true; render(); return; }
+  if(sortB){ state.sort=sortB.dataset.sort; render(); return; }
+  if(attrB){ const a=attrB.dataset.attr; state.attrs=state.attrs.includes(a)?state.attrs.filter(x=>x!==a):[...state.attrs,a]; render(); return; }
+  if(sw){ state[sw.dataset.sw]=!state[sw.dataset.sw]; render(); return; }
+  if(reset){ state.sort='dps'; state.attrs=[]; state.showLocked=false; render(); return; }
+  if(close){ state.modal=false; render(); return; }
+});
+stageEl.addEventListener('input', e=>{ if(e.target.id==='defSlider'){ state.def=+e.target.value; state.enemyIdx=ENEMIES.findIndex(en=>en.def===state.def); updateDynamic(); } });
+
+/* drag-to-reorder */
+stageEl.addEventListener('dragstart', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(!c||state.pendingSwap!=null){ e.preventDefault(); return; } state.dragIdx=+c.dataset.idx; e.dataTransfer.effectAllowed='move'; c.classList.add('dragging'); });
+stageEl.addEventListener('dragover', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(c&&state.dragIdx!=null){ e.preventDefault(); document.querySelectorAll('.eqcard.dragover').forEach(x=>x.classList.remove('dragover')); c.classList.add('dragover'); } });
+stageEl.addEventListener('drop', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(!c||state.dragIdx==null) return; e.preventDefault(); const to=+c.dataset.idx, from=state.dragIdx; if(to!==from){ const a=[...state.equipped]; const [m]=a.splice(from,1); a.splice(to,0,m); state.equipped=a; } state.dragIdx=null; render(); });
+stageEl.addEventListener('dragend', ()=>{ state.dragIdx=null; document.querySelectorAll('.eqcard.dragover,.eqcard.dragging').forEach(x=>x.classList.remove('dragover','dragging')); });
+
+document.getElementById('seg-cap').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+  state.cap=+b.dataset.n;
+  document.querySelectorAll('#seg-cap button').forEach(x=>x.classList.toggle('on',x===b));
+  if(state.equipped.length>state.cap) state.equipped=state.equipped.slice(0,state.cap);
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

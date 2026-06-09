@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Challenge Screen · Type-Driven Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tooltip-shared.jsx"></script>
+<script type="text/babel" src="tooltip-final.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="inv-data.jsx"></script>
+<script type="text/babel" src="inv-shared.jsx"></script>
+<script type="text/babel" src="chal2-data.jsx?v=2"></script>
+<script type="text/babel" src="chal2-shared.jsx?v=2"></script>
+<script type="text/babel" src="chal2-bands.jsx?v=2"></script>
+<script type="text/babel" src="chal2-boards.jsx?v=2"></script>
+<script type="text/babel" src="chal2-rail.jsx?v=2"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "mystery": "rarity",
+  "glow": true,
+  "density": "compact",
+  "sort": "progress"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const tweaks = { mystery: t.mystery, glow: t.glow, density: t.density, sort: t.sort };
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="directions" title="Challenges · Type-Driven Directions"
+          subtitle="Three redesigns where ChallengeType is the primary organising axis (8 types: Enemies Killed, Bosses Defeated, Zones Cleared, Time Trial, Level Reached, Damage Dealt, Battles Won, Skills Used). Rewards are SEALED until their challenge is completed — a locked reward shows only a teaser (rarity tier + item category / mod type), then reveals its name on unlock, where hovering opens the same tooltip you'd see inspecting it in your inventory. Time Trial challenges (lower-is-better) show best-time-vs-target instead of a 0→goal fill. Item mods now carry rarity, so a mod reward gets the full rarity treatment too. Tweaks (toolbar): mystery level of the teaser, rarity glow, density, and sort order.">
+          <DCArtboard id="bands" label="A · Type Bands (grouped scroll)" width={1320} height={900}>
+            <ChallengeBands tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="boards" label="B · Collection Boards (per-type panels)" width={1320} height={900}>
+            <ChallengeBoards tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="rail" label="C · Type Rail (type as navigation)" width={1320} height={900}>
+            <ChallengeRail tweaks={tweaks} />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Sealed rewards" />
+        <TweakRadio label="Teaser detail" value={t.mystery}
+          options={[{ value: 'category', label: 'Rarity + type' }, { value: 'rarity', label: 'Rarity only' }, { value: 'sealed', label: 'Fully sealed' }]}
+          onChange={(v) => setTweak('mystery', v)} />
+        <TweakToggle label="Rarity glow" value={t.glow} onChange={(v) => setTweak('glow', v)} />
+        <TweakSection label="Layout" />
+        <TweakRadio label="Density" value={t.density}
+          options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]}
+          onChange={(v) => setTweak('density', v)} />
+        <TweakRadio label="Sort within type" value={t.sort}
+          options={[{ value: 'progress', label: 'Progress' }, { value: 'rarity', label: 'Rarity' }, { value: 'default', label: 'Default' }]}
+          onChange={(v) => setTweak('sort', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

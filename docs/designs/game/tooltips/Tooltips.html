@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tooltips · Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tooltip-shared.jsx"></script>
+<script type="text/babel" src="tooltip-card.jsx"></script>
+<script type="text/babel" src="tooltip-sheet.jsx"></script>
+<script type="text/babel" src="tooltip-panel.jsx"></script>
+<script type="text/babel" src="tooltip-final.jsx"></script>
+
+<script type="text/babel">
+function App() {
+  return (
+    <DesignCanvas
+      title="Tooltips · Item & Skill"
+      subtitle="Three modernization directions. Each artboard frames the tooltip in its hover context — a ghost slot at the corner suggests where it came from. Sample item is a weapon with three mods; sample skill is Cleave, 0.8s into a 2.0s cooldown.">
+
+      <DCSection id="final" title="Final picks" subtitle="Item = C + A's mod tiles + A's EQUIPPED badge. Skill = C with a smaller bolded total. Cooldown indicators are animated so you can compare pips vs pill — both loop from full cooldown to ready every ~3s.">
+        <DCArtboard id="final-item" label="Item · final" width={400} height={480}>
+          <HoverContext slotIcon={<SwordGlyph />}>
+            <FinalItemTooltip item={SAMPLE_ITEM} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="final-skill-pill" label="Skill · cooldown pill" width={400} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <FinalSkillTooltipPill skill={SAMPLE_SKILL} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="final-skill-pips" label="Skill · cooldown pips" width={400} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <FinalSkillTooltipPips skill={SAMPLE_SKILL} />
+          </HoverContext>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="items" title="Item tooltip" subtitle="Hover an item in inventory">
+        <DCArtboard id="item-now" label="Now · Svelte source" width={380} height={480}>
+          <HoverContext slotIcon={<SwordGlyph />}>
+            <CurrentItemTooltip />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="item-a" label="A · Refined Card" width={380} height={480}>
+          <HoverContext slotIcon={<SwordGlyph />}>
+            <ItemTooltipA item={SAMPLE_ITEM} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="item-b" label="B · Data Sheet" width={380} height={480}>
+          <HoverContext slotIcon={<SwordGlyph />}>
+            <ItemTooltipB item={SAMPLE_ITEM} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="item-c" label="C · Layered Panel" width={400} height={480}>
+          <HoverContext slotIcon={<SwordGlyph />}>
+            <ItemTooltipC item={SAMPLE_ITEM} />
+          </HoverContext>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="skills" title="Skill tooltip" subtitle="Hover a skill slot in fight">
+        <DCArtboard id="skill-now" label="Now · Svelte source" width={380} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <CurrentSkillTooltip />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="skill-a" label="A · Refined Card" width={380} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <SkillTooltipA skill={SAMPLE_SKILL} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="skill-b" label="B · Data Sheet" width={380} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <SkillTooltipB skill={SAMPLE_SKILL} />
+          </HoverContext>
+        </DCArtboard>
+        <DCArtboard id="skill-c" label="C · Layered Panel" width={400} height={440}>
+          <HoverContext slotIcon={<BoltGlyph />} kind="skill">
+            <SkillTooltipC skill={SAMPLE_SKILL} />
+          </HoverContext>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+/* Faithful re-renders of the current tooltips on the dark gradient. */
+
+function CurrentItemTooltip() {
+  return (
+    <div style={{
+      width: 240,
+      background: '#f0f0f0', color: '#111',
+      border: '1px solid #000', borderRadius: 5,
+      boxShadow: '0 0 0.25rem #000',
+      padding: '0.5rem',
+      fontSize: 12,
+    }}>
+      <div style={{ fontSize: 20, marginBottom: 8, textAlign: 'center' }}>{SAMPLE_ITEM.name}</div>
+      <div style={{ fontSize: 16, marginBottom: 8 }}>Stats:</div>
+      <ul style={{ margin: 0, paddingLeft: 16, listStyle: 'none' }}>
+        {SAMPLE_ITEM.attributes.map((a) => (
+          <li key={a.name}>{a.name} {a.value > 0 ? '+' : ''}{a.value}{a.suffix || ''}</li>
+        ))}
+      </ul>
+      <div style={{ fontSize: 16, margin: '8px 0' }}>Applied Mods:</div>
+      <ul style={{ margin: 0, paddingLeft: 16, listStyle: 'none' }}>
+        {SAMPLE_ITEM.appliedMods.map((m) => (
+          <li key={m.name}><b>{m.name}</b>: {m.description}</li>
+        ))}
+      </ul>
+      <div style={{ fontSize: 16, margin: '8px 0' }}>Description:</div>
+      <p style={{ margin: 0 }}>{SAMPLE_ITEM.description}</p>
+      {SAMPLE_ITEM.equipped && (
+        <div style={{ marginTop: 8, textAlign: 'center', color: 'gold', fontWeight: 700, fontSize: 13 }}>Equipped</div>
+      )}
+    </div>
+  );
+}
+
+function CurrentSkillTooltip() {
+  const s = skillStats(SAMPLE_SKILL);
+  return (
+    <div style={{
+      width: 240,
+      background: '#f0f0f0', color: '#111',
+      border: '1px solid #000', borderRadius: 5,
+      boxShadow: '0 0 0.25rem #000',
+      padding: '0.5rem',
+      fontSize: 12,
+    }}>
+      <div style={{ fontSize: 20, marginBottom: 8, textAlign: 'center' }}>
+        {SAMPLE_SKILL.name} ({fmt(s.remainingCd)}s)
+      </div>
+      <div style={{ fontSize: 16, marginBottom: 8 }}>Damage:</div>
+      <ul style={{ margin: 0, paddingLeft: 16, listStyle: 'none' }}>
+        <li>Base: {SAMPLE_SKILL.baseDamage}</li>
+        {SAMPLE_SKILL.damageMultipliers.map((m) => (
+          <li key={m.attribute}>{m.attribute}: {fmt(m.value)} ({m.multiplier}x)</li>
+        ))}
+        <li>Enemy Defense: {fmt(SAMPLE_SKILL.enemyDefense)}</li>
+        <li>Total: {fmt(s.total)}</li>
+        <li>Cooldown: {fmt(s.adjustedCd)}s</li>
+        <li>DPS: {fmt(s.dps)}</li>
+      </ul>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

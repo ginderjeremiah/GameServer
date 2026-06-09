@@ -136,3 +136,7 @@ The per-screen design decisions (the Challenge, Options, Loading, Session-resume
 - **[frontend-screens.md](./frontend-screens.md)** — feature-specific screen write-ups and their rationale.
 
 When you add a new in-game screen, document its notable design decisions there (not here), and only surface a decision in this file if it establishes a cross-cutting pattern other screens are expected to follow.
+
+## Claude Design files
+
+Most (if not all) redesigned screens in this game were crafted in the Claude Design tool. All chats and handoff artifacts are stored in the designs subfolder and are listed in the **[designs.md](./designs/designs.md)** file. You can reference these if you ever need the context for the creation of initial designs.

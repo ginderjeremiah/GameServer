@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skills Page — Wireframes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f4f1ea;
+    --panel:#fbf9f4;
+    --panel2:#efece3;
+    --ink:#2b2a2f;
+    --ink2:#6c6a73;
+    --line:#c5c1b6;
+    --line-strong:#9a968c;
+    --accent:#3866c9;
+    --accent-wash:#dde5f7;
+    --hi:#ffe7a0;
+    --lock:#a39e93;
+    --sans:'Kalam', 'Comic Sans MS', cursive;
+    --display:'Caveat', cursive;
+    --mono:'Space Mono', ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #fbf9f4 0%, var(--paper) 60%) fixed;
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  body.mono{ --accent:#3a3940; --accent-wash:#e6e3da; --hi:#e3dfd4; }
+
+  /* ---------- top toolbar ---------- */
+  .toolbar{
+    height:60px; display:flex; align-items:center; gap:18px;
+    padding:0 22px; border-bottom:1.5px dashed var(--line-strong);
+    background:rgba(251,249,244,.7); position:relative; z-index:5;
+  }
+  .brand{ display:flex; align-items:baseline; gap:12px; flex:0 0 auto; }
+  .brand .mk{ font-family:var(--display); font-size:30px; font-weight:700; line-height:1; padding-right:14px; }
+  .brand .sub{ font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2); }
+
+  .tabs{ display:flex; gap:7px; margin-left:6px; flex-wrap:nowrap; }
+  .tab{
+    font-family:var(--sans); font-size:14px; cursor:pointer; white-space:nowrap;
+    padding:5px 11px; border:2px solid var(--ink); background:transparent; color:var(--ink);
+    border-radius:140px 9px 130px 9px/9px 130px 9px 140px;
+    transition:transform .08s;
+  }
+  .tab b{ font-family:var(--mono); font-size:11px; margin-right:5px; color:var(--ink2); }
+  .tab:hover{ transform:translateY(-1px) rotate(-.4deg); }
+  .tab.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .tab.active b{ color:rgba(255,255,255,.7); }
+
+  .spacer{ flex:1; }
+  .tweaks{ display:flex; align-items:center; gap:14px; }
+  .tw{ display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink2); }
+  .seg{ display:flex; border:1.5px solid var(--line-strong); border-radius:6px; overflow:hidden; }
+  .seg button{ font-family:var(--mono); font-size:11px; border:none; background:transparent; padding:4px 9px; cursor:pointer; color:var(--ink2); border-right:1.5px solid var(--line-strong); }
+  .seg button:last-child{ border-right:none; }
+  .seg button.on{ background:var(--ink); color:var(--paper); }
+  .toggle{ cursor:pointer; border:1.5px solid var(--line-strong); border-radius:6px; padding:4px 10px; font-family:var(--mono); font-size:11px; background:transparent; color:var(--ink2); }
+  .toggle.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* ---------- stage / scaler ---------- */
+  #stage{ position:absolute; inset:60px 0 0 0; overflow:hidden; }
+  #scaler{ position:absolute; top:24px; left:50%; transform-origin:top center; }
+  .frame{
+    width:1180px; min-height:712px;
+    background:var(--panel);
+    border:2.5px solid var(--ink);
+    border-radius:14px;
+    box-shadow:7px 9px 0 rgba(43,42,47,.13);
+    padding:26px 30px 30px;
+    position:relative;
+  }
+
+  /* ---------- shared sketch primitives ---------- */
+  .sk{ border:2px solid var(--ink); border-radius:200px 10px 210px 10px/10px 210px 10px 200px; }
+  .sk-b{ border:2px solid var(--ink); border-radius:10px 200px 12px 200px/200px 12px 200px 12px; }
+  .dashed{ border:1.6px dashed var(--line-strong); }
+
+  .scr-head{ display:flex; align-items:flex-end; gap:14px; margin-bottom:4px; }
+  .diamond{ width:13px; height:13px; transform:rotate(45deg); background:var(--accent); margin-bottom:8px; }
+  body.mono .diamond{ background:var(--ink); }
+  .scr-title{ font-family:var(--display); font-size:38px; font-weight:700; line-height:.9; }
+  .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink2); }
+  .scr-sub{ font-family:var(--sans); font-size:14px; color:var(--ink2); margin-top:2px; }
+
+  .label{ font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2); }
+  .chip{ font-family:var(--mono); font-size:10px; letter-spacing:.5px; padding:2px 8px; border:1.5px solid var(--line-strong); border-radius:20px; color:var(--ink2); white-space:nowrap; }
+  .chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  body.mono .chip.on{ background:var(--ink); border-color:var(--ink); }
+
+  /* icon placeholder (hatched) */
+  .ico{
+    background-image:repeating-linear-gradient(45deg, var(--line) 0 2px, transparent 2px 7px);
+    background-color:var(--panel2);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:8px; color:var(--ink2); text-align:center; line-height:1.1;
+  }
+  .equipped-stamp{
+    font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--accent); border:1.5px solid var(--accent); border-radius:4px; padding:1px 6px;
+    transform:rotate(-3deg); background:var(--accent-wash);
+  }
+  body.mono .equipped-stamp{ color:var(--ink); border-color:var(--ink); }
+  .lockwrap{ opacity:.55; }
+  .lock-tag{ font-family:var(--mono); font-size:9px; color:var(--lock); }
+
+  /* annotation notes */
+  .note{ position:absolute; font-family:var(--display); font-size:19px; color:var(--accent); line-height:1; pointer-events:none; max-width:190px; }
+  body.mono .note{ color:var(--ink2); }
+  .note small{ font-family:var(--sans); font-size:12px; display:block; color:var(--ink2); margin-top:2px; }
+
+  .btn{ font-family:var(--sans); font-size:15px; padding:7px 16px; cursor:pointer; background:var(--accent); color:#fff; border:2px solid var(--accent); border-radius:130px 9px 120px 9px/9px 120px 9px 130px; }
+  body.mono .btn{ background:var(--ink); border-color:var(--ink); }
+  .btn.ghost{ background:transparent; color:var(--ink); border-color:var(--ink); }
+
+  .stat{ display:flex; flex-direction:column; gap:1px; }
+  .stat .v{ font-family:var(--sans); font-weight:700; font-size:18px; line-height:1; }
+  .stat .k{ font-family:var(--mono); font-size:8.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink2); }
+
+  .bar{ height:7px; background:var(--panel2); border:1.5px solid var(--line-strong); border-radius:6px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:var(--accent); }
+  body.mono .bar > i{ background:var(--ink); }
+
+  /* scrollbars within frame regions */
+  .scrollY{ overflow-y:auto; }
+  .scrollY::-webkit-scrollbar{ width:8px; }
+  .scrollY::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
+
+  .legend{ position:absolute; right:30px; bottom:18px; font-family:var(--mono); font-size:9px; color:var(--ink2); letter-spacing:1px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="brand">
+      <span class="mk">Skills</span>
+      <span class="sub">Wireframes · v1</span>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="spacer"></div>
+    <div class="tweaks">
+      <div class="tw">Loadout
+        <div class="seg" id="seg-load">
+          <button data-n="4">4</button><button data-n="5" class="on">5</button><button data-n="6">6</button>
+        </div>
+      </div>
+      <button class="toggle on" id="tg-lock">Show locked</button>
+      <button class="toggle" id="tg-mono">Mono</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div id="scaler"></div>
+  </div>
+
+<script>
+/* ----------------------------- data ----------------------------- */
+const ATTR = { STR:'Strength', INT:'Intellect', AGI:'Agility', DEX:'Dexterity', END:'Endurance', LUK:'Luck' };
+const SKILLS = [
+  { id:1, name:'Ember Strike',  dmg:42, cd:1.2, scale:['STR'],        kind:'Strike', desc:'A searing overhead blow.', eq:1 },
+  { id:2, name:'Frost Lance',   dmg:38, cd:1.6, scale:['INT'],        kind:'Strike', desc:'Pierces and chills the target.', eq:2 },
+  { id:3, name:'Rend',          dmg:24, cd:0.8, scale:['STR','DEX'],  kind:'Strike', desc:'Fast tearing slash.', eq:3 },
+  { id:4, name:'Venom Spit',    dmg:18, cd:1.0, scale:['INT'],        kind:'Damage over time', desc:'Applies a stacking poison.', eq:4 },
+  { id:5, name:'Crushing Blow', dmg:70, cd:2.4, scale:['STR'],        kind:'Strike', desc:'Heavy, slow, devastating.', eq:5 },
+  { id:6, name:'Quick Jab',     dmg:12, cd:0.5, scale:['AGI'],        kind:'Strike', desc:'Rapid low-cost poke.' },
+  { id:7, name:'Arc Bolt',      dmg:30, cd:1.1, scale:['INT'],        kind:'Strike', desc:'Chained lightning hit.' },
+  { id:8, name:'Bleed',         dmg:15, cd:1.0, scale:['DEX'],        kind:'Damage over time', desc:'Opens a lasting wound.' },
+  { id:9, name:'Guard Break',   dmg:28, cd:1.4, scale:['STR'],        kind:'Strike', desc:'Shatters enemy defense.' },
+  { id:10,name:'Riptide',       dmg:34, cd:1.5, scale:['AGI','INT'],  kind:'Strike', desc:'Sweeping water arc.' },
+  { id:90,name:'Meteor',        dmg:120,cd:4.0, scale:['INT'],        kind:'Strike', desc:'Calls down a burning rock.', lock:'Clear the Ashen Vale' },
+  { id:91,name:'Soul Drain',    dmg:26, cd:1.8, scale:['INT'],        kind:'Damage over time', desc:'Siphons life over time.', lock:'Defeat 250 enemies' },
+];
+function loadout(){ return SKILLS.filter(s=>s.eq).sort((a,b)=>a.eq-b.eq); }
+function library(){ return SKILLS.filter(s=>!s.eq); }
+
+/* ----------------------------- state ----------------------------- */
+const state = { tab:'A', loadoutN:5, showLocked:true, mono:false };
+
+const CONCEPTS = [
+  { id:'A', name:'Loadout + Grid' },
+  { id:'B', name:'Inspector' },
+  { id:'C', name:'Deck' },
+  { id:'D', name:'Table' },
+  { id:'E', name:'Wheel' },
+];
+
+/* ----------------------------- small helpers ----------------------------- */
+const dps = s => (s.dmg / s.cd).toFixed(0);
+const scaleChips = s => s.scale.map(a=>`<span class="chip">${a}</span>`).join('');
+function icoBox(s, size){
+  return `<div class="ico sk" style="width:${size}px;height:${size}px;flex:0 0 ${size}px;">${s.lock?'🔒':'icon'}</div>`;
+}
+function emptySlotTxt(){ return 'empty'; }
+
+/* ===================================================================
+   CONCEPT A — Loadout bar + library grid  (inventory-style, familiar)
+=================================================================== */
+function conceptA(){
+  const eq = loadout().slice(0, state.loadoutN);
+  const slots = [];
+  for(let i=0;i<state.loadoutN;i++){
+    const s = eq[i];
+    if(s){
+      slots.push(`<div class="a-slot sk">
+        <div class="a-slot-num">${i+1}</div>
+        ${icoBox(s,52)}
+        <div style="flex:1;min-width:0;">
+          <div class="a-name">${s.name}</div>
+          <div class="a-mini">${s.dmg} dmg · ${s.cd}s · ${dps(s)} dps</div>
+          <div style="display:flex;gap:5px;margin-top:4px;">${scaleChips(s)}</div>
+        </div>
+        <div class="a-x">✕</div>
+      </div>`);
+    } else {
+      slots.push(`<div class="a-slot dashed" style="border-style:dashed;justify-content:center;color:var(--ink2);">
+        <span style="font-family:var(--display);font-size:30px;">+</span>
+        <span class="label">add skill</span>
+      </div>`);
+    }
+  }
+
+  const lib = library().filter(s=> state.showLocked || !s.lock);
+  const cards = lib.map(s=>`
+    <div class="a-card sk ${s.lock?'lockwrap':''}">
+      <div style="display:flex;gap:10px;">
+        ${icoBox(s,44)}
+        <div style="flex:1;min-width:0;">
+          <div class="a-name">${s.name}</div>
+          <div class="lock-tag">${s.kind}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin:9px 0 8px;">
+        <div class="stat"><span class="v">${s.dmg}</span><span class="k">dmg</span></div>
+        <div class="stat"><span class="v">${s.cd}s</span><span class="k">cooldown</span></div>
+        <div class="stat"><span class="v">${dps(s)}</span><span class="k">dps</span></div>
+      </div>
+      <div style="display:flex;gap:5px;margin-bottom:11px;">${scaleChips(s)}</div>
+      ${s.lock
+        ? `<div class="lock-tag">🔒 unlock — ${s.lock}</div>`
+        : `<button class="btn ghost" style="width:100%;">Equip ▸</button>`}
+    </div>`).join('');
+
+  return `
+  <div class="frame">
+    <div class="scr-head">
+      <span class="diamond"></span>
+      <div>
+        <div class="eyebrow">Concept A · familiar</div>
+        <div class="scr-title">Skills</div>
+      </div>
+      <div style="flex:1;"></div>
+      <div class="scr-sub" style="text-align:right;">Equip up to ${state.loadoutN} · drag to reorder priority</div>
+    </div>
+
+    <div class="label" style="margin:18px 0 8px;">▸ Equipped loadout — cast priority left→right</div>
+    <div class="a-loadout">${slots.join('')}</div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:20px 0 10px;">
+      <div class="label">▸ Skill library</div>
+      <span class="chip on">All</span><span class="chip">Strike</span><span class="chip">DoT</span><span class="chip">Locked</span>
+      <div style="flex:1;"></div>
+      <span class="chip" style="border-style:dashed;">⌕ search…</span>
+    </div>
+    <div class="a-grid">${cards}</div>
+
+    <div class="note" style="right:46px;bottom:128px;width:230px;text-align:right;">one row = your whole loadout
+      <small>mirrors the Inventory equip-rail you already have</small></div>
+    <div class="legend">A · loadout bar pinned on top · library grid below · equip in-place</div>
+  </div>
+  <style>
+    .a-loadout{ display:grid; grid-template-columns:repeat(${state.loadoutN},1fr); gap:12px; }
+    .a-slot{ background:var(--panel2); padding:11px 12px; display:flex; align-items:center; gap:10px; min-height:84px; position:relative; }
+    .a-slot-num{ position:absolute; top:6px; left:8px; font-family:var(--mono); font-size:9px; color:var(--ink2); }
+    .a-x{ font-family:var(--mono); font-size:11px; color:var(--ink2); align-self:flex-start; cursor:pointer; }
+    .a-name{ font-family:var(--sans); font-weight:700; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .a-mini{ font-family:var(--mono); font-size:9.5px; color:var(--ink2); margin-top:2px; }
+    .a-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:13px; }
+    .a-card{ background:var(--panel); padding:13px; }
+  </style>`;
+}
+
+/* ===================================================================
+   CONCEPT B — Left rail + big detail inspector (master/detail)
+=================================================================== */
+function conceptB(){
+  const sel = SKILLS.find(s=>s.id===5); // Crushing Blow selected
+  const all = SKILLS.filter(s=> state.showLocked || !s.lock);
+  const rows = all.map(s=>`
+    <div class="b-row ${s.id===sel.id?'sel':''} ${s.lock?'lockwrap':''}">
+      ${icoBox(s,30)}
+      <div style="flex:1;min-width:0;">
+        <div class="b-rowname">${s.name}</div>
+        <div class="lock-tag">${s.dmg} dmg · ${s.cd}s</div>
+      </div>
+      ${s.eq?'<span class="b-dot" title="equipped"></span>':''}
+      ${s.lock?'<span class="lock-tag">🔒</span>':''}
+    </div>`).join('');
+
+  const loadStrip = Array.from({length:state.loadoutN}).map((_,i)=>{
+    const s = loadout()[i];
+    return s
+      ? `<div class="b-mini sk">${icoBox(s,22)}<span>${s.name}</span></div>`
+      : `<div class="b-mini dashed" style="color:var(--ink2);justify-content:center;">+ empty</div>`;
+  }).join('');
+
+  return `
+  <div class="frame">
+    <div class="scr-head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Concept B · inspector</div><div class="scr-title">Skills</div></div>
+    </div>
+
+    <div class="b-cols">
+      <!-- rail -->
+      <div class="b-rail sk-b">
+        <div class="b-search dashed">⌕ search skills…</div>
+        <div class="b-list scrollY">${rows}</div>
+      </div>
+
+      <!-- detail -->
+      <div class="b-detail sk-b">
+        <div style="display:flex;gap:16px;align-items:flex-start;">
+          ${icoBox(sel,88)}
+          <div style="flex:1;">
+            <div class="eyebrow">${sel.kind}</div>
+            <div style="font-family:var(--display);font-size:34px;font-weight:700;line-height:1;">${sel.name}</div>
+            <div class="scr-sub">${sel.desc}</div>
+          </div>
+          <button class="btn">✓ Remove</button>
+        </div>
+
+        <div class="b-bignums">
+          <div class="stat"><span class="v" style="font-size:26px;">${sel.dmg}</span><span class="k">base damage</span></div>
+          <div class="stat"><span class="v" style="font-size:26px;">${sel.cd}s</span><span class="k">cooldown</span></div>
+          <div class="stat"><span class="v" style="font-size:26px;">${dps(sel)}</span><span class="k">dps</span></div>
+        </div>
+
+        <div class="label" style="margin:18px 0 10px;">▸ Attribute scaling</div>
+        ${sel.scale.map((a,i)=>`
+          <div class="b-scale">
+            <span class="chip on" style="width:54px;text-align:center;">${a}</span>
+            <div class="bar" style="flex:1;"><i style="width:${[72,40][i]||55}%;"></i></div>
+            <span class="lock-tag">${ATTR[a]} ×${[0.8,0.5][i]||0.6}</span>
+          </div>`).join('')}
+
+        <div class="label" style="margin:20px 0 8px;">▸ Source</div>
+        <div class="scr-sub">Unlocked by challenge — <b>Reach level 10</b></div>
+      </div>
+    </div>
+
+    <div class="label" style="margin:16px 0 8px;">▸ Loadout (${loadout().length}/${state.loadoutN})</div>
+    <div class="b-strip">${loadStrip}</div>
+
+    <div class="note" style="right:48px;top:470px;width:210px;text-align:right;">big inspector =
+      <small>room for description, scaling bars, lore, the equip CTA</small></div>
+    <div class="legend">B · scannable rail · deep single-skill inspector · loadout strip pinned at bottom</div>
+  </div>
+  <style>
+    .b-cols{ display:grid; grid-template-columns:300px 1fr; gap:16px; margin-top:16px; height:430px; }
+    .b-rail{ background:var(--panel); display:flex; flex-direction:column; overflow:hidden; }
+    .b-search{ margin:10px; padding:7px 10px; font-family:var(--mono); font-size:11px; color:var(--ink2); border-radius:6px; }
+    .b-list{ flex:1; padding:0 8px 8px; }
+    .b-row{ display:flex; align-items:center; gap:9px; padding:7px 8px; border-bottom:1px dashed var(--line); cursor:pointer; }
+    .b-row.sel{ background:var(--accent-wash); border-radius:8px; border-bottom-color:transparent; }
+    .b-rowname{ font-family:var(--sans); font-weight:700; font-size:14px; }
+    .b-dot{ width:8px;height:8px;border-radius:50%;background:var(--accent); }
+    body.mono .b-dot{ background:var(--ink); }
+    .b-detail{ background:var(--panel); padding:20px 22px; }
+    .b-bignums{ display:flex; gap:34px; margin-top:18px; padding-top:16px; border-top:1.6px dashed var(--line-strong); }
+    .b-scale{ display:flex; align-items:center; gap:11px; margin-bottom:9px; }
+    .b-strip{ display:grid; grid-template-columns:repeat(${state.loadoutN},1fr); gap:10px; }
+    .b-mini{ display:flex; align-items:center; gap:7px; padding:7px 9px; background:var(--panel2); font-family:var(--sans); font-size:13px; font-weight:700; }
+  </style>`;
+}
+
+/* ===================================================================
+   CONCEPT C — Deck / hand builder (card metaphor, nods to card game)
+=================================================================== */
+function conceptC(){
+  const eq = loadout().slice(0,state.loadoutN);
+  const hand = [];
+  for(let i=0;i<state.loadoutN;i++){
+    const s = eq[i];
+    if(s){
+      hand.push(`<div class="c-card sk" style="--rot:${(i-(state.loadoutN-1)/2)*2.5}deg;">
+        <div class="c-top">${icoBox(s,40)}<span class="equipped-stamp">slot ${i+1}</span></div>
+        <div class="c-name">${s.name}</div>
+        <div class="lock-tag">${s.kind}</div>
+        <div class="c-nums">
+          <div class="stat"><span class="v">${s.dmg}</span><span class="k">dmg</span></div>
+          <div class="stat"><span class="v">${s.cd}s</span><span class="k">cd</span></div>
+        </div>
+        <div style="display:flex;gap:4px;">${scaleChips(s)}</div>
+        <div class="c-pull">↓ swap out</div>
+      </div>`);
+    } else {
+      hand.push(`<div class="c-card dashed" style="--rot:0deg;align-items:center;justify-content:center;color:var(--ink2);">
+        <span style="font-family:var(--display);font-size:40px;">+</span>
+        <span class="label">drag a card up</span></div>`);
+    }
+  }
+
+  const lib = library().filter(s=> state.showLocked || !s.lock);
+  const tray = lib.map(s=>`
+    <div class="c-tray-card sk ${s.lock?'lockwrap':''}">
+      ${icoBox(s,34)}
+      <div class="c-name" style="font-size:14px;">${s.name}</div>
+      <div class="lock-tag">${s.dmg}·${s.cd}s${s.lock?' 🔒':''}</div>
+      ${s.lock?'':'<div class="c-grab">⤒ drag up</div>'}
+    </div>`).join('');
+
+  const sumDmg = eq.reduce((a,s)=>a+s.dmg,0);
+  return `
+  <div class="frame">
+    <div class="scr-head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Concept C · build a hand</div><div class="scr-title">Skill Deck</div></div>
+      <div style="flex:1;"></div>
+      <div class="c-readout sk">
+        <div class="stat"><span class="v" style="font-size:22px;">${sumDmg}</span><span class="k">hand damage</span></div>
+        <div class="stat"><span class="v" style="font-size:22px;">${(eq.reduce((a,s)=>a+1/s.cd,0)).toFixed(1)}</span><span class="k">casts / s</span></div>
+        <div style="flex:1;min-width:120px;">
+          <div class="k" style="margin-bottom:4px;">coverage</div>
+          <div class="bar"><i style="width:78%;"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="label" style="margin:18px 0 10px;">▸ Active hand — ${eq.length}/${state.loadoutN}</div>
+    <div class="c-hand">${hand.join('')}</div>
+
+    <div class="c-tray sk-b">
+      <div class="c-tray-head">
+        <div class="label">▸ Collection</div>
+        <span class="chip" style="border-style:dashed;">◂ drag · scroll ▸</span>
+      </div>
+      <div class="c-tray-row scrollY">${tray}</div>
+    </div>
+
+    <div class="note" style="left:34px;bottom:60px;transform:rotate(-2deg);width:300px;">your equipped skills read as a hand of cards</div>
+    <div class="legend">C · loadout = a “hand” up top · collection tray below · drag cards up to slot, down to drop</div>
+  </div>
+  <style>
+    .c-readout{ display:flex; align-items:center; gap:20px; background:var(--panel2); padding:10px 16px; max-width:430px; }
+    .c-hand{ display:grid; grid-template-columns:repeat(${state.loadoutN},1fr); gap:14px; }
+    .c-card{ background:var(--panel); padding:13px; min-height:190px; display:flex; flex-direction:column; gap:7px; transform:rotate(var(--rot)); }
+    .c-top{ display:flex; align-items:flex-start; justify-content:space-between; }
+    .c-name{ font-family:var(--sans); font-weight:700; font-size:16px; }
+    .c-nums{ display:flex; gap:16px; margin-top:auto; }
+    .c-pull,.c-grab{ font-family:var(--mono); font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--ink2); text-align:center; border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
+    .c-tray{ background:var(--panel); margin-top:18px; padding:12px 14px; }
+    .c-tray-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .c-tray-row{ display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; }
+    .c-tray-card{ flex:0 0 130px; background:var(--panel2); padding:10px; display:flex; flex-direction:column; gap:5px; align-items:flex-start; }
+  </style>`;
+}
+
+/* ===================================================================
+   CONCEPT D — Theorycraft table (dense, sortable, min-maxer)
+=================================================================== */
+function conceptD(){
+  const all = SKILLS.filter(s=> state.showLocked || !s.lock)
+                    .sort((a,b)=> dps(b)-dps(a));
+  const rows = all.map(s=>`
+    <tr class="${s.eq?'eq':''} ${s.lock?'lockwrap':''}">
+      <td class="d-check">${s.lock?'🔒':`<span class="box ${s.eq?'on':''}">${s.eq?'✓':''}</span>`}</td>
+      <td class="d-name">${icoBox(s,24)}<span>${s.name}</span></td>
+      <td><span class="chip" style="border-style:dashed;">${s.kind==='Strike'?'Strike':'DoT'}</span></td>
+      <td class="num">${s.dmg}</td>
+      <td class="num">${s.cd}s</td>
+      <td class="num strong">${dps(s)}</td>
+      <td>${s.scale.map(a=>`<span class="chip">${a}</span>`).join(' ')}</td>
+      <td class="src">${s.lock? s.lock : 'unlocked'}</td>
+    </tr>`).join('');
+
+  const eq = loadout().slice(0,state.loadoutN);
+  const chips = Array.from({length:state.loadoutN}).map((_,i)=>{
+    const s = eq[i];
+    return s ? `<span class="d-eqchip">${i+1}. ${s.name}</span>`
+             : `<span class="d-eqchip empty">${i+1}. —</span>`;
+  }).join('');
+
+  return `
+  <div class="frame">
+    <div class="scr-head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Concept D · theorycraft</div><div class="scr-title">Skills</div></div>
+    </div>
+
+    <div class="d-summary sk-b">
+      <div>
+        <div class="label" style="margin-bottom:7px;">▸ Loadout ${eq.length}/${state.loadoutN}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${chips}</div>
+      </div>
+      <div style="display:flex;gap:26px;">
+        <div class="stat"><span class="v" style="font-size:24px;">${eq.reduce((a,s)=>a+ +dps(s),0)}</span><span class="k">combined dps</span></div>
+        <div class="stat"><span class="v" style="font-size:24px;">${eq.reduce((a,s)=>a+s.dmg,0)}</span><span class="k">burst</span></div>
+      </div>
+    </div>
+
+    <div class="label" style="margin:18px 0 8px;">▸ All skills · click a header to sort · tick to equip</div>
+    <div class="d-tablewrap sk-b scrollY">
+      <table class="d-table">
+        <thead><tr>
+          <th>equip</th><th class="l">skill ↕</th><th>type</th>
+          <th class="num">dmg ↕</th><th class="num">cd ↕</th><th class="num">dps ▾</th>
+          <th class="l">scaling</th><th class="l">unlock</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="legend">D · summary bar + sortable spreadsheet · equip via the tick column · numbers-first, for min-maxers</div>
+  </div>
+  <style>
+    .d-summary{ background:var(--panel); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; margin-top:16px; }
+    .d-eqchip{ font-family:var(--sans); font-weight:700; font-size:13px; padding:4px 10px; background:var(--accent-wash); border-radius:6px; }
+    body.mono .d-eqchip{ background:var(--panel2); }
+    .d-eqchip.empty{ background:transparent; border:1.4px dashed var(--line-strong); color:var(--ink2); font-weight:400; }
+    .d-tablewrap{ background:var(--panel); max-height:344px; }
+    .d-table{ width:100%; border-collapse:collapse; font-family:var(--sans); }
+    .d-table th{ font-family:var(--mono); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--ink2); text-align:right; padding:11px 12px; border-bottom:2px solid var(--ink); position:sticky; top:0; background:var(--panel); }
+    .d-table th.l{ text-align:left; }
+    .d-table td{ padding:9px 12px; border-bottom:1px dashed var(--line); text-align:right; font-size:14px; }
+    .d-table td.d-name{ display:flex; align-items:center; gap:9px; text-align:left; font-weight:700; }
+    .d-table td.num{ font-family:var(--mono); font-size:13px; }
+    .d-table td.num.strong{ font-weight:700; color:var(--accent); }
+    body.mono .d-table td.num.strong{ color:var(--ink); }
+    .d-table td.src{ text-align:left; font-family:var(--mono); font-size:10px; color:var(--ink2); }
+    .d-table tr.eq td{ background:var(--accent-wash); }
+    body.mono .d-table tr.eq td{ background:var(--panel2); }
+    .d-check .box{ display:inline-block; width:18px; height:18px; border:1.7px solid var(--ink); border-radius:4px; }
+    .d-check .box.on{ background:var(--accent); border-color:var(--accent); color:#fff; font-size:12px; text-align:center; line-height:16px; }
+    body.mono .d-check .box.on{ background:var(--ink); }
+    .d-table td.d-check{ text-align:center; }
+  </style>`;
+}
+
+/* ===================================================================
+   CONCEPT E — Radial loadout wheel (novel / visual)
+=================================================================== */
+function conceptE(){
+  const eq = loadout().slice(0,state.loadoutN);
+  const R = 150;
+  const nodes = Array.from({length:state.loadoutN}).map((_,i)=>{
+    const ang = (-90 + i*(360/state.loadoutN)) * Math.PI/180;
+    const x = Math.cos(ang)*R, y = Math.sin(ang)*R;
+    const s = eq[i];
+    return `<div class="e-node ${s?'':'empty'}" style="left:calc(50% + ${x}px); top:calc(50% + ${y}px);">
+      ${ s ? `${icoBox(s,46)}<div class="e-node-name">${s.name}</div><div class="lock-tag">${s.cd}s</div>`
+           : `<span style="font-family:var(--display);font-size:30px;color:var(--ink2);">+</span>` }
+      <div class="e-slotnum">${i+1}</div>
+    </div>`;
+  }).join('');
+
+  const lib = library().filter(s=> state.showLocked || !s.lock);
+  const list = lib.map((s,i)=>`
+    <div class="e-li ${i===0?'sel':''} ${s.lock?'lockwrap':''}">
+      ${icoBox(s,28)}
+      <div style="flex:1;min-width:0;">
+        <div class="b-rowname">${s.name}</div>
+        <div class="lock-tag">${s.dmg} dmg · ${s.cd}s${s.lock?' · 🔒 '+s.lock:''}</div>
+      </div>
+      ${s.lock?'':'<span class="chip on">assign ▸</span>'}
+    </div>`).join('');
+
+  return `
+  <div class="frame">
+    <div class="scr-head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Concept E · experimental</div><div class="scr-title">Skill Wheel</div></div>
+    </div>
+
+    <div class="e-cols">
+      <div class="e-stage">
+        <div class="e-ring"></div>
+        <div class="e-core sk">
+          <div class="label">your</div>
+          <div style="font-family:var(--display);font-size:26px;font-weight:700;line-height:1;">Loadout</div>
+          <div class="lock-tag">${eq.length}/${state.loadoutN} slotted</div>
+        </div>
+        ${nodes}
+      </div>
+
+      <div class="e-panel sk-b">
+        <div class="e-search dashed">⌕ pick a skill, then a slot…</div>
+        <div class="label" style="margin:0 0 8px;">▸ Library</div>
+        <div class="e-list scrollY">${list}</div>
+      </div>
+    </div>
+
+    <div class="note" style="left:30px;bottom:60px;transform:rotate(-2deg);">slots arranged like an action wheel
+      <small>spatial + memorable, but risks feeling gimmicky — here to react against</small></div>
+    <div class="legend">E · radial equip wheel around a core · library list assigns into the next/clicked slot</div>
+  </div>
+  <style>
+    .e-cols{ display:grid; grid-template-columns:1fr 340px; gap:18px; margin-top:14px; height:452px; }
+    .e-stage{ position:relative; }
+    .e-ring{ position:absolute; left:50%; top:50%; width:300px; height:300px; transform:translate(-50%,-50%); border:2px dashed var(--line-strong); border-radius:50%; }
+    .e-core{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:128px; height:128px; border-radius:50%; background:var(--panel2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    .e-node{ position:absolute; transform:translate(-50%,-50%); width:84px; height:84px; border-radius:50%; background:var(--panel); border:2px solid var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+    .e-node.empty{ border-style:dashed; background:transparent; }
+    .e-node-name{ font-family:var(--sans); font-weight:700; font-size:11px; line-height:1; }
+    .e-node .ico{ width:34px !important; height:34px !important; flex-basis:34px !important; }
+    .e-slotnum{ position:absolute; top:-7px; left:-7px; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-family:var(--mono); font-size:10px; display:flex; align-items:center; justify-content:center; }
+    body.mono .e-slotnum{ background:var(--ink); }
+    .e-panel{ background:var(--panel); padding:14px; display:flex; flex-direction:column; }
+    .e-search{ padding:8px 10px; font-family:var(--mono); font-size:11px; color:var(--ink2); border-radius:6px; margin-bottom:12px; }
+    .e-list{ flex:1; display:flex; flex-direction:column; gap:4px; }
+    .e-li{ display:flex; align-items:center; gap:9px; padding:8px; border-bottom:1px dashed var(--line); cursor:pointer; }
+    .e-li.sel{ background:var(--accent-wash); border-radius:8px; border-bottom-color:transparent; }
+  </style>`;
+}
+
+const RENDER = { A:conceptA, B:conceptB, C:conceptC, D:conceptD, E:conceptE };
+
+/* ----------------------------- shell wiring ----------------------------- */
+function buildTabs(){
+  document.getElementById('tabs').innerHTML = CONCEPTS.map(c=>
+    `<button class="tab ${c.id===state.tab?'active':''}" data-tab="${c.id}"><b>${c.id}</b>${c.name}</button>`
+  ).join('');
+  document.querySelectorAll('.tab').forEach(b=> b.onclick = ()=>{ state.tab=b.dataset.tab; render(); });
+}
+function render(){
+  document.body.classList.toggle('mono', state.mono);
+  document.querySelectorAll('.tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===state.tab));
+  document.getElementById('scaler').innerHTML = RENDER[state.tab]();
+  fit();
+}
+function fit(){
+  const stage = document.getElementById('stage');
+  const frame = document.querySelector('.frame');
+  if(!frame) return;
+  const availW = stage.clientWidth - 48;
+  const availH = stage.clientHeight - 48;
+  const scale = Math.min(1, availW/frame.offsetWidth, availH/frame.offsetHeight);
+  const sc = document.getElementById('scaler');
+  sc.style.transform = `translateX(-50%) scale(${scale})`;
+}
+window.addEventListener('resize', fit);
+
+/* tweaks */
+document.getElementById('seg-load').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+  state.loadoutN = +b.dataset.n;
+  document.querySelectorAll('#seg-load button').forEach(x=>x.classList.toggle('on', x===b));
+  render();
+});
+document.getElementById('tg-lock').onclick = function(){ state.showLocked=!state.showLocked; this.classList.toggle('on', state.showLocked); render(); };
+document.getElementById('tg-mono').onclick = function(){ state.mono=!state.mono; this.classList.toggle('on', state.mono); render(); };
+
+buildTabs();
+render();
+</script>
+</body>
+</html>

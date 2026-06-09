@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Inventory Screen · Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tooltip-shared.jsx"></script>
+<script type="text/babel" src="tooltip-final.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="inv-data.jsx"></script>
+<script type="text/babel" src="inv-shared.jsx"></script>
+<script type="text/babel" src="inv-rail.jsx"></script>
+<script type="text/babel" src="inv-doll.jsx"></script>
+<script type="text/babel" src="inv-unified.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "slotSize": 68,
+  "perPage": 48,
+  "glow": true,
+  "accentBorders": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const tweaks = { slotSize: t.slotSize, perPage: t.perPage, glow: t.glow, accentBorders: t.accentBorders };
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="directions" title="Inventory · Directions"
+          subtitle="Three takes on the refactored inventory — items are unlocked (one copy each), gear equips by drag (or ⌘-click), items can be favorited & sorted, and mods slot into items. All three share data + the finalized item tooltip; they differ in how equipped gear is shown and where mods are edited. Tweaks (toolbar) adjust slot size, items-per-page, and accent styling live across all three.">
+          <DCArtboard id="rail" label="A · Loadout Rail" width={1280} height={880}>
+            <InventoryRail tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="doll" label="B · Paper Doll + Forge" width={1280} height={880}>
+            <InventoryDoll tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="unified" label="C · Unified Workbench" width={1280} height={880}>
+            <InventoryUnified tweaks={tweaks} />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Layout" />
+        <TweakSlider label="Slot size" value={t.slotSize} min={44} max={96} step={4} unit="px"
+          onChange={(v) => setTweak('slotSize', v)} />
+        <TweakSlider label="Items per page" value={t.perPage} min={8} max={48} step={4}
+          onChange={(v) => setTweak('perPage', v)} />
+        <TweakSection label="Grid style" />
+        <TweakToggle label="Rarity glow" value={t.glow} onChange={(v) => setTweak('glow', v)} />
+        <TweakToggle label="Category accent borders" value={t.accentBorders} onChange={(v) => setTweak('accentBorders', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Stats · Statistics · Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0b0c0f;
+    font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { height: 100%; }
+  ::selection { background: rgba(161,194,247,0.3); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  input::placeholder { color: rgba(240,240,240,0.35); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="sb-stat-data.jsx"></script>
+<script type="text/babel" src="sb-stat-shared.jsx"></script>
+<script type="text/babel" src="sb-stat-master.jsx"></script>
+<script type="text/babel" src="sb-stat-grouped.jsx"></script>
+<script type="text/babel" src="sb-stat-cards.jsx"></script>
+<script type="text/babel" src="sb-stat-entity.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#a1c2f7"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const p = { accent: t.accent };
+
+  return (
+    <React.Fragment>
+      <DesignCanvas
+        title="Stats · Statistics — Four Directions"
+        subtitle="The 14 EStatisticType statistics, each broken down per associated entity (kills by enemy, time by zone, damage by skill…). Directions A–C explore navigating the 14 types; Direction D flips it — filter to one entity and see every stat that references it at once. Same character/data across all four, so they stay comparable. Nav chrome omitted to keep focus on the idea.">
+        <DCSection id="stats-nav" title="Navigating the 14 types" subtitle="Three ways to get from the type list to a per-entity breakdown.">
+          <DCArtboard id="master" label="A · Master + Detail — list, then breakdown" width={1180} height={720}>
+            <StatMaster {...p} />
+          </DCArtboard>
+          <DCArtboard id="grouped" label="B · Category Tabs — Combat / Survival / …" width={1180} height={760}>
+            <StatGrouped {...p} />
+          </DCArtboard>
+          <DCArtboard id="cards" label="C · Scroll — everything inline" width={1120} height={900}>
+            <StatCards {...p} />
+          </DCArtboard>
+        </DCSection>
+        <DCSection id="stats-entity" title="Entity pivot" subtitle="The inverse: pick an entity, see all of its stats. (Pairs well with any of A–C.)">
+          <DCArtboard id="entity" label="D · Entity Pivot — filter by enemy / zone / skill" width={1180} height={720}>
+            <StatEntity {...p} />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Theme" />
+        <TweakColor label="UI accent" value={t.accent}
+          options={['#a1c2f7', '#bde0b4', '#f0d28a', '#c4b6ec']}
+          onChange={(v) => setTweak('accent', v)} />
+      </TweaksPanel>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

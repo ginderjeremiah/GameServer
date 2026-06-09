@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skills — Inspector (B, fleshed out)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@300;400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f4f1ea; --panel:#fbf9f4; --panel2:#efece3;
+    --ink:#2b2a2f; --ink2:#6c6a73; --line:#c5c1b6; --line-strong:#9a968c;
+    --accent:#3866c9; --accent-wash:#dde5f7; --danger:#b8553f; --danger-wash:#f1ddd5;
+    --lock:#a39e93;
+    --sans:'Kalam','Comic Sans MS',cursive; --display:'Caveat',cursive; --mono:'Space Mono',ui-monospace,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{ background:radial-gradient(120% 80% at 50% -10%, #fbf9f4 0%, var(--paper) 60%) fixed; color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow:hidden; }
+  body.mono{ --accent:#3a3940; --accent-wash:#e6e3da; --danger:#5a5760; --danger-wash:#e6e3da; }
+
+  /* toolbar */
+  .toolbar{ height:58px; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1.5px dashed var(--line-strong); background:rgba(251,249,244,.7); position:relative; z-index:5; }
+  .brand{ display:flex; align-items:baseline; gap:14px; }
+  .brand .mk{ font-family:var(--display); font-size:29px; font-weight:700; line-height:1; padding-right:14px; }
+  .brand .sub{ font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2); }
+  .spacer{ flex:1; }
+  .tweaks{ display:flex; align-items:center; gap:14px; }
+  .tw{ display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink2); }
+  .seg{ display:flex; border:1.5px solid var(--line-strong); border-radius:6px; overflow:hidden; }
+  .seg button{ font-family:var(--mono); font-size:11px; border:none; background:transparent; padding:4px 9px; cursor:pointer; color:var(--ink2); border-right:1.5px solid var(--line-strong); }
+  .seg button:last-child{ border-right:none; }
+  .seg button.on{ background:var(--ink); color:var(--paper); }
+  .toggle{ cursor:pointer; border:1.5px solid var(--line-strong); border-radius:6px; padding:4px 10px; font-family:var(--mono); font-size:11px; background:transparent; color:var(--ink2); }
+  .toggle.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* stage */
+  #stage{ position:absolute; inset:58px 0 0 0; overflow:hidden; }
+  #scaler{ position:absolute; top:22px; left:50%; transform-origin:top center; }
+  .frame{ width:1180px; min-height:772px; background:var(--panel); border:2.5px solid var(--ink); border-radius:14px; box-shadow:7px 9px 0 rgba(43,42,47,.13); padding:24px 30px 26px; position:relative; }
+
+  /* sketch primitives */
+  .sk{ border:2px solid var(--ink); border-radius:200px 10px 210px 10px/10px 210px 10px 200px; }
+  .sk-b{ border:2px solid var(--ink); border-radius:10px 200px 12px 200px/200px 12px 200px 12px; }
+  .dashed{ border:1.6px dashed var(--line-strong); }
+  .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink2); }
+  .label{ font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2); }
+  .diamond{ width:13px; height:13px; transform:rotate(45deg); background:var(--accent); margin-bottom:7px; }
+  body.mono .diamond{ background:var(--ink); }
+  .chip{ font-family:var(--mono); font-size:10px; letter-spacing:.5px; padding:2px 8px; border:1.5px solid var(--line-strong); border-radius:20px; color:var(--ink2); white-space:nowrap; }
+  .chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  body.mono .chip.on{ background:var(--ink); border-color:var(--ink); }
+  .ico{ background-image:repeating-linear-gradient(45deg, var(--line) 0 2px, transparent 2px 7px); background-color:var(--panel2); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:8px; color:var(--ink2); }
+  .stat{ display:flex; flex-direction:column; gap:1px; }
+  .stat .v{ font-family:var(--sans); font-weight:700; line-height:1; }
+  .stat .k{ font-family:var(--mono); font-size:8.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink2); }
+  .bar{ height:7px; background:var(--panel2); border:1.5px solid var(--line-strong); border-radius:6px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:var(--accent); }
+  body.mono .bar > i{ background:var(--ink); }
+  .btn{ font-family:var(--sans); font-size:15px; padding:8px 18px; cursor:pointer; background:var(--accent); color:#fff; border:2px solid var(--accent); border-radius:130px 9px 120px 9px/9px 120px 9px 130px; white-space:nowrap; }
+  body.mono .btn{ background:var(--ink); border-color:var(--ink); }
+  .btn.ghost{ background:transparent; color:var(--ink); border-color:var(--ink); }
+  .btn.danger{ background:var(--danger-wash); color:var(--danger); border-color:var(--danger); }
+  .btn.dim{ background:transparent; color:var(--ink2); border-color:var(--line-strong); }
+  .scrollY{ overflow-y:auto; } .scrollY::-webkit-scrollbar{ width:8px; } .scrollY::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
+
+  /* header */
+  .head{ display:flex; align-items:flex-end; gap:14px; }
+  .scr-title{ font-family:var(--display); font-size:38px; font-weight:700; line-height:.9; }
+  .scr-sub{ font-family:var(--sans); font-size:14px; color:var(--ink2); margin-top:2px; }
+  .head-totals{ display:flex; gap:30px; align-items:center; padding:9px 18px; background:var(--panel2); }
+  .head-totals .v{ font-size:21px; }
+
+  /* main columns */
+  .cols{ display:grid; grid-template-columns:286px 1fr; gap:18px; margin-top:16px; height:438px; }
+
+  /* rail */
+  .rail{ background:var(--panel); display:flex; flex-direction:column; overflow:hidden; }
+  .rail-top{ padding:11px 11px 9px; display:flex; flex-direction:column; gap:8px; border-bottom:1.5px dashed var(--line); }
+  .searchrow{ display:flex; gap:7px; }
+  .search{ flex:1; display:flex; align-items:center; gap:7px; padding:7px 10px; font-family:var(--mono); font-size:11px; color:var(--ink2); border-radius:6px; }
+  .filt-btn{ display:flex; align-items:center; gap:5px; padding:7px 10px; font-family:var(--mono); font-size:10px; letter-spacing:.5px; text-transform:uppercase; cursor:pointer; border:1.6px solid var(--ink); border-radius:7px; background:transparent; color:var(--ink); }
+  .filt-btn .badge{ background:var(--accent); color:#fff; border-radius:10px; font-size:9px; padding:0 5px; }
+  body.mono .filt-btn .badge{ background:var(--ink); }
+  .rail-meta{ display:flex; align-items:center; justify-content:space-between; }
+  .rail-list{ flex:1; padding:6px 8px 8px; }
+  .grp{ font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink2); padding:9px 6px 5px; display:flex; justify-content:space-between; }
+  .row{ display:flex; align-items:center; gap:9px; padding:7px 8px; border-bottom:1px dashed var(--line); cursor:pointer; border-radius:8px; }
+  .row:hover{ background:var(--panel2); }
+  .row.sel{ background:var(--accent-wash); border-bottom-color:transparent; }
+  .row.lock{ opacity:.5; }
+  .row .rico{ width:30px; height:30px; flex:0 0 30px; }
+  .rowname{ font-family:var(--sans); font-weight:700; font-size:14px; line-height:1.05; }
+  .rowmeta{ font-family:var(--mono); font-size:9px; color:var(--ink2); }
+  .slotbadge{ font-family:var(--mono); font-size:9px; color:#fff; background:var(--accent); border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; flex:0 0 18px; }
+  body.mono .slotbadge{ background:var(--ink); }
+  .lockmini{ font-family:var(--mono); font-size:11px; color:var(--lock); }
+
+  /* detail */
+  .detail{ background:var(--panel); padding:20px 24px; display:flex; flex-direction:column; }
+  .d-top{ display:flex; gap:16px; align-items:flex-start; }
+  .d-ico{ width:92px; height:92px; flex:0 0 92px; position:relative; }
+  .d-ico .slotbadge{ position:absolute; top:-7px; left:-7px; }
+  .d-name{ font-family:var(--display); font-size:34px; font-weight:700; line-height:1; }
+  .d-cta{ display:flex; flex-direction:column; gap:7px; align-items:flex-end; }
+  .d-hint{ font-family:var(--mono); font-size:9px; letter-spacing:.5px; color:var(--ink2); max-width:150px; text-align:right; }
+  .bignums{ display:flex; gap:30px; margin-top:16px; padding-top:14px; border-top:1.6px dashed var(--line-strong); }
+  .bignums .v{ font-size:26px; }
+  .d-sec{ margin-top:16px; }
+  .scale{ display:flex; align-items:center; gap:11px; margin-top:8px; }
+  .scale .chip{ width:50px; text-align:center; }
+  .scale .contrib{ font-family:var(--mono); font-size:10px; color:var(--ink2); white-space:nowrap; min-width:118px; }
+  .d-foot{ margin-top:auto; padding-top:14px; display:flex; gap:26px; border-top:1.6px dashed var(--line); }
+  .foot-item .lab{ font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink2); }
+  .foot-item .val{ font-family:var(--sans); font-size:14px; }
+
+  /* equipped band */
+  .band-head{ display:flex; align-items:center; gap:12px; margin:16px 0 8px; }
+  .band{ display:grid; grid-template-columns:repeat(var(--cap), 1fr); gap:11px; }
+  .eqcard{ background:var(--panel2); padding:10px 11px; position:relative; min-height:104px; display:flex; flex-direction:column; gap:6px; }
+  .eqcard .num{ position:absolute; top:6px; left:8px; font-family:var(--mono); font-size:9px; color:var(--ink2); }
+  .eqcard .rm{ position:absolute; top:6px; right:8px; font-family:var(--mono); font-size:11px; color:var(--ink2); cursor:pointer; }
+  .eqcard .en{ font-family:var(--sans); font-weight:700; font-size:14px; margin-top:9px; line-height:1.05; cursor:pointer; }
+  .eqcard .es{ display:flex; gap:12px; }
+  .eqcard .es .v{ font-size:15px; }
+  .eqcard.empty{ background:transparent; align-items:center; justify-content:center; color:var(--ink2); cursor:pointer; }
+  .eqcard.empty .plus{ font-family:var(--display); font-size:30px; }
+  .eqcard[draggable="true"]{ cursor:grab; }
+  .eqcard.dragging{ opacity:.45; }
+  .eqcard.dragover{ outline:2px dashed var(--accent); outline-offset:3px; }
+  .eqcard.swap-target{ cursor:pointer; border-color:var(--danger); background:var(--danger-wash); }
+  .eqcard.swap-target:hover{ box-shadow:inset 0 0 0 2px var(--danger); }
+  .eqcard .rep{ position:absolute; top:6px; right:8px; font-family:var(--mono); font-size:9px; color:var(--danger); }
+  .eqcard.empty.dimmed{ opacity:.28; }
+
+  /* modal */
+  .modal-layer{ position:absolute; inset:0; z-index:40; display:none; }
+  .modal-layer.open{ display:block; }
+  .backdrop{ position:absolute; inset:0; background:color-mix(in srgb, var(--ink) 34%, transparent); backdrop-filter:blur(1.5px); }
+  .modal{ position:absolute; left:50%; top:48%; transform:translate(-50%,-50%) rotate(-.4deg); width:430px; background:var(--panel); padding:22px 24px 20px; }
+  .modal h3{ font-family:var(--display); font-size:30px; font-weight:700; margin:0 0 2px; }
+  .modal .msub{ font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2); }
+  .mgroup{ margin-top:16px; }
+  .mgroup .gl{ font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink2); margin-bottom:8px; }
+  .opts{ display:flex; flex-wrap:wrap; gap:8px; }
+  .opt{ font-family:var(--sans); font-size:14px; padding:6px 13px; border:1.6px solid var(--line-strong); border-radius:130px 9px 120px 9px/9px 120px 9px 130px; cursor:pointer; background:transparent; color:var(--ink); white-space:nowrap; }
+  .opt.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  body.mono .opt.on{ background:var(--ink); border-color:var(--ink); }
+  .mrow{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--line); }
+  .mrow .ml{ font-family:var(--sans); font-size:15px; white-space:nowrap; }
+  .switch{ width:42px; height:22px; border-radius:20px; border:1.7px solid var(--line-strong); background:transparent; position:relative; cursor:pointer; }
+  .switch::after{ content:''; position:absolute; top:1.5px; left:2px; width:16px; height:16px; border-radius:50%; background:var(--line-strong); transition:.12s; }
+  .switch.on{ border-color:var(--accent); }
+  .switch.on::after{ left:21px; background:var(--accent); }
+  body.mono .switch.on{ border-color:var(--ink); } body.mono .switch.on::after{ background:var(--ink); }
+  .mfoot{ display:flex; justify-content:space-between; align-items:center; margin-top:20px; }
+
+  .note{ position:absolute; font-family:var(--display); font-size:18px; color:var(--accent); line-height:1.05; pointer-events:none; }
+  body.mono .note{ color:var(--ink2); }
+  .note small{ font-family:var(--sans); font-size:12px; display:block; color:var(--ink2); }
+  .legend{ position:absolute; right:30px; bottom:8px; font-family:var(--mono); font-size:9px; color:var(--ink2); letter-spacing:.5px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="brand"><span class="mk">Skills</span><span class="sub">Inspector · concept B</span></div>
+    <div class="spacer"></div>
+    <div class="tweaks">
+      <div class="tw">Cap
+        <div class="seg" id="seg-cap">
+          <button data-n="4">4</button><button data-n="5" class="on">5</button><button data-n="6">6</button>
+        </div>
+      </div>
+      <button class="toggle" id="tg-modal">Filter modal</button>
+      <button class="toggle" id="tg-mono">Mono</button>
+    </div>
+  </div>
+
+  <div id="stage"><div id="scaler"></div></div>
+
+<script>
+/* ----- sample player attributes (for scaling contributions) ----- */
+const PLAYER = { STR:45, END:30, INT:38, AGI:33, DEX:28, LUK:20 };
+const ATTRNAME = { STR:'Strength', END:'Endurance', INT:'Intellect', AGI:'Agility', DEX:'Dexterity', LUK:'Luck' };
+
+const SKILLS = [
+  { id:1, name:'Ember Strike',  base:42, cd:1.2, scale:[['STR',0.8]], desc:'A searing overhead blow that ignites on impact.', source:'Starting skill' },
+  { id:2, name:'Frost Lance',   base:38, cd:1.6, scale:[['INT',0.7]], desc:'Conjures a spear of ice that pierces and chills.', source:'Reach level 5' },
+  { id:3, name:'Rend',          base:24, cd:0.8, scale:[['STR',0.5],['DEX',0.4]], desc:'A fast tearing slash — low damage, high tempo.', source:'Defeat 50 enemies' },
+  { id:4, name:'Venom Spit',    base:18, cd:1.0,    scale:[['INT',0.6]], desc:'Coats the target in a stacking, lingering poison.', source:'Win 25 battles' },
+  { id:5, name:'Crushing Blow', base:70, cd:2.4, scale:[['STR',0.8]], desc:'Heavy, slow, devastating — your biggest single hit.', source:'Reach level 10' },
+  { id:6, name:'Quick Jab',     base:12, cd:0.5, scale:[['AGI',0.5]], desc:'A rapid, cheap poke that keeps pressure on.', source:'Starting skill' },
+  { id:7, name:'Arc Bolt',      base:30, cd:1.1, scale:[['INT',0.6]], desc:'A bolt of chained lightning that leaps to the foe.', source:'Clear the Tide Hollow' },
+  { id:8, name:'Bleed',         base:15, cd:1.0,    scale:[['DEX',0.5]], desc:'Opens a wound that drains health over time.', source:'Defeat 100 enemies' },
+  { id:9, name:'Guard Break',   base:28, cd:1.4, scale:[['STR',0.6]], desc:'Shatters enemy defense, softening them up.', source:'Reach level 8' },
+  { id:10,name:'Riptide',       base:34, cd:1.5, scale:[['AGI',0.4],['INT',0.4]], desc:'A sweeping arc of water that drags foes in.', source:'Clear the Tide Hollow' },
+  { id:90,name:'Meteor',        base:120,cd:4.0, scale:[['INT',1.0]], desc:'Calls a burning rock from the sky. Huge, slow.', lock:'Clear the Ashen Vale' },
+  { id:91,name:'Soul Drain',    base:26, cd:1.8,    scale:[['INT',0.7]], desc:'Siphons the enemy\u2019s life into your own.', lock:'Defeat 250 enemies' },
+];
+const byId = id => SKILLS.find(s=>s.id===id);
+const contrib = s => s.scale.map(([a,m])=>({ a, m, val:Math.round(PLAYER[a]*m) }));
+const totalDmg = s => s.base + contrib(s).reduce((x,c)=>x+c.val,0);
+const dps = s => (totalDmg(s)/s.cd).toFixed(0);
+const ATTR_ORDER = ['STR','END','INT','AGI','DEX','LUK'];
+const USED_ATTRS = ATTR_ORDER.filter(a => SKILLS.some(s=>s.scale.some(([x])=>x===a)));
+
+/* ----------------------------- state ----------------------------- */
+const state = {
+  sel: 5,
+  equipped: [1,2,3,4,5],
+  cap: 5,
+  mono:false,
+  modal:false,
+  // filter (applied)
+  sort:'dps',
+  attrs:[],        // attribute codes to filter the library by
+  showLocked:false,
+  // transient interaction state
+  pendingSwap:null, // skill id waiting to replace a chosen equipped slot
+  dragIdx:null,
+};
+const SORTS = [['dps','DPS'],['dmg','Damage'],['cd','Cooldown'],['name','Name']];
+
+const isEq = id => state.equipped.includes(id);
+const slotOf = id => state.equipped.indexOf(id)+1;
+const activeFilters = () => state.attrs.length + (state.showLocked?1:0);
+
+/* ----------------------------- render ----------------------------- */
+function railRows(){
+  let list = SKILLS.filter(s=>{
+    if(!state.showLocked && s.lock) return false;
+    if(state.attrs.length && !s.scale.some(([a])=>state.attrs.includes(a))) return false;
+    return true;
+  });
+  const key = state.sort;
+  list.sort((a,b)=>{
+    if(key==='name') return a.name.localeCompare(b.name);
+    if(key==='cd') return a.cd-b.cd;
+    if(key==='dmg') return totalDmg(b)-totalDmg(a);
+    return dps(b)-dps(a);
+  });
+  const eqList = list.filter(s=>isEq(s.id)).sort((a,b)=>slotOf(a.id)-slotOf(b.id));
+  const avList = list.filter(s=>!isEq(s.id));
+  const rowHtml = s=>`
+    <div class="row ${s.id===state.sel?'sel':''} ${s.lock?'lock':''}" data-pick="${s.id}">
+      <div class="ico sk rico">${s.lock?'\u{1F512}':'ico'}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="rowname">${s.name}</div>
+        <div class="rowmeta">${totalDmg(s)} dmg \u00b7 ${s.cd}s \u00b7 ${dps(s)} dps</div>
+      </div>
+      ${isEq(s.id)?`<div class="slotbadge">${slotOf(s.id)}</div>`:''}
+      ${s.lock?'<span class="lockmini">\u{1F512}</span>':''}
+    </div>`;
+  let html='';
+  if(eqList.length){ html+=`<div class="grp"><span>\u25c6 Equipped</span><span>${state.equipped.length}/${state.cap}</span></div>`+eqList.map(rowHtml).join(''); }
+  html+=`<div class="grp"><span>Available</span><span>${avList.length}</span></div>`+ (avList.map(rowHtml).join('') || `<div class="rowmeta" style="padding:10px 8px;">none match the filter</div>`);
+  return html;
+}
+
+function detail(){
+  const s = byId(state.sel);
+  const eq = isEq(s.id);
+  const full = state.equipped.length>=state.cap;
+  const pending = state.pendingSwap===s.id;
+  let cta;
+  if(s.lock){
+    cta = `<button class="btn dim" disabled style="cursor:not-allowed;">\u{1F512} Locked</button>
+           <div class="d-hint">Unlock by completing<br><b style="color:var(--ink);">${s.lock}</b></div>`;
+  } else if(eq){
+    cta = `<button class="btn danger" data-toggle="${s.id}">\u2713 In loadout \u00b7 Remove</button>
+           <div class="d-hint">priority slot ${slotOf(s.id)} \u00b7 drag below to reorder</div>`;
+  } else if(pending){
+    cta = `<button class="btn ghost" data-swapcancel="1">Cancel swap</button>
+           <div class="d-hint">pick an equipped card below to replace</div>`;
+  } else if(full){
+    cta = `<button class="btn ghost" data-toggle="${s.id}">Loadout full \u00b7 Swap\u2026</button>
+           <div class="d-hint">choose which slot to replace</div>`;
+  } else {
+    cta = `<button class="btn" data-toggle="${s.id}">Equip \u25b8</button>
+           <div class="d-hint">${state.cap-state.equipped.length} slot(s) free</div>`;
+  }
+  const cs = contrib(s);
+  const maxC = Math.max(s.base, ...cs.map(c=>c.val), 1);
+  const scaleHtml = cs.map(c=>`
+    <div class="scale">
+      <span class="chip on">${c.a}</span>
+      <div class="bar" style="flex:1;"><i style="width:${Math.round(c.val/maxC*100)}%;"></i></div>
+      <span class="contrib">${ATTRNAME[c.a]} \u00d7${c.m} = +${c.val}</span>
+    </div>`).join('');
+  return `
+    <div class="d-top">
+      <div class="ico sk d-ico">${s.lock?'\u{1F512}':'icon'}${eq?`<div class="slotbadge">${slotOf(s.id)}</div>`:''}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="eyebrow">${s.scale.length?('Scales '+s.scale.map(([a])=>a).join(' \u00b7 ')):'Active skill'}</div>
+        <div class="d-name">${s.name}</div>
+        <div class="scr-sub">${s.desc}</div>
+      </div>
+      <div class="d-cta">${cta}</div>
+    </div>
+
+    <div class="bignums">
+      <div class="stat"><span class="v">${totalDmg(s)}</span><span class="k">damage</span></div>
+      <div class="stat"><span class="v">${s.cd}s</span><span class="k">cooldown</span></div>
+      <div class="stat"><span class="v">${dps(s)}</span><span class="k">dps</span></div>
+      <div class="stat"><span class="v">${(10/s.cd).toFixed(1)}</span><span class="k">casts / 10s</span></div>
+    </div>
+
+    <div class="d-sec">
+      <div class="label">\u25b8 Damage breakdown \u00b7 base ${s.base} + scaling</div>
+      ${scaleHtml || '<div class="scr-sub">No attribute scaling.</div>'}
+    </div>
+
+    <div class="d-foot">
+      <div class="foot-item"><div class="lab">Scaling</div><div class="val">${s.scale.length?s.scale.map(([a])=>a).join(' \u00b7 '):'\u2014'}</div></div>
+      <div class="foot-item"><div class="lab">Source</div><div class="val">${s.lock?('\u{1F512} '+s.lock):('\u2713 '+s.source)}</div></div>
+      <div class="foot-item"><div class="lab">Status</div><div class="val">${eq?('Equipped \u00b7 slot '+slotOf(s.id)):(s.lock?'Locked':'Available')}</div></div>
+    </div>`;
+}
+
+function band(){
+  const target = state.pendingSwap!=null;
+  const slots=[];
+  for(let i=0;i<state.cap;i++){
+    const id = state.equipped[i];
+    if(id!=null){
+      const s=byId(id);
+      slots.push(`<div class="eqcard sk ${target?'swap-target':''}" data-idx="${i}" draggable="${!target}">
+        <span class="num">${i+1}</span>${target?'<span class="rep">\u21aa replace</span>':`<span class="rm" data-toggle="${id}">\u2715</span>`}
+        <div class="en" data-pick="${id}">${s.name}</div>
+        <div class="es">
+          <div class="stat"><span class="v">${totalDmg(s)}</span><span class="k">dmg</span></div>
+          <div class="stat"><span class="v">${s.cd}s</span><span class="k">cd</span></div>
+          <div class="stat"><span class="v">${dps(s)}</span><span class="k">dps</span></div>
+        </div>
+        <div style="display:flex;gap:5px;">${s.scale.map(([a])=>`<span class="chip">${a}</span>`).join('')}</div>
+      </div>`);
+    } else {
+      slots.push(`<div class="eqcard dashed empty ${target?'dimmed':''}"><span class="plus">+</span><span class="label">add skill</span></div>`);
+    }
+  }
+  return slots.join('');
+}
+
+function modal(){
+  if(!state.modal) return '<div class="modal-layer" id="modal-layer"></div>';
+  const sortOpts = SORTS.map(([k,l])=>`<button class="opt ${state.sort===k?'on':''}" data-sort="${k}">${l}</button>`).join('');
+  return `
+  <div class="modal-layer open" id="modal-layer">
+    <div class="backdrop" data-close="1"></div>
+    <div class="modal sk-b">
+      <div class="msub">Library</div>
+      <h3>Sort &amp; Filter</h3>
+      <div class="mgroup">
+        <div class="gl">Sort by</div>
+        <div class="opts">${sortOpts}</div>
+      </div>
+      <div class="mgroup">
+        <div class="gl">Filter by attribute</div>
+        <div class="opts">${USED_ATTRS.map(a=>`<button class="opt ${state.attrs.includes(a)?'on':''}" data-attr="${a}">${ATTRNAME[a]}</button>`).join('')}</div>
+      </div>
+      <div class="mgroup">
+        <div class="mrow"><span class="ml">Show locked skills</span><button class="switch ${state.showLocked?'on':''}" data-sw="showLocked"></button></div>
+      </div>
+      <div class="mfoot">
+        <button class="btn dim" data-reset="1">Reset</button>
+        <button class="btn" data-close="1">Apply</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function render(){
+  document.body.classList.toggle('mono', state.mono);
+  const combinedDps = state.equipped.reduce((x,id)=>x+ +dps(byId(id)),0);
+  const burst = state.equipped.reduce((x,id)=>x+ totalDmg(byId(id)),0);
+  const nf = activeFilters();
+  document.getElementById('scaler').innerHTML = `
+  <div class="frame" style="--cap:${state.cap};">
+    <div class="head">
+      <span class="diamond"></span>
+      <div><div class="eyebrow">Equip the skills you fight with</div><div class="scr-title">Skills</div></div>
+      <div style="flex:1;"></div>
+      <div class="head-totals sk">
+        <div class="stat"><span class="v">${state.equipped.length}/${state.cap}</span><span class="k">equipped</span></div>
+        <div class="stat"><span class="v">${combinedDps}</span><span class="k">combined dps</span></div>
+        <div class="stat"><span class="v">${burst}</span><span class="k">burst</span></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="rail sk-b">
+        <div class="rail-top">
+          <div class="searchrow">
+            <div class="search dashed">\u2315 search skills\u2026</div>
+            <button class="filt-btn" id="open-filter">\u21c5 Sort\u00b7Filter ${nf?`<span class="badge">${nf}</span>`:''}</button>
+          </div>
+          <div class="rail-meta">
+            <span class="label">Sort: ${SORTS.find(x=>x[0]===state.sort)[1]}</span>
+            <span class="label">${state.attrs.length?('Attr: '+state.attrs.join(', ')):'All attributes'}${state.showLocked?' \u00b7 +locked':''}</span>
+          </div>
+        </div>
+        <div class="rail-list scrollY">${railRows()}</div>
+      </div>
+
+      <div class="detail sk-b">${detail()}</div>
+    </div>
+
+    <div class="band-head">
+      ${state.pendingSwap!=null
+        ? `<span class="label" style="color:var(--danger);">\u25b8 Replacing with ${byId(state.pendingSwap).name} \u2014 click a slot to swap in</span>
+           <div style="flex:1;"></div>
+           <button class="chip" data-swapcancel="1" style="cursor:pointer;border-color:var(--ink);color:var(--ink);">Cancel</button>`
+        : `<span class="label">\u25b8 Equipped loadout \u2014 priority left \u2192 right \u00b7 drag to reorder</span>
+           <div style="flex:1;"></div>
+           <span class="chip">${state.equipped.length}/${state.cap}</span>`}
+    </div>
+    <div class="band">${band()}</div>
+
+    <div class="legend">B+ \u00b7 click to inspect \u00b7 equip / remove / drag-reorder live \u00b7 Sort\u00b7Filter opens a modal</div>
+    ${modal()}
+  </div>`;
+  fit();
+}
+
+function fit(){
+  const stage=document.getElementById('stage'), frame=document.querySelector('.frame');
+  if(!frame) return;
+  const scale=Math.min(1,(stage.clientWidth-48)/frame.offsetWidth,(stage.clientHeight-44)/frame.offsetHeight);
+  document.getElementById('scaler').style.transform=`translateX(-50%) scale(${scale})`;
+}
+window.addEventListener('resize', fit);
+
+/* ----------------------------- interactions ----------------------------- */
+document.getElementById('stage').addEventListener('click', e=>{
+  const pick=e.target.closest('[data-pick]');
+  const tog=e.target.closest('[data-toggle]');
+  const open=e.target.closest('#open-filter');
+  const close=e.target.closest('[data-close]');
+  const reset=e.target.closest('[data-reset]');
+  const sortB=e.target.closest('[data-sort]');
+  const attrB=e.target.closest('[data-attr]');
+  const sw=e.target.closest('[data-sw]');
+  const swapcancel=e.target.closest('[data-swapcancel]');
+  // --- swap mode takes precedence: pick an equipped card to replace ---
+  if(state.pendingSwap!=null){
+    if(swapcancel){ state.pendingSwap=null; render(); return; }
+    const card=e.target.closest('.eqcard[data-idx]');
+    if(card){ const idx=+card.dataset.idx; const incoming=state.pendingSwap; state.equipped=state.equipped.map((x,i)=>i===idx?incoming:x); state.sel=incoming; state.pendingSwap=null; render(); return; }
+  }
+  if(tog){ const id=+tog.dataset.toggle; const s=byId(id); if(s.lock) return;
+    if(isEq(id)) state.equipped=state.equipped.filter(x=>x!==id);
+    else if(state.equipped.length<state.cap) state.equipped=[...state.equipped,id];
+    else state.pendingSwap=id; // loadout full — enter swap mode
+    render(); return; }
+  if(pick){ state.sel=+pick.dataset.pick; state.pendingSwap=null; render(); return; }
+  if(open){ state.modal=true; syncModalToggle(); render(); return; }
+  if(sortB){ state.sort=sortB.dataset.sort; render(); return; }
+  if(attrB){ const a=attrB.dataset.attr; state.attrs=state.attrs.includes(a)?state.attrs.filter(x=>x!==a):[...state.attrs,a]; render(); return; }
+  if(sw){ const k=sw.dataset.sw; state[k]=!state[k]; render(); return; }
+  if(reset){ state.sort='dps'; state.attrs=[]; state.showLocked=false; render(); return; }
+  if(close){ state.modal=false; syncModalToggle(); render(); return; }
+});
+
+/* drag-to-reorder the equipped loadout */
+const stageEl=document.getElementById('stage');
+stageEl.addEventListener('dragstart', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(!c||state.pendingSwap!=null){ e.preventDefault(); return; } state.dragIdx=+c.dataset.idx; e.dataTransfer.effectAllowed='move'; c.classList.add('dragging'); });
+stageEl.addEventListener('dragover', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(c&&state.dragIdx!=null){ e.preventDefault(); document.querySelectorAll('.eqcard.dragover').forEach(x=>x.classList.remove('dragover')); c.classList.add('dragover'); } });
+stageEl.addEventListener('drop', e=>{ const c=e.target.closest('.eqcard[data-idx]'); if(!c||state.dragIdx==null) return; e.preventDefault(); const to=+c.dataset.idx, from=state.dragIdx; if(to!==from){ const arr=[...state.equipped]; const [m]=arr.splice(from,1); arr.splice(to,0,m); state.equipped=arr; } state.dragIdx=null; render(); });
+stageEl.addEventListener('dragend', ()=>{ state.dragIdx=null; document.querySelectorAll('.eqcard.dragover,.eqcard.dragging').forEach(x=>x.classList.remove('dragover','dragging')); });
+
+/* tweaks */
+document.getElementById('seg-cap').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+  state.cap=+b.dataset.n;
+  document.querySelectorAll('#seg-cap button').forEach(x=>x.classList.toggle('on',x===b));
+  if(state.equipped.length>state.cap) state.equipped=state.equipped.slice(0,state.cap);
+  render();
+});
+function syncModalToggle(){ document.getElementById('tg-modal').classList.toggle('on', state.modal); }
+document.getElementById('tg-modal').onclick=function(){ state.modal=!state.modal; this.classList.toggle('on',state.modal); render(); };
+document.getElementById('tg-mono').onclick=function(){ state.mono=!state.mono; this.classList.toggle('on',state.mono); render(); };
+
+render();
+</script>
+</body>
+</html>

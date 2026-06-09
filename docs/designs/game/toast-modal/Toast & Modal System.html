@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Toast &amp; Modal System · Tactic Foundry</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="tm-shared.jsx"></script>
+<script type="text/babel" src="tm-toasts.jsx"></script>
+<script type="text/babel" src="tm-modals.jsx"></script>
+<script type="text/babel" src="tm-playground.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "toastDir": "atmospheric",
+  "modalDir": "atmospheric",
+  "modalKind": "destructive",
+  "anchor": "top-right"
+}/*EDITMODE-END*/;
+
+const DIR_NAME = { standard: 'A · Standard', iconed: 'B · Iconed', atmospheric: 'C · Atmospheric' };
+const MDIR_NAME = { sheet: 'A · Sheet', framed: 'B · Framed', atmospheric: 'C · Atmospheric' };
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <React.Fragment>
+      <DesignCanvas
+        title="Toast &amp; Modal System · Tactic Foundry"
+        subtitle="A standard treatment for transient toasts and blocking modals, in the game's existing language — dark #14151b surfaces, Geist + Geist Mono, rotated-diamond marks, thin borders, accent-glow shadows. Three directions each, safe → bold. The four status types (info / success / warning / error) reuse the colors already in the toast store. The last board is live: fire toasts and open modals with real entrance/exit motion, and use Tweaks to set the toast anchor.">
+
+        <DCSection id="toasts" title="Toasts · three directions"
+          subtitle="Each board stacks all four status types. A keeps today's minimal toast; B adds a status tile + glyph and an auto-dismiss timer bar; C is game-flavored — a pulsing diamond, accent glow + tint, and an inline action. All auto-animate in on load.">
+          {['standard', 'iconed', 'atmospheric'].map((d) => (
+            <DCArtboard key={d} id={`toast-${d}`} label={`${DIR_NAME[d]} — ${TOAST_DIRECTIONS.find((x) => x.id === d).blurb}`} width={460} height={560}>
+              <ToastStack direction={d} />
+            </DCArtboard>
+          ))}
+        </DCSection>
+
+        <DCSection id="modals" title="Modals · three directions"
+          subtitle="A confirm dialog over the dimmed game. A is a quiet centered sheet; B frames it with a diamond header, an accent rail and divider rules; C is heightened for big moments (rewards, boss intros) with an emblem, a softly pulsing glow border and a vignette. Buttons follow the existing accent / ghost pattern.">
+          {['sheet', 'framed', 'atmospheric'].map((d) => (
+            <DCArtboard key={d} id={`modal-${d}`} label={`${MDIR_NAME[d]} — ${MODAL_DIRECTIONS.find((x) => x.id === d).blurb}`} width={640} height={480}>
+              <ModalScene direction={d} kind="confirm" animateIn={false} />
+            </DCArtboard>
+          ))}
+        </DCSection>
+
+        <DCSection id="content" title="Modal content types"
+          subtitle="The same direction (B · Framed shown) flexes across the content kinds you flagged: a two-action Confirm, a single-button Acknowledge, and a Destructive confirm that swaps to the error color for the primary action.">
+          {[['confirm', 'Confirm / cancel'], ['acknowledge', 'Acknowledge — single action'], ['destructive', 'Destructive — danger tone']].map(([k, lbl]) => (
+            <DCArtboard key={k} id={`content-${k}`} label={lbl} width={560} height={440}>
+              <ModalScene direction="framed" kind={k} animateIn={false} />
+            </DCArtboard>
+          ))}
+        </DCSection>
+
+        <DCSection id="live" title="Live playground · motion + placement"
+          subtitle="Driven by the Tweaks panel. Click a status glyph or Fire toast to push a real toast (auto-dismisses after 6s with an exit animation); Open modal to see the dialog enter. Switch directions, content kind and toast anchor in Tweaks.">
+          <DCArtboard id="playground" label="Live — fire toasts, open modals" width={1080} height={640}>
+            <Playground toastDir={t.toastDir} modalDir={t.modalDir} modalKind={t.modalKind} anchor={t.anchor} />
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Toasts" />
+        <TweakSelect label="Toast direction" value={t.toastDir}
+          options={[{ value: 'standard', label: 'A · Standard' }, { value: 'iconed', label: 'B · Iconed' }, { value: 'atmospheric', label: 'C · Atmospheric' }]}
+          onChange={(v) => setTweak('toastDir', v)} />
+        <TweakSelect label="Anchor" value={t.anchor}
+          options={[{ value: 'top-right', label: 'Top right' }, { value: 'top-center', label: 'Top center' }, { value: 'bottom-right', label: 'Bottom right' }, { value: 'bottom-center', label: 'Bottom center' }]}
+          onChange={(v) => setTweak('anchor', v)} />
+
+        <TweakSection label="Modals" />
+        <TweakSelect label="Modal direction" value={t.modalDir}
+          options={[{ value: 'sheet', label: 'A · Sheet' }, { value: 'framed', label: 'B · Framed' }, { value: 'atmospheric', label: 'C · Atmospheric' }]}
+          onChange={(v) => setTweak('modalDir', v)} />
+        <TweakRadio label="Content" value={t.modalKind}
+          options={[{ value: 'confirm', label: 'Confirm' }, { value: 'acknowledge', label: 'Ack' }, { value: 'destructive', label: 'Danger' }]}
+          onChange={(v) => setTweak('modalKind', v)} />
+      </TweaksPanel>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

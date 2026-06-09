@@ -179,7 +179,8 @@ GameServer/
 │   │   └── styles/           # Global SCSS and theming
 │   └── e2e-tests/            # Playwright end-to-end tests
 ├── docs/                     # Architecture and design documentation
-│   └── spikes/               # Research spikes for large scale effor
+│   ├── designs/              # Claude Design mocks and chat transcripts
+│   └── spikes/               # Research spikes for large scale efforts
 ├── docker-compose.local.yml  # Local dev stack (Docker Desktop, bridge networking)
 ├── docker-compose.yml        # CI / constrained-environment stack (host networking)
 ├── e2e-seed.sql              # Minimal seed data for Playwright runs

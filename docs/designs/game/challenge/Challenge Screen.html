@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Challenge Screen · Directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #ededed; font-family: Geist, Arial, Helvetica, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tooltip-shared.jsx"></script>
+<script type="text/babel" src="tooltip-final.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="inv-data.jsx"></script>
+<script type="text/babel" src="inv-shared.jsx"></script>
+<script type="text/babel" src="chal-data.jsx"></script>
+<script type="text/babel" src="chal-shared.jsx"></script>
+<script type="text/babel" src="chal-ledger.jsx"></script>
+<script type="text/babel" src="chal-grid.jsx"></script>
+<script type="text/babel" src="chal-track.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "density": "comfortable",
+  "rarityGlow": true,
+  "rewardSub": false,
+  "iconSize": 60
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const tweaks = { density: t.density, rarityGlow: t.rarityGlow, rewardSub: t.rewardSub, iconSize: t.iconSize };
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="directions" title="Challenges · Directions"
+          subtitle="Three takes on the Challenges screen, redesigned in the game's visual language. The shared idea: a challenge's REWARD (an item or an item-mod) becomes an interactive, rarity-aware affordance — hover it to reveal the exact same tooltip you'd see inspecting that thing in your inventory (items reuse the finalized item tooltip; mods get a matching mod tooltip). The three differ in how the reward is surfaced: a highlighted text link, a rarity icon tile, or an inline chip. Tweaks (toolbar) adjust density, rarity glow, the reward subtitle, and the grid's icon size.">
+          <DCArtboard id="ledger" label="A · Ledger (reward as link)" width={1280} height={880}>
+            <ChallengeLedger tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="grid" label="B · Reward-forward cards" width={1280} height={880}>
+            <ChallengeGrid tweaks={tweaks} />
+          </DCArtboard>
+          <DCArtboard id="tracks" label="C · Tracks + summary rail" width={1280} height={880}>
+            <ChallengeTracks tweaks={tweaks} />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Layout" />
+        <TweakRadio label="Density" value={t.density}
+          options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]}
+          onChange={(v) => setTweak('density', v)} />
+        <TweakSlider label="Reward icon size (B)" value={t.iconSize} min={40} max={68} step={4} unit="px"
+          onChange={(v) => setTweak('iconSize', v)} />
+        <TweakSection label="Reward styling" />
+        <TweakToggle label="Rarity glow" value={t.rarityGlow} onChange={(v) => setTweak('rarityGlow', v)} />
+        <TweakToggle label="Reward subtitle (A)" value={t.rewardSub} onChange={(v) => setTweak('rewardSub', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
