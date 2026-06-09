@@ -34,7 +34,7 @@ namespace Game.Core.Tests.Battle.Performance
     /// </para>
     /// <para>
     /// These are tagged <c>[Trait("Category", "Performance")]</c> so they can be excluded from a run
-    /// in one line (<c>dotnet test --filter-not-trait "Category=Performance"</c>) if they ever prove
+    /// in one line (<c>dotnet test -- --filter-not-trait "Category=Performance"</c>) if they ever prove
     /// noisy on the PR gate. They are intentionally <b>backend-only</b>: unlike the battle-simulation
     /// <em>parity</em> tests, they assert nothing about correctness or determinism, so there is no
     /// frontend mirror to keep in sync.
