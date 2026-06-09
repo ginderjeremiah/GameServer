@@ -12,6 +12,8 @@ This project is a web-based game with a svelte 5 frontend and a C# ASP.NET Core 
 
 This game is an idle incremental RPG where players can progress through various stages, defeat monsters, and unlock new content. The game features a variety of mechanics, including character leveling and stat points, unlockable items and item modifications, and skills. It primarily revolves around a continuous battle mechanic where players idle in different zones and automatically fight monsters.
 
+This game is not publicly available and is still in development. You do not have to be concerned about making changes backwards compatible or grandfathering for new features.
+
 VERY IMPORTANT: if you are working on game features or mechanics, you MUST read the [Game Design Document](./docs/game-design.md).
 
 # General Coding Guidelines
@@ -19,6 +21,7 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 - Prefer writing DRY code whenever possible.
 - NEVER omit the {} when writing if/else, while, or for blocks.
 - AVOID using the null-forgiving operator (!) as much as possible. You should always attempt to appropriate handle nullable values and you should only reach for (!) if you ABSOLUTELY need it.
+- Generally try to keep code comments to 1-2 lines. Only include more than 2 if the extra context is critical.
 - Keep in mind that the code already in the codebase may violate the rules/suggestions in the documentation, but that does NOT mean that the code is "ok". You should not copy the style or patterns of existing code if it contradicts the recommendations from documentation. In fact if you do see such code, you should mention it as a follow-up comment (or create a follow-up GitHub issue) and suggest refactoring it to align with the current guidelines. The documentation should be considered the source of truth for how code should be written in this project, and all code (new and old) should be held to those standards.
 - When you are altering existing code check that you are not leaving dead code behind. If you are removing or replacing functionality, make sure to remove any code that is no longer being used as well. This includes things like unused variables, functions, classes, and imports.
 - Remember that as code evolves over time, some code may become unused, redundant, or overly complex. It is important to regularly review and refactor code to keep it clean and maintainable. If you are working on a piece of code and notice that it has become unwieldy or difficult to understand, take the time to refactor it and improve its readability and maintainability or create a follow-up task to address it later if it would increase the scope of your work by a significant amount.
