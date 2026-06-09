@@ -2,7 +2,8 @@ import { onDestroy } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
 export interface TooltipComponent {
-	getBaseNode: () => HTMLDivElement;
+	// May be undefined until the tooltip component's root element has mounted.
+	getBaseNode: () => HTMLDivElement | undefined;
 }
 
 export interface TooltipData {

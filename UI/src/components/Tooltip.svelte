@@ -10,12 +10,12 @@ let { component, position, visible }: TooltipData = $props();
 let container: HTMLDivElement;
 
 $effect(() => {
-	const comp = component();
-	if (comp) {
+	const node = component()?.getBaseNode();
+	if (node) {
 		// eslint-disable-next-line svelte/no-dom-manipulating
 		container.replaceChildren();
 		// eslint-disable-next-line svelte/no-dom-manipulating
-		container.appendChild(comp.getBaseNode());
+		container.appendChild(node);
 	}
 });
 

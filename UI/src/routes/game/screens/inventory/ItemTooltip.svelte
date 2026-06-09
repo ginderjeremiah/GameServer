@@ -1,46 +1,40 @@
-<div
-	class="item-tooltip"
-	bind:this={container}
-	style={item ? '' : 'display: none;'}
-	style:border-left="3px solid {rarityAccent}"
->
-	{#if item}
+<TooltipShell accent={rarityAccent} hidden={!item} bind:base={container}>
+	{#snippet header()}
 		<TooltipTitle label={categoryName} name={displayName} diamondColor={categoryColor} labelColor={categoryColor}>
 			{#snippet trailing()}
-				{#if item.equipped}
+				{#if item?.equipped}
 					<EquippedBadge />
 				{/if}
 			{/snippet}
 		</TooltipTitle>
+	{/snippet}
 
-		<div class="tt-body">
-			<!-- Stats -->
-			{#if attributeMap?.length}
-				<TooltipSection label="Stats">
-					<TooltipStatsGrid entries={attributeMap} />
-				</TooltipSection>
-			{/if}
-
-			<!-- Mods — every slot, filled or empty -->
-			{#if modSlots.length}
-				<TooltipSection label="Mods · {filledCount}/{modSlots.length}">
-					<ModList slots={modSlots} />
-				</TooltipSection>
-			{/if}
-
-			<!-- Description -->
-			{#if item.description}
-				<TooltipSection label="Description" last>
-					<div class="tt-description">{item.description}</div>
-				</TooltipSection>
-			{/if}
-		</div>
+	<!-- Stats -->
+	{#if attributeMap?.length}
+		<TooltipSection label="Stats">
+			<TooltipStatsGrid entries={attributeMap} />
+		</TooltipSection>
 	{/if}
-</div>
+
+	<!-- Mods — every slot, filled or empty -->
+	{#if modSlots.length}
+		<TooltipSection label="Mods · {filledCount}/{modSlots.length}">
+			<ModList slots={modSlots} />
+		</TooltipSection>
+	{/if}
+
+	<!-- Description -->
+	{#if item?.description}
+		<TooltipSection label="Description" last>
+			<div class="tt-description">{item.description}</div>
+		</TooltipSection>
+	{/if}
+</TooltipShell>
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { composeItemName, itemCategoryColor, itemCategoryName, rarityColor } from '$lib/common';
+import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
@@ -55,7 +49,9 @@ type Props = {
 
 const { item }: Props = $props();
 
-let container: HTMLDivElement;
+// Bound to the shell's root element and relocated into the global tooltip container
+// by getBaseNode(); reactive so the relocation runs once the shell has mounted.
+let container = $state<HTMLDivElement>();
 
 const attributeMap = $derived(item?.totalAttributes?.getAttributeMap());
 
@@ -80,16 +76,6 @@ const displayName = $derived(item ? composeItemName(item.name, item.appliedMods)
 </script>
 
 <style lang="scss">
-.item-tooltip {
-	width: 280px;
-	border-radius: 3px;
-	box-shadow: -4px 0 16px color-mix(in srgb, var(--black) 15%, transparent);
-}
-
-.tt-body {
-	padding: 12px 16px 14px;
-}
-
 .tt-description {
 	font-size: 11.5px;
 	font-style: italic;
