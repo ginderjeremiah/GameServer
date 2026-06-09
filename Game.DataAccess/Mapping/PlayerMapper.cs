@@ -35,6 +35,7 @@ namespace Game.DataAccess.Mapping
                     Player = player,
                     SkillId = skill.SkillId,
                     Selected = skill.Selected,
+                    Order = skill.Order,
                 }).ToList();
 
             player.PlayerAttributes = newPlayer.Attributes
@@ -129,8 +130,14 @@ namespace Game.DataAccess.Mapping
 
             var playerSkills = skillsById.Values.ToList();
 
+            // Order the equipped set by (Order, SkillId) for a stable total order. The equipped
+            // order is captured into BattleSnapshot.SkillIds and sent to the client, so the
+            // backend's order must be deterministic to preserve battle parity — including for
+            // legacy rows that default to Order = 0 (SkillId is the deterministic tie-break).
             var selectedSkills = entity.PlayerSkills
                 .Where(ps => ps.Selected)
+                .OrderBy(ps => ps.Order)
+                .ThenBy(ps => ps.SkillId)
                 .Select(ps => skillsById[ps.SkillId])
                 .ToList();
 

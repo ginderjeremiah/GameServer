@@ -5,6 +5,7 @@
         public int PlayerId { get; set; }
         public int SkillId { get; set; }
         public bool Selected { get; set; }
+        public int Order { get; set; }
 
         public virtual Player Player { get => field ?? throw new NotLoadedException(nameof(Player)); set; }
         public virtual Skill Skill { get => field ?? throw new NotLoadedException(nameof(Skill)); set; }

@@ -35,7 +35,7 @@ namespace Game.Core.Players
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
                 Skills = Enumerable.Range(0, StarterSkillCount)
-                    .Select(id => new NewPlayerSkill { SkillId = id, Selected = true })
+                    .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
                     .ToList(),
                 Attributes = Enumerable.Range(0, AttributeCount)
                     .Select(id => new StatAllocation { Attribute = (EAttribute)id, Amount = StartingAttributeAmount })
