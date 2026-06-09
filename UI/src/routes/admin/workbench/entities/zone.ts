@@ -20,12 +20,10 @@ const refresh = async (): Promise<WorkbenchZone[]> => {
 		bossEnemyId: zone.bossEnemyId ?? -1,
 		// Likewise normalise the optional unlock-gate FK to the "None" sentinel (-1).
 		unlockChallengeId: zone.unlockChallengeId ?? -1,
-		zoneEnemies: enemies
-			.filter((enemy) => enemy.spawns.some((spawn) => spawn.zoneId === zone.id))
-			.map((enemy) => ({
-				enemyId: enemy.id,
-				weight: enemy.spawns.find((spawn) => spawn.zoneId === zone.id)!.weight
-			}))
+		zoneEnemies: enemies.flatMap((enemy) => {
+			const spawn = enemy.spawns.find((s) => s.zoneId === zone.id);
+			return spawn ? [{ enemyId: enemy.id, weight: spawn.weight }] : [];
+		})
 	}));
 };
 

@@ -171,6 +171,9 @@ export function groupBySource<T extends AttributeModifier>(
 			groups.set(line.source, { source: line.source, total: line.applied, lines: [line] });
 		}
 	}
-	const ordered = SOURCE_ORDER.filter((s) => groups.has(s)).map((s) => groups.get(s)!);
+	const ordered = SOURCE_ORDER.flatMap((s) => {
+		const group = groups.get(s);
+		return group ? [group] : [];
+	});
 	return { groups: ordered, mults };
 }

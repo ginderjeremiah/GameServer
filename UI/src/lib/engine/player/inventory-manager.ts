@@ -90,8 +90,8 @@ export class InventoryManager {
 
 		// Unequip from any current slot
 		for (let i = 0; i < this.equippedSlots.length; i++) {
-			if (this.equippedSlots[i]?.itemId === itemId) {
-				const old = this.equippedSlots[i]!;
+			const old = this.equippedSlots[i];
+			if (old?.itemId === itemId) {
 				old.equipped = false;
 				old.equipmentSlotId = undefined;
 				this.equippedSlots[i] = undefined;
@@ -99,8 +99,8 @@ export class InventoryManager {
 		}
 
 		// Unequip whatever is in the target slot
-		if (this.equippedSlots[slotId]) {
-			const displaced = this.equippedSlots[slotId]!;
+		const displaced = this.equippedSlots[slotId];
+		if (displaced) {
 			displaced.equipped = false;
 			displaced.equipmentSlotId = undefined;
 		}

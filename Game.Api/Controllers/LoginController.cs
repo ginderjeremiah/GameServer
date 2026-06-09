@@ -75,7 +75,7 @@ namespace Game.Api.Controllers
         [HttpGet]
         public async Task<ApiResponse<PlayerData>> Status()
         {
-            if (!_sessionService.SessionAvailable)
+            if (!_sessionService.Authenticated)
             {
                 return ApiResponse.Error("Not logged in");
             }
@@ -92,7 +92,7 @@ namespace Game.Api.Controllers
         [HttpGet]
         public async Task<ApiResponse<ActiveSessionResult>> ActiveSession()
         {
-            if (!_sessionService.SessionAvailable)
+            if (!_sessionService.Authenticated)
             {
                 return ApiResponse.Error("Not logged in");
             }
