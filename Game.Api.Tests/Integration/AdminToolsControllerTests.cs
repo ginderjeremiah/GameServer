@@ -571,6 +571,46 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(10m, created.ProgressGoal);
         }
 
+        [Fact]
+        public async Task AddEditChallenges_AddChallengeWithSkillReward_RoundTripsRewardSkillId()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball"); // Id 0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Pyromancer",
+                        Description = "Defeat enough foes to learn Fireball.",
+                        ChallengeTypeId = (int)EChallengeType.EnemiesKilled,
+                        TargetEntityId = (int?)null,
+                        ProgressGoal = 25m,
+                        RewardItemId = (int?)null,
+                        RewardItemModId = (int?)null,
+                        RewardSkillId = (int?)skill.Id
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditChallenges", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            var created = Assert.Single(GetChallenges(), c => c.Name == "Pyromancer");
+            Assert.Equal(skill.Id, created.RewardSkillId);
+        }
+
         // The reference-data HTTP GET endpoints were removed (#64); reads now go over the socket, which
         // serves the same in-memory caches these repositories expose. The admin write filter invalidates
         // those caches, so reading through the repository after a write returns the freshly-persisted data

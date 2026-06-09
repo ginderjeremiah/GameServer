@@ -1,22 +1,31 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute } from '$lib/api';
-import type { ISkill } from '$lib/api';
+import { EAttribute, EItemModType } from '$lib/api';
+import type { ISkill, IItem, IItemMod } from '$lib/api';
 
 // Drive the REAL production simulation. The mocked `staticData.skills` is the
 // registry `makeBattler` registers each scenario's skills into, so the Battlers
-// resolve their skills exactly as the live game does.
+// resolve their skills exactly as the live game does; `items` / `itemMods` back
+// the registries `makeEquipment` builds equipped items + applied mods from.
 const mockSkills: ISkill[] = [];
+const mockItems: IItem[] = [];
+const mockItemMods: IItemMod[] = [];
 vi.mock('$stores', () => ({
 	staticData: {
 		get skills() {
 			return mockSkills;
+		},
+		get items() {
+			return mockItems;
+		},
+		get itemMods() {
+			return mockItemMods;
 		}
 	}
 }));
 
 import { BattleSimulator, Battler } from '$lib/battle';
 import type { BattleResult } from '$lib/battle';
-import { battlerFactory, makeSkill } from './battle-sim-test-utils';
+import { battlerFactory, equipmentFactory, makeSkill } from './battle-sim-test-utils';
 
 /**
  * The parity matrix below asserts the full outcome (victory / playerDied /
@@ -27,6 +36,7 @@ import { battlerFactory, makeSkill } from './battle-sim-test-utils';
  */
 const msPerTick = 40;
 const makeBattler = battlerFactory(mockSkills);
+const makeEquipment = equipmentFactory(mockItems, mockItemMods);
 
 // ── Shared parity matrix ───────────────────────────────────────────────────────
 // Every scenario here MUST mirror — with identical inputs and identical expected
@@ -176,12 +186,66 @@ const scenarios: ParityScenario[] = [
 			),
 		maxMs: 200,
 		expected: { victory: false, playerDied: false, totalMs: 200 }
+	},
+
+	// The only scenario whose player is built through the equipped-item + applied-mod
+	// attribute-composition path (the rest build the player from raw stat allocations).
+	// An item and two mods (prefix + suffix) each contribute Strength, so dropping any
+	// one source changes the kill count; the item's Agility and the prefix's Dexterity
+	// additionally feed CooldownRecovery, so the whole merge is exercised end to end.
+	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
+	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=10 → cdMult=1.10.
+	//   Player skill: 10 + 45*1.5 = 77.5 raw, after enemy def 17 → 60.5, fires every 28 ticks
+	//     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
+	//   Enemy: MaxHealth=400, Def=17; attack 5-32 clamps to 0, so the player never dies.
+	//   7 hits reach 423.5 ≥ 400 at tick 196 → 7840ms (vs 21600ms for the same allocations
+	//   with no equipment — proof the merged attributes change the outcome).
+	{
+		name: 'equippedItemWithMods',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 20 },
+					{ id: EAttribute.Endurance, amount: 20 }
+				],
+				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])],
+				makeEquipment({
+					attributes: [
+						{ attributeId: EAttribute.Strength, amount: 10 },
+						{ attributeId: EAttribute.Agility, amount: 20 }
+					],
+					mods: [
+						{
+							type: EItemModType.Prefix,
+							attributes: [
+								{ attributeId: EAttribute.Strength, amount: 8 },
+								{ attributeId: EAttribute.Dexterity, amount: 20 }
+							]
+						},
+						{
+							type: EItemModType.Suffix,
+							attributes: [{ attributeId: EAttribute.Strength, amount: 7 }]
+						}
+					]
+				})
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 15 }
+				],
+				[makeSkill(5, 2000)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 7840 }
 	}
 ];
 
 describe('Battle simulation parity with backend', () => {
 	beforeEach(() => {
 		mockSkills.length = 0;
+		mockItems.length = 0;
+		mockItemMods.length = 0;
 	});
 
 	for (const scenario of scenarios) {
@@ -205,6 +269,27 @@ describe('Battle simulation parity with backend', () => {
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
 		expect(enemy.attributes.getValue(EAttribute.Defense)).toBe(17);
+	});
+
+	it('composes the equippedItemWithMods stat + item + mod attributes to the expected values', () => {
+		// Pins the merged values down so a divergence in item/mod attribute merging
+		// (rather than just the battle outcome) is reported directly. Mirrors
+		// BattleSimulatorParityTests.Parity_EquippedItemWithMods_ComposesMergedAttributes.
+		const scenario = scenarios.find((s) => s.name === 'equippedItemWithMods');
+		if (!scenario) {
+			throw new Error('equippedItemWithMods scenario is missing from the matrix');
+		}
+		const player = scenario.player();
+
+		// Strength 20 (alloc) + 10 (item) + 8 (prefix) + 7 (suffix) = 45.
+		expect(player.attributes.getValue(EAttribute.Strength)).toBe(45);
+		expect(player.attributes.getValue(EAttribute.Endurance)).toBe(20);
+		expect(player.attributes.getValue(EAttribute.Agility)).toBe(20);
+		expect(player.attributes.getValue(EAttribute.Dexterity)).toBe(20);
+		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(675);
+		expect(player.attributes.getValue(EAttribute.Defense)).toBe(32);
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(10);
+		expect(player.cdMultiplier).toBeCloseTo(1.1, 10);
 	});
 
 	it('ends sooner if the player double-counts derived stats (the historical bug)', () => {

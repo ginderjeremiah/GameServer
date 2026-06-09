@@ -95,6 +95,43 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(25.0, damage, 0.001);
         }
 
+        [Fact]
+        public void CalculateDamage_OnHotPath_DoesNotAllocate()
+        {
+            // CalculateDamage runs on every skill fire, the hottest sub-path of the simulation, so it
+            // must stay allocation-free (the prior LINQ `.Sum(lambda)` boxed a list enumerator and
+            // captured a closure on every call — #286). Measure managed allocations on this thread
+            // across a batch of calls and assert none, locking the optimization in against regression.
+            var multipliers = new List<AttributeModifier>
+            {
+                new() { Attribute = EAttribute.Strength,  Amount = 2.0, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
+                new() { Attribute = EAttribute.Endurance, Amount = 1.5, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
+                new() { Attribute = EAttribute.Agility,   Amount = 0.5, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
+            };
+            var skill = MakeSkill(cooldownMs: 1000, baseDamage: 5, multipliers: multipliers);
+            var battleSkill = new BattleSkill(skill);
+
+            var attacker = MakeBattler(strength: 10);
+            var defender = MakeBattler(strength: 0);
+            var context = new BattleContext(attacker, defender, timeDelta: 0);
+
+            // Warm up so JIT compilation and the AttributeCollection's first-access value caching
+            // happen before measuring — otherwise their one-off allocations would be counted.
+            for (var i = 0; i < 200; i++)
+            {
+                _ = battleSkill.CalculateDamage(context);
+            }
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++)
+            {
+                _ = battleSkill.CalculateDamage(context);
+            }
+            var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.Equal(0, allocatedBytes);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Skill MakeSkill(int cooldownMs, double baseDamage, List<AttributeModifier>? multipliers = null) => new()

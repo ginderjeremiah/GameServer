@@ -250,6 +250,9 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int?>("RewardItemModId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("RewardSkillId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("TargetEntityId")
                         .HasColumnType("integer");
 
@@ -260,6 +263,8 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("RewardItemId");
 
                     b.HasIndex("RewardItemModId");
+
+                    b.HasIndex("RewardSkillId");
 
                     b.ToTable("Challenges");
                 });
@@ -847,6 +852,9 @@ namespace Game.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Order")
                         .HasColumnType("integer");
 
                     b.Property<bool>("Selected")
@@ -1487,11 +1495,17 @@ namespace Game.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("RewardItemModId");
 
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "RewardSkill")
+                        .WithMany()
+                        .HasForeignKey("RewardSkillId");
+
                     b.Navigation("ChallengeType");
 
                     b.Navigation("RewardItem");
 
                     b.Navigation("RewardItemMod");
+
+                    b.Navigation("RewardSkill");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.ChallengeType", b =>

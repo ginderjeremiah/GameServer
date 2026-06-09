@@ -42,6 +42,7 @@ namespace Game.Api.Sockets.Commands
                 ProgressGoal = challenge.ProgressGoal,
                 RewardItemId = challenge.RewardItemId,
                 RewardItemModId = challenge.RewardItemModId,
+                RewardSkillId = challenge.RewardSkillId,
             };
         }
     }

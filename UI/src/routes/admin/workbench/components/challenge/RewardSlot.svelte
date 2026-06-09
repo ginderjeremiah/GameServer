@@ -2,7 +2,7 @@
 <div class="ch-reward-slot" class:filled={valueId != null} class:open>
 	<div class="ch-reward-head">
 		<span class="ch-reward-ic" style={valueId != null && color ? `color:${color};border-color:${color}` : ''}>
-			<WorkbenchIcon kind={kind === 'item' ? 'box' : 'rune'} size={15} />
+			<WorkbenchIcon kind={kind === 'item' ? 'box' : kind === 'mod' ? 'rune' : 'bolt'} size={15} />
 		</span>
 		<div class="ch-reward-body">
 			<div class="ch-reward-label">
@@ -23,9 +23,7 @@
 		{/if}
 	</div>
 	<button type="button" class="btn sm reward-cta" class:primary={valueId == null} onclick={onOpen}>
-		<WorkbenchIcon kind={open ? 'chevD' : 'plus'} size={12} />{valueId != null
-			? 'Change…'
-			: `Choose ${kind === 'item' ? 'item' : 'mod'}…`}
+		<WorkbenchIcon kind={open ? 'chevD' : 'plus'} size={12} />{valueId != null ? 'Change…' : `Choose ${kind}…`}
 	</button>
 </div>
 
@@ -33,7 +31,7 @@
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
 
 interface Props {
-	kind: 'item' | 'mod';
+	kind: 'item' | 'mod' | 'skill';
 	label: string;
 	valueId: number | undefined;
 	name: string | undefined;

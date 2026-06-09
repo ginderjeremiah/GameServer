@@ -123,6 +123,9 @@ class WorkbenchReference {
 		const mod = (staticData.itemMods ?? []).find((m) => m.id === id);
 		return mod ? this.modTypeName(mod.itemModTypeId) : undefined;
 	};
+	skillRecords = () => staticData.skills ?? [];
+	skillName = (id: number) => (staticData.skills ?? []).find((s) => s.id === id)?.name;
+	skillBaseDamage = (id: number) => (staticData.skills ?? []).find((s) => s.id === id)?.baseDamage;
 
 	// ── Name lookups ──
 	itemCategoryName = (id: number) => EItemCategory[id] ?? '';

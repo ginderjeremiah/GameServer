@@ -38,6 +38,7 @@ export interface IChallenge {
 	progressGoal: number;
 	rewardItemId?: number;
 	rewardItemModId?: number;
+	rewardSkillId?: number;
 }
 
 export interface IEnemy {

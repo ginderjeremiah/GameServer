@@ -6,6 +6,7 @@ using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
+using Game.Core.Skills;
 using Xunit;
 
 namespace Game.Core.Tests.Players
@@ -169,6 +170,46 @@ namespace Game.Core.Tests.Players
             Assert.NotNull(evt);
             Assert.Equal(player.Id, evt.PlayerId);
             Assert.Equal(5, evt.ItemModId);
+        }
+
+        // ── UnlockSkill ──────────────────────────────────────────────────────
+
+        [Fact]
+        public void UnlockSkill_AddsSkillToUnlockedSetUnselected()
+        {
+            var player = MakePlayer();
+            var skill = MakeSkill(id: 7);
+
+            player.UnlockSkill(skill);
+
+            Assert.Equal(skill, Assert.Single(player.Skills));
+            // Earning a skill does not equip it.
+            Assert.Empty(player.SelectedSkills);
+        }
+
+        [Fact]
+        public void UnlockSkill_RaisesSkillUnlockedEvent()
+        {
+            var player = MakePlayer();
+            var skill = MakeSkill(id: 7);
+
+            player.UnlockSkill(skill);
+
+            var evt = player.DomainEvents.OfType<SkillUnlockedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(7, evt.SkillId);
+        }
+
+        [Fact]
+        public void UnlockSkill_AlreadyUnlocked_DoesNotDuplicateInUnlockedSet()
+        {
+            var player = MakePlayer();
+            player.UnlockSkill(MakeSkill(id: 7));
+
+            player.UnlockSkill(MakeSkill(id: 7));
+
+            Assert.Single(player.Skills);
         }
 
         // ── TrySetFavorite ───────────────────────────────────────────────────
@@ -335,5 +376,15 @@ namespace Game.Core.Tests.Players
                 ModSlots = modSlots ?? [],
                 Tags = [],
             };
+
+        private static Skill MakeSkill(int id) => new()
+        {
+            Id = id,
+            Name = $"Skill {id}",
+            BaseDamage = 10,
+            Description = string.Empty,
+            CooldownMs = 1000,
+            DamageMultipliers = [],
+        };
     }
 }
