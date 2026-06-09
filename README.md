@@ -102,7 +102,7 @@ Run all backend tests (unit + integration):
 dotnet test Game.sln
 ```
 
-Integration tests require a running PostgreSQL and Redis instance. In constrained environments (e.g. CI without Docker bridge networking) the session-start hook handles this automatically — see [`docs/backend.md`](docs/backend.md#integration-test-containers-in-constrained-environments).
+Integration tests require a running PostgreSQL and Redis instance. In constrained environments (e.g. CI without Docker bridge networking) the session-start hook handles this automatically — see [`docs/infrastructure.md`](docs/infrastructure.md#integration-test-containers-in-constrained-environments).
 
 ### Frontend
 
@@ -154,7 +154,7 @@ Two compose files are provided depending on the environment:
 | [`docker-compose.local.yml`](docker-compose.local.yml) | Bridge (Docker Desktop) | Local development on Windows/Mac or standard Linux                        |
 | [`docker-compose.yml`](docker-compose.yml)             | Host                    | CI (GitHub Actions) or constrained environments without bridge networking |
 
-Both start the API, PostgreSQL, and Redis (the SvelteKit frontend is started separately by Playwright or `npm run dev`). See [`docs/backend.md`](docs/backend.md#dockerized-api-stack-for-end-to-end-playwright-runs) for configuration details and environment variable overrides.
+Both start the API, PostgreSQL, and Redis (the SvelteKit frontend is started separately by Playwright or `npm run dev`). See [`docs/infrastructure.md`](docs/infrastructure.md#dockerized-api-stack-for-end-to-end-playwright-runs) for configuration details and environment variable overrides.
 
 ## Project Structure
 
