@@ -16,7 +16,7 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    [ServiceFilter(typeof(AdminCacheInvalidationFilter), Order = AdminCacheInvalidationFilter.FilterOrder)]
+    [ReloadReferenceCaches]
     public class AdminChallengesController(IAdminChallenges adminChallenges) : ControllerBase
     {
         private readonly IAdminChallenges _adminChallenges = adminChallenges;

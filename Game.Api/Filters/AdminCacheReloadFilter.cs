@@ -10,7 +10,12 @@ namespace Game.Api.Filters
     /// preserving the Workbench's read-your-writes guarantee. A reload failure after a successful write
     /// surfaces as an error on the admin response (the write persisted; the admin can retry).
     /// </summary>
-    public class AdminCacheInvalidationFilter(IEnumerable<IReloadableReferenceCache> caches) : IAsyncActionFilter
+    /// <remarks>
+    /// Apply via <see cref="ReloadReferenceCachesAttribute"/> rather than a bare
+    /// <c>[ServiceFilter(typeof(AdminCacheReloadFilter))]</c>: the ordering below must hold for
+    /// read-your-writes, and the attribute bakes it in so a controller cannot accidentally omit it.
+    /// </remarks>
+    public class AdminCacheReloadFilter(IEnumerable<IReloadableReferenceCache> caches) : IAsyncActionFilter
     {
         /// <summary>
         /// Ordered to run outermost among action filters so this filter's post-action reload executes AFTER

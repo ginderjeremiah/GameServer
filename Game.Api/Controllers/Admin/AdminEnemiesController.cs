@@ -17,7 +17,7 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    [ServiceFilter(typeof(AdminCacheInvalidationFilter), Order = AdminCacheInvalidationFilter.FilterOrder)]
+    [ReloadReferenceCaches]
     public class AdminEnemiesController(IAdminEnemies adminEnemies) : ControllerBase
     {
         private readonly IAdminEnemies _adminEnemies = adminEnemies;

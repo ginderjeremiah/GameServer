@@ -85,7 +85,7 @@ namespace Game.Api
                 .AddTransient<SocketCommandFactory>()
                 .AddReferenceDataCommands()
                 .AddSingleton<ApiCodeGenerator>()
-                .AddScoped<AdminCacheInvalidationFilter>()
+                .AddScoped<AdminCacheReloadFilter>()
                 .AddScoped<AdminRoleAuthorizationFilter>();
 
             // Migrations are applied on startup in Development (frictionless local F5) and whenever
