@@ -98,6 +98,26 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void WriteApiInterfaces_EnumTypeConstructor_WritesEnumDefinition()
+        {
+            var writer = new ApiInterfaceWriter(_options);
+            var descriptor = new CodeGenTypeDescriptor(typeof(TestEnum));
+
+            writer.WriteApiInterfaces([descriptor], "// Auto-generated");
+
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "enums.ts"));
+            Assert.Contains("export enum TestEnum {", content);
+            Assert.Contains("None = 0,", content);
+            Assert.Contains("Pending = 3,", content);
+        }
+
+        [Fact]
+        public void EnumTypeConstructor_RejectsNonEnumType()
+        {
+            Assert.Throws<ArgumentException>(() => new CodeGenTypeDescriptor(typeof(SimpleModel)));
+        }
+
+        [Fact]
         public void WriteApiInterfaces_NestedClass_WritesImports()
         {
             var writer = new ApiInterfaceWriter(_options);

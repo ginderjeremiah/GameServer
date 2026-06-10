@@ -124,6 +124,7 @@ namespace Game.Core
     /// <summary>
     /// Represents a slot for items to be equipped to.
     /// </summary>
+    [ClientMirrored]
     public enum EEquipmentSlot
     {
         /// <summary>
@@ -259,6 +260,7 @@ namespace Game.Core
     /// <summary>
     /// Represents the type of a modifier (the way it is applied).
     /// </summary>
+    [ClientMirrored]
     public enum EModifierType
     {
         /// <summary>
@@ -342,6 +344,7 @@ namespace Game.Core
     /// <summary>
     /// Represents the source that contributed the attribute modifier.
     /// </summary>
+    [ClientMirrored]
     public enum EAttributeModifierSource
     {
         /// <summary>

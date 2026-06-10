@@ -58,6 +58,15 @@ export enum EEntityType {
 	Skill = 3,
 }
 
+export enum EEquipmentSlot {
+	HelmSlot = 0,
+	ChestSlot = 1,
+	LegSlot = 2,
+	BootSlot = 3,
+	WeaponSlot = 4,
+	AccessorySlot = 5,
+}
+
 export enum EItemCategory {
 	Helm = 1,
 	Chest = 2,
