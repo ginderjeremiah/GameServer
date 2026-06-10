@@ -1,8 +1,8 @@
 import type { Battler } from './battler';
 import { battleStep } from './battle-step';
+import { tickSize } from '$lib/engine/logical-engine';
 
-const msPerTick = 40;
-const defaultMaxMs = msPerTick * 10000;
+const defaultMaxMs = tickSize * 10000;
 
 /**
  * The deterministic outcome of a simulated battle. Mirrors the shape the backend
@@ -28,9 +28,9 @@ export class BattleSimulator {
 	) {}
 
 	public simulate(maxMs: number = defaultMaxMs): BattleResult {
-		let totalMs = msPerTick;
-		for (; totalMs <= maxMs; totalMs += msPerTick) {
-			battleStep(this.player, this.enemy, msPerTick);
+		let totalMs = tickSize;
+		for (; totalMs <= maxMs; totalMs += tickSize) {
+			battleStep(this.player, this.enemy, tickSize);
 
 			if (this.enemy.isDead) {
 				return { victory: true, playerDied: false, totalMs };
@@ -41,6 +41,6 @@ export class BattleSimulator {
 		}
 
 		// Mirror the backend's timeout return: the last simulated tick (maxMs), not maxMs + one tick.
-		return { victory: false, playerDied: false, totalMs: totalMs - msPerTick };
+		return { victory: false, playerDied: false, totalMs: totalMs - tickSize };
 	}
 }
