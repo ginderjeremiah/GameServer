@@ -168,6 +168,14 @@ describe('Skills screen', () => {
 		expect(container.querySelector('.modal')).toBeNull();
 	});
 
+	it('closes the sort/filter modal on Escape', async () => {
+		const { container } = render(Skills);
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
+		expect(container.querySelector('.modal')).toBeTruthy();
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(container.querySelector('.modal')).toBeNull();
+	});
+
 	it('updates effective numbers when the compare-vs defense changes', async () => {
 		const { container } = render(Skills);
 		const slider = container.querySelector<HTMLInputElement>('input[type="range"]')!;

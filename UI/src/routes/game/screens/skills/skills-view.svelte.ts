@@ -7,11 +7,12 @@
    through the single `SetSelectedSkills` socket command (mirroring how the backend
    models the loadout as one atomic set — see docs/spikes/179).
 
-   IMPORTANT: skill damage is NOT redefined here. Raw damage and the CooldownRecovery-
-   adjusted cooldown are computed from the same `BattleAttributes` the battle
-   simulation uses (player allocation + equipped item/mod stats), so the numbers the
-   page shows match what the game actually fights with. Effective damage subtracts the
-   Compare-vs defense, exactly like the battle's `Skill` vs enemy Defense. */
+   IMPORTANT: the display formulas here **mirror** the battle's (`Skill.calculateDamage`,
+   `Battler.takeDamage`'s defense subtraction, `Battler.cdMultiplier`) rather than calling
+   them — a deliberate display-only copy, with no parity guard, tracked for consolidation
+   onto one shared source in #347. They read attribute values from the same `BattleAttributes`
+   the simulation uses (player allocation + equipped item/mod stats), so today the numbers
+   the page shows match what the game actually fights with. */
 
 import { EAttribute, type IChallenge, type ISkill, apiSocket } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
@@ -71,7 +72,7 @@ export const effectiveDamage = (rawDamage: number, defense: number): number => M
 export const damagePerSecond = (damage: number, cooldown: number): number => (cooldown > 0 ? damage / cooldown : 0);
 
 /** Raw damage of a skill given the resolved battle attributes: base plus each
- *  multiplier applied to the attribute it scales (the battle `Skill.calculateDamage`). */
+ *  multiplier applied to the attribute it scales (mirrors the battle `Skill.calculateDamage`). */
 export function skillRawDamage(skill: ISkill, attributes: BattleAttributes): number {
 	let damage = skill.baseDamage;
 	for (const mult of skill.damageMultipliers) {

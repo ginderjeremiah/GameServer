@@ -1,3 +1,5 @@
+<svelte:window onkeydown={onKeydown} />
+
 {#if view.modalOpen}
 	<div class="modal-layer">
 		<button type="button" class="backdrop" aria-label="Close" onclick={() => (view.modalOpen = false)}></button>
@@ -77,6 +79,13 @@ const { view }: Props = $props();
 
 const attributeName = (id: EAttribute) =>
 	staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+
+/** Escape closes the open filter overlay (the backdrop click / Apply are the other paths). */
+const onKeydown = (e: KeyboardEvent) => {
+	if (e.key === 'Escape' && view.modalOpen) {
+		view.modalOpen = false;
+	}
+};
 </script>
 
 <style lang="scss">
@@ -107,7 +116,7 @@ const attributeName = (id: EAttribute) =>
 	border-radius: 6px;
 	background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface));
 	box-shadow:
-		0 30px 80px rgba(0, 0, 0, 0.6),
+		0 30px 80px color-mix(in srgb, var(--black) 60%, transparent),
 		0 0 40px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
