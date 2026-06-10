@@ -43,10 +43,8 @@ namespace Game.Core.Tests.Battle.Performance
     [Trait("Category", "Performance")]
     public class BattlePerformanceTests
     {
-        private const int MsPerTick = 40;
-
         // Per-tick cost cancels the tick count, so the scaling gates use a modest fixed length to stay
-        // fast; the backstop uses the simulator's real default cap (DefaultMaxMs / MsPerTick = 10000).
+        // fast; the backstop uses the simulator's real default cap (DefaultMaxBattleMs / MsPerTick = 10000).
         private const int ScalingTicks = 800;
         private const int WorstCaseTicks = 10_000;
 
@@ -172,7 +170,7 @@ namespace Game.Core.Tests.Battle.Performance
             string label, int skillCount, int multiplierCount, int ticks,
             int warmup, int samples, int operationsPerSample)
         {
-            var maxMs = ticks * MsPerTick;
+            var maxMs = ticks * GameConstants.MsPerTick;
 
             // Validate the scenario really runs to the tick cap: both combatants must survive so the
             // battle does a fixed, known amount of per-tick work (required for the per-tick figures to

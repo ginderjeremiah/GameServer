@@ -10,7 +10,6 @@ import type { BattleAttributes } from '$lib/battle';
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-		maxSelectedSkills: 3,
 		currentZone: 0,
 		attributes: [] as { attributeId: number; amount: number }[],
 		get selectedSkills(): number[] {
@@ -40,6 +39,13 @@ vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
+});
+// Pin the generated loadout cap so the full-loadout/swap scenarios below stay coherent (the
+// fixtures equip three of four unlocked skills); the cap's behavior is what's under test, not its
+// value. Partial mock — the other constants must stay real for the transitively-imported engine.
+vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	return { ...actual, MAX_SELECTED_SKILLS: 3 };
 });
 
 import {
@@ -188,7 +194,6 @@ beforeEach(() => {
 		{ skillId: 2, selected: true, order: 2 },
 		{ skillId: 3, selected: false, order: 0 }
 	];
-	mockPlayerManager.maxSelectedSkills = 3;
 	mockPlayerManager.attributes = [];
 	mockInventoryManager.equipmentStats = [];
 	view = new SkillsView();

@@ -12,9 +12,9 @@ vi.mock('$stores', () => ({
 }));
 
 import { BattleSimulator } from '$lib/battle';
+import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { battlerFactory, makeSkill } from './battle-sim-test-utils';
 
-const msPerTick = 40;
 const makeBattler = battlerFactory(mockSkills);
 // A combatant with no Strength/Endurance has MaxHealth=50, Def=2 (the derived-stat floor).
 const baseStats = [{ id: EAttribute.Endurance, amount: 0 }];
@@ -50,7 +50,7 @@ describe('BattleSimulator', () => {
 
 		const result = new BattleSimulator(player, enemy).simulate();
 
-		expect(result).toEqual({ victory: false, playerDied: false, totalMs: msPerTick * 10000 });
+		expect(result).toEqual({ victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS });
 	});
 
 	it('stops at maxMs (not maxMs + one tick) when capped before a kill', () => {

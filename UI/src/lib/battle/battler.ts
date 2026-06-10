@@ -1,6 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
 import { IBattlerAttribute, EAttribute } from '$lib/api';
+import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
 
 interface BattlerData {
@@ -10,7 +11,6 @@ interface BattlerData {
 	name: string;
 }
 
-const maxSkills = 4;
 let battlerId = 0;
 
 export class Battler {
@@ -20,7 +20,7 @@ export class Battler {
 	public currentHealth = 0;
 	public attributes: BattleAttributes = new BattleAttributes();
 	public skills: (Skill | undefined)[] = [];
-	public maxSkills: typeof maxSkills = maxSkills;
+	public maxSkills = MAX_SELECTED_SKILLS;
 	public isDead = true;
 
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
@@ -86,7 +86,7 @@ export class Battler {
 		const skills: (Skill | undefined)[] = battlerData.selectedSkills.map(
 			(skillId) => new Skill(skillData[skillId], this)
 		);
-		while (skills.length < maxSkills) {
+		while (skills.length < MAX_SELECTED_SKILLS) {
 			skills.push(undefined);
 		}
 		return skills;

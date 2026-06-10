@@ -1,9 +1,7 @@
 import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData, IUnlockedSkill } from '$lib/api';
+import { EXP_PER_LEVEL, STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 import { formatNum, statify } from '$lib/common';
 import { logMessage } from '../log';
-
-const expPerLevel = 100;
-const statPointsPerLevel = 6;
 
 export class PlayerManager implements IPlayerData {
 	public name = '';
@@ -14,7 +12,6 @@ export class PlayerManager implements IPlayerData {
 	public statPointsUsed = 0;
 	public attributes: IBattlerAttribute[] = [];
 	public unlockedSkills: IUnlockedSkill[] = [];
-	public maxSelectedSkills = 0;
 	public logPreferences: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
@@ -42,7 +39,6 @@ export class PlayerManager implements IPlayerData {
 		this.statPointsUsed = data.statPointsUsed;
 		this.attributes = data.attributes;
 		this.unlockedSkills = data.unlockedSkills;
-		this.maxSelectedSkills = data.maxSelectedSkills;
 		this.logPreferences = data.logPreferences;
 		this.inventoryData = data.inventoryData;
 	}
@@ -50,15 +46,15 @@ export class PlayerManager implements IPlayerData {
 	public grantExp(exp: number) {
 		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
-		while (this.exp >= this.level * expPerLevel) {
+		while (this.exp >= this.level * EXP_PER_LEVEL) {
 			this.levelUp();
 		}
 	}
 
 	public levelUp() {
-		this.exp -= this.level * expPerLevel;
+		this.exp -= this.level * EXP_PER_LEVEL;
 		this.level++;
-		this.statPointsGained += statPointsPerLevel;
+		this.statPointsGained += STAT_POINTS_PER_LEVEL;
 		logMessage(ELogType.LevelUp, 'Congratulations, you leveled up!');
 		logMessage(ELogType.LevelUp, `You are now level ${this.level}.`);
 	}
