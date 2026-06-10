@@ -33,6 +33,15 @@ namespace Game.DataAccess.DependencyInjection
                 .AddSingleton(PlayerUpdateRetryPolicy.Default)
                 .AddSingleton<DataProviderSynchronizer>()
                 .AddHostedService(sp => sp.GetRequiredService<DataProviderSynchronizer>())
+                // Cross-instance reference-cache invalidation (#359): the synchronizer broadcasts a
+                // reference-data-changed notification after admin writes (as IReferenceDataChangeNotifier,
+                // called by the admin cache-reload filter) and, as a hosted service, subscribes at startup
+                // to react to other instances' notifications with a debounced background reload sweep.
+                .AddSingleton(ReferenceCacheReloadPolicy.Default)
+                .AddSingleton<CoalescingReferenceCacheReloader>()
+                .AddSingleton<ReferenceCacheSynchronizer>()
+                .AddSingleton<IReferenceDataChangeNotifier>(sp => sp.GetRequiredService<ReferenceCacheSynchronizer>())
+                .AddHostedService(sp => sp.GetRequiredService<ReferenceCacheSynchronizer>())
                 // Player aggregate (write-behind: Redis + async sync)
                 .AddScoped<IPlayerRepository, PlayerRepository>()
                 // Entity store (admin tools)

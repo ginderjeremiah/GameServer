@@ -9,5 +9,7 @@
         internal const string PUBSUB_PLAYER_CHANNEL = "player";
         internal const string PUBSUB_PLAYER_QUEUE = "PlayerUpdateQueue";
         internal const string PUBSUB_PLAYER_DEAD_LETTER_QUEUE = "PlayerUpdateDeadLetterQueue";
+
+        internal const string PUBSUB_REFERENCE_DATA_CHANNEL = "referenceData";
     }
 }
