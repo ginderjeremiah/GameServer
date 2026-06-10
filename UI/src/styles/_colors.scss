@@ -4,6 +4,12 @@ $black: black;
 
 $dark-light-gray-grad: linear-gradient(0deg, rgba(0, 0, 0, 1) 0%, rgba(60, 60, 60, 1) 100%);
 
+// Opaque near-black page canvas. Drives the --page var and the global html/body
+// backstop in common.scss: a solid colour that paints on the very first frame so a
+// hard reload never flashes the white default canvas before the page gradient (a
+// background-image, which can rasterize a frame later) has painted.
+$page: #0f1014;
+
 // design system colors
 $accent: #a1c2f7;
 $accent-light: #c0d8ff;

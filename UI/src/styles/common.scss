@@ -1,6 +1,20 @@
+@use 'colors';
+
 :root {
 	font-size: 16px;
 	font-family: Geist, Arial, Helvetica, sans-serif;
+}
+
+// Opaque dark canvas backstop. The visible page surface is .page-base's gradient (a
+// background-image), but its background-color — and the html/body default — is
+// transparent, exposing the browser's white canvas in any frame before that image
+// paints. Routes that render dark content even at SSR (game, login, loading) cover it,
+// but /admin renders nothing until its client-only auth gate resolves, so a hard reload
+// there flashed white. A solid colour on the root canvas paints on the first frame and
+// removes the flash everywhere (the themeable surface stays .page-base).
+html,
+body {
+	background-color: colors.$page;
 }
 
 body {

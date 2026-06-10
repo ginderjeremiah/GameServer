@@ -64,14 +64,28 @@ describe('root layout boot gate', () => {
 		expect(resumeSession).not.toHaveBeenCalled();
 	});
 
-	it('resumes straight into the game when the session is fully restorable', async () => {
+	it('resumes a fully-restorable session into the game from the login route', async () => {
 		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
 		resumeSession.mockResolvedValue('game');
-		setPath('/game');
+		setPath('/');
 		renderLayout();
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
 		expect(resumeSession).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps a fully-restorable session on the route it refreshed on (e.g. /admin)', async () => {
+		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
+		resumeSession.mockResolvedValue('game');
+		// A restored session has a live player, so the post-boot safety net stays inert.
+		playerManager.name = 'Hero';
+		setPath('/admin');
+		renderLayout();
+
+		await waitFor(() => expect(resumeSession).toHaveBeenCalledTimes(1));
+		// Splash clears and the route content is revealed in place — no navigation away from /admin.
+		await waitFor(() => expect(screen.getByTestId('child')).toBeTruthy());
+		expect(goto).not.toHaveBeenCalled();
 	});
 
 	it('falls back to the loading screen when a reference set must be downloaded', async () => {
