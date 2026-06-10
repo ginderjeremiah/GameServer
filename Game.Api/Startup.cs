@@ -130,6 +130,10 @@ namespace Game.Api
                 await migrator.Migrate();
             }
 
+            // Eagerly load the in-memory reference-data caches before serving traffic so a database
+            // problem surfaces as a boot failure rather than on the first player request (#357).
+            app.Services.InitializeReferenceCaches();
+
             app.UseCors(builder =>
             {
                 builder.WithOrigins("http://localhost:5174")
