@@ -145,10 +145,7 @@ namespace Game.Application.Tests.Events
 
             // Reference caches are static and not reset between tests, so refresh them to pick up the
             // rows just seeded before the handler reads through its providers.
-            scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IItems>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<ISkills>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IEnemies>().InvalidateCache();
+            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
 
             return new Setup(player.Id, enemy.Id, item.Id, mod.Id, rewardSkill.Id);
         }
