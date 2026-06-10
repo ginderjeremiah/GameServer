@@ -16,7 +16,8 @@
 		"format": "prettier --write .",
 		"test:e2e": "playwright test",
 		"test:unit": "vitest",
-		"test:unit:ci": "vitest --run --reporter=minimal --reporter=json --outputFile.json=./unit-test-results.json"
+		"test:unit:ci": "vitest --run --reporter=minimal --reporter=json --outputFile.json=./unit-test-results.json --coverage",
+		"test:unit:coverage": "vitest --run --coverage"
 	},
 	"devDependencies": {
 		"@emnapi/core": "^1.10.0",
@@ -29,6 +30,7 @@
 		"@testing-library/svelte": "^5.3.1",
 		"@types/eslint": "^9.6.1",
 		"@types/node": "^25.9.1",
+		"@vitest/coverage-v8": "^4.1.8",
 		"eslint": "^9.0.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-prettier": "^5.5.6",

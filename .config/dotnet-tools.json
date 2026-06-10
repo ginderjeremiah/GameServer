@@ -8,6 +8,20 @@
         "dotnet-ef"
       ],
       "rollForward": false
+    },
+    "dotnet-coverage": {
+      "version": "18.8.0",
+      "commands": [
+        "dotnet-coverage"
+      ],
+      "rollForward": false
+    },
+    "dotnet-reportgenerator-globaltool": {
+      "version": "5.5.10",
+      "commands": [
+        "reportgenerator"
+      ],
+      "rollForward": false
     }
   }
 }

@@ -95,10 +95,14 @@ jobs:
     - name: Run formatter (verify only)
       run: dotnet format --verify-no-changes
 
-    - name: Execute full test suite
-      # The build above already restored and compiled everything; reuse those binaries instead of
-      # letting `dotnet test` trigger a redundant restore + rebuild.
-      run: dotnet test --no-build --no-restore
+    - name: Execute tests with coverage gate
+      # build/coverage.ps1 restores the coverage tools, collects one merged Cobertura across the whole
+      # solution's test run (dotnet-coverage, out-of-band so it's immune to the xunit.v3 / MTP version
+      # coupling), builds the ReportGenerator report, and runs the per-assembly coverage gate
+      # (build/coverage-floors.json). A test failure or a gate breach both fail this step. -NoBuild
+      # reuses the binaries from "Build solution" above.
+      shell: pwsh
+      run: ./build/coverage.ps1 -NoBuild
 
     - name: Upload test results
       if: always()
@@ -106,6 +110,14 @@ jobs:
       with:
         name: backend-test-results
         path: '**/TestResults/'
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: backend-coverage-report
+        path: coverage/backend-report
+        if-no-files-found: ignore
 
   test-frontend:
     needs: [detect-changes]

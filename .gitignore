@@ -153,6 +153,13 @@ coverage*.json
 coverage*.xml
 coverage*.info
 
+# Backend coverage output (dotnet-coverage Cobertura + ReportGenerator report)
+/coverage/
+
+# ...but the committed coverage gate config must stay tracked (the `coverage*.json` rule above
+# otherwise catches it).
+!build/coverage-floors.json
+
 # Visual Studio code coverage results
 *.coverage
 *.coveragexml

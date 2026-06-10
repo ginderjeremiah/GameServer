@@ -89,7 +89,7 @@ namespace Game.Api.CodeGen
 
         /// <summary>
         /// This descriptor together with every type reachable through its generic arguments
-        /// (recursively). A rendered type's text references all of these — e.g. <c>IChange&lt;IItem&gt;[]</c>
+        /// (recursively). A rendered type's text references all of these — e.g. <c>IChange<IItem>[]</c>
         /// names both <c>IChange</c> and <c>IItem</c> — so the map writers use this to collect the full
         /// import set rather than only the outermost type.
         /// </summary>
