@@ -18,6 +18,7 @@ import { TooltipBase, ToastContainer, ModalHost } from '$components';
 import { getTokens, onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';
+import { bootRedirect } from '$lib/engine/boot-redirect';
 import { toastError } from '$stores';
 import BootSplash from './BootSplash.svelte';
 import '$styles/common.scss';
@@ -39,11 +40,11 @@ onMount(() => {
 onSocketError((message) => toastError(message));
 
 // Boot gate. On a fresh page load (refresh or deep link) the in-memory game state is gone, so we
-// attempt to restore the session and decide where to land — straight into the game when the whole
-// reference-data cache is current, the loading screen when something must download, or the login
-// screen otherwise — showing a lightweight splash while we work it out rather than flashing the
-// loading manifest or the login form. `booting` starts false so it matches the server render (no
-// hydration mismatch) and is flipped on only on the client, where the stored tokens are visible.
+// attempt to restore the session and decide where to land — keeping a fully-restored session on the
+// route it loaded on (so refreshing /admin stays on /admin), the loading screen when something must
+// download, or the login screen otherwise — showing a lightweight splash while we work it out rather
+// than flashing the loading manifest or the login form. `booting` starts false so it matches the
+// server render (no hydration mismatch) and is flipped on only on the client, where the tokens live.
 let booting = $state(false);
 // True once the boot decision has resolved; until then the redirect guard below stays inert so it
 // can't bounce us off a protected route mid-restore.
@@ -61,11 +62,12 @@ onMount(async () => {
 
 		booting = true;
 		const destination = await resumeSession();
-		if (destination === 'game') {
+		const redirect = bootRedirect(destination, page.url.pathname);
+		if (redirect === 'game') {
 			await goto(resolve('/game'));
-		} else if (destination === 'loading') {
+		} else if (redirect === 'loading') {
 			await goto(resolve('/loading'));
-		} else if (page.url.pathname !== '/') {
+		} else if (redirect === 'login') {
 			await goto(resolve('/'));
 		}
 	} finally {
@@ -113,7 +115,7 @@ $effect(() => {
 	// opacity knob — lower it for a more see-through tooltip — and flows through
 	// theme overrides. Paired with the container's backdrop blur for legibility.
 	--tooltip-bg: color-mix(in srgb, var(--surface) 92%, transparent);
-	--page: #0f1014;
+	--page: #{colors.$page};
 	--panel: #16171e;
 	--panel-2: #1b1c24;
 	--mono: 'Geist Mono', ui-monospace, monospace;
