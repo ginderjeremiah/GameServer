@@ -25,6 +25,7 @@ vi.mock('$stores', () => ({
 
 import { BattleSimulator, Battler } from '$lib/battle';
 import type { BattleResult } from '$lib/battle';
+import { DEFAULT_MAX_BATTLE_MS, MS_PER_TICK } from '$lib/api/types/game-constants';
 import { battlerFactory, equipmentFactory, makeSkill } from './battle-sim-test-utils';
 
 /**
@@ -34,7 +35,6 @@ import { battlerFactory, equipmentFactory, makeSkill } from './battle-sim-test-u
  * running the real simulator (rather than a hand-rolled copy) means a change to
  * the per-tick arithmetic that diverges from the backend can no longer pass here.
  */
-const msPerTick = 40;
 const makeBattler = battlerFactory(mockSkills);
 const makeEquipment = equipmentFactory(mockItems, mockItemMods);
 
@@ -112,7 +112,7 @@ const scenarios: ParityScenario[] = [
 		name: 'highDefenseFloor',
 		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
-		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
+		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
 	// Neither side has skills, so no damage is dealt — runs to the default timeout.
@@ -134,7 +134,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[]
 			),
-		expected: { victory: false, playerDied: false, totalMs: msPerTick * 10000 }
+		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
 	// A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout (3 skills)
@@ -254,7 +254,7 @@ describe('Battle simulation parity with backend', () => {
 			const result = sim.simulate(scenario.maxMs);
 
 			expect(result).toEqual(scenario.expected);
-			expect(result.totalMs % msPerTick).toBe(0);
+			expect(result.totalMs % MS_PER_TICK).toBe(0);
 		});
 	}
 

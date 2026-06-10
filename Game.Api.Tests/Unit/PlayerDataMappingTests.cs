@@ -45,24 +45,13 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void FromPlayer_ReportsLoadoutCap()
-        {
-            var player = MakePlayer(skills: [MakeSkill(0)], selectedSkills: [MakeSkill(0)]);
-
-            var data = PlayerDataModel.FromPlayer(player);
-
-            Assert.Equal(CorePlayer.MaxSelectedSkills, data.MaxSelectedSkills);
-        }
-
-        [Fact]
-        public void FromPlayer_NoUnlockedSkills_ReturnsEmptySetAndStillReportsCap()
+        public void FromPlayer_NoUnlockedSkills_ReturnsEmptySet()
         {
             var player = MakePlayer(skills: [], selectedSkills: []);
 
             var data = PlayerDataModel.FromPlayer(player);
 
             Assert.Empty(data.UnlockedSkills);
-            Assert.Equal(CorePlayer.MaxSelectedSkills, data.MaxSelectedSkills);
         }
 
         private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills) => new()

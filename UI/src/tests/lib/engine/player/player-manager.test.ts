@@ -27,7 +27,6 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		{ skillId: 2, selected: false },
 		{ skillId: 3, selected: true, order: 2 }
 	],
-	maxSelectedSkills: 4,
 	logPreferences: [
 		{ id: ELogType.Damage, enabled: false },
 		{ id: ELogType.Exp, enabled: true }
@@ -74,7 +73,6 @@ describe('PlayerManager', () => {
 			expect(manager.statPointsUsed).toBe(24);
 			expect(manager.attributes).toEqual(data.attributes);
 			expect(manager.unlockedSkills).toEqual(data.unlockedSkills);
-			expect(manager.maxSelectedSkills).toBe(4);
 			expect(manager.logPreferences).toEqual(data.logPreferences);
 			expect(manager.inventoryData).toEqual(data.inventoryData);
 		});
@@ -148,7 +146,6 @@ describe('PlayerManager', () => {
 			expect(manager.exp).toBe(0);
 			expect(manager.attributes).toEqual([]);
 			expect(manager.unlockedSkills).toEqual([]);
-			expect(manager.maxSelectedSkills).toBe(0);
 			expect(manager.selectedSkills).toEqual([]);
 			expect(manager.logPreferences).toEqual([]);
 			expect(manager.inventoryData).toEqual({

@@ -1,6 +1,9 @@
 import { createHook, getEventCounter } from '$lib/common';
+import { MS_PER_TICK } from '$lib/api/types/game-constants';
 
-export const tickSize = 40; //ms
+// The logical tick size in ms — generated from the backend GameConstants so it can never drift
+// from the simulation the server replays (battle parity depends on it).
+export const tickSize = MS_PER_TICK;
 const tickSizeX5 = tickSize * 5;
 const pollingIntervalMs = 10;
 

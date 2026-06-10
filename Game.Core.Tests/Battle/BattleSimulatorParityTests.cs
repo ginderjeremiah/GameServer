@@ -92,7 +92,7 @@ namespace Game.Core.Tests.Battle
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 1000)]),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 40 * 10000),
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
                 // Neither side has any skills, so no damage is ever dealt and the
                 // battle runs to the default timeout.
@@ -101,7 +101,7 @@ namespace Game.Core.Tests.Battle
                     Enemy: () => MakeEnemy(strength: 10, endurance: 10, skills: []),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 40 * 10000),
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
                 // A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout
                 // (3 skills, more than the random 4-skill cap would force a narrowing on) against a player

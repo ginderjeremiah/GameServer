@@ -1,8 +1,7 @@
 import type { Battler } from './battler';
 import { battleStep } from './battle-step';
 import { tickSize } from '$lib/engine/logical-engine';
-
-const defaultMaxMs = tickSize * 10000;
+import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 /**
  * The deterministic outcome of a simulated battle. Mirrors the shape the backend
@@ -27,7 +26,7 @@ export class BattleSimulator {
 		private readonly enemy: Battler
 	) {}
 
-	public simulate(maxMs: number = defaultMaxMs): BattleResult {
+	public simulate(maxMs: number = DEFAULT_MAX_BATTLE_MS): BattleResult {
 		let totalMs = tickSize;
 		for (; totalMs <= maxMs; totalMs += tickSize) {
 			battleStep(this.player, this.enemy, tickSize);

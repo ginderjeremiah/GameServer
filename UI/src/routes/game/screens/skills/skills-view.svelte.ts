@@ -2,7 +2,7 @@
    locked) skill beside a large inspector, with an editable equipped band below.
 
    The page lets the player choose which skills (and in what order) are equipped
-   for battle, capped at `playerManager.maxSelectedSkills`. Edits are atomic: each
+   for battle, capped at the generated `MAX_SELECTED_SKILLS`. Edits are atomic: each
    committed change (equip / unequip / swap / reorder) replaces the whole loadout
    through the single `SetSelectedSkills` socket command (mirroring how the backend
    models the loadout as one atomic set — see docs/spikes/179).
@@ -15,6 +15,7 @@
    the page shows match what the game actually fights with. */
 
 import { EAttribute, type IChallenge, type ISkill, apiSocket } from '$lib/api';
+import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { BattleAttributes } from '$lib/battle';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
@@ -140,8 +141,8 @@ export class SkillsView {
 		}
 	}
 
-	/** The loadout cap (number of equip slots). */
-	readonly cap = $derived(playerManager.maxSelectedSkills);
+	/** The loadout cap (number of equip slots) — the single generated game constant. */
+	readonly cap = MAX_SELECTED_SKILLS;
 
 	/** Ids the player has unlocked. */
 	readonly unlockedIds = $derived(playerManager.unlockedSkills.map((s) => s.skillId));

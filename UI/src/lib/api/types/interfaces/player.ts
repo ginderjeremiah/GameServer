@@ -19,7 +19,6 @@ export interface IPlayerData {
 	exp: number;
 	attributes: IBattlerAttribute[];
 	unlockedSkills: IUnlockedSkill[];
-	maxSelectedSkills: number;
 	currentZone: number;
 	statPointsGained: number;
 	statPointsUsed: number;

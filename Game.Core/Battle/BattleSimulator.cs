@@ -5,9 +5,6 @@ namespace Game.Core.Battle
         private Battler PlayerBattler { get; set; }
         private Battler EnemyBattler { get; set; }
 
-        private const int MsPerTick = 40;
-        private const int DefaultMaxMs = MsPerTick * 10000;
-
         public BattleSimulator(Battler playerBattler, Battler enemyBattler)
         {
             PlayerBattler = playerBattler;
@@ -16,11 +13,12 @@ namespace Game.Core.Battle
 
         public BattleResult Simulate(int? maxMs = null)
         {
-            var limit = maxMs ?? DefaultMaxMs;
-            var context = new BattleContext(PlayerBattler, EnemyBattler, MsPerTick);
+            var msPerTick = GameConstants.MsPerTick;
+            var limit = maxMs ?? GameConstants.DefaultMaxBattleMs;
+            var context = new BattleContext(PlayerBattler, EnemyBattler, msPerTick);
 
             int totalMs;
-            for (totalMs = MsPerTick; totalMs <= limit; totalMs += MsPerTick)
+            for (totalMs = msPerTick; totalMs <= limit; totalMs += msPerTick)
             {
                 PlayerBattler.Update(context);
 
@@ -41,7 +39,7 @@ namespace Game.Core.Battle
                 context.SwapActiveAndTargetBattlers();
             }
 
-            return new BattleResult(false, false, totalMs - MsPerTick, context.Stats);
+            return new BattleResult(false, false, totalMs - msPerTick, context.Stats);
         }
     }
 }
