@@ -3,9 +3,8 @@ using CoreItemMod = Game.Core.Items.ItemMod;
 
 namespace Game.Abstractions.DataAccess
 {
-    public interface IItemMods
+    public interface IItemMods : ICacheInvalidatable
     {
-        public void InvalidateCache();
         public List<Contracts.ItemMod> All(bool refreshCache = false);
         // Whether an item mod with the given id exists; lets callers validate before GetItemMod without touching the entity.
         public bool ValidateItemModId(int itemModId);

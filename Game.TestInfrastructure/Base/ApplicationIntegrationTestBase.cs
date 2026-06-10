@@ -1,4 +1,3 @@
-using Game.Abstractions.DataAccess;
 using Game.Application.DependencyInjection;
 using Game.Core.Events;
 using Game.DataAccess;
@@ -82,14 +81,7 @@ namespace Game.TestInfrastructure.Base
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await DatabaseCleaner.TruncatePlayerDataAsync(context);
             await RedisCleaner.FlushAsync(Containers.CacheConnectionString);
-
-            // Invalidate static caches in repositories so stale data doesn't leak between tests
-            scope.ServiceProvider.GetRequiredService<IEnemies>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IZones>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<ISkills>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IItems>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IItemMods>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
+            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
         }
     }
 }

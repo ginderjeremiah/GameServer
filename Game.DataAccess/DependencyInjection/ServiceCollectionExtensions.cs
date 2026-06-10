@@ -44,21 +44,28 @@ namespace Game.DataAccess.DependencyInjection
                 // an internal entity-cache/queries seam (used by Enemies to build domain enemies, and by
                 // the Content Authoring admin repositories for existence/diff lookups); a single scoped
                 // instance backs both so the cached entity list is shared rather than duplicated.
+                // ICacheInvalidatable registrations allow resolving all invalidatable caches as a set
+                // (e.g. IEnumerable<ICacheInvalidatable>) without a manually-maintained list.
                 .AddScoped<IChallenges, Challenges>()
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IChallenges>())
                 .AddScoped<Enemies>()
                 .AddScoped<IEnemies>(sp => sp.GetRequiredService<Enemies>())
                 .AddScoped<IEnemyEntityCache>(sp => sp.GetRequiredService<Enemies>())
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IEnemies>())
                 .AddScoped<Items>()
                 .AddScoped<IItems>(sp => sp.GetRequiredService<Items>())
                 .AddScoped<IItemEntityCache>(sp => sp.GetRequiredService<Items>())
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IItems>())
                 .AddScoped<ItemMods>()
                 .AddScoped<IItemMods>(sp => sp.GetRequiredService<ItemMods>())
                 .AddScoped<IItemModEntityCache>(sp => sp.GetRequiredService<ItemMods>())
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IItemMods>())
                 .AddScoped<IItemModTypes, ItemModTypes>()
                 .AddScoped<IItemCategories, ItemCategories>()
                 .AddScoped<Skills>()
                 .AddScoped<ISkills>(sp => sp.GetRequiredService<Skills>())
                 .AddScoped<ISkillEntityCache>(sp => sp.GetRequiredService<Skills>())
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<ISkills>())
                 .AddScoped<Tags>()
                 .AddScoped<ITags>(sp => sp.GetRequiredService<Tags>())
                 .AddScoped<ITagEntityQueries>(sp => sp.GetRequiredService<Tags>())
@@ -66,6 +73,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<Zones>()
                 .AddScoped<IZones>(sp => sp.GetRequiredService<Zones>())
                 .AddScoped<IZoneEntityCache>(sp => sp.GetRequiredService<Zones>())
+                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IZones>())
                 .AddScoped<ISessionStore, SessionStore>()
                 .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
                 .AddScoped<IUsers, Users>()

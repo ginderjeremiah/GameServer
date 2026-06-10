@@ -3,9 +3,8 @@ using CoreZone = Game.Core.Zones.Zone;
 
 namespace Game.Abstractions.DataAccess
 {
-    public interface IZones
+    public interface IZones : ICacheInvalidatable
     {
-        public void InvalidateCache();
         public List<Contracts.Zone> All(bool refreshCache = false);
         // Returns the read contract for a single zone; throws if the id is out of range.
         public Contracts.Zone GetZone(int zoneId);

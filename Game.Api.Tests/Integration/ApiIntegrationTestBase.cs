@@ -1,4 +1,3 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Services;
@@ -41,14 +40,7 @@ namespace Game.Api.Tests.Integration
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await DatabaseCleaner.TruncatePlayerDataAsync(context);
             await RedisCleaner.FlushAsync(Containers.CacheConnectionString);
-
-            // Invalidate static caches in repositories so stale data doesn't leak between tests
-            scope.ServiceProvider.GetRequiredService<IEnemies>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IZones>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<ISkills>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IItems>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IItemMods>().InvalidateCache();
-            scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
+            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
         }
 
         public async ValueTask DisposeAsync()

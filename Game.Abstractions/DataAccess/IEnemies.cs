@@ -3,9 +3,8 @@ using CoreEnemy = Game.Core.Enemies.Enemy;
 
 namespace Game.Abstractions.DataAccess
 {
-    public interface IEnemies
+    public interface IEnemies : ICacheInvalidatable
     {
-        public void InvalidateCache();
         public List<Contracts.Enemy> All(bool refreshCache = false);
 
         /// <summary>Maps the entity enemy with <paramref name="level"/> to a domain
