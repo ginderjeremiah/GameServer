@@ -30,6 +30,14 @@ In early versions of this game, items dropped randomly from enemies with random 
 
 This system was ultimately scrapped in favor of a more deterministic system where items and item modifications are unlocked through Challenges. This change was made to provide a more engaging and rewarding progression system for players, as well as to allow for more strategic decision-making when it comes to character builds and playstyles. The tag system still exists as a means of determining which item modifications can be applied to which items. For example, a "Sharpened" modification may only be applicable to items with the "Sharp" tag.
 
+# Content Lifecycle — Retiring Reference Data
+
+Authored reference content (items, item mods, skills, enemies, zones, challenges) is **retired**, never hard-deleted. Retiring takes a piece of content *out of circulation* — the game stops introducing it anew — while keeping it permanently valid for anything that already references it. This is a deliberate design choice for an idle game where content ids are baked into persisted player state (equipped items, applied mods, unlocked skills, completed challenges, battle snapshots): a player who already earned a now-retired item keeps it and it behaves exactly as before, but new players won't encounter it.
+
+- **Retired ≠ deleted.** A retired record stays in the catalogue and is fully resolvable; it just isn't offered for new acquisition or encounters. Retiring is reversible (reinstate).
+- **What "out of circulation" means today:** a retired enemy no longer spawns in random idle encounters. Because acquisition is otherwise authored — items/mods/skills come from specific challenge rewards, bosses and zone unlocks are authored by id — retirement doesn't silently pull content a player already has or a challenge already grants; it only stops *new* organic exposure (random spawns), with admin authoring still able to reference it until the picker-exclusion follow-up lands.
+- **Why not delete:** deleting a non-terminal record would corrupt the id-as-index lookups the whole game relies on and orphan persisted references. See [backend.md → Retiring reference data](./backend.md#retiring-reference-data-content-lifecycle) for the mechanism and the deferred per-entity edge cases.
+
 # Challenges and Statistics
 
 Challenges and Statistics are relatively new additions to the game, and their design is still evolving. Challenges are a way for players to unlock new content and progression by completing specific tasks or reaching certain milestones in the game. They can range from simple objectives, like defeating a certain number of monsters, to more complex ones, like completing a zone without taking any damage.

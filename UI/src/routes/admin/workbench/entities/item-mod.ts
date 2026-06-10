@@ -18,6 +18,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 	singular: 'Item Mod',
 	glyph: 'rune',
 	blankName: 'Unnamed mod',
+	retireable: true,
 	newItem: (id) => ({
 		id,
 		name: '',

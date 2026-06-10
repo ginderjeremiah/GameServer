@@ -91,10 +91,13 @@ namespace Game.DataAccess.Repositories
         /// Builds the per-zone enemy spawn tables from the in-memory enemy list. The ZoneEnemy weights are
         /// already eager-loaded by <see cref="AllEntities"/>, so no database query (and no lock) is required, and
         /// keying by zone id avoids the previous unbounded list growth for arbitrary or invalid ids.
+        /// Retired enemies are excluded so they no longer roll as random encounters, while still resolving
+        /// by id for existing references (e.g. an authored zone boss).
         /// </summary>
         private static Dictionary<int, ProbabilityTable<int>> BuildZoneEnemyTables(IEnumerable<Enemy> enemies)
         {
             return enemies
+                .Where(enemy => enemy.RetiredAt is null)
                 .SelectMany(enemy => enemy.ZoneEnemies)
                 .GroupBy(zoneEnemy => zoneEnemy.ZoneId)
                 .ToDictionary(

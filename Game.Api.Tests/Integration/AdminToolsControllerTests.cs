@@ -67,6 +67,78 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditEnemies_RetireEnemy_PersistsRetiredAtAndKeepsItResolvable()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Doomed");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Retiring is an ordinary Edit that stamps RetiredAt — the admin tools no longer hard-delete
+            // top-level reference records.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        enemy.Id,
+                        enemy.Name,
+                        IsBoss = false,
+                        RetiredAt = DateTime.UtcNow,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
+            Assert.NotNull(saved.RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditEnemies_DeleteEnemy_IsRejectedAndLeavesRecordIntact()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Persistent");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // A top-level Delete against a zero-based-id reference set is unsupported (it would open an
+            // id gap that mis-resolves index lookups) — the batch fails and the record is untouched.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        enemy.Id,
+                        enemy.Name,
+                        IsBoss = false,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 2 // Delete
+                }
+            };
+
+            // The change set is rejected before anything is committed (the test host rethrows the
+            // action's exception), so the record is left untouched.
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken));
+
+            Assert.Contains(GetEnemies(), e => e.Id == enemy.Id);
+        }
+
+        [Fact]
         public async Task AddEditZones_AddZone_Succeeds()
         {
             using var authClient = await SetupAuthenticatedClientAsync();

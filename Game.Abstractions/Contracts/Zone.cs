@@ -21,5 +21,9 @@ namespace Game.Abstractions.Contracts
         /// <summary>The challenge that gates entry to this zone, or null when the zone is always open. The
         /// zone unlocks once the player completes this challenge.</summary>
         public int? UnlockChallengeId { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
+        /// Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
     }
 }

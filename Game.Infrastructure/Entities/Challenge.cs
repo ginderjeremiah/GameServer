@@ -12,6 +12,9 @@ namespace Game.Infrastructure.Entities
         public int? RewardItemModId { get; set; }
         public int? RewardSkillId { get; set; }
 
+        /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
+        public DateTime? RetiredAt { get; set; }
+
         public virtual Item? RewardItem { get; set; }
         public virtual ItemMod? RewardItemMod { get; set; }
         public virtual Skill? RewardSkill { get; set; }

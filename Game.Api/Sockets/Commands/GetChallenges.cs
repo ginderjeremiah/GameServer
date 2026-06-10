@@ -43,6 +43,7 @@ namespace Game.Api.Sockets.Commands
                 RewardItemId = challenge.RewardItemId,
                 RewardItemModId = challenge.RewardItemModId,
                 RewardSkillId = challenge.RewardSkillId,
+                RetiredAt = challenge.RetiredAt,
             };
         }
     }

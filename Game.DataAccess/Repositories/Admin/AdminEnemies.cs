@@ -29,11 +29,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Id = item.Id,
                     Name = item.Name,
                     IsBoss = item.IsBoss,
-                }),
-                delete: item => _entityStore.Delete(new Entities.Enemy
-                {
-                    Id = item.Id,
-                    Name = "",
+                    RetiredAt = item.RetiredAt,
                 }));
         }
 

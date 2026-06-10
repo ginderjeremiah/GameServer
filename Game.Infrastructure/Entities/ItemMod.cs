@@ -8,6 +8,9 @@
         public int ItemModTypeId { get; set; }
         public int RarityId { get; set; }
 
+        /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
+        public DateTime? RetiredAt { get; set; }
+
         public virtual ItemModType ItemModType { get => field ?? throw new NotLoadedException(nameof(ItemModType)); set; }
         public virtual Rarity Rarity { get => field ?? throw new NotLoadedException(nameof(Rarity)); set; }
 

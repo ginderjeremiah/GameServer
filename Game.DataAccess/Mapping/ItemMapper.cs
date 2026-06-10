@@ -85,6 +85,7 @@ namespace Game.DataAccess.Mapping
                         ItemModSlotTypeId = (EItemModType)ims.ItemModSlotTypeId,
                     }).ToList(),
                 Tags = entity.Tags.Select(t => t.Id).ToList(),
+                RetiredAt = entity.RetiredAt,
             };
         }
 
@@ -106,6 +107,7 @@ namespace Game.DataAccess.Mapping
                         Amount = ima.Amount,
                     }).ToList(),
                 Tags = entity.Tags.Select(t => t.Id).ToList(),
+                RetiredAt = entity.RetiredAt,
             };
         }
     }

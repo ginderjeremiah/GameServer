@@ -4,6 +4,11 @@ import type { WorkbenchIconKind } from '../WorkbenchIcon.svelte';
 export interface Identified {
 	id: number;
 	name?: string;
+	/**
+	 * Retire timestamp for reference entities (ISO string when retired, null/absent while active).
+	 * Present only on {@link EntityConfig.retireable} entities; tags and never-saved records leave it unset.
+	 */
+	retiredAt?: string | null;
 }
 
 /**
@@ -153,6 +158,12 @@ export interface EntityConfig<T extends Identified> {
 	singular: string;
 	glyph: WorkbenchIconKind;
 	blankName: string;
+	/**
+	 * Zero-based-id reference entity: records are <em>retired</em> (kept at their slot, resolvable by id)
+	 * rather than hard-deleted, which would open an id gap that mis-resolves index lookups. The detail
+	 * header offers Retire/Reinstate instead of Delete. Omitted (delete-able) for non-index entities like tags.
+	 */
+	retireable?: boolean;
 	newItem: (id: number) => T;
 	listBadge?: (rec: T) => string | null;
 	badgeColor?: (rec: T) => string;

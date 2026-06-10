@@ -40,12 +40,7 @@ namespace Game.DataAccess.Repositories.Admin
                     RewardItemId = item.RewardItemId,
                     RewardItemModId = item.RewardItemModId,
                     RewardSkillId = item.RewardSkillId,
-                }),
-                delete: item => _entityStore.Delete(new Entities.Challenge
-                {
-                    Id = item.Id,
-                    Name = "",
-                    Description = "",
+                    RetiredAt = item.RetiredAt,
                 }));
         }
     }

@@ -17,6 +17,7 @@ export const enemyEntity: EntityConfig<IEnemy> = {
 	singular: 'Enemy',
 	glyph: 'skull',
 	blankName: 'Unnamed enemy',
+	retireable: true,
 	newItem: (id) => ({ id, name: '', isBoss: false, attributeDistribution: [], skillPool: [], spawns: [] }),
 	listBadge: (e) => (e.isBoss ? 'Boss' : null),
 	badgeColor: () => 'var(--enemy-accent)',

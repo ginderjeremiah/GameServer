@@ -9,5 +9,9 @@ namespace Game.Abstractions.Contracts
         public required IEnumerable<AttributeDistribution> AttributeDistribution { get; set; }
         public required IEnumerable<int> SkillPool { get; set; }
         public required IEnumerable<EnemySpawn> Spawns { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
+        /// Null while active.</summary>
+        public DateTime? RetiredAt { get; set; }
     }
 }
