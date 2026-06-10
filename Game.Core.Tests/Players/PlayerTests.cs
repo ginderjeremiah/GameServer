@@ -338,6 +338,88 @@ namespace Game.Core.Tests.Players
             Assert.Equal([1, 2, 3, 4], player.SelectedSkills.Select(s => s.Id));
         }
 
+        // ── TryUnequipItem ───────────────────────────────────────────────────
+
+        [Fact]
+        public void TryUnequipItem_EquippedSlot_ClearsSlotAndRaisesItemUnequippedEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItem(id: 10));
+            player.TryEquipItem(10, EEquipmentSlot.AccessorySlot);
+            player.ClearEvents();
+
+            var result = player.TryUnequipItem(EEquipmentSlot.AccessorySlot);
+
+            Assert.True(result);
+            // The slot no longer holds the item.
+            Assert.DoesNotContain(player.Inventory.EquipmentSlots, s => s.ItemId == 10);
+            var evt = player.DomainEvents.OfType<ItemUnequippedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(10, evt.ItemId);
+        }
+
+        [Fact]
+        public void TryUnequipItem_EmptySlot_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayer();
+            player.ClearEvents();
+
+            // Nothing is equipped in the slot, so there is nothing to unequip.
+            var result = player.TryUnequipItem(EEquipmentSlot.AccessorySlot);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<ItemUnequippedEvent>());
+        }
+
+        // ── TryRemoveMod ─────────────────────────────────────────────────────
+
+        [Fact]
+        public void TryRemoveMod_AppliedMod_RemovesModAndRaisesModRemovedEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItemWithPrefixSlot(id: 10));
+            player.UnlockMod(5);
+            player.TryApplyMod(10, 5, 0, MakeMod(5, EItemModType.Prefix));
+            player.ClearEvents();
+
+            var result = player.TryRemoveMod(10, 0);
+
+            Assert.True(result);
+            Assert.Empty(player.Inventory.UnlockedItems.Single().AppliedMods);
+            var evt = player.DomainEvents.OfType<ModRemovedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(10, evt.ItemId);
+            Assert.Equal(0, evt.ItemModSlotId);
+        }
+
+        [Fact]
+        public void TryRemoveMod_NoModInSlot_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItemWithPrefixSlot(id: 10));
+            player.ClearEvents();
+
+            // The item is unlocked but the slot has no applied mod to remove.
+            var result = player.TryRemoveMod(10, 0);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<ModRemovedEvent>());
+        }
+
+        [Fact]
+        public void TryRemoveMod_ItemNotUnlocked_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayer();
+            player.ClearEvents();
+
+            var result = player.TryRemoveMod(999, 0);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<ModRemovedEvent>());
+        }
+
         // ── TrySetFavorite ───────────────────────────────────────────────────
 
         [Fact]
@@ -510,6 +592,23 @@ namespace Game.Core.Tests.Players
                 ModSlots = modSlots ?? [],
                 Tags = [],
             };
+
+        /// <summary>An accessory carrying a single Prefix mod slot at index 0, for the apply/remove-mod paths.</summary>
+        private static Item MakeItemWithPrefixSlot(int id) => MakeItem(id, modSlots:
+        [
+            new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+        ]);
+
+        private static ItemMod MakeMod(int id, EItemModType type) => new()
+        {
+            Id = id,
+            Name = $"Mod {id}",
+            Description = string.Empty,
+            Type = type,
+            Rarity = ERarity.Common,
+            Attributes = [],
+            Tags = [],
+        };
 
         private static Skill MakeSkill(int id) => new()
         {

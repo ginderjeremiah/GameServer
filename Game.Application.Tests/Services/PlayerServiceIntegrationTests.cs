@@ -439,6 +439,241 @@ namespace Game.Application.Tests.Services
             Assert.Empty(player.SelectedSkills);
         }
 
+        [Fact]
+        public async Task EquipItem_PersistsEquippedSlotToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            // A Weapon-category item (CreateItemAsync default), unlocked but not yet equipped.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+            Assert.True(success);
+
+            // Drain the write-behind queue (the hosted worker is disabled in the harness) so the change
+            // reaches the database, then read the row from a fresh context to confirm persistence.
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.UnlockedItems
+                .FirstOrDefaultAsync(ui => ui.PlayerId == playerEntity.Id && ui.ItemId == item.Id, CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal((int)EEquipmentSlot.WeaponSlot, persisted.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task EquipItem_ItemNotUnlocked_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            // The item exists in the catalog but the player has not unlocked it.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+
+            Assert.False(success);
+        }
+
+        [Fact]
+        public async Task UnequipItem_PersistsClearedSlotToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            // A Weapon-category item unlocked and already equipped in the weapon slot.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.UnequipItem(player, EEquipmentSlot.WeaponSlot);
+            Assert.True(success);
+
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.UnlockedItems
+                .FirstOrDefaultAsync(ui => ui.PlayerId == playerEntity.Id && ui.ItemId == item.Id, CancellationToken);
+            Assert.NotNull(persisted);
+            // The slot was cleared, so the item is unlocked but no longer equipped.
+            Assert.Null(persisted.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task UnequipItem_EmptySlot_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // Nothing is equipped in the weapon slot, so there is nothing to unequip.
+            var success = await playerService.UnequipItem(player, EEquipmentSlot.WeaponSlot);
+
+            Assert.False(success);
+        }
+
+        [Fact]
+        public async Task RemoveMod_PersistsRemovalToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // A weapon with one Prefix mod slot, equipped in the weapon slot.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var modSlot = new Infrastructure.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+                Index = 0,
+            };
+            context.ItemModSlots.Add(modSlot);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
+            });
+
+            var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
+            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            // Persist the applied mod as if it had been applied in a previous session, so the player
+            // loads with it already in place and RemoveMod has something to remove (the inverse of
+            // the LoadPlayer_PersistedAppliedMod scenario).
+            // AppliedMod.ItemModSlotId is a FK to ItemModSlot.Id, so the persisted row, the RemoveMod
+            // argument (matched against the loaded AppliedModSlot.ItemModSlotId), and the verify query
+            // all key off modSlot.Id — the same value the symmetric LoadPlayer_PersistedAppliedMod test
+            // persists. (The domain's Index-vs-Id mismatch on the apply path is tracked separately.)
+            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                ItemModSlotId = modSlot.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.RemoveMod(player, item.Id, modSlot.Id);
+            Assert.True(success);
+
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var remaining = await verifyContext.AppliedMods
+                .AnyAsync(am => am.PlayerId == playerEntity.Id && am.ItemId == item.Id && am.ItemModSlotId == modSlot.Id, CancellationToken);
+            Assert.False(remaining);
+        }
+
+        [Fact]
+        public async Task RemoveMod_NoAppliedMod_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // The item is unlocked but has no mod applied in slot 0, so there is nothing to remove.
+            var success = await playerService.RemoveMod(player, item.Id, itemModSlotId: 0);
+
+            Assert.False(success);
+        }
+
+        [Fact]
+        public async Task SaveLogPreferences_PersistsPreferencesToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var preferences = new List<LogPreference>
+            {
+                new() { LogType = ELogType.Damage, Enabled = false },
+                new() { LogType = ELogType.Exp, Enabled = true },
+            };
+
+            await playerService.SaveLogPreferences(player, preferences);
+
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.LogPreferences
+                .Where(lp => lp.PlayerId == playerEntity.Id)
+                .ToListAsync(CancellationToken);
+
+            Assert.Single(rows, lp => lp.LogTypeId == (int)ELogType.Damage && !lp.Enabled);
+            Assert.Single(rows, lp => lp.LogTypeId == (int)ELogType.Exp && lp.Enabled);
+        }
+
         private async Task DrainPlayerUpdateQueue(IServiceProvider services)
         {
             var pubsub = services.GetRequiredService<IPubSubService>();
