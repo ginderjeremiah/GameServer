@@ -39,6 +39,7 @@ export type ApiSocketResponseTypes = {
 	'NewEnemy': INewEnemyModel;
 	'SaveLogPreferences': undefined;
 	'SetItemFavorite': undefined;
+	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
 };
 
@@ -48,6 +49,7 @@ export type ApiSocketRequestTypes = {
 	'NewEnemy': INewEnemyRequest;
 	'SaveLogPreferences': ILogPreference[];
 	'SetItemFavorite': ISetItemFavoriteRequest;
+	'SetSelectedSkills': number[];
 };
 
 export type ApiSocketCommand = keyof ApiSocketResponseTypes;

@@ -112,6 +112,38 @@ namespace Game.Core.Players
             RaiseEvent(new SkillUnlockedEvent(Id, skill.Id));
         }
 
+        /// <summary>
+        /// Replaces the player's equipped skill loadout with <paramref name="orderedSkillIds"/> in the
+        /// given order, handling select, deselect, and reorder through one atomic path. Enforces the
+        /// loadout rules as anti-cheat: the set must contain no duplicates, fit within
+        /// <see cref="MaxSelectedSkills"/>, and consist only of skills the player has already unlocked.
+        /// On success the equipped set + order is replaced and a single
+        /// <see cref="SelectedSkillsChangedEvent"/> is raised; any validation failure rejects the change
+        /// (returns <c>false</c>, raising no event and leaving the loadout untouched).
+        /// </summary>
+        public bool TrySetSelectedSkills(IReadOnlyList<int> orderedSkillIds)
+        {
+            if (orderedSkillIds.Count > MaxSelectedSkills)
+            {
+                return false;
+            }
+
+            if (orderedSkillIds.Distinct().Count() != orderedSkillIds.Count)
+            {
+                return false;
+            }
+
+            var unlockedById = Skills.ToDictionary(s => s.Id);
+            if (!orderedSkillIds.All(unlockedById.ContainsKey))
+            {
+                return false;
+            }
+
+            SelectedSkills = orderedSkillIds.Select(id => unlockedById[id]).ToList();
+            RaiseEvent(new SelectedSkillsChangedEvent(Id, orderedSkillIds.ToList()));
+            return true;
+        }
+
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)
         {
             if (!Inventory.TryEquipItem(itemId, slot))

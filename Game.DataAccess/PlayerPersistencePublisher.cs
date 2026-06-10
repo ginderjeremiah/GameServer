@@ -21,6 +21,7 @@ namespace Game.DataAccess
         IDomainEventHandler<ModAppliedEvent>,
         IDomainEventHandler<ModRemovedEvent>,
         IDomainEventHandler<SkillUnlockedEvent>,
+        IDomainEventHandler<SelectedSkillsChangedEvent>,
         IDomainEventHandler<ItemFavoriteChangedEvent>,
         IDomainEventHandler<LogPreferenceChangedEvent>
     {
@@ -35,6 +36,7 @@ namespace Game.DataAccess
         public Task HandleAsync(ModAppliedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(ModRemovedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(SkillUnlockedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
+        public Task HandleAsync(SelectedSkillsChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(ItemFavoriteChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
         public Task HandleAsync(LogPreferenceChangedEvent domainEvent, CancellationToken cancellationToken = default) => PublishAsync(domainEvent);
 

@@ -212,6 +212,132 @@ namespace Game.Core.Tests.Players
             Assert.Single(player.Skills);
         }
 
+        // ── TrySetSelectedSkills ─────────────────────────────────────────────
+
+        [Fact]
+        public void TrySetSelectedSkills_ValidSet_ReplacesEquippedSetInGivenOrder()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+
+            var result = player.TrySetSelectedSkills([3, 1, 2]);
+
+            Assert.True(result);
+            // The equipped set is the exact requested order (not re-sorted); the write-behind handler
+            // persists each id's index as its Order so the mapper reproduces this order on reload.
+            Assert.Equal([3, 1, 2], player.SelectedSkills.Select(s => s.Id));
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_ValidSet_RaisesSelectedSkillsChangedEventWithOrderedIds()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+
+            player.TrySetSelectedSkills([3, 1]);
+
+            var evt = player.DomainEvents.OfType<SelectedSkillsChangedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal([3, 1], evt.OrderedSkillIds);
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_OverCap_ReturnsFalseAndRaisesNoEvent()
+        {
+            // Five unlocked skills, selecting all of them — one over the cap of 4.
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3, 4, 5);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([1, 2, 3, 4, 5]);
+
+            Assert.False(result);
+            Assert.Empty(player.SelectedSkills);
+            Assert.Empty(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_DuplicateId_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([1, 2, 1]);
+
+            Assert.False(result);
+            Assert.Empty(player.SelectedSkills);
+            Assert.Empty(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_NotUnlockedId_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+            player.ClearEvents();
+
+            // 9 is not in the player's unlocked set, so the whole loadout is rejected.
+            var result = player.TrySetSelectedSkills([1, 9]);
+
+            Assert.False(result);
+            Assert.Empty(player.SelectedSkills);
+            Assert.Empty(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_RejectedSet_LeavesExistingLoadoutUntouched()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+            player.TrySetSelectedSkills([1, 2]);
+            player.ClearEvents();
+
+            // A subsequent invalid request (duplicate) must not clobber the previously-equipped set.
+            var result = player.TrySetSelectedSkills([3, 3]);
+
+            Assert.False(result);
+            Assert.Equal([1, 2], player.SelectedSkills.Select(s => s.Id));
+            Assert.Empty(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_ReorderOnly_UpdatesOrderAndRaisesEvent()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+            player.TrySetSelectedSkills([1, 2, 3]);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([3, 2, 1]);
+
+            Assert.True(result);
+            Assert.Equal([3, 2, 1], player.SelectedSkills.Select(s => s.Id));
+            var evt = Assert.Single(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+            Assert.Equal([3, 2, 1], evt.OrderedSkillIds);
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_DeselectToEmpty_ClearsLoadoutAndRaisesEventWithEmptyList()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3);
+            player.TrySetSelectedSkills([1, 2]);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([]);
+
+            Assert.True(result);
+            Assert.Empty(player.SelectedSkills);
+            var evt = Assert.Single(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+            Assert.Empty(evt.OrderedSkillIds);
+        }
+
+        [Fact]
+        public void TrySetSelectedSkills_ExactlyAtCap_IsAccepted()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3, 4);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([1, 2, 3, 4]);
+
+            Assert.True(result);
+            Assert.Equal([1, 2, 3, 4], player.SelectedSkills.Select(s => s.Id));
+        }
+
         // ── TrySetFavorite ───────────────────────────────────────────────────
 
         [Fact]
@@ -354,6 +480,14 @@ namespace Game.Core.Tests.Players
             Skills = [],
             LogPreferences = [],
         };
+
+        /// <summary>Builds a player whose unlocked set contains a skill for each given id (none equipped).</summary>
+        private static Player MakePlayerWithUnlockedSkills(params int[] skillIds)
+        {
+            var player = MakePlayer();
+            player.Skills = skillIds.Select(MakeSkill).ToList();
+            return player;
+        }
 
         private static Enemy MakeEnemy(int id = 1) => new()
         {

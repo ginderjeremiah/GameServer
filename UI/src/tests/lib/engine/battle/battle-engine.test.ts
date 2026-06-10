@@ -68,6 +68,9 @@ vi.mock('$lib/engine/player/player-manager', () => ({
 }));
 
 vi.mock('$lib/engine/logical-engine', () => ({
+	// Mirrors the real exported constant; BattleSimulator reads it at module load for its
+	// default max-duration cap. The engine itself is otherwise fully stubbed below.
+	tickSize: 40,
 	LogicalEngine: vi.fn(class {}),
 	onLogicalUpdate: vi.fn((cb: DeltaCallback) => {
 		logicalUpdateCallbacks.push(cb);

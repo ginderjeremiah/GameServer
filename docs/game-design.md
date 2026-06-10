@@ -20,7 +20,9 @@ Attributes are somewhat of a work-in-progress feature, but the general idea is t
 
 Skills are a fairly underdeveloped feature in the game, but the general idea is that they will provide active abilities for players that are automatically used during battles. Skills currently only deal damage.
 
-Skills are **unlockable through Challenges**, mirroring the item/mod reward path: a challenge may carry an optional `RewardSkillId`, and completing it unlocks that skill via `Player.UnlockSkill`. An earned skill is added to the player's unlocked set **unselected** — unlocking a skill does not auto-equip it. New players still start with their fixed starter skills. Choosing which unlocked skills are equipped (a selection page with a fixed loadout cap and a meaningful order) is upcoming work; until it lands, only the starter skills are equipped.
+Skills are **unlockable through Challenges**, mirroring the item/mod reward path: a challenge may carry an optional `RewardSkillId`, and completing it unlocks that skill via `Player.UnlockSkill`. An earned skill is added to the player's unlocked set **unselected** — unlocking a skill does not auto-equip it. New players still start with their fixed starter skills equipped.
+
+Players choose which unlocked skills are equipped (and in what order) through the skill **loadout**. The equipped set is **capped at 4** (`Player.MaxSelectedSkills`, matching the enemy loadout cap) and its **order is meaningful** — it drives in-game display order and is the current (incidental) tie-break when two skills come off cooldown on the same tick. The loadout is replaced **atomically**: a single `SetSelectedSkills(orderedSkillIds)` command handles select, deselect, and reorder through one path, with the cap and unlocked-only rules enforced on the backend as **anti-cheat**. The player-facing selection page is the remaining piece of this feature.
 
 In the future, Skills will be expanded to include a wider variety of effects, such as buffs, debuffs, healing, and utility effects, and skills may become unlockable through means beyond Challenges.
 
