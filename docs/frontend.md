@@ -39,6 +39,8 @@ The frontend simulates battles in real time as an anti-cheat measure: the backen
 
 The cross-implementation parity suite (`battle-simulation-parity.test.ts`) drives the production `BattleSimulator` (not a hand-rolled copy), so a change to `Battler.advanceCooldowns`, `Skill.calculateDamage` or `Battler.takeDamage` that diverged from the backend would fail parity rather than silently weaken the replay. Keep its scenario matrix row-for-row aligned with the backend's `BattleSimulatorParityTests`.
 
+**Mid-battle attributes are a modifier graph, not a frozen snapshot.** `BattleAttributes` (`$lib/battle/battle-attributes.ts`) retains its modifier list instead of flattening to a `number[]` at battle start, and composes the per-attribute totals through the same `computeAttributes` path the breakdown screen uses — memoised, recomputed only when a modifier is added (`addModifier`) or removed (`removeModifier`, by reference). This mirrors the backend `AttributeCollection` (whose `RemoveModifier` performs the same cascading derived-node cache invalidation as `AddModifier`), so both sides resolve derived attributes through one composition path even as values change mid-fight — the parity surface skill effects build on. Consequently `Battler.cdMultiplier` is a **live read** of `CooldownRecovery` (matching the backend's per-tick read) rather than a value cached at `reset`.
+
 ## Authentication (JWT bearer + rotating refresh tokens)
 
 The frontend authenticates against the backend's JWT scheme (see the backend doc for the server side). All of the token handling lives in the API client layer (`lib/api`) so the rest of the app never touches tokens directly:

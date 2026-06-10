@@ -73,6 +73,42 @@ namespace Game.Core.Collections
             return false;
         }
 
+        /// <summary>
+        /// Removes the first node matching <paramref name="value"/> per
+        /// <paramref name="equalityComparer"/> rather than the ordering comparer. Use this to
+        /// remove a specific instance when several entries can share the same sort key (the
+        /// ordering comparer would otherwise remove whichever entry sorts equal first).
+        /// </summary>
+        public bool Remove(T value, IEqualityComparer<T> equalityComparer)
+        {
+            if (_head is null)
+            {
+                return false;
+            }
+
+            if (equalityComparer.Equals(_head.Value, value))
+            {
+                _head = _head.Next;
+                Count--;
+                return true;
+            }
+
+            var current = _head;
+            while (current.Next is not null)
+            {
+                if (equalityComparer.Equals(current.Next.Value, value))
+                {
+                    current.Next = current.Next.Next;
+                    Count--;
+                    return true;
+                }
+
+                current = current.Next;
+            }
+
+            return false;
+        }
+
         public void Clear()
         {
             _head = null;

@@ -1,8 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { EAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
+import { EModifierType, EAttributeModifierSource, type AttributeModifier } from '$lib/battle/attribute-modifier';
 
 const makeAttrs = (...pairs: [EAttribute, number][]) => pairs.map(([attributeId, amount]) => ({ attributeId, amount }));
+
+const additive = (attribute: EAttribute, amount: number): AttributeModifier => ({
+	attribute,
+	amount,
+	type: EModifierType.Additive,
+	source: EAttributeModifierSource.PlayerStatPoints
+});
 
 describe('BattleAttributes', () => {
 	describe('constructor', () => {
@@ -83,6 +91,71 @@ describe('BattleAttributes', () => {
 
 			expect(map.length).toBeGreaterThan(0);
 			expect(map.some((a) => a.value === 0)).toBe(true);
+		});
+	});
+
+	// Mirrors Game.Core.Tests AttributeCollectionTests.RemoveModifier_* so the two attribute
+	// implementations stay aligned on add/remove and the derived-cascade behaviour.
+	describe('addModifier / removeModifier', () => {
+		it('recomputes the value when a modifier is added', () => {
+			const ba = new BattleAttributes([]);
+			expect(ba.getValue(EAttribute.Strength)).toBe(0);
+
+			ba.addModifier(additive(EAttribute.Strength, 10));
+			expect(ba.getValue(EAttribute.Strength)).toBe(10);
+		});
+
+		it('reverts the value when a modifier is removed', () => {
+			const ba = new BattleAttributes([]);
+			const modifier = additive(EAttribute.Strength, 5);
+			ba.addModifier(additive(EAttribute.Strength, 10));
+			ba.addModifier(modifier);
+			expect(ba.getValue(EAttribute.Strength)).toBe(15);
+
+			expect(ba.removeModifier(modifier)).toBe(true);
+			expect(ba.getValue(EAttribute.Strength)).toBe(10);
+		});
+
+		it('cascades a removal to derived attributes (Strength → MaxHealth)', () => {
+			const ba = new BattleAttributes([]);
+			const strength = additive(EAttribute.Strength, 10);
+			ba.addModifier(strength);
+			// MaxHealth derives from Strength (×5): 50 + 5*10 = 100.
+			expect(ba.getValue(EAttribute.MaxHealth)).toBe(100);
+
+			ba.removeModifier(strength);
+			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50);
+		});
+
+		it('restores the value when a removed modifier is re-added', () => {
+			const ba = new BattleAttributes([]);
+			const modifier = additive(EAttribute.Strength, 7);
+			ba.addModifier(modifier);
+
+			ba.removeModifier(modifier);
+			expect(ba.getValue(EAttribute.Strength)).toBe(0);
+
+			ba.addModifier(modifier);
+			expect(ba.getValue(EAttribute.Strength)).toBe(7);
+		});
+
+		it('removes the exact instance among modifiers of the same type', () => {
+			const ba = new BattleAttributes([]);
+			const first = additive(EAttribute.Strength, 10);
+			const second = additive(EAttribute.Strength, 3);
+			ba.addModifier(first);
+			ba.addModifier(second);
+
+			ba.removeModifier(second);
+			expect(ba.getValue(EAttribute.Strength)).toBe(10);
+		});
+
+		it('returns false when removing a modifier that was never added', () => {
+			const ba = new BattleAttributes([]);
+			ba.addModifier(additive(EAttribute.Strength, 10));
+
+			expect(ba.removeModifier(additive(EAttribute.Strength, 10))).toBe(false);
+			expect(ba.getValue(EAttribute.Strength)).toBe(10);
 		});
 	});
 });

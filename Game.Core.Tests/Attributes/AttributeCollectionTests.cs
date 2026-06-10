@@ -126,6 +126,114 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
+        public void RemoveModifier_RevertsTheValue()
+        {
+            var added = Additive(EAttribute.Strength, 5);
+            var collection = new AttributeCollection([Additive(EAttribute.Strength, 10)]);
+            collection.AddModifier(added);
+
+            var before = collection[EAttribute.Strength];
+            var removed = collection.RemoveModifier(added);
+            var after = collection[EAttribute.Strength];
+
+            Assert.True(removed);
+            Assert.Equal(15, before);
+            Assert.Equal(10, after);
+        }
+
+        [Fact]
+        public void RemoveModifier_CascadesInvalidationToDerivedAttributes()
+        {
+            var strength = Additive(EAttribute.Strength, 10);
+            var collection = new AttributeCollection([strength]);
+
+            // MaxHealth derives from Strength (×5): 50 + 5*10 = 100 while the modifier is present.
+            var before = collection[EAttribute.MaxHealth];
+            collection.RemoveModifier(strength);
+            var after = collection[EAttribute.MaxHealth];
+
+            Assert.Equal(100, before);
+            Assert.Equal(50, after);
+        }
+
+        [Fact]
+        public void RemoveModifier_ThenReAdd_RestoresTheValue()
+        {
+            var modifier = Additive(EAttribute.Strength, 7);
+            var collection = new AttributeCollection([modifier]);
+
+            collection.RemoveModifier(modifier);
+            Assert.Equal(0, collection[EAttribute.Strength]);
+
+            collection.AddModifier(modifier);
+            Assert.Equal(7, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
+        public void RemoveModifier_RemovesTheExactInstanceAmongSameTypeModifiers()
+        {
+            // Two additive Strength modifiers share a sort key (Type); only the targeted
+            // instance must be removed, not whichever sorts equal first.
+            var first = Additive(EAttribute.Strength, 10);
+            var second = Additive(EAttribute.Strength, 3);
+            var collection = new AttributeCollection([first, second]);
+
+            collection.RemoveModifier(second);
+
+            Assert.Equal(10, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
+        public void RemoveModifier_RemovesDerivedModifierAndUpdatesValue()
+        {
+            // Endurance contributes to MaxHealth (×20) both via the static derived modifier and
+            // this extra one; removing the extra leaves the static contribution intact.
+            var extraEndurance = new AttributeModifier
+            {
+                Attribute = EAttribute.MaxHealth,
+                Amount = 3.0,
+                Type = EModifierType.Additive,
+                Source = EAttributeModifierSource.Derived,
+                DerivedSource = EAttribute.Endurance,
+            };
+            var collection = new AttributeCollection([Additive(EAttribute.Endurance, 10)]);
+            collection.AddModifier(extraEndurance);
+
+            // 50 + (20 + 3)*10 = 280 with the extra derived modifier present.
+            Assert.Equal(280, collection[EAttribute.MaxHealth]);
+
+            collection.RemoveModifier(extraEndurance);
+
+            // Back to the static-only derivation: 50 + 20*10 = 250.
+            Assert.Equal(250, collection[EAttribute.MaxHealth]);
+
+            // The cascade link from Endurance still works for the remaining static modifier.
+            collection.AddModifier(Additive(EAttribute.Endurance, 5));
+            Assert.Equal(50 + 20 * 15, collection[EAttribute.MaxHealth]);
+        }
+
+        [Fact]
+        public void RemoveModifier_NotPresent_ReturnsFalse()
+        {
+            var collection = new AttributeCollection([Additive(EAttribute.Strength, 10)]);
+
+            var removed = collection.RemoveModifier(Additive(EAttribute.Strength, 10));
+
+            Assert.False(removed);
+            Assert.Equal(10, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
+        public void RemoveModifier_AttributeWithNoModifiers_ReturnsFalse()
+        {
+            var collection = new AttributeCollection([]);
+
+            var removed = collection.RemoveModifier(Additive(EAttribute.Intellect, 1));
+
+            Assert.False(removed);
+        }
+
+        [Fact]
         public void AllModifiers_ReturnsAllAddedModifiers()
         {
             var modifiers = new List<AttributeModifier>
