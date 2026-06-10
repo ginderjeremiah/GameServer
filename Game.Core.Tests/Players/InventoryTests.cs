@@ -166,7 +166,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
@@ -196,7 +196,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             // Don't unlock mod 10
@@ -223,7 +223,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
@@ -250,7 +250,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
@@ -277,20 +277,63 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TryApplyMod_ModSlotIndexNotFound_ReturnsFalse()
+        public void TryApplyMod_ModSlotIdNotFound_ReturnsFalse()
         {
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
 
-            // The item has only slot index 0; index 5 does not exist.
+            // The item has only slot Id 0; slot Id 5 does not exist.
             var result = inventory.TryApplyMod(1, 10, 5, MakeMod(10, EItemModType.Prefix));
 
             Assert.False(result);
+        }
+
+        [Fact]
+        public void TryApplyMod_SlotIdDiffersFromOrdinal_ResolvesById()
+        {
+            // Regression for the Index/Id conflation (#316): a slot whose DB Id (3) is not its
+            // 0-based position in the item's slot list. The client speaks the slot's Id, so apply
+            // must resolve by Id — matching by ordinal would target the wrong slot or none at all.
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 3, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 4, Type = EItemModType.Suffix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+
+            var result = inventory.TryApplyMod(1, 10, 4, MakeMod(10, EItemModType.Suffix));
+
+            Assert.True(result);
+            var applied = Assert.Single(inventory.UnlockedItems[0].AppliedMods);
+            Assert.Equal(4, applied.ItemModSlotId);
+            Assert.Equal(10, applied.ItemModId);
+        }
+
+        [Fact]
+        public void TryRemoveMod_SlotIdDiffersFromOrdinal_ResolvesById()
+        {
+            // Regression for #316: removal must key off the slot's Id, consistent with apply/persistence.
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 3, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 4, Type = EItemModType.Suffix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 4, MakeMod(10, EItemModType.Suffix));
+
+            var result = inventory.TryRemoveMod(1, 4);
+
+            Assert.True(result);
+            Assert.Empty(inventory.UnlockedItems[0].AppliedMods);
         }
 
         // ── TryRemoveMod ────────────────────────────────────────────────────
@@ -301,7 +344,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
@@ -424,7 +467,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, EItemCategory.Accessory, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
@@ -450,7 +493,7 @@ namespace Game.Core.Tests.Players
                 attributes: [MakeModifier(EAttribute.Strength, 5.0, EAttributeModifierSource.Item)],
                 modSlots:
                 [
-                    new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                    new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
                 ]);
             AddUnlockedItem(inventory, item);
             inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
@@ -473,7 +516,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, EItemCategory.Accessory, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.UnlockMod(10);
@@ -494,8 +537,8 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, EItemCategory.Accessory, modSlots:
             [
-                new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
-                new ItemModSlot { Id = 1, Index = 1, Type = EItemModType.Suffix },
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 1, Type = EItemModType.Suffix },
             ]);
             AddUnlockedItem(inventory, item);
             inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);

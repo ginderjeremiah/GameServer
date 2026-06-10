@@ -102,7 +102,7 @@ namespace Game.Core.Players.Inventories
                 return false;
             }
 
-            var modSlot = unlocked.Item.ModSlots.FirstOrDefault(s => s.Index == itemModSlotId);
+            var modSlot = unlocked.Item.ModSlots.FirstOrDefault(s => s.Id == itemModSlotId);
             if (modSlot is null)
             {
                 return false;

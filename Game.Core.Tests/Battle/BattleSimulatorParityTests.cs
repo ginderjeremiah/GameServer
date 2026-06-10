@@ -328,7 +328,6 @@ namespace Game.Core.Tests.Battle
                 ModSlots = mods.Select((mod, index) => new ItemModSlot
                 {
                     Id = index,
-                    Index = index,
                     Type = mod.Type,
                 }).ToList(),
                 Tags = [],

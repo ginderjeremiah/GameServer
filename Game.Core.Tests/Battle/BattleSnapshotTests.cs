@@ -16,7 +16,7 @@ namespace Game.Core.Tests.Battle
         public void FromPlayer_CapturesLevelStatsEquipmentAndSkills()
         {
             var item = MakeItem(1, attributes: [MakeModifier(EAttribute.Strength, 5)],
-                modSlots: [new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix }]);
+                modSlots: [new ItemModSlot { Id = 0, Type = EItemModType.Prefix }]);
             var mod = MakeMod(10, EItemModType.Prefix, [MakeModifier(EAttribute.Dexterity, 7)]);
 
             var player = MakePlayer(
@@ -165,7 +165,7 @@ namespace Game.Core.Tests.Battle
         {
             var item = MakeItem(1,
                 attributes: [MakeModifier(EAttribute.Strength, 5), MakeModifier(EAttribute.Endurance, 2)],
-                modSlots: [new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix }]);
+                modSlots: [new ItemModSlot { Id = 0, Type = EItemModType.Prefix }]);
             var mod = MakeMod(10, EItemModType.Prefix, [MakeModifier(EAttribute.Dexterity, 7)]);
             var skillA = MakeSkill(2);
             var skillB = MakeSkill(3);
@@ -198,8 +198,8 @@ namespace Game.Core.Tests.Battle
                 attributes: [MakeModifier(EAttribute.Strength, 5)],
                 modSlots:
                 [
-                    new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
-                    new ItemModSlot { Id = 1, Index = 1, Type = EItemModType.Suffix },
+                    new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
+                    new ItemModSlot { Id = 1, Type = EItemModType.Suffix },
                 ]);
             var prefix = MakeMod(10, EItemModType.Prefix, [MakeModifier(EAttribute.Strength, 3)]);
             var suffix = MakeMod(11, EItemModType.Suffix, [MakeModifier(EAttribute.Dexterity, 4)]);

@@ -118,12 +118,12 @@ namespace Game.Application.Tests.Services
 
             // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.ItemModSlots.Add(new Infrastructure.Entities.ItemModSlot
+            var modSlot = new Infrastructure.Entities.ItemModSlot
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
-                Index = 0,
-            });
+            };
+            context.ItemModSlots.Add(modSlot);
             context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
             {
                 PlayerId = playerEntity.Id,
@@ -144,11 +144,68 @@ namespace Game.Application.Tests.Services
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var applied = await playerService.ApplyMod(player, item.Id, mod.Id, itemModSlotId: 0);
+            // The client speaks the slot's DB Id, so apply resolves the target by Id (not ordinal).
+            var applied = await playerService.ApplyMod(player, item.Id, mod.Id, modSlot.Id);
 
             Assert.True(applied);
             var modifiers = player.Inventory.GetEquippedAttributeModifiers().ToList();
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Strength && m.Amount == 5.0 && m.Source == EAttributeModifierSource.Item);
+            Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
+        }
+
+        [Fact]
+        public async Task ApplyMod_SecondItemSlotIdNotZero_ResolvesById()
+        {
+            // Regression for #316: the apply path used to match the slot by its per-item Index, which
+            // only equals the slot's DB Id for the first authored slot (Id 0). A second item's slot has
+            // Id != 0, so a client request carrying that Id silently found no slot. Authoring a throwaway
+            // slotted item first pushes the real item's slot to Id 1, exercising the masked case.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // First authored slotted item consumes slot Id 0.
+            var decoyItem = await TestDataSeeder.CreateItemAsync(context);
+            context.ItemModSlots.Add(new Infrastructure.Entities.ItemModSlot
+            {
+                ItemId = decoyItem.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+            });
+
+            // The item under test: its only slot is authored second, so it gets a non-zero Id.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var modSlot = new Infrastructure.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+            };
+            context.ItemModSlots.Add(modSlot);
+            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerEntity.Id,
+                ItemId = item.Id,
+                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
+            });
+
+            var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
+            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
+            {
+                PlayerId = playerEntity.Id,
+                ItemModId = mod.Id,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+            Assert.NotEqual(0, modSlot.Id);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var applied = await playerService.ApplyMod(player, item.Id, mod.Id, modSlot.Id);
+
+            Assert.True(applied);
+            var modifiers = player.Inventory.GetEquippedAttributeModifiers().ToList();
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 7.0 && m.Source == EAttributeModifierSource.ItemMod);
         }
 
@@ -187,7 +244,6 @@ namespace Game.Application.Tests.Services
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
-                Index = 0,
             };
             context.ItemModSlots.Add(modSlot);
             context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
@@ -240,7 +296,6 @@ namespace Game.Application.Tests.Services
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
-                Index = 0,
             };
             context.ItemModSlots.Add(modSlot);
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
@@ -565,7 +620,6 @@ namespace Game.Application.Tests.Services
             {
                 ItemId = item.Id,
                 ItemModSlotTypeId = (int)EItemModType.Prefix,
-                Index = 0,
             };
             context.ItemModSlots.Add(modSlot);
             context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
@@ -588,8 +642,7 @@ namespace Game.Application.Tests.Services
             // the LoadPlayer_PersistedAppliedMod scenario).
             // AppliedMod.ItemModSlotId is a FK to ItemModSlot.Id, so the persisted row, the RemoveMod
             // argument (matched against the loaded AppliedModSlot.ItemModSlotId), and the verify query
-            // all key off modSlot.Id — the same value the symmetric LoadPlayer_PersistedAppliedMod test
-            // persists. (The domain's Index-vs-Id mismatch on the apply path is tracked separately.)
+            // all key off modSlot.Id — the single identifier the apply/remove path resolves by (#316).
             context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
             {
                 PlayerId = playerEntity.Id,
