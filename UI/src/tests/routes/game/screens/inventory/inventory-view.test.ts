@@ -65,6 +65,15 @@ const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERar
 		...extra
 	}) as unknown as Item;
 
+// Locate a seeded item, narrowing it to a defined Item (avoids a null-forgiving `!`).
+const itemOf = (view: InventoryView, itemId: number): Item => {
+	const item = view.items.find((i) => i.itemId === itemId);
+	if (!item) {
+		throw new Error(`expected inventory item ${itemId} to exist`);
+	}
+	return item;
+};
+
 beforeEach(() => {
 	equipItem.mockClear();
 	unequipItem.mockClear();
@@ -198,11 +207,10 @@ describe('InventoryView', () => {
 
 	it('toggleEquip equips an unequipped item and unequips an equipped one', () => {
 		const view = new InventoryView();
-		const blade = view.items.find((i) => i.itemId === 2)!;
-		view.toggleEquip(blade); // Weapon category (5) → slot 4
+		view.toggleEquip(itemOf(view, 2)); // Weapon category (5) → slot 4
 		expect(view.equippedBySlot[4]?.itemId).toBe(2);
 
-		view.toggleEquip(view.items.find((i) => i.itemId === 2)!);
+		view.toggleEquip(itemOf(view, 2));
 		expect(view.equippedBySlot[4]).toBeUndefined();
 		expect(unequipItem).toHaveBeenCalledWith(4);
 	});
@@ -234,7 +242,7 @@ describe('InventoryView', () => {
 		staticData.itemMods = [{ id: 0, name: 'Sharp', itemModTypeId: 2, attributes: [] }];
 		const view = new InventoryView();
 		view.applyMod(2, 0 /* slotId */, 0 /* modId */);
-		const item = view.items.find((i) => i.itemId === 2)!;
+		const item = itemOf(view, 2);
 		expect(item.appliedMods.map((m) => m.id)).toEqual([0]);
 		expect(item.appliedMods[0].itemModSlotId).toBe(0);
 		expect(applyMod).toHaveBeenCalledWith(2, 0, 0);
