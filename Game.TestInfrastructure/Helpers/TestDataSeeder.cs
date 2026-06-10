@@ -1,28 +1,32 @@
-using System.Text;
+using Game.Abstractions.Auth;
+using Game.Application.Auth;
 using Game.Infrastructure.Entities;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Game.TestInfrastructure.Helpers
 {
     public static class TestDataSeeder
     {
-        private static readonly byte[] TestPepperBytes = Encoding.UTF8.GetBytes(TestAuthHelper.TestPepper);
+        // A real PBKDF2 hasher matching the pepper used across the integration tests, with a cheap
+        // iteration count so seeding stays fast. Shared so every seeded credential is in the current
+        // self-contained format the production hasher produces.
+        private static readonly IPasswordHasher PasswordHasher = new Pbkdf2PasswordHasher(
+            Options.Create(new PasswordHashingOptions
+            {
+                Pepper = TestAuthHelper.TestPepper,
+                Iterations = 1000,
+            }));
 
-        // Seeds a user whose credential is stored in the legacy (pre-PBKDF2) format. This is intentional:
-        // it keeps coverage on the transparent login-migration path, and a legacy hash is still accepted
-        // by the current Pbkdf2PasswordHasher (which upgrades it on first login).
+        // Seeds a user whose credential is stored in the current self-contained PBKDF2 format.
         public static async Task<User> CreateUserAsync(GameContext context, string username = "testuser", string password = "testpass")
         {
-            var salt = Guid.NewGuid();
-            var passHash = LegacyPasswordHash.Hash(password, salt.ToString(), TestPepperBytes);
-
             var user = new User
             {
                 Username = username,
-                Salt = salt,
-                PassHash = passHash,
+                PassHash = PasswordHasher.Hash(password),
                 LastLogin = DateTime.UtcNow,
             };
 

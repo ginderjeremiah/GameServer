@@ -125,36 +125,34 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task Login_LegacyCredentials_TransparentlyRehashesToCurrentScheme()
+        public async Task Login_OutdatedWorkFactor_TransparentlyRehashesToCurrentIterations()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            // CreateUserAsync seeds a legacy-format credential.
-            var user = await TestDataSeeder.CreateUserAsync(context, "legacyuser", "legacypass");
+            // CreateUserAsync seeds at the low (1000-iteration) work factor.
+            var user = await TestDataSeeder.CreateUserAsync(context, "rehashuser", "rehashpass");
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
-            // Sanity: the seeded hash is in the legacy format (no PBKDF2 prefix).
-            Assert.False(user.PassHash.StartsWith("$pbkdf2-sha256$", StringComparison.Ordinal));
-
-            var accountService = CreateAccountService(scope.ServiceProvider);
-            var result = await accountService.Login("legacyuser", "legacypass");
+            // Logging in through a hasher with a higher work factor should upgrade the stored hash.
+            var accountService = CreateAccountService(scope.ServiceProvider, iterations: 2000);
+            var result = await accountService.Login("rehashuser", "rehashpass");
             Assert.True(result.Success);
 
-            // The credential was upgraded in place (same salt, new scheme) — the cache-flush equivalent is
-            // reading the row back from a fresh context.
+            // The credential was re-derived at the new work factor in place — the cache-flush equivalent
+            // is reading the row back from a fresh context.
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
             var migrated = await verifyContext.Users.AsNoTracking()
                 .FirstAsync(u => u.Id == user.Id, CancellationToken);
-            Assert.StartsWith("$pbkdf2-sha256$", migrated.PassHash);
-            Assert.Equal(user.Salt, migrated.Salt);
+            Assert.StartsWith("$pbkdf2-sha256$2000$", migrated.PassHash);
+            Assert.NotEqual(user.PassHash, migrated.PassHash);
 
             // Re-login against the upgraded credential still succeeds.
             using var reloginScope = CreateScope();
-            var reloginResult = await CreateAccountService(reloginScope.ServiceProvider)
-                .Login("legacyuser", "legacypass");
+            var reloginResult = await CreateAccountService(reloginScope.ServiceProvider, iterations: 2000)
+                .Login("rehashuser", "rehashpass");
             Assert.True(reloginResult.Success);
         }
 
@@ -261,14 +259,15 @@ namespace Game.Application.Tests.Services
             Assert.Null(refreshed);
         }
 
-        private static AccountService CreateAccountService(IServiceProvider provider)
+        private static AccountService CreateAccountService(IServiceProvider provider, int iterations = 1000)
         {
             // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
-            // so legacy-seeded credentials verify and migrate exactly as they would in production.
+            // so seeded credentials verify exactly as they would in production. A higher iteration count
+            // can be supplied to exercise the transparent work-factor upgrade on login.
             var hasher = new Pbkdf2PasswordHasher(Options.Create(new PasswordHashingOptions
             {
                 Pepper = TestPepper,
-                Iterations = 1000,
+                Iterations = iterations,
             }));
 
             return new AccountService(

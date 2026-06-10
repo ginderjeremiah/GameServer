@@ -4,7 +4,6 @@
     {
         public int Id { get; set; }
         public required string Username { get; set; }
-        public Guid Salt { get; set; }
         public required string PassHash { get; set; }
         public DateTime LastLogin { get; set; }
 
