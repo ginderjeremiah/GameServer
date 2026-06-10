@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { IEnemy } from '$lib/api';
+import { EChangeType, type IEnemy } from '$lib/api';
+import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Enemy config transforms: `newItem` defaults, the boss list badge, and the
    persist path — the identity DTO strips the child collections, and only the
@@ -31,6 +32,9 @@ import { enemyEntity } from '$routes/admin/workbench/entities/enemy';
 
 /** Finds the body posted to a given AdminTools endpoint (or undefined if never called). */
 const postBodyTo = (endpoint: string) => mockPost.mock.calls.find((c) => c[0] === endpoint)?.[1];
+
+/** A table section's config by key (for exercising its `newRow` factory). */
+const tableSection = (key: string) => enemyEntity.sections.find((s) => s.key === key) as TableSectionConfig<IEnemy>;
 
 beforeEach(() => {
 	mockPost.mockReset().mockResolvedValue(undefined);
@@ -117,5 +121,61 @@ describe('enemyEntity', () => {
 		expect(postBodyTo('AdminTools/SetEnemySkills')).toEqual({ enemyId: 0, skillIds: [1, 2] });
 		expect(postBodyTo('AdminTools/SetEnemyAttributeDistributions')).toBeUndefined();
 		expect(postBodyTo('AdminTools/SetEnemySpawns')).toBeUndefined();
+	});
+
+	it('persist Adds a new enemy and saves its children against the resolved id', async () => {
+		// A freshly-added record carries a temporary negative id; after the identity Add the
+		// backend appends it at a real id, which persistEntity resolves before the child savers run.
+		const added: IEnemy = {
+			id: -1,
+			name: 'New Enemy',
+			isBoss: true,
+			attributeDistribution: [{ attributeId: 0, baseAmount: 3, amountPerLevel: 1 }],
+			skillPool: [2],
+			spawns: [{ zoneId: 1, weight: 8 }]
+		};
+		socket.enemies = [{ ...added, id: 7 }]; // the persisted record at its real id
+
+		await enemyEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });
+
+		// Identity Add posted with the child collections stripped.
+		const addCall = postBodyTo('AdminTools/AddEditEnemies');
+		expect(addCall[0].changeType).toBe(EChangeType.Add);
+		expect(addCall[0].item).toEqual({
+			id: -1,
+			name: 'New Enemy',
+			isBoss: true,
+			attributeDistribution: [],
+			skillPool: [],
+			spawns: []
+		});
+		// Every child saver runs against the RESOLVED id (7), not the temporary -1.
+		expect(postBodyTo('AdminTools/SetEnemyAttributeDistributions')).toEqual({
+			enemyId: 7,
+			attributeDistributions: [{ attributeId: 0, baseAmount: 3, amountPerLevel: 1 }]
+		});
+		expect(postBodyTo('AdminTools/SetEnemySkills')).toEqual({ enemyId: 7, skillIds: [2] });
+		expect(postBodyTo('AdminTools/SetEnemySpawns')).toEqual({ enemyId: 7, spawns: [{ zoneId: 1, weight: 8 }] });
+	});
+
+	describe('newRow factories', () => {
+		it('attribute newRow picks the first free attribute and zeroes the amounts', () => {
+			// Strength (id 0) is already taken, so the first free attribute (id 1) is chosen.
+			const enemy: IEnemy = {
+				...baseline,
+				attributeDistribution: [{ attributeId: 0, baseAmount: 1, amountPerLevel: 0 }]
+			};
+			expect(tableSection('attrs').newRow(enemy)).toEqual({ attributeId: 1, baseAmount: 0, amountPerLevel: 0 });
+		});
+
+		it('spawn newRow picks the first unused zone with the default weight', () => {
+			staticData.zones = [
+				{ id: 0, name: 'Verdant Hollow', levelMin: 1, levelMax: 5 },
+				{ id: 1, name: 'Frost Cavern', levelMin: 6, levelMax: 10 }
+			];
+			// Zone 0 is already assigned, so zone 1 is the first free option.
+			const enemy: IEnemy = { ...baseline, spawns: [{ zoneId: 0, weight: 5 }] };
+			expect(tableSection('spawns').newRow(enemy)).toEqual({ zoneId: 1, weight: 5 });
+		});
 	});
 });

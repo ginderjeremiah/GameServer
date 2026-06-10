@@ -144,4 +144,42 @@ describe('ChallengeRewardSection', () => {
 		const retiredRow = container.querySelector('.ch-picker-nm.retired') as HTMLElement;
 		expect(retiredRow?.textContent).toContain('Rusty Relic');
 	});
+
+	it('opens the mod picker and assigns the chosen mod', async () => {
+		const { store, record, baseline } = setup();
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose mod…'));
+		expect(container.querySelector('.ch-picker')).toBeTruthy();
+		await fireEvent.click(screen.getByText('Sharp'));
+		expect((store.items[0] as unknown as IChallenge).rewardItemModId).toBe(0);
+		expect(container.querySelector('.ch-picker')).toBeNull();
+	});
+
+	it('opens the skill picker and assigns the chosen skill', async () => {
+		const { store, record, baseline } = setup();
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose skill…'));
+		expect(container.querySelector('.ch-picker')).toBeTruthy();
+		await fireEvent.click(screen.getByText('Cleave'));
+		expect((store.items[0] as unknown as IChallenge).rewardSkillId).toBe(0);
+		expect(container.querySelector('.ch-picker')).toBeNull();
+	});
+
+	it('collapses an open picker when the rendered record switches to a different challenge', async () => {
+		// Two sibling challenges in the same store; the section is reused as the detail
+		// pane switches between them, and its $effect must reset the open picker on switch.
+		const first = { id: 1, name: 'One', challengeTypeId: 1, entityType: 0, progressGoal: 5 } as IChallenge;
+		const second = { id: 2, name: 'Two', challengeTypeId: 1, entityType: 0, progressGoal: 5 } as IChallenge;
+		const store = new EntityStore(config(), [first, second] as unknown as Identified[]);
+
+		const { container, rerender } = render(ChallengeRewardSection, {
+			props: { record: store.items[0], baseline: store.baselineOf(1), store }
+		});
+		await fireEvent.click(screen.getByText('Choose item…'));
+		expect(container.querySelector('.ch-picker')).toBeTruthy();
+
+		// Switch the detail pane to the other record: the picker collapses.
+		await rerender({ record: store.items[1], baseline: store.baselineOf(2), store });
+		expect(container.querySelector('.ch-picker')).toBeNull();
+	});
 });
