@@ -54,4 +54,12 @@ describe('Inventory screen', () => {
 		const { container } = render(Inventory);
 		expect(container.querySelector('.rail')).toBeTruthy();
 	});
+
+	it('renders the drawer backdrop as a <button> (not a <div>) for a11y', () => {
+		const { container } = render(Inventory);
+		const backdrop = container.querySelector('.backdrop');
+		expect(backdrop?.tagName.toLowerCase()).toBe('button');
+		expect(backdrop?.getAttribute('type')).toBe('button');
+		expect(backdrop?.getAttribute('aria-label')).toBe('Close item drawer');
+	});
 });
