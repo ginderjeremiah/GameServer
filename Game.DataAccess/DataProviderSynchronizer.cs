@@ -321,12 +321,11 @@ namespace Game.DataAccess
             for (var index = 0; index < evt.OrderedSkillIds.Count; index++)
             {
                 var skillId = evt.OrderedSkillIds[index];
-                var order = index;
                 await context.PlayerSkills
                     .Where(ps => ps.PlayerId == evt.PlayerId && ps.SkillId == skillId)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(ps => ps.Selected, true)
-                        .SetProperty(ps => ps.Order, order));
+                        .SetProperty(ps => ps.Order, index));
             }
         }
 
