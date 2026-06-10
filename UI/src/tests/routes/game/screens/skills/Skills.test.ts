@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EAttribute, type IChallenge, type ISkill } from '$lib/api';
+import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
 
 // Same engine/stores/api mocks as the view-model test: the rendered screen builds
 // its own SkillsView from these at mount.
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+		currentZone: 0,
 		attributes: [] as { attributeId: number; amount: number }[],
 		get selectedSkills(): number[] {
 			return playerManager.unlockedSkills
@@ -20,7 +21,13 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
-		staticData: { skills: [] as ISkill[], challenges: [] as IChallenge[], attributes: undefined as unknown }
+		staticData: {
+			skills: [] as ISkill[],
+			challenges: [] as IChallenge[],
+			zones: undefined as IZone[] | undefined,
+			enemies: undefined as IEnemy[] | undefined,
+			attributes: undefined as unknown
+		}
 	};
 });
 
@@ -62,6 +69,27 @@ const CHALLENGES = [
 	{ id: 0, name: 'Slay Ten', description: '', challengeTypeId: 0, entityType: 0, progressGoal: 10, rewardSkillId: 4 }
 ] as unknown as IChallenge[];
 
+// Zone 0 (idle range [2,8], boss enemy 2 at level 10): one in-zone spawn + the boss pill.
+const ZONES: IZone[] = [
+	{ id: 0, name: 'Vale', description: '', order: 0, levelMin: 2, levelMax: 8, bossEnemyId: 2, bossLevel: 10 }
+];
+
+// amountPerLevel 1 keeps the spawn's Defense (2 + 1·level) under this catalogue's slider ceiling.
+const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
+	name: `Enemy ${over.id}`,
+	isBoss: false,
+	attributeDistribution: [{ attributeId: EAttribute.Endurance, baseAmount: 0, amountPerLevel: 1 }],
+	skillPool: [],
+	spawns: [],
+	...over
+});
+
+const ENEMIES: IEnemy[] = [
+	enemy({ id: 0, name: 'Imp', spawns: [{ zoneId: 0, weight: 1 }] }),
+	enemy({ id: 1, name: 'Wolf', spawns: [{ zoneId: 1, weight: 1 }] }),
+	enemy({ id: 2, name: 'Ogre King', isBoss: true })
+];
+
 const rowByName = (container: HTMLElement, name: string): HTMLElement | undefined =>
 	Array.from(container.querySelectorAll<HTMLElement>('.row')).find((r) => r.textContent?.includes(name));
 
@@ -70,6 +98,9 @@ beforeEach(() => {
 	toastError.mockReset();
 	staticData.skills = SKILLS;
 	staticData.challenges = CHALLENGES;
+	staticData.zones = ZONES;
+	staticData.enemies = ENEMIES;
+	mockPlayerManager.currentZone = 0;
 	mockPlayerManager.unlockedSkills = [
 		{ skillId: 0, selected: true, order: 0 },
 		{ skillId: 1, selected: true, order: 1 },
@@ -186,6 +217,23 @@ describe('Skills screen', () => {
 		const slider = container.querySelector<HTMLInputElement>('input[type="range"]')!;
 		await fireEvent.input(slider, { target: { value: '5' } });
 		expect(container.querySelector('.vs-defval b')?.textContent).toBe('5');
+	});
+
+	it('renders compare-vs enemy pills and snaps the slider when one is clicked', async () => {
+		const { container } = render(Skills);
+		const pills = Array.from(container.querySelectorAll<HTMLButtonElement>('.epill'));
+		// Zone 0's in-zone spawn (Imp) + the boss (Ogre King); Wolf spawns elsewhere.
+		expect(pills.map((p) => p.querySelector('.en')?.textContent)).toEqual(['Imp', '◆ Ogre King']);
+
+		await fireEvent.click(pills[0]); // Imp: Defense = 2 + 1*5 = 7
+		expect(container.querySelector('.vs-defval b')?.textContent).toBe('7');
+		expect(pills[0].classList.contains('on')).toBe(true);
+
+		// Dragging the slider deselects the active pill.
+		const slider = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+		await fireEvent.input(slider, { target: { value: '3' } });
+		expect(pills[0].classList.contains('on')).toBe(false);
+		expect(container.querySelector('.vs-defval b')?.textContent).toBe('3');
 	});
 
 	it('filters the rail by search term', async () => {

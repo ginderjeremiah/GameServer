@@ -14,7 +14,7 @@
    the simulation uses (player allocation + equipped item/mod stats), so today the numbers
    the page shows match what the game actually fights with. */
 
-import { EAttribute, type IChallenge, type ISkill, apiSocket } from '$lib/api';
+import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { BattleAttributes } from '$lib/battle';
 import { playerManager, inventoryManager } from '$lib/engine';
@@ -63,6 +63,17 @@ export interface SkillMetrics {
 	source?: IChallenge;
 }
 
+/** A Compare-vs quick-pick: an enemy from the current zone whose flat Defense snaps the slider. */
+export interface ComparePreset {
+	/** Stable identity — distinguishes the boss pill from a same-id idle-spawn pill. */
+	key: string;
+	name: string;
+	/** True for the zone's dedicated boss (evaluated at its fixed level), false for an idle spawn. */
+	isBoss: boolean;
+	/** The enemy's flat Defense at its evaluated level. */
+	defense: number;
+}
+
 /* ── pure helpers (no reactive state — unit-tested directly) ───────────────── */
 
 /** Effective damage after subtracting flat enemy defense (never below zero —
@@ -109,6 +120,25 @@ export function sortMetrics(sort: SkillSort, defense: number): (a: SkillMetrics,
 	}
 }
 
+/** The representative level for a zone's idle spawns: the midpoint of its encounter range.
+ *  Spawns roll uniformly in [levelMin, levelMax] and defense scales linearly with level, so the
+ *  midpoint is the expected encounter level — and thus the expected defense — without a server roll. */
+export function zoneSpawnLevel(zone: IZone): number {
+	return (zone.levelMin + zone.levelMax) / 2;
+}
+
+/** An enemy's flat Defense at a given level — the value the battle subtracts in `Battler.takeDamage`.
+ *  Mirrors the backend enemy build (`Enemy.GetAttributeModifiers`): each attribute distribution
+ *  contributes `baseAmount + amountPerLevel * level` additively, then Defense is resolved through the
+ *  same derived-attribute composition the battle uses (base + per-Endurance + per-Agility). */
+export function enemyDefense(enemy: IEnemy, level: number): number {
+	const modifiers = enemy.attributeDistribution.map((dist) => ({
+		attributeId: dist.attributeId,
+		amount: dist.baseAmount + dist.amountPerLevel * level
+	}));
+	return new BattleAttributes(modifiers, true).getValue(EAttribute.Defense);
+}
+
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class SkillsView {
@@ -123,6 +153,8 @@ export class SkillsView {
 	showLocked = $state(false);
 	/** Compare-vs flat defense (0 ⇒ no defender). Drives every effective value. */
 	defense = $state(0);
+	/** The selected Compare-vs preset pill, or null when defense was set manually (slider drag). */
+	selectedPresetKey = $state<string | null>(null);
 	modalOpen = $state(false);
 	/** When set, an equip on a full loadout is awaiting the slot to replace. */
 	pendingSwap = $state<number | null>(null);
@@ -186,6 +218,36 @@ export class SkillsView {
 
 	/** Slider ceiling: enough defense to fully block the biggest hit. */
 	readonly maxDamage = $derived(Math.max(1, ...this.catalogue.map((s) => this.metricsById[s.id]?.rawDamage ?? 0)));
+
+	/** Enemy quick-picks for the Compare-vs bar, sourced from the player's current zone: every
+	 *  non-retired enemy that spawns there (defense at the range midpoint) plus the zone's dedicated
+	 *  boss (defense at its fixed level). Empty until zone/enemy reference data is loaded. */
+	readonly comparePresets = $derived.by<ComparePreset[]>(() => {
+		const zone = staticData.zones?.[playerManager.currentZone];
+		if (!zone) {
+			return [];
+		}
+		const enemies = staticData.enemies ?? [];
+		const spawnLevel = zoneSpawnLevel(zone);
+		const presets: ComparePreset[] = enemies
+			.filter((enemy) => !enemy.retiredAt && enemy.spawns.some((spawn) => spawn.zoneId === zone.id))
+			.map((enemy) => ({
+				key: `spawn-${enemy.id}`,
+				name: enemy.name,
+				isBoss: false,
+				defense: enemyDefense(enemy, spawnLevel)
+			}));
+		const boss = zone.bossEnemyId == null ? undefined : enemies[zone.bossEnemyId];
+		if (boss) {
+			presets.push({
+				key: `boss-${boss.id}`,
+				name: boss.name,
+				isBoss: true,
+				defense: enemyDefense(boss, zone.bossLevel)
+			});
+		}
+		return presets;
+	});
 
 	/** Core attributes any catalogue skill scales on (the offered filter chips). */
 	readonly usedAttributes = $derived(
@@ -322,6 +384,14 @@ export class SkillsView {
 
 	setDefense(defense: number): void {
 		this.defense = Math.max(0, Math.min(defense, this.maxDamage));
+		// A manual slider drag drops the active preset selection (mirrors the mock).
+		this.selectedPresetKey = null;
+	}
+
+	/** Snap the Compare-vs defense to an enemy preset and mark its pill selected. */
+	selectPreset(preset: ComparePreset): void {
+		this.defense = Math.max(0, Math.min(preset.defense, this.maxDamage));
+		this.selectedPresetKey = preset.key;
 	}
 
 	setSort(sort: SkillSort): void {
