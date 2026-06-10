@@ -50,6 +50,7 @@ const screenKeyMap: Record<string, GameScreen> = {
 	cardGame: 'CardGame',
 	challenges: 'Challenges',
 	inventory: 'Inventory',
+	skills: 'Skills',
 	attributes: 'Attributes',
 	attributeBreakdown: 'AttributeBreakdown',
 	stats: 'Statistics',

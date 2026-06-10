@@ -20,6 +20,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 	{ key: 'cardGame', label: 'Card Game', group: 'combat', built: true },
 	{ key: 'challenges', label: 'Challenges', group: 'combat', built: true },
 	{ key: 'inventory', label: 'Inventory', group: 'character', built: true },
+	{ key: 'skills', label: 'Skills', group: 'character', built: true },
 	{ key: 'attributes', label: 'Attributes', group: 'character', built: true },
 	{ key: 'attributeBreakdown', label: 'Attribute Breakdown', group: 'character', built: true },
 	{ key: 'stats', label: 'Stats', group: 'character', built: true },
