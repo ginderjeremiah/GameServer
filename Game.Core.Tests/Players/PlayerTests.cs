@@ -593,10 +593,10 @@ namespace Game.Core.Tests.Players
                 Tags = [],
             };
 
-        /// <summary>An accessory carrying a single Prefix mod slot at index 0, for the apply/remove-mod paths.</summary>
+        /// <summary>An accessory carrying a single Prefix mod slot (Id 0), for the apply/remove-mod paths.</summary>
         private static Item MakeItemWithPrefixSlot(int id) => MakeItem(id, modSlots:
         [
-            new ItemModSlot { Id = 0, Index = 0, Type = EItemModType.Prefix },
+            new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
         ]);
 
         private static ItemMod MakeMod(int id, EItemModType type) => new()

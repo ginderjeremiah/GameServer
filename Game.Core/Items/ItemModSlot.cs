@@ -16,11 +16,6 @@ namespace Game.Core.Items
         public required EItemModType Type { get; set; }
 
         /// <summary>
-        /// The index of this slot on the item.
-        /// </summary>
-        public required int Index { get; set; }
-
-        /// <summary>
         /// The item mod currently applied in this slot (if any).
         /// </summary>
         public ItemMod? ItemMod { get; set; }

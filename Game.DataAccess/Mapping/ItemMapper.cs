@@ -31,7 +31,6 @@ namespace Game.DataAccess.Mapping
                     {
                         Id = ims.Id,
                         Type = (EItemModType)ims.ItemModSlotTypeId,
-                        Index = ims.Index,
                         ItemMod = null,
                     }).ToList(),
                 Tags = [],
