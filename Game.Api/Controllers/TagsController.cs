@@ -23,17 +23,5 @@ namespace Game.Api.Controllers
         {
             return ApiResponse.Success(_tagCategories.All());
         }
-
-        [HttpGet]
-        public ApiAsyncEnumerableResponse<Tag> TagsForItem(int itemId)
-        {
-            return ApiResponse.Success(_tags.GetTagsForItem(itemId));
-        }
-
-        [HttpGet]
-        public ApiAsyncEnumerableResponse<Tag> TagsForItemMod(int itemModId)
-        {
-            return ApiResponse.Success(_tags.GetTagsForItemMod(itemModId));
-        }
     }
 }

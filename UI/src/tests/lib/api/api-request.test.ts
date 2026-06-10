@@ -78,10 +78,10 @@ describe('ApiRequest', () => {
 		});
 
 		it('appends URL params when provided', async () => {
-			await new ApiRequest('Items/SlotsForItem').get({ itemId: 5, refreshCache: true });
+			await new ApiRequest('AdminTools/GetUsers').get({ page: 2, pageSize: 25 });
 
-			expect(lastCall().url).toContain('itemId=5');
-			expect(lastCall().url).toContain('refreshCache=true');
+			expect(lastCall().url).toContain('page=2');
+			expect(lastCall().url).toContain('pageSize=25');
 		});
 
 		it('attaches the bearer access token when one is stored', async () => {
@@ -116,10 +116,10 @@ describe('ApiRequest', () => {
 		});
 
 		it('skips undefined URL params', async () => {
-			await new ApiRequest('Items/SlotsForItem').get({ itemId: 5, refreshCache: undefined });
+			await new ApiRequest('AdminTools/GetUsers').get({ page: 5, archived: undefined });
 
-			expect(lastCall().url).toContain('itemId=5');
-			expect(lastCall().url).not.toContain('refreshCache');
+			expect(lastCall().url).toContain('page=5');
+			expect(lastCall().url).not.toContain('archived');
 		});
 	});
 

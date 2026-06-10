@@ -70,11 +70,6 @@ export interface IItem {
 	retiredAt?: string;
 }
 
-export interface IItemCategory {
-	id: number;
-	name: string;
-}
-
 export interface IItemMod {
 	id: number;
 	name: string;
@@ -90,11 +85,6 @@ export interface IItemModSlot {
 	id: number;
 	itemId: number;
 	itemModSlotTypeId: EItemModType;
-}
-
-export interface IItemModType {
-	id: number;
-	name: string;
 }
 
 export interface ISkill {
