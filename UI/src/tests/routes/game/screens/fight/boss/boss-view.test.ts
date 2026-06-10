@@ -60,7 +60,8 @@ beforeEach(() => {
 	enemyManager.setAutoFight.mockReset();
 	playerManager.currentZone = 3;
 	// Reference sets are indexed by id (the zero-based Id-as-index invariant), so each
-	// zone sits at its own id; ids 1 and 3 leave holes that index access skips as undefined.
+	// zone sits at its own id; the zones occupy slots 1 and 3, leaving holes at 0 and 2
+	// that index access reads as undefined.
 	const zones: IZone[] = [];
 	zones[bosslessZone.id] = bosslessZone;
 	zones[bossZone.id] = bossZone;
