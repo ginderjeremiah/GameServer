@@ -1,6 +1,6 @@
 import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, ApiRequest, apiSocket } from '$lib/api';
 import { playerManager } from '$lib/engine';
-import { Item, newItem } from '$lib/battle';
+import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
 
 //Manually putting this here until codegen gets updated to load this
@@ -133,10 +133,8 @@ export class InventoryManager {
 	}
 
 	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
-		if (!this.unlockedMods.has(itemModId)) {
-			return false;
-		}
-		if (!this.unlockedItems.has(itemId)) {
+		const item = this.unlockedItems.get(itemId);
+		if (!this.unlockedMods.has(itemModId) || !item) {
 			return false;
 		}
 
@@ -146,15 +144,21 @@ export class InventoryManager {
 			return false;
 		}
 
-		// Re-fetch player data to get updated item state
-		// (or update locally — for now just log success)
+		// Mirror the change onto the authoritative item (the equip/favorite precedent) so
+		// equipmentStats (battle) and any view re-seed reflect it without a page reload.
+		item.appliedMods = [
+			...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
+			newItemMod({ itemModId, itemModSlotId })
+		];
+		this.refreshItemAttributes(item);
 		logMessage(ELogType.ItemFound, 'Modifier applied.');
 
 		return true;
 	}
 
 	public async removeMod(itemId: number, itemModSlotId: number) {
-		if (!this.unlockedItems.has(itemId)) {
+		const item = this.unlockedItems.get(itemId);
+		if (!item) {
 			return false;
 		}
 
@@ -164,9 +168,17 @@ export class InventoryManager {
 			return false;
 		}
 
+		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
+		this.refreshItemAttributes(item);
 		logMessage(ELogType.ItemFound, 'Modifier removed.');
 
 		return true;
+	}
+
+	/** Rebuilds an item's cached totalAttributes after its applied mods change. */
+	private refreshItemAttributes(item: Item) {
+		const allAttributes = [...item.attributes, ...item.appliedMods.flatMap((mod) => mod.attributes)];
+		item.totalAttributes = new BattleAttributes(allAttributes, false);
 	}
 
 	/**
