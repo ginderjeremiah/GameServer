@@ -27,6 +27,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var zone = await TestDataSeeder.CreateZoneAsync(context, "Read Zone", levelMin: 3, levelMax: 9, order: 2);
+            await ReloadReferenceCachesAsync();
 
             var zones = scope.ServiceProvider.GetRequiredService<IZones>();
 
@@ -48,6 +49,7 @@ namespace Game.Application.Tests.DataAccess
             var boss = await TestDataSeeder.CreateEnemyAsync(context, "Catacomb Lich", isBoss: true);
             var zone = await TestDataSeeder.CreateZoneAsync(
                 context, "Forgotten Catacombs", levelMin: 8, levelMax: 11, bossEnemyId: boss.Id, bossLevel: 18);
+            await ReloadReferenceCachesAsync();
 
             var zones = scope.ServiceProvider.GetRequiredService<IZones>();
 
@@ -64,6 +66,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Glade");
+            await ReloadReferenceCachesAsync();
 
             var zones = scope.ServiceProvider.GetRequiredService<IZones>();
 
@@ -90,6 +93,7 @@ namespace Game.Application.Tests.DataAccess
             var boss = await TestDataSeeder.CreateEnemyAsync(context, "Catacomb Lich", isBoss: true);
             var zone = await TestDataSeeder.CreateZoneAsync(
                 context, "Forgotten Catacombs", levelMin: 8, levelMax: 11, bossEnemyId: boss.Id, bossLevel: 18);
+            await ReloadReferenceCachesAsync();
 
             var zones = scope.ServiceProvider.GetRequiredService<IZones>();
 
@@ -110,6 +114,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Glade");
+            await ReloadReferenceCachesAsync();
 
             var zones = scope.ServiceProvider.GetRequiredService<IZones>();
 

@@ -131,8 +131,9 @@ namespace Game.Api
             }
 
             // Eagerly load the in-memory reference-data caches before serving traffic so a database
-            // problem surfaces as a boot failure rather than on the first player request (#357).
-            app.Services.InitializeReferenceCaches();
+            // problem surfaces as a boot failure rather than on the first player request (#357), and so
+            // every cache has a published snapshot before any read (#358).
+            await app.Services.InitializeReferenceCachesAsync();
 
             app.UseCors(builder =>
             {

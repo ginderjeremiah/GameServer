@@ -15,7 +15,7 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    [ServiceFilter(typeof(AdminCacheInvalidationFilter))]
+    [ServiceFilter(typeof(AdminCacheInvalidationFilter), Order = AdminCacheInvalidationFilter.FilterOrder)]
     public class AdminTagsController(IAdminTags adminTags) : ControllerBase
     {
         private readonly IAdminTags _adminTags = adminTags;

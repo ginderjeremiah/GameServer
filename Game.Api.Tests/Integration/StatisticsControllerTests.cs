@@ -25,6 +25,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (authClient, _) = await LoginAndBuildClientAsync("statsuser", "statspass");
             return authClient;
@@ -60,6 +62,9 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 7m);
                 await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 3m, entityId: 1);
             }
+
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (client, _) = await LoginAndBuildClientAsync("statsdata", "statspass");
             using var authClient = client;

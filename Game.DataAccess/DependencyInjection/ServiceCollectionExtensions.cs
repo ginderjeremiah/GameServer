@@ -5,6 +5,7 @@ using Game.Core.Events;
 using Game.Core.Players.Events;
 using Game.DataAccess.Repositories;
 using Game.DataAccess.Repositories.Admin;
+using Game.DataAccess.Repositories.Caching;
 using Game.Infrastructure;
 using Game.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,38 +41,46 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IUnitOfWork, UnitOfWork>()
                 // Player progress repo (UnitOfWork saves; also serves read-only API queries)
                 .AddScoped<IPlayerProgressRepository, PlayerProgressRepository>()
-                // Reference data repos (in-memory cached). Each serves both its public read contract and
-                // an internal entity-cache/queries seam (used by Enemies to build domain enemies, and by
-                // the Content Authoring admin repositories for existence/diff lookups); a single scoped
-                // instance backs both so the cached entity list is shared rather than duplicated.
-                // ICacheInvalidatable registrations allow resolving all invalidatable caches as a set
-                // (e.g. IEnumerable<ICacheInvalidatable>) without a manually-maintained list.
+                // Reference data caches. A singleton snapshot holder per set owns the immutable cached
+                // snapshot and its eager build-then-swap ReloadAsync; the scoped repos are thin readers over
+                // it. Each repo serves both its public read contract and an internal entity-cache/queries
+                // seam (used by Enemies to build domain enemies, and by the Content Authoring admin
+                // repositories for existence/diff lookups); a single scoped instance backs both so the
+                // projection is shared rather than duplicated. The IReloadableReferenceCache registrations
+                // (the holders) let the admin reload filter and the startup initializer resolve every cache
+                // as a set (IEnumerable<IReloadableReferenceCache>) without a manually-maintained list.
+                .AddSingleton<ChallengesCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<ChallengesCacheHolder>())
                 .AddScoped<IChallenges, Challenges>()
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IChallenges>())
+                .AddSingleton<EnemiesCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<EnemiesCacheHolder>())
                 .AddScoped<Enemies>()
                 .AddScoped<IEnemies>(sp => sp.GetRequiredService<Enemies>())
                 .AddScoped<IEnemyEntityCache>(sp => sp.GetRequiredService<Enemies>())
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IEnemies>())
+                .AddSingleton<ItemsCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<ItemsCacheHolder>())
                 .AddScoped<Items>()
                 .AddScoped<IItems>(sp => sp.GetRequiredService<Items>())
                 .AddScoped<IItemEntityCache>(sp => sp.GetRequiredService<Items>())
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IItems>())
+                .AddSingleton<ItemModsCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<ItemModsCacheHolder>())
                 .AddScoped<ItemMods>()
                 .AddScoped<IItemMods>(sp => sp.GetRequiredService<ItemMods>())
                 .AddScoped<IItemModEntityCache>(sp => sp.GetRequiredService<ItemMods>())
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IItemMods>())
+                .AddSingleton<SkillsCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<SkillsCacheHolder>())
                 .AddScoped<Skills>()
                 .AddScoped<ISkills>(sp => sp.GetRequiredService<Skills>())
                 .AddScoped<ISkillEntityCache>(sp => sp.GetRequiredService<Skills>())
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<ISkills>())
                 .AddScoped<Tags>()
                 .AddScoped<ITags>(sp => sp.GetRequiredService<Tags>())
                 .AddScoped<ITagEntityQueries>(sp => sp.GetRequiredService<Tags>())
                 .AddScoped<ITagCategories, TagCategories>()
+                .AddSingleton<ZonesCacheHolder>()
+                .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<ZonesCacheHolder>())
                 .AddScoped<Zones>()
                 .AddScoped<IZones>(sp => sp.GetRequiredService<Zones>())
                 .AddScoped<IZoneEntityCache>(sp => sp.GetRequiredService<Zones>())
-                .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IZones>())
                 .AddScoped<ISessionStore, SessionStore>()
                 .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
                 .AddScoped<IUsers, Users>()

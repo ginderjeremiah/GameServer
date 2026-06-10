@@ -1,59 +1,35 @@
 using Game.Abstractions.DataAccess;
-using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
-using Game.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore;
+using Game.DataAccess.Repositories.Caching;
+using Game.Infrastructure.Entities;
 using Contracts = Game.Abstractions.Contracts;
 using CoreItemMod = Game.Core.Items.ItemMod;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class ItemMods : IItemMods, IItemModEntityCache
+    internal class ItemMods(ItemModsCacheHolder holder) : IItemMods, IItemModEntityCache
     {
-        private static List<ItemMod>? _allMods;
+        private IReadOnlyList<ItemMod> Entities => holder.Current;
 
-        private readonly GameContext _context;
-
-        public ItemMods(GameContext context)
+        public List<Contracts.ItemMod> All()
         {
-            _context = context;
-        }
-
-        public void InvalidateCache() => _allMods = null;
-
-        private List<ItemMod> AllEntities(bool refreshCache = false)
-        {
-            if (_allMods is null || refreshCache)
-            {
-                _allMods = _context.ItemMods
-                    .Include(im => im.ItemModAttributes)
-                    .Include(im => im.Tags)
-                    .AsNoTracking()
-                    .OrderBy(im => im.Id)
-                    .ToList();
-            }
-            return _allMods;
-        }
-
-        public List<Contracts.ItemMod> All(bool refreshCache = false)
-        {
-            return [.. AllEntities(refreshCache).Select(ItemMapper.ModToContract)];
+            return [.. Entities.Select(ItemMapper.ModToContract)];
         }
 
         public bool ValidateItemModId(int itemModId)
         {
-            return itemModId >= 0 && itemModId < AllEntities().Count;
+            return itemModId >= 0 && itemModId < Entities.Count;
         }
 
         public ItemMod? LookupItemMod(int itemModId)
         {
-            var itemMods = AllEntities();
+            var itemMods = Entities;
             return itemMods.Count <= itemModId || itemModId < 0 ? null : itemMods[itemModId];
         }
 
         public CoreItemMod GetItemMod(int itemModId)
         {
-            return ItemMapper.ModToCore(AllEntities()[itemModId]);
+            return ItemMapper.ModToCore(Entities[itemModId]);
         }
     }
 }

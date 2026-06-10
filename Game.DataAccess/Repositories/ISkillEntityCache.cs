@@ -11,7 +11,7 @@ namespace Game.DataAccess.Repositories
     /// </summary>
     internal interface ISkillEntityCache
     {
-        IReadOnlyList<SkillEntity> AllSkillEntities(bool refreshCache = false);
+        IReadOnlyList<SkillEntity> AllSkillEntities();
 
         /// <summary>The cached skill entity at <paramref name="skillId"/> (its zero-based index), or null if out of range.</summary>
         SkillEntity? LookupSkill(int skillId);

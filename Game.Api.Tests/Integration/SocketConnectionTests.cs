@@ -27,6 +27,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             // Login to create session in Redis
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",

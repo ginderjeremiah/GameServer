@@ -112,6 +112,8 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
@@ -134,6 +136,8 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             // Logging in through a hasher with a higher work factor should upgrade the stored hash.
             var accountService = CreateAccountService(scope.ServiceProvider, iterations: 2000);
@@ -165,6 +169,8 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
@@ -211,6 +217,8 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
             var login = await accountService.Login("refreshuser", "refreshpass");
@@ -247,6 +255,8 @@ namespace Game.Application.Tests.Services
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
             var login = await accountService.Login("logoutuser", "logoutpass");

@@ -3,9 +3,9 @@ using CoreSkill = Game.Core.Skills.Skill;
 
 namespace Game.Abstractions.DataAccess
 {
-    public interface ISkills : ICacheInvalidatable
+    public interface ISkills
     {
-        public List<Contracts.Skill> AllSkills(bool refreshCache = false);
+        public List<Contracts.Skill> AllSkills();
         public CoreSkill GetSkill(int skillId);
     }
 }

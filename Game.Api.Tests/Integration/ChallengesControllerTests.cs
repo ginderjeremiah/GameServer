@@ -1,4 +1,3 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Progress;
 using Game.Infrastructure.Database;
@@ -35,10 +34,11 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.AddPlayerChallengeAsync(
                     context, playerId, challengeId, progress: 10m, completed: true, completedAt: DateTime.UtcNow);
 
-                // The challenge reference cache is static and shared across tests; refresh it so the
-                // newly seeded challenge is resolvable by id during the read.
-                scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
             }
+
+            // Reload the caches so the newly seeded challenge is resolvable by id during the read (the
+            // caches no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var (client, _) = await LoginAndBuildClientAsync("challuser", "challpass");
             using var authClient = client;

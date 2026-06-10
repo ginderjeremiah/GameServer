@@ -28,6 +28,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var creds = new { Username = "loginuser", Password = "loginpass" };
 
@@ -59,6 +61,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (authClient, _) = await LoginAndBuildClientAsync("beareruser", "bearerpass");
 
@@ -98,6 +102,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var creds = new { Username = "wrongpassuser", Password = "wrongpass" };
 
@@ -180,6 +186,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (authClient, _) = await LoginAndBuildClientAsync("nosocketuser", "nosocketpass");
 
@@ -202,6 +210,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (authClient, _) = await LoginAndBuildClientAsync("livesocketuser", "livesocketpass");
 
@@ -238,6 +248,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var login = await LoginAsync("refreshuser", "refreshpass");
 
@@ -270,6 +282,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var login = await LoginAsync("rotateuser", "rotatepass");
 
@@ -310,6 +324,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             var (authClient, login) = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
 
@@ -357,6 +373,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
             await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
 
             // Act — log in and reuse the issued access token against an admin endpoint.
@@ -379,6 +397,8 @@ namespace Game.Api.Tests.Integration
             var skill = await TestDataSeeder.CreateSkillAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
 
             // Act
             var (authClient, _) = await LoginAndBuildClientAsync("plainlogin", "plainpass");

@@ -32,6 +32,8 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill0.Id, selected: false);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill1.Id, selected: false);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill2.Id, selected: false);
+            // The caches no longer lazily refill, so reload them to resolve the player's skills on load.
+            await ReloadReferenceCachesAsync();
 
             return (user.Id, [skill0.Id, skill1.Id, skill2.Id]);
         }

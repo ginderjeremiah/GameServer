@@ -9,25 +9,18 @@ namespace Game.DataAccess.DependencyInjection
     public static class ReferenceDataInitialization
     {
         /// <summary>
-        /// Eagerly loads every cached reference-data set before the application serves traffic. Each
-        /// cached reference repo fills its static list on first read; invoking those reads here triggers
-        /// the fill up front, so a database problem surfaces as a boot failure rather than on the first
-        /// player request. Resolving the repos in a scope and invoking their cached reads is sufficient
-        /// while the lazy-fill path still exists (#357); the reload-and-swap follow-up (#358) will replace
-        /// the internals with an awaited reload over the DI-discovered cache set.
+        /// Eagerly loads every reference-data cache before the application serves traffic by reloading each
+        /// DI-discovered <see cref="IReloadableReferenceCache"/> (the singleton snapshot holders). A database
+        /// problem therefore surfaces as a boot failure rather than on the first player request, and once
+        /// this completes every holder has a published snapshot so reads never observe an empty cache.
         /// </summary>
-        public static void InitializeReferenceCaches(this IServiceProvider provider)
+        public static async Task InitializeReferenceCachesAsync(this IServiceProvider provider, CancellationToken cancellationToken = default)
         {
-            // Reference repos are scoped, so resolve and read them within a dedicated scope.
-            using var scope = provider.CreateScope();
-            var scopedProvider = scope.ServiceProvider;
-
-            _ = scopedProvider.GetRequiredService<IItems>().All();
-            _ = scopedProvider.GetRequiredService<IItemMods>().All();
-            _ = scopedProvider.GetRequiredService<ISkills>().AllSkills();
-            _ = scopedProvider.GetRequiredService<IEnemies>().All();
-            _ = scopedProvider.GetRequiredService<IZones>().All();
-            _ = scopedProvider.GetRequiredService<IChallenges>().All();
+            // The holders are singletons and create their own scope for the load, so no outer scope is needed.
+            foreach (var cache in provider.GetServices<IReloadableReferenceCache>())
+            {
+                await cache.ReloadAsync(cancellationToken);
+            }
         }
     }
 }

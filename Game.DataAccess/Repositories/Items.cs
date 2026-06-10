@@ -1,54 +1,30 @@
 using Game.Abstractions.DataAccess;
-using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
-using Game.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore;
+using Game.DataAccess.Repositories.Caching;
+using Game.Infrastructure.Entities;
 using Contracts = Game.Abstractions.Contracts;
 using CoreItem = Game.Core.Items.Item;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Items : IItems, IItemEntityCache
+    internal class Items(ItemsCacheHolder holder) : IItems, IItemEntityCache
     {
-        private static List<Item>? _allItems;
+        private IReadOnlyList<Item> Entities => holder.Current;
 
-        private readonly GameContext _context;
-
-        public Items(GameContext context)
+        public List<Contracts.Item> All()
         {
-            _context = context;
-        }
-
-        public void InvalidateCache() => _allItems = null;
-
-        private List<Item> AllEntities(bool refreshCache = false)
-        {
-            if (_allItems is null || refreshCache)
-            {
-                _allItems = [.. _context.Items
-                    .AsNoTracking()
-                    .Include(i => i.ItemModSlots)
-                    .Include(i => i.ItemAttributes)
-                    .Include(i => i.Tags)
-                    .OrderBy(i => i.Id)];
-            }
-            return _allItems;
-        }
-
-        public List<Contracts.Item> All(bool refreshCache = false)
-        {
-            return [.. AllEntities(refreshCache).Select(ItemMapper.ToContract)];
+            return [.. Entities.Select(ItemMapper.ToContract)];
         }
 
         public Item? LookupItem(int itemId)
         {
-            var items = AllEntities();
+            var items = Entities;
             return items.Count <= itemId || itemId < 0 ? null : items[itemId];
         }
 
         public CoreItem GetItem(int itemId)
         {
-            return ItemMapper.ToCore(AllEntities()[itemId]);
+            return ItemMapper.ToCore(Entities[itemId]);
         }
     }
 }

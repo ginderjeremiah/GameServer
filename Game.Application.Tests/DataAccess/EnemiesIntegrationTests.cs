@@ -32,6 +32,7 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneA.Id, enemyA1.Id, weight: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneA.Id, enemyA2.Id, weight: 3);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneB.Id, enemyB.Id, weight: 1);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
@@ -59,6 +60,7 @@ namespace Game.Application.Tests.DataAccess
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             var zone = await TestDataSeeder.CreateZoneAsync(context);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
@@ -75,6 +77,7 @@ namespace Game.Application.Tests.DataAccess
             var populatedZone = await TestDataSeeder.CreateZoneAsync(context, "Populated");
             var emptyZone = await TestDataSeeder.CreateZoneAsync(context, "Empty");
             await TestDataSeeder.LinkEnemyToZoneAsync(context, populatedZone.Id, enemy.Id);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
@@ -96,6 +99,7 @@ namespace Game.Application.Tests.DataAccess
             // Retire one of the two zone enemies: out of the spawn rolls, but kept at its slot.
             retired.RetiredAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
@@ -127,6 +131,7 @@ namespace Game.Application.Tests.DataAccess
             var target = seeded[2];
             target.RetiredAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
@@ -151,6 +156,7 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+            await ReloadReferenceCachesAsync();
 
             var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
 

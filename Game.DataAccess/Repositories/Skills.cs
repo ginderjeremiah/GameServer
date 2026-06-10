@@ -1,53 +1,35 @@
 using Game.Abstractions.DataAccess;
-using Game.Infrastructure.Entities;
 using Game.DataAccess.Mapping;
-using Game.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore;
+using Game.DataAccess.Repositories.Caching;
+using Game.Infrastructure.Entities;
 using Contracts = Game.Abstractions.Contracts;
 using CoreSkill = Game.Core.Skills.Skill;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Skills : ISkills, ISkillEntityCache
+    internal class Skills(SkillsCacheHolder holder) : ISkills, ISkillEntityCache
     {
-        private static List<Skill>? _skillDataList;
+        private IReadOnlyList<Skill> Entities => holder.Current;
 
-        private readonly GameContext _context;
-
-        public Skills(GameContext context)
+        public IReadOnlyList<Skill> AllSkillEntities()
         {
-            _context = context;
+            return Entities;
         }
 
-        public void InvalidateCache() => _skillDataList = null;
-
-        public IReadOnlyList<Skill> AllSkillEntities(bool refreshCache = false)
+        public List<Contracts.Skill> AllSkills()
         {
-            if (_skillDataList is null || refreshCache)
-            {
-                _skillDataList = _context.Skills
-                    .AsNoTracking()
-                    .Include(s => s.SkillDamageMultipliers)
-                    .OrderBy(s => s.Id)
-                    .ToList();
-            }
-            return _skillDataList;
-        }
-
-        public List<Contracts.Skill> AllSkills(bool refreshCache = false)
-        {
-            return [.. AllSkillEntities(refreshCache).Select(SkillMapper.ToContract)];
+            return [.. Entities.Select(SkillMapper.ToContract)];
         }
 
         public Skill? LookupSkill(int skillId)
         {
-            var skills = AllSkillEntities();
+            var skills = Entities;
             return skills.Count <= skillId || skillId < 0 ? null : skills[skillId];
         }
 
         public CoreSkill GetSkill(int skillId)
         {
-            return SkillMapper.ToCore(AllSkillEntities()[skillId]);
+            return SkillMapper.ToCore(Entities[skillId]);
         }
     }
 }
