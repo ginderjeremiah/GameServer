@@ -1,17 +1,19 @@
-import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, ApiRequest, apiSocket } from '$lib/api';
+import {
+	IInventoryItem,
+	IBattlerAttribute,
+	ELogType,
+	EItemCategory,
+	EEquipmentSlot,
+	ApiRequest,
+	apiSocket
+} from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
 
-//Manually putting this here until codegen gets updated to load this
-export enum EEquipmentSlot {
-	HelmSlot = 0,
-	ChestSlot = 1,
-	LegSlot = 2,
-	BootSlot = 3,
-	WeaponSlot = 4,
-	AccessorySlot = 5
-}
+// Re-exported from the generated client so the established `$lib/engine` import sites keep resolving
+// it here while the single source of truth is the codegen'd enum.
+export { EEquipmentSlot };
 
 export class InventoryManager {
 	/** All items the player has unlocked, keyed by itemId. */

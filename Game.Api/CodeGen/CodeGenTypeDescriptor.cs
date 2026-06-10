@@ -45,6 +45,32 @@ namespace Game.Api.CodeGen
             }
         }
 
+        /// <summary>
+        /// Builds a descriptor for a standalone enum type the reflection walk never reaches through a
+        /// DTO member (a <see cref="ClientMirroredAttribute"/> domain enum). Enums are non-generic,
+        /// non-nullable value types, so the nullability/generic machinery the member-based constructors
+        /// derive from <see cref="NullabilityInfo"/> does not apply and is left at its default.
+        /// </summary>
+        public CodeGenTypeDescriptor(Type enumType)
+        {
+            if (!enumType.IsEnum)
+            {
+                throw new ArgumentException($"Only enum types are supported by this constructor; '{enumType.Name}' is not an enum.", nameof(enumType));
+            }
+
+            UnderlyingType = enumType;
+            Name = enumType.Name;
+            GenericArgumentDescriptors = [];
+            PropertyDescriptors = [];
+
+            var obsoleteAttribute = enumType.GetCustomAttribute<ObsoleteAttribute>();
+            if (obsoleteAttribute is not null)
+            {
+                IsObsolete = true;
+                ObsoleteMessage = obsoleteAttribute.Message;
+            }
+        }
+
         public CodeGenTypeDescriptor(NullabilityInfo nullabilityInfo, Type? overrideType = null)
         {
             UnderlyingType = overrideType ?? GetUnderlyingType(nullabilityInfo);
