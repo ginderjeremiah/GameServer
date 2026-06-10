@@ -59,7 +59,12 @@ beforeEach(() => {
 	enemyManager.retreatFromBoss.mockReset();
 	enemyManager.setAutoFight.mockReset();
 	playerManager.currentZone = 3;
-	staticData.zones = [bosslessZone, bossZone];
+	// Reference sets are indexed by id (the zero-based Id-as-index invariant), so each
+	// zone sits at its own id; ids 1 and 3 leave holes that index access skips as undefined.
+	const zones: IZone[] = [];
+	zones[bosslessZone.id] = bosslessZone;
+	zones[bossZone.id] = bossZone;
+	staticData.zones = zones;
 	staticData.enemies = [boss];
 	statistics.isZoneCleared.mockReturnValue(false);
 });

@@ -35,7 +35,8 @@ import Fight from '$routes/game/screens/fight/Fight.svelte';
 import { makeBattler } from './fight-fixtures';
 
 const makeZone = (over: Partial<IZone> = {}): IZone => ({
-	id: 10,
+	// Zone id == its index in staticData.zones (the Id-as-index invariant the boss view indexes by).
+	id: 0,
 	name: 'Verdant Hollow',
 	description: '',
 	order: 1,
@@ -48,7 +49,7 @@ const makeZone = (over: Partial<IZone> = {}): IZone => ({
 beforeEach(() => {
 	mockBattleEngine.player = makeBattler({ name: 'Aelara' });
 	mockBattleEngine.enemy = makeBattler({ name: 'Dire Wolf' });
-	mockPlayerManager.currentZone = 10;
+	mockPlayerManager.currentZone = 0;
 	mockEnemyManager.mode = 'idle';
 	mockEnemyManager.autoFight = false;
 	mockEnemyManager.bossOutcome = undefined;

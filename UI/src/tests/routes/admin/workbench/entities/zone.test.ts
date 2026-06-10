@@ -154,7 +154,10 @@ describe('zoneEntity', () => {
 	});
 
 	it('headline names the dedicated boss, or is blank without one', () => {
-		staticData.enemies = [{ id: 7, name: 'Warden', isBoss: true }];
+		// Enemies are indexed by id (Id-as-index), so the boss sits at enemies[7].
+		const enemies: unknown[] = [];
+		enemies[7] = { id: 7, name: 'Warden', isBoss: true };
+		staticData.enemies = enemies;
 		const gated = { ...zoneEntity.newItem(1), bossEnemyId: 7, bossLevel: 3 };
 		expect(zoneEntity.headline?.(gated)).toBe('Boss: Warden · LV 3');
 		expect(zoneEntity.headline?.({ ...gated, bossEnemyId: -1 })).toBe('');

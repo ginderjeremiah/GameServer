@@ -953,6 +953,52 @@ namespace Game.Api.Tests.Integration
             Assert.Contains(await GetTags(), t => t.Name == "Fire" && t.TagCategoryId == (int)ETagCategory.Accessory);
         }
 
+        // Tags keep the hard-delete lifecycle (they are .find/Map-keyed, not index-keyed, so they don't suffer
+        // the index mis-resolution bug #289 addressed for the six zero-based-id reference sets). This verifies
+        // that hard-deleting an *in-use* tag is graceful: the FK_*Tags_Tags cascade removes the join rows rather
+        // than throwing, and the referencing item/mod stay resolvable (just without that tag).
+        [Fact]
+        public async Task AddEditTags_DeleteInUseTag_CascadesJoinRowsAndLeavesReferencesResolvable()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Tagged Sword");
+            var itemMod = await TestDataSeeder.CreateItemModAsync(context, "Tagged Rune");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "Doomed");
+
+            // Apply the tag to both an item and a mod so the delete must cascade two join tables.
+            var itemEntity = await context.Items.Include(i => i.Tags).FirstAsync(i => i.Id == item.Id, CancellationToken);
+            var modEntity = await context.ItemMods.Include(m => m.Tags).FirstAsync(m => m.Id == itemMod.Id, CancellationToken);
+            itemEntity.Tags.Add(await context.Tags.FirstAsync(t => t.Id == tag.Id, CancellationToken));
+            modEntity.Tags.Add(await context.Tags.FirstAsync(t => t.Id == tag.Id, CancellationToken));
+            await context.SaveChangesAsync(CancellationToken);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new { Id = tag.Id, Name = "Doomed", TagCategoryId = (int)ETagCategory.Accessory },
+                    ChangeType = 2 // Delete
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+
+            // The tag is gone, the join rows cascaded away, and the item/mod remain (sans the deleted tag).
+            Assert.DoesNotContain(await GetTags(), t => t.Id == tag.Id);
+            Assert.Empty(await GetTagsForItem(item.Id));
+            Assert.Empty(await GetTagsForItemMod(itemMod.Id));
+            Assert.Contains(GetItems(), i => i.Id == item.Id);
+            Assert.Contains(GetItemMods(), m => m.Id == itemMod.Id);
+        }
+
         [Fact]
         public async Task SetEnemyAttributeDistributions_ValidEnemy_PersistsDistribution()
         {
