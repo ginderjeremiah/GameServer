@@ -1,7 +1,7 @@
 # Spike #180 — Plan out skill effects
 
 - **Spike issue:** [#180](https://github.com/ginderjeremiah/GameServer/issues/180)
-- **Status:** Draft — design reviewed with the project owner (core decisions settled); implementation sub-issues not yet created.
+- **Status:** Design decided; split into implementation sub-issues (see [Implementation issues](#implementation-issues)), with deferred extensions tracked in [#336](https://github.com/ginderjeremiah/GameServer/issues/336). Not yet implemented.
 
 ## Goal
 
@@ -81,13 +81,15 @@ Everything in "Runtime semantics" executes on both sides. The frontend attribute
 
 ## Implementation issues
 
-To be created after owner review of this document, as sub-issues of #180 (planned breakdown):
+Tracked as sub-issues of #180:
 
-1. **Attribute foundation: removable modifiers + frontend modifier-graph battler attributes** *(foundation)* — area **A**.
-2. **`SkillEffect` reference data + admin authoring end-to-end** *(independent of 1)* — area **B**. No battle behaviour.
-3. **Battle runtime: timed attribute buffs/debuffs** *(depends on 1 + 2)* — area **C**.
-4. **Battle runtime: DoT/HoT per-tick attributes + simulator phase** *(depends on 3)* — area **D**.
-5. **UI: skill-effect indicators, active-effect chips, logs** *(depends on 2 + 3; DoT display polish with 4)* — area **E**.
+1. **[#331](https://github.com/ginderjeremiah/GameServer/issues/331) — Attribute foundation: removable modifiers + frontend modifier-graph battle attributes** *(foundation)* — area **A**.
+2. **[#332](https://github.com/ginderjeremiah/GameServer/issues/332) — `SkillEffect` reference data + admin authoring end-to-end** *(independent of #331)* — area **B**. No battle behaviour.
+3. **[#333](https://github.com/ginderjeremiah/GameServer/issues/333) — Battle runtime: timed attribute buffs/debuffs** *(depends on #331 + #332)* — area **C**.
+4. **[#334](https://github.com/ginderjeremiah/GameServer/issues/334) — Battle runtime: DoT/HoT per-tick attributes + simulator phase** *(depends on #333)* — area **D**.
+5. **[#335](https://github.com/ginderjeremiah/GameServer/issues/335) — UI: skill-effect indicators, active-effect chips, logs** *(depends on #332 + #333; DoT display polish with #334)* — area **E**.
+
+**#331** and **#332** can proceed in parallel; **#333** needs both, then **#334** and **#335** follow.
 
 ## Documentation to update on landing
 
@@ -95,6 +97,8 @@ To be created after owner review of this document, as sub-issues of #180 (planne
 - `docs/backend.md` — battle-setup section: effect runtime rules summary + the removable-modifier/attribute-recompute parity surface. (With **A**/**C**.)
 
 ## Deferred extensions (designed seams, not in V1)
+
+Tracked in [#336](https://github.com/ginderjeremiah/GameServer/issues/336) (standalone, not a sub-issue — closing the spike must not depend on them):
 
 - **Proc chance (`ChanceToApply`)** — lands with/after the seeded-RNG work (#178); requires a defined global RNG draw order across crit/dodge/effect rolls.
 - **Hit-count durations & every-Nth-hit triggers** — the "after x hits" idea: add a duration-type discriminator (e.g. `EEffectDurationType { Time, HitsTaken }`) and/or trigger fields to `SkillEffect` when wanted; needs hit-event bookkeeping on the battler.
