@@ -19,7 +19,14 @@
 
 	<!-- Detail drawer: right-side slide-over with dimmed backdrop + click-outside close -->
 	<div class="drawer-layer" style:pointer-events={view.selected ? 'auto' : 'none'}>
-		<div class="backdrop" class:open={!!view.selected} role="presentation" onclick={() => view.select(null)}></div>
+		<button
+			class="backdrop"
+			type="button"
+			tabindex="-1"
+			aria-label="Close item drawer"
+			class:open={!!view.selected}
+			onclick={() => view.select(null)}
+		></button>
 		<div class="drawer" class:open={!!view.selected}>
 			{#if view.selected}
 				<ItemDrawer item={view.selected} {view} />
@@ -114,6 +121,9 @@ const view = new InventoryView();
 .backdrop {
 	position: absolute;
 	inset: 0;
+	padding: 0;
+	border: none;
+	cursor: default;
 	background: color-mix(in srgb, var(--black) 50%, transparent);
 	opacity: 0;
 	transition: opacity 200ms;
