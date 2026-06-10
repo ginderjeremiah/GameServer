@@ -54,7 +54,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 		if (z.bossEnemyId == null || z.bossEnemyId < 0) {
 			return '';
 		}
-		const boss = (staticData.enemies ?? []).find((e) => e.id === z.bossEnemyId);
+		const boss = staticData.enemies?.[z.bossEnemyId];
 		return boss ? `Boss: ${boss.name} · LV ${z.bossLevel}` : '';
 	},
 	sections: [

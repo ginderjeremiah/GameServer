@@ -10,9 +10,7 @@ import { staticData, statistics } from '$stores';
 
 export class BossView {
 	/** The zone the player is currently in. */
-	private readonly zone = $derived<IZone | undefined>(
-		staticData.zones?.find((z) => z.id === playerManager.currentZone)
-	);
+	private readonly zone = $derived<IZone | undefined>(staticData.zones?.[playerManager.currentZone]);
 
 	/** The current zone's dedicated boss enemy, if one is authored. */
 	readonly boss = $derived.by<IEnemy | undefined>(() => {

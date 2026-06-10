@@ -91,6 +91,20 @@ class WorkbenchReference {
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));
 	challengeTypeById = (id: number) => this.challengeTypes.find((t) => t.id === id);
 
+	/** The zero-based-id reference set backing an entity dimension (indexable by id). */
+	private entitySource = (entityType: EEntityType): { id: number; name: string }[] | undefined => {
+		switch (entityType) {
+			case EEntityType.Enemy:
+				return staticData.enemies;
+			case EEntityType.Zone:
+				return staticData.zones;
+			case EEntityType.Skill:
+				return staticData.skills;
+			default:
+				return undefined;
+		}
+	};
+
 	/**
 	 * Target-entity catalogue for a statistic's entity dimension (Enemy / Zone / Skill).
 	 * When `bossOnly` is set (a boss-only statistic such as BossesDefeated) the Enemy
@@ -101,31 +115,27 @@ class WorkbenchReference {
 		const source =
 			entityType === EEntityType.Enemy
 				? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss)
-				: entityType === EEntityType.Zone
-					? staticData.zones
-					: entityType === EEntityType.Skill
-						? staticData.skills
-						: [];
+				: this.entitySource(entityType);
 		return (source ?? []).map((e) => ({ id: e.id, name: e.name }));
 	};
 	entityOptions = (entityType: EEntityType, bossOnly = false): SelectOption[] =>
 		this.entityCatalog(entityType, bossOnly).map((e) => ({ value: e.id, text: e.name }));
 	entityName = (entityType: EEntityType, id: number): string | null =>
-		this.entityCatalog(entityType).find((e) => e.id === id)?.name ?? null;
+		this.entitySource(entityType)?.[id]?.name ?? null;
 
 	// ── Reward lookups (item / item-mod records the challenge reward picker reads) ──
 	itemRecords = () => staticData.items ?? [];
 	itemModRecords = () => staticData.itemMods ?? [];
-	itemRecName = (id: number) => (staticData.items ?? []).find((i) => i.id === id)?.name;
-	itemRarityId = (id: number) => (staticData.items ?? []).find((i) => i.id === id)?.rarityId;
-	itemModName = (id: number) => (staticData.itemMods ?? []).find((m) => m.id === id)?.name;
+	itemRecName = (id: number) => staticData.items?.[id]?.name;
+	itemRarityId = (id: number) => staticData.items?.[id]?.rarityId;
+	itemModName = (id: number) => staticData.itemMods?.[id]?.name;
 	itemModTypeName = (id: number) => {
-		const mod = (staticData.itemMods ?? []).find((m) => m.id === id);
+		const mod = staticData.itemMods?.[id];
 		return mod ? this.modTypeName(mod.itemModTypeId) : undefined;
 	};
 	skillRecords = () => staticData.skills ?? [];
-	skillName = (id: number) => (staticData.skills ?? []).find((s) => s.id === id)?.name;
-	skillBaseDamage = (id: number) => (staticData.skills ?? []).find((s) => s.id === id)?.baseDamage;
+	skillName = (id: number) => staticData.skills?.[id]?.name;
+	skillBaseDamage = (id: number) => staticData.skills?.[id]?.baseDamage;
 
 	// ── Name lookups ──
 	itemCategoryName = (id: number) => EItemCategory[id] ?? '';
