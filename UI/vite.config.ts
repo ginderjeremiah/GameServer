@@ -35,11 +35,11 @@ export default defineConfig({
 				'src/lib/battle/**': { lines: 99, functions: 100, branches: 88, statements: 99 },
 				'src/lib/engine/**': { lines: 91, functions: 87, branches: 85, statements: 90 },
 				'src/lib/common/**': { lines: 90, functions: 89, branches: 80, statements: 90 },
-				'src/lib/api/**': { lines: 89, functions: 90, branches: 82, statements: 89 },
+				'src/lib/api/**': { lines: 89, functions: 90, branches: 83, statements: 89 },
 				'src/lib/card-game/**': { lines: 94, functions: 100, branches: 81, statements: 94 },
 				'src/stores/**': { lines: 98, functions: 100, branches: 90, statements: 98 },
 				'src/components/**': { lines: 89, functions: 95, branches: 74, statements: 92 },
-				'src/routes/**': { lines: 73, functions: 68, branches: 52, statements: 70 }
+				'src/routes/**': { lines: 73, functions: 68, branches: 53, statements: 71 }
 			}
 		}
 	},
