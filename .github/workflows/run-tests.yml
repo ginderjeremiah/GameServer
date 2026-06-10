@@ -43,6 +43,7 @@ jobs:
             - 'Game.Infrastructure.Tests/**'
             - 'Game.TestInfrastructure/**'
             - 'Game.sln'
+            - 'build/**'
             - 'docker-compose.yml'
             - 'e2e-seed.sql'
             - '.dockerignore'

@@ -1,8 +1,8 @@
 {
   "_comment": "Backend coverage gate floors. Assemblies under 'gated' fail the build when below their line/branch floor; every other measured assembly is reported but never fails (measure-only). Floors are a ratchet: seeded at the current level and only ever raised. Re-seed after a full run by reading coverage/backend-report/Summary.json. See docs/infrastructure.md (Code coverage).",
   "gated": {
-    "Game.Core": { "line": 95, "branch": 90 },
-    "Game.Application": { "line": 90, "branch": 79 }
+    "Game.Core": { "line": 96, "branch": 91 },
+    "Game.Application": { "line": 94, "branch": 83 }
   },
   "measureOnly": [
     "Game.Api",
