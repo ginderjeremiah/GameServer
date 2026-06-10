@@ -87,8 +87,14 @@ describe('SkillTooltip', () => {
 	});
 
 	it('derives cooldown and DPS, shortening the cooldown for a faster battler', () => {
-		const fast = makeBattler({ attributes: [{ attributeId: EAttribute.Strength, amount: 20 }] });
-		fast.cdMultiplier = 2;
+		// cdMultiplier is a live read of CooldownRecovery: 1 + 100/100 = 2 (fixtures skip the
+		// derived pass, so CooldownRecovery is taken verbatim from the supplied attributes).
+		const fast = makeBattler({
+			attributes: [
+				{ attributeId: EAttribute.Strength, amount: 20 },
+				{ attributeId: EAttribute.CooldownRecovery, amount: 100 }
+			]
+		});
 		const skill = makeSkill(fast, {
 			baseDamage: 10,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }],

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EAttribute } from '$lib/api';
 import type { ISkill } from '$lib/api';
+import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 
 const mockSkills: ISkill[] = [];
 
@@ -76,6 +77,20 @@ describe('Battler', () => {
 
 			const cdRecovery = 0.4 * 20 + 0.1 * 10;
 			expect(battler.cdMultiplier).toBeCloseTo(1 + cdRecovery / 100, 10);
+		});
+
+		it('reads cdMultiplier live, reflecting a mid-battle CooldownRecovery change', () => {
+			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			expect(battler.cdMultiplier).toBe(1);
+
+			battler.attributes.addModifier({
+				attribute: EAttribute.CooldownRecovery,
+				amount: 100,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.PlayerStatPoints
+			});
+
+			expect(battler.cdMultiplier).toBe(2);
 		});
 
 		it('sets isDead to false', () => {

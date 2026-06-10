@@ -318,5 +318,44 @@ namespace Game.Core.Tests.Collections
                     $"Order violated at index {i}: {result[i - 1]} > {result[i]}");
             }
         }
+
+        // ── Remove(value, equalityComparer): identity-aware removal ──
+        // The ordering comparer here sorts by Key only, so two distinct boxes can share a sort
+        // key; the equality overload must remove the targeted instance, not whichever sorts equal.
+
+        private sealed class Box(int key)
+        {
+            public int Key { get; } = key;
+        }
+
+        [Fact]
+        public void RemoveWithEqualityComparer_RemovesTargetedInstanceAmongSortEqualEntries()
+        {
+            var list = new SortedLinkedList<Box>((a, b) => a.Key.CompareTo(b.Key));
+            var first = new Box(1);
+            var second = new Box(1);
+            var third = new Box(1);
+            list.Add(first);
+            list.Add(second);
+            list.Add(third);
+
+            var removed = list.Remove(second, EqualityComparer<Box>.Default);
+
+            Assert.True(removed);
+            Assert.Equal(2, list.Count);
+            Assert.Equal(new[] { first, third }, list.ToList());
+        }
+
+        [Fact]
+        public void RemoveWithEqualityComparer_NotPresent_ReturnsFalse()
+        {
+            var list = new SortedLinkedList<Box>((a, b) => a.Key.CompareTo(b.Key));
+            list.Add(new Box(1));
+
+            var removed = list.Remove(new Box(1), EqualityComparer<Box>.Default);
+
+            Assert.False(removed);
+            Assert.Equal(1, list.Count);
+        }
     }
 }

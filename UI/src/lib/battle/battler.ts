@@ -21,8 +21,13 @@ export class Battler {
 	public attributes: BattleAttributes = new BattleAttributes();
 	public skills: (Skill | undefined)[] = [];
 	public maxSkills: typeof maxSkills = maxSkills;
-	public cdMultiplier = 1;
 	public isDead = true;
+
+	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
+	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
+	public get cdMultiplier(): number {
+		return 1 + this.attributes.getValue(EAttribute.CooldownRecovery) / 100;
+	}
 
 	constructor(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
 		this.reset(battlerData, additionalAtttributes);
@@ -73,7 +78,6 @@ export class Battler {
 		}
 
 		this.currentHealth = this.attributes.getValue(EAttribute.MaxHealth);
-		this.cdMultiplier = 1 + this.attributes.getValue(EAttribute.CooldownRecovery) / 100;
 		this.isDead = false;
 	}
 
