@@ -73,6 +73,16 @@ namespace Game.TestInfrastructure.Helpers
             return await ReadResponseAsync(commandInfo.Id);
         }
 
+        /// <summary>
+        /// Reads from the socket until a response with the given ID arrives, without sending anything.
+        /// Use this when a command is emitted through a server-side path (e.g. pub/sub) rather than
+        /// directly from the client.
+        /// </summary>
+        public async Task<ApiSocketResponse> WaitForResponseAsync(string commandId)
+        {
+            return await ReadResponseAsync(commandId);
+        }
+
         public async Task CloseAsync()
         {
             if (_socket.State == WebSocketState.Open)
