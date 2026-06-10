@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EItemModType, ERarity, type IItemMod } from '$lib/api';
+import { EChangeType, EItemModType, ERarity, type IItemMod } from '$lib/api';
+import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Item-mod config transforms: `newItem` defaults, the derived meta line, and the
    persist path — a child-only attribute edit must NOT hit the identity Add/Edit
@@ -31,6 +32,9 @@ import { itemModEntity } from '$routes/admin/workbench/entities/item-mod';
 
 /** Finds the body posted to a given AdminTools endpoint (or undefined if never called). */
 const postBodyTo = (endpoint: string) => mockPost.mock.calls.find((c) => c[0] === endpoint)?.[1];
+
+/** A table section's config by key (for exercising its `newRow` factory). */
+const tableSection = (key: string) => itemModEntity.sections.find((s) => s.key === key) as TableSectionConfig<IItemMod>;
 
 beforeEach(() => {
 	mockPost.mockReset().mockResolvedValue(undefined);
@@ -113,5 +117,47 @@ describe('itemModEntity', () => {
 		});
 		// Tags were untouched, so their endpoint is skipped.
 		expect(postBodyTo('AdminTools/SetTagsForItemMod')).toBeUndefined();
+	});
+
+	it('persist Adds a new mod and saves its attributes/tags against the resolved id', async () => {
+		// A freshly-added record has a temporary negative id; persistEntity resolves the real
+		// id from the post-save refetch before running the attribute/tag child savers.
+		const added: IItemMod = {
+			id: -1,
+			name: 'Keen',
+			description: 'Sharper edge',
+			itemModTypeId: EItemModType.Prefix,
+			rarityId: ERarity.Rare,
+			attributes: [{ attributeId: 0, amount: 3 }],
+			tags: [5]
+		};
+		socket.itemMods = [{ ...added, id: 9 }]; // the persisted record at its real id
+
+		await itemModEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });
+
+		// Identity Add posted with the child collections stripped.
+		const addCall = postBodyTo('AdminTools/AddEditItemMods');
+		expect(addCall[0].changeType).toBe(EChangeType.Add);
+		expect(addCall[0].item).toEqual({
+			id: -1,
+			name: 'Keen',
+			description: 'Sharper edge',
+			itemModTypeId: EItemModType.Prefix,
+			rarityId: ERarity.Rare,
+			attributes: [],
+			tags: []
+		});
+		// An added record has no baseline, so every attribute is an Add against the resolved id (9).
+		expect(postBodyTo('AdminTools/AddEditItemModAttributes')).toMatchObject({
+			id: 9,
+			changes: [{ changeType: EChangeType.Add, item: { attributeId: 0, amount: 3 } }]
+		});
+		expect(postBodyTo('AdminTools/SetTagsForItemMod')).toEqual({ id: 9, tagIds: [5] });
+	});
+
+	it('attribute newRow picks the first free attribute with a default amount', () => {
+		// Strength (id 0) is already taken, so the first free attribute (id 1) is chosen.
+		const mod: IItemMod = { ...itemModEntity.newItem(1), attributes: [{ attributeId: 0, amount: 5 }] };
+		expect(tableSection('attributes').newRow(mod)).toEqual({ attributeId: 1, amount: 1 });
 	});
 });
