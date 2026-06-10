@@ -586,6 +586,10 @@ namespace Game.Application.Tests.Services
             // Persist the applied mod as if it had been applied in a previous session, so the player
             // loads with it already in place and RemoveMod has something to remove (the inverse of
             // the LoadPlayer_PersistedAppliedMod scenario).
+            // AppliedMod.ItemModSlotId is a FK to ItemModSlot.Id, so the persisted row, the RemoveMod
+            // argument (matched against the loaded AppliedModSlot.ItemModSlotId), and the verify query
+            // all key off modSlot.Id — the same value the symmetric LoadPlayer_PersistedAppliedMod test
+            // persists. (The domain's Index-vs-Id mismatch on the apply path is tracked separately.)
             context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
             {
                 PlayerId = playerEntity.Id,
