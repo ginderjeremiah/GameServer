@@ -178,10 +178,11 @@ namespace Game.Application.Tests.DataAccess
                 await TestDataSeeder.AddPlayerChallengeAsync(context, playerId, challengeId, progress: 4m, completed: false);
             }
 
+            // Reload the caches so the seeded challenge is resolvable by id (they no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             using (var scope = CreateScope())
             {
-                // The challenge cache is static and not reset between tests, so refresh it to pick up the seeded row.
-                scope.ServiceProvider.GetRequiredService<IChallenges>().InvalidateCache();
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
 
                 var progress = await repo.Load(MakeDomainPlayer(playerId));

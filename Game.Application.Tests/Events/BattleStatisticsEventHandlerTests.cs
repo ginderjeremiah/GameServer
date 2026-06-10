@@ -143,9 +143,9 @@ namespace Game.Application.Tests.Events
                 rewardItemModId: modReward ? mod.Id : null,
                 rewardSkillId: skillReward ? rewardSkill.Id : null);
 
-            // Reference caches are static and not reset between tests, so refresh them to pick up the
-            // rows just seeded before the handler reads through its providers.
-            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
+            // The caches no longer lazily refill, so reload them to pick up the rows just seeded before the
+            // handler reads through its providers.
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             return new Setup(player.Id, enemy.Id, item.Id, mod.Id, rewardSkill.Id);
         }

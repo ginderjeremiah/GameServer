@@ -42,8 +42,8 @@ class WorkbenchReference {
 
 	async load() {
 		// Reference data is read over the socket (the loading screen's transport); the admin's
-		// post-save reads stay fresh because every admin write invalidates these in-memory caches
-		// server-side (AdminCacheInvalidationFilter). Tags have no socket command yet, so they
+		// post-save reads stay fresh because every admin write reloads these in-memory caches
+		// server-side (AdminCacheReloadFilter). Tags have no socket command yet, so they
 		// remain on HTTP.
 		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes, challenges] =
 			await Promise.all([

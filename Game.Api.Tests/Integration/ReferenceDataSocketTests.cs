@@ -43,6 +43,10 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
+            // Reload the caches so the Get* socket commands serve the seeded reference data (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             // Login to create the session in Redis that the socket handshake requires.
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",
                 new { Username = "refdatauser", Password = "refdatapass" });

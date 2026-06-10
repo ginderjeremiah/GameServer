@@ -37,6 +37,9 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: bossZone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, playerSkill.Id);
 
+            // Reload the caches so the boss battle resolves the seeded boss/zone (the caches no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",
                 new { Username = "bossuser", Password = "bosspass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);

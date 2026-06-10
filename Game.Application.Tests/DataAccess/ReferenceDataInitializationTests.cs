@@ -21,7 +21,7 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task InitializeReferenceCaches_LoadsAllCachedSets_SoTheyServeWithoutTheDatabase()
+        public async Task InitializeReferenceCachesAsync_LoadsAllCachedSets_SoTheyServeWithoutTheDatabase()
         {
             int itemId, modId, skillId, enemyId, zoneId, challengeId;
 
@@ -38,7 +38,7 @@ namespace Game.Application.Tests.DataAccess
                 challengeId = (await TestDataSeeder.CreateChallengeAsync(context)).Id;
 
                 // Eagerly load every cache up front — the startup step under test.
-                seedScope.ServiceProvider.InitializeReferenceCaches();
+                await seedScope.ServiceProvider.InitializeReferenceCachesAsync(CancellationToken);
 
                 // Wipe the reference tables. A lazy fill from here would see nothing, so any data the
                 // reads below still return must have been cached by the eager load above.
@@ -57,7 +57,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task InitializeReferenceCaches_DatabaseUnreachable_Throws()
+        public async Task InitializeReferenceCachesAsync_DatabaseUnreachable_Throws()
         {
             // A provider whose database cannot be reached; Redis points at the real test container so
             // only the database load fails.
@@ -78,12 +78,9 @@ namespace Game.Application.Tests.DataAccess
 
             await using var provider = services.BuildServiceProvider();
 
-            // Clear the process-wide static caches so the load must hit the (unreachable) database
-            // rather than serving an earlier test's cached data.
-            ReferenceCacheCleaner.InvalidateAll(provider);
-
-            // Fail fast: the boot must surface the database problem rather than swallow it.
-            Assert.ThrowsAny<Exception>(() => provider.InitializeReferenceCaches());
+            // The snapshot holders are per-provider singletons starting unpopulated, so the reload must hit
+            // the (unreachable) database. Fail fast: the boot must surface the problem rather than swallow it.
+            await Assert.ThrowsAnyAsync<Exception>(() => provider.InitializeReferenceCachesAsync(CancellationToken));
         }
     }
 }

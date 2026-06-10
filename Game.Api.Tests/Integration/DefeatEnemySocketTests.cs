@@ -32,6 +32,9 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
+            // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",
                 new { Username = "defeatuser", Password = "defeatpass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);

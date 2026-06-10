@@ -33,6 +33,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -67,6 +71,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -110,6 +118,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -131,6 +143,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -159,6 +175,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -197,6 +217,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -227,6 +251,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -253,6 +281,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -293,6 +325,10 @@ namespace Game.Application.Tests.Services
             playerEntity.StatPointsUsed = 2;
             await context.SaveChangesAsync(CancellationToken);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -330,6 +366,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -362,6 +402,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -399,6 +443,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -434,6 +482,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: bosslessZone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -476,6 +528,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: currentZone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -530,6 +586,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -575,6 +635,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -629,6 +693,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone1.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -661,6 +729,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone1.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -700,6 +772,10 @@ namespace Game.Application.Tests.Services
             // The player has completed the gating challenge, so zone2 is unlocked for them.
             await TestDataSeeder.AddPlayerChallengeAsync(context, playerEntity.Id, gate.Id, progress: 1m, completed: true);
 
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -731,6 +807,10 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
@@ -764,6 +844,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
             await TestDataSeeder.AddPlayerChallengeAsync(context, playerEntity.Id, gate.Id, progress: 1m, completed: true);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);

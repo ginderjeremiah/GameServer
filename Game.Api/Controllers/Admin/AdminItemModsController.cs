@@ -15,7 +15,7 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    [ServiceFilter(typeof(AdminCacheInvalidationFilter))]
+    [ReloadReferenceCaches]
     public class AdminItemModsController(IAdminItemMods adminItemMods) : ControllerBase
     {
         private readonly IAdminItemMods _adminItemMods = adminItemMods;

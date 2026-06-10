@@ -75,13 +75,19 @@ namespace Game.TestInfrastructure.Base
 
         protected IServiceScope CreateScope() => _rootProvider!.CreateScope();
 
+        /// <summary>
+        /// Rebuilds the reference-data cache snapshots from the current database state. Call after seeding
+        /// reference rows directly so the caches (which no longer lazily refill) serve the seeded data.
+        /// </summary>
+        protected Task ReloadReferenceCachesAsync() => ReferenceCacheReloader.ReloadAllAsync(_rootProvider!);
+
         protected async Task CleanupAsync()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await DatabaseCleaner.TruncatePlayerDataAsync(context);
             await RedisCleaner.FlushAsync(Containers.CacheConnectionString);
-            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
         }
     }
 }

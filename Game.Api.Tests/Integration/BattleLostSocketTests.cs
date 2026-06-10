@@ -54,6 +54,9 @@ namespace Game.Api.Tests.Integration
             player.StatPointsUsed = 2;
             await context.SaveChangesAsync();
 
+            // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",
                 new { Username = "weakplayer", Password = "weakpass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
@@ -75,6 +78,9 @@ namespace Game.Api.Tests.Integration
             var user = await TestDataSeeder.CreateUserAsync(context, "lossuser", "losspass");
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+
+            // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var loginResponse = await Client.PostAsJsonAsync("/api/Login",
                 new { Username = "lossuser", Password = "losspass" });

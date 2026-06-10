@@ -14,8 +14,8 @@ namespace Game.Api.Controllers.Admin
     /// </summary>
     /// <remarks>
     /// Unlike the reference-data admin controllers, this one does not carry
-    /// <see cref="AdminCacheInvalidationFilter"/>: user accounts are not list-cached in memory, so there
-    /// is no read-cache to invalidate after a write.
+    /// <see cref="ReloadReferenceCachesAttribute"/>: user accounts are not list-cached in memory, so there
+    /// is no read-cache to reload after a write.
     /// </remarks>
     [Route("/api/AdminTools/[action]")]
     [ApiController]

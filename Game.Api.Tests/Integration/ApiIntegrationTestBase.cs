@@ -40,7 +40,7 @@ namespace Game.Api.Tests.Integration
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await DatabaseCleaner.TruncatePlayerDataAsync(context);
             await RedisCleaner.FlushAsync(Containers.CacheConnectionString);
-            ReferenceCacheCleaner.InvalidateAll(scope.ServiceProvider);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
         }
 
         public async ValueTask DisposeAsync()
@@ -93,5 +93,11 @@ namespace Game.Api.Tests.Integration
         /// Creates a scoped service provider for direct DB access in test setup.
         /// </summary>
         protected IServiceScope CreateScope() => Factory.Services.CreateScope();
+
+        /// <summary>
+        /// Rebuilds the reference-data cache snapshots from the current database state. Call after seeding
+        /// reference rows directly so the caches (which no longer lazily refill) serve the seeded data.
+        /// </summary>
+        protected Task ReloadReferenceCachesAsync() => ReferenceCacheReloader.ReloadAllAsync(Factory.Services);
     }
 }

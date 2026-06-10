@@ -37,6 +37,10 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
 
             var updates = new List<SimpleAttributeUpdate>
@@ -62,6 +66,10 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
 
             var updates = new List<SimpleAttributeUpdate>
@@ -85,6 +93,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
 
             var player1 = await playerService.LoadPlayer(playerEntity.Id);
@@ -100,6 +112,10 @@ namespace Game.Application.Tests.Services
         public async Task LoadPlayer_NonExistent_ReturnsNull()
         {
             using var scope = CreateScope();
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
 
             var player = await playerService.LoadPlayer(99999);
@@ -139,6 +155,10 @@ namespace Game.Application.Tests.Services
                 ItemModId = mod.Id,
             });
             await context.SaveChangesAsync(CancellationToken);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -198,6 +218,10 @@ namespace Game.Application.Tests.Services
             await context.SaveChangesAsync(CancellationToken);
             Assert.NotEqual(0, modSlot.Id);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -217,6 +241,10 @@ namespace Game.Application.Tests.Services
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -273,6 +301,10 @@ namespace Game.Application.Tests.Services
             });
             await context.SaveChangesAsync(CancellationToken);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -323,6 +355,10 @@ namespace Game.Application.Tests.Services
                 ItemModId = mod.Id,
             });
             await context.SaveChangesAsync(CancellationToken);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -380,6 +416,10 @@ namespace Game.Application.Tests.Services
             // An unlocked-but-unselected skill must stay out of the equipped loadout.
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skillE.Id, selected: false, order: 0);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -410,6 +450,10 @@ namespace Game.Application.Tests.Services
                 ItemId = item.Id,
             });
             await context.SaveChangesAsync(CancellationToken);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -449,6 +493,10 @@ namespace Game.Application.Tests.Services
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill1.Id, selected: false);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill2.Id, selected: false);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -483,6 +531,10 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             var skill = await TestDataSeeder.CreateSkillAsync(context);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -510,6 +562,10 @@ namespace Game.Application.Tests.Services
                 ItemId = item.Id,
             });
             await context.SaveChangesAsync(CancellationToken);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -541,6 +597,10 @@ namespace Game.Application.Tests.Services
             // The item exists in the catalog but the player has not unlocked it.
             var item = await TestDataSeeder.CreateItemAsync(context);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -568,6 +628,10 @@ namespace Game.Application.Tests.Services
             });
             await context.SaveChangesAsync(CancellationToken);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -594,6 +658,10 @@ namespace Game.Application.Tests.Services
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
@@ -652,6 +720,10 @@ namespace Game.Application.Tests.Services
             });
             await context.SaveChangesAsync(CancellationToken);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -684,6 +756,10 @@ namespace Game.Application.Tests.Services
             });
             await context.SaveChangesAsync(CancellationToken);
 
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
@@ -702,6 +778,10 @@ namespace Game.Application.Tests.Services
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
+            // longer lazily refill).
+            await ReloadReferenceCachesAsync();
 
             var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
             var player = await playerService.LoadPlayer(playerEntity.Id);
