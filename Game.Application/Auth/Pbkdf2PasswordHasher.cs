@@ -2,29 +2,29 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Game.Abstractions.Auth;
-using Game.Core;
 using Microsoft.Extensions.Options;
 
 namespace Game.Application.Auth
 {
     /// <summary>
     /// Derives password hashes with PBKDF2 (HMAC-SHA256), a purpose-built, deliberately-slow key
-    /// derivation function, replacing the bespoke iterated-SHA-512 construction. New hashes are stored in
-    /// a self-describing format (<c>$pbkdf2-sha256$&lt;iterations&gt;$&lt;base64-key&gt;</c>) so the work
-    /// factor is recorded alongside the hash and can be raised over time. An application-wide pepper is
-    /// folded in via a standard HMAC pre-hash (defence-in-depth), supplied through
-    /// <see cref="PasswordHashingOptions"/> rather than process-global state.
+    /// derivation function. Hashes are stored in a self-describing format
+    /// (<c>$pbkdf2-sha256$&lt;iterations&gt;$&lt;base64-salt&gt;$&lt;base64-key&gt;</c>) so both the work
+    /// factor and the per-hash salt live alongside the key — the stored hash is fully self-contained and
+    /// the work factor can be raised over time. An application-wide pepper is folded in via a standard
+    /// HMAC pre-hash (defence-in-depth), supplied through <see cref="PasswordHashingOptions"/> rather than
+    /// process-global state.
     /// </summary>
     /// <remarks>
-    /// The per-user salt is the existing <see cref="Guid"/> credential salt (a 128-bit random value),
-    /// reused as the PBKDF2 salt so no schema change is required. Credentials still stored under the
-    /// legacy scheme are verified via <see cref="LegacyPasswordHash"/> and reported as
-    /// <see cref="PasswordVerificationResult.SuccessRehashNeeded"/> so the caller can migrate them on login.
+    /// A fresh 128-bit random salt is generated for every hash and embedded in the output, so no separate
+    /// salt storage is required. A credential stored with an outdated work factor verifies and is reported
+    /// as <see cref="PasswordVerificationResult.SuccessRehashNeeded"/> so the caller can upgrade it on login.
     /// </remarks>
     public class Pbkdf2PasswordHasher : IPasswordHasher
     {
         private const string FormatPrefix = "$pbkdf2-sha256$";
         private const int KeyLengthBytes = 32;
+        private const int SaltLengthBytes = 16;
         private static readonly HashAlgorithmName DerivationAlgorithm = HashAlgorithmName.SHA256;
 
         private readonly int _iterations;
@@ -37,31 +37,22 @@ namespace Game.Application.Auth
             _pepper = Encoding.UTF8.GetBytes(value.Pepper);
         }
 
-        public string Hash(string password, Guid salt)
+        public string Hash(string password)
         {
+            var salt = RandomNumberGenerator.GetBytes(SaltLengthBytes);
             var derived = Derive(password, salt, _iterations);
             return string.Concat(
                 FormatPrefix,
                 _iterations.ToString(CultureInfo.InvariantCulture),
                 "$",
+                Convert.ToBase64String(salt),
+                "$",
                 Convert.ToBase64String(derived));
         }
 
-        public PasswordVerificationResult Verify(string password, Guid salt, string storedHash)
+        public PasswordVerificationResult Verify(string password, string storedHash)
         {
-            if (string.IsNullOrEmpty(storedHash))
-            {
-                return PasswordVerificationResult.Failed;
-            }
-
-            return storedHash.StartsWith(FormatPrefix, StringComparison.Ordinal)
-                ? VerifyCurrent(password, salt, storedHash)
-                : VerifyLegacy(password, salt, storedHash);
-        }
-
-        private PasswordVerificationResult VerifyCurrent(string password, Guid salt, string storedHash)
-        {
-            if (!TryParse(storedHash, out var iterations, out var expected))
+            if (string.IsNullOrEmpty(storedHash) || !TryParse(storedHash, out var iterations, out var salt, out var expected))
             {
                 return PasswordVerificationResult.Failed;
             }
@@ -78,21 +69,10 @@ namespace Game.Application.Auth
                 : PasswordVerificationResult.SuccessRehashNeeded;
         }
 
-        private PasswordVerificationResult VerifyLegacy(string password, Guid salt, string storedHash)
-        {
-            var computed = Encoding.UTF8.GetBytes(LegacyPasswordHash.Hash(password, salt.ToString(), _pepper));
-            var expected = Encoding.UTF8.GetBytes(storedHash);
-
-            // A legacy match is always due for migration to the PBKDF2 scheme.
-            return CryptographicOperations.FixedTimeEquals(computed, expected)
-                ? PasswordVerificationResult.SuccessRehashNeeded
-                : PasswordVerificationResult.Failed;
-        }
-
-        private byte[] Derive(string password, Guid salt, int iterations)
+        private byte[] Derive(string password, byte[] salt, int iterations)
         {
             // Fold the application-wide pepper into the secret via a standard HMAC pre-hash so both the
-            // per-user salt and the global secret contribute, without a bespoke mixing construction.
+            // per-hash salt and the global secret contribute, without a bespoke mixing construction.
             var passwordBytes = Encoding.UTF8.GetBytes(password);
             byte[] secret;
             if (_pepper.Length > 0)
@@ -104,36 +84,59 @@ namespace Game.Application.Auth
                 secret = passwordBytes;
             }
 
-            return Rfc2898DeriveBytes.Pbkdf2(secret, salt.ToByteArray(), iterations, DerivationAlgorithm, KeyLengthBytes);
+            return Rfc2898DeriveBytes.Pbkdf2(secret, salt, iterations, DerivationAlgorithm, KeyLengthBytes);
         }
 
-        private static bool TryParse(string storedHash, out int iterations, out byte[] hash)
+        private static bool TryParse(string storedHash, out int iterations, out byte[] salt, out byte[] hash)
         {
             iterations = 0;
+            salt = [];
             hash = [];
 
+            if (!storedHash.StartsWith(FormatPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             var body = storedHash.AsSpan(FormatPrefix.Length);
-            var separator = body.IndexOf('$');
-            if (separator <= 0)
+            var iterationsEnd = body.IndexOf('$');
+            if (iterationsEnd <= 0)
             {
                 return false;
             }
 
-            if (!int.TryParse(body[..separator], NumberStyles.None, CultureInfo.InvariantCulture, out iterations) || iterations < 1)
+            if (!int.TryParse(body[..iterationsEnd], NumberStyles.None, CultureInfo.InvariantCulture, out iterations) || iterations < 1)
             {
                 return false;
             }
 
+            var rest = body[(iterationsEnd + 1)..];
+            var saltEnd = rest.IndexOf('$');
+            if (saltEnd <= 0)
+            {
+                return false;
+            }
+
+            if (!TryDecodeBase64(rest[..saltEnd], out salt) || salt.Length == 0)
+            {
+                return false;
+            }
+
+            return TryDecodeBase64(rest[(saltEnd + 1)..], out hash) && hash.Length > 0;
+        }
+
+        private static bool TryDecodeBase64(ReadOnlySpan<char> value, out byte[] decoded)
+        {
             try
             {
-                hash = Convert.FromBase64String(body[(separator + 1)..].ToString());
+                decoded = Convert.FromBase64String(value.ToString());
+                return true;
             }
             catch (FormatException)
             {
+                decoded = [];
                 return false;
             }
-
-            return hash.Length > 0;
         }
     }
 }

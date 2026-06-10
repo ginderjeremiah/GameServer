@@ -42,12 +42,10 @@ namespace Game.Application.Services
                 return CreateAccountStatus.UsernameTaken;
             }
 
-            var salt = Guid.NewGuid();
             var account = new NewAccount
             {
                 Username = username,
-                PassHash = _passwordHasher.Hash(password, salt),
-                Salt = salt,
+                PassHash = _passwordHasher.Hash(password),
             };
 
             _users.CreateAccount(account, _newPlayerFactory.Create(username));
@@ -68,7 +66,7 @@ namespace Game.Application.Services
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
-            var verification = _passwordHasher.Verify(password, account.Salt, account.PassHash);
+            var verification = _passwordHasher.Verify(password, account.PassHash);
             if (verification == PasswordVerificationResult.Failed)
             {
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
@@ -85,16 +83,15 @@ namespace Game.Application.Services
                 return AccountLoginResult.Failed(LoginStatus.PlayerDataNotFound);
             }
 
-            // Transparently migrate a credential stored under the legacy scheme (or an outdated work
-            // factor) now that we have verified the plaintext, so existing accounts upgrade without a
-            // forced reset. The salt is reused; only the derived hash changes. This is best-effort: an
-            // opportunistic upgrade must never cost the user an otherwise-valid login — if the write
-            // fails transiently the legacy hash still verifies, so the next login simply retries it.
+            // Transparently re-hash a credential stored with an outdated work factor now that we have
+            // verified the plaintext, so existing accounts upgrade without a forced reset. This is
+            // best-effort: an opportunistic upgrade must never cost the user an otherwise-valid login — if
+            // the write fails transiently the old hash still verifies, so the next login simply retries it.
             if (verification == PasswordVerificationResult.SuccessRehashNeeded)
             {
                 try
                 {
-                    await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password, account.Salt));
+                    await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password));
                 }
                 catch (Exception ex)
                 {

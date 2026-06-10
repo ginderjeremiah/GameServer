@@ -4,24 +4,25 @@ namespace Game.Abstractions.Auth
     /// Hashes and verifies account passwords. Abstracted here so the application layer can orchestrate
     /// credential checks without depending on the concrete key-derivation implementation. The current
     /// implementation derives keys with PBKDF2; the abstraction also supports transparently upgrading
-    /// credentials that were stored under an older (or weaker-parameterised) scheme.
+    /// credentials that were stored with parameters that no longer match the current configuration.
     /// </summary>
     public interface IPasswordHasher
     {
         /// <summary>
-        /// Derives a self-describing hash of <paramref name="password"/> using the per-user
-        /// <paramref name="salt"/> and the hasher's currently-configured parameters.
+        /// Derives a self-describing hash of <paramref name="password"/> using a fresh random salt and the
+        /// hasher's currently-configured parameters. The salt is embedded in the returned hash, so it is
+        /// fully self-contained.
         /// </summary>
-        string Hash(string password, Guid salt);
+        string Hash(string password);
 
         /// <summary>
-        /// Verifies <paramref name="password"/> against the <paramref name="storedHash"/> created with the
-        /// given <paramref name="salt"/>. The comparison is constant-time. Returns
+        /// Verifies <paramref name="password"/> against the self-contained <paramref name="storedHash"/>
+        /// (which carries its own salt and parameters). The comparison is constant-time. Returns
         /// <see cref="PasswordVerificationResult.SuccessRehashNeeded"/> when the credential is valid but
-        /// was stored under a legacy scheme or with parameters that no longer match the current
-        /// configuration, signalling the caller to re-hash and persist it.
+        /// was stored with parameters that no longer match the current configuration, signalling the
+        /// caller to re-hash and persist it.
         /// </summary>
-        PasswordVerificationResult Verify(string password, Guid salt, string storedHash);
+        PasswordVerificationResult Verify(string password, string storedHash);
     }
 
     /// <summary>
@@ -36,8 +37,8 @@ namespace Game.Abstractions.Auth
         Success,
 
         /// <summary>
-        /// The password matched, but the stored hash should be re-derived with the current scheme/parameters
-        /// (e.g. a legacy hash being migrated on login).
+        /// The password matched, but the stored hash should be re-derived with the current parameters
+        /// (e.g. an outdated work factor being upgraded on login).
         /// </summary>
         SuccessRehashNeeded,
     }

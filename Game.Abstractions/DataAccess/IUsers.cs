@@ -27,9 +27,8 @@ namespace Game.Abstractions.DataAccess
         Task<bool> CheckIfUsernameExists(string userName);
 
         /// <summary>
-        /// Replaces the stored password hash for the given user. Used to transparently migrate a
-        /// credential to the current hashing scheme after a successful login; the per-user salt is
-        /// unchanged. No-op if the user does not exist.
+        /// Replaces the stored password hash for the given user. Used to transparently upgrade a
+        /// credential to the current work factor after a successful login. No-op if the user does not exist.
         /// </summary>
         Task UpdatePasswordHash(int userId, string passHash);
 

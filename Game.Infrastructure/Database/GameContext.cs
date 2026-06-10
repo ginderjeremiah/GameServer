@@ -417,8 +417,9 @@ namespace Game.Infrastructure.Database
                 entity.Property(u => u.Username)
                     .HasMaxLength(20);
 
+                // Self-contained PBKDF2 hash: $pbkdf2-sha256$<iterations>$<base64-salt>$<base64-key>.
                 entity.Property(u => u.PassHash)
-                    .HasMaxLength(88);
+                    .HasMaxLength(128);
             });
 
             modelBuilder.Entity<BrowserInfo>(entity =>

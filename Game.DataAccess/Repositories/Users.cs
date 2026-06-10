@@ -17,7 +17,6 @@ namespace Game.DataAccess.Repositories
             u => new AccountCredentials
             {
                 Id = u.Id,
-                Salt = u.Salt,
                 PassHash = u.PassHash,
                 Roles = u.Roles.Select(r => r.Name).ToList(),
                 PlayerIds = u.Players.Select(p => p.Id).ToList(),
@@ -57,7 +56,6 @@ namespace Game.DataAccess.Repositories
             {
                 Username = account.Username,
                 PassHash = account.PassHash,
-                Salt = account.Salt,
                 LastLogin = DateTime.UtcNow,
             };
 

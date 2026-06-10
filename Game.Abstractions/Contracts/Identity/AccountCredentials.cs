@@ -13,7 +13,6 @@ namespace Game.Abstractions.Contracts.Identity
     public class AccountCredentials
     {
         public int Id { get; set; }
-        public Guid Salt { get; set; }
         public required string PassHash { get; set; }
         public required IReadOnlyList<string> Roles { get; set; }
         public required IReadOnlyList<int> PlayerIds { get; set; }

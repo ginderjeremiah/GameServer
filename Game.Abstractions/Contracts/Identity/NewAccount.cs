@@ -14,6 +14,5 @@ namespace Game.Abstractions.Contracts.Identity
     {
         public required string Username { get; init; }
         public required string PassHash { get; init; }
-        public required Guid Salt { get; init; }
     }
 }
