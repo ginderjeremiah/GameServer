@@ -16,8 +16,10 @@
 --
 -- Rows are inserted in dependency order (Enemies before the Zones that reference them as bosses).
 -- It is applied against the e2e Postgres AFTER the API has migrated (the CI workflow runs it once
--- the API answers). Every statement is idempotent (ON CONFLICT DO NOTHING), so re-running is safe.
--- It is intentionally separate from the app: production/local databases are never touched by it.
+-- the API answers), and the workflow then restarts the API so its startup-loaded reference-data
+-- caches (#357) reflect the seed. Every statement is idempotent (ON CONFLICT DO NOTHING), so
+-- re-running is safe. It is intentionally separate from the app: production/local databases are
+-- never touched by it.
 
 -- Starter skills (ids 0/1/2 are referenced directly by LoginController.CreateAccount).
 INSERT INTO "Skills" ("Id", "Name", "BaseDamage", "Description", "CooldownMs", "IconPath") VALUES

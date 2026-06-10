@@ -16,8 +16,10 @@
 #
 # Seeding: the API migrates on startup but migrations only carry the intrinsic enum-backed reference
 # data. The static content the e2e suite needs (Skills/Enemies/Zones) must be applied separately once
-# the API is up, e.g.:
+# the API is up, then the API must be restarted so it reloads its reference-data caches (which it
+# eagerly loads at startup, #357) from the now-seeded database, e.g.:
 #   docker compose exec -T postgres psql -U game -d game -p 5544 -f - < e2e-seed.sql
+#   docker compose restart api
 # See e2e-seed.sql and docs/backend.md "Dockerized API stack for end-to-end (Playwright) runs".
 
 services:
