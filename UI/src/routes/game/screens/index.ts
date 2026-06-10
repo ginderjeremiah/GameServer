@@ -3,6 +3,7 @@ export { default as CardGame } from './card-game/CardGame.svelte';
 export { default as Attributes } from './attributes/Attributes.svelte';
 export { default as Challenges } from './challenges/Challenges.svelte';
 export { default as Inventory } from './inventory/Inventory.svelte';
+export { default as Skills } from './skills/Skills.svelte';
 export { default as Options } from './options/Options.svelte';
 export { default as Statistics } from './stats/Statistics.svelte';
 export { default as AttributeBreakdown } from './attribute-breakdown/AttributeBreakdown.svelte';
