@@ -122,12 +122,13 @@ namespace Game.Api.Services
                     {
                         _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
                         await socket.ExecuteCommand(nextCommandInfo);
-                        nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "An error occured while executing a socket command: {CommandInfo}", nextCommandInfo);
                     }
+
+                    nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
                 }
             };
         }

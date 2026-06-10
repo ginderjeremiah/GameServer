@@ -40,9 +40,9 @@ namespace Game.Api.Sockets
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             using var scope = _scopeFactory.CreateScope();
-            var command = _commandFactory.CreateCommand(commandInfo, scope);
             try
             {
+                var command = _commandFactory.CreateCommand(commandInfo, scope);
                 var response = await command.ExecuteAsync(_context);
                 await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
                 await _context.SendData(response);
