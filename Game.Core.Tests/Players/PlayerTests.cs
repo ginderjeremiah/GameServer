@@ -109,14 +109,14 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void GrantExp_ExactlyAtThreshold_DoesNotLevelUp()
+        public void GrantExp_ExactlyAtThreshold_LevelsUp()
         {
             var player = MakePlayer(level: 1, exp: 0);
 
-            player.GrantExp(100); // threshold is > 100, not >=
+            player.GrantExp(100); // threshold is >+ 100, not >
 
-            Assert.Equal(1, player.Level);
-            Assert.Equal(100, player.Exp);
+            Assert.Equal(2, player.Level);
+            Assert.Equal(0, player.Exp);
         }
 
         // ── UnlockItem ──────────────────────────────────────────────────────

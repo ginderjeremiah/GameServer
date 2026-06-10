@@ -67,7 +67,7 @@ namespace Game.Core.Players
         public void GrantExp(int amount)
         {
             Exp += amount;
-            while (Exp > Level * ExpPerLevel)
+            while (Exp >= Level * ExpPerLevel)
             {
                 Exp -= Level * ExpPerLevel;
                 Level++;

@@ -50,7 +50,7 @@ export class PlayerManager implements IPlayerData {
 	public grantExp(exp: number) {
 		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
-		if (this.exp >= this.level * expPerLevel) {
+		while (this.exp >= this.level * expPerLevel) {
 			this.levelUp();
 		}
 	}
