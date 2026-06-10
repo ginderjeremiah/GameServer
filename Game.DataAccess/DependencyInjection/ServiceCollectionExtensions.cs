@@ -60,8 +60,6 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IItemMods>(sp => sp.GetRequiredService<ItemMods>())
                 .AddScoped<IItemModEntityCache>(sp => sp.GetRequiredService<ItemMods>())
                 .AddScoped<ICacheInvalidatable>(sp => sp.GetRequiredService<IItemMods>())
-                .AddScoped<IItemModTypes, ItemModTypes>()
-                .AddScoped<IItemCategories, ItemCategories>()
                 .AddScoped<Skills>()
                 .AddScoped<ISkills>(sp => sp.GetRequiredService<Skills>())
                 .AddScoped<ISkillEntityCache>(sp => sp.GetRequiredService<Skills>())

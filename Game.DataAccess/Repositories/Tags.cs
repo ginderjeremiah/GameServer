@@ -25,22 +25,6 @@ namespace Game.DataAccess.Repositories
             return _context.Tags.Select(ToContract).AsAsyncEnumerable();
         }
 
-        public IAsyncEnumerable<Contracts.Tag> GetTagsForItem(int itemId)
-        {
-            return _context.Tags
-                .Where(t => t.Items.Any(i => i.Id == itemId))
-                .Select(ToContract)
-                .AsAsyncEnumerable();
-        }
-
-        public IAsyncEnumerable<Contracts.Tag> GetTagsForItemMod(int itemModId)
-        {
-            return _context.Tags
-                .Where(t => t.ItemMods.Any(im => im.Id == itemModId))
-                .Select(ToContract)
-                .AsAsyncEnumerable();
-        }
-
         public IAsyncEnumerable<Tag> GetTags(IEnumerable<int> tagIds)
         {
             return _context.Tags.Where(t => tagIds.Contains(t.Id)).AsAsyncEnumerable();

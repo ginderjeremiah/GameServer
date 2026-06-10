@@ -15,10 +15,8 @@ import type {
 	IEnemy,
 	IEquipRequest,
 	IItem,
-	IItemCategory,
 	IItemMod,
 	IItemModSlot,
-	IItemModType,
 	ILoginCredentials,
 	ILoginResult,
 	IPlayerChallenge,
@@ -38,8 +36,7 @@ import type {
 	ITag,
 	ITagCategory,
 	IUserActionData,
-	IZone,
-	IZoneEnemy
+	IZone
 } from './';
 
 export type ApiResponseTypes = {
@@ -66,9 +63,6 @@ export type ApiResponseTypes = {
 	'AdminTools/SetUserRoles': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
 	'Challenges/Player': IPlayerChallenge[];
-	'ItemCategories': IItemCategory[];
-	'ItemMods/ItemModTypes': IItemModType[];
-	'Items/SlotsForItem': IItemModSlot[];
 	'Login': ILoginResult;
 	'Login/ActiveSession': IActiveSessionResult;
 	'Login/CreateAccount': undefined;
@@ -86,9 +80,6 @@ export type ApiResponseTypes = {
 	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
-	'Tags/TagsForItem': ITag[];
-	'Tags/TagsForItemMod': ITag[];
-	'Zones/ZoneEnemies': IZoneEnemy[];
 };
 
 export type ApiRequestTypes = {
@@ -113,7 +104,6 @@ export type ApiRequestTypes = {
 	'AdminTools/SetTagsForItemMod': ISetTagsData;
 	'AdminTools/SetUserRoles': ISetUserRolesData;
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
-	'Items/SlotsForItem': { itemId: number, refreshCache?: boolean };
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
 	'Login/DeviceInfo': IDeviceInfoRequest;
@@ -124,9 +114,6 @@ export type ApiRequestTypes = {
 	'Player/RemoveMod': IRemoveModRequest;
 	'Player/UnequipItem': IEquipRequest;
 	'Player/UpdatePlayerStats': IAttributeUpdate[];
-	'Tags/TagsForItem': { itemId: number };
-	'Tags/TagsForItemMod': { itemModId: number };
-	'Zones/ZoneEnemies': { zoneId: number };
 };
 
 export type ApiEndpoint = keyof ApiResponseTypes;

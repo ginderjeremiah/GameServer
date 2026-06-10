@@ -62,13 +62,5 @@ namespace Game.DataAccess.Repositories
         {
             return zoneId >= 0 && zoneId < AllEntities().Count;
         }
-
-        public IAsyncEnumerable<Contracts.ZoneEnemy> ZoneEnemies(int zoneId)
-        {
-            return _context.ZoneEnemies
-                .Where(ze => ze.ZoneId == zoneId)
-                .Select(ze => new Contracts.ZoneEnemy { EnemyId = ze.EnemyId, Weight = ze.Weight })
-                .AsAsyncEnumerable();
-        }
     }
 }

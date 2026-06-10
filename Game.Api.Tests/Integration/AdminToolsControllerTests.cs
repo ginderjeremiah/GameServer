@@ -1148,13 +1148,21 @@ namespace Game.Api.Tests.Integration
         private async Task<List<Tag>> GetTagsForItem(int itemId)
         {
             using var scope = CreateScope();
-            return await scope.ServiceProvider.GetRequiredService<ITags>().GetTagsForItem(itemId).ToListAsync();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.Tags
+                .Where(t => t.Items.Any(i => i.Id == itemId))
+                .Select(t => new Tag { Id = t.Id, Name = t.Name, TagCategoryId = t.TagCategoryId })
+                .ToListAsync();
         }
 
         private async Task<List<Tag>> GetTagsForItemMod(int itemModId)
         {
             using var scope = CreateScope();
-            return await scope.ServiceProvider.GetRequiredService<ITags>().GetTagsForItemMod(itemModId).ToListAsync();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.Tags
+                .Where(t => t.ItemMods.Any(im => im.Id == itemModId))
+                .Select(t => new Tag { Id = t.Id, Name = t.Name, TagCategoryId = t.TagCategoryId })
+                .ToListAsync();
         }
 
         private async Task<List<Tag>> GetTags()

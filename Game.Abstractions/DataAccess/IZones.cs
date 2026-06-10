@@ -14,6 +14,5 @@ namespace Game.Abstractions.DataAccess
         public CoreZone GetDomainZone(int zoneId);
 
         public bool ValidateZoneId(int zoneId);
-        public IAsyncEnumerable<Contracts.ZoneEnemy> ZoneEnemies(int zoneId);
     }
 }
