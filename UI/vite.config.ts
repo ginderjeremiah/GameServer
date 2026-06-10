@@ -39,7 +39,7 @@ export default defineConfig({
 				'src/lib/card-game/**': { lines: 94, functions: 100, branches: 81, statements: 94 },
 				'src/stores/**': { lines: 98, functions: 100, branches: 90, statements: 98 },
 				'src/components/**': { lines: 89, functions: 95, branches: 74, statements: 92 },
-				'src/routes/**': { lines: 73, functions: 68, branches: 53, statements: 71 }
+				'src/routes/**': { lines: 88, functions: 87, branches: 67, statements: 88 }
 			}
 		}
 	},

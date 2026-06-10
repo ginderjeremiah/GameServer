@@ -67,6 +67,37 @@ describe('enemyEntity', () => {
 		expect(enemyEntity.listBadge?.(baseline)).toBeNull();
 	});
 
+	it('surfaces the attribute, skill and zone counts in the list meta', () => {
+		expect(enemyEntity.meta(baseline)).toEqual([
+			['attr', 1],
+			['skill', 1],
+			['zone', 1]
+		]);
+	});
+
+	it('colours the list badge with the enemy accent', () => {
+		expect(enemyEntity.badgeColor?.(baseline)).toBe('var(--enemy-accent)');
+	});
+
+	it('persist saves the attribute distribution and spawns when they change', async () => {
+		const record: IEnemy = {
+			...baseline,
+			attributeDistribution: [{ attributeId: 0, baseAmount: 2, amountPerLevel: 1 }], // changed
+			spawns: [{ zoneId: 0, weight: 9 }] // changed
+		};
+		socket.enemies = [record];
+
+		await enemyEntity.persist({ added: [], modified: [{ record, baseline }], deleted: [], existingIds: [0] });
+
+		expect(postBodyTo('AdminTools/SetEnemyAttributeDistributions')).toEqual({
+			enemyId: 0,
+			attributeDistributions: [{ attributeId: 0, baseAmount: 2, amountPerLevel: 1 }]
+		});
+		expect(postBodyTo('AdminTools/SetEnemySpawns')).toEqual({ enemyId: 0, spawns: [{ zoneId: 0, weight: 9 }] });
+		// The skill pool was untouched, so its endpoint is skipped.
+		expect(postBodyTo('AdminTools/SetEnemySkills')).toBeUndefined();
+	});
+
 	it('persist strips the child collections off the identity DTO and saves only the changed child', async () => {
 		const record: IEnemy = { ...baseline, name: 'Cave Bat', skillPool: [1, 2] }; // identity + skills changed
 		socket.enemies = [record];
