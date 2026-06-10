@@ -11,7 +11,6 @@ namespace Game.Api.Models.Player
         public int Exp { get; set; }
         public required List<BattlerAttribute> Attributes { get; set; }
         public required List<UnlockedSkill> UnlockedSkills { get; set; }
-        public int MaxSelectedSkills { get; set; }
         public int CurrentZone { get; set; }
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
@@ -30,7 +29,6 @@ namespace Game.Api.Models.Player
                 CurrentZone = player.CurrentZoneId,
                 StatPointsGained = player.StatPoints.StatPointsGained,
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
-                MaxSelectedSkills = CorePlayer.MaxSelectedSkills,
                 // Project every unlocked skill with its loadout state, parallel to UnlockedItems'
                 // Equipped/EquipmentSlotId. SelectedSkills is already a deterministic (Order, SkillId)
                 // ordering (PlayerMapper.ToCore), so the equipped skill's index is its loadout order;

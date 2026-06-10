@@ -38,5 +38,38 @@ namespace Game.Api.Tests.CodeGen
                 ApiCodeGenerator.GetClientMirroredEnumDescriptors(),
                 descriptor => Assert.True(descriptor.IsEnum));
         }
+
+        [Theory]
+        [InlineData(nameof(GameConstants.MsPerTick))]
+        [InlineData(nameof(GameConstants.DefaultMaxBattleMs))]
+        [InlineData(nameof(GameConstants.MaxSelectedSkills))]
+        [InlineData(nameof(GameConstants.ExpPerLevel))]
+        [InlineData(nameof(GameConstants.StatPointsPerLevel))]
+        public void GetClientMirroredConstantFields_IncludesGameConstants(string fieldName)
+        {
+            var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
+                .Select(field => field.Name)
+                .ToList();
+
+            Assert.Contains(fieldName, fieldNames);
+        }
+
+        [Fact]
+        public void GetClientMirroredConstantFields_OnlyReturnsCompileTimeConstants()
+        {
+            Assert.All(
+                ApiCodeGenerator.GetClientMirroredConstantFields(),
+                field => Assert.True(field.IsLiteral));
+        }
+
+        [Fact]
+        public void GetClientMirroredConstantFields_IsOrderedDeterministically()
+        {
+            var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
+                .Select(field => field.Name)
+                .ToList();
+
+            Assert.Equal(fieldNames.OrderBy(name => name), fieldNames);
+        }
     }
 }

@@ -15,20 +15,6 @@ namespace Game.Core.Players
     /// </summary>
     public class Player : AggregateRoot
     {
-        /// <summary>The experience required to advance a level scales linearly as <c>Level * <see cref="ExpPerLevel"/></c>.</summary>
-        private const int ExpPerLevel = 100;
-
-        /// <summary>The number of stat points awarded on each level-up.</summary>
-        private const int StatPointsPerLevel = 6;
-
-        /// <summary>
-        /// The maximum number of skills a player may equip in their battle loadout. Fixed at the
-        /// enemy loadout cap (<see cref="Enemies.Enemy"/> brings ≤ 4 skills into a battle) for
-        /// player/enemy symmetry. This is the single source of truth for the cap; enforcement of a
-        /// loadout change against it is added with the set-loadout command (#263).
-        /// </summary>
-        public const int MaxSelectedSkills = 4;
-
         public required int Id { get; set; }
         public required string Name { get; set; }
         public required int Level { get; set; }
@@ -67,11 +53,11 @@ namespace Game.Core.Players
         public void GrantExp(int amount)
         {
             Exp += amount;
-            while (Exp >= Level * ExpPerLevel)
+            while (Exp >= Level * GameConstants.ExpPerLevel)
             {
-                Exp -= Level * ExpPerLevel;
+                Exp -= Level * GameConstants.ExpPerLevel;
                 Level++;
-                StatPoints.StatPointsGained += StatPointsPerLevel;
+                StatPoints.StatPointsGained += GameConstants.StatPointsPerLevel;
                 RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
             }
 
@@ -116,14 +102,14 @@ namespace Game.Core.Players
         /// Replaces the player's equipped skill loadout with <paramref name="orderedSkillIds"/> in the
         /// given order, handling select, deselect, and reorder through one atomic path. Enforces the
         /// loadout rules as anti-cheat: the set must contain no duplicates, fit within
-        /// <see cref="MaxSelectedSkills"/>, and consist only of skills the player has already unlocked.
+        /// <see cref="GameConstants.MaxSelectedSkills"/>, and consist only of skills the player has already unlocked.
         /// On success the equipped set + order is replaced and a single
         /// <see cref="SelectedSkillsChangedEvent"/> is raised; any validation failure rejects the change
         /// (returns <c>false</c>, raising no event and leaving the loadout untouched).
         /// </summary>
         public bool TrySetSelectedSkills(IReadOnlyList<int> orderedSkillIds)
         {
-            if (orderedSkillIds.Count > MaxSelectedSkills)
+            if (orderedSkillIds.Count > GameConstants.MaxSelectedSkills)
             {
                 return false;
             }
