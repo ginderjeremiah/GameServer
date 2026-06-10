@@ -34,13 +34,15 @@ namespace Game.DataAccess
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             // The reload loop starts before the subscription so a notification can never find it missing.
+            // The subscription is id-scoped (InstanceId) so StopAsync removes only this handler rather
+            // than tearing down every subscriber the channel might gain.
             _reloadLoop = _reloader.RunAsync(_stopping.Token);
-            await _pubsub.Subscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, HandleNotification);
+            await _pubsub.Subscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, HandleNotification, InstanceId);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await _pubsub.UnSubscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL);
+            await _pubsub.UnSubscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, InstanceId);
             _stopping.Cancel();
             await _reloadLoop;
         }

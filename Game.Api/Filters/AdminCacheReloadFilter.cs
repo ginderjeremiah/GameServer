@@ -19,7 +19,8 @@ namespace Game.Api.Filters
     /// </remarks>
     public class AdminCacheReloadFilter(
         IEnumerable<IReloadableReferenceCache> caches,
-        IReferenceDataChangeNotifier changeNotifier) : IAsyncActionFilter
+        IReferenceDataChangeNotifier changeNotifier,
+        ILogger<AdminCacheReloadFilter> logger) : IAsyncActionFilter
     {
         /// <summary>
         /// Ordered to run outermost among action filters so this filter's post-action reload executes AFTER
@@ -36,8 +37,17 @@ namespace Game.Api.Filters
             {
                 // Broadcast first: the write is already committed at this point (this filter runs outside
                 // CommitFilter), so other instances can begin their background reloads while this instance
-                // pays its own awaited reload below.
-                await changeNotifier.NotifyChangedAsync();
+                // pays its own awaited reload below. The broadcast is best-effort — a failure must never
+                // abort the local read-your-writes reload, so it is swallowed with a warning (other
+                // instances stay stale until the next notification, an accepted cost).
+                try
+                {
+                    await changeNotifier.NotifyChangedAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to broadcast the reference-data change; other instances may serve stale reference data until the next notification.");
+                }
 
                 foreach (var cache in caches)
                 {
