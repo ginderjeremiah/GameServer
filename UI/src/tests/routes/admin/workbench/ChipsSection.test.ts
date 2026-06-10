@@ -11,10 +11,11 @@ interface Row extends Identified {
 	skillPool: number[];
 }
 
-const CATALOGUE = [
+const CATALOGUE: { id: number; name: string; baseDamage: number; retired?: boolean }[] = [
 	{ id: 1, name: 'Cleave', baseDamage: 12 },
 	{ id: 2, name: 'Fireball', baseDamage: 25 },
-	{ id: 3, name: 'Heal', baseDamage: 0 }
+	{ id: 3, name: 'Heal', baseDamage: 0 },
+	{ id: 4, name: 'Smite', baseDamage: 18, retired: true }
 ];
 
 const section: ChipsSectionConfig<Row> = {
@@ -102,6 +103,20 @@ describe('ChipsSection', () => {
 		const removeFirst = container.querySelector('.skill-chip .x') as HTMLElement;
 		await fireEvent.click(removeFirst);
 		expect(store.items[0].skillPool).toEqual([2]);
+	});
+
+	it('excludes a retired catalogue entry from the add select but keeps an assigned one as a chip', () => {
+		const { store, record, baseline } = setup([4]);
+		const { container } = renderChips(store, record, baseline);
+		// The retired skill is still rendered as a chip (name resolves) and marked retired.
+		const chip = container.querySelector('.skill-chip') as HTMLElement;
+		expect(chip.classList.contains('retired')).toBe(true);
+		expect(screen.getByText('Smite')).toBeTruthy();
+		expect(screen.getByText('retired')).toBeTruthy();
+		// …but it is not offered for fresh assignment (only Cleave, Fireball, Heal remain).
+		const addSelect = container.querySelector('.add-select select') as HTMLSelectElement;
+		expect(addSelect.querySelectorAll('option')).toHaveLength(4);
+		expect(screen.queryByText('Smite · 18 dmg')).toBeNull();
 	});
 
 	it('flags a chip added since the baseline', () => {

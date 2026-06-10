@@ -53,7 +53,7 @@
 				value={value as number}
 				onchange={(e) => set(+e.currentTarget.value)}
 			>
-				{#each field.options?.() ?? [] as option (option.value)}
+				{#each field.options?.(value as number) ?? [] as option (option.value)}
 					<option value={option.value}>{option.text}</option>
 				{/each}
 			</select>

@@ -33,9 +33,10 @@
 				onclick={() => !isClaimed && onPick(record.id)}
 			>
 				<span class="tdot" style="background: {isClaimed ? 'var(--text-muted)' : record.color}"></span>
-				<span class="ch-picker-nm">{record.name}</span>
+				<span class="ch-picker-nm" class:retired={record.retired}>{record.name}</span>
 				<span class="rare-tag" style="color: {isClaimed ? 'var(--text-muted)' : record.color}">{record.tag}</span>
 				<span class="picker-spacer"></span>
+				{#if record.retired}<span class="ch-picker-state retired">retired</span>{/if}
 				{#if isCurrent}<span class="ch-picker-state current">selected</span>{/if}
 				{#if isClaimed}<span class="ch-picker-state"><WorkbenchIcon kind="x" size={9} sw={2} />{owner?.name}</span>{/if}
 			</button>
@@ -53,6 +54,8 @@ export interface PickerRecord {
 	name: string;
 	color: string;
 	tag: string;
+	/** A retired record — only ever present when it's the challenge's current reward (kept for display). */
+	retired?: boolean;
 }
 
 interface Props {
@@ -86,5 +89,12 @@ const availableCount = $derived(records.filter((r) => !claimed.has(r.id) || r.id
 	font-size: 11.5px;
 	color: var(--text-muted);
 	padding: 14px 4px;
+}
+.ch-picker-nm.retired {
+	text-decoration: line-through;
+	color: var(--text-muted);
+}
+.ch-picker-state.retired {
+	color: var(--text-muted);
 }
 </style>

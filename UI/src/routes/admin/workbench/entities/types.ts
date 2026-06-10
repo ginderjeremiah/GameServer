@@ -39,8 +39,12 @@ export interface FieldConfig<T> {
 	/** Toggle labels. */
 	onLabel?: string;
 	offLabel?: string;
-	/** Select option provider (resolved at render so it can read live ref data). */
-	options?: () => SelectOption[];
+	/**
+	 * Select option provider (resolved at render so it can read live ref data). Receives the
+	 * field's current value so a retireable provider can keep an already-authored (now retired)
+	 * reference visible rather than blanking it.
+	 */
+	options?: (current?: number) => SelectOption[];
 	/** Marks the field required; an empty value raises the field/section/record warning. */
 	required?: boolean;
 	reqMsg?: string;
@@ -50,7 +54,8 @@ export interface ColumnConfig {
 	key: string;
 	label: string;
 	type: 'select' | 'number' | 'share';
-	options?: () => SelectOption[];
+	/** Select option provider; receives the row's current value so a retired reference stays visible. */
+	options?: (current?: number) => SelectOption[];
 	align?: 'r';
 	width?: number;
 	min?: number;
@@ -102,7 +107,8 @@ export interface TableSectionConfig<T> extends BaseSection<T> {
 export interface ChipsSectionConfig<T> extends BaseSection<T> {
 	kind: 'chips';
 	itemsKey: keyof T & string;
-	catalogue: () => { id: number; name: string }[];
+	/** Catalogue of addable entries; a `retired` entry stays available for display but can't be newly added. */
+	catalogue: () => { id: number; name: string; retired?: boolean }[];
 	labelOf: (entry: { id: number; name: string }) => string;
 	metaOf: (entry: { id: number; name: string }) => string;
 	emptyIcon: WorkbenchIconKind;

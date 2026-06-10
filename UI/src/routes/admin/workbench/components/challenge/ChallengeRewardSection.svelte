@@ -25,6 +25,7 @@
 			color={challenge.rewardItemId != null
 				? reference.rarityColor(reference.itemRarityId(challenge.rewardItemId) ?? ERarity.Common)
 				: null}
+			retired={challenge.rewardItemId != null && reference.itemRetired(challenge.rewardItemId)}
 			dirty={itemDirty}
 			open={open === 'item'}
 			onClear={() => setItem(undefined)}
@@ -37,6 +38,7 @@
 			name={challenge.rewardItemModId != null ? reference.itemModName(challenge.rewardItemModId) : undefined}
 			sub={challenge.rewardItemModId != null ? (reference.itemModTypeName(challenge.rewardItemModId) ?? '') : ''}
 			color={challenge.rewardItemModId != null ? 'var(--accent)' : null}
+			retired={challenge.rewardItemModId != null && reference.itemModRetired(challenge.rewardItemModId)}
 			dirty={modDirty}
 			open={open === 'mod'}
 			onClear={() => setMod(undefined)}
@@ -49,6 +51,7 @@
 			name={challenge.rewardSkillId != null ? reference.skillName(challenge.rewardSkillId) : undefined}
 			sub={challenge.rewardSkillId != null ? `${reference.skillBaseDamage(challenge.rewardSkillId) ?? 0} dmg` : ''}
 			color={challenge.rewardSkillId != null ? 'var(--accent)' : null}
+			retired={challenge.rewardSkillId != null && reference.skillRetired(challenge.rewardSkillId)}
 			dirty={skillDirty}
 			open={open === 'skill'}
 			onClear={() => setSkill(undefined)}
@@ -136,29 +139,43 @@ const none = $derived(
 	challenge.rewardItemId == null && challenge.rewardItemModId == null && challenge.rewardSkillId == null
 );
 
+// Retired records drop out of the pick list (can't be newly granted) unless they're the
+// challenge's current reward, which stays visible (marked retired) so it isn't silently lost.
 const itemPickRecords = $derived(
-	reference.itemRecords().map((i) => ({
-		id: i.id,
-		name: i.name,
-		color: reference.rarityColor(i.rarityId),
-		tag: reference.rarityName(i.rarityId)
-	}))
+	reference
+		.itemRecords()
+		.filter((i) => !i.retiredAt || i.id === challenge.rewardItemId)
+		.map((i) => ({
+			id: i.id,
+			name: i.name,
+			color: reference.rarityColor(i.rarityId),
+			tag: reference.rarityName(i.rarityId),
+			retired: !!i.retiredAt
+		}))
 );
 const modPickRecords = $derived(
-	reference.itemModRecords().map((m) => ({
-		id: m.id,
-		name: m.name,
-		color: 'var(--accent)',
-		tag: reference.modTypeName(m.itemModTypeId)
-	}))
+	reference
+		.itemModRecords()
+		.filter((m) => !m.retiredAt || m.id === challenge.rewardItemModId)
+		.map((m) => ({
+			id: m.id,
+			name: m.name,
+			color: 'var(--accent)',
+			tag: reference.modTypeName(m.itemModTypeId),
+			retired: !!m.retiredAt
+		}))
 );
 const skillPickRecords = $derived(
-	reference.skillRecords().map((s) => ({
-		id: s.id,
-		name: s.name,
-		color: 'var(--accent)',
-		tag: `${s.baseDamage} dmg`
-	}))
+	reference
+		.skillRecords()
+		.filter((s) => !s.retiredAt || s.id === challenge.rewardSkillId)
+		.map((s) => ({
+			id: s.id,
+			name: s.name,
+			color: 'var(--accent)',
+			tag: `${s.baseDamage} dmg`,
+			retired: !!s.retiredAt
+		}))
 );
 
 const setItem = (id: number | undefined) => {

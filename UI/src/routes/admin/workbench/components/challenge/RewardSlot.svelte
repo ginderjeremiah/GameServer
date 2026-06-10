@@ -9,8 +9,9 @@
 				{label}{#if dirty}<span class="ch-reward-dot"></span>{/if}
 			</div>
 			{#if valueId != null}
-				<div class="ch-reward-name" style={color ? `color:${color}` : ''}>
+				<div class="ch-reward-name" class:retired style={color ? `color:${color}` : ''}>
 					{name}<span class="ch-reward-sub">{sub}</span>
+					{#if retired}<span class="ch-reward-retired">retired</span>{/if}
 				</div>
 			{:else}
 				<div class="ch-reward-empty">Nothing unlocked</div>
@@ -37,13 +38,15 @@ interface Props {
 	name: string | undefined;
 	sub: string;
 	color: string | null;
+	/** The current reward references a retired record — flagged so the author knows it's out of circulation. */
+	retired?: boolean;
 	dirty: boolean;
 	open: boolean;
 	onClear: () => void;
 	onOpen: () => void;
 }
 
-const { kind, label, valueId, name, sub, color, dirty, open, onClear, onOpen }: Props = $props();
+const { kind, label, valueId, name, sub, color, retired = false, dirty, open, onClear, onOpen }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -62,5 +65,22 @@ const { kind, label, valueId, name, sub, color, dirty, open, onClear, onOpen }: 
 	border-radius: 50%;
 	background: var(--warning);
 	box-shadow: 0 0 5px var(--warning);
+}
+.ch-reward-name.retired {
+	text-decoration: line-through;
+	text-decoration-color: var(--text-muted);
+}
+.ch-reward-retired {
+	margin-left: 8px;
+	font-family: var(--mono);
+	font-size: 9.5px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+	border: 1px solid color-mix(in srgb, var(--text-muted) 45%, transparent);
+	border-radius: 3px;
+	padding: 1px 5px;
+	text-decoration: none;
+	vertical-align: middle;
 }
 </style>
