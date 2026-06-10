@@ -8,14 +8,18 @@ namespace Game.Api.Filters
     /// freshly written data. Each cache rebuilds its snapshot off to the side and swaps it atomically, so
     /// players keep reading the previous snapshot with no gap while the admin request pays the reload cost —
     /// preserving the Workbench's read-your-writes guarantee. A reload failure after a successful write
-    /// surfaces as an error on the admin response (the write persisted; the admin can retry).
+    /// surfaces as an error on the admin response (the write persisted; the admin can retry). The write is
+    /// also broadcast to every other API instance (<see cref="IReferenceDataChangeNotifier"/>), each of which
+    /// reacts with a debounced background reload of its own caches (#359).
     /// </summary>
     /// <remarks>
     /// Apply via <see cref="ReloadReferenceCachesAttribute"/> rather than a bare
     /// <c>[ServiceFilter(typeof(AdminCacheReloadFilter))]</c>: the ordering below must hold for
     /// read-your-writes, and the attribute bakes it in so a controller cannot accidentally omit it.
     /// </remarks>
-    public class AdminCacheReloadFilter(IEnumerable<IReloadableReferenceCache> caches) : IAsyncActionFilter
+    public class AdminCacheReloadFilter(
+        IEnumerable<IReloadableReferenceCache> caches,
+        IReferenceDataChangeNotifier changeNotifier) : IAsyncActionFilter
     {
         /// <summary>
         /// Ordered to run outermost among action filters so this filter's post-action reload executes AFTER
@@ -30,6 +34,11 @@ namespace Game.Api.Filters
             var executedContext = await next();
             if (executedContext.Exception is null || executedContext.ExceptionHandled)
             {
+                // Broadcast first: the write is already committed at this point (this filter runs outside
+                // CommitFilter), so other instances can begin their background reloads while this instance
+                // pays its own awaited reload below.
+                await changeNotifier.NotifyChangedAsync();
+
                 foreach (var cache in caches)
                 {
                     // Not tied to the request's cancellation token: the write has committed, so the cache
