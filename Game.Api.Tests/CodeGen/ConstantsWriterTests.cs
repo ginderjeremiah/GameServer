@@ -35,6 +35,7 @@ namespace Game.Api.Tests.CodeGen
             public const int DefaultMaxBattleMs = MsPerTick * 10000;
             public const bool FlagEnabled = true;
             public const string Label = "hello";
+            public const string Tricky = "a'b\\c";
         }
 
         private static FieldInfo[] SampleFields =>
@@ -64,6 +65,15 @@ namespace Game.Api.Tests.CodeGen
 
             Assert.Contains("export const FLAG_ENABLED = true;", content);
             Assert.Contains("export const LABEL = 'hello';", content);
+        }
+
+        [Fact]
+        public void WriteConstants_EscapesQuotesAndBackslashesInStrings()
+        {
+            var content = WriteAndRead(SampleFields);
+
+            // 'a'b\c' would be a broken (or injected) TS literal; the quote and backslash must escape.
+            Assert.Contains(@"export const TRICKY = 'a\'b\\c';", content);
         }
 
         [Theory]

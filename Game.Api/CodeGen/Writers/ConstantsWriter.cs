@@ -56,10 +56,23 @@ namespace Game.Api.CodeGen.Writers
             {
                 null => throw new InvalidOperationException("A client-mirrored constant must have a value."),
                 bool boolean => boolean ? "true" : "false",
-                string text => $"'{text}'",
+                string text => $"'{EscapeSingleQuotedString(text)}'",
                 _ => Convert.ToString(value, CultureInfo.InvariantCulture)
                     ?? throw new InvalidOperationException($"Could not render the value of constant '{value}'."),
             };
+        }
+
+        // Escapes a string for a single-quoted TypeScript literal so a value containing a quote,
+        // backslash, or line break can't emit broken (or injected) TS. Backslash is escaped first so
+        // the escapes introduced afterwards aren't doubled.
+        private static string EscapeSingleQuotedString(string text)
+        {
+            return text
+                .Replace("\\", "\\\\")
+                .Replace("'", "\\'")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
         }
 
         [GeneratedRegex("([a-z0-9])([A-Z])")]
