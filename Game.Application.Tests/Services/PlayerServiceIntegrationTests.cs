@@ -377,6 +377,68 @@ namespace Game.Application.Tests.Services
             Assert.True(persisted.Favorite);
         }
 
+        [Fact]
+        public async Task SetSelectedSkills_PersistsLoadoutToDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Three unlocked-but-unequipped skills for the player to choose a loadout from.
+            var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
+            var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
+            var skill2 = await TestDataSeeder.CreateSkillAsync(context, name: "S2");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill0.Id, selected: false);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill1.Id, selected: false);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill2.Id, selected: false);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var success = await playerService.SetSelectedSkills(player, [skill2.Id, skill0.Id]);
+            Assert.True(success);
+
+            // Drain the write-behind queue (the hosted worker is disabled in the harness) so the change
+            // reaches the database, then read the rows from a fresh context to confirm persistence.
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills
+                .Where(ps => ps.PlayerId == playerEntity.Id)
+                .ToListAsync(CancellationToken);
+
+            Assert.Equal(3, rows.Count);
+            // The chosen loadout is persisted in order; the unchosen skill stays unlocked but unequipped.
+            Assert.Single(rows, ps => ps.SkillId == skill2.Id && ps.Selected && ps.Order == 0);
+            Assert.Single(rows, ps => ps.SkillId == skill0.Id && ps.Selected && ps.Order == 1);
+            Assert.Single(rows, ps => ps.SkillId == skill1.Id && !ps.Selected && ps.Order == 0);
+        }
+
+        [Fact]
+        public async Task SetSelectedSkills_SkillNotUnlocked_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // The skill exists in the catalog but the player has not unlocked it, so the loadout is rejected.
+            var success = await playerService.SetSelectedSkills(player, [skill.Id]);
+
+            Assert.False(success);
+            Assert.Empty(player.SelectedSkills);
+        }
+
         private async Task DrainPlayerUpdateQueue(IServiceProvider services)
         {
             var pubsub = services.GetRequiredService<IPubSubService>();

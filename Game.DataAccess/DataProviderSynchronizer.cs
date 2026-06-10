@@ -165,6 +165,11 @@ namespace Game.DataAccess
                     await HandleSkillUnlocked(context, skillUnlockEvt);
                     break;
 
+                case nameof(SelectedSkillsChangedEvent):
+                    var selectedSkillsEvt = Deserialize<SelectedSkillsChangedEvent>(envelope.Payload);
+                    await HandleSelectedSkillsChanged(context, selectedSkillsEvt);
+                    break;
+
                 case nameof(ItemFavoriteChangedEvent):
                     var favoriteEvt = Deserialize<ItemFavoriteChangedEvent>(envelope.Payload);
                     await HandleItemFavoriteChanged(context, favoriteEvt);
@@ -299,6 +304,29 @@ namespace Game.DataAccess
                     Order = 0,
                 });
                 await context.SaveChangesAsync();
+            }
+        }
+
+        private static async Task HandleSelectedSkillsChanged(GameContext context, SelectedSkillsChangedEvent evt)
+        {
+            // Delete-then-rebuild for idempotency: first clear every Selected/Order flag for the
+            // player, then mark each id in the ordered loadout Selected = true with its index as Order.
+            // Re-applying the event converges to the same state (same shape as the mod-applied handler).
+            await context.PlayerSkills
+                .Where(ps => ps.PlayerId == evt.PlayerId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(ps => ps.Selected, false)
+                    .SetProperty(ps => ps.Order, 0));
+
+            for (var index = 0; index < evt.OrderedSkillIds.Count; index++)
+            {
+                var skillId = evt.OrderedSkillIds[index];
+                var order = index;
+                await context.PlayerSkills
+                    .Where(ps => ps.PlayerId == evt.PlayerId && ps.SkillId == skillId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(ps => ps.Selected, true)
+                        .SetProperty(ps => ps.Order, order));
             }
         }
 

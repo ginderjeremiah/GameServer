@@ -205,6 +205,130 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(0, row.Order);
         }
 
+        [Fact]
+        public async Task ProcessQueue_SelectedSkillsChangedEvent_ReplacesEquippedSetAndOrderIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
+            var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
+            var skill2 = await TestDataSeeder.CreateSkillAsync(context, name: "S2");
+
+            // Starting loadout: skill0 (order 0), skill1 (order 1) equipped; skill2 unlocked but not equipped.
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill0.Id, selected: true, order: 0);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill1.Id, selected: true, order: 1);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill2.Id, selected: false, order: 0);
+
+            // New loadout swaps skill1 out for skill2 and reverses the survivor's position.
+            var evt = new SelectedSkillsChangedEvent(player.Id, [skill2.Id, skill0.Id]);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Deliver the same event twice: the delete-then-rebuild handler must converge to one result.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills
+                .Where(ps => ps.PlayerId == player.Id)
+                .ToListAsync(CancellationToken);
+
+            Assert.Equal(3, rows.Count);
+            // skill2 is now first, skill0 second; skill1 is deselected and its order reset to 0.
+            AssertSkillState(rows, skill2.Id, selected: true, order: 0);
+            AssertSkillState(rows, skill0.Id, selected: true, order: 1);
+            AssertSkillState(rows, skill1.Id, selected: false, order: 0);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_SelectedSkillsChangedEvent_ReorderOnly_UpdatesOrder()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
+            var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
+
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill0.Id, selected: true, order: 0);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill1.Id, selected: true, order: 1);
+
+            // Same set, swapped positions.
+            var evt = new SelectedSkillsChangedEvent(player.Id, [skill1.Id, skill0.Id]);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            await synchronizer.ProcessQueue(new InMemoryPubSubQueue(Serialize(evt)));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills
+                .Where(ps => ps.PlayerId == player.Id)
+                .ToListAsync(CancellationToken);
+
+            AssertSkillState(rows, skill1.Id, selected: true, order: 0);
+            AssertSkillState(rows, skill0.Id, selected: true, order: 1);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_SelectedSkillsChangedEvent_DeselectToEmpty_ClearsAllSelections()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
+            var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
+
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill0.Id, selected: true, order: 0);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill1.Id, selected: true, order: 1);
+
+            // An empty loadout deselects everything (the skills stay unlocked).
+            var evt = new SelectedSkillsChangedEvent(player.Id, []);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            await synchronizer.ProcessQueue(new InMemoryPubSubQueue(Serialize(evt)));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills
+                .Where(ps => ps.PlayerId == player.Id)
+                .ToListAsync(CancellationToken);
+
+            // Both skills remain unlocked but are no longer equipped, with order reset to 0.
+            Assert.Equal(2, rows.Count);
+            AssertSkillState(rows, skill0.Id, selected: false, order: 0);
+            AssertSkillState(rows, skill1.Id, selected: false, order: 0);
+        }
+
+        private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
+        {
+            var row = Assert.Single(rows, ps => ps.SkillId == skillId);
+            Assert.Equal(selected, row.Selected);
+            Assert.Equal(order, row.Order);
+        }
+
         private static async Task<List<string>> DrainDeadLetterQueue(IPubSubService pubsub)
         {
             var deadLetterQueue = pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);

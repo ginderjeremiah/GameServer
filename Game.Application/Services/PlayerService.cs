@@ -58,6 +58,17 @@ namespace Game.Application.Services
             return true;
         }
 
+        public async Task<bool> SetSelectedSkills(Player player, IReadOnlyList<int> orderedSkillIds)
+        {
+            if (!player.TrySetSelectedSkills(orderedSkillIds))
+            {
+                return false;
+            }
+
+            await _playerRepo.SavePlayer(player);
+            return true;
+        }
+
         public async Task SaveLogPreferences(Player player, IEnumerable<LogPreference> preferences)
         {
             foreach (var preference in preferences)
