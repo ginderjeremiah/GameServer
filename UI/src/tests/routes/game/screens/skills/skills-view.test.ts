@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, type IChallenge, type ISkill } from '$lib/api';
+import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
 import type { BattleAttributes } from '$lib/battle';
 
 // Engine + stores are mocked so importing the view-model doesn't drag in the real
@@ -11,6 +11,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
 		maxSelectedSkills: 3,
+		currentZone: 0,
 		attributes: [] as { attributeId: number; amount: number }[],
 		get selectedSkills(): number[] {
 			return playerManager.unlockedSkills
@@ -24,7 +25,13 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
-		staticData: { skills: [] as ISkill[], challenges: [] as IChallenge[], attributes: undefined as unknown }
+		staticData: {
+			skills: [] as ISkill[],
+			challenges: [] as IChallenge[],
+			zones: undefined as IZone[] | undefined,
+			enemies: undefined as IEnemy[] | undefined,
+			attributes: undefined as unknown
+		}
 	};
 });
 
@@ -42,6 +49,8 @@ import {
 	skillRawDamage,
 	skillContributions,
 	sortMetrics,
+	zoneSpawnLevel,
+	enemyDefense,
 	type SkillMetrics
 } from '$routes/game/screens/skills/skills-view.svelte';
 
@@ -117,6 +126,49 @@ const CHALLENGES = [
 	}
 ] as unknown as IChallenge[];
 
+/* Compare-vs fixtures. Enemy Defense resolves through the real BattleAttributes as
+   `2 (base) + 1·Endurance + 0.5·Agility`, so each enemy's distribution is chosen for a
+   clean expected value: with only per-level Endurance, Defense = 2 + amountPerLevel·level. */
+const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
+	name: `Enemy ${over.id}`,
+	isBoss: false,
+	attributeDistribution: [],
+	skillPool: [],
+	spawns: [],
+	...over
+});
+
+const enemyDist = (endurancePerLevel: number) => [
+	{ attributeId: EAttribute.Endurance, baseAmount: 0, amountPerLevel: endurancePerLevel }
+];
+
+// Zone 0: idle range [2, 8] (midpoint level 5), dedicated boss enemy 2 fought at level 10.
+const ZONES: IZone[] = [
+	{
+		id: 0,
+		name: 'Vale',
+		description: '',
+		order: 0,
+		levelMin: 2,
+		levelMax: 8,
+		bossEnemyId: 2,
+		bossLevel: 10
+	}
+];
+
+const ENEMIES: IEnemy[] = [
+	enemy({ id: 0, name: 'Imp', attributeDistribution: enemyDist(2), spawns: [{ zoneId: 0, weight: 1 }] }),
+	enemy({ id: 1, name: 'Wolf', attributeDistribution: enemyDist(5), spawns: [{ zoneId: 1, weight: 1 }] }),
+	enemy({ id: 2, name: 'Ogre King', isBoss: true, attributeDistribution: enemyDist(3) }),
+	enemy({
+		id: 3,
+		name: 'Wraith',
+		attributeDistribution: enemyDist(9),
+		spawns: [{ zoneId: 0, weight: 1 }],
+		retiredAt: '2026-01-01T00:00:00Z'
+	})
+];
+
 const lastPayload = (): number[] => sendSocketCommand.mock.calls.at(-1)?.[1] as number[];
 
 let view: SkillsView;
@@ -126,6 +178,9 @@ beforeEach(() => {
 	toastError.mockReset();
 	staticData.skills = SKILLS;
 	staticData.challenges = CHALLENGES;
+	staticData.zones = ZONES;
+	staticData.enemies = ENEMIES;
+	mockPlayerManager.currentZone = 0;
 	// ids 0–3 unlocked; 0–2 equipped in order; 4 and 5 not owned.
 	mockPlayerManager.unlockedSkills = [
 		{ skillId: 0, selected: true, order: 0 },
@@ -184,6 +239,16 @@ describe('pure helpers', () => {
 		expect([b, a].sort(sortMetrics('dps', 0)).map((m) => m.skill.id)).toEqual([0, 1]);
 		// dps with defense 80: a=(100-80)/2=10, b=0 → a first; damage a=20, b=0.
 		expect([b, a].sort(sortMetrics('dmg', 80)).map((m) => m.skill.id)).toEqual([0, 1]);
+	});
+
+	it('takes the midpoint of a zone range as the representative spawn level', () => {
+		expect(zoneSpawnLevel(ZONES[0])).toBe(5); // (2 + 8) / 2
+	});
+
+	it('resolves an enemy Defense through the derived attribute composition', () => {
+		// Defense = 2 (base) + 1·Endurance + 0.5·Agility. Imp has 2·level Endurance only.
+		expect(enemyDefense(ENEMIES[0], 5)).toBe(12); // 2 + 2*5
+		expect(enemyDefense(ENEMIES[2], 10)).toBe(32); // boss: 2 + 3*10
 	});
 });
 
@@ -315,5 +380,46 @@ describe('SkillsView — compare-vs defense', () => {
 		// base damages of [0,1,2] = 12 + 40 + 5 = 57 at zero defense.
 		expect(Math.round(view.combinedEffectiveBurst)).toBe(57);
 		expect(view.combinedEffectiveDps).toBeGreaterThan(0);
+	});
+});
+
+describe('SkillsView — compare-vs enemy presets', () => {
+	it('sources pills from the current zone: in-zone spawns (midpoint level) plus the boss', () => {
+		const presets = view.comparePresets;
+		// Imp spawns in zone 0; Wolf spawns elsewhere; Wraith is retired; Ogre King is the boss.
+		expect(presets.map((p) => p.key)).toEqual(['spawn-0', 'boss-2']);
+		expect(presets[0]).toMatchObject({ name: 'Imp', isBoss: false, defense: 12 }); // 2 + 2*5
+		expect(presets[1]).toMatchObject({ name: 'Ogre King', isBoss: true, defense: 32 }); // 2 + 3*10
+	});
+
+	it('is empty when the current zone has no reference data yet', () => {
+		staticData.zones = undefined;
+		const fresh = new SkillsView();
+		expect(fresh.comparePresets).toEqual([]);
+	});
+
+	it('snaps the slider to a preset and marks its pill selected', () => {
+		const [spawn, boss] = view.comparePresets;
+		view.selectPreset(spawn);
+		expect(view.defense).toBe(12);
+		expect(view.selectedPresetKey).toBe('spawn-0');
+
+		view.selectPreset(boss);
+		expect(view.defense).toBe(32);
+		expect(view.selectedPresetKey).toBe('boss-2');
+	});
+
+	it('clamps a preset defense above the slider ceiling but keeps the pill selected', () => {
+		view.selectPreset({ key: 'spawn-9', name: 'Colossus', isBoss: false, defense: 9999 });
+		expect(view.defense).toBe(view.maxDamage);
+		expect(view.selectedPresetKey).toBe('spawn-9');
+	});
+
+	it('deselects the active pill when the slider is dragged manually', () => {
+		view.selectPreset(view.comparePresets[0]);
+		expect(view.selectedPresetKey).toBe('spawn-0');
+		view.setDefense(7);
+		expect(view.defense).toBe(7);
+		expect(view.selectedPresetKey).toBeNull();
 	});
 });
