@@ -145,7 +145,7 @@ export class ApiSocket {
 				const request = this.inFlightRequests.find((c) => c.command.id === data.id);
 				if (request) {
 					request.command.resolve(data);
-					console.debug(`Response to '${request.command.commandName}' received after ${request.startTime - now}ms.`);
+					console.debug(`Response to '${request.command.commandName}' received after ${now - request.startTime}ms.`);
 				}
 			}
 		} catch (ex) {
