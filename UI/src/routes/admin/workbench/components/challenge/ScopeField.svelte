@@ -65,7 +65,8 @@ const specific = $derived(challenge.targetEntityId != null);
 // A boss-only statistic (e.g. BossesDefeated) only ever increments for boss enemies,
 // so restrict the enemy target picker to bosses to keep the challenge authorable.
 const bossOnly = $derived(typeBossOnly(reference.challengeTypes, challenge.challengeTypeId));
-const options = $derived(reference.entityOptions(challenge.entityType, bossOnly));
+// Pass the current target so a now-retired authored target stays selectable/visible.
+const options = $derived(reference.entityOptions(challenge.entityType, bossOnly, challenge.targetEntityId));
 const dirty = $derived(baseline ? challenge.targetEntityId !== baseline.targetEntityId : false);
 
 const setGlobal = () => store.patch(challenge.id, (d) => ((d as unknown as IChallenge).targetEntityId = undefined));

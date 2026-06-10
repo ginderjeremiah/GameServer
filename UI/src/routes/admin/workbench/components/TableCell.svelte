@@ -2,7 +2,7 @@
 	<td style:min-width="{col.min ?? 160}px">
 		<div class="fld">
 			<select class="sel" class:dirty value={row[col.key]} onchange={(e) => onChange(+e.currentTarget.value)}>
-				{#each col.options?.() ?? [] as option (option.value)}
+				{#each col.options?.(row[col.key]) ?? [] as option (option.value)}
 					<option value={option.value} disabled={taken.has(option.value) && option.value !== row[col.key]}>
 						{option.text}
 					</option>

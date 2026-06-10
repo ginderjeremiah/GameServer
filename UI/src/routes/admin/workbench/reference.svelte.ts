@@ -25,6 +25,9 @@ export interface TagColor {
 const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 	pairs.map((p) => ({ value: p.id, text: p.name }));
 
+/** A zero-based-id reference record that can be retired (kept at its slot, resolvable by id). */
+type RetireableRef = { id: number; name: string; retiredAt?: string | null };
+
 /**
  * Loads and exposes the reference data the workbench's select options, tag UI,
  * and derived spawn-share math read from. Catalogues that the workbench also
@@ -67,32 +70,59 @@ class WorkbenchReference {
 	}
 
 	// ── Select options ──
+	/**
+	 * Build select options from a retireable reference set: active records are always
+	 * selectable, but a retired record is offered only when it is the current value
+	 * (`keep`). This excludes retired records from new authoring (a hard block — they
+	 * are never in a fresh list) while keeping an already-authored reference visible
+	 * (marked "· retired") and editable, instead of silently blanking it. Once the
+	 * author changes away from a kept retired value it leaves the list, so it can't be
+	 * re-picked.
+	 */
+	private retireableOptions = <T extends RetireableRef>(
+		records: T[],
+		keep: number | undefined,
+		label: (r: T) => string = (r) => r.name
+	): SelectOption[] =>
+		records
+			.filter((r) => !r.retiredAt || r.id === keep)
+			.map((r) => ({ value: r.id, text: r.retiredAt ? `${label(r)} · retired` : label(r) }));
+
 	attributeOptions = (): SelectOption[] => toOptions(enumPairs(EAttribute));
 	itemCategoryOptions = (): SelectOption[] => toOptions(enumPairs(EItemCategory));
 	rarityOptions = (): SelectOption[] => toOptions(enumPairs(ERarity));
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	tagCategoryOptions = (): SelectOption[] => this.tagCategories.map((c) => ({ value: c.id, text: c.name }));
-	zoneOptions = (): SelectOption[] =>
-		(staticData.zones ?? []).map((z) => ({ value: z.id, text: `${z.name} · L${z.levelMin}–${z.levelMax}` }));
-	enemyOptions = (): SelectOption[] => (staticData.enemies ?? []).map((e) => ({ value: e.id, text: e.name }));
-	/** Dedicated-boss picker options: a "None" sentinel (-1) plus every enemy flagged as a boss. */
-	bossEnemyOptions = (): SelectOption[] => [
+	zoneOptions = (keep?: number): SelectOption[] =>
+		this.retireableOptions(staticData.zones ?? [], keep, (z) => `${z.name} · L${z.levelMin}–${z.levelMax}`);
+	enemyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.enemies ?? [], keep);
+	/** Dedicated-boss picker options: a "None" sentinel (-1) plus every active boss enemy. */
+	bossEnemyOptions = (keep?: number): SelectOption[] => [
 		{ value: -1, text: 'None' },
-		...(staticData.enemies ?? []).filter((e) => e.isBoss).map((e) => ({ value: e.id, text: e.name }))
+		...this.retireableOptions(
+			(staticData.enemies ?? []).filter((e) => e.isBoss),
+			keep
+		)
 	];
-	/** Zone unlock-gate picker options: a "None" sentinel (-1) plus every challenge. */
-	unlockChallengeOptions = (): SelectOption[] => [
+	/** Zone unlock-gate picker options: a "None" sentinel (-1) plus every active challenge. */
+	unlockChallengeOptions = (keep?: number): SelectOption[] => [
 		{ value: -1, text: 'None (always open)' },
-		...(staticData.challenges ?? []).map((c) => ({ value: c.id, text: c.name }))
+		...this.retireableOptions(staticData.challenges ?? [], keep)
 	];
-	skillCatalogue = () => (staticData.skills ?? []).map((s) => ({ id: s.id, name: s.name, baseDamage: s.baseDamage }));
+	skillCatalogue = () =>
+		(staticData.skills ?? []).map((s) => ({
+			id: s.id,
+			name: s.name,
+			baseDamage: s.baseDamage,
+			retired: !!s.retiredAt
+		}));
 
 	// ── Challenges ──
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));
 	challengeTypeById = (id: number) => this.challengeTypes.find((t) => t.id === id);
 
 	/** The zero-based-id reference set backing an entity dimension (indexable by id). */
-	private entitySource = (entityType: EEntityType): { id: number; name: string }[] | undefined => {
+	private entitySource = (entityType: EEntityType): RetireableRef[] | undefined => {
 		switch (entityType) {
 			case EEntityType.Enemy:
 				return staticData.enemies;
@@ -106,20 +136,21 @@ class WorkbenchReference {
 	};
 
 	/**
-	 * Target-entity catalogue for a statistic's entity dimension (Enemy / Zone / Skill).
+	 * The reference records backing a statistic's entity dimension (Enemy / Zone / Skill).
 	 * When `bossOnly` is set (a boss-only statistic such as BossesDefeated) the Enemy
 	 * dimension is restricted to enemies flagged `isBoss`, so the editor can't author a
 	 * challenge against a non-boss that the statistic would never increment for.
 	 */
-	entityCatalog = (entityType: EEntityType, bossOnly = false): { id: number; name: string }[] => {
-		const source =
-			entityType === EEntityType.Enemy
-				? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss)
-				: this.entitySource(entityType);
-		return (source ?? []).map((e) => ({ id: e.id, name: e.name }));
-	};
-	entityOptions = (entityType: EEntityType, bossOnly = false): SelectOption[] =>
-		this.entityCatalog(entityType, bossOnly).map((e) => ({ value: e.id, text: e.name }));
+	private entityRecords = (entityType: EEntityType, bossOnly: boolean): RetireableRef[] =>
+		entityType === EEntityType.Enemy
+			? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss)
+			: (this.entitySource(entityType) ?? []);
+
+	entityCatalog = (entityType: EEntityType, bossOnly = false): { id: number; name: string }[] =>
+		this.entityRecords(entityType, bossOnly).map((e) => ({ id: e.id, name: e.name }));
+	/** Target-entity picker options. Retired records are excluded unless `keep` is the current target. */
+	entityOptions = (entityType: EEntityType, bossOnly = false, keep?: number): SelectOption[] =>
+		this.retireableOptions(this.entityRecords(entityType, bossOnly), keep);
 	entityName = (entityType: EEntityType, id: number): string | null =>
 		this.entitySource(entityType)?.[id]?.name ?? null;
 
@@ -128,7 +159,9 @@ class WorkbenchReference {
 	itemModRecords = () => staticData.itemMods ?? [];
 	itemRecName = (id: number) => staticData.items?.[id]?.name;
 	itemRarityId = (id: number) => staticData.items?.[id]?.rarityId;
+	itemRetired = (id: number) => !!staticData.items?.[id]?.retiredAt;
 	itemModName = (id: number) => staticData.itemMods?.[id]?.name;
+	itemModRetired = (id: number) => !!staticData.itemMods?.[id]?.retiredAt;
 	itemModTypeName = (id: number) => {
 		const mod = staticData.itemMods?.[id];
 		return mod ? this.modTypeName(mod.itemModTypeId) : undefined;
@@ -136,6 +169,7 @@ class WorkbenchReference {
 	skillRecords = () => staticData.skills ?? [];
 	skillName = (id: number) => staticData.skills?.[id]?.name;
 	skillBaseDamage = (id: number) => staticData.skills?.[id]?.baseDamage;
+	skillRetired = (id: number) => !!staticData.skills?.[id]?.retiredAt;
 
 	// ── Name lookups ──
 	itemCategoryName = (id: number) => EItemCategory[id] ?? '';

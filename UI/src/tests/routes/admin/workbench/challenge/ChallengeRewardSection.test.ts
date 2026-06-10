@@ -2,12 +2,17 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { ERarity, type IChallenge } from '$lib/api';
 
-const ITEMS = [
+const ITEMS: { id: number; name: string; rarityId: ERarity; retiredAt?: string }[] = [
 	{ id: 0, name: 'Iron Helm', rarityId: ERarity.Common },
-	{ id: 1, name: 'Dragon Blade', rarityId: ERarity.Legendary }
+	{ id: 1, name: 'Dragon Blade', rarityId: ERarity.Legendary },
+	{ id: 2, name: 'Rusty Relic', rarityId: ERarity.Common, retiredAt: '2026-01-01T00:00:00Z' }
 ];
-const MODS = [{ id: 0, name: 'Sharp', itemModTypeId: 2 }];
-const SKILLS = [{ id: 0, name: 'Cleave', baseDamage: 12 }];
+const MODS: { id: number; name: string; itemModTypeId: number; retiredAt?: string }[] = [
+	{ id: 0, name: 'Sharp', itemModTypeId: 2 }
+];
+const SKILLS: { id: number; name: string; baseDamage: number; retiredAt?: string }[] = [
+	{ id: 0, name: 'Cleave', baseDamage: 12 }
+];
 
 const { mockReference } = vi.hoisted(() => ({
 	mockReference: {
@@ -22,7 +27,10 @@ const { mockReference } = vi.hoisted(() => ({
 		itemModTypeName: vi.fn(() => 'Prefix'),
 		modTypeName: vi.fn(() => 'Prefix'),
 		skillName: vi.fn((id: number) => SKILLS.find((s) => s.id === id)?.name),
-		skillBaseDamage: vi.fn((id: number) => SKILLS.find((s) => s.id === id)?.baseDamage)
+		skillBaseDamage: vi.fn((id: number) => SKILLS.find((s) => s.id === id)?.baseDamage),
+		itemRetired: vi.fn((id: number) => !!ITEMS.find((i) => i.id === id)?.retiredAt),
+		itemModRetired: vi.fn((id: number) => !!MODS.find((m) => m.id === id)?.retiredAt),
+		skillRetired: vi.fn((id: number) => !!SKILLS.find((s) => s.id === id)?.retiredAt)
 	}
 }));
 vi.mock('$routes/admin/workbench/reference.svelte', () => ({ reference: mockReference }));
@@ -108,5 +116,32 @@ describe('ChallengeRewardSection', () => {
 		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
 		await fireEvent.click(container.querySelector('.row-x[title="Clear reward"]') as HTMLElement);
 		expect((store.items[0] as unknown as IChallenge).rewardItemId).toBeUndefined();
+	});
+
+	it('omits a retired item from the picker for fresh authoring', async () => {
+		const { store, record, baseline } = setup();
+		render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose item…'));
+		// Active items are offered; the retired "Rusty Relic" is not.
+		expect(screen.getByText('Iron Helm')).toBeTruthy();
+		expect(screen.getByText('Dragon Blade')).toBeTruthy();
+		expect(screen.queryByText('Rusty Relic')).toBeNull();
+	});
+
+	it('keeps a retired current reward visible and marked, not silently blanked', () => {
+		const { store, record, baseline } = setup({ rewardItemId: 2 });
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		const name = container.querySelector('.ch-reward-name') as HTMLElement;
+		expect(name.textContent).toContain('Rusty Relic');
+		expect(name.classList.contains('retired')).toBe(true);
+		expect(container.querySelector('.ch-reward-retired')).toBeTruthy();
+	});
+
+	it('still lists the retired current reward in the picker (marked retired) so it shows as selected', async () => {
+		const { store, record, baseline } = setup({ rewardItemId: 2 });
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Change…'));
+		const retiredRow = container.querySelector('.ch-picker-nm.retired') as HTMLElement;
+		expect(retiredRow?.textContent).toContain('Rusty Relic');
 	});
 });

@@ -5,9 +5,10 @@
 		<div class="chips">
 			{#each ids as id (id)}
 				{@const entry = catalogue.find((c) => c.id === id)}
-				<div class="skill-chip" class:added={baseIds && !baseIds.includes(id)}>
+				<div class="skill-chip" class:added={baseIds && !baseIds.includes(id)} class:retired={entry?.retired}>
 					<span class="nm">{entry ? section.labelOf(entry) : `#${id}`}</span>
 					<span class="dm">{entry ? section.metaOf(entry) : ''}</span>
+					{#if entry?.retired}<span class="retired-tag">retired</span>{/if}
 					<span
 						class="x"
 						role="button"
@@ -56,7 +57,9 @@ const itemsKey = $derived(section.itemsKey as string);
 const ids = $derived((fieldsOf(record)[itemsKey] as number[]) ?? []);
 const baseIds = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as number[]) : null);
 const catalogue = $derived(section.catalogue());
-const available = $derived(catalogue.filter((c) => !ids.includes(c.id)));
+// Retired entries stay in the catalogue so an already-assigned chip still renders its
+// name, but they are excluded from the add-list so they can't be newly assigned.
+const available = $derived(catalogue.filter((c) => !ids.includes(c.id) && !c.retired));
 
 const add = (id: number) => {
 	if (id && !ids.includes(id)) {
@@ -77,6 +80,20 @@ const remove = (id: number) => {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+}
+.skill-chip.retired .nm {
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+.retired-tag {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+	border: 1px solid color-mix(in srgb, var(--text-muted) 45%, transparent);
+	border-radius: 3px;
+	padding: 1px 5px;
 }
 .add-select {
 	margin-top: 14px;

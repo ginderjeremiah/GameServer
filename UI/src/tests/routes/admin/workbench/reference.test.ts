@@ -111,8 +111,8 @@ describe('reference-data-backed select options', () => {
 
 	it('exposes the skill catalogue with base damage', () => {
 		expect(reference.skillCatalogue()).toEqual([
-			{ id: 0, name: 'Cleave', baseDamage: 12 },
-			{ id: 1, name: 'Fireball', baseDamage: 25 }
+			{ id: 0, name: 'Cleave', baseDamage: 12, retired: false },
+			{ id: 1, name: 'Fireball', baseDamage: 25, retired: false }
 		]);
 	});
 
@@ -126,6 +126,70 @@ describe('reference-data-backed select options', () => {
 		expect(reference.bossEnemyOptions()).toEqual([{ value: -1, text: 'None' }]);
 		expect(reference.unlockChallengeOptions()).toEqual([{ value: -1, text: 'None (always open)' }]);
 		expect(reference.skillCatalogue()).toEqual([]);
+	});
+});
+
+describe('retired records in selectable options', () => {
+	beforeEach(() => {
+		// Retire one record per zero-based-id set (kept at its slot, resolvable by id).
+		staticData.enemies[2].retiredAt = '2026-01-01T00:00:00Z'; // Goblin (non-boss)
+		staticData.enemies[3].retiredAt = '2026-01-01T00:00:00Z'; // Ancient Wyrm (boss)
+		staticData.zones[1].retiredAt = '2026-01-01T00:00:00Z'; // Frost Cavern
+		staticData.challenges[1].retiredAt = '2026-01-01T00:00:00Z'; // Boss Slayer
+		staticData.skills[1].retiredAt = '2026-01-01T00:00:00Z'; // Fireball
+		staticData.items[1].retiredAt = '2026-01-01T00:00:00Z'; // Dragon Blade
+		staticData.itemMods[1].retiredAt = '2026-01-01T00:00:00Z'; // of Power
+	});
+
+	it('omits retired records from a fresh enemy/zone option list', () => {
+		expect(reference.enemyOptions().map((o) => o.value)).toEqual([0, 1]);
+		expect(reference.zoneOptions().map((o) => o.value)).toEqual([0]);
+	});
+
+	it('keeps a retired record visible (marked) when it is the current value', () => {
+		expect(reference.enemyOptions(2)).toEqual([
+			{ value: 0, text: 'Cave Bat' },
+			{ value: 1, text: 'Catacomb Lich' },
+			{ value: 2, text: 'Goblin · retired' }
+		]);
+		expect(reference.zoneOptions(1)).toContainEqual({ value: 1, text: 'Frost Cavern · L6–10 · retired' });
+	});
+
+	it('drops a retired record again once the author keeps a different value', () => {
+		// keep references an active record, so the retired Goblin is no longer offered.
+		expect(reference.enemyOptions(0).map((o) => o.value)).toEqual([0, 1]);
+	});
+
+	it('excludes retired bosses / challenges from their sentinel-prefixed pickers', () => {
+		expect(reference.bossEnemyOptions().map((o) => o.value)).toEqual([-1, 1]);
+		expect(reference.unlockChallengeOptions().map((o) => o.value)).toEqual([-1, 0]);
+		// …unless one is the current value.
+		expect(reference.bossEnemyOptions(3)).toContainEqual({ value: 3, text: 'Ancient Wyrm · retired' });
+		expect(reference.unlockChallengeOptions(1)).toContainEqual({ value: 1, text: 'Boss Slayer · retired' });
+	});
+
+	it('excludes a retired target entity from the picker but keeps the current one', () => {
+		expect(reference.entityOptions(EEntityType.Skill).map((o) => o.value)).toEqual([0]);
+		expect(reference.entityOptions(EEntityType.Skill, false, 1)).toContainEqual({
+			value: 1,
+			text: 'Fireball · retired'
+		});
+	});
+
+	it('flags retired skills in the catalogue and resolves retired reward status by id', () => {
+		expect(reference.skillCatalogue().find((s) => s.id === 1)?.retired).toBe(true);
+		expect(reference.skillRetired(1)).toBe(true);
+		expect(reference.skillRetired(0)).toBe(false);
+		expect(reference.itemRetired(1)).toBe(true);
+		expect(reference.itemRetired(0)).toBe(false);
+		expect(reference.itemModRetired(1)).toBe(true);
+		expect(reference.itemModRetired(0)).toBe(false);
+	});
+
+	it('still resolves a retired record by id for display lookups', () => {
+		// entityName / itemRecName remain index-based so an authored reference still renders.
+		expect(reference.entityName(EEntityType.Enemy, 2)).toBe('Goblin');
+		expect(reference.entityName(EEntityType.Skill, 1)).toBe('Fireball');
 	});
 });
 
