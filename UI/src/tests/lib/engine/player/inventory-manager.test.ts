@@ -372,6 +372,69 @@ describe('InventoryManager', () => {
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'Modifier applied.');
 		});
 
+		it('mirrors the mod onto the authoritative item and its totalAttributes on success', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+
+			await manager.applyMod(1, 10, 0);
+
+			const item = manager.unlockedItems.get(1);
+			expect(item?.appliedMods.map((m) => m.id)).toEqual([10]);
+			expect(item?.appliedMods[0].itemModSlotId).toBe(0);
+			// totalAttributes recomputes to include the mod's attributes (Agility 3).
+			expect(item?.totalAttributes.getValue(EAttribute.Agility)).toBe(3);
+		});
+
+		it('replaces an existing mod occupying the same slot', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockItemMods[11] = makeItemMod(11);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, appliedMods: [{ itemModId: 10, itemModSlotId: 0 }] })
+			];
+			mockInventoryData.unlockedMods = [10, 11];
+			manager.initialize();
+
+			await manager.applyMod(1, 11, 0);
+
+			const item = manager.unlockedItems.get(1);
+			expect(item?.appliedMods.map((m) => m.id)).toEqual([11]);
+		});
+
+		it('reflects an applied mod in equipmentStats for an equipped item', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+
+			await manager.applyMod(1, 10, 0);
+
+			expect(manager.equipmentStats).toEqual([
+				{ attributeId: EAttribute.Strength, amount: 5 },
+				{ attributeId: EAttribute.Agility, amount: 3 }
+			]);
+		});
+
+		it('leaves the authoritative item unchanged when the API returns an error', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+			mockPost.mockResolvedValue({ error: 'nope' });
+
+			const result = await manager.applyMod(1, 10, 0);
+
+			expect(result).toBe(false);
+			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
+		});
+
 		it('returns false and makes no API call when the mod is not unlocked', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
@@ -423,6 +486,28 @@ describe('InventoryManager', () => {
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'Modifier removed.');
 		});
 
+		it('removes the mod from the authoritative item and equipmentStats on success', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({
+					itemId: 1,
+					equipped: true,
+					equipmentSlotId: EEquipmentSlot.WeaponSlot,
+					appliedMods: [{ itemModId: 10, itemModSlotId: 0 }]
+				})
+			];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+
+			await manager.removeMod(1, 0);
+
+			const item = manager.unlockedItems.get(1);
+			expect(item?.appliedMods).toEqual([]);
+			expect(item?.totalAttributes.getValue(EAttribute.Agility)).toBe(0);
+			expect(manager.equipmentStats).toEqual([{ attributeId: EAttribute.Strength, amount: 5 }]);
+		});
+
 		it('returns false and makes no API call when the item is not unlocked', async () => {
 			manager.initialize();
 
@@ -442,6 +527,22 @@ describe('InventoryManager', () => {
 
 			expect(result).toBe(false);
 			expect(logMessage).not.toHaveBeenCalled();
+		});
+
+		it('leaves the applied mod in place when the API returns an error', async () => {
+			mockItems[1] = makeItem(1);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, appliedMods: [{ itemModId: 10, itemModSlotId: 0 }] })
+			];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+			mockPost.mockResolvedValue({ error: 'nope' });
+
+			const result = await manager.removeMod(1, 0);
+
+			expect(result).toBe(false);
+			expect(manager.unlockedItems.get(1)?.appliedMods.map((m) => m.id)).toEqual([10]);
 		});
 	});
 
