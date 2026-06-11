@@ -30,6 +30,40 @@ namespace Game.Core.Tests.Events
             Assert.Empty(aggregate.DomainEvents);
         }
 
+        [Fact]
+        public async Task DispatchAsync_HandlerRaisesEventsUnboundedly_ThrowsAfterSafetyBound()
+        {
+            DomainEventDispatcher.RegisterDomainEventHandler<LoopEvent, LoopEventHandler>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(new HandledLog()));
+            var aggregate = new TestAggregate();
+            aggregate.Raise(new LoopEvent(aggregate));
+
+            // A handler that keeps raising a fresh event on the aggregate never lets the drain settle; the
+            // safety bound surfaces that as a thrown exception rather than spinning forever.
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => dispatcher.DispatchAsync(aggregate, TestContext.Current.CancellationToken));
+        }
+
+        [Fact]
+        public async Task DispatchAsync_MultipleHandlersForSameEvent_RunsAll()
+        {
+            var log = new HandledLog();
+            DomainEventDispatcher.RegisterDomainEventHandler<MultiEvent, MultiHandlerA>();
+            DomainEventDispatcher.RegisterDomainEventHandler<MultiEvent, MultiHandlerB>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(log));
+
+            await dispatcher.DispatchAsync(new IDomainEvent[] { new MultiEvent() }, TestContext.Current.CancellationToken);
+
+            // Both handlers registered against the same event type fire — exercising the registry's
+            // add-to-existing path and the per-event handler fan-out. The handler collection is an
+            // unordered ConcurrentBag, so assert membership rather than order.
+            Assert.Equal(2, log.Handled.Count);
+            Assert.Contains("A", log.Handled);
+            Assert.Contains("B", log.Handled);
+        }
+
         // Test-only aggregate that exposes RaiseEvent so a handler can enqueue a follow-up event on it.
         private sealed class TestAggregate : AggregateRoot
         {
@@ -39,6 +73,10 @@ namespace Game.Core.Tests.Events
         private sealed record FirstEvent(TestAggregate Aggregate) : IDomainEvent;
 
         private sealed record SecondEvent : IDomainEvent;
+
+        private sealed record LoopEvent(TestAggregate Aggregate) : IDomainEvent;
+
+        private sealed record MultiEvent : IDomainEvent;
 
         // Records the order events were handled so the test can assert the cascade ran in one dispatch.
         private sealed class HandledLog
@@ -63,6 +101,34 @@ namespace Game.Core.Tests.Events
             public Task HandleAsync(SecondEvent domainEvent, CancellationToken cancellationToken = default)
             {
                 log.Handled.Add(nameof(SecondEvent));
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class MultiHandlerA(HandledLog log) : IDomainEventHandler<MultiEvent>
+        {
+            public Task HandleAsync(MultiEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("A");
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class MultiHandlerB(HandledLog log) : IDomainEventHandler<MultiEvent>
+        {
+            public Task HandleAsync(MultiEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("B");
+                return Task.CompletedTask;
+            }
+        }
+
+        // Always re-raises a fresh event on the aggregate, so the drain loop can never settle.
+        private sealed class LoopEventHandler : IDomainEventHandler<LoopEvent>
+        {
+            public Task HandleAsync(LoopEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                domainEvent.Aggregate.Raise(new LoopEvent(domainEvent.Aggregate));
                 return Task.CompletedTask;
             }
         }
