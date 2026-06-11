@@ -9,7 +9,6 @@ namespace Game.Infrastructure.Redis
         private static ConnectionMultiplexer? _cacheInstance;
         private static ConnectionMultiplexer? _pubsubInstance;
         private static readonly object _cacheLock = new();
-        private static readonly object _pubsubLock = new();
 
         // Minimum size to grow the thread pool to before connecting (see ConnectMultiplexer).
         private const int MinThreadPoolThreads = 32;
@@ -76,9 +75,6 @@ namespace Game.Infrastructure.Redis
             {
                 _cacheInstance?.Dispose();
                 _cacheInstance = null;
-            }
-            lock (_pubsubLock)
-            {
                 _pubsubInstance?.Dispose();
                 _pubsubInstance = null;
             }
