@@ -33,12 +33,12 @@ export default defineConfig({
 			// for pure-display markup. Re-seed with `node scripts/coverage-floors.mjs` to ratchet up.
 			thresholds: {
 				'src/lib/battle/**': { lines: 99, functions: 100, branches: 90, statements: 99 },
-				'src/lib/engine/**': { lines: 96, functions: 95, branches: 90, statements: 96 },
-				'src/lib/common/**': { lines: 96, functions: 92, branches: 82, statements: 96 },
+				'src/lib/engine/**': { lines: 97, functions: 96, branches: 90, statements: 96 },
+				'src/lib/common/**': { lines: 97, functions: 93, branches: 85, statements: 97 },
 				'src/lib/api/**': { lines: 96, functions: 98, branches: 91, statements: 96 },
 				'src/lib/card-game/**': { lines: 94, functions: 100, branches: 81, statements: 94 },
 				'src/stores/**': { lines: 98, functions: 100, branches: 90, statements: 98 },
-				'src/components/**': { lines: 92, functions: 95, branches: 79, statements: 94 },
+				'src/components/**': { lines: 93, functions: 96, branches: 79, statements: 94 },
 				'src/routes/**': { lines: 93, functions: 91, branches: 72, statements: 92 }
 			}
 		}
