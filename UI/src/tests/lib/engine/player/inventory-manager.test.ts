@@ -611,6 +611,22 @@ describe('InventoryManager', () => {
 			expect(manager.unlockedItems.has(3)).toBe(true);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, expect.stringContaining('Item 3'));
 		});
+
+		it('is idempotent — an already-unlocked item is not overwritten or re-logged', () => {
+			mockItems[3] = makeItem(3);
+			mockInventoryData.unlockedItems = [
+				{ itemId: 3, equipped: true, equipmentSlotId: 4, favorite: true, appliedMods: [] }
+			];
+			manager.initialize();
+			vi.mocked(logMessage).mockClear();
+			const existing = manager.unlockedItems.get(3);
+
+			manager.addUnlockedItem({ itemId: 3, equipped: false, favorite: false, appliedMods: [] });
+
+			// The existing item (with its equipped/favorite state) is preserved, not replaced.
+			expect(manager.unlockedItems.get(3)).toBe(existing);
+			expect(logMessage).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('addUnlockedMod', () => {
@@ -619,6 +635,26 @@ describe('InventoryManager', () => {
 
 			expect(manager.unlockedMods.has(20)).toBe(true);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'New modifier unlocked!');
+		});
+
+		it('reassigns the Set so reactive consumers re-derive', () => {
+			const before = manager.unlockedMods;
+
+			manager.addUnlockedMod(20);
+
+			expect(manager.unlockedMods).not.toBe(before);
+		});
+
+		it('is idempotent — an already-unlocked mod is not re-added or re-logged', () => {
+			mockInventoryData.unlockedMods = [20];
+			manager.initialize();
+			vi.mocked(logMessage).mockClear();
+			const before = manager.unlockedMods;
+
+			manager.addUnlockedMod(20);
+
+			expect(manager.unlockedMods).toBe(before);
+			expect(logMessage).not.toHaveBeenCalled();
 		});
 	});
 });
