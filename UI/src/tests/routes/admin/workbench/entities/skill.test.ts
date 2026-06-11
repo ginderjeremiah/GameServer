@@ -97,6 +97,34 @@ describe('skillEntity', () => {
 		});
 	});
 
+	it('multipliers newRow picks the first free attribute with a default multiplier of 1', () => {
+		// Strength (id 0) is already taken, so the first free attribute (id 1) is chosen.
+		const skill: ISkill = {
+			...skillEntity.newItem(1),
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }]
+		};
+		expect(tableSection('multipliers').newRow(skill)).toEqual({ attributeId: EAttribute.Endurance, multiplier: 1 });
+	});
+
+	it('section count/warn badges reflect the multiplier and effect collections', () => {
+		const multipliers = tableSection('multipliers');
+		const effects = tableSection('effects');
+		const empty = skillEntity.newItem(1);
+
+		expect(multipliers.count?.(empty)).toBe(0);
+		expect(multipliers.warn?.(empty)).toBe('No damage multipliers');
+		expect(effects.count?.(empty)).toBe(0);
+
+		const filled: ISkill = {
+			...empty,
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
+			effects: [effect(), effect({ id: 2 })]
+		};
+		expect(multipliers.count?.(filled)).toBe(1);
+		expect(multipliers.warn?.(filled)).toBeNull();
+		expect(effects.count?.(filled)).toBe(2);
+	});
+
 	it('persist saves the effects when only effects change, without an identity Edit or a multipliers call', async () => {
 		const baseline: ISkill = {
 			id: 0,
