@@ -212,6 +212,84 @@ describe('BattleEngine', () => {
 			engine.resume();
 			expect(engine.stage).toBe(BattleStage.Active);
 		});
+
+		it('resume falls back to Idle when a battler is already dead', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			engine.enemy.takeDamage(1e9);
+			engine.resume();
+
+			expect(engine.stage).toBe(BattleStage.Idle);
+		});
+
+		it('transitions to Defeated and logs when the player dies', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			// Kill the player, then run a sub-cooldown tick so no skill fires and the enemy survives —
+			// leaving the player-dead branch as the only outcome.
+			engine.player.takeDamage(1e9);
+			logicalUpdateCallbacks[0](40);
+
+			expect(engine.stage).toBe(BattleStage.Defeated);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, "You've been defeated!");
+		});
+	});
+
+	describe('startLoading', () => {
+		it('enters the Loading stage and seeds the countdown', () => {
+			engine.startLoading(100);
+
+			expect(engine.stage).toBe(BattleStage.Loading);
+			expect(engine.loadingTime).toBe(100);
+		});
+
+		it('counts the loading time down each render frame and resolves + unhooks at zero', async () => {
+			const promise = engine.startLoading(100);
+			const unhook = vi.fn();
+			// startLoading registers a render hook that also receives an `unhook` third arg (provided by
+			// the real render engine); the shared RenderCallback type only models the first two.
+			const countdown = renderUpdateCallbacks[0] as (delta: number, logicalDelta: number, unhook: () => void) => void;
+
+			// First frame doesn't reach zero — still ticking, not yet unhooked.
+			countdown(60, 0, unhook);
+			expect(engine.loadingTime).toBe(40);
+			expect(unhook).not.toHaveBeenCalled();
+
+			// Second frame drives it past zero — the promise resolves and the hook removes itself.
+			countdown(60, 0, unhook);
+			await expect(promise).resolves.toBeUndefined();
+			expect(unhook).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('renderUpdate', () => {
+		it('advances both battlers render cooldowns while Active', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			const playerSpy = vi.spyOn(engine.player, 'updateRenderCooldowns');
+			const enemySpy = vi.spyOn(engine.enemy, 'updateRenderCooldowns');
+
+			renderUpdateCallbacks[0](16, 16);
+
+			expect(playerSpy).toHaveBeenCalledWith(16);
+			expect(enemySpy).toHaveBeenCalledWith(16);
+		});
+
+		it('does nothing while not Active', () => {
+			engine.start();
+			const playerSpy = vi.spyOn(engine.player, 'updateRenderCooldowns');
+
+			// Still Idle — no enemy loaded.
+			renderUpdateCallbacks[0](16, 16);
+
+			expect(playerSpy).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('logicalUpdate', () => {
