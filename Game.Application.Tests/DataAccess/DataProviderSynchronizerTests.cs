@@ -322,6 +322,17 @@ namespace Game.Application.Tests.DataAccess
             AssertSkillState(rows, skill1.Id, selected: false, order: 0);
         }
 
+        [Fact]
+        public async Task StartAsync_SubscribeThrows_PropagatesException()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var throwingPubSub = new ThrowingPubSubService();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, throwingPubSub, logger, TestRetryPolicy);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => synchronizer.StartAsync(CancellationToken.None));
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -413,6 +424,23 @@ namespace Game.Application.Tests.DataAccess
 
                 return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
             }
+        }
+
+        /// <summary>
+        /// A minimal <see cref="IPubSubService"/> stub whose <c>Subscribe</c> overloads always throw, used to verify
+        /// that <see cref="DataProviderSynchronizer.StartAsync"/> propagates a subscribe failure rather than swallowing it.
+        /// </summary>
+        private sealed class ThrowingPubSubService : IPubSubService
+        {
+            public Task Publish(string channel, string message) => Task.CompletedTask;
+            public Task Publish(string channel, string queueName, string queueData) => Task.CompletedTask;
+            public Task Publish<T>(string channel, string queueName, T queueData) => Task.CompletedTask;
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task UnSubscribe(string channel) => Task.CompletedTask;
+            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
