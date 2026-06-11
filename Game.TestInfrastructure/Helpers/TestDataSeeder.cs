@@ -257,6 +257,68 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        // Marks an item as unlocked for a player, optionally already equipped in a slot and/or favorited.
+        public static async Task LinkItemToPlayerAsync(
+            GameContext context,
+            int playerId,
+            int itemId,
+            EEquipmentSlot? equipmentSlot = null,
+            bool favorite = false)
+        {
+            context.UnlockedItems.Add(new UnlockedItem
+            {
+                PlayerId = playerId,
+                ItemId = itemId,
+                EquipmentSlotId = (int?)equipmentSlot,
+                Favorite = favorite,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Authors a mod slot on an item and returns it so callers can resolve its store-generated Id.
+        public static async Task<ItemModSlot> AddItemModSlotAsync(
+            GameContext context,
+            int itemId,
+            EItemModType modType = EItemModType.Prefix)
+        {
+            var modSlot = new ItemModSlot
+            {
+                ItemId = itemId,
+                ItemModSlotTypeId = (int)modType,
+            };
+            context.ItemModSlots.Add(modSlot);
+            await context.SaveChangesAsync();
+            return modSlot;
+        }
+
+        public static async Task LinkModToPlayerAsync(GameContext context, int playerId, int itemModId)
+        {
+            context.UnlockedMods.Add(new UnlockedMod
+            {
+                PlayerId = playerId,
+                ItemModId = itemModId,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Persists an applied mod as if it had been applied in a previous session.
+        public static async Task ApplyModToItemAsync(
+            GameContext context,
+            int playerId,
+            int itemId,
+            int itemModSlotId,
+            int itemModId)
+        {
+            context.AppliedMods.Add(new AppliedMod
+            {
+                PlayerId = playerId,
+                ItemId = itemId,
+                ItemModSlotId = itemModSlotId,
+                ItemModId = itemModId,
+            });
+            await context.SaveChangesAsync();
+        }
+
         public static async Task<Challenge> CreateChallengeAsync(
             GameContext context,
             string name = "Test Challenge",
