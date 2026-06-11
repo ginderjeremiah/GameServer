@@ -1,5 +1,6 @@
 ﻿import { IAttributeMultiplier, ISkill, ISkillEffect } from '$lib/api';
 import { Battler } from './battler';
+import { calculateSkillDamage } from './battle-formulas';
 
 export class Skill implements ISkill {
 	id: number;
@@ -27,10 +28,6 @@ export class Skill implements ISkill {
 	}
 
 	public calculateDamage() {
-		let dmg = this.baseDamage;
-		this.damageMultipliers.forEach((dmgType) => {
-			dmg += this.owner.attributes.getValue(dmgType.attributeId) * dmgType.multiplier;
-		});
-		return dmg;
+		return calculateSkillDamage(this, this.owner.attributes);
 	}
 }

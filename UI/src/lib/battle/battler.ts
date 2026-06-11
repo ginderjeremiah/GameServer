@@ -1,5 +1,6 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
+import { applyDefense, cooldownMultiplier } from './battle-formulas';
 import { IBattlerAttribute, EAttribute } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
@@ -25,7 +26,7 @@ export class Battler {
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
 	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
 	public get cdMultiplier(): number {
-		return 1 + this.attributes.getValue(EAttribute.CooldownRecovery) / 100;
+		return cooldownMultiplier(this.attributes);
 	}
 
 	constructor(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
@@ -55,10 +56,7 @@ export class Battler {
 	}
 
 	public takeDamage(rawDamage: number) {
-		let damage = rawDamage - this.attributes.getValue(EAttribute.Defense);
-		if (damage < 0) {
-			damage = 0;
-		}
+		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense));
 		this.currentHealth -= damage;
 		this.isDead = this.currentHealth <= 0;
 		return damage;
