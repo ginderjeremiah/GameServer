@@ -1,6 +1,8 @@
 using Game.Abstractions.DataAccess;
 using Game.Application;
 using Game.Core;
+using Game.Core.Battle;
+using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Progress;
@@ -224,6 +226,49 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(new HashSet<int> { completedId }, ids);
             }
         }
+
+        [Fact]
+        public async Task RecordBattleCompleted_PersistsDamageHealedStatistic()
+        {
+            // The DamageHealed statistic (fed by the DoT/HoT phase's PlayerDamageHealed) was defined but
+            // unused before #334; this verifies it now flows through RecordBattleCompleted to a persisted row.
+            var playerId = await SeedPlayerAsync();
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                var progress = await repo.Load(MakeDomainPlayer(playerId));
+                progress.RecordBattleCompleted(
+                    MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats { PlayerDamageHealed = 12.5 }, isBossBattle: false, zoneId: 0);
+
+                await repo.Save(progress);
+                await unitOfWork.CommitAsync();
+            }
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var stat = await context.PlayerStatistics.AsNoTracking()
+                    .SingleAsync(
+                        s => s.PlayerId == playerId && s.StatisticTypeId == (int)EStatisticType.DamageHealed,
+                        CancellationToken);
+
+                Assert.Equal(12.5m, stat.Value);
+            }
+        }
+
+        private static Enemy MakeEnemy(int id = 1) => new()
+        {
+            Id = id,
+            Name = "Test Enemy",
+            Level = 1,
+            IsBoss = false,
+            AttributeDistributions = [],
+            AvailableSkills = [],
+        };
 
         private async Task<int> SeedPlayerAsync()
         {

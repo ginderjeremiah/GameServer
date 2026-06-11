@@ -79,6 +79,28 @@ export class Battler {
 		return damage;
 	}
 
+	/** Applies one tick of damage-over-time from DamageTakenPerSecond (authored per second, scaled to
+	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt. */
+	public applyDamageOverTime(timeDelta: number) {
+		const damage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
+		this.currentHealth -= damage;
+		this.isDead = this.currentHealth <= 0;
+		return damage;
+	}
+
+	/** Applies one tick of heal-over-time from HealthRegenPerSecond (authored per second, scaled to
+	 *  `timeDelta`), capped at MaxHealth. Returns the actual (post-cap) health restored. */
+	public applyHealOverTime(timeDelta: number) {
+		const heal = (this.attributes.getValue(EAttribute.HealthRegenPerSecond) * timeDelta) / 1000;
+		const healed = Math.min(heal, this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth);
+		if (healed > 0) {
+			this.currentHealth += healed;
+			return healed;
+		}
+
+		return 0;
+	}
+
 	/** Applies a timed skill `effect` to this battler. Re-applying an already-active effect (matched by
 	 *  its authored id) refreshes its remaining duration without adding a second modifier (no stacking);
 	 *  a new effect adds a modifier and may shift MaxHealth, so the health is re-clamped. */

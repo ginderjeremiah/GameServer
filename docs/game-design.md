@@ -16,7 +16,7 @@ Character progression in the game is primarily driven by leveling up and allocat
 
 Attributes are somewhat of a work-in-progress feature, but the general idea is that they will provide various bonuses and effects that influence combat, other Attributes, and potentially other mechanics in the game. Currently they come from stat allocations and equipment, but this will be expanded in the future. For example, a Skill may receive a damage bonus based on the player's Strength Attribute, and the player's MaxHealth Attribute will receive a bonus based on their Strength as well. Attributes are designed to go above and beyond the traditional RPG stats and provide a system for complex effects.
 
-The attribute system is the substrate for timed skill effects (see [Skills](#skills)): applying an effect adds a real attribute modifier to the target mid-battle and expiry removes it, so derived attributes cascade naturally (a temporary Strength buff also raises MaxHealth, exactly like a permanent one). Damage-over-time and heal-over-time are realized the same way, through two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — that an end-of-tick simulator phase will consume (a poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration). Those two attributes are defined now; the simulator phase that applies them is the remaining piece of the DoT/HoT work.
+The attribute system is the substrate for timed skill effects (see [Skills](#skills)): applying an effect adds a real attribute modifier to the target mid-battle and expiry removes it, so derived attributes cascade naturally (a temporary Strength buff also raises MaxHealth, exactly like a permanent one). Damage-over-time and heal-over-time are realized the same way, through two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — that an end-of-tick simulator phase consumes (a poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration). See [Skill Effects](#skill-effects) for the DoT/HoT runtime rules.
 
 # Skills
 
@@ -36,6 +36,13 @@ A skill may carry any number of authored **effects**. Each effect is a timed att
 - **Timed, in 40ms ticks.** A duration of `DurationMs` influences `DurationMs / 40` ticks (counting the tick it was applied on); effects expire at the start of a tick, before any skill fires.
 - **Refresh, not stack.** Re-applying an already-active effect refreshes its remaining duration to full rather than adding a second modifier — magnitudes never stack from the same authored effect (distinct effects on the same attribute do stack).
 - **MaxHealth never heals on a buff.** When an effect raises MaxHealth, current health is left unchanged (no free healing); when MaxHealth drops below current health, current health is clamped down to the new maximum.
+
+Damage-over-time and heal-over-time are just effects on two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — applied by an **end-of-tick phase** that runs after both battlers' skills resolve (only while both still live). A poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration; a regen, a self buff to `HealthRegenPerSecond`. Its rules:
+
+- **Per-second units.** The phase applies `value × 40 / 1000` per 40ms tick.
+- **Enemy resolves first.** The enemy's DoT/HoT is applied before the player's, so an enemy DoT kill awards victory before the player's DoT lands — a same-tick mutual DoT kill favours the player (mirroring the skill-exchange order).
+- **Damage before heal, death between.** For each battler `DamageTakenPerSecond` applies first (**bypassing Defense**) and death is checked, then `HealthRegenPerSecond` heals (capped at MaxHealth) — so a lethal DoT tick kills even when the same tick's heal would have saved the battler.
+- **Statistics.** DoT dealt to the enemy counts toward `DamageDealt` (but not the highest-single-attack or per-skill totals — per-skill DoT attribution is deferred); DoT taken by the player counts toward `DamageTaken`; the player's post-cap healing feeds the `DamageHealed` statistic.
 
 Effects are deterministic in this version (they always apply when the skill fires — no proc chance), and durations are time-based. Authoring effects on skills is done through the admin Workbench's skill editor.
 

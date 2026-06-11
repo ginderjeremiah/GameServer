@@ -69,6 +69,36 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// Applies one tick of damage-over-time from <see cref="DamageTakenPerSecond"/> (authored per second,
+        /// scaled to <paramref name="ms"/>). Unlike <see cref="TakeDamage"/> it <b>bypasses Defense</b>, and
+        /// returns the damage dealt so the caller can attribute it to the battle statistics.
+        /// </summary>
+        public double ApplyDamageOverTime(int ms)
+        {
+            var damage = _attributes[DamageTakenPerSecond] * ms / 1000.0;
+            CurrentHealth -= damage;
+            return damage;
+        }
+
+        /// <summary>
+        /// Applies one tick of heal-over-time from <see cref="HealthRegenPerSecond"/> (authored per second,
+        /// scaled to <paramref name="ms"/>), capped at <see cref="MaxHealth"/>. Returns the actual (post-cap)
+        /// health restored so the caller can attribute it to the battle statistics.
+        /// </summary>
+        public double ApplyHealOverTime(int ms)
+        {
+            var heal = _attributes[HealthRegenPerSecond] * ms / 1000.0;
+            var healed = Math.Min(heal, _attributes[MaxHealth] - CurrentHealth);
+            if (healed > 0)
+            {
+                CurrentHealth += healed;
+                return healed;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
         /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler. Re-applying an
         /// already-active effect (matched by its authored id) refreshes its remaining duration to full
         /// without adding a second modifier (no stacking); a new effect adds a <see cref="AttributeModifier"/>

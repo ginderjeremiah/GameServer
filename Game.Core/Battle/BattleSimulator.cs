@@ -42,6 +42,21 @@ namespace Game.Core.Battle
                 }
 
                 context.SwapActiveAndTargetBattlers();
+
+                // End-of-tick damage/heal-over-time, reached only with both battlers still alive (matching
+                // the skill-exchange early returns). The enemy resolves first, so an enemy DoT kill awards
+                // victory before the player's DoT applies — a same-tick mutual DoT kill favours the player.
+                context.ResolveDamageOverTime();
+
+                if (EnemyBattler.IsDead)
+                {
+                    return new BattleResult(true, false, totalMs, context.Stats);
+                }
+
+                if (PlayerBattler.IsDead)
+                {
+                    return new BattleResult(false, true, totalMs, context.Stats);
+                }
             }
 
             return new BattleResult(false, false, totalMs - msPerTick, context.Stats);
