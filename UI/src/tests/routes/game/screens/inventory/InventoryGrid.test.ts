@@ -1,7 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EItemCategory, ERarity } from '$lib/api';
 import { BattleAttributes, type Item } from '$lib/battle';
+
+const { setTooltipPosition, showTooltip, hideTooltip } = vi.hoisted(() => ({
+	setTooltipPosition: vi.fn(),
+	showTooltip: vi.fn(),
+	hideTooltip: vi.fn()
+}));
 
 vi.mock('$lib/engine', () => ({
 	EEquipmentSlot: { HelmSlot: 0, ChestSlot: 1, LegSlot: 2, BootSlot: 3, WeaponSlot: 4, AccessorySlot: 5 },
@@ -21,11 +27,7 @@ vi.mock('$lib/engine', () => ({
 
 vi.mock('$stores', () => ({
 	staticData: { itemMods: [] },
-	registerTooltipComponent: vi.fn(() => ({
-		setTooltipPosition: vi.fn(),
-		showTooltip: vi.fn(),
-		hideTooltip: vi.fn()
-	}))
+	registerTooltipComponent: vi.fn(() => ({ setTooltipPosition, showTooltip, hideTooltip }))
 }));
 
 import InventoryGrid from '$routes/game/screens/inventory/InventoryGrid.svelte';
@@ -103,5 +105,85 @@ describe('InventoryGrid', () => {
 		const { container } = render(InventoryGrid, { props: { view: makeView(items) } });
 		const slots = container.querySelectorAll('.grid-slot');
 		expect(slots.length).toBe(2);
+	});
+
+	it('disables the next-page button when on the last page', () => {
+		const items = Array.from({ length: 50 }, (_, i) => makeGridItem(i + 1));
+		// page: 1 puts us on the last page (pages = ceil(50/48) = 2, pageClamped = min(1, 1) = 1).
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { page: 1 }) } });
+		const pageBtns = container.querySelectorAll('.page-btn') as NodeListOf<HTMLButtonElement>;
+		const nextBtn = pageBtns[1];
+		expect(nextBtn.disabled).toBe(true);
+	});
+
+	it('enables the previous-page button when not on the first page', () => {
+		const items = Array.from({ length: 50 }, (_, i) => makeGridItem(i + 1));
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { page: 1 }) } });
+		const pageBtns = container.querySelectorAll('.page-btn') as NodeListOf<HTMLButtonElement>;
+		const prevBtn = pageBtns[0];
+		expect(prevBtn.disabled).toBe(false);
+	});
+
+	it('shows the correct page indicator text on the last page', () => {
+		const items = Array.from({ length: 50 }, (_, i) => makeGridItem(i + 1));
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { page: 1 }) } });
+		expect(container.querySelector('.page-indicator')!.textContent).toBe('2 / 2');
+	});
+});
+
+describe('InventoryGrid — tooltip suppression', () => {
+	it('shows the tooltip on hover when nothing is selected or dragged', async () => {
+		showTooltip.mockClear();
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items) } });
+		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
+		expect(showTooltip).toHaveBeenCalled();
+	});
+
+	it('suppresses the tooltip when an item is selected', async () => {
+		showTooltip.mockClear();
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { selectedId: 1 }) } });
+		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
+		expect(showTooltip).not.toHaveBeenCalled();
+	});
+
+	it('suppresses the tooltip when an item is being dragged', async () => {
+		showTooltip.mockClear();
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { dragItemId: 1 }) } });
+		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
+		expect(showTooltip).not.toHaveBeenCalled();
+	});
+});
+
+describe('InventoryGrid — drag interactions', () => {
+	it('hides the tooltip when a drag starts', async () => {
+		hideTooltip.mockClear();
+		const items = [makeGridItem(1)];
+		const view = makeView(items);
+		const { container } = render(InventoryGrid, { props: { view } });
+		await fireEvent.dragStart(container.querySelector('.grid-slot')!, {
+			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
+		});
+		expect(hideTooltip).toHaveBeenCalled();
+	});
+
+	it('sets view.dragItemId on drag start', async () => {
+		const items = [makeGridItem(7)];
+		const view = makeView(items);
+		const { container } = render(InventoryGrid, { props: { view } });
+		await fireEvent.dragStart(container.querySelector('.grid-slot')!, {
+			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
+		});
+		expect(view.dragItemId).toBe(7);
+	});
+
+	it('clears view.dragItemId on drag end', async () => {
+		const items = [makeGridItem(7)];
+		const view = makeView(items, { dragItemId: 7 });
+		const { container } = render(InventoryGrid, { props: { view } });
+		await fireEvent.dragEnd(container.querySelector('.grid-slot')!);
+		expect(view.dragItemId).toBeNull();
 	});
 });
