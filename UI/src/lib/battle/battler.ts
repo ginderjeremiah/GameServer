@@ -47,18 +47,21 @@ export class Battler {
 		this.reset(battlerData, additionalAtttributes);
 	}
 
-	public advanceCooldowns(timeDelta: number) {
-		const firedSkills: Skill[] = [];
+	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
+	 *  for each skill that becomes ready as soon as it fires — before the next slot accrues. Because
+	 *  `cdMultiplier` is read live per slot, an earlier slot's effect (e.g. a self CooldownRecovery buff
+	 *  applied in `onFire`) influences a later slot's accrual on the same tick, mirroring the backend's
+	 *  per-slot `BattleSkill.Update`. */
+	public advanceCooldowns(timeDelta: number, onFire: (skill: Skill) => void) {
 		for (const skill of this.skills) {
 			if (skill) {
 				skill.chargeTime += timeDelta * this.cdMultiplier;
 				if (skill.chargeTime >= skill.cooldownMs) {
-					firedSkills.push(skill);
 					skill.chargeTime = 0;
+					onFire(skill);
 				}
 			}
 		}
-		return firedSkills;
 	}
 
 	public updateRenderCooldowns(renderDelta: number) {
@@ -132,6 +135,11 @@ export class Battler {
 	}
 
 	public reset(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
+		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
+		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
+		for (const active of this.#activeEffects) {
+			this.attributes.removeModifier(active.modifier);
+		}
 		this.#activeEffects = [];
 		if (battlerData) {
 			const atts = additionalAtttributes

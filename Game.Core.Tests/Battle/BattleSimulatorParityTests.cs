@@ -263,6 +263,31 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
+
+                // Same-tick CDR ordering: slot 0's self CooldownRecovery buff (applied after it fires) speeds
+                // up slot 1's charge accrual ON THE SAME TICK, because each slot reads the cooldown multiplier
+                // live in loadout order — so an earlier slot's effect influences a later slot firing that tick.
+                //   Player: base CDR=0 (cdMult=1). slot0 = pure buffer (0 damage, cooldown 40, Self +100 CDR
+                //     permanent → cdMult=2 once applied); slot1 = baseDamage 27, cooldown 400, no multiplier.
+                //   Enemy:  Str=5 → MaxHealth=75, Def=2, no skills. Each slot1 hit deals 27−2 = 25.
+                //   The buff lifts slot1's accrual to 80/tick from the first tick, so slot1 fires every 200ms at
+                //   ticks 200,400,600 → enemy dies on the 3rd hit at 600. (Accruing every slot before any effect
+                //   — a two-phase order — would slip slot1's first fire to 240 and the kill to 640.)
+                ["cdrBuffSpeedsLaterSlotSameTick"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(104, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 100, Permanent)]),
+                            MakeSkill(2, baseDamage: 27, cooldownMs: 400),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 5, endurance: 0,
+                        skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 600),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>

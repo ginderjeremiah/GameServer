@@ -144,6 +144,19 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.currentHealth).toBe(50);
 	});
 
+	it('clears active effects on reset so buffs do not carry into the next battle', () => {
+		const battler = makeBattler();
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 10));
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(20);
+
+		battler.reset(); // a data-less reset keeps the attribute set, so the effect modifiers must be removed
+
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
+		// And no orphaned bookkeeping remains to act on a later expiry tick.
+		battler.advanceEffects(40);
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
+	});
+
 	it('routes a skill’s Self effect to the caster and Opponent effect to the foe', () => {
 		const caster = makeBattler();
 		const foe = makeBattler();

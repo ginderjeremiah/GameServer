@@ -127,7 +127,7 @@ Skills can carry authored `SkillEffect`s that apply as **timed attribute modifie
 - **`Battler` owns the active-effect bookkeeping.** It tracks `{ sourceEffect, modifier, remainingMs }` per effect; `ApplyEffect` refreshes an already-active effect's duration (matched by the authored effect id) instead of stacking a second modifier; `AdvanceEffects(ms)` — called for both battlers at the **start of each tick** in `BattleSimulator.Simulate`, before any skill fires — decrements and removes the expired ones, so an effect influences exactly `DurationMs / MsPerTick` ticks (counting the application tick). `CurrentHealth` is left untouched when MaxHealth rises (no free heal) and clamped down when it drops, at both the apply and expire points.
 - **No per-tick allocations.** The per-tick decrement early-returns when a battler has no active effects and otherwise iterates an index loop with no allocation (the same hot-path discipline as #286); the active-effect list is created lazily on first apply.
 
-The two new per-second attributes (`DamageTakenPerSecond`, `HealthRegenPerSecond`) and the `EAttributeModifierSource.SkillEffect` value are seeded here so the schema settles once; the DoT/HoT simulator phase that consumes the per-second attributes is the remaining piece of the effects work.
+The two new per-second attributes (`DamageTakenPerSecond`, `HealthRegenPerSecond`) are seeded here so the schema settles once (the `EAttributeModifierSource.SkillEffect` value that marks effect modifiers arrived earlier with the #332 reference data); the DoT/HoT simulator phase that consumes the per-second attributes is the remaining piece of the effects work.
 
 ## Caching and Pub/Sub
 

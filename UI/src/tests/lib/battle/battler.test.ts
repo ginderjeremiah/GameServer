@@ -14,6 +14,7 @@ vi.mock('$stores', () => ({
 }));
 
 import { Battler } from '$lib/battle/battler';
+import type { Skill } from '$lib/battle/skill';
 
 const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill => ({
 	id,
@@ -126,11 +127,11 @@ describe('Battler', () => {
 				})
 			);
 
-			battler.advanceCooldowns(500);
+			battler.advanceCooldowns(500, () => {});
 			expect(battler.skills[0]!.chargeTime).toBe(500 * battler.cdMultiplier);
 		});
 
-		it('returns fired skills and resets their charge time', () => {
+		it('invokes onFire for fired skills and resets their charge time', () => {
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [],
@@ -138,13 +139,14 @@ describe('Battler', () => {
 				})
 			);
 
-			const fired = battler.advanceCooldowns(1000);
+			const fired: Skill[] = [];
+			battler.advanceCooldowns(1000, (skill) => fired.push(skill));
 			expect(fired).toHaveLength(1);
 			expect(fired[0].name).toBe('Skill 0');
 			expect(battler.skills[0]!.chargeTime).toBe(0);
 		});
 
-		it('returns empty array when no skills are ready', () => {
+		it('does not invoke onFire when no skills are ready', () => {
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [],
@@ -152,7 +154,8 @@ describe('Battler', () => {
 				})
 			);
 
-			const fired = battler.advanceCooldowns(100);
+			const fired: Skill[] = [];
+			battler.advanceCooldowns(100, (skill) => fired.push(skill));
 			expect(fired).toHaveLength(0);
 		});
 
@@ -164,7 +167,7 @@ describe('Battler', () => {
 				})
 			);
 
-			expect(() => battler.advanceCooldowns(500)).not.toThrow();
+			expect(() => battler.advanceCooldowns(500, () => {})).not.toThrow();
 		});
 	});
 

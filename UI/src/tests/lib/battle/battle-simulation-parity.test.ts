@@ -355,6 +355,40 @@ const scenarios: ParityScenario[] = [
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Same-tick CDR ordering: slot 0's self CooldownRecovery buff speeds up slot 1's accrual on the same
+	// tick, because each slot reads the cooldown multiplier live in loadout order. Mirrors the backend
+	// `cdrBuffSpeedsLaterSlotSameTick` scenario.
+	//   Player: base CDR=0. slot0 = pure buffer (0 dmg, cooldown 40, Self +100 CDR permanent → cdMult=2),
+	//     slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
+	//   The boosted accrual makes slot1 fire at 200,400,600 → enemy dies on the 3rd hit at 600.
+	{
+		name: 'cdrBuffSpeedsLaterSlotSameTick',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeSkill(
+						0,
+						40,
+						[],
+						[
+							makeEffect(
+								104,
+								ESkillEffectTarget.Self,
+								EAttribute.CooldownRecovery,
+								EModifierType.Additive,
+								100,
+								PERMANENT
+							)
+						]
+					),
+					makeSkill(27, 400)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 5 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 600 }
 	}
 ];
 
