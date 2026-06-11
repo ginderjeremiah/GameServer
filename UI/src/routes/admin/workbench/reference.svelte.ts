@@ -4,7 +4,9 @@ import {
 	EEntityType,
 	EItemCategory,
 	EItemModType,
+	EModifierType,
 	ERarity,
+	ESkillEffectTarget,
 	fetchSocketData,
 	type IChallengeType,
 	type IItem,
@@ -92,6 +94,8 @@ class WorkbenchReference {
 	itemCategoryOptions = (): SelectOption[] => toOptions(enumPairs(EItemCategory));
 	rarityOptions = (): SelectOption[] => toOptions(enumPairs(ERarity));
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
+	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
+	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));
 	tagCategoryOptions = (): SelectOption[] => this.tagCategories.map((c) => ({ value: c.id, text: c.name }));
 	zoneOptions = (keep?: number): SelectOption[] =>
 		this.retireableOptions(staticData.zones ?? [], keep, (z) => `${z.name} · L${z.levelMin}–${z.levelMax}`);

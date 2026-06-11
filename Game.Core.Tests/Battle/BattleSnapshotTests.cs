@@ -325,6 +325,7 @@ namespace Game.Core.Tests.Battle
             Description = string.Empty,
             CooldownMs = 1000,
             DamageMultipliers = [],
+            Effects = [],
         };
 
         private static AttributeModifier MakeModifier(EAttribute attribute, double amount) => new()

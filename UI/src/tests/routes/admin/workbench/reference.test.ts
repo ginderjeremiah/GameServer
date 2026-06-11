@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EChallengeGoalComparison, EEntityType, EItemCategory, EItemModType, ERarity } from '$lib/api';
+import {
+	EChallengeGoalComparison,
+	EEntityType,
+	EItemCategory,
+	EItemModType,
+	EModifierType,
+	ERarity,
+	ESkillEffectTarget
+} from '$lib/api';
 
 // WorkbenchReference reads its catalogues from the in-memory staticData store, so
 // it is mocked here (mirrors statistics-view.test.ts). The tags/categories/challenge-types
@@ -73,6 +81,17 @@ describe('enum-backed select options', () => {
 		expect(reference.itemCategoryOptions().find((o) => o.value === EItemCategory.Weapon)?.text).toBe('Weapon');
 		expect(reference.rarityOptions().find((o) => o.value === ERarity.Legendary)?.text).toBe('Legendary');
 		expect(reference.modTypeOptions().find((o) => o.value === EItemModType.Prefix)?.text).toBe('Prefix');
+	});
+
+	it('builds skill-effect-target and modifier-type options from their enums', () => {
+		expect(reference.skillEffectTargetOptions().find((o) => o.value === ESkillEffectTarget.Self)?.text).toBe('Self');
+		expect(reference.skillEffectTargetOptions().find((o) => o.value === ESkillEffectTarget.Opponent)?.text).toBe(
+			'Opponent'
+		);
+		expect(reference.modifierTypeOptions().find((o) => o.value === EModifierType.Additive)?.text).toBe('Additive');
+		expect(reference.modifierTypeOptions().find((o) => o.value === EModifierType.Multiplicative)?.text).toBe(
+			'Multiplicative'
+		);
 	});
 });
 

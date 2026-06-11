@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace Game.Api.Controllers.Admin
 {
     /// <summary>
-    /// Admin Workbench endpoints for persisting skills and their damage multipliers. A thin HTTP
-    /// adapter over <see cref="IAdminSkills"/>. The route prefix is shared across every admin
-    /// controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
+    /// Admin Workbench endpoints for persisting skills, their damage multipliers, and their effects.
+    /// A thin HTTP adapter over <see cref="IAdminSkills"/>. The route prefix is shared across every
+    /// admin controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
     /// </summary>
     [Route("/api/AdminTools/[action]")]
     [ApiController]
@@ -31,6 +31,14 @@ namespace Game.Api.Controllers.Admin
         public ApiResponse SetSkillMultipliers([FromBody] AddEditAttributesData changeData)
         {
             return _adminSkills.SetMultipliers(changeData)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Skill does not exist.");
+        }
+
+        [HttpPost]
+        public ApiResponse SetSkillEffects([FromBody] SetSkillEffectsData changeData)
+        {
+            return _adminSkills.SetEffects(changeData)
                 ? ApiResponse.Success()
                 : ApiResponse.Error("Skill does not exist.");
         }

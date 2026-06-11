@@ -10,6 +10,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	name: 'Slash',
 	baseDamage: 10,
 	damageMultipliers: [],
+	effects: [],
 	description: 'A basic slash',
 	cooldownMs: 1000,
 	iconPath: '/icons/slash.png',

@@ -27,6 +27,7 @@ export enum EAttributeModifierSource {
 	Derived = 4,
 	Item = 5,
 	ItemMod = 6,
+	SkillEffect = 7,
 }
 
 export enum EChallengeGoalComparison {
@@ -103,6 +104,11 @@ export enum ERarity {
 	Epic = 4,
 	Legendary = 5,
 	Mythic = 6,
+}
+
+export enum ESkillEffectTarget {
+	Self = 1,
+	Opponent = 2,
 }
 
 export enum EStatisticType {

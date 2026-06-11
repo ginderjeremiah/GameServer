@@ -61,6 +61,7 @@ export function battlerFactory(registry: ISkill[]) {
 				baseDamage: spec.baseDamage,
 				cooldownMs: spec.cooldownMs,
 				damageMultipliers: spec.multipliers,
+				effects: [],
 				description: '',
 				iconPath: ''
 			});

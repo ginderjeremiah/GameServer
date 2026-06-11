@@ -51,6 +51,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
 	baseDamage: 10,
 	damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
+	effects: [],
 	description: 'A skill.',
 	cooldownMs: 1000,
 	iconPath: '',

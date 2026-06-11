@@ -6,6 +6,7 @@ import type {
 	IAttributeDistribution,
 	IBattlerAttribute,
 	IEnemySpawn,
+	ISkillEffect,
 	IZoneEnemy
 } from '../';
 
@@ -32,6 +33,11 @@ export interface ISetEnemySkillsData {
 export interface ISetEnemySpawnsData {
 	enemyId: number;
 	spawns: IEnemySpawn[];
+}
+
+export interface ISetSkillEffectsData {
+	id: number;
+	changes: IChange<ISkillEffect>[];
 }
 
 export interface ISetTagsData {

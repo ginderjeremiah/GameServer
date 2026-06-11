@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
+using Game.Core;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -75,6 +76,56 @@ namespace Game.DataAccess.Repositories.Admin
                         {
                             SkillId = skill.Id,
                             AttributeId = (int)attribute.AttributeId,
+                        });
+                    }
+                });
+
+            return true;
+        }
+
+        public bool SetEffects(SetSkillEffectsData data)
+        {
+            var skill = _skills.LookupSkill(data.Id);
+            if (skill is null)
+            {
+                return false;
+            }
+
+            ChangeSetProcessor.Apply(data.Changes,
+                add: effect => _entityStore.Insert(new Entities.SkillEffect
+                {
+                    SkillId = skill.Id,
+                    Target = (int)effect.Target,
+                    AttributeId = (int)effect.AttributeId,
+                    ModifierType = (int)effect.ModifierTypeId,
+                    Amount = effect.Amount,
+                    DurationMs = effect.DurationMs,
+                }),
+                // Build fresh, navigation-free entities so cached back-references don't drag
+                // the whole graph into the change tracker.
+                edit: effect =>
+                {
+                    if (skill.SkillEffects.Any(se => se.Id == effect.Id))
+                    {
+                        _entityStore.Update(new Entities.SkillEffect
+                        {
+                            Id = effect.Id,
+                            SkillId = skill.Id,
+                            Target = (int)effect.Target,
+                            AttributeId = (int)effect.AttributeId,
+                            ModifierType = (int)effect.ModifierTypeId,
+                            Amount = effect.Amount,
+                            DurationMs = effect.DurationMs,
+                        });
+                    }
+                },
+                delete: effect =>
+                {
+                    if (skill.SkillEffects.Any(se => se.Id == effect.Id))
+                    {
+                        _entityStore.Delete(new Entities.SkillEffect
+                        {
+                            Id = effect.Id,
                         });
                     }
                 });

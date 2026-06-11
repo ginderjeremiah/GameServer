@@ -124,6 +124,7 @@ namespace Game.Core.Tests.Enemies
             BaseDamage = 1,
             CooldownMs = 1000,
             DamageMultipliers = [],
+            Effects = [],
         };
 
         private static Enemy MakeEnemy(List<Skill> skills) => new()

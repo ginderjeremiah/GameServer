@@ -570,6 +570,142 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SetSkillEffects_AddEditDelete_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Poison Sting"); // Id 0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Add two effects: a self Strength buff and an opponent Defense debuff.
+            var addData = new
+            {
+                Id = skill.Id,
+                Changes = new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            Id = 0,
+                            Target = (int)ESkillEffectTarget.Self,
+                            AttributeId = (int)EAttribute.Strength,
+                            ModifierTypeId = (int)EModifierType.Additive,
+                            Amount = 15m,
+                            DurationMs = 5000
+                        },
+                        ChangeType = 0 // Add
+                    },
+                    new
+                    {
+                        Item = new
+                        {
+                            Id = 0,
+                            Target = (int)ESkillEffectTarget.Opponent,
+                            AttributeId = (int)EAttribute.Defense,
+                            ModifierTypeId = (int)EModifierType.Multiplicative,
+                            Amount = 0.5m,
+                            DurationMs = 3000
+                        },
+                        ChangeType = 0 // Add
+                    }
+                }
+            };
+
+            var addResponse = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillEffects", addData, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, addResponse.StatusCode);
+
+            var afterAdd = Assert.Single(GetSkills(), s => s.Id == skill.Id);
+            Assert.Equal(2, afterAdd.Effects.Count());
+            var selfBuff = Assert.Single(afterAdd.Effects, e => e.Target == ESkillEffectTarget.Self);
+            Assert.Equal(EAttribute.Strength, selfBuff.AttributeId);
+            Assert.Equal(EModifierType.Additive, selfBuff.ModifierTypeId);
+            Assert.Equal(15m, selfBuff.Amount);
+            Assert.Equal(5000, selfBuff.DurationMs);
+            var debuff = Assert.Single(afterAdd.Effects, e => e.Target == ESkillEffectTarget.Opponent);
+            Assert.Equal(EAttribute.Defense, debuff.AttributeId);
+
+            // Edit the self buff's amount and delete the opponent debuff.
+            var editData = new
+            {
+                Id = skill.Id,
+                Changes = new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            selfBuff.Id,
+                            Target = (int)ESkillEffectTarget.Self,
+                            AttributeId = (int)EAttribute.Strength,
+                            ModifierTypeId = (int)EModifierType.Additive,
+                            Amount = 25m,
+                            DurationMs = 5000
+                        },
+                        ChangeType = 1 // Edit
+                    },
+                    new
+                    {
+                        Item = new
+                        {
+                            debuff.Id,
+                            Target = (int)ESkillEffectTarget.Opponent,
+                            AttributeId = (int)EAttribute.Defense,
+                            ModifierTypeId = (int)EModifierType.Multiplicative,
+                            Amount = 0.5m,
+                            DurationMs = 3000
+                        },
+                        ChangeType = 2 // Delete
+                    }
+                }
+            };
+
+            var editResponse = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillEffects", editData, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
+
+            var afterEdit = Assert.Single(GetSkills(), s => s.Id == skill.Id);
+            var remaining = Assert.Single(afterEdit.Effects);
+            Assert.Equal(selfBuff.Id, remaining.Id);
+            Assert.Equal(ESkillEffectTarget.Self, remaining.Target);
+            Assert.Equal(25m, remaining.Amount);
+        }
+
+        [Fact]
+        public async Task SetSkillEffects_MissingSkill_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new
+            {
+                Id = 999,
+                Changes = new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            Id = 0,
+                            Target = (int)ESkillEffectTarget.Self,
+                            AttributeId = (int)EAttribute.Strength,
+                            ModifierTypeId = (int)EModifierType.Additive,
+                            Amount = 5m,
+                            DurationMs = 1000
+                        },
+                        ChangeType = 0 // Add
+                    }
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillEffects", data, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Skill does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task AddEditSkills_EditZeroIdSkill_UpdatesInPlaceWithoutCreatingDuplicate()
         {
             using var scope = CreateScope();
@@ -591,7 +727,8 @@ namespace Game.Api.Tests.Integration
                         CooldownMs = 1500,
                         Description = "Updated",
                         IconPath = "skills/new.png",
-                        DamageMultipliers = Array.Empty<object>()
+                        DamageMultipliers = Array.Empty<object>(),
+                        Effects = Array.Empty<object>()
                     },
                     ChangeType = 1 // Edit
                 }

@@ -241,6 +241,7 @@ namespace Game.Core.Tests.Battle.Performance
                 CooldownMs = 80, // fires every couple of ticks, so the damage path runs heavily
                 BaseDamage = 10,
                 DamageMultipliers = multipliers,
+                Effects = [],
             };
         }
 

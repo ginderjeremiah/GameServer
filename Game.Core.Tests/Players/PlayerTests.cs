@@ -618,6 +618,7 @@ namespace Game.Core.Tests.Players
             Description = string.Empty,
             CooldownMs = 1000,
             DamageMultipliers = [],
+            Effects = [],
         };
     }
 }

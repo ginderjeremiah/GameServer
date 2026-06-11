@@ -4,6 +4,7 @@ using Game.Core.Attributes.Modifiers;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
+using CoreSkillEffect = Game.Core.Skills.SkillEffect;
 
 namespace Game.DataAccess.Mapping
 {
@@ -26,6 +27,16 @@ namespace Game.DataAccess.Mapping
                     {
                         AttributeId = (EAttribute)sdm.AttributeId,
                         Multiplier = sdm.Multiplier,
+                    }).ToList(),
+                Effects = entity.SkillEffects
+                    .Select(se => new Contracts.SkillEffect
+                    {
+                        Id = se.Id,
+                        Target = (ESkillEffectTarget)se.Target,
+                        AttributeId = (EAttribute)se.AttributeId,
+                        ModifierTypeId = (EModifierType)se.ModifierType,
+                        Amount = se.Amount,
+                        DurationMs = se.DurationMs,
                     }).ToList(),
                 RetiredAt = entity.RetiredAt,
             };
@@ -51,6 +62,16 @@ namespace Game.DataAccess.Mapping
                         Amount = (double)sdm.Multiplier,
                         Type = EModifierType.Multiplicative,
                         Source = EAttributeModifierSource.Derived,
+                    }).ToList(),
+                Effects = (entity.SkillEffects ?? [])
+                    .Select(se => new CoreSkillEffect
+                    {
+                        Id = se.Id,
+                        Target = (ESkillEffectTarget)se.Target,
+                        AttributeId = (EAttribute)se.AttributeId,
+                        ModifierType = (EModifierType)se.ModifierType,
+                        Amount = (double)se.Amount,
+                        DurationMs = se.DurationMs,
                     }).ToList(),
             };
         }

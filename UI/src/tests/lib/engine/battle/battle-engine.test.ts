@@ -117,6 +117,7 @@ describe('BattleEngine', () => {
 			name: 'Slash',
 			baseDamage: 100,
 			damageMultipliers: [],
+			effects: [],
 			description: '',
 			cooldownMs: 500,
 			iconPath: ''

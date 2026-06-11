@@ -261,6 +261,7 @@ namespace Game.Core.Tests.Battle
                             Source = EAttributeModifierSource.Derived,
                         }
                     ],
+                Effects = [],
             };
 
         private static Battler MakeBattler(

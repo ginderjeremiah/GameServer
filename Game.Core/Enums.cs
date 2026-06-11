@@ -375,7 +375,29 @@ namespace Game.Core
         /// <summary>
         /// The modifier came from an item mod.
         /// </summary>
-        ItemMod = 6
+        ItemMod = 6,
+
+        /// <summary>
+        /// The modifier came from an active skill effect (a timed buff/debuff).
+        /// </summary>
+        SkillEffect = 7,
+    }
+
+    /// <summary>
+    /// Determines which battler a <see cref="SkillEffect"/> is applied to when its skill fires.
+    /// </summary>
+    [ClientMirrored]
+    public enum ESkillEffectTarget
+    {
+        /// <summary>
+        /// The effect is applied to the battler that used the skill.
+        /// </summary>
+        Self = 1,
+
+        /// <summary>
+        /// The effect is applied to the opposing battler.
+        /// </summary>
+        Opponent = 2,
     }
 
     /// <summary>
