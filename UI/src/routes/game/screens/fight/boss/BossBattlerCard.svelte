@@ -14,6 +14,8 @@
 
 	<BossHpBar currentHealth={battler.currentHealth} {maxHealth} />
 
+	<ActiveEffectChips {battler} reversed />
+
 	<div class="skills">
 		<Skills {battler} side="enemy" accent="var(--boss-accent)" />
 	</div>
@@ -22,6 +24,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
+import ActiveEffectChips from '../ActiveEffectChips.svelte';
 import Skills from '../Skills.svelte';
 import BossKicker from './BossKicker.svelte';
 import BossDiamond from './BossDiamond.svelte';

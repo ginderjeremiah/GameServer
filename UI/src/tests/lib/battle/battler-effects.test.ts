@@ -183,6 +183,63 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(foe.attributes.getValue(EAttribute.Strength)).toBe(17);
 	});
 
+	it('exposes a reactive view of active effects for the chips, populated from the authored effect', () => {
+		const battler = makeBattler();
+
+		battler.applyEffect(effect(7, EAttribute.Defense, EModifierType.Additive, 4, 1000));
+
+		expect(battler.activeEffects).toHaveLength(1);
+		expect(battler.activeEffects[0]).toEqual({
+			sourceId: 7,
+			attribute: EAttribute.Defense,
+			modifierType: EModifierType.Additive,
+			amount: 4,
+			durationMs: 1000,
+			remainingMs: 1000,
+			renderRemainingMs: 1000
+		});
+	});
+
+	it('refresh resets the view’s remaining (logical and render) without adding a second view', () => {
+		const battler = makeBattler();
+		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200);
+
+		battler.applyEffect(e);
+		battler.advanceEffects(40); // remaining 200 → 160
+		expect(battler.activeEffects[0].remainingMs).toBe(160);
+
+		battler.applyEffect(e); // refresh
+		expect(battler.activeEffects).toHaveLength(1);
+		expect(battler.activeEffects[0].remainingMs).toBe(200);
+		expect(battler.activeEffects[0].renderRemainingMs).toBe(200);
+	});
+
+	it('drops the view when its effect expires and clears all views on reset', () => {
+		const battler = makeBattler();
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5, 40));
+		expect(battler.activeEffects).toHaveLength(1);
+
+		battler.advanceEffects(40); // expires
+		expect(battler.activeEffects).toHaveLength(0);
+
+		battler.applyEffect(effect(2, EAttribute.Strength, EModifierType.Additive, 5, 1000));
+		battler.reset();
+		expect(battler.activeEffects).toHaveLength(0);
+	});
+
+	it('interpolates renderRemainingMs toward the next tick, clamped at zero', () => {
+		const battler = makeBattler();
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5, 1000));
+		battler.advanceEffects(40); // remainingMs 1000 → 960; renderRemainingMs untouched (still 1000)
+
+		battler.updateRenderEffects(10);
+		expect(battler.activeEffects[0].renderRemainingMs).toBe(950); // 960 - 10
+
+		// Render delta past the logical remaining clamps to 0 rather than going negative.
+		battler.updateRenderEffects(2000);
+		expect(battler.activeEffects[0].renderRemainingMs).toBe(0);
+	});
+
 	it('deals a skill’s damage before applying its self buff', () => {
 		// The shared battleStep is the single per-tick path; firing a Strength-scaling skill that also
 		// self-buffs Strength must hit for the pre-buff value, then leave the caster buffed for later hits.

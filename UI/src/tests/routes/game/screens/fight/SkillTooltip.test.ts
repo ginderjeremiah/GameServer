@@ -107,6 +107,50 @@ describe('SkillTooltip', () => {
 		expect(metrics.textContent).toContain('90');
 	});
 
+	it('renders an "On hit" effect line per authored effect, tinted by buff/debuff direction', async () => {
+		const { EModifierType, ESkillEffectTarget } = await import('$lib/api');
+		staticData.attributes[EAttribute.Strength] = { id: EAttribute.Strength, name: 'Strength', description: '' };
+		staticData.attributes[EAttribute.Defense] = { id: EAttribute.Defense, name: 'Defense', description: '' };
+		const skill = makeSkill(owner, {
+			name: 'Warcry',
+			effects: [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 5000
+				},
+				{
+					id: 2,
+					target: ESkillEffectTarget.Opponent,
+					attributeId: EAttribute.Defense,
+					modifierTypeId: EModifierType.Additive,
+					amount: -10,
+					durationMs: 3000
+				}
+			]
+		});
+		const { container, getByText } = render(SkillTooltip, { props: { skill } });
+
+		expect(getByText('On hit')).toBeTruthy();
+		const lines = container.querySelectorAll('.effect-line');
+		expect(lines).toHaveLength(2);
+		expect(lines[0].textContent).toContain('+15');
+		expect(lines[0].textContent).toContain('Strength');
+		expect(lines[0].textContent).toContain('self · 5s');
+		expect((lines[0].querySelector('.mag') as HTMLElement).style.color).toBe('var(--effect-buff)');
+		expect(lines[1].textContent).toContain('-10');
+		expect((lines[1].querySelector('.mag') as HTMLElement).style.color).toBe('var(--effect-debuff)');
+	});
+
+	it('omits the "On hit" section for a skill with no effects', () => {
+		const skill = makeSkill(owner, { effects: [] });
+		const { queryByText } = render(SkillTooltip, { props: { skill } });
+		expect(queryByText('On hit')).toBeNull();
+	});
+
 	it('reads READY for a fully-charged skill and a remaining time for one on cooldown', () => {
 		const ready = makeSkill(owner, { cooldownMs: 1000 });
 		ready.renderChargeTime = 1000; // fully charged

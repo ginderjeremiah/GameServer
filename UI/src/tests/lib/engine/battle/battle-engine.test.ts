@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ELogType } from '$lib/api';
+import { EAttribute, ELogType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
 
 // Callbacks captured from the mocked engine hooks. `onLogicalUpdate` emits a delta,
@@ -239,6 +239,49 @@ describe('BattleEngine', () => {
 			logicalUpdateCallbacks[0](200);
 
 			expect(engine.timeElapsed).toBe(300);
+		});
+	});
+
+	describe('renderUpdate', () => {
+		it('interpolates skill cooldowns and active-effect countdowns while Active', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			engine.player.applyEffect({
+				id: 1,
+				target: ESkillEffectTarget.Self,
+				attributeId: EAttribute.Strength,
+				modifierTypeId: EModifierType.Additive,
+				amount: 5,
+				durationMs: 1000
+			});
+
+			// The render hook is invoked with (renderDelta, logicalDelta); the engine interpolates off the
+			// logical delta — 200ms into the current tick depletes the 1000ms effect's render countdown to 800.
+			renderUpdateCallbacks[0](16, 200);
+
+			expect(engine.player.activeEffects[0].renderRemainingMs).toBe(800);
+			expect(engine.player.skills[0]?.renderChargeTime).toBeGreaterThan(0);
+		});
+
+		it('leaves render state untouched when not Active', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+			engine.player.applyEffect({
+				id: 1,
+				target: ESkillEffectTarget.Self,
+				attributeId: EAttribute.Strength,
+				modifierTypeId: EModifierType.Additive,
+				amount: 5,
+				durationMs: 1000
+			});
+			engine.pause();
+
+			renderUpdateCallbacks[0](16, 200);
+
+			expect(engine.player.activeEffects[0].renderRemainingMs).toBe(1000);
 		});
 	});
 
