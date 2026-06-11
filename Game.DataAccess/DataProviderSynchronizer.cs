@@ -26,10 +26,9 @@ namespace Game.DataAccess
             _retryPolicy = retryPolicy;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            _ = InitSubscriber();
-            return Task.CompletedTask;
+            await InitSubscriber();
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
