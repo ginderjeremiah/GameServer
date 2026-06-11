@@ -187,8 +187,8 @@ namespace Game.DataAccess
                     await HandleLogPreferenceChanged(context, logEvt);
                     break;
 
-                    // PlayerLeveledUpEvent is handled in-process only — it has no persistence
-                    // handler registered, so it is never published to this queue.
+                // PlayerLeveledUpEvent is handled in-process only — it has no persistence
+                // handler registered, so it is never published to this queue.
 
                 default:
                     throw new UnknownEventTypeException(envelope.Type);
