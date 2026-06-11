@@ -74,6 +74,48 @@ namespace Game.TestInfrastructure.Helpers
         }
 
         /// <summary>
+        /// Sends a command without reading its response. Use when the test cares about a later
+        /// server-pushed message rather than the command's own reply, so that reply isn't consumed by an
+        /// Id match (which would race the push).
+        /// </summary>
+        public async Task SendCommandNoWaitAsync(string commandName, object? parameters = null)
+        {
+            var commandInfo = new SocketCommandInfo(commandName)
+            {
+                Id = Guid.NewGuid().ToString(),
+                Parameters = parameters?.Serialize(),
+            };
+
+            var json = commandInfo.Serialize();
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token);
+        }
+
+        /// <summary>
+        /// Reads until a message whose <c>Name</c> matches arrives (skipping any others, e.g. a different
+        /// command's response), for server-pushed commands that carry no request Id to match on. Returns
+        /// the push with its typed data so the payload can be asserted.
+        /// </summary>
+        public async Task<ApiSocketResponse<TResponse>> WaitForCommandAsync<TResponse>(string commandName)
+        {
+            while (true)
+            {
+                var message = await ReadMessageAsync();
+                if (message == "ping")
+                {
+                    await SendPongAsync();
+                    continue;
+                }
+
+                var response = message.Deserialize<ApiSocketResponse<TResponse>>();
+                if (response is not null && response.Name == commandName)
+                {
+                    return response;
+                }
+            }
+        }
+
+        /// <summary>
         /// Reads from the socket until a response with the given ID arrives, without sending anything.
         /// Use this when a command is emitted through a server-side path (e.g. pub/sub) rather than
         /// directly from the client.

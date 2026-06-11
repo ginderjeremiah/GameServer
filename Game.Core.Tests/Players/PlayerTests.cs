@@ -212,6 +212,60 @@ namespace Game.Core.Tests.Players
             Assert.Single(player.Skills);
         }
 
+        // ── CompleteChallenge ────────────────────────────────────────────────
+
+        [Fact]
+        public void CompleteChallenge_UnlocksEveryRewardKind()
+        {
+            var player = MakePlayer();
+            var item = MakeItem(id: 10);
+            var skill = MakeSkill(id: 7);
+
+            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5, rewardSkill: skill);
+
+            Assert.Contains(player.Inventory.UnlockedItems, u => u.Item == item);
+            Assert.Contains(5, player.Inventory.UnlockedMods);
+            Assert.Contains(player.Skills, s => s.Id == 7);
+            // A reward skill is unlocked unselected — completing a challenge never equips it.
+            Assert.DoesNotContain(player.SelectedSkills, s => s.Id == 7);
+        }
+
+        [Fact]
+        public void CompleteChallenge_RaisesChallengeCompletedEventWithRewardIds()
+        {
+            var player = MakePlayer();
+
+            player.CompleteChallenge(challengeId: 3, rewardItem: MakeItem(id: 10), rewardItemModId: 5, rewardSkill: MakeSkill(id: 7));
+
+            var evt = player.DomainEvents.OfType<ChallengeCompletedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(3, evt.ChallengeId);
+            Assert.Equal(10, evt.RewardItemId);
+            Assert.Equal(5, evt.RewardItemModId);
+            Assert.Equal(7, evt.RewardSkillId);
+        }
+
+        [Fact]
+        public void CompleteChallenge_NoRewards_UnlocksNothingButStillRaisesEvent()
+        {
+            var player = MakePlayer();
+
+            player.CompleteChallenge(challengeId: 3, rewardItem: null, rewardItemModId: null, rewardSkill: null);
+
+            Assert.Empty(player.Inventory.UnlockedItems);
+            Assert.Empty(player.Inventory.UnlockedMods);
+            Assert.Empty(player.Skills);
+            // The completion is still announced (e.g. a zone-gating challenge with no item reward) with
+            // all reward ids null.
+            var evt = player.DomainEvents.OfType<ChallengeCompletedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(3, evt.ChallengeId);
+            Assert.Null(evt.RewardItemId);
+            Assert.Null(evt.RewardItemModId);
+            Assert.Null(evt.RewardSkillId);
+        }
+
         // ── TrySetSelectedSkills ─────────────────────────────────────────────
 
         [Fact]

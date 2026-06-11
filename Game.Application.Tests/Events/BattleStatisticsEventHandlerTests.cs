@@ -4,6 +4,7 @@ using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
 using Game.Core.Players;
+using Game.Core.Players.Events;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -85,6 +86,23 @@ namespace Game.Application.Tests.Events
             Assert.Contains(setup.ModId, player.Inventory.UnlockedMods);
             Assert.Contains(player.Skills, s => s.Id == setup.RewardSkillId);
             Assert.DoesNotContain(player.SelectedSkills, s => s.Id == setup.RewardSkillId);
+        }
+
+        [Fact]
+        public async Task CompletingChallenge_RaisesChallengeCompletedEventWithRewardIds()
+        {
+            using var scope = CreateScope();
+            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: true, skillReward: true);
+
+            var player = await CompleteChallengeVictoryAsync(scope, setup);
+
+            // The completion is announced for the client push, carrying every reward id it unlocked so the
+            // client can make them usable immediately.
+            var evt = Assert.Single(player.DomainEvents.OfType<ChallengeCompletedEvent>());
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(setup.ItemId, evt.RewardItemId);
+            Assert.Equal(setup.ModId, evt.RewardItemModId);
+            Assert.Equal(setup.RewardSkillId, evt.RewardSkillId);
         }
 
         [Fact]

@@ -139,6 +139,37 @@ describe('PlayerManager', () => {
 		});
 	});
 
+	describe('addUnlockedSkill', () => {
+		it('adds the skill to the unlocked set unselected and logs it', () => {
+			manager.initialize(makePlayerData({ unlockedSkills: [{ skillId: 0, selected: true, order: 0 }] }));
+
+			manager.addUnlockedSkill(5);
+
+			expect(manager.unlockedSkills).toContainEqual({ skillId: 5, selected: false });
+			// Earning a skill does not equip it.
+			expect(manager.selectedSkills).not.toContain(5);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'New skill unlocked!');
+		});
+
+		it('reassigns the array so reactive consumers re-derive', () => {
+			manager.initialize(makePlayerData({ unlockedSkills: [] }));
+			const before = manager.unlockedSkills;
+
+			manager.addUnlockedSkill(5);
+
+			expect(manager.unlockedSkills).not.toBe(before);
+		});
+
+		it('is idempotent — an already-unlocked skill is not duplicated', () => {
+			manager.initialize(makePlayerData({ unlockedSkills: [{ skillId: 5, selected: false }] }));
+
+			manager.addUnlockedSkill(5);
+
+			expect(manager.unlockedSkills.filter((s) => s.skillId === 5)).toHaveLength(1);
+			expect(logMessage).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('default state', () => {
 		it('starts with empty defaults before initialization', () => {
 			expect(manager.name).toBe('');

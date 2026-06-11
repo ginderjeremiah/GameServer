@@ -8,7 +8,8 @@ import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
 import { staticData, statistics, playerChallenges, acknowledgeModal } from '$stores';
-import { apiSocket } from '$lib/api';
+import { apiSocket, type IApiSocketResponse } from '$lib/api';
+import { playerManager } from './player/player-manager';
 
 export const inventoryManager = statify(new InventoryManager());
 export const enemyManager = statify(new EnemyManager());
@@ -34,6 +35,37 @@ export const startGame = () => {
 		startRenderEngine();
 		startBattleEngine();
 		apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
+		apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
+	}
+};
+
+/**
+ * Applies a completed-challenge push from the server: marks the challenge complete (so completion-gated
+ * UI like zone navigation and the reward reveal update without a refetch) and unlocks each reward it
+ * carries so the player can use it immediately — equip the item/mod, select the skill — instead of only
+ * after a page refresh.
+ */
+export const handleChallengeCompleted = (response: IApiSocketResponse<'ChallengeCompleted'>) => {
+	const data = response.data;
+	if (!data) {
+		return;
+	}
+
+	playerChallenges.markCompleted(data.challengeId);
+
+	if (data.rewardItemId != null) {
+		inventoryManager.addUnlockedItem({
+			itemId: data.rewardItemId,
+			equipped: false,
+			favorite: false,
+			appliedMods: []
+		});
+	}
+	if (data.rewardItemModId != null) {
+		inventoryManager.addUnlockedMod(data.rewardItemModId);
+	}
+	if (data.rewardSkillId != null) {
+		playerManager.addUnlockedSkill(data.rewardSkillId);
 	}
 };
 

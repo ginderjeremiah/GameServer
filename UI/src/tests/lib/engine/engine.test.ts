@@ -15,7 +15,7 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 const { staticDataStub, statisticsStub, playerChallengesStub } = vi.hoisted(() => ({
 	staticDataStub: { loaded: true },
 	statisticsStub: { load: vi.fn(), reset: vi.fn() },
-	playerChallengesStub: { load: vi.fn(), reset: vi.fn() }
+	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() }
 }));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
@@ -63,12 +63,18 @@ vi.mock('$lib/engine/battle/battle-engine', () => ({
 vi.mock('$lib/engine/player/inventory-manager', () => ({
 	InventoryManager: class {
 		initialize = vi.fn();
+		addUnlockedItem = vi.fn();
+		addUnlockedMod = vi.fn();
 	}
 }));
+
+const { addUnlockedSkill } = vi.hoisted(() => ({ addUnlockedSkill: vi.fn() }));
+vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: { addUnlockedSkill } }));
 
 import {
 	startGame,
 	handleSocketReplaced,
+	handleChallengeCompleted,
 	SESSION_REPLACED_TITLE,
 	SESSION_REPLACED_BODY,
 	logicEngine,
@@ -78,6 +84,13 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
+import type { IApiSocketResponse } from '$lib/api';
+
+/** Builds a ChallengeCompleted push response with the given reward ids (defaults: no rewards). */
+const challengeCompletedResponse = (
+	data: Partial<IApiSocketResponse<'ChallengeCompleted'>['data']> & { challengeId: number }
+): IApiSocketResponse<'ChallengeCompleted'> =>
+	({ id: '', name: 'ChallengeCompleted', data }) as IApiSocketResponse<'ChallengeCompleted'>;
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -130,6 +143,7 @@ describe('startGame', () => {
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
 		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
+		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
 	});
 
 	it('does nothing when the static data is not loaded', () => {
@@ -149,5 +163,56 @@ describe('startGame', () => {
 
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
 		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
+	});
+});
+
+describe('handleChallengeCompleted', () => {
+	it('marks the challenge completed so completion-gated UI updates without a refetch', () => {
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7 }));
+
+		expect(playerChallengesStub.markCompleted).toHaveBeenCalledWith(7);
+	});
+
+	it('unlocks an item reward so it can be equipped immediately', () => {
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardItemId: 3 }));
+
+		expect(inventoryManager.addUnlockedItem).toHaveBeenCalledWith({
+			itemId: 3,
+			equipped: false,
+			favorite: false,
+			appliedMods: []
+		});
+		expect(inventoryManager.addUnlockedMod).not.toHaveBeenCalled();
+		expect(addUnlockedSkill).not.toHaveBeenCalled();
+	});
+
+	it('unlocks a mod reward', () => {
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardItemModId: 5 }));
+
+		expect(inventoryManager.addUnlockedMod).toHaveBeenCalledWith(5);
+		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
+	});
+
+	it('unlocks a skill reward', () => {
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardSkillId: 9 }));
+
+		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
+	});
+
+	it('unlocks every reward kind a single challenge carries', () => {
+		handleChallengeCompleted(
+			challengeCompletedResponse({ challengeId: 7, rewardItemId: 3, rewardItemModId: 5, rewardSkillId: 9 })
+		);
+
+		expect(inventoryManager.addUnlockedItem).toHaveBeenCalledTimes(1);
+		expect(inventoryManager.addUnlockedMod).toHaveBeenCalledWith(5);
+		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
+	});
+
+	it('does nothing when the push carries no data', () => {
+		handleChallengeCompleted({ id: '', name: 'ChallengeCompleted' } as IApiSocketResponse<'ChallengeCompleted'>);
+
+		expect(playerChallengesStub.markCompleted).not.toHaveBeenCalled();
+		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
 	});
 });

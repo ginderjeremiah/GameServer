@@ -31,20 +31,11 @@ namespace Game.Application.Events
                 var player = domainEvent.Player;
                 foreach (var c in completed)
                 {
-                    if (c.RewardItemId.HasValue)
-                    {
-                        var item = _items.GetItem(c.RewardItemId.Value);
-                        player.UnlockItem(item);
-                    }
-                    if (c.RewardItemModId.HasValue)
-                    {
-                        player.UnlockMod(c.RewardItemModId.Value);
-                    }
-                    if (c.RewardSkillId.HasValue)
-                    {
-                        var skill = _skills.GetSkill(c.RewardSkillId.Value);
-                        player.UnlockSkill(skill);
-                    }
+                    // Resolve the reward reference data here (the data-access concern) and let the domain
+                    // own the rest: unlocking each reward and raising the ChallengeCompletedEvent.
+                    var rewardItem = c.RewardItemId.HasValue ? _items.GetItem(c.RewardItemId.Value) : null;
+                    var rewardSkill = c.RewardSkillId.HasValue ? _skills.GetSkill(c.RewardSkillId.Value) : null;
+                    player.CompleteChallenge(c.ChallengeId, rewardItem, c.RewardItemModId, rewardSkill);
                 }
             }
 

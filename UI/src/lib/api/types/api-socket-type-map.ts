@@ -6,6 +6,7 @@ import type {
 	IBattleLostResponse,
 	IChallenge,
 	IChallengeBossRequest,
+	IChallengeCompletedModel,
 	IChallengeType,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
@@ -25,6 +26,7 @@ import type {
 export type ApiSocketResponseTypes = {
 	'BattleLost': IBattleLostResponse;
 	'ChallengeBoss': INewEnemyModel;
+	'ChallengeCompleted': IChallengeCompletedModel;
 	'DefeatEnemy': IDefeatEnemyResponse;
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];

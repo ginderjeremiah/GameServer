@@ -99,6 +99,32 @@ namespace Game.Core.Players
         }
 
         /// <summary>
+        /// Completes a challenge for the player: unlocks each reward the challenge carries (item, mod,
+        /// and/or skill — any of which may be absent) and raises a single <see cref="ChallengeCompletedEvent"/>
+        /// describing the completion and what it unlocked. Consolidates the per-challenge reward
+        /// orchestration in the domain so the application layer only has to resolve the reward reference
+        /// data and hand it over.
+        /// </summary>
+        public void CompleteChallenge(int challengeId, Item? rewardItem, int? rewardItemModId, Skill? rewardSkill)
+        {
+            if (rewardItem is not null)
+            {
+                UnlockItem(rewardItem);
+            }
+            if (rewardItemModId.HasValue)
+            {
+                UnlockMod(rewardItemModId.Value);
+            }
+            if (rewardSkill is not null)
+            {
+                UnlockSkill(rewardSkill);
+            }
+
+            RaiseEvent(new ChallengeCompletedEvent(
+                Id, challengeId, rewardItem?.Id, rewardItemModId, rewardSkill?.Id));
+        }
+
+        /// <summary>
         /// Replaces the player's equipped skill loadout with <paramref name="orderedSkillIds"/> in the
         /// given order, handling select, deselect, and reorder through one atomic path. Enforces the
         /// loadout rules as anti-cheat: the set must contain no duplicates, fit within
