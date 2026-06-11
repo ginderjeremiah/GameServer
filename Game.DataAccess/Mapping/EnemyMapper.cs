@@ -49,14 +49,14 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 IsBoss = entity.IsBoss,
                 Level = level,
-                AttributeDistributions = (entity.AttributeDistributions ?? [])
+                AttributeDistributions = entity.AttributeDistributions
                     .Select(ad => new AttributeDistribution
                     {
                         AttributeId = (EAttribute)ad.AttributeId,
                         BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
-                AvailableSkills = (entity.EnemySkills ?? [])
+                AvailableSkills = entity.EnemySkills
                     .Where(es => skillLookup.ContainsKey(es.SkillId))
                     .Select(es => SkillMapper.ToCore(skillLookup[es.SkillId]))
                     .ToList(),

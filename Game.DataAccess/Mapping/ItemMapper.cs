@@ -18,7 +18,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description ?? string.Empty,
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
-                Attributes = (entity.ItemAttributes ?? [])
+                Attributes = entity.ItemAttributes
                     .Select(ia => new AttributeModifier
                     {
                         Attribute = (EAttribute)ia.AttributeId,
@@ -26,7 +26,7 @@ namespace Game.DataAccess.Mapping
                         Type = EModifierType.Additive,
                         Source = EAttributeModifierSource.Item,
                     }).ToList(),
-                ModSlots = (entity.ItemModSlots ?? [])
+                ModSlots = entity.ItemModSlots
                     .Select(ims => new ItemModSlot
                     {
                         Id = ims.Id,
@@ -46,7 +46,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description ?? string.Empty,
                 Type = (EItemModType)entity.ItemModTypeId,
                 Rarity = (ERarity)entity.RarityId,
-                Attributes = (entity.ItemModAttributes ?? [])
+                Attributes = entity.ItemModAttributes
                     .Select(ima => new AttributeModifier
                     {
                         Attribute = (EAttribute)ima.AttributeId,
