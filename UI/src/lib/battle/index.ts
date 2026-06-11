@@ -1,4 +1,5 @@
 export * from './battler.ts';
+export * from './battle-formulas';
 export * from './battle-step';
 export * from './battle-simulator';
 export * from './battle-attributes';

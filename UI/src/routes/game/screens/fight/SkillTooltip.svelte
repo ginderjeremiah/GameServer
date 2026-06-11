@@ -17,8 +17,8 @@
 </TooltipShell>
 
 <script lang="ts">
-import { EAttribute, type IAttributeMultiplier } from '$lib/api';
-import { type Skill } from '$lib/battle';
+import { EAttribute } from '$lib/api';
+import { applyDefense, skillContributions, type Skill } from '$lib/battle';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -44,25 +44,21 @@ const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) :
 
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(
-	(skill?.damageMultipliers ?? []).map((mult) => ({
-		name: attributeName(mult.attributeId),
-		multiplier: mult.multiplier,
-		value: getMultiplier(mult)
+	(skill ? skillContributions(skill, skill.owner.attributes) : []).map((contribution) => ({
+		name: attributeName(contribution.attributeId),
+		multiplier: contribution.multiplier,
+		value: contribution.value
 	}))
 );
-const totalDamage = $derived(baseDamage + multipliers.reduce((a, b) => a + b.value, 0));
+const totalDamage = $derived(skill?.calculateDamage() ?? 0);
 const enemyDefense = $derived(opponent?.attributes.getValue(EAttribute.Defense) ?? 0);
-const total = $derived(Math.max(totalDamage - enemyDefense, 0));
+const total = $derived(applyDefense(totalDamage, enemyDefense));
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
 const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
 const remainingCd = $derived(Math.max(adjustedCd - (skill?.renderChargeTime ?? 0) / 1000 / cdMultiplier, 0));
 const isReady = $derived(remainingCd <= 0.01);
 const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - remainingCd) / adjustedCd) * 100));
 const remainingCdFormatted = $derived(remainingCd.toFixed(2));
-
-const getMultiplier = (mult: IAttributeMultiplier) => {
-	return (skill?.owner.attributes.getValue(mult.attributeId) ?? 0) * mult.multiplier;
-};
 
 const attributeName = (attrId: number) => {
 	return staticData.attributes?.[attrId]?.name ?? EAttribute[attrId] ?? 'Unknown';

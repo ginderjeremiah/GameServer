@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
-import type { BattleAttributes } from '$lib/battle';
 
 // Engine + stores are mocked so importing the view-model doesn't drag in the real
 // game engine. `playerManager.unlockedSkills` is a plain writable array (the view
@@ -50,10 +49,7 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 
 import {
 	SkillsView,
-	effectiveDamage,
 	damagePerSecond,
-	skillRawDamage,
-	skillContributions,
 	sortMetrics,
 	zoneSpawnLevel,
 	enemyDefense,
@@ -71,10 +67,6 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	iconPath: '',
 	...over
 });
-
-/** A fake `BattleAttributes` that returns canned values per attribute id. */
-const fakeAttributes = (values: Partial<Record<EAttribute, number>>): BattleAttributes =>
-	({ getValue: (id: EAttribute) => values[id] ?? 0 }) as unknown as BattleAttributes;
 
 const metric = (over: Partial<SkillMetrics> & { skill: ISkill }): SkillMetrics => ({
 	unlocked: true,
@@ -200,39 +192,13 @@ beforeEach(() => {
 	view = new SkillsView();
 });
 
+/* The raw-damage / defense-subtraction / cooldown-multiplier formulas are the shared battle
+   formulas (`$lib/battle/battle-formulas`), unit-tested in `tests/lib/battle/battle-formulas.test.ts`;
+   here only the page-local helpers and the view's consumption of the shared ones are covered. */
 describe('pure helpers', () => {
-	it('clamps effective damage at zero', () => {
-		expect(effectiveDamage(30, 10)).toBe(20);
-		expect(effectiveDamage(10, 40)).toBe(0);
-	});
-
 	it('returns zero dps for a non-positive cooldown', () => {
 		expect(damagePerSecond(50, 2)).toBe(25);
 		expect(damagePerSecond(50, 0)).toBe(0);
-	});
-
-	it('computes raw damage as base plus each attribute contribution', () => {
-		const s = skill({
-			id: 9,
-			baseDamage: 10,
-			damageMultipliers: [
-				{ attributeId: EAttribute.Strength, multiplier: 2 },
-				{ attributeId: EAttribute.Luck, multiplier: 0.5 }
-			]
-		});
-		const attrs = fakeAttributes({ [EAttribute.Strength]: 20, [EAttribute.Luck]: 8 });
-		// 10 + 20*2 + 8*0.5 = 54
-		expect(skillRawDamage(s, attrs)).toBe(54);
-	});
-
-	it('breaks down per-attribute contributions', () => {
-		const s = skill({
-			id: 9,
-			baseDamage: 10,
-			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }]
-		});
-		const attrs = fakeAttributes({ [EAttribute.Strength]: 20 });
-		expect(skillContributions(s, attrs)).toEqual([{ attributeId: EAttribute.Strength, multiplier: 2, value: 40 }]);
 	});
 
 	it('sorts by name, ascending cooldown, and defense-aware dps/damage', () => {
@@ -273,6 +239,18 @@ describe('SkillsView — initial state', () => {
 
 	it('exposes the skill catalogue defense ceiling for the slider', () => {
 		expect(view.maxDamage).toBe(100); // skill 4 base damage
+	});
+
+	it('resolves metrics through the shared battle formulas and the derived attribute composition', () => {
+		// Strength feeds Alpha's 1× multiplier directly; Agility derives CooldownRecovery (0.4/pt).
+		mockPlayerManager.attributes = [
+			{ attributeId: EAttribute.Strength, amount: 20 },
+			{ attributeId: EAttribute.Agility, amount: 10 }
+		];
+		const fresh = new SkillsView();
+		expect(fresh.rawDamage(0)).toBe(32); // 12 base + 20·1
+		expect(fresh.cooldown(0)).toBeCloseTo(1 / 1.04, 10); // 1s / (1 + 4 CDR / 100)
+		expect(fresh.metric(0)?.contributions).toEqual([{ attributeId: EAttribute.Strength, multiplier: 1, value: 20 }]);
 	});
 });
 

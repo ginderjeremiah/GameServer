@@ -7,16 +7,23 @@
    through the single `SetSelectedSkills` socket command (mirroring how the backend
    models the loadout as one atomic set — see docs/spikes/179).
 
-   IMPORTANT: the display formulas here **mirror** the battle's (`Skill.calculateDamage`,
-   `Battler.takeDamage`'s defense subtraction, `Battler.cdMultiplier`) rather than calling
-   them — a deliberate display-only copy, with no parity guard, tracked for consolidation
-   onto one shared source in #347. They read attribute values from the same `BattleAttributes`
-   the simulation uses (player allocation + equipped item/mod stats), so today the numbers
-   the page shows match what the game actually fights with. */
+   The display numbers come straight from the shared pure battle formulas
+   (`$lib/battle/battle-formulas` — the same functions `Skill.calculateDamage`,
+   `Battler.takeDamage` and `Battler.cdMultiplier` delegate to), computed against the same
+   `BattleAttributes` composition the simulation uses (player allocation + equipped
+   item/mod stats), so the page shows what the game actually fights with by
+   construction (#347). */
 
 import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
-import { BattleAttributes } from '$lib/battle';
+import {
+	BattleAttributes,
+	applyDefense,
+	calculateSkillDamage,
+	cooldownMultiplier,
+	skillContributions,
+	type SkillContribution
+} from '$lib/battle';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -39,13 +46,6 @@ export const FILTERABLE_ATTRIBUTES: EAttribute[] = [
 	EAttribute.Dexterity,
 	EAttribute.Luck
 ];
-
-/** One attribute's contribution to a skill's raw damage. */
-export interface SkillContribution {
-	attributeId: EAttribute;
-	multiplier: number;
-	value: number;
-}
 
 /** Everything the page needs to render and rank one skill — defense-independent
  *  (effective values are derived per-render from the live Compare-vs defense). */
@@ -76,31 +76,8 @@ export interface ComparePreset {
 
 /* ── pure helpers (no reactive state — unit-tested directly) ───────────────── */
 
-/** Effective damage after subtracting flat enemy defense (never below zero —
- *  matching the battle's `max(damage - defense, 0)`). */
-export const effectiveDamage = (rawDamage: number, defense: number): number => Math.max(rawDamage - defense, 0);
-
 /** Damage per second for a damage value over a cooldown (0 for a non-positive cooldown). */
 export const damagePerSecond = (damage: number, cooldown: number): number => (cooldown > 0 ? damage / cooldown : 0);
-
-/** Raw damage of a skill given the resolved battle attributes: base plus each
- *  multiplier applied to the attribute it scales (mirrors the battle `Skill.calculateDamage`). */
-export function skillRawDamage(skill: ISkill, attributes: BattleAttributes): number {
-	let damage = skill.baseDamage;
-	for (const mult of skill.damageMultipliers) {
-		damage += attributes.getValue(mult.attributeId) * mult.multiplier;
-	}
-	return damage;
-}
-
-/** Per-attribute breakdown of a skill's scaling at the given attributes. */
-export function skillContributions(skill: ISkill, attributes: BattleAttributes): SkillContribution[] {
-	return skill.damageMultipliers.map((mult) => ({
-		attributeId: mult.attributeId,
-		multiplier: mult.multiplier,
-		value: attributes.getValue(mult.attributeId) * mult.multiplier
-	}));
-}
 
 /** Comparator over `SkillMetrics` for the given sort + Compare-vs defense.
  *  DPS/Damage rank by *effective* value (defense-aware), descending. */
@@ -111,12 +88,12 @@ export function sortMetrics(sort: SkillSort, defense: number): (a: SkillMetrics,
 		case 'cd':
 			return (a, b) => a.cooldown - b.cooldown;
 		case 'dmg':
-			return (a, b) => effectiveDamage(b.rawDamage, defense) - effectiveDamage(a.rawDamage, defense);
+			return (a, b) => applyDefense(b.rawDamage, defense) - applyDefense(a.rawDamage, defense);
 		case 'dps':
 		default:
 			return (a, b) =>
-				damagePerSecond(effectiveDamage(b.rawDamage, defense), b.cooldown) -
-				damagePerSecond(effectiveDamage(a.rawDamage, defense), a.cooldown);
+				damagePerSecond(applyDefense(b.rawDamage, defense), b.cooldown) -
+				damagePerSecond(applyDefense(a.rawDamage, defense), a.cooldown);
 	}
 }
 
@@ -195,14 +172,14 @@ export class SkillsView {
 	 *  wholesale when attributes/equipment change — read via {@link metric}. */
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
-		const cdMultiplier = 1 + attrs.getValue(EAttribute.CooldownRecovery) / 100;
+		const cdMultiplier = cooldownMultiplier(attrs);
 		const challenges = staticData.challenges ?? [];
 		const byId: Record<number, SkillMetrics> = {};
 		for (const skill of this.catalogue) {
 			byId[skill.id] = {
 				skill,
 				unlocked: this.unlockedIds.includes(skill.id),
-				rawDamage: skillRawDamage(skill, attrs),
+				rawDamage: calculateSkillDamage(skill, attrs),
 				cooldown: cdMultiplier > 0 ? skill.cooldownMs / 1000 / cdMultiplier : skill.cooldownMs / 1000,
 				contributions: skillContributions(skill, attrs),
 				source: challenges.find((c) => c.rewardSkillId === skill.id)
@@ -322,7 +299,7 @@ export class SkillsView {
 	}
 
 	effective(id: number): number {
-		return effectiveDamage(this.rawDamage(id), this.defense);
+		return applyDefense(this.rawDamage(id), this.defense);
 	}
 
 	effectiveDps(id: number): number {
