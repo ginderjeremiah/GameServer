@@ -210,32 +210,28 @@ describe('InventoryManager', () => {
 		});
 	});
 
-	describe('selectItem', () => {
-		it('updates the selected item id', () => {
+	describe('items (reactive published list)', () => {
+		it('mirrors unlockedItemList and republishes a new array reference on mutation', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
 
-			manager.selectItem(1);
+			expect(manager.items).toBe(manager.unlockedItemList);
+			expect(manager.items.map((i) => i.itemId)).toEqual([1]);
 
-			expect(manager.selectedItemId).toBe(1);
-			expect(manager.selectedItem?.itemId).toBe(1);
-		});
-	});
-
-	describe('selectedItem', () => {
-		it('returns undefined when no item selected', () => {
-			expect(manager.selectedItem).toBeUndefined();
+			const before = manager.items;
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			// A mutation publishes a fresh array reference so reactive consumers re-derive.
+			expect(manager.items).not.toBe(before);
 		});
 
-		it('returns the selected item', () => {
-			mockItems[1] = makeItem(1);
-			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
+		it('publishes a newly unlocked item into the list', () => {
+			mockItems[3] = makeItem(3);
 			manager.initialize();
 
-			manager.selectItem(1);
-			expect(manager.selectedItem).toBeDefined();
-			expect(manager.selectedItem?.itemId).toBe(1);
+			manager.addUnlockedItem(makeInventoryItem({ itemId: 3 }));
+
+			expect(manager.items.map((i) => i.itemId)).toEqual([3]);
 		});
 	});
 
@@ -308,6 +304,26 @@ describe('InventoryManager', () => {
 			const result = await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 
 			expect(result).toBe(false);
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
+		});
+
+		it('applies the change optimistically before the persist resolves, then rolls back on error', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+
+			let resolvePost: (value: { error?: string }) => void = () => {};
+			mockPost.mockReturnValue(new Promise((resolve) => (resolvePost = resolve)));
+
+			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			// Optimistically equipped while the persist is still in flight.
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+
+			resolvePost({ error: 'nope' });
+			await pending;
+
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
 		});

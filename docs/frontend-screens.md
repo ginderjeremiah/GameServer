@@ -2,6 +2,16 @@
 
 This document collects the per-screen design decisions for the in-game screens and the boot flow. It is split out from [frontend.md](./frontend.md) (which covers the cross-cutting frontend architecture — auth, reference data, the Workbench, theming, toasts) so that the main doc stays focused. The decisions below are feature-specific; the cross-cutting patterns they build on (the reactive view-model pattern, themeable accent variables, the empty-vs-error/toast rule) are documented in `frontend.md`.
 
+## Inventory screen (gear & mods)
+
+The in-game Inventory screen (`src/routes/game/screens/inventory`) is the gear/mod loadout: an equipped rail, a filterable/sortable item grid, an equipped-totals panel, and a detail drawer for inspecting/modding an item.
+
+Key decisions and rationale:
+
+- **The `InventoryManager` is the single source of truth and the single mutation path.** `InventoryView` (`inventory-view.svelte.ts`) holds only UI state (sort/filter/selection/drag/page) and reads the authoritative item data **through** the manager's reactive `items` / `equippedSlots` / `equipmentStats`, delegating every action (equip, unequip, apply/remove mod, favorite) to it. It does **not** keep its own shallow copies or re-implement the manager's mutation logic — the earlier copy-and-mirror approach (#352) was two parallel sources kept in hand-sync, which is exactly the divergence #342 hit. The manager owns the item objects; the view is a pure projection.
+- **Optimistic apply with rollback.** Each manager mutation applies to the authoritative item/slot state synchronously (so the UI updates instantly), then persists; a failed persist rolls the change back to the captured prior state so the local state can never diverge from what was saved. (Favorite is the one exception — a low-stakes flag kept optimistically and re-synced on the next toggle/reload rather than rolled back.)
+- **Reactivity without making the items reactive.** `Item`s stay plain objects (they carry a display-only `BattleAttributes`, which must not become a reactive proxy — see [frontend.md](./frontend.md) → _Battle simulation & parity_). Instead the `statify`-reactive manager **republishes** a fresh `items` array (and re-references `equippedSlots`) on every mutation; that reassignment is the reactivity signal the view's `$derived` getters depend on, so in-place item-field edits surface without deep item reactivity and without touching the battle hot path (which still reads `equipmentStats` only).
+
 ## Challenge screen (the Type Rail)
 
 The in-game Challenges screen (`src/routes/game/screens/challenges`) is a **type-driven master/detail** view: a left rail lists each `ChallengeType` (ring meter + done/total) plus an "Overview" entry; selecting a type swaps the right pane to a hero banner + that type's challenge cards with an in-page Progress/Rarity/Name sort, while "Overview" shows overall progress, a pulsing "next up" reward, and a per-type grid. It reuses the existing screen chrome (dark frame, diamond mark, Geist/Geist Mono) and is decomposed into many small components per the component-size guideline.

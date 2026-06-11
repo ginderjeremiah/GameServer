@@ -25,8 +25,12 @@ export class InventoryManager {
 	/** The 6 equipment slots — index matches EEquipmentSlot. */
 	public equippedSlots: (Item | undefined)[] = new Array(6).fill(undefined);
 
-	/** Currently selected item (for mod customization panel). */
-	public selectedItemId: number | undefined;
+	/**
+	 * Reactive published view of `unlockedItems`. The manager is the single owner of the item
+	 * objects and the only place they are mutated; this snapshot is republished (`publish`) on every
+	 * change so reactive consumers (the inventory screen) re-derive without keeping their own copies.
+	 */
+	public items: Item[] = [];
 
 	public initialize() {
 		this.unlockedItems.clear();
@@ -50,10 +54,12 @@ export class InventoryManager {
 				this.equippedSlots[invItem.equipmentSlotId] = item;
 			}
 		}
+
+		this.publish();
 	}
 
 	public get unlockedItemList(): Item[] {
-		return [...this.unlockedItems.values()];
+		return this.items;
 	}
 
 	/** Computes combined attributes from all equipped items and their applied mods. */
@@ -70,30 +76,146 @@ export class InventoryManager {
 		return stats;
 	}
 
-	public get selectedItem(): Item | undefined {
-		return this.selectedItemId != null ? this.unlockedItems.get(this.selectedItemId) : undefined;
-	}
-
-	public selectItem(itemId: number) {
-		this.selectedItemId = itemId;
-	}
-
 	public async equipItem(itemId: number, slotId: EEquipmentSlot) {
 		const item = this.unlockedItems.get(itemId);
 		if (!item) {
 			return false;
 		}
 
+		// Apply optimistically (instant UI), then persist; a failed persist rolls the change back so
+		// the authoritative state can never diverge from what was actually saved.
+		const rollback = this.snapshotEquipped(item, this.equippedSlots[slotId]);
+		this.applyEquip(item, slotId);
+		this.publish();
+
 		const req = new ApiRequest('Player/EquipItem');
 		const response = await req.post({ itemId, equipmentSlotId: slotId });
 		if (response.error) {
+			rollback();
+			this.publish();
 			return false;
 		}
 
+		return true;
+	}
+
+	public async unequipItem(slotId: EEquipmentSlot) {
+		const item = this.equippedSlots[slotId];
+		if (!item) {
+			return false;
+		}
+
+		const rollback = this.snapshotEquipped(item);
+		item.equipped = false;
+		item.equipmentSlotId = undefined;
+		this.equippedSlots[slotId] = undefined;
+		this.publish();
+
+		const req = new ApiRequest('Player/UnequipItem');
+		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
+		if (response.error) {
+			rollback();
+			this.publish();
+			return false;
+		}
+
+		return true;
+	}
+
+	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
+		const item = this.unlockedItems.get(itemId);
+		if (!this.unlockedMods.has(itemModId) || !item) {
+			return false;
+		}
+
+		const prevMods = item.appliedMods;
+		const prevTotal = item.totalAttributes;
+		item.appliedMods = [
+			...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
+			newItemMod({ itemModId, itemModSlotId })
+		];
+		this.refreshItemAttributes(item);
+		this.publish();
+
+		const req = new ApiRequest('Player/ApplyMod');
+		const response = await req.post({ itemId, itemModId, itemModSlotId });
+		if (response.error) {
+			item.appliedMods = prevMods;
+			item.totalAttributes = prevTotal;
+			this.publish();
+			return false;
+		}
+
+		logMessage(ELogType.ItemFound, 'Modifier applied.');
+		return true;
+	}
+
+	public async removeMod(itemId: number, itemModSlotId: number) {
+		const item = this.unlockedItems.get(itemId);
+		if (!item) {
+			return false;
+		}
+
+		const prevMods = item.appliedMods;
+		const prevTotal = item.totalAttributes;
+		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
+		this.refreshItemAttributes(item);
+		this.publish();
+
+		const req = new ApiRequest('Player/RemoveMod');
+		const response = await req.post({ itemId, itemModSlotId });
+		if (response.error) {
+			item.appliedMods = prevMods;
+			item.totalAttributes = prevTotal;
+			this.publish();
+			return false;
+		}
+
+		logMessage(ELogType.ItemFound, 'Modifier removed.');
+		return true;
+	}
+
+	/**
+	 * Toggles whether an item is favorited and persists it via a websocket command. The local flag is
+	 * updated optimistically; a failed send keeps the local state (it re-syncs on the next toggle or
+	 * on reload) rather than rolling back, since a favourite flag is low-stakes.
+	 */
+	public async setFavorite(itemId: number, favorite: boolean) {
+		const item = this.unlockedItems.get(itemId);
+		if (!item) {
+			return false;
+		}
+
+		item.favorite = favorite;
+		this.publish();
+		try {
+			await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
+		} catch {
+			// Keep the optimistic local state; it re-syncs on the next toggle/reload.
+		}
+		return true;
+	}
+
+	/** Called when the player unlocks a new item from a challenge reward. */
+	public addUnlockedItem(invItem: IInventoryItem) {
+		const item = newItem(invItem);
+		this.unlockedItems.set(invItem.itemId, item);
+		this.publish();
+		logMessage(ELogType.ItemFound, `Unlocked: ${item.name}!`);
+	}
+
+	/** Called when the player unlocks a new mod from a challenge reward. */
+	public addUnlockedMod(modId: number) {
+		this.unlockedMods.add(modId);
+		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
+	}
+
+	/** The equip mutation, applied directly to the authoritative items + slot array. */
+	private applyEquip(item: Item, slotId: EEquipmentSlot) {
 		// Unequip from any current slot
 		for (let i = 0; i < this.equippedSlots.length; i++) {
 			const old = this.equippedSlots[i];
-			if (old?.itemId === itemId) {
+			if (old?.itemId === item.itemId) {
 				old.equipped = false;
 				old.equipmentSlotId = undefined;
 				this.equippedSlots[i] = undefined;
@@ -111,70 +233,24 @@ export class InventoryManager {
 		item.equipped = true;
 		item.equipmentSlotId = slotId;
 		this.equippedSlots[slotId] = item;
-
-		return true;
 	}
 
-	public async unequipItem(slotId: EEquipmentSlot) {
-		const item = this.equippedSlots[slotId];
-		if (!item) {
-			return false;
-		}
-
-		const req = new ApiRequest('Player/UnequipItem');
-		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
-		if (response.error) {
-			return false;
-		}
-
-		item.equipped = false;
-		item.equipmentSlotId = undefined;
-		this.equippedSlots[slotId] = undefined;
-
-		return true;
-	}
-
-	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
-		const item = this.unlockedItems.get(itemId);
-		if (!this.unlockedMods.has(itemModId) || !item) {
-			return false;
-		}
-
-		const req = new ApiRequest('Player/ApplyMod');
-		const response = await req.post({ itemId, itemModId, itemModSlotId });
-		if (response.error) {
-			return false;
-		}
-
-		// Mirror the change onto the authoritative item (the equip/favorite precedent) so
-		// equipmentStats (battle) and any view re-seed reflect it without a page reload.
-		item.appliedMods = [
-			...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
-			newItemMod({ itemModId, itemModSlotId })
-		];
-		this.refreshItemAttributes(item);
-		logMessage(ELogType.ItemFound, 'Modifier applied.');
-
-		return true;
-	}
-
-	public async removeMod(itemId: number, itemModSlotId: number) {
-		const item = this.unlockedItems.get(itemId);
-		if (!item) {
-			return false;
-		}
-
-		const req = new ApiRequest('Player/RemoveMod');
-		const response = await req.post({ itemId, itemModSlotId });
-		if (response.error) {
-			return false;
-		}
-
-		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
-		this.refreshItemAttributes(item);
-		logMessage(ELogType.ItemFound, 'Modifier removed.');
-
-		return true;
+	/**
+	 * Captures the slot array plus the equip/slot fields of the given items, returning a closure that
+	 * restores them — the rollback for a failed equip/unequip persist.
+	 */
+	private snapshotEquipped(...items: (Item | undefined)[]): () => void {
+		const prevSlots = [...this.equippedSlots];
+		const snaps = items
+			.filter((it): it is Item => it != null)
+			.map((it) => ({ item: it, equipped: it.equipped, slot: it.equipmentSlotId }));
+		return () => {
+			this.equippedSlots = prevSlots;
+			for (const snap of snaps) {
+				snap.item.equipped = snap.equipped;
+				snap.item.equipmentSlotId = snap.slot;
+			}
+		};
 	}
 
 	/** Rebuilds an item's cached totalAttributes after its applied mods change. */
@@ -183,37 +259,10 @@ export class InventoryManager {
 		item.totalAttributes = new BattleAttributes(allAttributes, false);
 	}
 
-	/**
-	 * Toggles whether an item is favorited and persists it via a websocket
-	 * command. The local flag is updated optimistically; a failed send keeps
-	 * the local state (it re-syncs on the next toggle or on reload).
-	 */
-	public async setFavorite(itemId: number, favorite: boolean) {
-		const item = this.unlockedItems.get(itemId);
-		if (!item) {
-			return false;
-		}
-
-		item.favorite = favorite;
-		try {
-			await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
-		} catch {
-			// Keep the optimistic local state; it re-syncs on the next toggle/reload.
-		}
-		return true;
-	}
-
-	/** Called when the player unlocks a new item from a challenge reward. */
-	public addUnlockedItem(invItem: IInventoryItem) {
-		const item = newItem(invItem);
-		this.unlockedItems.set(invItem.itemId, item);
-		logMessage(ELogType.ItemFound, `Unlocked: ${item.name}!`);
-	}
-
-	/** Called when the player unlocks a new mod from a challenge reward. */
-	public addUnlockedMod(modId: number) {
-		this.unlockedMods.add(modId);
-		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
+	/** Republishes the reactive item snapshot so consumers re-derive after a mutation. */
+	private publish() {
+		this.items = [...this.unlockedItems.values()];
+		this.equippedSlots = [...this.equippedSlots];
 	}
 }
 

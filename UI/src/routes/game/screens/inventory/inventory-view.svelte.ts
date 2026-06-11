@@ -48,11 +48,11 @@ export interface StatEntry {
 }
 
 /* ─── Reactive view-model ────────────────────────────────────────────────
-   Holds the UI state for the inventory screen. Item edits (equip, favorite,
-   mods) update the local reactive copies immediately and delegate to the
-   inventoryManager for persistence. */
+   Holds only the UI state for the inventory screen (sort/filter/selection).
+   The item data and every mutation live on the authoritative `inventoryManager`;
+   the view reads through its reactive `items`/`equippedSlots` and delegates
+   actions, so there is a single source of truth and a single mutation path. */
 export class InventoryView {
-	items = $state<Item[]>([]);
 	sort = $state<SortKey>('category');
 	filterCat = $state<EItemCategory | null>(null);
 	favOnly = $state(false);
@@ -60,25 +60,18 @@ export class InventoryView {
 	dragItemId = $state<number | null>(null);
 	page = $state(0);
 
-	constructor() {
-		this.reload();
-	}
-
-	/** Seed the reactive copies from the manager's unlocked items. */
-	reload() {
-		this.items = inventoryManager.unlockedItemList.map((i) => ({
-			...i,
-			appliedMods: [...i.appliedMods]
-		}));
+	/** The authoritative unlocked items, read reactively through the manager. */
+	get items(): Item[] {
+		return inventoryManager.unlockedItemList;
 	}
 
 	readonly equippedBySlot = $derived.by(() => {
 		const map: Partial<Record<EEquipmentSlot, Item>> = {};
-		for (const it of this.items) {
-			if (it.equipmentSlotId != null) {
-				map[it.equipmentSlotId as EEquipmentSlot] = it;
+		inventoryManager.equippedSlots.forEach((item, slot) => {
+			if (item) {
+				map[slot as EEquipmentSlot] = item;
 			}
-		}
+		});
 		return map;
 	});
 
@@ -113,14 +106,13 @@ export class InventoryView {
 		return list.sort(SORTS[this.sort].cmp);
 	});
 
-	readonly equippedTotals = $derived.by<StatEntry[]>(() => {
-		const allAttrs = this.items
-			.filter((i) => i.equipmentSlotId != null)
-			.flatMap((i) => [...i.attributes, ...i.appliedMods.flatMap((m) => m.attributes)]);
-		return new BattleAttributes(allAttrs, false).getAttributeMap();
-	});
+	// Display totals reuse the manager's single equipmentStats derivation rather than re-flattening
+	// equipped items, projecting it to a named stat list for the UI.
+	readonly equippedTotals = $derived.by<StatEntry[]>(() =>
+		new BattleAttributes(inventoryManager.equipmentStats, false).getAttributeMap()
+	);
 
-	readonly slotsFilled = $derived(this.items.filter((i) => i.equipmentSlotId != null).length);
+	readonly slotsFilled = $derived(inventoryManager.equippedSlots.filter((s) => s != null).length);
 
 	/* ── actions ─────────────────────────────────────────────────────── */
 
@@ -129,25 +121,10 @@ export class InventoryView {
 	}
 
 	equip(itemId: number, slotId: EEquipmentSlot) {
-		for (const it of this.items) {
-			if (it.itemId === itemId) {
-				it.equipmentSlotId = slotId;
-				it.equipped = true;
-			} else if (it.equipmentSlotId === slotId) {
-				it.equipmentSlotId = undefined;
-				it.equipped = false;
-			}
-		}
 		inventoryManager.equipItem(itemId, slotId);
 	}
 
 	unequip(slotId: EEquipmentSlot) {
-		for (const it of this.items) {
-			if (it.equipmentSlotId === slotId) {
-				it.equipmentSlotId = undefined;
-				it.equipped = false;
-			}
-		}
 		inventoryManager.unequipItem(slotId);
 	}
 
@@ -164,9 +141,7 @@ export class InventoryView {
 		if (!item) {
 			return;
 		}
-
-		item.favorite = !item.favorite;
-		inventoryManager.setFavorite(itemId, item.favorite);
+		inventoryManager.setFavorite(itemId, !item.favorite);
 	}
 
 	/** Unlocked mods compatible with a slot type, minus ones already on the item. */
@@ -179,26 +154,10 @@ export class InventoryView {
 	}
 
 	applyMod(itemId: number, slotId: number, modId: number) {
-		const item = this.items.find((i) => i.itemId === itemId);
-		const modData = staticData.itemMods?.[modId];
-		if (!item || !modData) {
-			return;
-		}
-
-		item.appliedMods = [
-			...item.appliedMods.filter((m) => m.itemModSlotId !== slotId),
-			{ ...modData, itemModSlotId: slotId }
-		];
 		inventoryManager.applyMod(itemId, modId, slotId);
 	}
 
 	removeMod(itemId: number, slotId: number) {
-		const item = this.items.find((i) => i.itemId === itemId);
-		if (!item) {
-			return;
-		}
-
-		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== slotId);
 		inventoryManager.removeMod(itemId, slotId);
 	}
 }
