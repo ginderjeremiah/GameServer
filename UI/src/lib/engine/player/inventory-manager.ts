@@ -198,6 +198,9 @@ export class InventoryManager {
 
 	/** Called when the player unlocks a new item from a challenge reward. */
 	public addUnlockedItem(invItem: IInventoryItem) {
+		if (this.unlockedItems.has(invItem.itemId)) {
+			return;
+		}
 		const item = newItem(invItem);
 		this.unlockedItems.set(invItem.itemId, item);
 		this.publish();
@@ -206,7 +209,12 @@ export class InventoryManager {
 
 	/** Called when the player unlocks a new mod from a challenge reward. */
 	public addUnlockedMod(modId: number) {
-		this.unlockedMods.add(modId);
+		if (this.unlockedMods.has(modId)) {
+			return;
+		}
+		// Reassign (not mutate) the Set so statify/$state tracks the change and reactive consumers —
+		// e.g. an open mod picker's `compatibleMods` — re-derive immediately, mirroring addUnlockedSkill.
+		this.unlockedMods = new Set(this.unlockedMods).add(modId);
 		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
 	}
 

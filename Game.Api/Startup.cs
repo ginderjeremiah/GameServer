@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Api.Auth;
 using Game.Api.CodeGen;
+using Game.Api.Events;
 using Game.Api.Filters;
 using Game.Api.Middleware;
 using Game.Api.Services;
@@ -9,6 +10,7 @@ using Game.Api.Sockets.Commands;
 using Game.Application.Auth;
 using Game.Application.DependencyInjection;
 using Game.Core.Events;
+using Game.Core.Players.Events;
 using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -87,6 +89,11 @@ namespace Game.Api
                 .AddSingleton<ApiCodeGenerator>()
                 .AddScoped<AdminCacheReloadFilter>()
                 .AddScoped<AdminRoleAuthorizationFilter>();
+
+            // Push a completed challenge's rewards to the player's live socket. This handler lives in the
+            // API layer because it depends on the socket infrastructure, so it is registered here rather
+            // than in AddApplication/AddDataAccess alongside the other domain-event handlers.
+            DomainEventDispatcher.RegisterDomainEventHandler<ChallengeCompletedEvent, ChallengeCompletedNotifier>();
 
             // Migrations are applied on startup in Development (frictionless local F5) and whenever
             // DataAccessOptions:MigrateOnStartup is enabled (e.g. the Dockerized API used by CI and

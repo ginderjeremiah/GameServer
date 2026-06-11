@@ -54,6 +54,21 @@ export const playerChallenges = {
 		return challenges.some((c) => c.challengeId === challengeId && c.completed);
 	},
 
+	/** Mark a challenge completed locally (e.g. on the `ChallengeCompleted` push) so completion-gated
+	 *  UI — zone navigation — reflects it immediately without re-fetching. A later `load(force)` will
+	 *  reconcile against the authoritative server progress. */
+	markCompleted(challengeId: number) {
+		const existing = challenges.find((c) => c.challengeId === challengeId);
+		if (existing?.completed) {
+			return;
+		}
+		if (existing) {
+			challenges = challenges.map((c) => (c.challengeId === challengeId ? { ...c, completed: true } : c));
+		} else {
+			challenges = [...challenges, { challengeId, progress: 0, completed: true }];
+		}
+	},
+
 	/** Reset to the unloaded state (e.g. on logout / session replacement). */
 	reset() {
 		challenges = [];

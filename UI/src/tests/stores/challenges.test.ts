@@ -68,6 +68,32 @@ describe('challenges store', () => {
 		expect(playerChallenges.isChallengeCompleted(5)).toBe(false); // no row
 	});
 
+	describe('markCompleted', () => {
+		it('flips an existing recorded challenge to completed', async () => {
+			get.mockResolvedValue([challenge(3, false)]);
+			await playerChallenges.load();
+
+			playerChallenges.markCompleted(3);
+
+			expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
+		});
+
+		it('adds a completion for a challenge with no recorded progress yet', () => {
+			playerChallenges.markCompleted(8);
+
+			expect(playerChallenges.isChallengeCompleted(8)).toBe(true);
+		});
+
+		it('is a no-op when the challenge is already completed (no duplicate row)', async () => {
+			get.mockResolvedValue([challenge(3, true)]);
+			await playerChallenges.load();
+
+			playerChallenges.markCompleted(3);
+
+			expect(playerChallenges.all.filter((c) => c.challengeId === 3)).toHaveLength(1);
+		});
+	});
+
 	it('reset() clears state and allows a fresh load', async () => {
 		get.mockResolvedValue([challenge(3, true)]);
 		await playerChallenges.load();

@@ -25,11 +25,33 @@ namespace Game.Core.Events
             _serviceProvider = serviceProvider;
         }
 
-        public Task DispatchAsync(AggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Safety bound on the drain loop below. A realistic event cascade is only a couple of levels
+        /// deep, so exceeding this means a handler is raising events on the aggregate unboundedly —
+        /// fail loudly rather than spin forever.
+        /// </summary>
+        private const int MaxDispatchIterations = 100;
+
+        public async Task DispatchAsync(AggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
         {
-            var events = aggregateRoot.DomainEvents.ToArray();
-            aggregateRoot.ClearEvents();
-            return DispatchAsync(events, cancellationToken);
+            // A handler reacting to an event may raise further events on the same aggregate (e.g.
+            // completing a challenge unlocks its reward items, each raising its own unlock event). Drain
+            // until the aggregate is quiescent so those secondary events are dispatched in this same
+            // cycle; otherwise they linger on the aggregate until the next save, delaying their
+            // persistence and any client notification driven off them.
+            var iterations = 0;
+            while (aggregateRoot.DomainEvents.Count > 0)
+            {
+                if (++iterations > MaxDispatchIterations)
+                {
+                    throw new InvalidOperationException(
+                        $"Domain event dispatch did not settle after {MaxDispatchIterations} iterations; a handler is raising events unboundedly.");
+                }
+
+                var events = aggregateRoot.DomainEvents.ToArray();
+                aggregateRoot.ClearEvents();
+                await DispatchAsync(events, cancellationToken);
+            }
         }
 
         public async Task DispatchAsync(IEnumerable<IDomainEvent> events, CancellationToken cancellationToken = default)

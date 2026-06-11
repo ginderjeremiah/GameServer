@@ -45,32 +45,44 @@ namespace Game.TestInfrastructure.Helpers
             string commandName,
             object? parameters = null)
         {
-            var commandInfo = new SocketCommandInfo(commandName)
-            {
-                Id = Guid.NewGuid().ToString(),
-                Parameters = parameters?.Serialize(),
-            };
-
-            var json = commandInfo.Serialize();
-            var bytes = Encoding.UTF8.GetBytes(json);
-            await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token);
-
-            return await ReadResponseAsync<TResponse>(commandInfo.Id);
+            var id = await SendCommandNoWaitAsync(commandName, parameters);
+            return await ReadUntilAsync(m => m.Deserialize<ApiSocketResponse<TResponse>>(), r => r.Id == id);
         }
 
         public async Task<ApiSocketResponse> SendCommandRawAsync(string commandName, object? parameters = null)
         {
+            var id = await SendCommandNoWaitAsync(commandName, parameters);
+            return await ReadUntilAsync(m => m.Deserialize<ApiSocketResponse>(), r => r.Id == id);
+        }
+
+        /// <summary>
+        /// Sends a command without reading its response and returns the generated command id. Use when the
+        /// test cares about a later server-pushed message rather than the command's own reply, so that
+        /// reply isn't consumed by an Id match (which would race the push). Also the single build-and-send
+        /// path the waiting send overloads delegate to.
+        /// </summary>
+        public async Task<string> SendCommandNoWaitAsync(string commandName, object? parameters = null)
+        {
+            var id = Guid.NewGuid().ToString();
             var commandInfo = new SocketCommandInfo(commandName)
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = id,
                 Parameters = parameters?.Serialize(),
             };
 
-            var json = commandInfo.Serialize();
-            var bytes = Encoding.UTF8.GetBytes(json);
+            var bytes = Encoding.UTF8.GetBytes(commandInfo.Serialize());
             await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token);
+            return id;
+        }
 
-            return await ReadResponseAsync(commandInfo.Id);
+        /// <summary>
+        /// Reads until a message whose <c>Name</c> matches arrives (skipping any others, e.g. a different
+        /// command's response), for server-pushed commands that carry no request Id to match on. Returns
+        /// the push with its typed data so the payload can be asserted.
+        /// </summary>
+        public Task<ApiSocketResponse<TResponse>> WaitForCommandAsync<TResponse>(string commandName)
+        {
+            return ReadUntilAsync(m => m.Deserialize<ApiSocketResponse<TResponse>>(), r => r.Name == commandName);
         }
 
         /// <summary>
@@ -78,9 +90,9 @@ namespace Game.TestInfrastructure.Helpers
         /// Use this when a command is emitted through a server-side path (e.g. pub/sub) rather than
         /// directly from the client.
         /// </summary>
-        public async Task<ApiSocketResponse> WaitForResponseAsync(string? commandId)
+        public Task<ApiSocketResponse> WaitForResponseAsync(string? commandId)
         {
-            return await ReadResponseAsync(commandId);
+            return ReadUntilAsync(m => m.Deserialize<ApiSocketResponse>(), r => r.Id == commandId);
         }
 
         public async Task CloseAsync()
@@ -98,7 +110,14 @@ namespace Game.TestInfrastructure.Helpers
             }
         }
 
-        private async Task<ApiSocketResponse<TResponse>> ReadResponseAsync<TResponse>(string? expectedId)
+        /// <summary>
+        /// Reads messages — answering server pings transparently — until one deserializes (via
+        /// <paramref name="deserialize"/>) and satisfies <paramref name="match"/>. The single ping-aware
+        /// read loop the typed/raw/by-name reads all share, differing only in their deserialize target
+        /// and match predicate.
+        /// </summary>
+        private async Task<T> ReadUntilAsync<T>(Func<string, T?> deserialize, Func<T, bool> match)
+            where T : ApiSocketResponse
         {
             while (true)
             {
@@ -109,27 +128,8 @@ namespace Game.TestInfrastructure.Helpers
                     continue;
                 }
 
-                var response = message.Deserialize<ApiSocketResponse<TResponse>>();
-                if (response is not null && response.Id == expectedId)
-                {
-                    return response;
-                }
-            }
-        }
-
-        private async Task<ApiSocketResponse> ReadResponseAsync(string? expectedId)
-        {
-            while (true)
-            {
-                var message = await ReadMessageAsync();
-                if (message == "ping")
-                {
-                    await SendPongAsync();
-                    continue;
-                }
-
-                var response = message.Deserialize<ApiSocketResponse>();
-                if (response is not null && response.Id == expectedId)
+                var response = deserialize(message);
+                if (response is not null && match(response))
                 {
                     return response;
                 }
