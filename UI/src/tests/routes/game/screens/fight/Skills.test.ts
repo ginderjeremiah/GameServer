@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import type { IAttribute } from '$lib/api';
+import { EAttribute, EModifierType, ESkillEffectTarget, type IAttribute } from '$lib/api';
 
 // Skills renders a SkillTooltip child, which resolves the opponent through the battle engine
 // and attribute names through the reference-data store; both are mocked.
@@ -64,6 +64,30 @@ describe('Skills', () => {
 		expect(slots[1].classList.contains('ready')).toBe(false);
 		// The cooldown sweep tracks the charge percentage (50% -> 180 of 360 degrees).
 		expect((slots[1] as HTMLElement).getAttribute('style')).toContain('180deg');
+	});
+
+	it('shows the effect badge only on skills that carry effects', () => {
+		battler.skills = [
+			makeSkill(battler, {
+				name: 'Curse',
+				effects: [
+					{
+						id: 1,
+						target: ESkillEffectTarget.Opponent,
+						attributeId: EAttribute.Defense,
+						modifierTypeId: EModifierType.Additive,
+						amount: -5,
+						durationMs: 3000
+					}
+				]
+			}),
+			makeSkill(battler, { id: 2, name: 'Slash', effects: [] })
+		];
+		const { container } = render(Skills, { props: { battler, side: 'player' } });
+
+		const slots = container.querySelectorAll('.skill-slot');
+		expect(slots[0].querySelector('.effect-badge-anchor')).not.toBeNull();
+		expect(slots[1].querySelector('.effect-badge-anchor')).toBeNull();
 	});
 
 	it('right-aligns the enemy skill row', () => {

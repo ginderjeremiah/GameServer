@@ -11,14 +11,21 @@
 		<DamageBreakdown base={baseDamage} {multipliers} enemyDefense={opponent ? enemyDefense : undefined} {total} />
 	</TooltipSection>
 
-	<TooltipSection label="Tempo" last>
+	<TooltipSection label="Tempo" last={effectLines.length === 0}>
 		<TempoMetrics cooldown={adjustedCd} dps={total / adjustedCd} />
 	</TooltipSection>
+
+	{#if effectLines.length > 0}
+		<TooltipSection label="On hit" last>
+			<EffectLines lines={effectLines} />
+		</TooltipSection>
+	{/if}
 </TooltipShell>
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, skillContributions, type Skill } from '$lib/battle';
+import { describeEffect } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -26,6 +33,7 @@ import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
 import CooldownPill from './skill-tooltip/CooldownPill.svelte';
 import DamageBreakdown from './skill-tooltip/DamageBreakdown.svelte';
+import EffectLines from './skill-tooltip/EffectLines.svelte';
 import TempoMetrics from './skill-tooltip/TempoMetrics.svelte';
 
 export const getBaseNode = () => container;
@@ -59,6 +67,10 @@ const remainingCd = $derived(Math.max(adjustedCd - (skill?.renderChargeTime ?? 0
 const isReady = $derived(remainingCd <= 0.01);
 const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - remainingCd) / adjustedCd) * 100));
 const remainingCdFormatted = $derived(remainingCd.toFixed(2));
+
+const effectLines = $derived(
+	(skill?.effects ?? []).map((effect) => describeEffect(effect, attributeName(effect.attributeId)))
+);
 
 const attributeName = (attrId: number) => {
 	return staticData.attributes?.[attrId]?.name ?? EAttribute[attrId] ?? 'Unknown';

@@ -3,6 +3,7 @@ export * from './rarity';
 export * from './challenge-type';
 export * from './zone-progression';
 export * from './attribute-display';
+export * from './skill-effect-display';
 export * from './item-display';
 export * from './types';
 export * from './hooks';

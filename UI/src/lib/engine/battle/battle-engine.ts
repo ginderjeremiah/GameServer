@@ -116,6 +116,8 @@ export class BattleEngine {
 		if (this.stage === Active) {
 			this.player.updateRenderCooldowns(renderDelta);
 			this.enemy.updateRenderCooldowns(renderDelta);
+			this.player.updateRenderEffects(renderDelta);
+			this.enemy.updateRenderEffects(renderDelta);
 		}
 	}
 

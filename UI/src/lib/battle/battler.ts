@@ -1,7 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
 import { applyDefense, cooldownMultiplier } from './battle-formulas';
-import { IBattlerAttribute, ISkillEffect, EAttribute } from '$lib/api';
+import { IBattlerAttribute, ISkillEffect, EAttribute, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
@@ -13,12 +13,20 @@ interface BattlerData {
 	name: string;
 }
 
-/** A timed skill effect active on a battler: the authored effect's id (the refresh key), the modifier it
- *  added to the attribute set (kept for identity removal on expiry), and the remaining duration in ms. */
-interface ActiveEffect {
+/** A timed skill effect active on a battler, as the UI renders it (the active-effect chips). Holds the
+ *  authored effect's id (the refresh key), the attribute/modifier it shifts, its full and remaining
+ *  durations, and a render-only remaining duration interpolated between ticks for a smooth countdown —
+ *  the chip analogue of {@link Skill.renderChargeTime}. The modifier instance itself is kept off this
+ *  view (in {@link Battler.effectModifiers}) so the view can be a reactive `statify` projection without
+ *  a reactive proxy breaking the reference identity {@link BattleAttributes.removeModifier} matches on. */
+export interface ActiveEffectView {
 	sourceId: number;
-	modifier: AttributeModifier;
+	attribute: EAttribute;
+	modifierType: EModifierType;
+	amount: number;
+	durationMs: number;
 	remainingMs: number;
+	renderRemainingMs: number;
 }
 
 let battlerId = 0;
@@ -32,10 +40,16 @@ export class Battler {
 	public skills: (Skill | undefined)[] = [];
 	public isDead = true;
 
-	/** The timed skill effects currently modifying this battler. A private (`#`) field so `statify`
-	 *  leaves it (and the modifier references it holds) non-reactive — otherwise a reactive proxy would
-	 *  break the reference identity {@link BattleAttributes.removeModifier} matches on. */
-	#activeEffects: ActiveEffect[] = [];
+	/** The timed skill effects currently on this battler, as a reactive (`statify`) projection the
+	 *  active-effect chips render. Display-only data: it never carries a modifier reference, so making
+	 *  it reactive is safe (see {@link ActiveEffectView}). */
+	public activeEffects: ActiveEffectView[] = [];
+
+	/** The modifier each active effect added to the attribute set, keyed by the effect's authored id.
+	 *  A private (`#`) field so `statify` leaves it — and the modifier references it holds —
+	 *  non-reactive, keeping the reference identity {@link BattleAttributes.removeModifier} matches on
+	 *  intact (a reactive array would deep-proxy its elements). */
+	#effectModifiers = new Map<number, AttributeModifier>();
 
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
 	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
@@ -72,6 +86,16 @@ export class Battler {
 		}
 	}
 
+	/** Interpolates each active effect's render-only remaining duration toward the next logical tick,
+	 *  mirroring {@link updateRenderCooldowns}, so the chip countdown depletes smoothly between the
+	 *  40ms logical ticks rather than stepping. Display-only; never touches the parity-relevant
+	 *  {@link ActiveEffectView.remainingMs}. */
+	public updateRenderEffects(renderDelta: number) {
+		for (const effect of this.activeEffects) {
+			effect.renderRemainingMs = Math.max(effect.remainingMs - renderDelta, 0);
+		}
+	}
+
 	public takeDamage(rawDamage: number) {
 		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense));
 		this.currentHealth -= damage;
@@ -83,9 +107,10 @@ export class Battler {
 	 *  its authored id) refreshes its remaining duration without adding a second modifier (no stacking);
 	 *  a new effect adds a modifier and may shift MaxHealth, so the health is re-clamped. */
 	public applyEffect(effect: ISkillEffect) {
-		for (const active of this.#activeEffects) {
+		for (const active of this.activeEffects) {
 			if (active.sourceId === effect.id) {
 				active.remainingMs = effect.durationMs;
+				active.renderRemainingMs = effect.durationMs;
 				return;
 			}
 		}
@@ -97,7 +122,16 @@ export class Battler {
 			source: EAttributeModifierSource.SkillEffect
 		};
 		this.attributes.addModifier(modifier);
-		this.#activeEffects.push({ sourceId: effect.id, modifier, remainingMs: effect.durationMs });
+		this.#effectModifiers.set(effect.id, modifier);
+		this.activeEffects.push({
+			sourceId: effect.id,
+			attribute: effect.attributeId,
+			modifierType: effect.modifierTypeId,
+			amount: effect.amount,
+			durationMs: effect.durationMs,
+			remainingMs: effect.durationMs,
+			renderRemainingMs: effect.durationMs
+		});
 		this.clampHealthToMaxHealth();
 	}
 
@@ -105,17 +139,21 @@ export class Battler {
 	 *  is removed and the totals recomputed). Called at the start of each tick before any skill fires, so
 	 *  an effect influences exactly `durationMs / tickSize` ticks counting the one it was applied on. */
 	public advanceEffects(timeDelta: number) {
-		if (this.#activeEffects.length === 0) {
+		if (this.activeEffects.length === 0) {
 			return;
 		}
 
 		let removedAny = false;
-		for (let i = this.#activeEffects.length - 1; i >= 0; i--) {
-			const active = this.#activeEffects[i];
+		for (let i = this.activeEffects.length - 1; i >= 0; i--) {
+			const active = this.activeEffects[i];
 			active.remainingMs -= timeDelta;
 			if (active.remainingMs <= 0) {
-				this.attributes.removeModifier(active.modifier);
-				this.#activeEffects.splice(i, 1);
+				const modifier = this.#effectModifiers.get(active.sourceId);
+				if (modifier) {
+					this.attributes.removeModifier(modifier);
+					this.#effectModifiers.delete(active.sourceId);
+				}
+				this.activeEffects.splice(i, 1);
 				removedAny = true;
 			}
 		}
@@ -137,10 +175,11 @@ export class Battler {
 	public reset(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
-		for (const active of this.#activeEffects) {
-			this.attributes.removeModifier(active.modifier);
+		for (const modifier of this.#effectModifiers.values()) {
+			this.attributes.removeModifier(modifier);
 		}
-		this.#activeEffects = [];
+		this.#effectModifiers.clear();
+		this.activeEffects = [];
 		if (battlerData) {
 			const atts = additionalAtttributes
 				? [...battlerData.attributes, ...additionalAtttributes]

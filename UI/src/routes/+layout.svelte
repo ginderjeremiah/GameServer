@@ -175,6 +175,15 @@ $effect(() => {
 	// log + options screens.
 	--eyebrow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
+	// Skill-effect accents — the buff (beneficial) vs debuff (detrimental) hue of a
+	// timed skill effect, and the neutral marker on a skill that carries effects.
+	// Consumed via the helpers in $lib/common/skill-effect-display (the effect chips,
+	// tooltip lines, and skill-button badge), so a theme can restyle effect signalling
+	// independently of the success/enemy/accent base hues they currently borrow.
+	--effect-buff: var(--success);
+	--effect-debuff: var(--enemy-accent);
+	--effect-accent: var(--accent-light);
+
 	// Item-mod-type accents. Consumed via the helpers in $lib/common/item-display.
 	--mod-component: #{colors.$mod-component};
 	--mod-prefix: #{colors.$mod-prefix};

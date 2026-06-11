@@ -18,6 +18,9 @@
 					{#if isReady(skill)}
 						<div class="ready-glow"></div>
 					{/if}
+					{#if skill.effects.length > 0}
+						<div class="effect-badge-anchor"><SkillEffectBadge /></div>
+					{/if}
 				{/if}
 			</div>
 			{#if skill}
@@ -32,6 +35,7 @@
 import type { Battler, Skill } from '$lib/battle';
 import { formatNum, tintColor } from '$lib/common';
 import { registerTooltipComponent, type TooltipComponent } from '$stores/tooltip.svelte';
+import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 import SkillTooltip from './SkillTooltip.svelte';
 
 type Props = {
@@ -150,6 +154,13 @@ const isReady = (skill: Skill) => {
 	inset: -1px;
 	border-radius: 2px;
 	animation: ready-pulse 1.2s ease-in-out infinite;
+	pointer-events: none;
+}
+
+.effect-badge-anchor {
+	position: absolute;
+	top: 3px;
+	right: 3px;
 	pointer-events: none;
 }
 

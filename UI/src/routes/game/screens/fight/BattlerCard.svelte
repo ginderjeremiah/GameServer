@@ -15,6 +15,9 @@
 		<div class="hp-text">{healthText}</div>
 	</div>
 
+	<!-- Active timed effects -->
+	<ActiveEffectChips {battler} reversed={side === 'enemy'} />
+
 	<!-- Skills -->
 	<Skills {battler} {side} />
 </div>
@@ -23,6 +26,7 @@
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
 import { formatNum, tintColor } from '$lib/common';
+import ActiveEffectChips from './ActiveEffectChips.svelte';
 import Skills from './Skills.svelte';
 
 type Props = {
