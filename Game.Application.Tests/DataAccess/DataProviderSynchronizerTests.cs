@@ -350,6 +350,217 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_ItemUnlockedEvent_InsertsUnlockedItemIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+
+            var evt = new ItemUnlockedEvent(player.Id, item.Id);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The same unlock is delivered twice (e.g. a retry, or two challenges granting the same item);
+            // the idempotent insert must leave exactly one row, unequipped and not favorited.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.UnlockedItems
+                .Where(ui => ui.PlayerId == player.Id && ui.ItemId == item.Id)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.Null(row.EquipmentSlotId);
+            Assert.False(row.Favorite);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ModUnlockedEvent_InsertsUnlockedModIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var mod = await TestDataSeeder.CreateItemModAsync(context);
+
+            var evt = new ModUnlockedEvent(player.Id, mod.Id);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice; the idempotent insert must leave exactly one row.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.UnlockedMods
+                .Where(um => um.PlayerId == player.Id && um.ItemModId == mod.Id)
+                .ToListAsync(CancellationToken);
+            Assert.Single(rows);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ModAppliedEvent_AppliesModToSlotIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            // An item with one Prefix mod slot, and a mod to apply into it.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var modSlot = new Infrastructure.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+            };
+            context.ItemModSlots.Add(modSlot);
+            await context.SaveChangesAsync(CancellationToken);
+            var mod = await TestDataSeeder.CreateItemModAsync(context);
+
+            var evt = new ModAppliedEvent(player.Id, item.Id, modSlot.Id, mod.Id);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice: the delete-then-insert handler must converge to a single applied mod in the slot.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.AppliedMods
+                .Where(am => am.PlayerId == player.Id && am.ItemId == item.Id && am.ItemModSlotId == modSlot.Id)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.Equal(mod.Id, row.ItemModId);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ModAppliedEvent_ReplacesExistingModInSameSlot()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var modSlot = new Infrastructure.Entities.ItemModSlot
+            {
+                ItemId = item.Id,
+                ItemModSlotTypeId = (int)EItemModType.Prefix,
+            };
+            context.ItemModSlots.Add(modSlot);
+            await context.SaveChangesAsync(CancellationToken);
+            var modA = await TestDataSeeder.CreateItemModAsync(context, name: "Mod A");
+            var modB = await TestDataSeeder.CreateItemModAsync(context, name: "Mod B");
+
+            // Applying a second mod to an already-filled slot must replace the first, not stack.
+            var applyA = new ModAppliedEvent(player.Id, item.Id, modSlot.Id, modA.Id);
+            var applyB = new ModAppliedEvent(player.Id, item.Id, modSlot.Id, modB.Id);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            var queue = new InMemoryPubSubQueue(Serialize(applyA), Serialize(applyB));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.AppliedMods
+                .Where(am => am.PlayerId == player.Id && am.ItemId == item.Id && am.ItemModSlotId == modSlot.Id)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.Equal(modB.Id, row.ItemModId);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_AttributeAllocationsChangedEvent_UpsertsInsertsAndDeletesIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            // The seeder gives the player Strength = 50 and Endurance = 50 allocations to start.
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            // One event exercising all three branches: update an existing allocation (Strength),
+            // delete an existing one by zeroing it (Endurance), and insert a brand-new one (Agility).
+            var evt = new AttributeAllocationsChangedEvent(player.Id, new List<AttributeAllocationEntry>
+            {
+                new(EAttribute.Strength, 75d),
+                new(EAttribute.Endurance, 0d),
+                new(EAttribute.Agility, 30d),
+            });
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice: re-applying the same allocations must converge to the same rows.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerAttributes
+                .Where(pa => pa.PlayerId == player.Id)
+                .ToListAsync(CancellationToken);
+
+            // Strength updated, Agility inserted, Endurance deleted (zeroed out).
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(75m, Assert.Single(rows, pa => pa.AttributeId == (int)EAttribute.Strength).Amount);
+            Assert.Equal(30m, Assert.Single(rows, pa => pa.AttributeId == (int)EAttribute.Agility).Amount);
+            Assert.DoesNotContain(rows, pa => pa.AttributeId == (int)EAttribute.Endurance);
+        }
+
+        [Fact]
+        public async Task StopAsync_CompletesWithoutError()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The synchronizer holds no per-process resources to release, so shutdown is a no-op that must not throw.
+            await synchronizer.StopAsync(CancellationToken.None);
+
+            Assert.Empty(logger.Entries);
+        }
+
+        [Fact]
         public async Task StartAsync_SubscribeThrows_PropagatesException()
         {
             using var scope = CreateScope();
