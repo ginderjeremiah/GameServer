@@ -113,12 +113,14 @@ describe('GridSlot — click interactions', () => {
 		expect(onToggleEquip).toHaveBeenCalledWith(item);
 	});
 
-	it('calls onToggleFav when the fav-star button is clicked', async () => {
+	it('calls onToggleFav when the fav-star button is clicked and does not bubble to onSelect', async () => {
 		const onToggleFav = vi.fn();
+		const onSelect = vi.fn();
 		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onToggleFav } });
+		const { container } = render(GridSlot, { props: { item, onToggleFav, onSelect } });
 		await fireEvent.click(container.querySelector('.fav-star')!);
 		expect(onToggleFav).toHaveBeenCalledWith(item);
+		expect(onSelect).not.toHaveBeenCalled();
 	});
 });
 
