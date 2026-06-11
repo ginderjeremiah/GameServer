@@ -141,41 +141,35 @@ const none = $derived(
 
 // Retired records drop out of the pick list (can't be newly granted) unless they're the
 // challenge's current reward, which stays visible (marked retired) so it isn't silently lost.
+const keepActive = <T extends { id: number; retiredAt?: string | null }>(records: T[], currentId: number | undefined) =>
+	records.filter((r) => !r.retiredAt || r.id === currentId);
+
 const itemPickRecords = $derived(
-	reference
-		.itemRecords()
-		.filter((i) => !i.retiredAt || i.id === challenge.rewardItemId)
-		.map((i) => ({
-			id: i.id,
-			name: i.name,
-			color: reference.rarityColor(i.rarityId),
-			tag: reference.rarityName(i.rarityId),
-			retired: !!i.retiredAt
-		}))
+	keepActive(reference.itemRecords(), challenge.rewardItemId).map((i) => ({
+		id: i.id,
+		name: i.name,
+		color: reference.rarityColor(i.rarityId),
+		tag: reference.rarityName(i.rarityId),
+		retired: !!i.retiredAt
+	}))
 );
 const modPickRecords = $derived(
-	reference
-		.itemModRecords()
-		.filter((m) => !m.retiredAt || m.id === challenge.rewardItemModId)
-		.map((m) => ({
-			id: m.id,
-			name: m.name,
-			color: 'var(--accent)',
-			tag: reference.modTypeName(m.itemModTypeId),
-			retired: !!m.retiredAt
-		}))
+	keepActive(reference.itemModRecords(), challenge.rewardItemModId).map((m) => ({
+		id: m.id,
+		name: m.name,
+		color: 'var(--accent)',
+		tag: reference.modTypeName(m.itemModTypeId),
+		retired: !!m.retiredAt
+	}))
 );
 const skillPickRecords = $derived(
-	reference
-		.skillRecords()
-		.filter((s) => !s.retiredAt || s.id === challenge.rewardSkillId)
-		.map((s) => ({
-			id: s.id,
-			name: s.name,
-			color: 'var(--accent)',
-			tag: `${s.baseDamage} dmg`,
-			retired: !!s.retiredAt
-		}))
+	keepActive(reference.skillRecords(), challenge.rewardSkillId).map((s) => ({
+		id: s.id,
+		name: s.name,
+		color: 'var(--accent)',
+		tag: `${s.baseDamage} dmg`,
+		retired: !!s.retiredAt
+	}))
 );
 
 const setItem = (id: number | undefined) => {
