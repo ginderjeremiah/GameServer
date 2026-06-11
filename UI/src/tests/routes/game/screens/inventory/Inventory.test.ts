@@ -10,6 +10,7 @@ vi.mock('$lib/engine', () => ({
 			return [];
 		},
 		equippedSlots: [],
+		equipmentStats: [],
 		unlockedMods: new Set<number>(),
 		equipItem: vi.fn(),
 		unequipItem: vi.fn(),

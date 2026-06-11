@@ -1,23 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EAttribute, EItemCategory, ERarity } from '$lib/api';
 import type { Item } from '$lib/battle';
+import type { IBattlerAttribute } from '$lib/api';
 
 // Light mock of the engine so importing the view-model doesn't pull the real
 // game engine. EEquipmentSlot mirrors the real enum's indices. `vi.hoisted`
-// keeps these initialized before the hoisted vi.mock factory runs.
-const { equipItem, unequipItem, setFavorite, applyMod, removeMod, unlockedMods, sampleItems, staticData } = vi.hoisted(
-	() => ({
-		equipItem: vi.fn(),
-		unequipItem: vi.fn(),
-		setFavorite: vi.fn(),
-		applyMod: vi.fn(),
-		removeMod: vi.fn(),
-		unlockedMods: new Set<number>(),
-		sampleItems: [] as Item[],
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		staticData: { itemMods: [] as any[] }
-	})
-);
+// keeps these initialized before the hoisted vi.mock factory runs. The view now
+// reads the manager's authoritative `unlockedItemList`/`equippedSlots`/`equipmentStats`
+// and delegates every mutation, so the mock exposes that surface.
+const {
+	equipItem,
+	unequipItem,
+	setFavorite,
+	applyMod,
+	removeMod,
+	unlockedMods,
+	sampleItems,
+	sampleSlots,
+	sampleStats,
+	staticData
+} = vi.hoisted(() => ({
+	equipItem: vi.fn(),
+	unequipItem: vi.fn(),
+	setFavorite: vi.fn(),
+	applyMod: vi.fn(),
+	removeMod: vi.fn(),
+	unlockedMods: new Set<number>(),
+	sampleItems: [] as Item[],
+	sampleSlots: new Array(6).fill(undefined) as (Item | undefined)[],
+	sampleStats: [] as IBattlerAttribute[],
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	staticData: { itemMods: [] as any[] | undefined }
+}));
 
 vi.mock('$lib/engine', () => ({
 	EEquipmentSlot: {
@@ -32,6 +46,12 @@ vi.mock('$lib/engine', () => ({
 	inventoryManager: {
 		get unlockedItemList() {
 			return sampleItems;
+		},
+		get equippedSlots() {
+			return sampleSlots;
+		},
+		get equipmentStats() {
+			return sampleStats;
 		},
 		unlockedMods,
 		equipItem,
@@ -65,15 +85,6 @@ const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERar
 		...extra
 	}) as unknown as Item;
 
-// Locate a seeded item, narrowing it to a defined Item (avoids a null-forgiving `!`).
-const itemOf = (view: InventoryView, itemId: number): Item => {
-	const item = view.items.find((i) => i.itemId === itemId);
-	if (!item) {
-		throw new Error(`expected inventory item ${itemId} to exist`);
-	}
-	return item;
-};
-
 beforeEach(() => {
 	equipItem.mockClear();
 	unequipItem.mockClear();
@@ -82,6 +93,8 @@ beforeEach(() => {
 	removeMod.mockClear();
 	unlockedMods.clear();
 	staticData.itemMods = [];
+	sampleSlots.fill(undefined);
+	sampleStats.length = 0;
 	sampleItems.length = 0;
 	sampleItems.push(
 		makeItem(1, 'Zeta Helm', EItemCategory.Helm, ERarity.Rare, { favorite: true }),
@@ -107,18 +120,27 @@ describe('inventory-view helpers', () => {
 		expect(EQUIP_SLOTS).toHaveLength(6);
 		expect(SORTS.name.cmp(makeItem(9, 'Aaa', 1, 1), makeItem(8, 'Bbb', 1, 1))).toBeLessThan(0);
 	});
+
+	it('breaks a category-sort tie by name', () => {
+		// Same category falls through to the localeCompare tiebreak.
+		expect(SORTS.category.cmp(makeItem(9, 'Bbb', 2, 1), makeItem(8, 'Aaa', 2, 1))).toBeGreaterThan(0);
+	});
 });
 
-describe('InventoryView', () => {
-	it('seeds reactive copies from the manager', () => {
-		const view = new InventoryView();
-		expect(view.items).toHaveLength(3);
+describe('InventoryView derivations', () => {
+	it('reads the unlocked items through the manager', () => {
+		expect(new InventoryView().items).toHaveLength(3);
 	});
 
 	it('sorts visible items by name', () => {
 		const view = new InventoryView();
 		view.sort = 'name';
 		expect(view.visible.map((i) => i.name)).toEqual(['Alpha Blade', 'Mid Ring', 'Zeta Helm']);
+	});
+
+	it('sorts visible items by category then name by default', () => {
+		// Helm(1) < Weapon(5) < Accessory(6) by category id.
+		expect(new InventoryView().visible.map((i) => i.name)).toEqual(['Zeta Helm', 'Alpha Blade', 'Mid Ring']);
 	});
 
 	it('filters by favorites and by category', () => {
@@ -129,29 +151,6 @@ describe('InventoryView', () => {
 		view.favOnly = false;
 		view.filterCat = EItemCategory.Weapon;
 		expect(view.visible.map((i) => i.itemId)).toEqual([2]);
-	});
-
-	it('toggles favorite and delegates to the manager', () => {
-		const view = new InventoryView();
-		view.toggleFavorite(2);
-		expect(view.items.find((i) => i.itemId === 2)?.favorite).toBe(true);
-		expect(setFavorite).toHaveBeenCalledWith(2, true);
-	});
-
-	it('equips an item into a slot and reflects it in equippedBySlot + totals', () => {
-		const view = new InventoryView();
-		view.equip(2, 4 /* WeaponSlot */);
-		expect(view.equippedBySlot[4]?.itemId).toBe(2);
-		expect(equipItem).toHaveBeenCalledWith(2, 4);
-		expect(view.slotsFilled).toBe(1);
-		// the equipped weapon contributes +5 Strength
-		expect(view.equippedTotals).toEqual([{ name: 'Strength', value: 5 }]);
-	});
-
-	it('sorts visible items by category then name by default', () => {
-		const view = new InventoryView();
-		// Helm(1) < Weapon(5) < Accessory(6) by category id.
-		expect(view.visible.map((i) => i.name)).toEqual(['Zeta Helm', 'Alpha Blade', 'Mid Ring']);
 	});
 
 	it('tallies overall, favorite and per-category counts', () => {
@@ -178,49 +177,78 @@ describe('InventoryView', () => {
 		expect(view.dragItem?.name).toBe('Mid Ring');
 	});
 
-	it('reload re-seeds the reactive copies from the manager', () => {
+	it('yields null when the selected/drag id no longer matches an item', () => {
 		const view = new InventoryView();
-		sampleItems.push(makeItem(4, 'New Boots', EItemCategory.Boot, ERarity.Common));
-		expect(view.items).toHaveLength(3);
-		view.reload();
-		expect(view.items).toHaveLength(4);
+		view.select(999);
+		expect(view.selected).toBeNull();
+		view.dragItemId = 999;
+		expect(view.dragItem).toBeNull();
 	});
 
-	it('swaps the occupant when equipping into an already-filled slot', () => {
+	it('derives equippedBySlot and slotsFilled from the manager slots', () => {
+		sampleSlots[4] = sampleItems[1]; // Alpha Blade in the weapon slot
 		const view = new InventoryView();
-		view.equip(2, 4);
-		view.equip(3, 4); // re-use the same weapon slot
-		expect(view.equippedBySlot[4]?.itemId).toBe(3);
-		expect(view.items.find((i) => i.itemId === 2)?.equipped).toBe(false);
-		expect(view.items.find((i) => i.itemId === 2)?.equipmentSlotId).toBeUndefined();
+		expect(view.equippedBySlot[4]?.itemId).toBe(2);
+		expect(view.equippedBySlot[0]).toBeUndefined();
 		expect(view.slotsFilled).toBe(1);
 	});
 
-	it('unequips a slot and delegates to the manager', () => {
-		const view = new InventoryView();
-		view.equip(2, 4);
-		view.unequip(4);
-		expect(view.equippedBySlot[4]).toBeUndefined();
-		expect(view.items.find((i) => i.itemId === 2)?.equipped).toBe(false);
+	it('projects equippedTotals from the manager equipmentStats', () => {
+		sampleStats.push({ attributeId: EAttribute.Strength, amount: 5 });
+		expect(new InventoryView().equippedTotals).toEqual([{ name: 'Strength', value: 5 }]);
+	});
+});
+
+describe('InventoryView delegation', () => {
+	it('equip delegates to the manager', () => {
+		new InventoryView().equip(2, 4);
+		expect(equipItem).toHaveBeenCalledWith(2, 4);
+	});
+
+	it('unequip delegates to the manager', () => {
+		new InventoryView().unequip(4);
 		expect(unequipItem).toHaveBeenCalledWith(4);
 	});
 
-	it('toggleEquip equips an unequipped item and unequips an equipped one', () => {
-		const view = new InventoryView();
-		view.toggleEquip(itemOf(view, 2)); // Weapon category (5) → slot 4
-		expect(view.equippedBySlot[4]?.itemId).toBe(2);
+	it('toggleEquip equips an unequipped item into its category slot', () => {
+		const item = sampleItems[1]; // Weapon category (5) → slot 4
+		new InventoryView().toggleEquip(item);
+		expect(equipItem).toHaveBeenCalledWith(2, 4);
+		expect(unequipItem).not.toHaveBeenCalled();
+	});
 
-		view.toggleEquip(itemOf(view, 2));
-		expect(view.equippedBySlot[4]).toBeUndefined();
+	it('toggleEquip unequips an item already in a slot', () => {
+		const item = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary, {
+			equipped: true,
+			equipmentSlotId: 4
+		});
+		new InventoryView().toggleEquip(item);
 		expect(unequipItem).toHaveBeenCalledWith(4);
+		expect(equipItem).not.toHaveBeenCalled();
+	});
+
+	it('toggleFavorite delegates the flipped flag to the manager', () => {
+		new InventoryView().toggleFavorite(2); // currently false → true
+		expect(setFavorite).toHaveBeenCalledWith(2, true);
 	});
 
 	it('toggleFavorite is a no-op for an unknown item', () => {
-		const view = new InventoryView();
-		view.toggleFavorite(999);
+		new InventoryView().toggleFavorite(999);
 		expect(setFavorite).not.toHaveBeenCalled();
 	});
 
+	it('applyMod delegates with the manager argument order (itemId, modId, slotId)', () => {
+		new InventoryView().applyMod(2, 0 /* slotId */, 7 /* modId */);
+		expect(applyMod).toHaveBeenCalledWith(2, 7, 0);
+	});
+
+	it('removeMod delegates to the manager', () => {
+		new InventoryView().removeMod(2, 0);
+		expect(removeMod).toHaveBeenCalledWith(2, 0);
+	});
+});
+
+describe('InventoryView.compatibleMods', () => {
 	it('lists only unlocked, type-matching mods not already applied', () => {
 		staticData.itemMods = [
 			{ id: 0, name: 'Sharp', itemModTypeId: 2, attributes: [] },
@@ -238,36 +266,22 @@ describe('InventoryView', () => {
 		expect(compatible[0].itemModSlotId).toBe(-1);
 	});
 
-	it('applies a mod into a slot, replacing any existing mod there, and delegates', () => {
-		staticData.itemMods = [{ id: 0, name: 'Sharp', itemModTypeId: 2, attributes: [] }];
-		const view = new InventoryView();
-		view.applyMod(2, 0 /* slotId */, 0 /* modId */);
-		const item = itemOf(view, 2);
-		expect(item.appliedMods.map((m) => m.id)).toEqual([0]);
-		expect(item.appliedMods[0].itemModSlotId).toBe(0);
-		expect(applyMod).toHaveBeenCalledWith(2, 0, 0);
+	it('skips sparse catalogue gaps and not-yet-unlocked mods', () => {
+		// A gap in the itemMods catalogue must be filtered out rather than throw, and a
+		// type-matching mod the player has not unlocked is excluded.
+		staticData.itemMods = [
+			undefined,
+			{ id: 1, name: 'Heavy', itemModTypeId: 2, attributes: [] },
+			{ id: 2, name: 'Locked', itemModTypeId: 2, attributes: [] }
+		];
+		unlockedMods.add(1); // id 2 stays locked
+		const item = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary);
+		expect(new InventoryView().compatibleMods(2, item).map((m) => m.id)).toEqual([1]);
 	});
 
-	it('applyMod is a no-op when the item or mod data is missing', () => {
-		staticData.itemMods = [];
-		const view = new InventoryView();
-		view.applyMod(2, 0, 99); // no such mod
-		view.applyMod(999, 0, 0); // no such item
-		expect(applyMod).not.toHaveBeenCalled();
-	});
-
-	it('removes a mod from a slot and delegates', () => {
-		staticData.itemMods = [{ id: 0, name: 'Sharp', itemModTypeId: 2, attributes: [] }];
-		const view = new InventoryView();
-		view.applyMod(2, 0, 0);
-		view.removeMod(2, 0);
-		expect(view.items.find((i) => i.itemId === 2)?.appliedMods).toEqual([]);
-		expect(removeMod).toHaveBeenCalledWith(2, 0);
-	});
-
-	it('removeMod is a no-op for an unknown item', () => {
-		const view = new InventoryView();
-		view.removeMod(999, 0);
-		expect(removeMod).not.toHaveBeenCalled();
+	it('returns nothing when the mod catalogue is unavailable', () => {
+		staticData.itemMods = undefined;
+		const item = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary);
+		expect(new InventoryView().compatibleMods(2, item)).toEqual([]);
 	});
 });
