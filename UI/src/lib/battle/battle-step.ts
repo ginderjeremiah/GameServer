@@ -30,16 +30,26 @@ export interface SkillActivation {
 export function battleStep(player: Battler, enemy: Battler, timeDelta: number): SkillActivation[] {
 	const activations: SkillActivation[] = [];
 
-	for (const skill of player.advanceCooldowns(timeDelta)) {
+	// Expire timed effects at the start of the tick, before either side fires, so an effect influences
+	// exactly durationMs / tickSize ticks (counting its application tick).
+	player.advanceEffects(timeDelta);
+	enemy.advanceEffects(timeDelta);
+
+	// Resolve each loadout slot fully in order — accrue, fire, damage, then apply effects — before the
+	// next slot accrues, so an earlier slot's effect (e.g. a self CooldownRecovery buff) influences a
+	// later slot on the same tick, exactly as the backend's per-slot BattleSkill.Update does.
+	player.advanceCooldowns(timeDelta, (skill) => {
 		const damage = enemy.takeDamage(skill.calculateDamage());
 		activations.push({ skill, damage, byPlayer: true });
-	}
+		skill.applyEffects(enemy);
+	});
 
 	if (!enemy.isDead) {
-		for (const skill of enemy.advanceCooldowns(timeDelta)) {
+		enemy.advanceCooldowns(timeDelta, (skill) => {
 			const damage = player.takeDamage(skill.calculateDamage());
 			activations.push({ skill, damage, byPlayer: false });
-		}
+			skill.applyEffects(player);
+		});
 	}
 
 	return activations;

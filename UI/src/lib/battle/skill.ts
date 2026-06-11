@@ -1,4 +1,4 @@
-﻿import { IAttributeMultiplier, ISkill, ISkillEffect } from '$lib/api';
+﻿import { IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget } from '$lib/api';
 import { Battler } from './battler';
 import { calculateSkillDamage } from './battle-formulas';
 
@@ -29,5 +29,15 @@ export class Skill implements ISkill {
 
 	public calculateDamage() {
 		return calculateSkillDamage(this, this.owner.attributes);
+	}
+
+	/** Applies this skill's effects when it fires: each {@link ESkillEffectTarget.Self} effect to the
+	 *  casting owner, each {@link ESkillEffectTarget.Opponent} effect to the given opponent. Called after
+	 *  the skill's damage is dealt, so a self damage-buff never boosts its own carrying hit. */
+	public applyEffects(opponent: Battler) {
+		for (const effect of this.effects) {
+			const target = effect.target === ESkillEffectTarget.Self ? this.owner : opponent;
+			target.applyEffect(effect);
+		}
 	}
 }

@@ -82,7 +82,19 @@ namespace Game.Core
         /// <summary>
         /// CURRENTLY UNUSED. A derived game attribute. Represents a flat reduction for damage received when a block occurs.
         /// </summary>
-        BlockReduction = 14
+        BlockReduction = 14,
+
+        /// <summary>
+        /// CURRENTLY UNUSED. A per-second attribute representing the amount of damage taken each second from
+        /// damage-over-time effects. Consumed by the DoT/HoT simulator phase (#334).
+        /// </summary>
+        DamageTakenPerSecond = 15,
+
+        /// <summary>
+        /// CURRENTLY UNUSED. A per-second attribute representing the amount of health restored each second from
+        /// heal-over-time effects. Consumed by the DoT/HoT simulator phase (#334).
+        /// </summary>
+        HealthRegenPerSecond = 16
     }
 
     /// <summary>

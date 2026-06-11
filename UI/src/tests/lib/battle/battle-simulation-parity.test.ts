@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EItemModType } from '$lib/api';
+import { EAttribute, EItemModType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IItem, IItemMod } from '$lib/api';
 
 // Drive the REAL production simulation. The mocked `staticData.skills` is the
@@ -26,7 +26,10 @@ vi.mock('$stores', () => ({
 import { BattleSimulator, Battler } from '$lib/battle';
 import type { BattleResult } from '$lib/battle';
 import { DEFAULT_MAX_BATTLE_MS, MS_PER_TICK } from '$lib/api/types/game-constants';
-import { battlerFactory, equipmentFactory, makeSkill } from './battle-sim-test-utils';
+import { battlerFactory, equipmentFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
+
+/** A duration long enough that an effect never expires within a battle (for "permanent" buffs). */
+const PERMANENT = 1_000_000;
 
 /**
  * The parity matrix below asserts the full outcome (victory / playerDied /
@@ -238,6 +241,154 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(5, 2000)]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 7840 }
+	},
+
+	// A self Strength buff: the carrying hit uses the pre-effect attributes and only subsequent hits see
+	// the boost (which also raises damage via the Strength→damage path); re-applying it each fire REFRESHES
+	// rather than stacks. Mirrors the backend `selfStrengthBuffAffectsLaterHits` scenario.
+	//   Player: Str=10, cdMult=1; skill = Str×1.0 raw, cooldown 400. Effect: Self +10 Strength, permanent.
+	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Hit 1 deals 10−2=8 (pre-buff); hits 2+ deal 20−2=18. Enemy HP 100 dies on hit 7 at 2800.
+	{
+		name: 'selfStrengthBuffAffectsLaterHits',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[makeEffect(100, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2800 }
+	},
+
+	// A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after the first
+	// hit applies it. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
+	//   Player: Str=20, base CDR=0 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
+	//     Effect: Self +100 CooldownRecovery → cdMult=2 once applied, permanent.
+	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 18.
+	//   Hit 1 at 400 applies the buff; thereafter the skill fires every 200ms → hit 6 at 1400.
+	{
+		name: 'cdrBuffShortensFireInterval',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 20 }],
+				[
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[
+							makeEffect(
+								101,
+								ESkillEffectTarget.Self,
+								EAttribute.CooldownRecovery,
+								EModifierType.Additive,
+								100,
+								PERMANENT
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1400 }
+	},
+
+	// Same-tick ordering: slot 0's self buff (applied after its own pre-buff hit) influences slot 1 firing
+	// after it on the same tick. Mirrors the backend `sameTickEarlierSlotBuffsLaterSlot` scenario.
+	//   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent), slot1 = Str×1.0 (no effect), both cooldown 400.
+	//   Enemy:  Str=16 → MaxHealth=130, Def=2, no skills.
+	//   Tick 400 deals 8 (slot0) + 18 (slot1, buffed) = 26; later ticks deal 36. Enemy HP 130 dies at 1600.
+	{
+		name: 'sameTickEarlierSlotBuffsLaterSlot',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[makeEffect(102, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
+					),
+					makeSkill(0, 400, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }])
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 16 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// MaxHealth clamp: an Opponent MaxHealth ×0.5 debuff halves the enemy's maximum and clamps its current
+	// health down to it. Mirrors the backend `opponentMaxHealthDebuffClamps` scenario.
+	//   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400.
+	//     Effect: Opponent ×0.5 MaxHealth (multiplicative), permanent.
+	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Tick 400 deals 10 (100→90) then halves MaxHealth to 50 → clamps to 50, then 50→0 → dies at 2400.
+	{
+		name: 'opponentMaxHealthDebuffClamps',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeSkill(
+						12,
+						400,
+						[],
+						[
+							makeEffect(
+								103,
+								ESkillEffectTarget.Opponent,
+								EAttribute.MaxHealth,
+								EModifierType.Multiplicative,
+								0.5,
+								PERMANENT
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Same-tick CDR ordering: slot 0's self CooldownRecovery buff speeds up slot 1's accrual on the same
+	// tick, because each slot reads the cooldown multiplier live in loadout order. Mirrors the backend
+	// `cdrBuffSpeedsLaterSlotSameTick` scenario.
+	//   Player: base CDR=0. slot0 = pure buffer (0 dmg, cooldown 40, Self +100 CDR permanent → cdMult=2),
+	//     slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
+	//   The boosted accrual makes slot1 fire at 200,400,600 → enemy dies on the 3rd hit at 600.
+	{
+		name: 'cdrBuffSpeedsLaterSlotSameTick',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeSkill(
+						0,
+						40,
+						[],
+						[
+							makeEffect(
+								104,
+								ESkillEffectTarget.Self,
+								EAttribute.CooldownRecovery,
+								EModifierType.Additive,
+								100,
+								PERMANENT
+							)
+						]
+					),
+					makeSkill(27, 400)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 5 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 600 }
 	}
 ];
 

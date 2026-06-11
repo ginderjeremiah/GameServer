@@ -20,6 +20,11 @@ namespace Game.Core.Battle
             int totalMs;
             for (totalMs = msPerTick; totalMs <= limit; totalMs += msPerTick)
             {
+                // Expire timed effects at the start of the tick, before either side fires, so an effect
+                // influences exactly DurationMs / tickSize ticks (counting its application tick).
+                PlayerBattler.AdvanceEffects(msPerTick);
+                EnemyBattler.AdvanceEffects(msPerTick);
+
                 PlayerBattler.Update(context);
 
                 if (EnemyBattler.IsDead)
