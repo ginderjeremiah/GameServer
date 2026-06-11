@@ -22,7 +22,7 @@ namespace Game.Core.Tests.Events
             var aggregate = new TestAggregate();
             aggregate.Raise(new FirstEvent(aggregate));
 
-            await dispatcher.DispatchAsync(aggregate);
+            await dispatcher.DispatchAsync(aggregate, TestContext.Current.CancellationToken);
 
             // The second handler ran only because the drain re-dispatched the event the first handler
             // raised mid-cycle, and the aggregate is left with nothing pending.
