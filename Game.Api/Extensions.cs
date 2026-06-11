@@ -14,22 +14,9 @@ namespace Game.Api
             };
         }
 
-        public static AsyncModelMapper<TEntity> To<TEntity>(this IAsyncEnumerable<TEntity>? source)
-        {
-            return new AsyncModelMapper<TEntity>(source);
-        }
-
         public static ModelMapper<TEntity> To<TEntity>(this IEnumerable<TEntity>? source)
         {
             return new ModelMapper<TEntity>(source);
-        }
-
-        public static async IAsyncEnumerable<TResult> Select<TSource, TResult>(this IAsyncEnumerable<TSource> source, Func<TSource, TResult> selector)
-        {
-            await foreach (var item in source)
-            {
-                yield return selector(item);
-            }
         }
     }
 }
