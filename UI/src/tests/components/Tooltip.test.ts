@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import Tooltip from '$components/Tooltip.svelte';
@@ -45,5 +45,45 @@ describe('Tooltip', () => {
 		// so the node should be a child of the tooltip container.
 		const tooltipEl = container.querySelector('[role="tooltip"]') as HTMLElement;
 		expect(tooltipEl.querySelector('div')?.textContent).toBe('tooltip-content');
+	});
+
+	describe('position clamping', () => {
+		beforeEach(() => {
+			// Deterministic viewport so the clamp thresholds don't depend on the jsdom default.
+			window.innerWidth = 1000;
+			window.innerHeight = 800;
+		});
+
+		// The style derived reads the (non-reactive) container binding, so it only recomputes once a
+		// reactive prop changes after mount — mirroring the real store toggling `visible` post-mount.
+		const renderVisible = async (position: { x: number; y: number }) => {
+			const props = makeProps({ visible: false, position });
+			const result = render(Tooltip, { props });
+			await result.rerender({ ...props, visible: true });
+			flushSync();
+			return result.container.querySelector('[role="tooltip"]') as HTMLElement;
+		};
+
+		it('anchors top-left near the origin (fits within the viewport)', async () => {
+			const tooltip = await renderVisible({ x: 20, y: 30 });
+
+			expect(tooltip.style.display).toBe('block');
+			expect(tooltip.style.left).toBe('35px');
+			expect(tooltip.style.top).toBe('45px');
+			expect(tooltip.style.right).toBe('');
+			expect(tooltip.style.bottom).toBe('');
+		});
+
+		it('flips to bottom-right when the cursor is near the far edges', async () => {
+			const tooltip = await renderVisible({ x: 990, y: 795 });
+
+			expect(tooltip.style.display).toBe('block');
+			// right = innerWidth - x + 15 = 1000 - 990 + 15
+			expect(tooltip.style.right).toBe('25px');
+			// bottom = innerHeight - y + 15 = 800 - 795 + 15
+			expect(tooltip.style.bottom).toBe('20px');
+			expect(tooltip.style.left).toBe('');
+			expect(tooltip.style.top).toBe('');
+		});
 	});
 });

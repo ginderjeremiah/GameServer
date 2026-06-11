@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import {
 	EChallengeGoalComparison,
 	EChallengeType,
@@ -85,5 +85,44 @@ describe('Challenges screen', () => {
 		// A failed load must not masquerade as a player with zero progress.
 		expect(screen.queryByText('Overview')).toBeNull();
 		expect(mockToastError).toHaveBeenCalledTimes(1);
+	});
+
+	describe('rail/detail interaction', () => {
+		it('pivots from the overview into a type detail when a type card is picked', async () => {
+			const { container } = render(Challenges);
+			await screen.findByText('Overview');
+
+			// Click the overview's "Enemies Killed" type card → view.select(type).
+			const typeCard = container.querySelector('.type-card') as HTMLElement;
+			await fireEvent.click(typeCard);
+
+			// The detail grid now shows the type's challenge cards + the sort control.
+			expect(await screen.findByText('First Blood')).toBeTruthy();
+			expect(screen.getByText('Sort')).toBeTruthy();
+			expect(screen.queryByText('Overview')).not.toBeNull(); // rail still present
+		});
+
+		it('selects a type from the rail', async () => {
+			const { container } = render(Challenges);
+			await screen.findByText('Overview');
+
+			const railButtons = container.querySelectorAll('.rail button');
+			// [0] is the Overview entry; [1] is the first type's rail button.
+			await fireEvent.click(railButtons[1]);
+
+			expect(await screen.findByText('First Blood')).toBeTruthy();
+		});
+
+		it('switches the active sort via the SortControl', async () => {
+			const { container } = render(Challenges);
+			await screen.findByText('Overview');
+			await fireEvent.click(container.querySelector('.type-card') as HTMLElement);
+			await screen.findByText('First Blood');
+
+			const nameSort = screen.getByText('Name');
+			await fireEvent.click(nameSort);
+
+			expect(nameSort.closest('button')?.classList.contains('active')).toBe(true);
+		});
 	});
 });
