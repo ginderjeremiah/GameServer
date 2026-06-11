@@ -1,4 +1,4 @@
-import { ApiRequest, fetchSocketData, type ISkill } from '$lib/api';
+import { ApiRequest, EAttribute, EModifierType, ESkillEffectTarget, fetchSocketData, type ISkill } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, persistEntity, skillEffectChanges } from '../save-helpers';
@@ -111,9 +111,9 @@ export const skillEntity: EntityConfig<ISkill> = {
 			emptySub: 'This skill applies no timed attribute modifiers.',
 			newRow: () => ({
 				id: 0,
-				target: 2,
-				attributeId: 0,
-				modifierTypeId: 1,
+				target: ESkillEffectTarget.Opponent,
+				attributeId: EAttribute.Strength,
+				modifierTypeId: EModifierType.Additive,
 				amount: 0,
 				durationMs: 3000
 			}),

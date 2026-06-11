@@ -384,7 +384,7 @@ namespace Game.Core
     }
 
     /// <summary>
-    /// Determines which battler a <see cref="SkillEffect"/> is applied to when its skill fires.
+    /// Determines which battler a <see cref="Skills.SkillEffect"/> is applied to when its skill fires.
     /// </summary>
     [ClientMirrored]
     public enum ESkillEffectTarget

@@ -669,6 +669,17 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(selfBuff.Id, remaining.Id);
             Assert.Equal(ESkillEffectTarget.Self, remaining.Target);
             Assert.Equal(25m, remaining.Amount);
+
+            // The domain projection (SkillMapper.ToCore, which #333's battle runtime consumes)
+            // resolves the same effect: decimal→double amount, enum casts, surrogate id.
+            var domainSkill = GetDomainSkill(skill.Id);
+            var domainEffect = Assert.Single(domainSkill.Effects);
+            Assert.Equal(selfBuff.Id, domainEffect.Id);
+            Assert.Equal(ESkillEffectTarget.Self, domainEffect.Target);
+            Assert.Equal(EAttribute.Strength, domainEffect.AttributeId);
+            Assert.Equal(EModifierType.Additive, domainEffect.ModifierType);
+            Assert.Equal(25.0, domainEffect.Amount);
+            Assert.Equal(5000, domainEffect.DurationMs);
         }
 
         [Fact]
@@ -835,6 +846,12 @@ namespace Game.Api.Tests.Integration
         {
             using var scope = CreateScope();
             return scope.ServiceProvider.GetRequiredService<ISkills>().AllSkills().ToList();
+        }
+
+        private Game.Core.Skills.Skill GetDomainSkill(int skillId)
+        {
+            using var scope = CreateScope();
+            return scope.ServiceProvider.GetRequiredService<ISkills>().GetSkill(skillId);
         }
 
         private List<Enemy> GetEnemies()

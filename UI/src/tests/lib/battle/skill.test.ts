@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute } from '$lib/api';
+import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IAttributeMultiplier } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { Skill } from '$lib/battle/skill';
@@ -28,7 +28,17 @@ const makeMockOwner = (attrs: [EAttribute, number][] = []) => {
 describe('Skill', () => {
 	describe('constructor', () => {
 		it('copies all properties from skill data', () => {
-			const data = makeSkillData({ id: 5, name: 'Fireball', baseDamage: 25, cooldownMs: 2000 });
+			const effects = [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 5,
+					durationMs: 3000
+				}
+			];
+			const data = makeSkillData({ id: 5, name: 'Fireball', baseDamage: 25, cooldownMs: 2000, effects });
 			const owner = makeMockOwner();
 			const skill = new Skill(data, owner);
 
@@ -36,6 +46,7 @@ describe('Skill', () => {
 			expect(skill.name).toBe('Fireball');
 			expect(skill.baseDamage).toBe(25);
 			expect(skill.cooldownMs).toBe(2000);
+			expect(skill.effects).toEqual(effects);
 		});
 
 		it('initializes chargeTime and renderChargeTime to 0', () => {

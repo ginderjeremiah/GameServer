@@ -10,8 +10,8 @@ namespace Game.DataAccess.Mapping
 {
     internal static class SkillMapper
     {
-        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage multipliers loaded) to the
-        /// reference-data read <see cref="Contracts.Skill"/> contract.</summary>
+        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded)
+        /// to the reference-data read <see cref="Contracts.Skill"/> contract.</summary>
         public static Contracts.Skill ToContract(EntitySkill entity)
         {
             return new Contracts.Skill
@@ -43,7 +43,7 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>
-        /// Maps an entity <see cref="EntitySkill"/> (with its damage multipliers loaded) to a
+        /// Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded) to a
         /// domain <see cref="Skill"/>.
         /// </summary>
         public static Skill ToCore(EntitySkill entity)
@@ -63,7 +63,7 @@ namespace Game.DataAccess.Mapping
                         Type = EModifierType.Multiplicative,
                         Source = EAttributeModifierSource.Derived,
                     }).ToList(),
-                Effects = (entity.SkillEffects ?? [])
+                Effects = entity.SkillEffects
                     .Select(se => new CoreSkillEffect
                     {
                         Id = se.Id,
