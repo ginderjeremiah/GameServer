@@ -171,6 +171,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_UnknownEventType_DeadLettersWithoutRetrying()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // A well-formed envelope whose Type matches no registered handler case — e.g. a new event
+            // added to PlayerPersistencePublisher without a corresponding case in HandleEvent.
+            var envelope = new DomainEventEnvelope
+            {
+                Type = "UnregisteredEventType",
+                Payload = "{}",
+            };
+            var message = envelope.Serialize();
+            var queue = new InMemoryPubSubQueue(message);
+
+            await synchronizer.ProcessQueue(queue);
+
+            // An unknown type is a poison message — no retry can fix it — so it is dead-lettered
+            // immediately with a warning and without escalating to an error.
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
+        }
+
+        [Fact]
         public async Task ProcessQueue_SkillUnlockedEvent_InsertsUnselectedPlayerSkillIdempotently()
         {
             using var scope = CreateScope();
@@ -322,6 +349,17 @@ namespace Game.Application.Tests.DataAccess
             AssertSkillState(rows, skill1.Id, selected: false, order: 0);
         }
 
+        [Fact]
+        public async Task StartAsync_SubscribeThrows_PropagatesException()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var throwingPubSub = new ThrowingPubSubService();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, throwingPubSub, logger, TestRetryPolicy);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => synchronizer.StartAsync(CancellationToken.None));
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -413,6 +451,23 @@ namespace Game.Application.Tests.DataAccess
 
                 return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
             }
+        }
+
+        /// <summary>
+        /// A minimal <see cref="IPubSubService"/> stub whose <c>Subscribe</c> overloads always throw, used to verify
+        /// that <see cref="DataProviderSynchronizer.StartAsync"/> propagates a subscribe failure rather than swallowing it.
+        /// </summary>
+        private sealed class ThrowingPubSubService : IPubSubService
+        {
+            public Task Publish(string channel, string message) => Task.CompletedTask;
+            public Task Publish(string channel, string queueName, string queueData) => Task.CompletedTask;
+            public Task Publish<T>(string channel, string queueName, T queueData) => Task.CompletedTask;
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task UnSubscribe(string channel) => Task.CompletedTask;
+            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
