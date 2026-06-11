@@ -20,7 +20,6 @@ export class Battler {
 	public currentHealth = 0;
 	public attributes: BattleAttributes = new BattleAttributes();
 	public skills: (Skill | undefined)[] = [];
-	public maxSkills = MAX_SELECTED_SKILLS;
 	public isDead = true;
 
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
