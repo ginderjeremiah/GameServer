@@ -3,13 +3,16 @@ import {
 	EItemCategory,
 	ERarity,
 	type EAttribute,
+	type EModifierType,
+	type ESkillEffectTarget,
 	type EItemModType,
 	type IAppliedModModel,
 	type IAttributeMultiplier,
 	type IBattlerAttribute,
 	type IItem,
 	type IItemMod,
-	type ISkill
+	type ISkill,
+	type ISkillEffect
 } from '$lib/api';
 
 /**
@@ -29,13 +32,25 @@ export interface SkillSpec {
 	baseDamage: number;
 	cooldownMs: number;
 	multipliers: IAttributeMultiplier[];
+	effects: ISkillEffect[];
 }
 
 export const makeSkill = (
 	baseDamage: number,
 	cooldownMs: number,
-	multipliers: IAttributeMultiplier[] = []
-): SkillSpec => ({ baseDamage, cooldownMs, multipliers });
+	multipliers: IAttributeMultiplier[] = [],
+	effects: ISkillEffect[] = []
+): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects });
+
+/** A timed skill effect, mirroring the backend parity test's MakeEffect helper. */
+export const makeEffect = (
+	id: number,
+	target: ESkillEffectTarget,
+	attributeId: EAttribute,
+	modifierTypeId: EModifierType,
+	amount: number,
+	durationMs: number
+): ISkillEffect => ({ id, target, attributeId, modifierTypeId, amount, durationMs });
 
 /**
  * Binds a `makeBattler` builder to a mock skill registry (the array a test's
@@ -61,7 +76,7 @@ export function battlerFactory(registry: ISkill[]) {
 				baseDamage: spec.baseDamage,
 				cooldownMs: spec.cooldownMs,
 				damageMultipliers: spec.multipliers,
-				effects: [],
+				effects: spec.effects,
 				description: '',
 				iconPath: ''
 			});

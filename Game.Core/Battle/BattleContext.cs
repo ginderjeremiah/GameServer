@@ -1,3 +1,5 @@
+using Game.Core.Skills;
+
 namespace Game.Core.Battle
 {
     public class BattleContext
@@ -31,6 +33,17 @@ namespace Game.Core.Battle
         public double GetActiveBattlerCooldownMultiplier()
         {
             return _activeBattler.GetCooldownMultiplier();
+        }
+
+        /// <summary>
+        /// Applies a skill <paramref name="effect"/> to the battler its <see cref="ESkillEffectTarget"/>
+        /// selects: <see cref="ESkillEffectTarget.Self"/> to the active (casting) battler,
+        /// <see cref="ESkillEffectTarget.Opponent"/> to the target battler.
+        /// </summary>
+        public void ApplySkillEffect(SkillEffect effect)
+        {
+            var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
+            battler.ApplyEffect(effect);
         }
 
         public void DamageTarget(double damage)

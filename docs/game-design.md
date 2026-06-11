@@ -14,17 +14,30 @@ There are some choices already made in the design of the game to support this:
 
 Character progression in the game is primarily driven by leveling up and allocating stat points. As players defeat monsters and complete challenges, they earn experience points (XP) that contribute to their character's level. When a player levels up, they receive stat points that can be allocated to core Attributes such as Strength, Agility, Intelligence, etc.
 
-Attributes are somewhat of a work-in-progress feature, but the general idea is that they will provide various bonuses and effects that influence combat, other Attributes, and potentially other mechanics in the game. Currently they come from stat allocations and equipment, but this will be expanded in the future. For example, a Skill may receive a damage bonus based on the player's Strength Attribute, and the player's MaxHealth Attribute will receive a bonus based on their Strength as well. Attributes are designed to go above and beyond the traditional RPG stats and provide a system for complex effects. For example, a Skill may cause a damage-over-time effect, which would be implemented by giving the target a bonus to their "DamageReceivedPerTick" or "PoisonDamagePerTick" Attribute for a certain duration. The battle simulation would then have logic implemented to apply that damage over time based on the value of that Attribute.
+Attributes are somewhat of a work-in-progress feature, but the general idea is that they will provide various bonuses and effects that influence combat, other Attributes, and potentially other mechanics in the game. Currently they come from stat allocations and equipment, but this will be expanded in the future. For example, a Skill may receive a damage bonus based on the player's Strength Attribute, and the player's MaxHealth Attribute will receive a bonus based on their Strength as well. Attributes are designed to go above and beyond the traditional RPG stats and provide a system for complex effects.
+
+The attribute system is the substrate for timed skill effects (see [Skills](#skills)): applying an effect adds a real attribute modifier to the target mid-battle and expiry removes it, so derived attributes cascade naturally (a temporary Strength buff also raises MaxHealth, exactly like a permanent one). Damage-over-time and heal-over-time are realized the same way, through two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — that an end-of-tick simulator phase will consume (a poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration). Those two attributes are defined now; the simulator phase that applies them is the remaining piece of the DoT/HoT work.
 
 # Skills
 
-Skills are a fairly underdeveloped feature in the game, but the general idea is that they will provide active abilities for players that are automatically used during battles. Skills currently only deal damage.
+Skills are a fairly underdeveloped feature in the game, but the general idea is that they will provide active abilities for players that are automatically used during battles. Beyond dealing damage, a skill can carry **timed effects** — buffs/debuffs that raise or lower an attribute on the caster or the opponent for a duration (see [Skill Effects](#skill-effects)).
 
 Skills are **unlockable through Challenges**, mirroring the item/mod reward path: a challenge may carry an optional `RewardSkillId`, and completing it unlocks that skill via `Player.UnlockSkill`. An earned skill is added to the player's unlocked set **unselected** — unlocking a skill does not auto-equip it. New players still start with their fixed starter skills equipped.
 
 Players choose which unlocked skills are equipped (and in what order) through the skill **loadout**. The equipped set is **capped at 4** (`GameConstants.MaxSelectedSkills`, matching the enemy loadout cap) and its **order is meaningful** — it drives in-game display order and is the current (incidental) tie-break when two skills come off cooldown on the same tick. The loadout is replaced **atomically**: a single `SetSelectedSkills(orderedSkillIds)` command handles select, deselect, and reorder through one path, with the cap and unlocked-only rules enforced on the backend as **anti-cheat**. The player-facing selection page is the remaining piece of this feature.
 
-In the future, Skills will be expanded to include a wider variety of effects, such as buffs, debuffs, healing, and utility effects, and skills may become unlockable through means beyond Challenges.
+In the future, Skills will be expanded to include a wider variety of effects, such as healing and utility effects, and skills may become unlockable through means beyond Challenges.
+
+## Skill Effects
+
+A skill may carry any number of authored **effects**. Each effect is a timed attribute modifier with a `Target` (the caster — `Self` — or the `Opponent`), an `Attribute`, a modifier type (additive/multiplicative), an `Amount`, and a `DurationMs`. When the skill fires, each effect is applied to its target as a real attribute modifier that expires after its duration. The runtime rules (which the frontend and backend implement identically, since battle logic runs on both sides) are:
+
+- **Damage first, then effects.** A skill computes and deals its damage from the pre-effect attribute state, then applies its effects — so a self damage-buff never boosts the very hit that carries it. Because skills resolve in loadout order, an earlier slot's effect *does* influence a later slot firing on the same tick.
+- **Timed, in 40ms ticks.** A duration of `DurationMs` influences `DurationMs / 40` ticks (counting the tick it was applied on); effects expire at the start of a tick, before any skill fires.
+- **Refresh, not stack.** Re-applying an already-active effect refreshes its remaining duration to full rather than adding a second modifier — magnitudes never stack from the same authored effect (distinct effects on the same attribute do stack).
+- **MaxHealth never heals on a buff.** When an effect raises MaxHealth, current health is left unchanged (no free healing); when MaxHealth drops below current health, current health is clamped down to the new maximum.
+
+Effects are deterministic in this version (they always apply when the skill fires — no proc chance), and durations are time-based. Authoring effects on skills is done through the admin Workbench's skill editor.
 
 # Items, Item Mods, and Tags
 

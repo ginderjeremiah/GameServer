@@ -23,9 +23,21 @@ namespace Game.Core.Battle
             if (ChargeTime >= Skill.CooldownMs)
             {
                 ChargeTime = 0.0;
+                // Damage is computed and dealt from the pre-effect attribute state, then the effects are
+                // applied — so a self damage-buff never boosts the hit that carries it, and an earlier
+                // loadout slot's effect does influence a later slot firing on the same tick.
                 var damage = CalculateDamage(context);
                 context.RecordSkillUse(Skill.Id, damage);
                 context.DamageTarget(damage);
+                ApplyEffects(context);
+            }
+        }
+
+        private void ApplyEffects(BattleContext context)
+        {
+            foreach (var effect in Skill.Effects)
+            {
+                context.ApplySkillEffect(effect);
             }
         }
 

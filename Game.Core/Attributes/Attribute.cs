@@ -51,6 +51,8 @@ namespace Game.Core.Attributes
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 BlockChance => "The percentage chance to block part of the damage from an incoming attack.",
                 BlockReduction => "A flat reduction applied to damage received when an attack is blocked.",
+                DamageTakenPerSecond => "The amount of damage taken each second from damage-over-time effects.",
+                HealthRegenPerSecond => "The amount of health restored each second from heal-over-time effects.",
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No description defined for the given attribute.")
             };
 #pragma warning restore CS0618

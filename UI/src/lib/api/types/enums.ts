@@ -18,6 +18,8 @@ export enum EAttribute {
 	DodgeChance = 12,
 	BlockChance = 13,
 	BlockReduction = 14,
+	DamageTakenPerSecond = 15,
+	HealthRegenPerSecond = 16,
 }
 
 export enum EAttributeModifierSource {

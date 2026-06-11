@@ -169,7 +169,104 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 7840),
+
+                // A self Strength buff: the hit that CARRIES the effect uses the pre-effect attributes,
+                // and only subsequent hits see the boost (which also raises damage via the Strength→damage
+                // path) — and re-applying it every fire REFRESHES rather than stacks (Str stays 20, not 30+).
+                //   Player: Str=10, cdMult=1; skill = Str×1.0 raw, fires every 10 ticks (cooldown 400).
+                //     Effect: Self +10 Strength (additive), effectively permanent.
+                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+                //   Hit 1 deals Str(10)−2 = 8 (pre-buff); hits 2+ deal Str(20)−2 = 18.
+                //   Enemy HP 100 → 92,74,56,38,20,2,−16: dies on hit 7 at tick 2800.
+                //   (A buggy carrying-hit boost would kill on hit 6 = 2400; stacking would kill even sooner.)
+                ["selfStrengthBuffAffectsLaterHits"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0,
+                                effects: [MakeEffect(100, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2800),
+
+                // A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after
+                // the first hit applies it — proving CDR buffs change fire ticks.
+                //   Player: Str=20, base CDR=0 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
+                //     Effect: Self +100 CooldownRecovery (additive) → cdMult=2 once applied, effectively permanent.
+                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 20−2 = 18.
+                //   Hit 1 fires at 400 (cdMult=1) and applies the buff; thereafter charge/tick = 80, so the
+                //   skill fires every 200ms: hits at 400,600,800,1000,1200,1400 → enemy dies on hit 6 at 1400.
+                //   (Ignoring the live CDR read would keep the 400ms interval → hit 6 at 2400.)
+                ["cdrBuffShortensFireInterval"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 20, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0,
+                                effects: [MakeEffect(101, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 100, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1400),
+
+                // Same-tick ordering: an earlier loadout slot's self buff influences a later slot firing on the
+                // same tick. Slot 0 buffs Strength after dealing its (pre-buff) damage, then slot 1 — firing
+                // after it on the same tick — deals its damage from the already-buffed Strength.
+                //   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent), slot1 = Str×1.0 (no effect),
+                //     both cooldown 400 so they fire together at 400,800,…; cdMult=1.
+                //   Enemy:  Str=16 → MaxHealth=130, Def=2, no skills.
+                //   Tick 400: slot0 deals 10−2=8 then buffs Str→20; slot1 deals 20−2=18 → 26 that tick.
+                //   Ticks 800+: both deal 18 → 36/tick. Enemy HP 130 → 104,68,32,−4: dies at tick 1600.
+                //   (If slot1 didn't see slot0's buff, tick 400 would deal only 16 and the kill would slip to 2000.)
+                ["sameTickEarlierSlotBuffsLaterSlot"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0,
+                                effects: [MakeEffect(102, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, Permanent)]),
+                            MakeSkill(2, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 16, endurance: 0,
+                        skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // MaxHealth clamp: an Opponent MaxHealth ×0.5 debuff halves the enemy's maximum, and because its
+                // current health exceeds the new max it is clamped down immediately — bringing the kill forward.
+                //   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400.
+                //     Effect: Opponent ×0.5 MaxHealth (multiplicative), effectively permanent.
+                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+                //   Tick 400: deals 10 (100→90) then halves MaxHealth to 50 → clamps 90 down to 50.
+                //   Then 50→40→30→20→10→0 over the next hits: dies at tick 2400 (vs 4000 with no debuff).
+                ["opponentMaxHealthDebuffClamps"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 12, cooldownMs: 400,
+                                effects: [MakeEffect(103, ESkillEffectTarget.Opponent, EAttribute.MaxHealth, EModifierType.Multiplicative, 0.5, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
             };
+
+        /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
+        private const int Permanent = 1_000_000;
 
         public static IEnumerable<object[]> ScenarioNames =>
             Scenarios.Keys.Select(name => new object[] { name });
@@ -242,7 +339,8 @@ namespace Game.Core.Tests.Battle
 
         private static Skill MakeSkill(
             int id, double baseDamage, int cooldownMs,
-            EAttribute? mult = null, double multAmount = 0) => new()
+            EAttribute? mult = null, double multAmount = 0,
+            List<SkillEffect>? effects = null) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
@@ -261,7 +359,19 @@ namespace Game.Core.Tests.Battle
                             Source = EAttributeModifierSource.Derived,
                         }
                     ],
-                Effects = [],
+                Effects = effects ?? [],
+            };
+
+        private static SkillEffect MakeEffect(
+            int id, ESkillEffectTarget target, EAttribute attribute,
+            EModifierType modifierType, double amount, int durationMs) => new()
+            {
+                Id = id,
+                Target = target,
+                AttributeId = attribute,
+                ModifierType = modifierType,
+                Amount = amount,
+                DurationMs = durationMs,
             };
 
         private static Battler MakeBattler(

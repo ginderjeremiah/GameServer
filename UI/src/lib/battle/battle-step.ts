@@ -30,15 +30,22 @@ export interface SkillActivation {
 export function battleStep(player: Battler, enemy: Battler, timeDelta: number): SkillActivation[] {
 	const activations: SkillActivation[] = [];
 
+	// Expire timed effects at the start of the tick, before either side fires, so an effect influences
+	// exactly durationMs / tickSize ticks (counting its application tick).
+	player.advanceEffects(timeDelta);
+	enemy.advanceEffects(timeDelta);
+
 	for (const skill of player.advanceCooldowns(timeDelta)) {
 		const damage = enemy.takeDamage(skill.calculateDamage());
 		activations.push({ skill, damage, byPlayer: true });
+		skill.applyEffects(enemy);
 	}
 
 	if (!enemy.isDead) {
 		for (const skill of enemy.advanceCooldowns(timeDelta)) {
 			const damage = player.takeDamage(skill.calculateDamage());
 			activations.push({ skill, damage, byPlayer: false });
+			skill.applyEffects(player);
 		}
 	}
 
