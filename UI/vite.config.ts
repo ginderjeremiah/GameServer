@@ -32,7 +32,7 @@ export default defineConfig({
 			// route/component layers are gated at-current to block backsliding without demanding tests
 			// for pure-display markup. Re-seed with `node scripts/coverage-floors.mjs` to ratchet up.
 			thresholds: {
-				'src/lib/battle/**': { lines: 99, functions: 100, branches: 89, statements: 99 },
+				'src/lib/battle/**': { lines: 99, functions: 100, branches: 90, statements: 99 },
 				'src/lib/engine/**': { lines: 94, functions: 92, branches: 87, statements: 93 },
 				'src/lib/common/**': { lines: 94, functions: 89, branches: 82, statements: 94 },
 				'src/lib/api/**': { lines: 89, functions: 90, branches: 82, statements: 89 },
