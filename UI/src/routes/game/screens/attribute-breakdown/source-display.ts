@@ -19,7 +19,9 @@ const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.Derived]: 'derived',
 	// AttributeDistribution is an enemy/NPC source that never appears in a
 	// player's breakdown; it falls back to the neutral base hue if ever shown.
-	[EAttributeModifierSource.AttributeDistribution]: 'base'
+	[EAttributeModifierSource.AttributeDistribution]: 'base',
+	// SkillEffect is a timed battle modifier; it falls back to the derived hue.
+	[EAttributeModifierSource.SkillEffect]: 'derived'
 };
 
 const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
@@ -28,7 +30,8 @@ const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.Item]: 'Equipment',
 	[EAttributeModifierSource.ItemMod]: 'Item mods',
 	[EAttributeModifierSource.Derived]: 'Derived',
-	[EAttributeModifierSource.AttributeDistribution]: 'Distribution'
+	[EAttributeModifierSource.AttributeDistribution]: 'Distribution',
+	[EAttributeModifierSource.SkillEffect]: 'Skill effect'
 };
 
 /** Themeable source accent hue, e.g. `var(--source-points)`. */

@@ -13,6 +13,7 @@
         public DateTime? RetiredAt { get; set; }
 
         public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get => field ?? throw new NotLoadedException(nameof(SkillDamageMultipliers)); set; }
+        public virtual List<SkillEffect> SkillEffects { get => field ?? throw new NotLoadedException(nameof(SkillEffects)); set; }
         public virtual List<EnemySkill> EnemySkills { get => field ?? throw new NotLoadedException(nameof(EnemySkills)); set; }
         public virtual List<PlayerSkill> PlayerSkills { get => field ?? throw new NotLoadedException(nameof(PlayerSkills)); set; }
     }

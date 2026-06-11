@@ -18,5 +18,7 @@ namespace Game.Core.Skills
         public required int CooldownMs { get; set; }
 
         public required List<AttributeModifier> DamageMultipliers { get; set; }
+
+        public required List<SkillEffect> Effects { get; set; }
     }
 }

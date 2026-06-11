@@ -1,4 +1,4 @@
-import { EChangeType, type IChange, type IItemModSlot } from '$lib/api';
+import { EChangeType, type IChange, type IItemModSlot, type ISkillEffect } from '$lib/api';
 import type { Identified, SaveDiff } from './entities/types';
 
 export const listsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -116,6 +116,68 @@ export function attributeChanges<K extends string, T extends AttributeRow & Reco
 	return changes;
 }
 
+interface SurrogateId {
+	id: number;
+}
+
+/**
+ * Diffs a surrogate-id child collection into Add/Edit/Delete changes: a row with
+ * `id <= 0` is a new, unsaved record (Add), an existing row whose fields differ
+ * from its baseline is an Edit (per `equals`), and a baseline row absent from the
+ * current set is a Delete. `toItem` maps a row to the persisted change payload
+ * (default: the row itself); it lets a caller normalise the new-record id or inject
+ * a parent key. Shared by every surrogate-id child collection (skill effects, item
+ * mod slots, …).
+ */
+function surrogateIdChanges<T extends SurrogateId>(
+	current: T[],
+	baseline: T[] | undefined,
+	equals: (a: T, b: T) => boolean,
+	toItem: (row: T) => T = (row) => row
+): IChange<T>[] {
+	const base = baseline ?? [];
+	const baseById = new Map(base.filter((row) => row.id > 0).map((row) => [row.id, row]));
+	const currentIds = new Set(current.filter((row) => row.id > 0).map((row) => row.id));
+	const changes: IChange<T>[] = [];
+
+	for (const row of current) {
+		if (row.id <= 0) {
+			changes.push({ changeType: EChangeType.Add, item: toItem(row) });
+		} else {
+			const previous = baseById.get(row.id);
+			if (previous && !equals(row, previous)) {
+				changes.push({ changeType: EChangeType.Edit, item: toItem(row) });
+			}
+		}
+	}
+	for (const row of base) {
+		if (!currentIds.has(row.id)) {
+			changes.push({ changeType: EChangeType.Delete, item: toItem(row) });
+		}
+	}
+	return changes;
+}
+
+/**
+ * Diffs a skill's effects into Add/Edit/Delete changes. Effects carry their own
+ * id (≤ 0 marks a new, unsaved effect).
+ */
+export function skillEffectChanges(
+	current: ISkillEffect[],
+	baseline: ISkillEffect[] | undefined
+): IChange<ISkillEffect>[] {
+	return surrogateIdChanges(
+		current,
+		baseline,
+		(a, b) =>
+			a.target === b.target &&
+			a.attributeId === b.attributeId &&
+			a.modifierTypeId === b.modifierTypeId &&
+			a.amount === b.amount &&
+			a.durationMs === b.durationMs
+	);
+}
+
 /**
  * Diffs an item's mod slots into Add/Edit/Delete changes. Slots carry their own
  * id (≤ 0 marks a new, unsaved slot); duplicates of the same type are allowed.
@@ -125,31 +187,10 @@ export function modSlotChanges(
 	baseline: IItemModSlot[] | undefined,
 	itemId: number
 ): IChange<IItemModSlot>[] {
-	const base = baseline ?? [];
-	const baseById = new Map(base.filter((slot) => slot.id > 0).map((slot) => [slot.id, slot]));
-	const currentIds = new Set(current.filter((slot) => slot.id > 0).map((slot) => slot.id));
-	const changes: IChange<IItemModSlot>[] = [];
-
-	for (const slot of current) {
-		if (slot.id <= 0) {
-			changes.push({ changeType: EChangeType.Add, item: { id: 0, itemId, itemModSlotTypeId: slot.itemModSlotTypeId } });
-		} else {
-			const previous = baseById.get(slot.id);
-			if (previous && previous.itemModSlotTypeId !== slot.itemModSlotTypeId) {
-				changes.push({
-					changeType: EChangeType.Edit,
-					item: { id: slot.id, itemId, itemModSlotTypeId: slot.itemModSlotTypeId }
-				});
-			}
-		}
-	}
-	for (const slot of base) {
-		if (!currentIds.has(slot.id)) {
-			changes.push({
-				changeType: EChangeType.Delete,
-				item: { id: slot.id, itemId, itemModSlotTypeId: slot.itemModSlotTypeId }
-			});
-		}
-	}
-	return changes;
+	return surrogateIdChanges(
+		current,
+		baseline,
+		(a, b) => a.itemModSlotTypeId === b.itemModSlotTypeId,
+		(slot) => ({ id: slot.id <= 0 ? 0 : slot.id, itemId, itemModSlotTypeId: slot.itemModSlotTypeId })
+	);
 }

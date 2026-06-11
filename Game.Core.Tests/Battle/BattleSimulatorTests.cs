@@ -130,6 +130,7 @@ namespace Game.Core.Tests.Battle
                             Source = EAttributeModifierSource.Derived,
                         }
                     ],
+                    Effects = [],
                 }
             ];
 
@@ -160,6 +161,7 @@ namespace Game.Core.Tests.Battle
                     CooldownMs = 1500,
                     BaseDamage = 5,
                     DamageMultipliers = [],
+                    Effects = [],
                 }
             ];
 

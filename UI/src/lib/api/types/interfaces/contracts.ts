@@ -7,7 +7,9 @@ import type {
 	EEntityType,
 	EItemCategory,
 	EItemModType,
+	EModifierType,
 	ERarity,
+	ESkillEffectTarget,
 	EStatisticType
 } from '../';
 
@@ -92,10 +94,20 @@ export interface ISkill {
 	name: string;
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
+	effects: ISkillEffect[];
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
 	retiredAt?: string;
+}
+
+export interface ISkillEffect {
+	id: number;
+	target: ESkillEffectTarget;
+	attributeId: EAttribute;
+	modifierTypeId: EModifierType;
+	amount: number;
+	durationMs: number;
 }
 
 export interface ITag {

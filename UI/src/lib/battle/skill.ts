@@ -1,4 +1,4 @@
-﻿import { IAttributeMultiplier, ISkill } from '$lib/api';
+﻿import { IAttributeMultiplier, ISkill, ISkillEffect } from '$lib/api';
 import { Battler } from './battler';
 
 export class Skill implements ISkill {
@@ -6,6 +6,7 @@ export class Skill implements ISkill {
 	name: string;
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
+	effects: ISkillEffect[];
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
@@ -18,6 +19,7 @@ export class Skill implements ISkill {
 		this.name = data.name;
 		this.baseDamage = data.baseDamage;
 		this.damageMultipliers = data.damageMultipliers;
+		this.effects = data.effects;
 		this.description = data.description;
 		this.cooldownMs = data.cooldownMs;
 		this.iconPath = data.iconPath;

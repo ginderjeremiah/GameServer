@@ -28,6 +28,7 @@ import type {
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
+	ISetSkillEffectsData,
 	ISetTagsData,
 	ISetUserRolesData,
 	ISetZoneEnemiesData,
@@ -57,6 +58,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
+	'AdminTools/SetSkillEffects': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
 	'AdminTools/SetTagsForItem': undefined;
 	'AdminTools/SetTagsForItemMod': undefined;
@@ -99,6 +101,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
+	'AdminTools/SetSkillEffects': ISetSkillEffectsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
 	'AdminTools/SetTagsForItem': ISetTagsData;
 	'AdminTools/SetTagsForItemMod': ISetTagsData;

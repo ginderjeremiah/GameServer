@@ -1,7 +1,7 @@
-import { ApiRequest, fetchSocketData, type ISkill } from '$lib/api';
+import { ApiRequest, EAttribute, EModifierType, ESkillEffectTarget, fetchSocketData, type ISkill } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { attributeChanges, persistEntity } from '../save-helpers';
+import { attributeChanges, persistEntity, skillEffectChanges } from '../save-helpers';
 import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
@@ -25,11 +25,13 @@ export const skillEntity: EntityConfig<ISkill> = {
 		cooldownMs: 2000,
 		iconPath: '',
 		description: '',
-		damageMultipliers: []
+		damageMultipliers: [],
+		effects: []
 	}),
 	meta: (s) => [
 		['dmg', s.baseDamage],
 		['×mult', s.damageMultipliers.length],
+		['fx', s.effects.length],
 		['cd', `${(s.cooldownMs / 1000).toFixed(1)}s`]
 	],
 	sections: [
@@ -94,13 +96,59 @@ export const skillEntity: EntityConfig<ISkill> = {
 				},
 				{ key: 'multiplier', label: 'Multiplier ×', type: 'number', align: 'r', width: 120, allowNegative: true }
 			]
+		},
+		{
+			key: 'effects',
+			label: 'Effects',
+			glyph: 'bolt',
+			desc: 'Timed attribute buffs/debuffs applied when the skill fires',
+			count: (s) => s.effects.length,
+			kind: 'table',
+			itemsKey: 'effects',
+			addLabel: 'Add effect',
+			emptyIcon: 'bolt',
+			emptyTitle: 'No effects',
+			emptySub: 'This skill applies no timed attribute modifiers.',
+			newRow: () => ({
+				id: 0,
+				target: ESkillEffectTarget.Opponent,
+				attributeId: EAttribute.Strength,
+				modifierTypeId: EModifierType.Additive,
+				amount: 0,
+				durationMs: 3000
+			}),
+			columns: [
+				{
+					key: 'target',
+					label: 'Target',
+					type: 'select',
+					options: reference.skillEffectTargetOptions,
+					width: 130
+				},
+				{
+					key: 'attributeId',
+					label: 'Attribute',
+					type: 'select',
+					options: reference.attributeOptions,
+					min: 170
+				},
+				{
+					key: 'modifierTypeId',
+					label: 'Modifier',
+					type: 'select',
+					options: reference.modifierTypeOptions,
+					width: 140
+				},
+				{ key: 'amount', label: 'Amount', type: 'number', align: 'r', width: 100, allowNegative: true },
+				{ key: 'durationMs', label: 'Duration (ms)', type: 'number', align: 'r', width: 130 }
+			]
 		}
 	],
 	refresh,
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: (s) => ({ ...s, damageMultipliers: [] }),
+			toPrimaryDto: (s) => ({ ...s, damageMultipliers: [], effects: [] }),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditSkills', changes),
 			refresh,
 			childSavers: [
@@ -108,6 +156,12 @@ export const skillEntity: EntityConfig<ISkill> = {
 					const changes = attributeChanges(record.damageMultipliers, baseline?.damageMultipliers, 'multiplier');
 					if (changes.length) {
 						await ApiRequest.post('AdminTools/SetSkillMultipliers', { id, changes });
+					}
+				},
+				async (id, record, baseline) => {
+					const changes = skillEffectChanges(record.effects, baseline?.effects);
+					if (changes.length) {
+						await ApiRequest.post('AdminTools/SetSkillEffects', { id, changes });
 					}
 				}
 			]

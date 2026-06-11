@@ -142,6 +142,7 @@ namespace Game.Core.Tests.Battle
             CooldownMs = cooldownMs,
             BaseDamage = baseDamage,
             DamageMultipliers = multipliers ?? [],
+            Effects = [],
         };
 
         /// <summary>

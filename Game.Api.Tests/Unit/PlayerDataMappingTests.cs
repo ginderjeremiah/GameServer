@@ -76,6 +76,7 @@ namespace Game.Api.Tests.Unit
             Description = string.Empty,
             CooldownMs = 1000,
             DamageMultipliers = [],
+            Effects = [],
         };
     }
 }

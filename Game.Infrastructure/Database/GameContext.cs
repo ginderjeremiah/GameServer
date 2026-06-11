@@ -43,6 +43,7 @@ namespace Game.Infrastructure.Database
         public DbSet<Role> Roles { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
+        public DbSet<SkillEffect> SkillEffects { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
@@ -342,6 +343,12 @@ namespace Game.Infrastructure.Database
                 entity.HasKey(sdm => new { sdm.SkillId, sdm.AttributeId });
 
                 entity.Property(sdm => sdm.Multiplier)
+                    .HasPrecision(18, 3);
+            });
+
+            modelBuilder.Entity<SkillEffect>(entity =>
+            {
+                entity.Property(se => se.Amount)
                     .HasPrecision(18, 3);
             });
 

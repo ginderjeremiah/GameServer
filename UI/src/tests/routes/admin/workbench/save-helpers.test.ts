@@ -1,6 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EChangeType, type IChange, type IItemModSlot } from '$lib/api';
-import { attributeChanges, modSlotChanges, persistEntity } from '../../../../routes/admin/workbench/save-helpers';
+import {
+	EAttribute,
+	EChangeType,
+	EModifierType,
+	ESkillEffectTarget,
+	type IChange,
+	type IItemModSlot,
+	type ISkillEffect
+} from '$lib/api';
+import {
+	attributeChanges,
+	modSlotChanges,
+	persistEntity,
+	skillEffectChanges
+} from '../../../../routes/admin/workbench/save-helpers';
 import type { Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
 
 describe('attributeChanges', () => {
@@ -43,6 +56,48 @@ describe('modSlotChanges', () => {
 			{ changeType: EChangeType.Add, item: { id: 0, itemId: 5, itemModSlotTypeId: 3 } },
 			{ changeType: EChangeType.Delete, item: { id: 2, itemId: 5, itemModSlotTypeId: 1 } }
 		]);
+	});
+});
+
+const makeEffect = (id: number, overrides: Partial<ISkillEffect> = {}): ISkillEffect => ({
+	id,
+	target: ESkillEffectTarget.Opponent,
+	attributeId: EAttribute.Strength,
+	modifierTypeId: EModifierType.Additive,
+	amount: 10,
+	durationMs: 3000,
+	...overrides
+});
+
+describe('skillEffectChanges', () => {
+	it('adds new effects (id <= 0), edits changed effects, and deletes removed effects', () => {
+		const current: ISkillEffect[] = [makeEffect(1, { amount: 15 }), makeEffect(0, { attributeId: EAttribute.Defense })];
+		const baseline: ISkillEffect[] = [makeEffect(1), makeEffect(2, { attributeId: EAttribute.Intellect })];
+		const changes = skillEffectChanges(current, baseline);
+		expect(changes).toEqual([
+			{ changeType: EChangeType.Edit, item: makeEffect(1, { amount: 15 }) },
+			{ changeType: EChangeType.Add, item: makeEffect(0, { attributeId: EAttribute.Defense }) },
+			{ changeType: EChangeType.Delete, item: makeEffect(2, { attributeId: EAttribute.Intellect }) }
+		]);
+	});
+
+	it('treats a missing baseline as all-added', () => {
+		const current: ISkillEffect[] = [makeEffect(0)];
+		const changes = skillEffectChanges(current, undefined);
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: makeEffect(0) }]);
+	});
+
+	it('emits no changes when current and baseline are identical', () => {
+		const effects = [makeEffect(1), makeEffect(2, { amount: 5 })];
+		expect(skillEffectChanges(effects, effects)).toEqual([]);
+	});
+
+	it('emits an Edit when any field changes', () => {
+		expect(skillEffectChanges([makeEffect(1, { target: ESkillEffectTarget.Self })], [makeEffect(1)])).toHaveLength(1);
+		expect(
+			skillEffectChanges([makeEffect(1, { modifierTypeId: EModifierType.Multiplicative })], [makeEffect(1)])
+		).toHaveLength(1);
+		expect(skillEffectChanges([makeEffect(1, { durationMs: 5000 })], [makeEffect(1)])).toHaveLength(1);
 	});
 });
 

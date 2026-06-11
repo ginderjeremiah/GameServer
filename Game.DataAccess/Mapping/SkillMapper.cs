@@ -4,13 +4,14 @@ using Game.Core.Attributes.Modifiers;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
+using CoreSkillEffect = Game.Core.Skills.SkillEffect;
 
 namespace Game.DataAccess.Mapping
 {
     internal static class SkillMapper
     {
-        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage multipliers loaded) to the
-        /// reference-data read <see cref="Contracts.Skill"/> contract.</summary>
+        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded)
+        /// to the reference-data read <see cref="Contracts.Skill"/> contract.</summary>
         public static Contracts.Skill ToContract(EntitySkill entity)
         {
             return new Contracts.Skill
@@ -27,12 +28,22 @@ namespace Game.DataAccess.Mapping
                         AttributeId = (EAttribute)sdm.AttributeId,
                         Multiplier = sdm.Multiplier,
                     }).ToList(),
+                Effects = entity.SkillEffects
+                    .Select(se => new Contracts.SkillEffect
+                    {
+                        Id = se.Id,
+                        Target = (ESkillEffectTarget)se.Target,
+                        AttributeId = (EAttribute)se.AttributeId,
+                        ModifierTypeId = (EModifierType)se.ModifierType,
+                        Amount = se.Amount,
+                        DurationMs = se.DurationMs,
+                    }).ToList(),
                 RetiredAt = entity.RetiredAt,
             };
         }
 
         /// <summary>
-        /// Maps an entity <see cref="EntitySkill"/> (with its damage multipliers loaded) to a
+        /// Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded) to a
         /// domain <see cref="Skill"/>.
         /// </summary>
         public static Skill ToCore(EntitySkill entity)
@@ -51,6 +62,16 @@ namespace Game.DataAccess.Mapping
                         Amount = (double)sdm.Multiplier,
                         Type = EModifierType.Multiplicative,
                         Source = EAttributeModifierSource.Derived,
+                    }).ToList(),
+                Effects = entity.SkillEffects
+                    .Select(se => new CoreSkillEffect
+                    {
+                        Id = se.Id,
+                        Target = (ESkillEffectTarget)se.Target,
+                        AttributeId = (EAttribute)se.AttributeId,
+                        ModifierType = (EModifierType)se.ModifierType,
+                        Amount = (double)se.Amount,
+                        DurationMs = se.DurationMs,
                     }).ToList(),
             };
         }

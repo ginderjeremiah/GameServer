@@ -7,6 +7,7 @@ namespace Game.Abstractions.Contracts
         public required string Name { get; set; }
         public decimal BaseDamage { get; set; }
         public required IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
+        public required IEnumerable<SkillEffect> Effects { get; set; }
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
