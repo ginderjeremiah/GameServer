@@ -168,6 +168,58 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetChallenges_PopulatedChallenge_MapsDomainToContract()
+        {
+            int userId;
+            int challengeId;
+            int enemyId;
+            int itemId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, "ChallengeTarget");
+                var item = await TestDataSeeder.CreateItemAsync(context, "ChallengeReward");
+                var challenge = await TestDataSeeder.CreateChallengeAsync(context,
+                    name: "Slay 10 Goblins",
+                    challengeTypeId: EChallengeType.EnemiesKilled,
+                    progressGoal: 10m,
+                    targetEntityId: enemy.Id,
+                    rewardItemId: item.Id);
+                challengeId = challenge.Id;
+                enemyId = enemy.Id;
+                itemId = item.Id;
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "challsocketuser", "challsocketpass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            // Reload so the seeded challenge is resolvable, then log in to create the socket session.
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("challsocketuser", "challsocketpass");
+
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Challenge>>("GetChallenges");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+
+            // The ToContract mapping flattens the domain ChallengeType to its id plus the derived
+            // statistic/entity dimensions — exercised here by a fully-populated challenge.
+            var mapped = Assert.Single(response.Data, c => c.Id == challengeId);
+            Assert.Equal("Slay 10 Goblins", mapped.Name);
+            Assert.Equal(EChallengeType.EnemiesKilled, mapped.ChallengeTypeId);
+            Assert.Equal(EStatisticType.EnemiesKilled, mapped.StatisticType);
+            Assert.Equal(EEntityType.Enemy, mapped.EntityType);
+            Assert.Equal(enemyId, mapped.TargetEntityId);
+            Assert.Equal(10m, mapped.ProgressGoal);
+            Assert.Equal(itemId, mapped.RewardItemId);
+            Assert.Null(mapped.RetiredAt);
+        }
+
+        [Fact]
         public async Task GetStatisticTypes_ReturnsIntrinsicStatisticTypes()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
