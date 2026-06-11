@@ -177,9 +177,12 @@ describe('Battler skill-effect bookkeeping', () => {
 		const player = make(
 			[{ id: EAttribute.Strength, amount: 10 }],
 			[
-				makeSkill(0, 40, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }], [
-					makeEffect(1, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, 1000)
-				])
+				makeSkill(
+					0,
+					40,
+					[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+					[makeEffect(1, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, 1000)]
+				)
 			]
 		);
 		const enemy = make([{ id: EAttribute.Strength, amount: 10 }], []); // Defense = 2

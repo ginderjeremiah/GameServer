@@ -255,9 +255,12 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[{ id: EAttribute.Strength, amount: 10 }],
 				[
-					makeSkill(0, 400, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }], [
-						makeEffect(100, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)
-					])
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[makeEffect(100, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
+					)
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
@@ -276,9 +279,21 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[{ id: EAttribute.Strength, amount: 20 }],
 				[
-					makeSkill(0, 400, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }], [
-						makeEffect(101, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 100, PERMANENT)
-					])
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[
+							makeEffect(
+								101,
+								ESkillEffectTarget.Self,
+								EAttribute.CooldownRecovery,
+								EModifierType.Additive,
+								100,
+								PERMANENT
+							)
+						]
+					)
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
@@ -296,9 +311,12 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[{ id: EAttribute.Strength, amount: 10 }],
 				[
-					makeSkill(0, 400, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }], [
-						makeEffect(102, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)
-					]),
+					makeSkill(
+						0,
+						400,
+						[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+						[makeEffect(102, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
+					),
 					makeSkill(0, 400, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }])
 				]
 			),
@@ -318,9 +336,21 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[],
 				[
-					makeSkill(12, 400, [], [
-						makeEffect(103, ESkillEffectTarget.Opponent, EAttribute.MaxHealth, EModifierType.Multiplicative, 0.5, PERMANENT)
-					])
+					makeSkill(
+						12,
+						400,
+						[],
+						[
+							makeEffect(
+								103,
+								ESkillEffectTarget.Opponent,
+								EAttribute.MaxHealth,
+								EModifierType.Multiplicative,
+								0.5,
+								PERMANENT
+							)
+						]
+					)
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
