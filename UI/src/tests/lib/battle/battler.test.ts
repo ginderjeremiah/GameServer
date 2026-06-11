@@ -98,7 +98,7 @@ describe('Battler', () => {
 			expect(battler.isDead).toBe(false);
 		});
 
-		it('fills skill slots up to maxSkills (4)', () => {
+		it('fills skill slots up to MAX_SELECTED_SKILLS', () => {
 			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
 			expect(battler.skills).toHaveLength(4);
 			expect(battler.skills[0]).toBeDefined();
