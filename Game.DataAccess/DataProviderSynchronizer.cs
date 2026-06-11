@@ -96,6 +96,13 @@ namespace Game.DataAccess
                     await deadLetterQueue.AddToQueueAsync(message);
                     return;
                 }
+                catch (UnknownEventTypeException ex)
+                {
+                    // An unrecognized event type is a poison message — no retry can fix it — so it is dead-lettered immediately.
+                    _logger.LogWarning(ex, "Dead-lettering player data event with unrecognized type '{EventType}' from queue '{Queue}'. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, message);
+                    await deadLetterQueue.AddToQueueAsync(message);
+                    return;
+                }
                 catch (Exception ex) when (attempt < _retryPolicy.MaxAttempts)
                 {
                     // An unexpected failure (e.g. a transient database error) may succeed on a retry.
@@ -179,8 +186,11 @@ namespace Game.DataAccess
                     await HandleLogPreferenceChanged(context, logEvt);
                     break;
 
-                    // PlayerLeveledUpEvent is handled in-process only — it has no persistence
-                    // handler registered, so it is never published to this queue.
+                // PlayerLeveledUpEvent is handled in-process only — it has no persistence
+                // handler registered, so it is never published to this queue.
+
+                default:
+                    throw new UnknownEventTypeException(envelope.Type);
             }
         }
 
@@ -385,5 +395,8 @@ namespace Game.DataAccess
 
         private static T Deserialize<T>(string json)
             => json.Deserialize<T>() ?? throw new JsonException($"Deserialized '{typeof(T).Name}' payload was null.");
+
+        private sealed class UnknownEventTypeException(string eventType)
+            : Exception($"Unrecognized player event type '{eventType}'.");
     }
 }

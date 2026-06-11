@@ -171,6 +171,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_UnknownEventType_DeadLettersWithoutRetrying()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // A well-formed envelope whose Type matches no registered handler case — e.g. a new event
+            // added to PlayerPersistencePublisher without a corresponding case in HandleEvent.
+            var envelope = new DomainEventEnvelope
+            {
+                Type = "UnregisteredEventType",
+                Payload = "{}",
+            };
+            var message = envelope.Serialize();
+            var queue = new InMemoryPubSubQueue(message);
+
+            await synchronizer.ProcessQueue(queue);
+
+            // An unknown type is a poison message — no retry can fix it — so it is dead-lettered
+            // immediately with a warning and without escalating to an error.
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
+        }
+
+        [Fact]
         public async Task ProcessQueue_SkillUnlockedEvent_InsertsUnselectedPlayerSkillIdempotently()
         {
             using var scope = CreateScope();
