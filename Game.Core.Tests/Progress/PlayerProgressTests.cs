@@ -20,6 +20,7 @@ namespace Game.Core.Tests.Progress
             {
                 PlayerDamageDealt = 120.5,
                 PlayerDamageTaken = 40.0,
+                PlayerDamageHealed = 18.75,
                 HighestPlayerAttack = 33.25,
             };
 
@@ -28,6 +29,7 @@ namespace Game.Core.Tests.Progress
 
             Assert.Equal(120.5m, progress.GetStatisticValue(EStatisticType.DamageDealt, null));
             Assert.Equal(40.0m, progress.GetStatisticValue(EStatisticType.DamageTaken, null));
+            Assert.Equal(18.75m, progress.GetStatisticValue(EStatisticType.DamageHealed, null));
             Assert.Equal(33.25m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
         }
 

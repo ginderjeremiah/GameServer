@@ -288,6 +288,124 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 600),
+
+                // DoT kill timing: a pure poison (an Opponent DamageTakenPerSecond debuff, no direct damage)
+                // ticks the enemy down. DTPS 50 → 50*40/1000 = 2 damage at the END of each tick, bypassing
+                // Defense. 2/tick over 25 ticks brings the 50-HP enemy to 0 → victory at tick 1000.
+                ["poisonKillTiming"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(200, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1000),
+
+                // Same-tick mutual DoT tie favours the player: both battlers poison each other for 2/tick and
+                // would reach 0 HP on the same tick (1000). The end-of-tick phase resolves the ENEMY first, so
+                // its death is awarded as a victory before the player's identical DoT is applied — the player
+                // never takes the lethal tick. (Applying the player's DoT first would flip this to a loss.)
+                ["poisonMutualDotTieFavoursPlayer"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(201, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(2, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(202, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
+                        ]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1000),
+
+                // Heal-over-time offsets incoming damage and flips the outcome. The player self-applies
+                // HealthRegenPerSecond 75 → 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 4 − Def 2).
+                // The regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never dies, and
+                // dealing no damage back the battle runs to the timeout. Without the regen the 2/tick would kill
+                // the player at tick 1000.
+                ["regenOutpacesDamage"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(203, ESkillEffectTarget.Self, EAttribute.HealthRegenPerSecond, EModifierType.Additive, 75, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 4, cooldownMs: 40)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
+
+                // Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond is applied and
+                // death checked BEFORE HealthRegenPerSecond. The player is poisoned for 10/tick and self-heals
+                // 6/tick (a net −4 grinding its 50 HP down). On the tick the 10 DoT takes HP from 10 to 0 the
+                // player dies — the 6 heal that would have saved it (10+6−10=6) never runs because death is
+                // checked first. Death at tick 11 → 440ms. (Healing first would let the player survive past here.)
+                ["dotBeforeRegenSameTickKills"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(204, ESkillEffectTarget.Self, EAttribute.HealthRegenPerSecond, EModifierType.Additive, 150, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(2, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(205, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, Permanent)]),
+                        ]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: true,
+                    ExpectedTotalMs: 440),
+
+                // DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to
+                // 0, but the same skill's Opponent DamageTakenPerSecond 250 → 10/tick ignores Defense and grinds
+                // the enemy's 250 HP down: victory at tick 1000. If DoT respected Defense (10−12 clamped to 0) the
+                // enemy would never die.
+                ["dotBypassesDefense"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 10, cooldownMs: 40,
+                                effects: [MakeEffect(206, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 10, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1000),
+
+                // DoT stops when its effect expires. A single poison application — the skill's 2000ms cooldown
+                // fires it once at tick 50 — lasts 400ms = 10 ticks, dealing 2/tick for 20 total, leaving the
+                // 50-HP enemy at 30. Capped at maxMs 3000 (before the skill could fire again at 4000) the battle
+                // ends with no winner; had the DoT never expired the 2/tick would have killed the enemy by ~2960.
+                ["dotExpiresStopsDamage"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 2000,
+                                effects: [MakeEffect(207, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, 400)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 3000,
+                    MaxMs: 3000),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>

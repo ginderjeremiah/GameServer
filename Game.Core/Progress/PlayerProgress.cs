@@ -29,6 +29,7 @@ namespace Game.Core.Progress
             Increment(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
             SetMax(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
             Increment(EStatisticType.DamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
+            Increment(EStatisticType.DamageHealed, null, (decimal)Math.Round(stats.PlayerDamageHealed, 3));
             Increment(EStatisticType.EnemiesEncountered, null, 1);
             Increment(EStatisticType.EnemiesEncountered, enemy.Id, 1);
 

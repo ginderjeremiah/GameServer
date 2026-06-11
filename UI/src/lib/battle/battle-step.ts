@@ -52,5 +52,20 @@ export function battleStep(player: Battler, enemy: Battler, timeDelta: number): 
 		});
 	}
 
+	// End-of-tick damage/heal-over-time, reached only while both battlers still live (mirroring the
+	// backend's both-alive guard). The enemy resolves first: DamageTakenPerSecond (bypassing Defense),
+	// a death check, then HealthRegenPerSecond (capped at MaxHealth) — so an enemy DoT kill ends the
+	// battle before the player's DoT applies, and a same-tick mutual DoT kill leaves the player alive.
+	if (!player.isDead && !enemy.isDead) {
+		enemy.applyDamageOverTime(timeDelta);
+		if (!enemy.isDead) {
+			enemy.applyHealOverTime(timeDelta);
+			player.applyDamageOverTime(timeDelta);
+			if (!player.isDead) {
+				player.applyHealOverTime(timeDelta);
+			}
+		}
+	}
+
 	return activations;
 }

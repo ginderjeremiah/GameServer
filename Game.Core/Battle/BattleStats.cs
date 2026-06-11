@@ -4,6 +4,7 @@ namespace Game.Core.Battle
     {
         public double PlayerDamageDealt { get; set; }
         public double PlayerDamageTaken { get; set; }
+        public double PlayerDamageHealed { get; set; }
         public double HighestPlayerAttack { get; set; }
         public int PlayerSkillsUsed { get; set; }
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
