@@ -45,11 +45,21 @@ namespace Game.Api.Sockets
                 {
                     if (dataBytes.Length - i <= MAX_MESSAGE_SIZE)
                     {
-                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i), WebSocketMessageType.Text, true, CancellationToken.None);
+                        await _socket.SendAsync(
+                            buffer: new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i),
+                            messageType: WebSocketMessageType.Text,
+                            endOfMessage: true,
+                            CancellationToken.None
+                        );
                     }
                     else
                     {
-                        await _socket.SendAsync(new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE), WebSocketMessageType.Text, false, CancellationToken.None);
+                        await _socket.SendAsync(
+                            buffer: new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE),
+                            messageType: WebSocketMessageType.Text,
+                            endOfMessage: false,
+                            CancellationToken.None
+                        );
                     }
                 }
             }
@@ -83,7 +93,7 @@ namespace Game.Api.Sockets
             if (buffersRead >= 1024)
             {
                 await Close(ESocketCloseReason.MessageTooBig);
-                throw new Exception("Socket message exceeded maximum allowed size.");
+                throw new WebSocketException("Socket message exceeded maximum allowed size.");
             }
 
             return message.ToString();
@@ -114,16 +124,19 @@ namespace Game.Api.Sockets
                 }
             }
 
+            if (lastNonZeroByte == -1)
+            {
+                return "";
+            }
+
             var str = Encoding.UTF8.GetString(_buffer, 0, lastNonZeroByte + 1);
             ClearBuffer(lastNonZeroByte);
             return str;
         }
 
-        private void ClearBuffer(int end = -1)
+        private void ClearBuffer(int end)
         {
-            var last = end > 0 ? end : _buffer.Length - 1;
-
-            for (var i = 0; i <= last; i++)
+            for (var i = 0; i <= end; i++)
             {
                 _buffer[i] = 0;
             }
