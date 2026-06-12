@@ -40,6 +40,10 @@ const SAMPLES: { logType: ELogType; messages: string[] }[] = [
 		messages: ['You cast Cleave on the Skeleton Mage.', 'The Skeleton Mage hits you for 14.']
 	},
 	{ logType: ELogType.EnemyDefeated, messages: ['The Skeleton Mage was defeated.'] },
+	{
+		logType: ELogType.SkillEffect,
+		messages: ['You are empowered: +15 Strength for 5s', 'The Skeleton Mage took 12 damage over time.']
+	},
 	{ logType: ELogType.ItemFound, messages: ['Found a Sapphire Shard.'] },
 	{ logType: ELogType.Exp, messages: ['Earned 47 exp.'] },
 	{ logType: ELogType.LevelUp, messages: ['Congratulations, you leveled up!'] },
@@ -51,6 +55,7 @@ const WEIGHTS: ELogType[] = [
 	ELogType.Damage,
 	ELogType.Damage,
 	ELogType.Damage,
+	ELogType.SkillEffect,
 	ELogType.ItemFound,
 	ELogType.Exp,
 	ELogType.EnemyDefeated,

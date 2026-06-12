@@ -1,7 +1,7 @@
 import { ELogType } from '$lib/api';
 import type { LogMessage } from '$lib/engine/log';
 
-export type GlyphKind = 'hit' | 'crit' | 'enemy' | 'loot' | 'system' | 'kill';
+export type GlyphKind = 'hit' | 'crit' | 'enemy' | 'loot' | 'system' | 'kill' | 'effect';
 
 export interface LogKind {
 	/** Accent color for the chip, message, and left bar. */
@@ -24,7 +24,8 @@ export const logColors = {
 	enemy: 'var(--log-enemy)',
 	loot: 'var(--log-loot)',
 	reward: 'var(--log-reward)',
-	system: 'var(--log-system)'
+	system: 'var(--log-system)',
+	effect: 'var(--log-effect)'
 } as const;
 
 const PLAYER = logColors.player;
@@ -32,6 +33,7 @@ const ENEMY = logColors.enemy;
 const LOOT = logColors.loot;
 const REWARD = logColors.reward;
 const SYSTEM = logColors.system;
+const EFFECT = logColors.effect;
 
 /**
  * Maps a {@link LogMessage} to its visual treatment for the sliding manifest.
@@ -57,6 +59,8 @@ export function logKind(log: LogMessage): LogKind {
 			return fromPlayer
 				? { color: ENEMY, glyph: 'kill', label: 'Defeat' }
 				: { color: LOOT, glyph: 'kill', label: 'Victory' };
+		case ELogType.SkillEffect:
+			return { color: EFFECT, glyph: 'effect', label: 'Effect' };
 		case ELogType.Debug:
 		default:
 			return { color: SYSTEM, glyph: 'system', label: 'Info' };

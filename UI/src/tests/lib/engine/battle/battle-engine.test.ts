@@ -13,9 +13,10 @@ vi.mock('svelte', async (importOriginal) => ({
 	onDestroy: vi.fn()
 }));
 
-const { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager } = vi.hoisted(() => {
+const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager } = vi.hoisted(() => {
 	const mockSkills: ISkill[] = [];
 	const mockEnemies: IEnemy[] = [];
+	const mockAttributes: { id: number; name: string }[] = [{ id: 0, name: 'Strength' }];
 	const mockPlayerManager = {
 		name: 'TestPlayer',
 		level: 5,
@@ -29,7 +30,7 @@ const { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager } = vi.
 		equipmentStats: []
 	};
 
-	return { mockSkills, mockEnemies, mockPlayerManager, mockInventoryManager };
+	return { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager };
 });
 
 let { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks } = vi.hoisted(() => {
@@ -47,6 +48,9 @@ vi.mock('$stores', () => ({
 		},
 		get enemies() {
 			return mockEnemies;
+		},
+		get attributes() {
+			return mockAttributes;
 		}
 	}
 }));
@@ -317,6 +321,114 @@ describe('BattleEngine', () => {
 			logicalUpdateCallbacks[0](200);
 
 			expect(engine.timeElapsed).toBe(300);
+		});
+
+		it('logs a skill-effect line when a skill applies a new effect', () => {
+			mockSkills[0].effects = [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 1000
+				}
+			];
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			logicalUpdateCallbacks[0](500); // the 500ms-cooldown skill fires, applying its self buff
+
+			expect(logMessage).toHaveBeenCalledWith(ELogType.SkillEffect, expect.stringContaining('empowered'));
+		});
+
+		it('aggregates damage-over-time into a single per-second summary line', () => {
+			mockSkills[0].baseDamage = 0; // keep the focus on DoT — no skill kill
+			engine.start();
+			const enemyInstance = {
+				id: 1,
+				level: 1,
+				seed: 0,
+				selectedSkills: [0],
+				attributes: [
+					{ attributeId: EAttribute.Endurance, amount: 200 }, // survive the full second
+					{ attributeId: EAttribute.DamageTakenPerSecond, amount: 12 }
+				]
+			};
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			// 25 ticks of 40ms = one second; the per-tick DoT must collapse to a single log line.
+			for (let i = 0; i < 25; i++) {
+				logicalUpdateCallbacks[0](40);
+			}
+
+			const dotCalls = vi
+				.mocked(logMessage)
+				.mock.calls.filter(([type, msg]) => type === ELogType.SkillEffect && String(msg).includes('damage over time'));
+			expect(dotCalls).toHaveLength(1);
+			expect(dotCalls[0][1]).toBe('Goblin took 12 damage over time.');
+		});
+
+		it('aggregates heal-over-time on the player into a single per-second summary line', () => {
+			mockSkills[0].baseDamage = 0; // no kill, so the full second of regen accumulates
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			engine.player.currentHealth = 10; // leave room so the regen is not capped away
+			engine.player.applyEffect({
+				id: 9,
+				target: ESkillEffectTarget.Self,
+				attributeId: EAttribute.HealthRegenPerSecond,
+				modifierTypeId: EModifierType.Additive,
+				amount: 8,
+				durationMs: 100000
+			});
+
+			for (let i = 0; i < 25; i++) {
+				logicalUpdateCallbacks[0](40);
+			}
+
+			const hotCalls = vi
+				.mocked(logMessage)
+				.mock.calls.filter(([type, msg]) => type === ELogType.SkillEffect && String(msg).includes('recovered'));
+			expect(hotCalls).toHaveLength(1);
+			expect(hotCalls[0][1]).toBe('You recovered 8 health.');
+		});
+
+		it('summarizes player damage-over-time and enemy heal-over-time per second', () => {
+			mockSkills[0].baseDamage = 0; // both battlers survive the full second
+			engine.start();
+			const enemyInstance = {
+				id: 1,
+				level: 1,
+				seed: 0,
+				selectedSkills: [],
+				attributes: [
+					{ attributeId: EAttribute.Endurance, amount: 200 },
+					{ attributeId: EAttribute.HealthRegenPerSecond, amount: 5 }
+				]
+			};
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			engine.enemy.currentHealth = 10; // leave room for the enemy's regen
+			engine.player.applyEffect({
+				id: 8,
+				target: ESkillEffectTarget.Self,
+				attributeId: EAttribute.DamageTakenPerSecond,
+				modifierTypeId: EModifierType.Additive,
+				amount: 6,
+				durationMs: 100000
+			});
+
+			for (let i = 0; i < 25; i++) {
+				logicalUpdateCallbacks[0](40);
+			}
+
+			const effectCalls = vi.mocked(logMessage).mock.calls.filter(([type]) => type === ELogType.SkillEffect);
+			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'You took 6 damage over time.']);
+			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'Goblin recovered 5 health.']);
 		});
 	});
 

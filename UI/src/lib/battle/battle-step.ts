@@ -1,5 +1,6 @@
 import type { Battler } from './battler';
 import type { Skill } from './skill';
+import type { ISkillEffect } from '$lib/api';
 
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
@@ -11,6 +12,29 @@ export interface SkillActivation {
 	skill: Skill;
 	damage: number;
 	byPlayer: boolean;
+}
+
+/** A skill effect that was newly applied during a tick, with the side it landed on. */
+export interface AppliedEffect {
+	effect: ISkillEffect;
+	/** Whether the effect landed on the player (`true`) or the enemy (`false`). */
+	onPlayer: boolean;
+}
+
+/**
+ * Optional per-tick observation sink the live {@link BattleEngine} passes to {@link battleStep} to
+ * collect the log-worthy events a tick produces beyond its damage activations: the effects newly
+ * applied this tick, and the damage/heal each side took from the end-of-tick DoT/HoT phase. The
+ * headless {@link BattleSimulator} omits it, so the parity path computes and allocates nothing extra
+ * and stays byte-identical to before. Reused across ticks by the caller, so {@link battleStep} resets
+ * it at the start of every call.
+ */
+export interface BattleStepLog {
+	appliedEffects: AppliedEffect[];
+	enemyDotDamage: number;
+	playerDotDamage: number;
+	enemyHotHeal: number;
+	playerHotHeal: number;
 }
 
 /**
@@ -27,8 +51,20 @@ export interface SkillActivation {
  * {@link Battler.takeDamage} cannot let the live game diverge from the backend
  * replay while a copied test stays green.
  */
-export function battleStep(player: Battler, enemy: Battler, timeDelta: number): SkillActivation[] {
+export function battleStep(player: Battler, enemy: Battler, timeDelta: number, log?: BattleStepLog): SkillActivation[] {
 	const activations: SkillActivation[] = [];
+
+	// Reset the (reused) observation sink for this tick; absent for the headless simulator.
+	if (log) {
+		log.appliedEffects.length = 0;
+		log.enemyDotDamage = 0;
+		log.playerDotDamage = 0;
+		log.enemyHotHeal = 0;
+		log.playerHotHeal = 0;
+	}
+	const onApplied = log
+		? (effect: ISkillEffect, target: Battler) => log.appliedEffects.push({ effect, onPlayer: target === player })
+		: undefined;
 
 	// Expire timed effects at the start of the tick, before either side fires, so an effect influences
 	// exactly durationMs / tickSize ticks (counting its application tick).
@@ -41,14 +77,14 @@ export function battleStep(player: Battler, enemy: Battler, timeDelta: number): 
 	player.advanceCooldowns(timeDelta, (skill) => {
 		const damage = enemy.takeDamage(skill.calculateDamage());
 		activations.push({ skill, damage, byPlayer: true });
-		skill.applyEffects(enemy);
+		skill.applyEffects(enemy, onApplied);
 	});
 
 	if (!enemy.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
 			const damage = player.takeDamage(skill.calculateDamage());
 			activations.push({ skill, damage, byPlayer: false });
-			skill.applyEffects(player);
+			skill.applyEffects(player, onApplied);
 		});
 	}
 
@@ -57,12 +93,22 @@ export function battleStep(player: Battler, enemy: Battler, timeDelta: number): 
 	// a death check, then HealthRegenPerSecond (capped at MaxHealth) — so an enemy DoT kill ends the
 	// battle before the player's DoT applies, and a same-tick mutual DoT kill leaves the player alive.
 	if (!player.isDead && !enemy.isDead) {
-		enemy.applyDamageOverTime(timeDelta);
+		const enemyDot = enemy.applyDamageOverTime(timeDelta);
+		if (log) {
+			log.enemyDotDamage = enemyDot;
+		}
 		if (!enemy.isDead) {
-			enemy.applyHealOverTime(timeDelta);
-			player.applyDamageOverTime(timeDelta);
+			const enemyHot = enemy.applyHealOverTime(timeDelta);
+			const playerDot = player.applyDamageOverTime(timeDelta);
+			if (log) {
+				log.enemyHotHeal = enemyHot;
+				log.playerDotDamage = playerDot;
+			}
 			if (!player.isDead) {
-				player.applyHealOverTime(timeDelta);
+				const playerHot = player.applyHealOverTime(timeDelta);
+				if (log) {
+					log.playerHotHeal = playerHot;
+				}
 			}
 		}
 	}

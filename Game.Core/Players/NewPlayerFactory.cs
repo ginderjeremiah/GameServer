@@ -54,6 +54,7 @@ namespace Game.Core.Players
                 new() { LogType = ELogType.LevelUp, Enabled = true },
                 new() { LogType = ELogType.ItemFound, Enabled = true },
                 new() { LogType = ELogType.EnemyDefeated, Enabled = true },
+                new() { LogType = ELogType.SkillEffect, Enabled = true },
             ];
         }
     }
