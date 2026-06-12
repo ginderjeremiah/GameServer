@@ -134,27 +134,12 @@ namespace Game.Application.Tests.Services
 
             // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            var modSlot = new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = item.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            };
-            context.ItemModSlots.Add(modSlot);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
+            var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
 
             // A Prefix mod granting Dexterity +7, unlocked for the player.
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerEntity.Id, mod.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -188,34 +173,15 @@ namespace Game.Application.Tests.Services
 
             // First authored slotted item consumes slot Id 0.
             var decoyItem = await TestDataSeeder.CreateItemAsync(context);
-            context.ItemModSlots.Add(new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = decoyItem.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            });
+            await TestDataSeeder.AddItemModSlotAsync(context, decoyItem.Id);
 
             // The item under test: its only slot is authored second, so it gets a non-zero Id.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            var modSlot = new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = item.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            };
-            context.ItemModSlots.Add(modSlot);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
+            var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
 
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerEntity.Id, mod.Id);
             Assert.NotEqual(0, modSlot.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
@@ -268,38 +234,16 @@ namespace Game.Application.Tests.Services
 
             // A weapon (base Strength +5) with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            var modSlot = new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = item.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            };
-            context.ItemModSlots.Add(modSlot);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
+            var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
 
             // A Prefix mod granting Dexterity +7, unlocked for the player.
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerEntity.Id, mod.Id);
 
             // Persist the applied mod as if it had been applied in a previous session, so the
             // player is loaded fresh from the DB with it already in place (the #90 scenario).
-            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                ItemModSlotId = modSlot.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.ApplyModToItemAsync(context, playerEntity.Id, item.Id, modSlot.Id, mod.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -324,37 +268,16 @@ namespace Game.Application.Tests.Services
             // the player; PlayerRepository must stitch these in from the in-memory catalogs.
             var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Fireball", baseDamage: 12m, cooldownMs: 1500);
             var item = await TestDataSeeder.CreateItemAsync(context, name: "Sword", attributeId: EAttribute.Strength, attributeAmount: 5m);
-            var modSlot = new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = item.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            };
-            context.ItemModSlots.Add(modSlot);
+            var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
             await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id, selected: true);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
-            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemModId = mod.Id,
-            });
-            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                ItemModSlotId = modSlot.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerEntity.Id, mod.Id);
+            await TestDataSeeder.ApplyModToItemAsync(context, playerEntity.Id, item.Id, modSlot.Id, mod.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -444,12 +367,7 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -556,12 +474,7 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             // A Weapon-category item (CreateItemAsync default), unlocked but not yet equipped.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -620,13 +533,7 @@ namespace Game.Application.Tests.Services
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             // A Weapon-category item unlocked and already equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -684,26 +591,11 @@ namespace Game.Application.Tests.Services
 
             // A weapon with one Prefix mod slot, equipped in the weapon slot.
             var item = await TestDataSeeder.CreateItemAsync(context);
-            var modSlot = new Infrastructure.Entities.ItemModSlot
-            {
-                ItemId = item.Id,
-                ItemModSlotTypeId = (int)EItemModType.Prefix,
-            };
-            context.ItemModSlots.Add(modSlot);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                EquipmentSlotId = (int)EEquipmentSlot.WeaponSlot,
-            });
+            var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id, EEquipmentSlot.WeaponSlot);
 
             var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
-            context.UnlockedMods.Add(new Infrastructure.Entities.UnlockedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerEntity.Id, mod.Id);
 
             // Persist the applied mod as if it had been applied in a previous session, so the player
             // loads with it already in place and RemoveMod has something to remove (the inverse of
@@ -711,14 +603,7 @@ namespace Game.Application.Tests.Services
             // AppliedMod.ItemModSlotId is a FK to ItemModSlot.Id, so the persisted row, the RemoveMod
             // argument (matched against the loaded AppliedModSlot.ItemModSlotId), and the verify query
             // all key off modSlot.Id — the single identifier the apply/remove path resolves by (#316).
-            context.AppliedMods.Add(new Infrastructure.Entities.AppliedMod
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-                ItemModSlotId = modSlot.Id,
-                ItemModId = mod.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.ApplyModToItemAsync(context, playerEntity.Id, item.Id, modSlot.Id, mod.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
@@ -749,12 +634,7 @@ namespace Game.Application.Tests.Services
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             var item = await TestDataSeeder.CreateItemAsync(context);
-            context.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
-            {
-                PlayerId = playerEntity.Id,
-                ItemId = item.Id,
-            });
-            await context.SaveChangesAsync(CancellationToken);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
 
             // Reference data was seeded directly; reload the caches so LoadPlayer resolves it (the caches no
             // longer lazily refill).
