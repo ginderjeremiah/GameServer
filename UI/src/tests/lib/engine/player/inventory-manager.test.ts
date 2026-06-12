@@ -309,6 +309,28 @@ describe('InventoryManager', () => {
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
 		});
 
+		it('restores both the displaced item and its slot when the persist fails', async () => {
+			mockItems[1] = makeItem(1);
+			mockItems[2] = makeItem(2);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot }),
+				makeInventoryItem({ itemId: 2 })
+			];
+			manager.initialize();
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+
+			const result = await manager.equipItem(2, EEquipmentSlot.WeaponSlot);
+
+			// The displaced incumbent (item 1) is fully restored to its slot, and the new item (item 2)
+			// is rolled back to unequipped — the single snapshot covers every object the equip touched.
+			expect(result).toBe(false);
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.equipmentSlotId).toBe(EEquipmentSlot.WeaponSlot);
+			expect(manager.unlockedItems.get(2)?.equipped).toBe(false);
+			expect(manager.unlockedItems.get(2)?.equipmentSlotId).toBeUndefined();
+		});
+
 		it('applies the change optimistically before the persist resolves, then rolls back on error', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];

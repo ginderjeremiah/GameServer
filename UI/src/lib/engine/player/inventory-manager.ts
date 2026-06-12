@@ -15,6 +15,31 @@ import { logMessage } from '$lib/engine/log';
 // it here while the single source of truth is the codegen'd enum.
 export { EEquipmentSlot };
 
+type RestoreSnapshot = () => void;
+
+/**
+ * Captures the current values of the named fields on `target`, returning a closure that restores
+ * them — the single snapshot/restore primitive behind every optimistic mutation's rollback. Captured
+ * fields must be reassigned (not mutated in place) for the snapshot to stay a valid baseline.
+ */
+const snapshotFields = <T extends object, K extends keyof T>(target: T, ...keys: K[]): RestoreSnapshot => {
+	const saved = keys.map((key) => ({ key, value: target[key] }));
+	return () => {
+		for (const { key, value } of saved) {
+			target[key] = value;
+		}
+	};
+};
+
+/** Combines several field snapshots into a single restore closure. */
+const combineSnapshots = (...restores: RestoreSnapshot[]): RestoreSnapshot => {
+	return () => {
+		for (const restore of restores) {
+			restore();
+		}
+	};
+};
+
 export class InventoryManager {
 	/** All items the player has unlocked, keyed by itemId. */
 	public unlockedItems: Map<number, Item> = new Map();
@@ -84,7 +109,11 @@ export class InventoryManager {
 
 		// Apply optimistically (instant UI), then persist; a failed persist rolls the change back so
 		// the authoritative state can never diverge from what was actually saved.
-		const rollback = this.snapshotEquipped(item, this.equippedSlots[slotId]);
+		const affected = [item, this.equippedSlots[slotId]].filter((it): it is Item => it != null);
+		const rollback = combineSnapshots(
+			snapshotFields(this, 'equippedSlots'),
+			...affected.map((it) => snapshotFields(it, 'equipped', 'equipmentSlotId'))
+		);
 		this.applyEquip(item, slotId);
 		this.publish();
 
@@ -105,10 +134,15 @@ export class InventoryManager {
 			return false;
 		}
 
-		const rollback = this.snapshotEquipped(item);
+		const rollback = combineSnapshots(
+			snapshotFields(this, 'equippedSlots'),
+			snapshotFields(item, 'equipped', 'equipmentSlotId')
+		);
 		item.equipped = false;
 		item.equipmentSlotId = undefined;
-		this.equippedSlots[slotId] = undefined;
+		const slots = [...this.equippedSlots];
+		slots[slotId] = undefined;
+		this.equippedSlots = slots;
 		this.publish();
 
 		const req = new ApiRequest('Player/UnequipItem');
@@ -128,8 +162,7 @@ export class InventoryManager {
 			return false;
 		}
 
-		const prevMods = item.appliedMods;
-		const prevTotal = item.totalAttributes;
+		const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 		item.appliedMods = [
 			...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
 			newItemMod({ itemModId, itemModSlotId })
@@ -140,8 +173,7 @@ export class InventoryManager {
 		const req = new ApiRequest('Player/ApplyMod');
 		const response = await req.post({ itemId, itemModId, itemModSlotId });
 		if (!response.ok) {
-			item.appliedMods = prevMods;
-			item.totalAttributes = prevTotal;
+			rollback();
 			this.publish();
 			return false;
 		}
@@ -156,8 +188,7 @@ export class InventoryManager {
 			return false;
 		}
 
-		const prevMods = item.appliedMods;
-		const prevTotal = item.totalAttributes;
+		const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
 		this.refreshItemAttributes(item);
 		this.publish();
@@ -165,8 +196,7 @@ export class InventoryManager {
 		const req = new ApiRequest('Player/RemoveMod');
 		const response = await req.post({ itemId, itemModSlotId });
 		if (!response.ok) {
-			item.appliedMods = prevMods;
-			item.totalAttributes = prevTotal;
+			rollback();
 			this.publish();
 			return false;
 		}
@@ -218,20 +248,22 @@ export class InventoryManager {
 		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
 	}
 
-	/** The equip mutation, applied directly to the authoritative items + slot array. */
+	/** The equip mutation, reassigning a fresh slot array so a captured snapshot stays a valid baseline. */
 	private applyEquip(item: Item, slotId: EEquipmentSlot) {
+		const slots = [...this.equippedSlots];
+
 		// Unequip from any current slot
-		for (let i = 0; i < this.equippedSlots.length; i++) {
-			const old = this.equippedSlots[i];
+		for (let i = 0; i < slots.length; i++) {
+			const old = slots[i];
 			if (old?.itemId === item.itemId) {
 				old.equipped = false;
 				old.equipmentSlotId = undefined;
-				this.equippedSlots[i] = undefined;
+				slots[i] = undefined;
 			}
 		}
 
 		// Unequip whatever is in the target slot
-		const displaced = this.equippedSlots[slotId];
+		const displaced = slots[slotId];
 		if (displaced) {
 			displaced.equipped = false;
 			displaced.equipmentSlotId = undefined;
@@ -240,25 +272,9 @@ export class InventoryManager {
 		// Equip the new item
 		item.equipped = true;
 		item.equipmentSlotId = slotId;
-		this.equippedSlots[slotId] = item;
-	}
+		slots[slotId] = item;
 
-	/**
-	 * Captures the slot array plus the equip/slot fields of the given items, returning a closure that
-	 * restores them — the rollback for a failed equip/unequip persist.
-	 */
-	private snapshotEquipped(...items: (Item | undefined)[]): () => void {
-		const prevSlots = [...this.equippedSlots];
-		const snaps = items
-			.filter((it): it is Item => it != null)
-			.map((it) => ({ item: it, equipped: it.equipped, slot: it.equipmentSlotId }));
-		return () => {
-			this.equippedSlots = prevSlots;
-			for (const snap of snaps) {
-				snap.item.equipped = snap.equipped;
-				snap.item.equipmentSlotId = snap.slot;
-			}
-		};
+		this.equippedSlots = slots;
 	}
 
 	/** Rebuilds an item's cached totalAttributes after its applied mods change. */
