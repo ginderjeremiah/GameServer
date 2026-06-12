@@ -28,6 +28,16 @@ export class ApiResponse<T extends ApiResponseType> {
 		return this.#raw.status;
 	}
 
+	/**
+	 * Whether the request succeeded: a 2xx status with no error message in the body (the backend signals
+	 * business failures via an `errorMessage` on an otherwise-200 response). Use this for control flow —
+	 * `error` is a display-message accessor that always returns a non-empty string (it falls back to the
+	 * status text or a generic message), so it must never be used as a boolean success check.
+	 */
+	public get ok(): boolean {
+		return this.status >= 200 && this.status < 300 && !this.responseJson.errorMessage;
+	}
+
 	public get data(): T {
 		if (!this.responseJson.data && this.responseJson.errorMessage) {
 			throw new Error(this.error);

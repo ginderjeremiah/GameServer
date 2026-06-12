@@ -30,8 +30,9 @@ vi.mock('$stores', () => ({
 }));
 
 // Controllable stubs for the network boundary the inventory mutations cross. `mockPost` resolves
-// the `{ error }` an `ApiRequest` would return, so a test can flip an endpoint to the
-// error/early-return path; `mockSendSocketCommand` backs `setFavorite`'s websocket persistence.
+// the `{ ok }` an `ApiRequest` response exposes (mirroring `ApiResponse.ok` — a success boolean,
+// since `ApiResponse.error` is an always-truthy message accessor), so a test can flip an endpoint to
+// the error/rollback path; `mockSendSocketCommand` backs `setFavorite`'s websocket persistence.
 const { mockPost, mockSendSocketCommand } = vi.hoisted(() => {
 	const mockPost = vi.fn();
 	const mockSendSocketCommand = vi.fn();
@@ -102,7 +103,7 @@ describe('InventoryManager', () => {
 		vi.mocked(ApiRequest).mockClear();
 
 		// Default the network boundary to success; error-path tests override per case.
-		mockPost.mockReset().mockResolvedValue({ error: undefined });
+		mockPost.mockReset().mockResolvedValue({ ok: true });
 		mockSendSocketCommand.mockReset().mockResolvedValue(undefined);
 
 		mockItems.length = 0;
@@ -299,7 +300,7 @@ describe('InventoryManager', () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 
@@ -313,7 +314,7 @@ describe('InventoryManager', () => {
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
 
-			let resolvePost: (value: { error?: string }) => void = () => {};
+			let resolvePost: (value: { ok: boolean; error?: string }) => void = () => {};
 			mockPost.mockReturnValue(new Promise((resolve) => (resolvePost = resolve)));
 
 			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
@@ -321,7 +322,7 @@ describe('InventoryManager', () => {
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 
-			resolvePost({ error: 'nope' });
+			resolvePost({ ok: false, error: 'nope' });
 			await pending;
 
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
@@ -363,7 +364,7 @@ describe('InventoryManager', () => {
 				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
 			];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.unequipItem(EEquipmentSlot.WeaponSlot);
 
@@ -443,7 +444,7 @@ describe('InventoryManager', () => {
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.applyMod(1, 10, 0);
 
@@ -479,7 +480,7 @@ describe('InventoryManager', () => {
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.applyMod(1, 10, 0);
 
@@ -537,7 +538,7 @@ describe('InventoryManager', () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.removeMod(1, 0);
 
@@ -553,7 +554,7 @@ describe('InventoryManager', () => {
 			];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ error: 'nope' });
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
 
 			const result = await manager.removeMod(1, 0);
 
