@@ -48,7 +48,7 @@ describe('SkillTooltip', () => {
 	});
 
 	it('shows the damage breakdown: base, per-attribute multiplier, enemy defense and total', () => {
-		staticData.attributes[EAttribute.Strength] = { id: EAttribute.Strength, name: 'Strength', description: '' };
+		staticData.attributes = [{ id: EAttribute.Strength, name: 'Strength', description: '' }];
 		const skill = makeSkill(owner, {
 			name: 'Cleave',
 			baseDamage: 10,
@@ -109,8 +109,10 @@ describe('SkillTooltip', () => {
 
 	it('renders an "On hit" effect line per authored effect, tinted by buff/debuff direction', async () => {
 		const { EModifierType, ESkillEffectTarget } = await import('$lib/api');
-		staticData.attributes[EAttribute.Strength] = { id: EAttribute.Strength, name: 'Strength', description: '' };
-		staticData.attributes[EAttribute.Defense] = { id: EAttribute.Defense, name: 'Defense', description: '' };
+		staticData.attributes = [
+			{ id: EAttribute.Strength, name: 'Strength', description: '' },
+			{ id: EAttribute.Defense, name: 'Defense', description: '' }
+		];
 		const skill = makeSkill(owner, {
 			name: 'Warcry',
 			effects: [
