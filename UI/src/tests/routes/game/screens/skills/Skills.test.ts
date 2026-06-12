@@ -260,6 +260,12 @@ describe('Skills screen', () => {
 		// Alpha (equipped, has effects) shows the badge; Bravo (effect-free) does not.
 		expect(rowByName(container, 'Alpha')?.querySelector('.effect-badge')).toBeTruthy();
 		expect(rowByName(container, 'Bravo')?.querySelector('.effect-badge')).toBeNull();
+
+		// The badge must anchor to the non-clipped outer tile, not the `overflow: hidden`
+		// `.icon-clip`, so its glow isn't cut off (#421).
+		const anchor = rowByName(container, 'Alpha')?.querySelector('.effect-badge-anchor');
+		expect(anchor?.parentElement?.classList.contains('skill-icon')).toBe(true);
+		expect(anchor?.closest('.icon-clip')).toBeNull();
 	});
 
 	it('renders an Effects section in the inspector for an effect-bearing skill', async () => {

@@ -1,9 +1,11 @@
 <div class="skill-icon" class:locked style:--icon-accent={accent} style:width="{size}px" style:height="{size}px">
-	{#if locked}
-		<span class="lock-glyph" aria-hidden="true">🔒</span>
-	{:else}
-		<img src={skill.iconPath} alt={skill.name} />
-	{/if}
+	<div class="icon-clip">
+		{#if locked}
+			<span class="lock-glyph" aria-hidden="true">🔒</span>
+		{:else}
+			<img src={skill.iconPath} alt={skill.name} />
+		{/if}
+	</div>
 	{#if skill.effects.length > 0}
 		<div class="effect-badge-anchor"><SkillEffectBadge /></div>
 	{/if}
@@ -33,14 +35,26 @@ const accent = $derived(
 <style lang="scss">
 .skill-icon {
 	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
 	flex-shrink: 0;
-	overflow: hidden;
 	border: 1px solid var(--border-light);
 	border-radius: 3px;
 	background: color-mix(in srgb, var(--white) 4%, transparent);
+
+	&.locked {
+		opacity: 0.8;
+	}
+}
+
+// Clips the rounded icon image; kept separate from `.skill-icon` so the effect badge
+// (anchored to the non-clipped outer tile) and its glow aren't cut off (#421).
+.icon-clip {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	border-radius: 3px;
 
 	&::before {
 		content: '';
@@ -51,10 +65,6 @@ const accent = $derived(
 			color-mix(in srgb, var(--icon-accent) 34%, transparent),
 			transparent 72%
 		);
-	}
-
-	&.locked {
-		opacity: 0.8;
 	}
 
 	img {
