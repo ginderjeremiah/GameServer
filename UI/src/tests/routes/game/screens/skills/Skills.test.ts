@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
+import {
+	EAttribute,
+	EModifierType,
+	ESkillEffectTarget,
+	type IChallenge,
+	type IEnemy,
+	type ISkill,
+	type ISkillEffect,
+	type IZone
+} from '$lib/api';
 
 // Same engine/stores/api mocks as the view-model test: the rendered screen builds
 // its own SkillsView from these at mount.
@@ -235,6 +244,47 @@ describe('Skills screen', () => {
 		await fireEvent.input(slider, { target: { value: '3' } });
 		expect(pills[0].classList.contains('on')).toBe(false);
 		expect(container.querySelector('.vs-defval b')?.textContent).toBe('3');
+	});
+
+	it('marks effect-bearing skills with a badge and leaves effect-free skills unmarked', () => {
+		const effect: ISkillEffect = {
+			id: 7,
+			target: ESkillEffectTarget.Opponent,
+			attributeId: EAttribute.Defense,
+			modifierTypeId: EModifierType.Additive,
+			amount: -10,
+			durationMs: 5000
+		};
+		staticData.skills = [skill({ id: 0, name: 'Alpha', effects: [effect] }), ...SKILLS.slice(1)];
+		const { container } = render(Skills);
+		// Alpha (equipped, has effects) shows the badge; Bravo (effect-free) does not.
+		expect(rowByName(container, 'Alpha')?.querySelector('.effect-badge')).toBeTruthy();
+		expect(rowByName(container, 'Bravo')?.querySelector('.effect-badge')).toBeNull();
+	});
+
+	it('renders an Effects section in the inspector for an effect-bearing skill', async () => {
+		const effect: ISkillEffect = {
+			id: 7,
+			target: ESkillEffectTarget.Opponent,
+			attributeId: EAttribute.Defense,
+			modifierTypeId: EModifierType.Additive,
+			amount: -10,
+			durationMs: 5000
+		};
+		staticData.skills = [skill({ id: 0, name: 'Alpha', effects: [effect] }), ...SKILLS.slice(1)];
+		const { container } = render(Skills);
+		await fireEvent.click(rowByName(container, 'Alpha')!);
+		const row = container.querySelector<HTMLElement>('.effect-row');
+		expect(row).toBeTruthy();
+		expect(row?.querySelector('.emag')?.textContent).toBe('-10');
+		expect(row?.querySelector('.eattr')?.textContent).toBe('Defense');
+		expect(row?.querySelector('.emeta')?.textContent).toContain('5s');
+	});
+
+	it('omits the inspector Effects section for an effect-free skill', async () => {
+		const { container } = render(Skills);
+		await fireEvent.click(rowByName(container, 'Delta')!);
+		expect(container.querySelector('.effect-row')).toBeNull();
 	});
 
 	it('filters the rail by search term', async () => {

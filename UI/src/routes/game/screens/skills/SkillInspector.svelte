@@ -71,6 +71,19 @@
 			</div>
 		</div>
 
+		{#if effects.length}
+			<div class="d-sec">
+				<div class="label">Effects</div>
+				{#each effects as effect (effect.id)}
+					<div class="effect-row">
+						<span class="emag" style:color={effectDirectionColor(effect.direction)}>{effect.magnitude}</span>
+						<span class="eattr">{effect.attributeName}</span>
+						<span class="emeta">{effect.targetLabel} · {effect.duration}</span>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
 		<div class="d-foot">
 			<div class="foot-item">
 				<div class="fl">Scaling</div>
@@ -90,7 +103,14 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { attributeCode, attributeColor, formatNum, normalizeText } from '$lib/common';
+import {
+	attributeCode,
+	attributeColor,
+	describeEffect,
+	effectDirectionColor,
+	formatNum,
+	normalizeText
+} from '$lib/common';
 import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
@@ -110,6 +130,15 @@ const fmt = (n: number) => formatNum(Math.round(n));
 
 const attributeName = (id: EAttribute) =>
 	staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+
+// One display description per authored effect, reusing the shared helper so wording/direction
+// match the battle tooltip's "On hit" lines; `id` is kept for a stable each-key.
+const effects = $derived(
+	(metrics?.skill.effects ?? []).map((effect) => ({
+		id: effect.id,
+		...describeEffect(effect, attributeName(effect.attributeId))
+	}))
+);
 
 const scalesEyebrow = $derived(
 	metrics?.skill.damageMultipliers.length
@@ -409,6 +438,35 @@ const rawNote = $derived.by(() => {
 			font-size: 13px;
 		}
 	}
+}
+
+.effect-row {
+	display: flex;
+	align-items: baseline;
+	gap: 11px;
+	margin-top: 8px;
+	font-size: 12px;
+}
+
+.emag {
+	min-width: 46px;
+	font-family: var(--mono);
+	font-size: 11px;
+	font-weight: 600;
+	text-align: right;
+}
+
+.eattr {
+	color: var(--text-secondary);
+}
+
+.emeta {
+	margin-left: auto;
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.4px;
+	color: var(--text-muted);
+	white-space: nowrap;
 }
 
 .d-foot {
