@@ -90,7 +90,7 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/EquipItem');
 		const response = await req.post({ itemId, equipmentSlotId: slotId });
-		if (response.error) {
+		if (!response.ok) {
 			rollback();
 			this.publish();
 			return false;
@@ -113,7 +113,7 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/UnequipItem');
 		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
-		if (response.error) {
+		if (!response.ok) {
 			rollback();
 			this.publish();
 			return false;
@@ -139,7 +139,7 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/ApplyMod');
 		const response = await req.post({ itemId, itemModId, itemModSlotId });
-		if (response.error) {
+		if (!response.ok) {
 			item.appliedMods = prevMods;
 			item.totalAttributes = prevTotal;
 			this.publish();
@@ -164,7 +164,7 @@ export class InventoryManager {
 
 		const req = new ApiRequest('Player/RemoveMod');
 		const response = await req.post({ itemId, itemModSlotId });
-		if (response.error) {
+		if (!response.ok) {
 			item.appliedMods = prevMods;
 			item.totalAttributes = prevTotal;
 			this.publish();

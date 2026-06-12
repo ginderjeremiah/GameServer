@@ -80,6 +80,35 @@ describe('ApiResponse', () => {
 		});
 	});
 
+	describe('ok', () => {
+		it('is true for a 2xx response with no error message', () => {
+			const response = new ApiResponse(makeRaw({ responseText: JSON.stringify({ data: null }) }));
+			expect(response.ok).toBe(true);
+		});
+
+		it('is true for a bodyless 2xx success (ApiResponse.Success())', () => {
+			const response = new ApiResponse(makeRaw({ responseText: '' }));
+			expect(response.ok).toBe(true);
+		});
+
+		it('is false for a 2xx response that carries an error message (a business failure)', () => {
+			const raw = makeRaw({
+				responseText: JSON.stringify({ data: null, errorMessage: 'Failed to equip item.' })
+			});
+			expect(new ApiResponse(raw).ok).toBe(false);
+		});
+
+		it('is false for a non-2xx status', () => {
+			const response = new ApiResponse(makeRaw({ status: 500, statusText: 'Internal Server Error' }));
+			expect(response.ok).toBe(false);
+		});
+
+		it('is false for a network error (status 0, empty body)', () => {
+			const response = new ApiResponse(makeRaw({ status: 0, statusText: '', responseText: '' }));
+			expect(response.ok).toBe(false);
+		});
+	});
+
 	describe('status', () => {
 		it('returns HTTP status code', () => {
 			const response = new ApiResponse(makeRaw({ status: 404 }));
