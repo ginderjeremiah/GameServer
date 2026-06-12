@@ -77,4 +77,17 @@ describe('Battler damage/heal-over-time', () => {
 		expect(healed).toBe(2);
 		expect(battler.currentHealth).toBe(100);
 	});
+
+	it('keeps isDead in sync after a heal (matches the backend always-live IsDead)', () => {
+		const battler = makeBattler([
+			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
+			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
+		]);
+		battler.takeDamage(52); // currentHealth 50
+
+		battler.applyHealOverTime(40); // heals 3 → currentHealth 53
+
+		expect(battler.isDead).toBe(battler.currentHealth <= 0);
+		expect(battler.isDead).toBe(false);
+	});
 });

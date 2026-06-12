@@ -119,6 +119,9 @@ export class Battler {
 		const healed = Math.min(heal, this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth);
 		if (healed > 0) {
 			this.currentHealth += healed;
+			// Keep the cached flag in sync with currentHealth, mirroring takeDamage/applyDamageOverTime and
+			// the backend's always-live IsDead, so isDead is correct regardless of mutation ordering.
+			this.isDead = this.currentHealth <= 0;
 			return healed;
 		}
 

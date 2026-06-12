@@ -67,6 +67,18 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(100, battler.CurrentHealth);
         }
 
+        [Fact]
+        public void ApplyHealOverTime_KeepsIsDeadInSync()
+        {
+            var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
+            battler.TakeDamage(52); // CurrentHealth 50
+
+            battler.ApplyHealOverTime(40); // heals 3 → CurrentHealth 53
+
+            Assert.Equal(battler.CurrentHealth <= 0, battler.IsDead);
+            Assert.False(battler.IsDead);
+        }
+
         // ── Statistics attribution (backend-only) ────────────────────────────
 
         [Fact]
