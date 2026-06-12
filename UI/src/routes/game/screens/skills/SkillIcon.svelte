@@ -4,11 +4,15 @@
 	{:else}
 		<img src={skill.iconPath} alt={skill.name} />
 	{/if}
+	{#if skill.effects.length > 0}
+		<div class="effect-badge-anchor"><SkillEffectBadge /></div>
+	{/if}
 </div>
 
 <script lang="ts">
 import type { ISkill } from '$lib/api';
 import { attributeColor } from '$lib/common';
+import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 
 type Props = {
 	skill: ISkill;
@@ -66,5 +70,12 @@ const accent = $derived(
 	position: relative;
 	font-size: 0.9em;
 	color: var(--text-muted);
+}
+
+.effect-badge-anchor {
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	pointer-events: none;
 }
 </style>
