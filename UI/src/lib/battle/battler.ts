@@ -127,13 +127,15 @@ export class Battler {
 
 	/** Applies a timed skill `effect` to this battler. Re-applying an already-active effect (matched by
 	 *  its authored id) refreshes its remaining duration without adding a second modifier (no stacking);
-	 *  a new effect adds a modifier and may shift MaxHealth, so the health is re-clamped. */
-	public applyEffect(effect: ISkillEffect) {
+	 *  a new effect adds a modifier and may shift MaxHealth, so the health is re-clamped. Returns `true`
+	 *  when the effect was newly applied and `false` on a refresh, so the live engine can log only the
+	 *  genuinely new applications (a refresh is already conveyed by the chip countdown resetting). */
+	public applyEffect(effect: ISkillEffect): boolean {
 		for (const active of this.activeEffects) {
 			if (active.sourceId === effect.id) {
 				active.remainingMs = effect.durationMs;
 				active.renderRemainingMs = effect.durationMs;
-				return;
+				return false;
 			}
 		}
 
@@ -155,6 +157,7 @@ export class Battler {
 			renderRemainingMs: effect.durationMs
 		});
 		this.clampHealthToMaxHealth();
+		return true;
 	}
 
 	/** Advances every active effect by `timeDelta`, removing any whose duration has elapsed (its modifier

@@ -80,13 +80,14 @@ namespace Game.Application.Tests.Services
             var logPreferencesByType = await verifyContext.Set<LogPreference>()
                 .Where(preference => preference.PlayerId == createdPlayer.Id)
                 .ToDictionaryAsync(preference => preference.LogTypeId, preference => preference.Enabled, CancellationToken);
-            Assert.Equal(6, logPreferencesByType.Count);
+            Assert.Equal(7, logPreferencesByType.Count);
             Assert.False(logPreferencesByType[(int)ELogType.Damage]);
             Assert.False(logPreferencesByType[(int)ELogType.Debug]);
             Assert.True(logPreferencesByType[(int)ELogType.Exp]);
             Assert.True(logPreferencesByType[(int)ELogType.LevelUp]);
             Assert.True(logPreferencesByType[(int)ELogType.ItemFound]);
             Assert.True(logPreferencesByType[(int)ELogType.EnemyDefeated]);
+            Assert.True(logPreferencesByType[(int)ELogType.SkillEffect]);
         }
 
         [Fact]

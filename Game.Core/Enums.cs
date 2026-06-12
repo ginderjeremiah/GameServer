@@ -203,7 +203,13 @@ namespace Game.Core
         /// <summary>
         /// Logs for when an enemy has been defeated.
         /// </summary>
-        EnemyDefeated = 6
+        EnemyDefeated = 6,
+
+        /// <summary>
+        /// Logs for skill-effect activity in battle: timed buff/debuff application and
+        /// per-second damage-over-time / heal-over-time summaries.
+        /// </summary>
+        SkillEffect = 7
     }
 
     /// <summary>

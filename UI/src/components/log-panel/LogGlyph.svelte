@@ -19,6 +19,8 @@
 		<path d="M2.5 4.5h9v8h-9z M5 4.5V3a2 2 0 014 0v1.5" />
 	{:else if glyph === 'kill'}
 		<path d="M7 2v10M2 7h10" />
+	{:else if glyph === 'effect'}
+		<path d="M7 1.5l4.5 2.6v5.8L7 12.5 2.5 9.9V4.1z M7 5v2.5M7 9v.01" />
 	{:else}
 		<circle cx="7" cy="7" r="4.5" />
 		<path d="M7 5v3M7 9.5v0.01" />

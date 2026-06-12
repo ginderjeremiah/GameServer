@@ -171,6 +171,7 @@ $effect(() => {
 	--log-loot: var(--success);
 	--log-reward: var(--warning);
 	--log-system: color-mix(in srgb, var(--text-primary) 70%, transparent);
+	--log-effect: var(--effect-accent);
 	// Mono section-label / eyebrow accent (a muted accent-light), used across the
 	// log + options screens.
 	--eyebrow: color-mix(in srgb, var(--accent-light) 70%, transparent);

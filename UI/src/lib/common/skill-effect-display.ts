@@ -84,3 +84,20 @@ export const describeEffect = (effect: ISkillEffect, attributeName: string): Eff
 		text: `${magnitude} ${attributeName} (${targetLabel}), ${duration}`
 	};
 };
+
+/** A combat-log line announcing a freshly-applied effect, phrased from the player's perspective so
+ *  `logKind` tints it correctly (player lines lead with "You"). The wording reuses the same
+ *  magnitude/duration pieces as the tooltip/chips, classifying the effect as empowering (buff) or
+ *  weakening (debuff) *for the battler it lands on* — e.g. `You are empowered: +15 Strength for 5s`
+ *  or `Goblin is weakened: -10 Defense for 5s`. */
+export const effectLogMessage = (
+	effect: ISkillEffect,
+	attributeName: string,
+	onPlayer: boolean,
+	enemyName: string
+): string => {
+	const { direction, magnitude, duration } = describeEffect(effect, attributeName);
+	const subject = onPlayer ? 'You are' : `${enemyName} is`;
+	const verb = direction === 'buff' ? 'empowered' : 'weakened';
+	return `${subject} ${verb}: ${magnitude} ${attributeName} for ${duration}`;
+};

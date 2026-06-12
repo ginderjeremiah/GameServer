@@ -92,6 +92,7 @@ export enum ELogType {
 	LevelUp = 4,
 	ItemFound = 5,
 	EnemyDefeated = 6,
+	SkillEffect = 7,
 }
 
 export enum EModifierType {

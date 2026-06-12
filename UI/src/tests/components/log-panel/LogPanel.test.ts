@@ -40,6 +40,13 @@ describe('LogPanel', () => {
 		expect(panel.textContent).toContain('2 events');
 	});
 
+	it('renders a skill-effect message with its dedicated glyph', () => {
+		logData.unshift({ id: 3, logType: ELogType.SkillEffect, message: 'You are empowered: +15 Strength for 5s' });
+
+		render(LogPanel);
+		expect(screen.getByTestId('log-panel').textContent).toContain('You are empowered: +15 Strength for 5s');
+	});
+
 	it('shows an empty state when there are no logs', () => {
 		render(LogPanel);
 		expect(screen.getByTestId('log-panel').textContent).toContain('No combat activity yet.');

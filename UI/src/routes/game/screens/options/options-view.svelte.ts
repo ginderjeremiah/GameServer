@@ -55,6 +55,14 @@ export const LOG_TYPES: LogTypeDef[] = [
 		color: logColors.loot
 	},
 	{
+		id: ELogType.SkillEffect,
+		group: 'combat',
+		name: 'Skill Effects',
+		desc: 'Buffs, debuffs, and damage/heal over time.',
+		glyph: 'effect',
+		color: logColors.effect
+	},
+	{
 		id: ELogType.Exp,
 		group: 'progression',
 		name: 'Experience',

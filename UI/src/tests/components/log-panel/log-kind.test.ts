@@ -62,6 +62,20 @@ describe('logKind', () => {
 		expect(result.label).toBe('Level');
 	});
 
+	it('returns the effect treatment for ELogType.SkillEffect', () => {
+		const result = logKind(makeLog(ELogType.SkillEffect, 'You are empowered: +15 Strength for 5s'));
+		expect(result.color).toBe(logColors.effect);
+		expect(result.glyph).toBe('effect');
+		expect(result.label).toBe('Effect');
+	});
+
+	it('uses the same effect treatment for an enemy-directed effect line', () => {
+		const result = logKind(makeLog(ELogType.SkillEffect, 'Goblin took 12 damage over time.'));
+		expect(result.color).toBe(logColors.effect);
+		expect(result.glyph).toBe('effect');
+		expect(result.label).toBe('Effect');
+	});
+
 	it('returns the system treatment for ELogType.Debug', () => {
 		const result = logKind(makeLog(ELogType.Debug, 'Debug info.'));
 		expect(result.color).toBe(logColors.system);

@@ -66,6 +66,14 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 	});
 
+	it('returns true for a new application and false for a refresh', () => {
+		const battler = makeBattler();
+		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5);
+
+		expect(battler.applyEffect(e)).toBe(true);
+		expect(battler.applyEffect(e)).toBe(false);
+	});
+
 	it('stacks two different effects on the same attribute', () => {
 		const battler = makeBattler();
 
@@ -181,6 +189,40 @@ describe('Battler skill-effect bookkeeping', () => {
 
 		expect(caster.attributes.getValue(EAttribute.Strength)).toBe(15);
 		expect(foe.attributes.getValue(EAttribute.Strength)).toBe(17);
+	});
+
+	it('reports each newly-applied effect (and the battler it landed on) to the onApplied callback', () => {
+		const caster = makeBattler();
+		const foe = makeBattler();
+		const skill = new Skill(
+			{
+				id: 0,
+				name: 'Dual',
+				baseDamage: 0,
+				cooldownMs: 40,
+				damageMultipliers: [],
+				effects: [
+					effect(1, EAttribute.Strength, EModifierType.Additive, 5, 1000, ESkillEffectTarget.Self),
+					effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
+				],
+				description: '',
+				iconPath: ''
+			},
+			caster
+		);
+
+		const applied: { id: number; onCaster: boolean }[] = [];
+		skill.applyEffects(foe, (e, target) => applied.push({ id: e.id, onCaster: target === caster }));
+
+		expect(applied).toEqual([
+			{ id: 1, onCaster: true },
+			{ id: 2, onCaster: false }
+		]);
+
+		// Re-firing while both effects are still active refreshes them, so nothing new is reported.
+		applied.length = 0;
+		skill.applyEffects(foe, (e, target) => applied.push({ id: e.id, onCaster: target === caster }));
+		expect(applied).toHaveLength(0);
 	});
 
 	it('exposes a reactive view of active effects for the chips, populated from the authored effect', () => {

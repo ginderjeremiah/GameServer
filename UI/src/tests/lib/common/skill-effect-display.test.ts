@@ -4,6 +4,7 @@ import {
 	describeEffect,
 	effectDirection,
 	effectDirectionColor,
+	effectLogMessage,
 	effectRaisesAttribute,
 	effectTargetLabel,
 	formatEffectDuration,
@@ -113,5 +114,43 @@ describe('describeEffect', () => {
 
 		expect(description.direction).toBe('debuff');
 		expect(description.text).toBe('-10 Defense (enemy), 3s');
+	});
+});
+
+describe('effectLogMessage', () => {
+	it('phrases a buff landing on the player as "You are empowered"', () => {
+		const message = effectLogMessage(
+			effect({ attributeId: EAttribute.Strength, amount: 15, durationMs: 5000 }),
+			'Strength',
+			true,
+			'Goblin'
+		);
+		expect(message).toBe('You are empowered: +15 Strength for 5s');
+	});
+
+	it('phrases a debuff landing on the enemy as "<name> is weakened"', () => {
+		const message = effectLogMessage(
+			effect({
+				attributeId: EAttribute.Defense,
+				modifierTypeId: EModifierType.Additive,
+				amount: -10,
+				durationMs: 3000
+			}),
+			'Defense',
+			false,
+			'Goblin'
+		);
+		expect(message).toBe('Goblin is weakened: -10 Defense for 3s');
+	});
+
+	it('classifies the direction by what the effect does to its target, not the magnitude sign', () => {
+		// A positive DamageTakenPerSecond is detrimental, so applying it to the enemy is a weakening debuff.
+		const message = effectLogMessage(
+			effect({ attributeId: EAttribute.DamageTakenPerSecond, amount: 12, durationMs: 3000 }),
+			'Damage Taken Per Second',
+			false,
+			'Goblin'
+		);
+		expect(message).toBe('Goblin is weakened: +12 Damage Taken Per Second for 3s');
 	});
 });
