@@ -1,6 +1,6 @@
 <CollapsibleRail testid="sidebar" pinTestid="pin-button" bind:pinned>
 	{#snippet brand(expanded)}
-		<div class="wordmark" class:show={expanded}>Tactic Foundry</div>
+		<div class="wordmark" class:show={expanded}>Name TBD</div>
 	{/snippet}
 
 	{#snippet body(expanded)}

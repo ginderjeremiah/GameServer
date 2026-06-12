@@ -1,7 +1,7 @@
 <CollapsibleRail testid="admin-sidebar" pinTestid="admin-pin-button" headerHeight={64} headerPadding={14} bind:pinned>
 	{#snippet brand(expanded)}
 		<div class="wordmark-block" class:show={expanded}>
-			<div class="wordmark">Tactic Foundry</div>
+			<div class="wordmark">Name TBD</div>
 			<div class="wordmark-tag">Admin Console</div>
 		</div>
 	{/snippet}
