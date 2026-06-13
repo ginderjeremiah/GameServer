@@ -9,7 +9,7 @@ namespace Game.DataAccess.Repositories
 {
     internal class ItemMods(ItemModsCacheHolder holder) : IItemMods, IItemModEntityCache
     {
-        private IReadOnlyList<ItemMod> Entities => holder.Current;
+        private IReadOnlyList<ItemMod> Entities => holder.Current.Entities;
 
         public List<Contracts.ItemMod> All()
         {
@@ -29,7 +29,9 @@ namespace Game.DataAccess.Repositories
 
         public CoreItemMod GetItemMod(int itemModId)
         {
-            return ItemMapper.ModToCore(Entities[itemModId]);
+            // Returns the snapshot's shared, pre-materialized instance rather than rebuilding a fresh graph
+            // per call. Applied mods are reference data treated as immutable by every caller, so sharing is safe.
+            return holder.Current.CoreItemMods[itemModId];
         }
     }
 }
