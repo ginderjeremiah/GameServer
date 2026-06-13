@@ -30,6 +30,7 @@ namespace Game.DataAccess.Repositories.Caching
                 .Include(e => e.AttributeDistributions)
                 .Include(e => e.EnemySkills)
                 .Include(e => e.ZoneEnemies)
+                .AsSplitQuery()
                 .OrderBy(e => e.Id)
                 .ToListAsync(cancellationToken);
 

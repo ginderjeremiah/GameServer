@@ -16,6 +16,7 @@ namespace Game.DataAccess.Repositories.Caching
                 .Include(i => i.ItemModSlots)
                 .Include(i => i.ItemAttributes)
                 .Include(i => i.Tags)
+                .AsSplitQuery()
                 .OrderBy(i => i.Id)
                 .ToListAsync(cancellationToken);
         }
