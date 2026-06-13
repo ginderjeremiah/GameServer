@@ -30,8 +30,7 @@
 </TooltipShell>
 
 <script lang="ts">
-import { EChallengeType } from '$lib/api';
-import { challengeTypeColor, normalizeText, resolveUnlockReward, tintColor, zonesUnlockedBy } from '$lib/common';
+import { challengeTypeColor, challengeTypeName, resolveUnlockReward, tintColor, zonesUnlockedBy } from '$lib/common';
 import { playerChallenges, staticData } from '$stores';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -53,12 +52,7 @@ let container = $state<HTMLDivElement>();
 const challenge = $derived(challengeId != null ? staticData.challenges?.[challengeId] : undefined);
 const completed = $derived(challenge != null && playerChallenges.isChallengeCompleted(challenge.id));
 const accent = $derived(challenge ? challengeTypeColor(challenge.challengeTypeId) : 'var(--accent)');
-const typeName = $derived(
-	challenge
-		? (staticData.challengeTypes?.find((t) => t.id === challenge.challengeTypeId)?.name ??
-				normalizeText(EChallengeType[challenge.challengeTypeId] ?? ''))
-		: ''
-);
+const typeName = $derived(challenge ? challengeTypeName(challenge.challengeTypeId, staticData.challengeTypes) : '');
 const unlockedZones = $derived(challenge ? zonesUnlockedBy(challenge.id, staticData.zones ?? []) : []);
 const reward = $derived(
 	challenge

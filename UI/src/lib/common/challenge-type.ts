@@ -1,5 +1,5 @@
-import { EChallengeType } from '$lib/api';
-import { tintColor } from './functions';
+import { EChallengeType, type IChallengeType } from '$lib/api';
+import { normalizeText, tintColor } from './functions';
 
 /*
  * Single source of truth for challenge-type accent visuals. The hues are
@@ -30,3 +30,12 @@ export const challengeTypeColor = (id: EChallengeType): string =>
 /** The challenge-type accent at a given opacity (themeable via `color-mix`). */
 export const challengeTypeTint = (id: EChallengeType, alpha: number): string =>
 	tintColor(challengeTypeColor(id), alpha);
+
+/**
+ * The challenge type's display name — the authored name from the `ChallengeTypes` reference set
+ * when available, falling back to the normalized enum name. The reference set is passed in (rather
+ * than read from `$stores`) so this module stays free of a store dependency, mirroring the other
+ * param-based `$lib/common` helpers.
+ */
+export const challengeTypeName = (id: EChallengeType, challengeTypes?: IChallengeType[]): string =>
+	challengeTypes?.find((t) => t.id === id)?.name ?? normalizeText(EChallengeType[id] ?? '');

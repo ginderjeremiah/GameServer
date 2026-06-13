@@ -1,8 +1,8 @@
+export { default as ChallengeTooltip } from './tooltip/ChallengeTooltip.svelte';
 export { default as DiamondMark } from './DiamondMark.svelte';
 export { default as Loading } from './Loading.svelte';
 export { default as Modal } from './Modal.svelte';
 export { default as ModalHost } from './ModalHost.svelte';
-export { default as ChallengeTooltip } from './tooltip/ChallengeTooltip.svelte';
 export { default as StatusGlyph } from './StatusGlyph.svelte';
 export { default as Toast } from './Toast.svelte';
 export { default as ToastContainer } from './ToastContainer.svelte';
