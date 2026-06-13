@@ -54,7 +54,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public void AddToQueue(string value)
         {
-            _logger.LogTrace("Retrieved value from RedisQueue: {QueueName}, value: {Value}", QueueName, value);
+            _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);
             _redis.ListRightPush(QueueName, value);
         }
 
@@ -65,7 +65,7 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public Task AddToQueueAsync(string value)
         {
-            _logger.LogTrace("Retrieved value from RedisQueue: {QueueName}, value: {Value}", QueueName, value);
+            _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);
             return _redis.ListRightPushAsync(QueueName, value);
         }
 
