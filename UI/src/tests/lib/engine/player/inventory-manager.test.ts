@@ -94,6 +94,9 @@ const makeInventoryItem = (overrides: Partial<IInventoryItem> & { itemId: number
 	...overrides
 });
 
+/** Drains the microtask queue so a queued mutation's optimistic apply lands before the assertion. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe('InventoryManager', () => {
 	let manager: InventoryManager;
 
@@ -340,7 +343,9 @@ describe('InventoryManager', () => {
 			mockPost.mockReturnValue(new Promise((resolve) => (resolvePost = resolve)));
 
 			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
-			// Optimistically equipped while the persist is still in flight.
+			// The mutation queues onto the serialization chain, so the optimistic apply lands on the next
+			// microtask rather than synchronously; flush it, then confirm it applied with the persist still in flight.
+			await flush();
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 
@@ -349,6 +354,127 @@ describe('InventoryManager', () => {
 
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
+		});
+	});
+
+	describe('overlapping mutations (serialization)', () => {
+		beforeEach(() => {
+			// Items 1 & 2 are weapons that contest the same slot; item 3 (helm) exercises an independent
+			// slot; mod 10 lets a test overlap an equip with an apply-mod across mutation types.
+			mockItems[1] = makeItem(1, EItemCategory.Weapon);
+			mockItems[2] = makeItem(2, EItemCategory.Weapon);
+			mockItems[3] = makeItem(3, EItemCategory.Helm);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1 }),
+				makeInventoryItem({ itemId: 2 }),
+				makeInventoryItem({ itemId: 3 })
+			];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+		});
+
+		it('queues the second mutation until the first has settled before it snapshots and persists', async () => {
+			let resolveFirst: (value: { ok: boolean }) => void = () => {};
+			mockPost.mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)));
+
+			const first = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			const second = manager.equipItem(3, EEquipmentSlot.HelmSlot);
+
+			// The first op has applied optimistically and is awaiting its persist; the second is still
+			// queued behind it — it has neither applied nor reached the network.
+			await flush();
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]).toBeUndefined();
+			expect(mockPost).toHaveBeenCalledTimes(1);
+
+			resolveFirst({ ok: true });
+			await Promise.all([first, second]);
+
+			expect(mockPost).toHaveBeenCalledTimes(2);
+			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]?.itemId).toBe(3);
+		});
+
+		it('keeps local state consistent with the server when the first of two same-slot equips fails', async () => {
+			// First equip fails, second succeeds. Without serialization the first op's rollback baseline
+			// (captured before the second applied) would restore an empty slot, discarding the second
+			// change while the server has it applied — the desync this issue fixes.
+			mockPost.mockReset();
+			mockPost.mockResolvedValueOnce({ ok: false, error: 'nope' });
+			mockPost.mockResolvedValue({ ok: true });
+
+			const [firstResult, secondResult] = await Promise.all([
+				manager.equipItem(1, EEquipmentSlot.WeaponSlot),
+				manager.equipItem(2, EEquipmentSlot.WeaponSlot)
+			]);
+
+			expect(firstResult).toBe(false);
+			expect(secondResult).toBe(true);
+			// Server ends with the second item equipped; local state must match.
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(2);
+			expect(manager.unlockedItems.get(2)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(2)?.equipmentSlotId).toBe(EEquipmentSlot.WeaponSlot);
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
+			expect(manager.unlockedItems.get(1)?.equipmentSlotId).toBeUndefined();
+		});
+
+		it('leaves the slot empty when both overlapping same-slot equips fail (no stale-baseline resurrection)', async () => {
+			// Both persists fail. Without serialization the second op's rollback restores a baseline taken
+			// after the first op's optimistic apply, resurrecting the first item even though its own
+			// persist already rolled it back — leaving an item shown as equipped that the server never saved.
+			mockPost.mockReset();
+			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+
+			const [firstResult, secondResult] = await Promise.all([
+				manager.equipItem(1, EEquipmentSlot.WeaponSlot),
+				manager.equipItem(2, EEquipmentSlot.WeaponSlot)
+			]);
+
+			expect(firstResult).toBe(false);
+			expect(secondResult).toBe(false);
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
+			expect(manager.unlockedItems.get(1)?.equipmentSlotId).toBeUndefined();
+			expect(manager.unlockedItems.get(2)?.equipped).toBe(false);
+			expect(manager.unlockedItems.get(2)?.equipmentSlotId).toBeUndefined();
+		});
+
+		it('keeps the queue alive when a mutation rejects, so the next mutation still runs', async () => {
+			// ApiRequest.post never rejects in practice (it maps network failures to a 0-status response),
+			// but a thrown operation must not wedge the chain: the rejection is isolated and the queued
+			// follow-up still snapshots and persists.
+			mockPost.mockReset();
+			mockPost.mockRejectedValueOnce(new Error('boom'));
+			mockPost.mockResolvedValue({ ok: true });
+
+			const first = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			const second = manager.equipItem(3, EEquipmentSlot.HelmSlot);
+
+			await expect(first).rejects.toThrow('boom');
+			await expect(second).resolves.toBe(true);
+			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]?.itemId).toBe(3);
+		});
+
+		it('serializes across mutation types — applyMod waits for a pending equip to settle', async () => {
+			// All four mutations route through the same chain, so an apply-mod queued behind an in-flight
+			// equip must not snapshot or persist until the equip settles.
+			let resolveEquip: (value: { ok: boolean }) => void = () => {};
+			mockPost.mockReturnValueOnce(new Promise((resolve) => (resolveEquip = resolve)));
+
+			const equip = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			const mod = manager.applyMod(1, 10, 0);
+
+			await flush();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
+			expect(mockPost).toHaveBeenCalledTimes(1);
+
+			resolveEquip({ ok: true });
+			await Promise.all([equip, mod]);
+
+			expect(mockPost).toHaveBeenCalledTimes(2);
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.appliedMods.map((m) => m.id)).toEqual([10]);
 		});
 	});
 
