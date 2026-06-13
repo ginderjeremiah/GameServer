@@ -16,6 +16,15 @@ namespace Game.Api.Sockets
         private readonly ILogger<SocketHandler> _logger;
         private readonly Func<Task> _onActivity;
 
+        // Serializes command execution across the two paths that reach ExecuteCommand — the client read
+        // loop and the pub/sub processor (server-initiated commands) — so the documented "websocket
+        // commands are handled sequentially for each player" guarantee holds for server pushes too,
+        // preventing the read-modify-write lost-update race on the shared cached player state. Left
+        // undisposed (like ReferenceCacheHolder's gate): a SemaphoreSlim only needs disposal once its
+        // AvailableWaitHandle is materialized (never here), and skipping it avoids an ObjectDisposedException
+        // race against an in-flight pub/sub command during socket teardown.
+        private readonly SemaphoreSlim _commandLock = new(1, 1);
+
         private DateTime _lastResponse = DateTime.UtcNow;
 
         public string Id => _context.SocketId;
@@ -39,9 +48,10 @@ namespace Game.Api.Sockets
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
-            using var scope = _scopeFactory.CreateScope();
+            await _commandLock.WaitAsync();
             try
             {
+                using var scope = _scopeFactory.CreateScope();
                 var command = _commandFactory.CreateCommand(commandInfo, scope);
                 var response = await command.ExecuteAsync(_context);
                 await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
@@ -55,6 +65,10 @@ namespace Game.Api.Sockets
                     Id = commandInfo.Id,
                     Error = "Internal Server Error"
                 });
+            }
+            finally
+            {
+                _commandLock.Release();
             }
         }
 

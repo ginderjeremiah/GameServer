@@ -16,6 +16,13 @@ namespace Game.Api.Sockets
         private readonly ILogger<SocketContext> _logger;
         private readonly WebSocket _socket;
 
+        // Guards every WebSocket output operation (sends and the close frame), which forbid overlapping
+        // calls. The read loop, the pub/sub processor, and the inactivity/close paths can all reach these
+        // concurrently; serializing here keeps two outputs from throwing or interleaving a multi-chunk
+        // frame. Distinct from SocketHandler's command lock because ExecuteCommand holds that lock while
+        // calling SendData. Left undisposed for the same reason as the command lock.
+        private readonly SemaphoreSlim _sendLock = new(1, 1);
+
         public string SocketId { get; }
         public int PlayerId { get; }
         public SessionService Session { get; }
@@ -39,6 +46,7 @@ namespace Game.Api.Sockets
 
             _logger.LogDebug("Sending data to playerId ({PlayerId}) from socket ({Id}): {Data}", PlayerId, SocketId, data);
             var dataBytes = Encoding.UTF8.GetBytes(data);
+            await _sendLock.WaitAsync();
             try
             {
                 for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
@@ -67,6 +75,10 @@ namespace Game.Api.Sockets
             {
                 _logger.LogError(ex, "Failed to send socket data: {Data}", data);
                 return false;
+            }
+            finally
+            {
+                _sendLock.Release();
             }
 
             return true;
@@ -112,7 +124,20 @@ namespace Game.Api.Sockets
             _socketClosedSource.TrySetResult(closeReason);
             if (_socket.State is WebSocketState.Open)
             {
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
+                // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
+                // SendData; re-check state inside the lock so a racing close only sends one close frame.
+                await _sendLock.WaitAsync();
+                try
+                {
+                    if (_socket.State is WebSocketState.Open)
+                    {
+                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
+                    }
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
             }
         }
     }
