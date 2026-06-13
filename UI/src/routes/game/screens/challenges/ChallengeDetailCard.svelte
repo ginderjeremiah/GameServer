@@ -16,8 +16,8 @@
 				>
 			{/if}
 			<div class="card-spacer"></div>
-			{#if done && c.completedAt}
-				<span class="card-completed">{c.completedAt}</span>
+			{#if done && completedAtDisplay}
+				<span class="card-completed">{completedAtDisplay}</span>
 			{/if}
 		</div>
 		<div class="card-desc">{c.description}</div>
@@ -40,6 +40,9 @@ interface Props {
 const { c }: Props = $props();
 
 const done = $derived(c.state === 'done');
+const completedAtDisplay = $derived(
+	c.completedAt ? new Date(c.completedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : null
+);
 </script>
 
 <style lang="scss">
