@@ -7,7 +7,9 @@ namespace Game.Core.Tests.Events
     /// <summary>
     /// Covers the dispatcher's drain behaviour: events a handler raises on the aggregate while reacting
     /// to another event must be dispatched in the same cycle (not left pending until the next save). This
-    /// is what lets a challenge completion's reward-unlock events persist and notify immediately.
+    /// is what lets a challenge completion's reward-unlock events persist and notify immediately. Also
+    /// covers per-handler failure isolation: one handler throwing must not silently drop the remaining
+    /// events/handlers in the batch (or the drain), and the collected failures are surfaced afterwards.
     /// </summary>
     public class DomainEventDispatcherTests
     {
@@ -64,6 +66,66 @@ namespace Game.Core.Tests.Events
             Assert.Contains("B", log.Handled);
         }
 
+        [Fact]
+        public async Task DispatchAsync_OneHandlerThrows_StillRunsOtherHandlersAndSurfacesFailure()
+        {
+            var log = new HandledLog();
+            DomainEventDispatcher.RegisterDomainEventHandler<SharedEvent, ThrowingHandler>();
+            DomainEventDispatcher.RegisterDomainEventHandler<SharedEvent, RecordingHandler>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(log));
+
+            // A handler throwing must not stop the other handler registered for the same event from
+            // running, and the failure is surfaced rather than swallowed.
+            var ex = await Assert.ThrowsAsync<AggregateException>(
+                () => dispatcher.DispatchAsync(new IDomainEvent[] { new SharedEvent() }, TestContext.Current.CancellationToken));
+
+            Assert.Single(ex.InnerExceptions);
+            Assert.Contains("Recording", log.Handled);
+        }
+
+        [Fact]
+        public async Task DispatchAsync_HandlerThrowsMidDrain_StillDispatchesRemainingEventsAndDrains()
+        {
+            var log = new HandledLog();
+            DomainEventDispatcher.RegisterDomainEventHandler<ThrowEvent, ThrowingHandler>();
+            DomainEventDispatcher.RegisterDomainEventHandler<SiblingEvent, SiblingEventHandler>();
+            DomainEventDispatcher.RegisterDomainEventHandler<ChildEvent, ChildEventHandler>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(log));
+            var aggregate = new TestAggregate();
+            aggregate.Raise(new ThrowEvent());
+            aggregate.Raise(new SiblingEvent(aggregate));
+
+            // The first event's handler throws, but its sibling in the same batch still dispatches, and the
+            // child event that sibling raises is still drained in the same cycle — the regression this issue
+            // is about (a mid-batch throw must not silently drop the already-cleared remaining events). The
+            // failure is still surfaced afterwards.
+            var ex = await Assert.ThrowsAsync<AggregateException>(
+                () => dispatcher.DispatchAsync(aggregate, TestContext.Current.CancellationToken));
+
+            Assert.Single(ex.InnerExceptions);
+            Assert.Contains("Sibling", log.Handled);
+            Assert.Contains("Child", log.Handled);
+            Assert.Empty(aggregate.DomainEvents);
+        }
+
+        [Fact]
+        public async Task DispatchAsync_MultipleHandlersThrow_AggregatesEveryFailure()
+        {
+            var log = new HandledLog();
+            DomainEventDispatcher.RegisterDomainEventHandler<MultiThrowEvent, ThrowingHandler>();
+            DomainEventDispatcher.RegisterDomainEventHandler<MultiThrowEvent, AlsoThrowingHandler>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(log));
+
+            // Every failing handler's exception is collected, not just the first one to throw.
+            var ex = await Assert.ThrowsAsync<AggregateException>(
+                () => dispatcher.DispatchAsync(new IDomainEvent[] { new MultiThrowEvent() }, TestContext.Current.CancellationToken));
+
+            Assert.Equal(2, ex.InnerExceptions.Count);
+        }
+
         // Test-only aggregate that exposes RaiseEvent so a handler can enqueue a follow-up event on it.
         private sealed class TestAggregate : AggregateRoot
         {
@@ -77,6 +139,16 @@ namespace Game.Core.Tests.Events
         private sealed record LoopEvent(TestAggregate Aggregate) : IDomainEvent;
 
         private sealed record MultiEvent : IDomainEvent;
+
+        private sealed record SharedEvent : IDomainEvent;
+
+        private sealed record ThrowEvent : IDomainEvent;
+
+        private sealed record SiblingEvent(TestAggregate Aggregate) : IDomainEvent;
+
+        private sealed record ChildEvent : IDomainEvent;
+
+        private sealed record MultiThrowEvent : IDomainEvent;
 
         // Records the order events were handled so the test can assert the cascade ran in one dispatch.
         private sealed class HandledLog
@@ -129,6 +201,58 @@ namespace Game.Core.Tests.Events
             public Task HandleAsync(LoopEvent domainEvent, CancellationToken cancellationToken = default)
             {
                 domainEvent.Aggregate.Raise(new LoopEvent(domainEvent.Aggregate));
+                return Task.CompletedTask;
+            }
+        }
+
+        // Throws for every event it handles, exercising per-handler isolation: its failure must not abort
+        // the rest of the batch or the drain.
+        private sealed class ThrowingHandler :
+            IDomainEventHandler<SharedEvent>,
+            IDomainEventHandler<ThrowEvent>,
+            IDomainEventHandler<MultiThrowEvent>
+        {
+            public Task HandleAsync(SharedEvent domainEvent, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("handler failed");
+            public Task HandleAsync(ThrowEvent domainEvent, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("handler failed");
+            public Task HandleAsync(MultiThrowEvent domainEvent, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("handler failed");
+        }
+
+        // A second failing handler so a multi-failure batch can assert every exception is collected.
+        private sealed class AlsoThrowingHandler : IDomainEventHandler<MultiThrowEvent>
+        {
+            public Task HandleAsync(MultiThrowEvent domainEvent, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("other handler failed");
+        }
+
+        // Records that it ran, proving a sibling handler's throw did not skip it.
+        private sealed class RecordingHandler(HandledLog log) : IDomainEventHandler<SharedEvent>
+        {
+            public Task HandleAsync(SharedEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("Recording");
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class SiblingEventHandler(HandledLog log) : IDomainEventHandler<SiblingEvent>
+        {
+            public Task HandleAsync(SiblingEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("Sibling");
+                // Raises a follow-up the drain must still dispatch even though a sibling event's handler threw.
+                domainEvent.Aggregate.Raise(new ChildEvent());
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class ChildEventHandler(HandledLog log) : IDomainEventHandler<ChildEvent>
+        {
+            public Task HandleAsync(ChildEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("Child");
                 return Task.CompletedTask;
             }
         }
