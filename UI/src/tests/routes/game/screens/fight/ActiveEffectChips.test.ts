@@ -63,7 +63,15 @@ describe('ActiveEffectChips', () => {
 
 		const fill = container.querySelector('.chip-fill') as HTMLElement;
 		expect(fill.style.width).toBe('50%');
-		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('0.5s');
+		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('0.50s');
+	});
+
+	it('formats integer seconds with two decimal places to prevent width jitter', () => {
+		battler.applyEffect(effect({ id: 1, durationMs: 2000 }));
+		battler.activeEffects[0].renderRemainingMs = 2000;
+		const { container } = render(ActiveEffectChips, { props: { battler } });
+
+		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('2.00s');
 	});
 
 	it('right-aligns the row when reversed (enemy/boss layout)', () => {
