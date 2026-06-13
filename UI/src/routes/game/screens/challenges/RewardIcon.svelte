@@ -9,6 +9,8 @@
 	>
 		{#if reward.kind === 'item' && reward.item}
 			<CategoryGlyph cat={reward.item.itemCategoryId} color={accent} size={Math.round(size * 0.5)} />
+		{:else if reward.kind === 'skill' && reward.skill}
+			<img class="skill-img" src={reward.skill.iconPath} alt="" />
 		{:else}
 			<div
 				class="mod-diamond"
@@ -75,6 +77,13 @@ const revealGlow = $derived(`0 0 calc(4px + ${reward.glow} * 16px) ${tintColor(a
 
 .mod-diamond {
 	transform: rotate(45deg);
+}
+
+.skill-img {
+	width: 62%;
+	height: 62%;
+	object-fit: cover;
+	border-radius: 3px;
 }
 
 @media (prefers-reduced-motion: no-preference) {

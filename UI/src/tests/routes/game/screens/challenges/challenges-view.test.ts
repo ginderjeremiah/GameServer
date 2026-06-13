@@ -135,6 +135,39 @@ describe('resolveReward', () => {
 		expect(reward?.mod?.id).toBe(213);
 	});
 
+	it('resolves a skill reward with the neutral skill accent and "Skill" sub-line', () => {
+		const ch = challenge({
+			id: 7,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 2
+		});
+		const reward = resolveReward(ch, true);
+		expect(reward).toMatchObject({ kind: 'skill', revealed: true, name: 'Firebolt', sub: 'Skill' });
+		expect(reward?.accent).toBe('var(--accent-light)');
+		expect(reward?.skill?.id).toBe(2);
+	});
+
+	it('honours the revealed flag for a skill reward', () => {
+		const ch = challenge({
+			id: 8,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 2
+		});
+		expect(resolveReward(ch, false)?.revealed).toBe(false);
+	});
+
+	it('returns null when the rewarded skill is missing from the pool', () => {
+		const ch = challenge({
+			id: 8,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 999
+		});
+		expect(resolveReward(ch, true)).toBeNull();
+	});
+
 	it('returns null when the challenge has no reward', () => {
 		expect(
 			resolveReward(challenge({ id: 99, name: 'No Reward', challengeTypeId: EChallengeType.EnemiesKilled }), true)

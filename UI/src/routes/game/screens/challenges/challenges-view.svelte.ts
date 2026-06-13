@@ -2,10 +2,11 @@ import {
 	EChallengeGoalComparison,
 	EChallengeType,
 	EEntityType,
-	type ERarity,
+	ERarity,
 	type IChallenge,
 	type IItemMod,
-	type IPlayerChallenge
+	type IPlayerChallenge,
+	type ISkill
 } from '$lib/api';
 import { BattleAttributes, type Item } from '$lib/battle';
 import {
@@ -26,24 +27,27 @@ import { challengeTypeUnit } from './challenge-meta';
 export type ChallengeState = 'locked' | 'active' | 'done';
 export type SortKey = 'progress' | 'rarity' | 'name';
 
-/** A challenge's reward, resolved against the item/mod reference pools. While
+/** A challenge's reward, resolved against the item/mod/skill reference pools. While
  *  the challenge is incomplete the reward is *sealed* (`revealed: false`) — the
  *  rarity tier and category are teased, but the name/stats stay hidden. */
 export interface ResolvedReward {
-	kind: 'item' | 'mod';
+	kind: 'item' | 'mod' | 'skill';
 	revealed: boolean;
+	/** Rarity tier (drives the rarity sort). Skills have no tier, so they resolve to `Common`. */
 	rarity: ERarity;
-	/** Themeable rarity hue (`var(--rarity-*)`). */
+	/** Themeable accent: the rarity hue for items/mods, the neutral skill accent for skills. */
 	accent: string;
-	/** Themeable rarity glow intensity (`var(--rarity-*-glow)`). */
+	/** Themeable rarity glow intensity (`var(--rarity-*-glow)`); `0` for the (rarity-less) skill. */
 	glow: string;
 	name: string;
-	/** Teaser sub-line, e.g. `Rare · Helm`. */
+	/** Teaser sub-line, e.g. `Rare · Helm`, or `Skill`. */
 	sub: string;
 	/** Item rewards: a preview battle item for the (re-used) item tooltip. */
 	item?: Item;
 	/** Mod rewards: the raw mod data for the mod tooltip. */
 	mod?: IItemMod;
+	/** Skill rewards: the raw skill data for the skill tooltip. */
+	skill?: ISkill;
 }
 
 export interface ProgressInfo {
@@ -160,6 +164,24 @@ export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward
 			name: mod.name,
 			sub: `${rarityLabel(mod.rarityId)} · ${modTypeLabel(mod.itemModTypeId)}`,
 			mod
+		};
+	}
+	if (ch.rewardSkillId != null) {
+		const skill = staticData.skills?.[ch.rewardSkillId];
+		if (!skill) {
+			return null;
+		}
+		// Skills carry no rarity tier; sort with the lowest and use the neutral skill accent
+		// (mirroring the shared `resolveUnlockReward` so both reward surfaces agree).
+		return {
+			kind: 'skill',
+			revealed,
+			rarity: ERarity.Common,
+			accent: 'var(--accent-light)',
+			glow: '0',
+			name: skill.name,
+			sub: 'Skill',
+			skill
 		};
 	}
 	return null;
