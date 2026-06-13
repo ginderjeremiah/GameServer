@@ -21,6 +21,16 @@ namespace Game.Api.Models.Player
         {
             var inventory = player.Inventory;
 
+            // Precompute the loadout-order and equipped-slot lookups once, so the per-skill and
+            // per-item projections below index them instead of rescanning SelectedSkills/EquipmentSlots
+            // for every unlocked entry.
+            var skillOrderById = player.SelectedSkills
+                .Select((skill, order) => (skill.Id, order))
+                .ToDictionary(entry => entry.Id, entry => entry.order);
+            var equipSlotByItemId = inventory.EquipmentSlots
+                .Where(slot => slot.ItemId.HasValue)
+                .ToDictionary(slot => slot.ItemId.GetValueOrDefault());
+
             return new PlayerData
             {
                 Name = player.Name,
@@ -36,12 +46,12 @@ namespace Game.Api.Models.Player
                 UnlockedSkills = player.Skills
                     .Select(skill =>
                     {
-                        var order = player.SelectedSkills.FindIndex(s => s.Id == skill.Id);
+                        var selected = skillOrderById.TryGetValue(skill.Id, out var order);
                         return new UnlockedSkill
                         {
                             SkillId = skill.Id,
-                            Selected = order >= 0,
-                            Order = order >= 0 ? order : null,
+                            Selected = selected,
+                            Order = selected ? order : null,
                         };
                     })
                     .ToList(),
@@ -64,8 +74,7 @@ namespace Game.Api.Models.Player
                     UnlockedItems = inventory.UnlockedItems
                         .Select(slot =>
                         {
-                            var equipSlot = inventory.EquipmentSlots
-                                .FirstOrDefault(es => es.ItemId == slot.ItemId);
+                            equipSlotByItemId.TryGetValue(slot.ItemId, out var equipSlot);
 
                             return new InventoryItem
                             {

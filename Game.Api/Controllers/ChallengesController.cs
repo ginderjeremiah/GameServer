@@ -16,8 +16,7 @@ namespace Game.Api.Controllers
         [HttpGet]
         public async Task<ApiEnumerableResponse<PlayerChallenge>> Player()
         {
-            var player = await _sessionService.LoadPlayer();
-            var progress = await _playerProgress.GetChallenges(player.Id);
+            var progress = await _playerProgress.GetChallenges(_sessionService.SelectedPlayerId);
             return ApiResponse.Success(progress.To().Model<PlayerChallenge>());
         }
     }

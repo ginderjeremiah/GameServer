@@ -16,8 +16,7 @@ namespace Game.Api.Controllers
         [HttpGet("/api/[controller]")]
         public async Task<ApiEnumerableResponse<PlayerStatistic>> Statistics()
         {
-            var player = await _sessionService.LoadPlayer();
-            var stats = await _playerProgress.GetStatistics(player.Id);
+            var stats = await _playerProgress.GetStatistics(_sessionService.SelectedPlayerId);
             return ApiResponse.Success(stats.To().Model<PlayerStatistic>());
         }
 

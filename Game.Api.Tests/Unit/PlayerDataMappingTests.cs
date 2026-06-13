@@ -1,3 +1,5 @@
+using Game.Core;
+using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
@@ -54,7 +56,33 @@ namespace Game.Api.Tests.Unit
             Assert.Empty(data.UnlockedSkills);
         }
 
-        private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills) => new()
+        [Fact]
+        public void FromPlayer_ProjectsUnlockedItems_WithEquippedStateAndSlot()
+        {
+            var weapon = MakeItem(10, EItemCategory.Weapon);
+            var helm = MakeItem(11, EItemCategory.Helm);
+
+            var inventory = new Inventory();
+            inventory.UnlockItem(weapon);
+            inventory.UnlockItem(helm);
+            inventory.TryEquipItem(weapon.Id, EEquipmentSlot.WeaponSlot);
+
+            var player = MakePlayer(skills: [], selectedSkills: [], inventory: inventory);
+
+            var data = PlayerDataModel.FromPlayer(player);
+
+            Assert.Equal(2, data.InventoryData.UnlockedItems.Count);
+
+            var equippedWeapon = data.InventoryData.UnlockedItems.Single(i => i.ItemId == weapon.Id);
+            Assert.True(equippedWeapon.Equipped);
+            Assert.Equal((int)EEquipmentSlot.WeaponSlot, equippedWeapon.EquipmentSlotId);
+
+            var unequippedHelm = data.InventoryData.UnlockedItems.Single(i => i.ItemId == helm.Id);
+            Assert.False(unequippedHelm.Equipped);
+            Assert.Null(unequippedHelm.EquipmentSlotId);
+        }
+
+        private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null) => new()
         {
             Id = 1,
             Name = "Test",
@@ -62,7 +90,7 @@ namespace Game.Api.Tests.Unit
             Exp = 0,
             CurrentZoneId = 0,
             StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
+            Inventory = inventory ?? new Inventory(),
             Skills = skills,
             SelectedSkills = selectedSkills,
             LogPreferences = [],
@@ -77,6 +105,18 @@ namespace Game.Api.Tests.Unit
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],
+        };
+
+        private static Item MakeItem(int id, EItemCategory category) => new()
+        {
+            Id = id,
+            Name = $"Item {id}",
+            Description = string.Empty,
+            Category = category,
+            Rarity = ERarity.Common,
+            Attributes = [],
+            ModSlots = [],
+            Tags = [],
         };
     }
 }

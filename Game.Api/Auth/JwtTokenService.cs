@@ -23,6 +23,9 @@ namespace Game.Api.Auth
 
         private readonly JwtOptions _options;
         private readonly SymmetricSecurityKey _signingKey;
+        // JsonWebTokenHandler is thread-safe and caches signing material internally, so a single
+        // instance is reused across all token issuance rather than allocated per call.
+        private readonly JsonWebTokenHandler _handler = new();
 
         public JwtTokenService(IOptions<JwtOptions> options)
         {
@@ -50,7 +53,7 @@ namespace Game.Api.Auth
                 SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256),
             };
 
-            return new JsonWebTokenHandler().CreateToken(descriptor);
+            return _handler.CreateToken(descriptor);
         }
     }
 }
