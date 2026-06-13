@@ -116,8 +116,8 @@ $effect(() => {
 	// theme overrides. Paired with the container's backdrop blur for legibility.
 	--tooltip-bg: color-mix(in srgb, var(--surface) 92%, transparent);
 	--page: #{colors.$page};
-	--panel: #16171e;
-	--panel-2: #1b1c24;
+	--panel: #{colors.$panel};
+	--panel-2: #{colors.$panel-2};
 	--mono: 'Geist Mono', ui-monospace, monospace;
 	--sans: Geist, system-ui, sans-serif;
 	--enemy: #{colors.$enemy-accent};
