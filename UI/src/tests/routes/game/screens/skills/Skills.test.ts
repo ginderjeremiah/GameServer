@@ -246,6 +246,44 @@ describe('Skills screen', () => {
 		expect(container.querySelector('.vs-defval b')?.textContent).toBe('3');
 	});
 
+	it('resorts the available rail when a compare-vs preset is clicked', async () => {
+		// Two available skills whose DPS ranking flips when Ogre King's defense (12) is applied.
+		// FastLow:  baseDmg=20, cd=1s  → DPS 20 at def=0, DPS  8.0 at def=12 (effective=8)
+		// SlowHigh: baseDmg=100, cd=10s → DPS 10 at def=0, DPS  8.8 at def=12 (effective=88)
+		staticData.skills = [
+			...SKILLS.slice(0, 3),
+			skill({ id: 3, name: 'FastLow', baseDamage: 20, damageMultipliers: [], cooldownMs: 1000 }),
+			skill({ id: 4, name: 'SlowHigh', baseDamage: 100, damageMultipliers: [], cooldownMs: 10000 })
+		];
+		mockPlayerManager.unlockedSkills = [
+			{ skillId: 0, selected: true, order: 0 },
+			{ skillId: 1, selected: true, order: 1 },
+			{ skillId: 2, selected: true, order: 2 },
+			{ skillId: 3, selected: false, order: 0 },
+			{ skillId: 4, selected: false, order: 0 }
+		];
+		const { container } = render(Skills);
+
+		// `.row` elements: first 3 are equipped (slot-ordered), then available (DPS-ordered).
+		const availableRowNames = () =>
+			Array.from(container.querySelectorAll<HTMLElement>('.row'))
+				.slice(3)
+				.map((r) => r.querySelector('.rowname')?.textContent ?? '');
+
+		// Initial DPS order: FastLow (20) > SlowHigh (10) → FastLow first.
+		expect(availableRowNames()[0]).toBe('FastLow');
+		expect(availableRowNames()[1]).toBe('SlowHigh');
+
+		// Ogre King pill: defense=12. SlowHigh (8.8 DPS) overtakes FastLow (8.0 DPS).
+		const ogreKing = Array.from(container.querySelectorAll<HTMLButtonElement>('.epill')).find((p) =>
+			p.textContent?.includes('Ogre King')
+		)!;
+		await fireEvent.click(ogreKing);
+
+		expect(availableRowNames()[0]).toBe('SlowHigh');
+		expect(availableRowNames()[1]).toBe('FastLow');
+	});
+
 	it('marks effect-bearing skills with a badge and leaves effect-free skills unmarked', () => {
 		const effect: ISkillEffect = {
 			id: 7,
