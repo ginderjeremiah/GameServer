@@ -20,6 +20,14 @@ Google's Gemini image models via a bundled standard-library Python script
 (`scripts/generate.py`). The whole point is the loop: generate something, look
 at it together with the user, and adjust until it's right.
 
+> **Working in this repo (GameServer)?** Game item/skill icons in `UI/static/img`
+> have a *locked* art style and a generate-on-chroma → background-strip pipeline.
+> Read [`docs/icon-art.md`](../../../docs/icon-art.md) **first** — it has the style
+> recipe, the exact reusable prompt blocks, a per-icon prompt catalog (so you stay
+> consistent and don't duplicate existing icons), and the background-removal
+> tooling and gotchas. (Project-specific — ignore this note if the skill was copied
+> to another project.)
+
 ## Prerequisites
 
 The script needs a Google AI Studio API key in `GEMINI_API_KEY` (or
@@ -36,6 +44,15 @@ setx GEMINI_API_KEY "your-key"
 Don't proceed with calls until a key is set -- every call hits a paid/quota'd
 API, so failing fast is kinder than retrying blindly.
 
+On Windows, a key set with `setx` (or via the System env UI) lives at the **User**
+scope and is **not** inherited by an already-open shell/tool session — so
+`$env:GEMINI_API_KEY` can read empty even though the key is set. Before asking the
+user to re-set it, pull it inline for the call:
+
+```powershell
+$env:GEMINI_API_KEY = [System.Environment]::GetEnvironmentVariable('GEMINI_API_KEY','User')
+```
+
 ## Models
 
 The user chose to support both, selectable per call via `--model`:
@@ -48,6 +65,11 @@ The user chose to support both, selectable per call via `--model`:
 
 A full model id can also be passed through directly. Stick with the default
 `flash` unless the user wants top quality or large sizes, then use `--model pro`.
+
+Output format differs: **`flash` returns a lossless PNG, `pro` returns a JPEG.**
+This matters whenever you need clean, crisp edges — e.g. before chroma-keying a
+background out to transparency (JPEG's edge artifacts make keying messy), prefer
+`flash`. See [Transparent backgrounds](#transparent-backgrounds).
 
 ## Workflow
 
@@ -116,6 +138,24 @@ These models reward rich, specific description over keyword soup.
   that loop is the strength here, so lean on it instead of over-engineering one
   giant prompt.
 
+## Transparent backgrounds
+
+These models **cannot output a real alpha channel.** Ask for a "transparent
+background" and the model paints a fake transparency *checkerboard* into the image
+(and often returns a JPEG, which can't hold alpha at all). To get a transparent
+PNG, **chroma-key** it instead:
+
+1. Generate on a **flat solid background colour the subject doesn't contain** —
+   lime green `#7CFC00` works for most subjects; use magenta `#FF00FF` for green
+   ones. Explicitly tell the model to **fill the whole frame edge-to-edge** — it
+   otherwise tends to frame the subject in a rounded panel, trapping un-keyable
+   colour in the corners.
+2. Use **`--model flash`** so the output is a lossless PNG with clean edges.
+3. **Key the colour out** to transparency. In this repo, `image-editing/strip-bg.py`
+   does this — a hue key (so it doesn't eat same-ish-hued subject colours) with
+   `--trim-corners` and `--fill-holes` cleanup for the panel/hole artifacts above.
+   See [`docs/icon-art.md`](../../../docs/icon-art.md) for the full pipeline.
+
 ## Aspect ratios & sizes
 
 - `--aspect`: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`,
@@ -144,6 +184,9 @@ The script exits non-zero and prints the raw API error on failure. Common cases:
 - **HTTP 429 with a non-zero limit and a `retryDelay`** — a genuine per-minute or
   per-day rate limit; wait the suggested delay and retry.
 - **No candidates / blocked** — the prompt tripped a safety filter; rephrase.
+- **Output is a JPEG, or has a painted checkerboard "transparent" background** —
+  expected: the models can't emit real alpha. See
+  [Transparent backgrounds](#transparent-backgrounds) for the chroma-key approach.
 
 This skill lives in this repo at `.claude/skills/image/`, so `/image` is
 available when working in this project. Copy it to `~/.claude/skills/image/` if

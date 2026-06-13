@@ -13,7 +13,7 @@ All of the frontend code is contained in the `UI` folder which is structured as 
   - `stores`: Svelte stores for managing application state, such as log data, static reference data, and tooltip data. NOTE: most stateful data is instead being moved to classes in the `lib` folder that are made reactive using the `statify` utility function, so avoid adding new stores if possible and consider whether the state you need can be managed using a reactive class.
   - `styles`: Global styles and theming for the frontend.
   - `tests`: Unit tests for the lib code, pages, and components
-- `static`: Static assets such as images, icons, and fonts used in the frontend.
+- `static`: Static assets such as images, icons, and fonts used in the frontend. Item/skill icons live in `static/img` — see [Icon Art & Image Generation](./icon-art.md) for the locked icon style, the generation/background-stripping pipeline (and its gotchas), and a per-icon prompt catalog before creating or regenerating any icons.
 - `e2e-tests`: Playwright end-to-end tests for the frontend components
 
 # General Frontend Guidelines
