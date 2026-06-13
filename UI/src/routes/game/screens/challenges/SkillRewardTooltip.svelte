@@ -47,7 +47,7 @@
 
 <script lang="ts">
 import { EAttribute, type ISkill } from '$lib/api';
-import { attributeColor, describeEffect, effectDirectionColor, formatNum, normalizeText } from '$lib/common';
+import { attributeColor, attributeEnumName, describeEffect, effectDirectionColor, formatNum } from '$lib/common';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
@@ -62,7 +62,7 @@ const { skill }: Props = $props();
 // Reference-data attribute name (the full names live in the `Attributes` set); falls back to the
 // humanised enum key, matching the battle skill tooltip.
 const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+	staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
 
 const scaling = $derived(
 	skill.damageMultipliers.map((m) => ({

@@ -1,4 +1,5 @@
 import { EAttribute } from '$lib/api';
+import { normalizeText } from './functions';
 
 /*
  * Single source of truth for core-attribute accent visuals and short codes. The
@@ -38,3 +39,8 @@ export const attributeColor = (id: EAttribute): string => {
 
 /** The three-letter code for a core attribute (empty for derived attributes). */
 export const attributeCode = (id: EAttribute): string => ATTRIBUTE_CODE[id] ?? '';
+
+/** The humanised enum-key fallback name for an attribute (e.g. `MaxHealth` → `Max Health`),
+ *  used when the live `Attributes` reference data is unavailable. An unknown/out-of-range id
+ *  has no enum key, so it degrades to a readable `Unknown` rather than a blank label. */
+export const attributeEnumName = (id: EAttribute): string => normalizeText(EAttribute[id]) || 'Unknown';

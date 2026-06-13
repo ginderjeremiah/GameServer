@@ -20,7 +20,7 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { effectDirection, effectDirectionColor, formatEffectMagnitude, normalizeText } from '$lib/common';
+import { attributeEnumName, effectDirection, effectDirectionColor, formatEffectMagnitude } from '$lib/common';
 import { staticData } from '$stores';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
@@ -33,7 +33,7 @@ type Props = {
 const { battler, reversed = false }: Props = $props();
 
 const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((attr) => attr.id === id)?.name ?? normalizeText(EAttribute[id]);
+	staticData.attributes?.find((attr) => attr.id === id)?.name ?? attributeEnumName(id);
 
 const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>

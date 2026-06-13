@@ -23,7 +23,7 @@
 
 import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
-import { normalizeText } from '$lib/common';
+import { attributeEnumName } from '$lib/common';
 import { playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -140,7 +140,7 @@ export function radarValueAtPointer(
 /** The display name for an attribute, preferring the live reference data and
  *  falling back to a normalised enum key (e.g. `MaxHealth` → `Max Health`). */
 export function attributeName(id: EAttribute): string {
-	return staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+	return staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
 }
 
 /** Compact labels for the dense theorycraft "per point" line. Falls back to the

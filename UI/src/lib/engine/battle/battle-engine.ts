@@ -1,8 +1,8 @@
 import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { staticData } from '$stores';
-import { EAttribute, ELogType, IEnemyInstance } from '$lib/api';
+import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
-import { formatNum, createHook, Action, effectLogMessage, normalizeText } from '$lib/common';
+import { formatNum, createHook, Action, effectLogMessage, attributeEnumName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
 import { inventoryManager } from '../engine';
@@ -140,7 +140,7 @@ export class BattleEngine {
 		for (const { effect, onPlayer } of this.stepLog.appliedEffects) {
 			const name =
 				staticData.attributes?.find((attr) => attr.id === effect.attributeId)?.name ??
-				normalizeText(EAttribute[effect.attributeId]);
+				attributeEnumName(effect.attributeId);
 			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, onPlayer, this.enemy.name));
 		}
 	}
