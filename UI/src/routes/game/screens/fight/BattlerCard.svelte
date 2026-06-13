@@ -45,7 +45,7 @@ const { battler, side }: Props = $props();
 
 const accent = $derived(side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
-const healthText = $derived(`${formatNum(battler.currentHealth)} / ${maxHealth}`);
+const healthText = $derived(`${formatNum(battler.currentHealth)} / ${formatNum(maxHealth)}`);
 const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100);
 </script>
 

@@ -33,6 +33,16 @@ describe('BattlerCard', () => {
 		expect(card.querySelector('.hp-text')?.textContent).toContain('80 / 100');
 	});
 
+	it('formats a fractional max health instead of rendering floating-point noise', () => {
+		const battler = makeBattler({
+			attributes: [{ attributeId: EAttribute.MaxHealth, amount: 412.50000000001 }],
+			currentHealth: 73.4
+		});
+		const { getByTestId } = render(BattlerCard, { props: { battler, side: 'player' } });
+
+		expect(getByTestId('player-card').querySelector('.hp-text')?.textContent).toContain('73.4 / 412.5');
+	});
+
 	it('exposes the HP bar as a progressbar with rounded current/max health', () => {
 		const battler = makeBattler({
 			name: 'Aelara',
