@@ -208,39 +208,40 @@ namespace Game.DataAccess
 
         private static async Task HandleAttributeAllocationsChanged(GameContext context, AttributeAllocationsChangedEvent evt)
         {
+            var currentRows = await context.PlayerAttributes
+                .Where(pa => pa.PlayerId == evt.PlayerId)
+                .ToListAsync();
+
+            var rowsByAttributeId = currentRows.ToDictionary(pa => pa.AttributeId);
+
             foreach (var alloc in evt.Allocations)
             {
                 var attributeId = (int)alloc.Attribute;
                 var amount = (decimal)alloc.Amount;
 
-                if (amount == 0)
+                if (rowsByAttributeId.TryGetValue(attributeId, out var row))
                 {
-                    await context.PlayerAttributes
-                        .Where(pa => pa.PlayerId == evt.PlayerId && pa.AttributeId == attributeId)
-                        .ExecuteDeleteAsync();
-                }
-                else
-                {
-                    var existing = await context.PlayerAttributes
-                        .FirstOrDefaultAsync(pa => pa.PlayerId == evt.PlayerId && pa.AttributeId == attributeId);
-
-                    if (existing is not null)
+                    if (amount == 0)
                     {
-                        existing.Amount = amount;
+                        context.PlayerAttributes.Remove(row);
                     }
                     else
                     {
-                        context.PlayerAttributes.Add(new PlayerAttribute
-                        {
-                            PlayerId = evt.PlayerId,
-                            AttributeId = attributeId,
-                            Amount = amount,
-                        });
+                        row.Amount = amount;
                     }
-
-                    await context.SaveChangesAsync();
+                }
+                else if (amount != 0)
+                {
+                    context.PlayerAttributes.Add(new PlayerAttribute
+                    {
+                        PlayerId = evt.PlayerId,
+                        AttributeId = attributeId,
+                        Amount = amount,
+                    });
                 }
             }
+
+            await context.SaveChangesAsync();
         }
 
         private static async Task HandleItemUnlocked(GameContext context, ItemUnlockedEvent evt)
