@@ -377,3 +377,5 @@ FodyWeavers.xsd
 
 # Transpiled Typescript files
 /GameServer/wwwroot/js
+# Local output from the /image skill (Nano Banana generations)
+generated-images/
