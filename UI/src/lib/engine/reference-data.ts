@@ -193,12 +193,11 @@ export const dedupedFetch = (key: string, run: () => Promise<void>): Promise<num
 	let pending = pendingFetches.get(key);
 	if (!pending) {
 		const start = performance.now();
+		// Clear the entry once it settles (success or failure) so concurrent callers share the in-flight
+		// promise, but a later call — e.g. the forced reload on session resume — re-invokes `run`.
 		pending = run()
 			.then(() => Math.round(performance.now() - start))
-			.catch((e) => {
-				pendingFetches.delete(key);
-				throw e;
-			});
+			.finally(() => pendingFetches.delete(key));
 		pendingFetches.set(key, pending);
 	}
 	return pending;

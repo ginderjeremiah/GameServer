@@ -241,6 +241,17 @@ describe('dedupedFetch', () => {
 		expect(run).toHaveBeenCalledTimes(1);
 	});
 
+	it('clears the in-flight entry on success so a later call re-runs', async () => {
+		const { dedupedFetch } = await loadModule();
+		const run = vi.fn().mockResolvedValue(undefined);
+
+		// First load resolves and clears the entry...
+		await expect(dedupedFetch('zones', run)).resolves.toBeTypeOf('number');
+		// ...so a forced reload re-invokes `run` rather than returning the stale resolved promise.
+		await expect(dedupedFetch('zones', run)).resolves.toBeTypeOf('number');
+		expect(run).toHaveBeenCalledTimes(2);
+	});
+
 	it('clears the in-flight entry on failure so a later call can retry', async () => {
 		const { dedupedFetch } = await loadModule();
 		const run = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined);
