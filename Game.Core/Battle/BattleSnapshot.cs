@@ -44,12 +44,19 @@ namespace Game.Core.Battle
                 .Select(itemId =>
                 {
                     // Applied mods live on the player's UnlockedItemSlot, so capture their IDs from there.
+                    // An equipped item must always have a matching unlocked entry (TryEquipItem enforces
+                    // this), so a missing entry means the inventory invariant is broken. Fail loudly rather
+                    // than silently capturing the item without its mods: this snapshot is the anti-cheat
+                    // parity surface, and a quiet capture would later validate a replay against weaker
+                    // attributes than the client simulated, failing legitimate victories with no signal.
                     var unlocked = player.Inventory.UnlockedItems
-                        .FirstOrDefault(u => u.ItemId == itemId);
+                        .FirstOrDefault(u => u.ItemId == itemId)
+                        ?? throw new InvalidOperationException(
+                            $"Equipped item {itemId} has no matching entry in the player's unlocked items.");
 
-                    var modIds = unlocked?.AppliedMods
+                    var modIds = unlocked.AppliedMods
                         .Select(m => m.ItemModId)
-                        .ToList() ?? [];
+                        .ToList();
 
                     return new EquippedItemSnapshot
                     {

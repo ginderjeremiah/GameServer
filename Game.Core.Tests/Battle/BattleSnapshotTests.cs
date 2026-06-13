@@ -78,6 +78,20 @@ namespace Game.Core.Tests.Battle
             Assert.Empty(equipped.AppliedModIds);
         }
 
+        [Fact]
+        public void FromPlayer_EquippedItemMissingFromUnlockedItems_ThrowsNamingItem()
+        {
+            var player = MakePlayer();
+            Equip(player, MakeItem(7, attributes: [MakeModifier(EAttribute.Strength, 5)]));
+
+            // Corrupt the inventory invariant: an item stays equipped but is no longer unlocked. The
+            // snapshot must fail loudly rather than silently capturing the item without its mods.
+            player.Inventory.UnlockedItems.Clear();
+
+            var ex = Assert.Throws<InvalidOperationException>(() => BattleSnapshot.FromPlayer(player));
+            Assert.Contains("Equipped item 7", ex.Message);
+        }
+
         // ── ToBattler ────────────────────────────────────────────────────────
 
         [Fact]
