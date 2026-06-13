@@ -62,5 +62,27 @@ namespace Game.Core.Attributes
         {
             return Enum.GetValues<EAttribute>().Select(a => new Attribute(a));
         }
+
+        /// <summary>
+        /// The core attributes a player directly invests stat points into. Every other attribute is
+        /// "derived" — computed from these via <see cref="Modifiers.StaticAttributeModifiers"/> — so the
+        /// core set is the meaningful measure of raw attribute investment.
+        /// </summary>
+        private static readonly HashSet<EAttribute> CoreAttributeSet =
+        [
+            Strength, Endurance, Intellect, Agility, Dexterity, Luck,
+        ];
+
+        /// <inheritdoc cref="CoreAttributeSet"/>
+        public static IReadOnlySet<EAttribute> CoreAttributes => CoreAttributeSet;
+
+        /// <summary>
+        /// Whether the given <paramref name="attribute"/> is a core (directly-allocatable) attribute
+        /// rather than a derived one.
+        /// </summary>
+        public static bool IsCore(EAttribute attribute)
+        {
+            return CoreAttributeSet.Contains(attribute);
+        }
     }
 }
