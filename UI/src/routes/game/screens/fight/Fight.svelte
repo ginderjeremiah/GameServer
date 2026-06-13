@@ -30,16 +30,16 @@
 		{:else}
 			<BattlerCard battler={battleEngine.enemy} side="enemy" />
 		{/if}
-
-		{#if boss.victory}
-			<ZoneClearedOverlay
-				bossName={boss.bossName}
-				zoneName={boss.zoneName}
-				autoFight={boss.autoFight}
-				unlockedNextZone={boss.unlockedNextZone}
-			/>
-		{/if}
 	</div>
+
+	{#if boss.victory}
+		<ZoneClearedOverlay
+			bossName={boss.bossName}
+			zoneName={boss.zoneName}
+			autoFight={boss.autoFight}
+			unlockedNextZone={boss.unlockedNextZone}
+		/>
+	{/if}
 </div>
 
 <script lang="ts">
