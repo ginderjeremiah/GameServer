@@ -12,11 +12,16 @@ export class PlayerManager implements IPlayerData {
 	public statPointsUsed = 0;
 	public attributes: IBattlerAttribute[] = [];
 	public unlockedSkills: IUnlockedSkill[] = [];
-	public logPreferences: ILogPreference[] = [];
+	private logPreferenceList: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
 		unlockedMods: []
 	};
+
+	/** O(1) `enabled`-by-type lookup, rebuilt whenever {@link logPreferences} is assigned, so the
+	 *  per-tick combat-log writer (`log.ts`) never linear-scans the preference list. `#`-private so
+	 *  `statify` leaves it alone — it is read imperatively, never inside a reactive derivation. */
+	#enabledByType = new Map<ELogType, boolean>();
 
 	/**
 	 * The equipped skill ids in loadout order, derived from the unlocked set. The wire payload
@@ -28,6 +33,21 @@ export class PlayerManager implements IPlayerData {
 			.filter((skill) => skill.selected)
 			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 			.map((skill) => skill.skillId);
+	}
+
+	/** The player's combat-log preferences. Assigning rebuilds the by-type enabled lookup. */
+	public get logPreferences(): ILogPreference[] {
+		return this.logPreferenceList;
+	}
+	public set logPreferences(preferences: ILogPreference[]) {
+		this.logPreferenceList = preferences;
+		this.#enabledByType = new Map(preferences.map((pref): [ELogType, boolean] => [pref.id, pref.enabled]));
+	}
+
+	/** Whether a log type is enabled, defaulting an unknown type to enabled (matching the combat-log
+	 *  writer's historical `?? true` fallback). O(1) via the prebuilt by-type map. */
+	public logTypeEnabled(logType: ELogType): boolean {
+		return this.#enabledByType.get(logType) ?? true;
 	}
 
 	public initialize(data: IPlayerData) {

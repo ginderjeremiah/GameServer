@@ -104,16 +104,36 @@ export function zoneSpawnLevel(zone: IZone): number {
 	return (zone.levelMin + zone.levelMax) / 2;
 }
 
+/** Memoised flat-Defense by enemy identity → level. Enemy defense at a fixed level is a pure
+ *  function of the (static, immutable mid-session) attribute distribution, so it never changes for a
+ *  given enemy record. Keying the outer cache on the enemy object means a record replaced when
+ *  reference data reloads is recomputed (and the stale entry GC'd) rather than served a wrong value. */
+const enemyDefenseCache = new WeakMap<IEnemy, Map<number, number>>();
+
 /** An enemy's flat Defense at a given level — the value the battle subtracts in `Battler.takeDamage`.
  *  Mirrors the backend enemy build (`Enemy.GetAttributeModifiers`): each attribute distribution
  *  contributes `baseAmount + amountPerLevel * level` additively, then Defense is resolved through the
- *  same derived-attribute composition the battle uses (base + per-Endurance + per-Agility). */
+ *  same derived-attribute composition the battle uses (base + per-Endurance + per-Agility). Memoised
+ *  per enemy+level so a Compare-vs recompute doesn't rebuild a full `BattleAttributes` per pill. */
 export function enemyDefense(enemy: IEnemy, level: number): number {
+	let byLevel = enemyDefenseCache.get(enemy);
+	if (byLevel === undefined) {
+		// A plain memo cache, not reactive state.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		byLevel = new Map<number, number>();
+		enemyDefenseCache.set(enemy, byLevel);
+	}
+	const cached = byLevel.get(level);
+	if (cached !== undefined) {
+		return cached;
+	}
 	const modifiers = enemy.attributeDistribution.map((dist) => ({
 		attributeId: dist.attributeId,
 		amount: dist.baseAmount + dist.amountPerLevel * level
 	}));
-	return new BattleAttributes(modifiers, true).getValue(EAttribute.Defense);
+	const defense = new BattleAttributes(modifiers, true).getValue(EAttribute.Defense);
+	byLevel.set(level, defense);
+	return defense;
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────── */
@@ -153,14 +173,14 @@ export class SkillsView {
 	/** The loadout cap (number of equip slots) — the single generated game constant. */
 	readonly cap = MAX_SELECTED_SKILLS;
 
-	/** Ids the player has unlocked. */
-	readonly unlockedIds = $derived(playerManager.unlockedSkills.map((s) => s.skillId));
+	/** Ids the player has unlocked, as a set for O(1) membership in the catalogue/metric derivations.
+	 *  Rebuilt from reactive deps on each change (a lookup, not mutable held state). */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	readonly unlockedIds = $derived(new Set(playerManager.unlockedSkills.map((s) => s.skillId)));
 
 	/** Skills shown on the page: every non-retired skill, plus any retired skill the
 	 *  player still owns (retirement keeps owned records resolvable). */
-	readonly catalogue = $derived(
-		(staticData.skills ?? []).filter((s) => this.unlockedIds.includes(s.id) || !s.retiredAt)
-	);
+	readonly catalogue = $derived((staticData.skills ?? []).filter((s) => this.unlockedIds.has(s.id) || !s.retiredAt));
 
 	/** The player's resolved battle attributes (allocation + equipped item/mod stats),
 	 *  the same composition the battle uses. */
@@ -178,7 +198,7 @@ export class SkillsView {
 		for (const skill of this.catalogue) {
 			byId[skill.id] = {
 				skill,
-				unlocked: this.unlockedIds.includes(skill.id),
+				unlocked: this.unlockedIds.has(skill.id),
 				rawDamage: calculateSkillDamage(skill, attrs),
 				cooldown: cdMultiplier > 0 ? skill.cooldownMs / 1000 / cdMultiplier : skill.cooldownMs / 1000,
 				contributions: skillContributions(skill, attrs),
@@ -320,7 +340,7 @@ export class SkillsView {
 
 	/** Equip / unequip a skill. Equipping into a full loadout starts a swap instead. */
 	toggle(id: number): void {
-		if (!this.unlockedIds.includes(id)) {
+		if (!this.unlockedIds.has(id)) {
 			return;
 		}
 		if (this.isEquipped(id)) {
@@ -414,10 +434,13 @@ export class SkillsView {
 	 *  the new equipped set/order without a reload (reassigned so the reactive proxy
 	 *  observes the change). */
 	private applyToPlayer(orderedIds: number[]): void {
-		playerManager.unlockedSkills = playerManager.unlockedSkills.map((s) => ({
-			...s,
-			selected: orderedIds.includes(s.skillId),
-			order: orderedIds.includes(s.skillId) ? orderedIds.indexOf(s.skillId) : 0
-		}));
+		playerManager.unlockedSkills = playerManager.unlockedSkills.map((s) => {
+			const order = orderedIds.indexOf(s.skillId);
+			return {
+				...s,
+				selected: order >= 0,
+				order: order >= 0 ? order : 0
+			};
+		});
 	}
 }

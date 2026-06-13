@@ -170,6 +170,30 @@ describe('PlayerManager', () => {
 		});
 	});
 
+	describe('logTypeEnabled', () => {
+		it('returns the stored enabled flag for a known log type via the prebuilt map', () => {
+			manager.initialize(makePlayerData());
+
+			expect(manager.logTypeEnabled(ELogType.Damage)).toBe(false);
+			expect(manager.logTypeEnabled(ELogType.Exp)).toBe(true);
+		});
+
+		it('defaults an unknown log type to enabled', () => {
+			manager.initialize(makePlayerData({ logPreferences: [] }));
+
+			expect(manager.logTypeEnabled(ELogType.LevelUp)).toBe(true);
+		});
+
+		it('rebuilds the lookup when preferences are reassigned', () => {
+			manager.initialize(makePlayerData());
+			expect(manager.logTypeEnabled(ELogType.Damage)).toBe(false);
+
+			manager.logPreferences = [{ id: ELogType.Damage, enabled: true }];
+
+			expect(manager.logTypeEnabled(ELogType.Damage)).toBe(true);
+		});
+	});
+
 	describe('default state', () => {
 		it('starts with empty defaults before initialization', () => {
 			expect(manager.name).toBe('');
