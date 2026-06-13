@@ -713,7 +713,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
-            Assert.Equal("Skill does not exist.", result.ErrorMessage);
+            Assert.Equal("Skill not found.", result.ErrorMessage);
         }
 
         [Fact]
@@ -1555,7 +1555,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
-            Assert.Equal("Item does not exist.", result.ErrorMessage);
+            Assert.Equal("Item not found.", result.ErrorMessage);
         }
 
         [Fact]
@@ -1683,7 +1683,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
-            Assert.Equal("Item Mod does not exist.", result.ErrorMessage);
+            Assert.Equal("Item mod not found.", result.ErrorMessage);
         }
 
         [Fact]
@@ -1697,7 +1697,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
-            Assert.Equal("Skill does not exist.", result.ErrorMessage);
+            Assert.Equal("Skill not found.", result.ErrorMessage);
         }
 
         [Fact]
