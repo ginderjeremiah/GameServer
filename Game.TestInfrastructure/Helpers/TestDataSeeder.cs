@@ -382,6 +382,23 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        // LogTypes are intrinsic, migration-seeded reference data, so the preference references an
+        // existing seeded log type rather than creating one.
+        public static async Task AddLogPreferenceAsync(
+            GameContext context,
+            int playerId,
+            ELogType logType,
+            bool enabled)
+        {
+            context.LogPreferences.Add(new LogPreference
+            {
+                PlayerId = playerId,
+                LogTypeId = (int)logType,
+                Enabled = enabled,
+            });
+            await context.SaveChangesAsync();
+        }
+
         public static async Task<Enemy> CreateStrongEnemyAsync(GameContext context)
         {
             return await CreateEnemyAsync(context, "Strong Enemy",
