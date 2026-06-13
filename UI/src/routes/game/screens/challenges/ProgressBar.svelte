@@ -1,4 +1,12 @@
-<div class="bar-track" style:height="{height}px" style:border-radius="{height / 2}px">
+<div
+	class="bar-track"
+	style:height="{height}px"
+	style:border-radius="{height / 2}px"
+	role="progressbar"
+	aria-valuenow={Math.round(clamped)}
+	aria-valuemin={0}
+	aria-valuemax={100}
+>
 	<div
 		class="bar-fill"
 		style:width="{clamped}%"

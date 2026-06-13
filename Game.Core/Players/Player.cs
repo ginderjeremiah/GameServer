@@ -140,7 +140,7 @@ namespace Game.Core.Players
                 return false;
             }
 
-            if (orderedSkillIds.Distinct().Count() != orderedSkillIds.Count)
+            if (HasDuplicate(orderedSkillIds))
             {
                 return false;
             }
@@ -154,6 +154,26 @@ namespace Game.Core.Players
             SelectedSkills = orderedSkillIds.Select(id => unlockedById[id]).ToList();
             RaiseEvent(new SelectedSkillsChangedEvent(Id, orderedSkillIds.ToList()));
             return true;
+        }
+
+        /// <summary>
+        /// Returns whether <paramref name="ids"/> contains a duplicate. A nested scan is allocation-free
+        /// and clearer than a HashSet for the loadout's tiny size (≤ <see cref="GameConstants.MaxSelectedSkills"/>).
+        /// </summary>
+        private static bool HasDuplicate(IReadOnlyList<int> ids)
+        {
+            for (var i = 0; i < ids.Count; i++)
+            {
+                for (var j = i + 1; j < ids.Count; j++)
+                {
+                    if (ids[i] == ids[j])
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)

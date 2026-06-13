@@ -1,4 +1,3 @@
-using Game.Abstractions.Contracts;
 using Game.Api.Models.Common;
 using Game.Api.Models.Enemies;
 using Game.Application.Services;
@@ -44,19 +43,7 @@ namespace Game.Api.Sockets.Commands
 
             return Success(new NewEnemyModel
             {
-                EnemyInstance = new EnemyInstance
-                {
-                    Id = result.Enemy.Id,
-                    Level = result.Enemy.Level,
-                    Seed = result.Seed,
-                    SelectedSkills = result.Enemy.BattleSkills.Select(s => s.Id).ToList(),
-                    Attributes = result.Enemy.GetAttributeModifiers()
-                        .Select(m => new BattlerAttribute
-                        {
-                            AttributeId = m.Attribute,
-                            Amount = (decimal)m.Amount,
-                        }),
-                }
+                EnemyInstance = EnemyInstance.FromSource(result)
             });
         }
     }

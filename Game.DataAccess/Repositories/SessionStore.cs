@@ -1,7 +1,6 @@
 ﻿using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players;
-using Game.Infrastructure.Database;
 
 
 namespace Game.DataAccess.Repositories
@@ -12,7 +11,7 @@ namespace Game.DataAccess.Repositories
 
         private readonly ICacheService _cache;
 
-        public SessionStore(GameContext context, ICacheService cache)
+        public SessionStore(ICacheService cache)
         {
             _cache = cache;
         }

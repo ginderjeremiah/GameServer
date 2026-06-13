@@ -9,7 +9,14 @@
 	</div>
 
 	<!-- HP Bar -->
-	<div class="hp-bar">
+	<div
+		class="hp-bar"
+		role="progressbar"
+		aria-label="{battler.name} health"
+		aria-valuenow={Math.round(battler.currentHealth)}
+		aria-valuemin={0}
+		aria-valuemax={maxHealth}
+	>
 		<div class="hp-disappearing" style:width="{healthPerc}%"></div>
 		<div class="hp-remaining" style:width="{healthPerc}%"></div>
 		<div class="hp-text">{healthText}</div>

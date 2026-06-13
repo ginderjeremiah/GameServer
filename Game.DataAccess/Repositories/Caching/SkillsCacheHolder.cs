@@ -15,6 +15,7 @@ namespace Game.DataAccess.Repositories.Caching
                 .AsNoTracking()
                 .Include(s => s.SkillDamageMultipliers)
                 .Include(s => s.SkillEffects)
+                .AsSplitQuery()
                 .OrderBy(s => s.Id)
                 .ToListAsync(cancellationToken);
         }

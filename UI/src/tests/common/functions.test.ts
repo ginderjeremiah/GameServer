@@ -64,6 +64,16 @@ describe('capitalize', () => {
 	it('handles single character', () => {
 		expect(capitalize('a')).toBe('A');
 	});
+
+	it('returns an empty string for empty input rather than throwing', () => {
+		expect(() => capitalize('')).not.toThrow();
+		expect(capitalize('')).toBe('');
+	});
+
+	it('returns an empty string for undefined input rather than throwing', () => {
+		expect(() => capitalize(undefined)).not.toThrow();
+		expect(capitalize(undefined)).toBe('');
+	});
 });
 
 describe('normalizeText', () => {
@@ -77,6 +87,18 @@ describe('normalizeText', () => {
 
 	it('splits multiple camelCase words', () => {
 		expect(normalizeText('myLongVariableName')).toBe('My Long Variable Name');
+	});
+
+	it('returns an empty string for empty input rather than throwing', () => {
+		expect(() => normalizeText('')).not.toThrow();
+		expect(normalizeText('')).toBe('');
+	});
+
+	it('returns an empty string for undefined input rather than throwing', () => {
+		// Hot display paths call `normalizeText(EAttribute[id])`, where an unknown id yields
+		// `undefined`; this must degrade gracefully instead of crashing mid-render/tick (#493).
+		expect(() => normalizeText(undefined)).not.toThrow();
+		expect(normalizeText(undefined)).toBe('');
 	});
 });
 
