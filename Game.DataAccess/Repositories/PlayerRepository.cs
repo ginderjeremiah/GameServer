@@ -12,6 +12,18 @@ namespace Game.DataAccess.Repositories
     {
         private static string PlayerPrefix => Constants.CACHE_PLAYER_PREFIX;
 
+        /// <summary>
+        /// Idle TTL for the cached player aggregate. It is written on every save and load-miss re-cache
+        /// and refreshed on every cache hit (sliding expiration), so an actively-playing player — whose
+        /// socket commands read/write the key continuously — never expires, while a dormant player ages
+        /// out of Redis instead of occupying memory forever. The 48h budget mirrors the refresh-token
+        /// lifetime: a player idle long enough for the key to lapse can no longer hold a live session, so
+        /// the only cost of expiry is one transparent DB reload on their next access (the cache-miss path
+        /// in <see cref="GetPlayer"/>). It also dwarfs the sub-second write-behind queue-drain window, so a
+        /// refreshed key never expires mid-drain (see docs/backend.md → Caching and Pub/Sub).
+        /// </summary>
+        private static readonly TimeSpan PlayerCacheTtl = TimeSpan.FromHours(48);
+
         private readonly GameContext _context;
         private readonly ICacheService _cache;
         private readonly IDomainEventDispatcher _dispatcher;
@@ -44,8 +56,13 @@ namespace Game.DataAccess.Repositories
                 player = await GetPlayerFromDb(playerId);
                 if (player is not null)
                 {
-                    _cache.SetAndForget(playerKey, player);
+                    _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
                 }
+            }
+            else
+            {
+                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
+                _cache.ExpireAndForget(playerKey, PlayerCacheTtl);
             }
 
             return player;
@@ -57,7 +74,7 @@ namespace Game.DataAccess.Repositories
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
-            _cache.SetAndForget(playerKey, player);
+            _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)
