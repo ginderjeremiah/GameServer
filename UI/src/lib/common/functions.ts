@@ -25,11 +25,14 @@ export function enumPairs(obj: Record<string | number, string | number>) {
 		.map((key) => ({ id: Number(key), name: normalizeText(obj[key] as string) }));
 }
 
-export function capitalize(str: string) {
+export function capitalize(str?: string) {
+	if (!str) {
+		return '';
+	}
 	return str[0].toUpperCase() + str.slice(1);
 }
 
-export function normalizeText(str: string) {
+export function normalizeText(str?: string) {
 	return capitalize(str).replaceAll(/([a-z])([A-Z])/g, '$1 $2');
 }
 
