@@ -7,7 +7,8 @@
 
     public enum DatabaseSystem
     {
-        SqlServer = 0,
+        // Deliberately starts at 1 so an unset/missing config binds to the unnamed default (0) and fails loud
+        // in GameContextFactory rather than silently selecting a provider (the app is Postgres-only).
         Postgres = 1
     }
 

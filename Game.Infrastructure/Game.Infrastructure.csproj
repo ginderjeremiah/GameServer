@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Game.TestInfrastructure" />
+    <InternalsVisibleTo Include="Game.Infrastructure.Tests" />
   </ItemGroup>
 
   <ItemGroup>
