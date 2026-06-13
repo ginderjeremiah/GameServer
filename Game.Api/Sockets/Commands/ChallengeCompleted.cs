@@ -12,7 +12,7 @@ namespace Game.Api.Sockets.Commands
     /// request type (the parameters are not a typed <c>Parameters</c> property) since the client only
     /// listens for it.
     /// </summary>
-    public class ChallengeCompleted : AbstractSocketCommandWithResponseData<ChallengeCompletedModel>
+    public class ChallengeCompleted : AbstractSocketCommandWithResponseData<ChallengeCompletedModel>, IServerInitiatedCommand
     {
         private ChallengeCompletedModel? _model;
 

@@ -122,6 +122,20 @@ namespace Game.Api.Sockets
                 var commandInfo = message.Deserialize<SocketCommandInfo>();
                 if (commandInfo is not null)
                 {
+                    if (_commandFactory.IsServerInitiatedOnly(commandInfo.Name))
+                    {
+                        // Server-initiated commands (e.g. ChallengeCompleted, SocketReplaced) are only valid
+                        // when dispatched via the backplane; a client sending one is rejected, not executed.
+                        _logger.LogWarning("Client attempted to invoke server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                        await _context.SendData(new ApiSocketResponse
+                        {
+                            Id = commandInfo.Id,
+                            Name = commandInfo.Name,
+                            Error = "Command cannot be invoked by the client."
+                        });
+                        return;
+                    }
+
                     await ExecuteCommand(commandInfo);
                 }
             }
