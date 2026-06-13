@@ -406,4 +406,16 @@ describe('SkillsView — compare-vs enemy presets', () => {
 		expect(view.defense).toBe(7);
 		expect(view.selectedPresetKey).toBeNull();
 	});
+
+	it('resorts railList by effective dps when a preset is selected', () => {
+		view.setSort('dps');
+		// At 0 defense: Delta(50/1=50) > Bravo(40/2=20) > Alpha(12/1=12) > Charlie(5/0.5=10).
+		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
+
+		// Imp (defense=12): Delta=(50-12)/1=38, Bravo=(40-12)/2=14, Alpha=Charlie=0.
+		const [spawn] = view.comparePresets;
+		view.selectPreset(spawn);
+		expect(view.defense).toBe(spawn.defense);
+		expect(view.railList.map((m) => m.skill.id).slice(0, 2)).toEqual([3, 1]);
+	});
 });
