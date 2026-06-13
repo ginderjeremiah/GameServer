@@ -9,7 +9,7 @@ namespace Game.Application
 
         public Task HandleAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Domain event dispatched: {EventType} — {Event}", domainEvent.GetType().Name, domainEvent);
+            _logger.LogDebug("Domain event dispatched: {EventType} — {Event}", domainEvent.GetType().Name, domainEvent);
             return Task.CompletedTask;
         }
     }
