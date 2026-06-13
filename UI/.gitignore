@@ -4,6 +4,9 @@ node_modules
 .output
 .vercel
 /.svelte-kit
+# Vitest runs with `src` as its Vite root, so SvelteKit syncs a second, generated
+# .svelte-kit there during unit tests; it is build output and must not be committed.
+/src/.svelte-kit
 /build
 
 # OS
