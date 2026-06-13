@@ -32,7 +32,7 @@ namespace Game.Api.Controllers.Admin
         {
             return _adminItemMods.SetAttributes(changeData)
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Item Mod does not exist.");
+                : ApiResponse.Error("Item mod not found.");
         }
 
         [HttpPost]

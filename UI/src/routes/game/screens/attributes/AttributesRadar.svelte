@@ -27,8 +27,8 @@
 			role="button"
 			tabindex={clickable ? 0 : -1}
 			aria-label={clickable
-				? `Adjust ${attributeName(coreIds[i])} — drag to allocate or click to add a point`
-				: `Adjust ${attributeName(coreIds[i])} — drag to refund points`}
+				? `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag to allocate or click to add a point`
+				: `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag to refund points`}
 			onpointerdown={(e) => startDrag(e, i)}
 			onclick={() => onVertexClick(i)}
 			onkeydown={(e) => clickable && handleKey(e, i)}
@@ -59,8 +59,9 @@
 
 <script lang="ts">
 import { onMount, untrack } from 'svelte';
-import { attributeColor, attributeCode } from '$lib/common';
-import { CORE_ATTRIBUTES, attributeName, radarValueAtPointer, type AttributesView } from './attributes-view.svelte';
+import { attributeColor, attributeCode, attributeName } from '$lib/common';
+import { staticData } from '$stores';
+import { CORE_ATTRIBUTES, radarValueAtPointer, type AttributesView } from './attributes-view.svelte';
 
 interface Props {
 	view: AttributesView;

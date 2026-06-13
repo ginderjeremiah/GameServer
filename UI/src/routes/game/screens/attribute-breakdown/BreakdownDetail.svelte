@@ -5,7 +5,7 @@
 	<div class="head">
 		<div class="heading">
 			<div class="title-row">
-				<h2 class="name">{attributeName(view.selected)}</h2>
+				<h2 class="name">{attributeName(view.selected, staticData.attributes)}</h2>
 				<KindTag group={view.selectedMeta.group} />
 			</div>
 			{#if description}
@@ -36,12 +36,9 @@ import SourceLegend from './SourceLegend.svelte';
 import KindTag from './KindTag.svelte';
 import BySourceBreakdown from './BySourceBreakdown.svelte';
 import ApplyOrderTrace from './ApplyOrderTrace.svelte';
-import {
-	attributeDescription,
-	attributeName,
-	fmtNum,
-	type AttributeBreakdownView
-} from './attribute-breakdown-view.svelte';
+import { attributeName } from '$lib/common';
+import { staticData } from '$stores';
+import { attributeDescription, fmtNum, type AttributeBreakdownView } from './attribute-breakdown-view.svelte';
 
 interface Props {
 	view: AttributeBreakdownView;

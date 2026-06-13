@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute } from '$lib/api';
-import { attributeEnumName } from '../../lib/common/attribute-display';
+import { EAttribute, type IAttribute } from '$lib/api';
+import { attributeEnumName, attributeName } from '../../lib/common/attribute-display';
 
 describe('attributeEnumName', () => {
 	it('returns the normalized enum key for a known attribute id', () => {
@@ -17,5 +17,33 @@ describe('attributeEnumName', () => {
 		const unknownId = 999 as EAttribute;
 		expect(() => attributeEnumName(unknownId)).not.toThrow();
 		expect(attributeEnumName(unknownId)).toBe('Unknown');
+	});
+});
+
+describe('attributeName', () => {
+	const mockAttributes: IAttribute[] = [
+		{ id: EAttribute.Strength, name: 'Physical Power', description: '' },
+		{ id: EAttribute.MaxHealth, name: 'Maximum Life', description: '' }
+	];
+
+	it('returns the reference-data name when attributes are provided', () => {
+		expect(attributeName(EAttribute.Strength, mockAttributes)).toBe('Physical Power');
+		expect(attributeName(EAttribute.MaxHealth, mockAttributes)).toBe('Maximum Life');
+	});
+
+	it('falls back to the normalised enum name when attributes are absent', () => {
+		expect(attributeName(EAttribute.Strength)).toBe('Strength');
+		expect(attributeName(EAttribute.MaxHealth)).toBe('Max Health');
+		expect(attributeName(EAttribute.CooldownRecovery)).toBe('Cooldown Recovery');
+	});
+
+	it('falls back to the normalised enum name when the id is absent from the provided list', () => {
+		expect(attributeName(EAttribute.Luck, mockAttributes)).toBe('Luck');
+	});
+
+	it('degrades to "Unknown" for an out-of-range id rather than throwing', () => {
+		const unknownId = 999 as EAttribute;
+		expect(() => attributeName(unknownId)).not.toThrow();
+		expect(attributeName(unknownId)).toBe('Unknown');
 	});
 });

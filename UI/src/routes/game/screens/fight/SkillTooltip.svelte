@@ -25,7 +25,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, skillContributions, type Skill } from '$lib/battle';
-import { attributeEnumName, describeEffect } from '$lib/common';
+import { attributeName, describeEffect } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -53,7 +53,7 @@ const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) :
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(
 	(skill ? skillContributions(skill, skill.owner.attributes) : []).map((contribution) => ({
-		name: attributeName(contribution.attributeId),
+		name: attributeName(contribution.attributeId, staticData.attributes),
 		multiplier: contribution.multiplier,
 		value: contribution.value
 	}))
@@ -69,9 +69,8 @@ const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - rem
 const remainingCdFormatted = $derived(remainingCd.toFixed(2));
 
 const effectLines = $derived(
-	(skill?.effects ?? []).map((effect) => describeEffect(effect, attributeName(effect.attributeId)))
+	(skill?.effects ?? []).map((effect) =>
+		describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
+	)
 );
-
-const attributeName = (attrId: number) =>
-	staticData.attributes?.find((a) => a.id === attrId)?.name ?? attributeEnumName(attrId);
 </script>

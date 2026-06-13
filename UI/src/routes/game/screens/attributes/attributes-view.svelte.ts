@@ -23,7 +23,7 @@
 
 import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
-import { attributeEnumName } from '$lib/common';
+import { attributeName } from '$lib/common';
 import { playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -137,12 +137,6 @@ export function radarValueAtPointer(
 	return (projection / axisLength) * hexMax;
 }
 
-/** The display name for an attribute, preferring the live reference data and
- *  falling back to a normalised enum key (e.g. `MaxHealth` → `Max Health`). */
-export function attributeName(id: EAttribute): string {
-	return staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
-}
-
 /** Compact labels for the dense theorycraft "per point" line. Falls back to the
  *  full name so a newly surfaced derived stat still reads correctly. */
 const DERIVED_SHORT: Partial<Record<EAttribute, string>> = {
@@ -152,7 +146,7 @@ const DERIVED_SHORT: Partial<Record<EAttribute, string>> = {
 };
 
 export function derivedShortLabel(id: EAttribute): string {
-	return DERIVED_SHORT[id] ?? attributeName(id);
+	return DERIVED_SHORT[id] ?? attributeName(id, staticData.attributes);
 }
 
 /** The unit suffix configured for a surfaced derived stat (empty if none). */

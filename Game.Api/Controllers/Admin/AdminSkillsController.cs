@@ -32,7 +32,7 @@ namespace Game.Api.Controllers.Admin
         {
             return _adminSkills.SetMultipliers(changeData)
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Skill does not exist.");
+                : ApiResponse.Error("Skill not found.");
         }
 
         [HttpPost]
@@ -40,7 +40,7 @@ namespace Game.Api.Controllers.Admin
         {
             return _adminSkills.SetEffects(changeData)
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Skill does not exist.");
+                : ApiResponse.Error("Skill not found.");
         }
     }
 }

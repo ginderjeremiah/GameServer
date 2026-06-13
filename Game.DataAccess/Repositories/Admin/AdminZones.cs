@@ -23,7 +23,7 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly IChallenges _challenges = challenges;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
+        public string? SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
             // A zone's dedicated boss must reference an existing enemy flagged IsBoss, and its unlock gate
             // must reference an existing challenge. Validate the whole change set up front so an invalid
@@ -39,14 +39,14 @@ namespace Game.DataAccess.Repositories.Admin
                 if (change.Item.BossEnemyId is int bossEnemyId
                     && _enemies.GetEnemy(bossEnemyId) is not { IsBoss: true })
                 {
-                    return false;
+                    return "Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.";
                 }
 
                 // Challenges are zero-based-id reference data, so a valid id is an in-range index.
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
                     && (unlockChallengeId < 0 || unlockChallengeId >= challengeCount))
                 {
-                    return false;
+                    return "Unlock challenge is invalid. A zone's unlock challenge must reference an existing challenge.";
                 }
             }
 
@@ -76,7 +76,7 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return null;
         }
 
         public bool SetEnemies(SetZoneEnemiesData data)
