@@ -32,7 +32,7 @@ namespace Game.Api.Controllers.Admin
         {
             return _adminItems.SetAttributes(changeData)
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Item does not exist.");
+                : ApiResponse.Error("Item not found.");
         }
 
         [HttpPost]
