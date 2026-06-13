@@ -15,6 +15,11 @@ $accent: #a1c2f7;
 $accent-light: #c0d8ff;
 $surface: #14151b;
 $surface-alpha: rgba(20, 21, 27, 0.96);
+// Raised panel surfaces sitting just above the page/surface base — the slightly
+// lighter card/well backgrounds (challenge cards/overview panels, workbench list,
+// card-game loom face). Consumed via the --panel / --panel-2 tokens.
+$panel: #16171e;
+$panel-2: #1b1c24;
 $text-primary: #f0f0f0;
 $text-secondary: rgba(240, 240, 240, 0.78);
 $text-tertiary: rgba(240, 240, 240, 0.55);
