@@ -34,6 +34,15 @@ export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
 		this.promiseResolver(data);
 	}
 
+	/** Settles a still-pending request with an error response that carries no data — e.g. when the socket
+	 *  drops before the server answered. Mirrors the shape of a server-reported error so callers handle it
+	 *  through the same `response.error` path they already use, rather than a separate reject channel. */
+	public settleWithError(error: string) {
+		// An error response carries no `data` (matching how the server signals errors), so the cast bridges
+		// the type's non-optional `data` field that callers already guard with optional chaining.
+		this.promiseResolver({ id: this.id, name: this.commandName, error } as IApiSocketResponse<T>);
+	}
+
 	public async getResponse() {
 		return await this.dataPromise;
 	}
