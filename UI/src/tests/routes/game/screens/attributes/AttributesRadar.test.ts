@@ -5,7 +5,13 @@ import type { AttributesView } from '$routes/game/screens/attributes/attributes-
 import AttributesRadar from '$routes/game/screens/attributes/AttributesRadar.svelte';
 
 const makeView = (
-	overrides: Partial<{ canInc: () => boolean; inc: (i: number) => void; setValue: (i: number, v: number) => void }>
+	overrides: Partial<{
+		canInc: () => boolean;
+		inc: (i: number) => void;
+		setValue: (i: number, v: number) => void;
+		lockScale: () => void;
+		unlockScale: () => void;
+	}>
 ): AttributesView =>
 	({
 		values: [5, 5, 5, 5, 5, 5],
@@ -14,6 +20,8 @@ const makeView = (
 		canInc: vi.fn(() => true),
 		inc: vi.fn(),
 		setValue: vi.fn(),
+		lockScale: vi.fn(),
+		unlockScale: vi.fn(),
 		...overrides
 	}) as unknown as AttributesView;
 
@@ -164,6 +172,34 @@ describe('AttributesRadar — drag interaction', () => {
 		await fireEvent.pointerMove(window, { clientX: C, clientY: C - 77.5 });
 
 		expect(view.setValue).not.toHaveBeenCalled();
+	});
+
+	it('pins the radar scale on drag start and releases it on pointer up', async () => {
+		// Pinning the scale for the gesture stops a mid-drag rescale from inflating
+		// the value under the pointer near the boundary values (#433).
+		const { view, vertices } = setup();
+		await fireEvent.pointerDown(vertices[0]);
+		expect(view.lockScale).toHaveBeenCalledTimes(1);
+		expect(view.unlockScale).not.toHaveBeenCalled();
+
+		await fireEvent.pointerMove(window, { clientX: C, clientY: C - 77.5 });
+		await fireEvent.pointerUp(window);
+		expect(view.unlockScale).toHaveBeenCalledTimes(1);
+	});
+
+	it('releases the pinned scale on pointer cancel', async () => {
+		const { view, vertices } = setup();
+		await fireEvent.pointerDown(vertices[0]);
+		await fireEvent.pointerCancel(window);
+		expect(view.unlockScale).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not pin the scale when interactive=false', async () => {
+		const { view, vertices } = setup({}, { interactive: false });
+		await fireEvent.pointerDown(vertices[0]);
+		await fireEvent.pointerUp(window);
+		expect(view.lockScale).not.toHaveBeenCalled();
+		expect(view.unlockScale).not.toHaveBeenCalled();
 	});
 });
 

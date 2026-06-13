@@ -166,6 +166,10 @@ function startDrag(e: PointerEvent, i: number): void {
 	dragMoved = false;
 	dragStartX = e.clientX;
 	dragStartY = e.clientY;
+	// Pin the radar scale for the gesture: the scale grows with the build, so an
+	// unpinned scale would rescale mid-drag and inflate the value under the
+	// pointer, over-allocating near the boundary values (#433).
+	view.lockScale();
 	// Suppress the native text/SVG selection a press-drag would otherwise start.
 	e.preventDefault();
 }
@@ -215,7 +219,12 @@ onMount(() => {
 		view.setValue(dragIndex, valueAtClient(e.clientX, e.clientY, dragIndex));
 	};
 	const onEnd = (): void => {
+		if (dragIndex === null) {
+			return;
+		}
 		dragIndex = null;
+		// Release the pinned scale so it recomputes to fit the final allocation.
+		view.unlockScale();
 	};
 	window.addEventListener('pointermove', onMove);
 	window.addEventListener('pointerup', onEnd);
