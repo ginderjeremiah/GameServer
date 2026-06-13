@@ -97,6 +97,34 @@ describe('ChipsSection', () => {
 		expect(store.items[0].skillPool).toEqual([1, 2]);
 	});
 
+	it('adds the zero-id (first) catalogue entry — id 0 is a real selection, not "no choice"', async () => {
+		// Ids are zero-based, so the first catalogue entry is id 0; a truthiness guard would drop it.
+		const zeroSection: ChipsSectionConfig<Identified> = {
+			...(section as unknown as ChipsSectionConfig<Identified>),
+			catalogue: () => [{ id: 0, name: 'Strike', baseDamage: 5 }, ...CATALOGUE]
+		};
+		const store = new EntityStore(config(), [{ id: 1, skillPool: [] }]);
+		const { container } = render(ChipsSection, {
+			props: {
+				section: zeroSection,
+				record: store.items[0] as Identified,
+				baseline: store.baselineOf(1),
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+		const addSelect = container.querySelector('.add-select select') as HTMLSelectElement;
+		await fireEvent.change(addSelect, { target: { value: '0' } });
+		expect(store.items[0].skillPool).toEqual([0]);
+	});
+
+	it('ignores the empty placeholder selection (does not add id 0)', async () => {
+		const { store, record, baseline } = setup([1]);
+		const { container } = renderChips(store, record, baseline);
+		const addSelect = container.querySelector('.add-select select') as HTMLSelectElement;
+		await fireEvent.change(addSelect, { target: { value: '' } });
+		expect(store.items[0].skillPool).toEqual([1]);
+	});
+
 	it('removes a chip when its remove control is activated', async () => {
 		const { store, record, baseline } = setup([1, 2]);
 		const { container } = renderChips(store, record, baseline);
