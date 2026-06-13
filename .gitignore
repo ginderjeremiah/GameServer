@@ -377,3 +377,6 @@ FodyWeavers.xsd
 
 # Transpiled Typescript files
 /GameServer/wwwroot/js
+
+# Output from the /image skill (.claude/skills/image) -- generated images, not source
+generated-images/
