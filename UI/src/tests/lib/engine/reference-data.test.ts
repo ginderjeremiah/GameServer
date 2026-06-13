@@ -9,7 +9,17 @@ const { sendSocketCommand, staticData, readReferenceCache, writeReferenceCache }
 	writeReferenceCache: vi.fn()
 }));
 
-vi.mock('$lib/api', () => ({ apiSocket: { sendSocketCommand } }));
+// reference-data drives the socket through fetchSocketData, which throws on a socket error. The mock
+// delegates to the per-test sendSocketCommand spy so each test still configures behaviour the same way.
+vi.mock('$lib/api', () => ({
+	fetchSocketData: async (command: string) => {
+		const response = await sendSocketCommand(command);
+		if (response.error) {
+			throw new Error(response.error);
+		}
+		return response.data;
+	}
+}));
 vi.mock('$stores', () => ({ staticData }));
 vi.mock('$lib/engine/reference-cache', () => ({ readReferenceCache, writeReferenceCache }));
 
