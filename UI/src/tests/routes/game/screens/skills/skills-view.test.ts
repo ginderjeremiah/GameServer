@@ -222,6 +222,18 @@ describe('pure helpers', () => {
 		expect(enemyDefense(ENEMIES[0], 5)).toBe(12); // 2 + 2*5
 		expect(enemyDefense(ENEMIES[2], 10)).toBe(32); // boss: 2 + 3*10
 	});
+
+	it('memoises enemy defense per enemy and level', () => {
+		const e = enemy({ id: 99, attributeDistribution: enemyDist(4) });
+		expect(enemyDefense(e, 5)).toBe(22); // 2 + 4*5
+
+		// The result is cached by enemy identity, so a later mutation of the (in practice immutable)
+		// distribution is not observed at the cached level — proving it is served from the memo.
+		e.attributeDistribution = enemyDist(100);
+		expect(enemyDefense(e, 5)).toBe(22);
+		// A different level is a distinct cache entry and reflects the current distribution.
+		expect(enemyDefense(e, 1)).toBe(102); // 2 + 100*1
+	});
 });
 
 describe('SkillsView — initial state', () => {
@@ -235,6 +247,12 @@ describe('SkillsView — initial state', () => {
 		const ids = view.catalogue.map((s) => s.id);
 		expect(ids).toContain(4); // locked, not retired → aspirational
 		expect(ids).not.toContain(5); // retired and unowned
+	});
+
+	it('exposes unlocked ids as a set for O(1) membership', () => {
+		expect(view.unlockedIds).toBeInstanceOf(Set);
+		expect(view.unlockedIds.has(0)).toBe(true); // unlocked starter
+		expect(view.unlockedIds.has(4)).toBe(false); // locked
 	});
 
 	it('exposes the skill catalogue defense ceiling for the slider', () => {

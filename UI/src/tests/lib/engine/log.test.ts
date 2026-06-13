@@ -3,8 +3,12 @@ import { ELogType } from '$lib/api';
 
 const { mockLogs, mockPlayerManager } = vi.hoisted(() => {
 	const mockLogs: { id: number; logType: number; message: string }[] = [];
+	// Mirrors PlayerManager's prebuilt map: an unknown type defaults to enabled.
 	const mockPlayerManager = {
-		logPreferences: [] as { id: number; enabled: boolean }[]
+		logPreferences: [] as { id: number; enabled: boolean }[],
+		logTypeEnabled(logType: number): boolean {
+			return mockPlayerManager.logPreferences.find((pref) => pref.id === logType)?.enabled ?? true;
+		}
 	};
 	return { mockLogs, mockPlayerManager };
 });
