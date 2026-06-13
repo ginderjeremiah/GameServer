@@ -108,23 +108,23 @@ namespace Game.Core
         }
 
         /// <summary>
-        /// Returns a copy of this string, but the first letter is lowercase.
+        /// Returns a copy of this string, but the first letter is lowercase. An empty string is returned unchanged.
         /// </summary>
         /// <param name="str"></param>
         /// <returns>A string with the first letter lowercase.</returns>
         public static string Decapitalize(this string str)
         {
-            return string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
+            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
         }
 
         /// <summary>
-        /// Returns a copy of this string, but the first letter is uppercase.
+        /// Returns a copy of this string, but the first letter is uppercase. An empty string is returned unchanged.
         /// </summary>
         /// <param name="str"></param>
         /// <returns>A string with the first letter uppercase.</returns>
         public static string Capitalize(this string str)
         {
-            return string.Concat(str[0].ToString().ToUpper(), str.AsSpan(1));
+            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToUpper(), str.AsSpan(1));
         }
 
         /// <summary>
