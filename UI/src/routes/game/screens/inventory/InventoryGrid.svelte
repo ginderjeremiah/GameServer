@@ -68,6 +68,9 @@ const slice = $derived(view.visible.slice(pageClamped * perPage, pageClamped * p
 
 // Reset to the first page whenever the filter/sort changes.
 $effect(() => {
+	void view.sort;
+	void view.filterCat;
+	void view.favOnly;
 	view.page = 0;
 });
 
