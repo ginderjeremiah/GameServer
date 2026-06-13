@@ -359,15 +359,18 @@ describe('InventoryManager', () => {
 
 	describe('overlapping mutations (serialization)', () => {
 		beforeEach(() => {
-			// Items 1 & 2 are weapons that contest the same slot; item 3 (helm) exercises an independent slot.
+			// Items 1 & 2 are weapons that contest the same slot; item 3 (helm) exercises an independent
+			// slot; mod 10 lets a test overlap an equip with an apply-mod across mutation types.
 			mockItems[1] = makeItem(1, EItemCategory.Weapon);
 			mockItems[2] = makeItem(2, EItemCategory.Weapon);
 			mockItems[3] = makeItem(3, EItemCategory.Helm);
+			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedItems = [
 				makeInventoryItem({ itemId: 1 }),
 				makeInventoryItem({ itemId: 2 }),
 				makeInventoryItem({ itemId: 3 })
 			];
+			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
 		});
 
@@ -450,6 +453,28 @@ describe('InventoryManager', () => {
 			await expect(first).rejects.toThrow('boom');
 			await expect(second).resolves.toBe(true);
 			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]?.itemId).toBe(3);
+		});
+
+		it('serializes across mutation types — applyMod waits for a pending equip to settle', async () => {
+			// All four mutations route through the same chain, so an apply-mod queued behind an in-flight
+			// equip must not snapshot or persist until the equip settles.
+			let resolveEquip: (value: { ok: boolean }) => void = () => {};
+			mockPost.mockReturnValueOnce(new Promise((resolve) => (resolveEquip = resolve)));
+
+			const equip = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			const mod = manager.applyMod(1, 10, 0);
+
+			await flush();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
+			expect(mockPost).toHaveBeenCalledTimes(1);
+
+			resolveEquip({ ok: true });
+			await Promise.all([equip, mod]);
+
+			expect(mockPost).toHaveBeenCalledTimes(2);
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.appliedMods.map((m) => m.id)).toEqual([10]);
 		});
 	});
 
