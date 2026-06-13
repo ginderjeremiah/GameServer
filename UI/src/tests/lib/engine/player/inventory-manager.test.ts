@@ -105,9 +105,11 @@ describe('InventoryManager', () => {
 		vi.mocked(logMessage).mockClear();
 		vi.mocked(ApiRequest).mockClear();
 
-		// Default the network boundary to success; error-path tests override per case.
+		// Default the network boundary to success; error-path tests override per case. The socket
+		// transport always resolves an `IApiSocketResponse` (never rejects), so a success resolves an
+		// object with no `error` field rather than `undefined`.
 		mockPost.mockReset().mockResolvedValue({ ok: true });
-		mockSendSocketCommand.mockReset().mockResolvedValue(undefined);
+		mockSendSocketCommand.mockReset().mockResolvedValue({});
 
 		mockItems.length = 0;
 		mockItemMods.length = 0;
@@ -733,16 +735,19 @@ describe('InventoryManager', () => {
 			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
-		it('keeps the optimistic local flag when the socket send fails', async () => {
+		it('keeps the optimistic local flag and logs when the socket reports an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
-			mockSendSocketCommand.mockRejectedValue(new Error('socket down'));
+			// The transport never rejects — it resolves every failure with an `error` field — so the
+			// failure must be observed via `response.error` and logged rather than swallowed by a catch.
+			mockSendSocketCommand.mockResolvedValue({ error: 'socket down' });
 
 			const result = await manager.setFavorite(1, true);
 
 			expect(result).toBe(true);
 			expect(manager.unlockedItems.get(1)?.favorite).toBe(true);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, expect.stringContaining('socket down'));
 		});
 	});
 
