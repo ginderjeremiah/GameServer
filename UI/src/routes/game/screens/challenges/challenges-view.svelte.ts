@@ -10,13 +10,14 @@ import {
 import { BattleAttributes, type Item } from '$lib/battle';
 import {
 	challengeTypeColor,
+	challengeTypeName,
 	itemCategoryName,
 	modTypeLabel,
-	normalizeText,
 	rarityColor,
 	rarityGlow,
 	rarityLabel,
-	rarityLevel
+	rarityLevel,
+	zonesUnlockedBy
 } from '$lib/common';
 import { staticData } from '$stores';
 import { challengeTypeUnit } from './challenge-meta';
@@ -77,6 +78,8 @@ export interface ChallengeVM {
 	/** Target entity name for scoped challenges ("Goblin", "Frostspire"), else null. */
 	target: string | null;
 	reward: ResolvedReward | null;
+	/** Names of zones this challenge unlocks (gated on it via `unlockChallengeId`), in authored order. */
+	unlocksZones: string[];
 }
 
 export interface TypeGroup {
@@ -90,10 +93,6 @@ export interface TypeGroup {
 /** Goal-comparison direction is intrinsic to the type; sourced from reference data. */
 function comparisonFor(typeId: EChallengeType): EChallengeGoalComparison {
 	return staticData.challengeTypes?.find((t) => t.id === typeId)?.goalComparison ?? EChallengeGoalComparison.AtLeast;
-}
-
-function typeNameFor(typeId: EChallengeType): string {
-	return staticData.challengeTypes?.find((t) => t.id === typeId)?.name ?? normalizeText(EChallengeType[typeId] ?? '');
 }
 
 /** Resolve a scoped challenge's target entity name from the relevant reference pool. */
@@ -202,7 +201,8 @@ export function buildChallengeVM(ch: IChallenge, player?: IPlayerChallenge): Cha
 		typeAccent: challengeTypeColor(ch.challengeTypeId),
 		target: targetName(ch),
 		// A reward is only revealed (and inspectable) once its challenge completes.
-		reward: resolveReward(ch, completed)
+		reward: resolveReward(ch, completed),
+		unlocksZones: zonesUnlockedBy(ch.id, staticData.zones ?? []).map((z) => z.name)
 	};
 }
 
@@ -212,7 +212,7 @@ const CHALLENGE_TYPE_IDS = Object.values(EChallengeType).filter((v): v is EChall
 export function groupByType(list: ChallengeVM[]): TypeGroup[] {
 	return CHALLENGE_TYPE_IDS.map((typeId) => ({
 		typeId,
-		label: typeNameFor(typeId),
+		label: challengeTypeName(typeId, staticData.challengeTypes),
 		accent: challengeTypeColor(typeId),
 		items: list.filter((c) => c.typeId === typeId)
 	})).filter((g) => g.items.length > 0);

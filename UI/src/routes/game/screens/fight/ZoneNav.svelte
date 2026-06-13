@@ -1,38 +1,74 @@
 <div class="zone-nav" data-testid="zone-nav">
-	<button
-		class="zone-btn"
-		class:locked={leftLocked}
-		disabled={leftDisabled}
-		aria-label={leftLocked ? 'Previous zone locked' : 'Previous zone'}
-		title={leftLocked ? LOCK_HINT : undefined}
-		onclick={handleClickLeft}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<span
+		class="zone-btn-wrap"
+		onmouseenter={(e) => showLock(leftLocked, prevZone?.unlockChallengeId, e)}
+		onmousemove={moveLock}
+		onmouseleave={hideLock}
 	>
-		{#if leftLocked}<LockGlyph />{:else}&#8249;{/if}
-	</button>
+		<button
+			class="zone-btn"
+			class:locked={leftLocked}
+			disabled={leftDisabled}
+			aria-label={leftLocked ? 'Previous zone locked' : 'Previous zone'}
+			onclick={handleClickLeft}
+		>
+			{#if leftLocked}<LockGlyph />{:else}&#8249;{/if}
+		</button>
+	</span>
 	<div class="zone-info">
 		<span class="zone-num">Zone · {String(zoneNum).padStart(2, '0')}</span>
 		<span class="zone-name">{current?.name}</span>
 	</div>
-	<button
-		class="zone-btn"
-		class:locked={rightLocked}
-		disabled={rightDisabled}
-		aria-label={rightLocked ? 'Next zone locked' : 'Next zone'}
-		title={rightLocked ? LOCK_HINT : undefined}
-		onclick={handleClickRight}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<span
+		class="zone-btn-wrap"
+		onmouseenter={(e) => showLock(rightLocked, nextZone?.unlockChallengeId, e)}
+		onmousemove={moveLock}
+		onmouseleave={hideLock}
 	>
-		{#if rightLocked}<LockGlyph />{:else}&#8250;{/if}
-	</button>
+		<button
+			class="zone-btn"
+			class:locked={rightLocked}
+			disabled={rightDisabled}
+			aria-label={rightLocked ? 'Next zone locked' : 'Next zone'}
+			onclick={handleClickRight}
+		>
+			{#if rightLocked}<LockGlyph />{:else}&#8250;{/if}
+		</button>
+	</span>
 </div>
+
+<ChallengeTooltip bind:this={tooltip} {challengeId} />
 
 <script lang="ts">
 import type { IZone } from '$lib/api';
-import { staticData, playerChallenges } from '$stores';
+import { staticData, playerChallenges, registerTooltipComponent, type TooltipComponent } from '$stores';
 import { playerManager } from '$lib/engine';
 import { isZoneUnlocked, zonesByOrder } from '$lib/common';
+import { ChallengeTooltip } from '$components';
 import LockGlyph from './LockGlyph.svelte';
 
-const LOCK_HINT = "Clear this zone's boss to unlock";
+// A locked zone is always gated on a challenge (an ungated zone is never locked), so the lock
+// affordance shows that gating challenge — what it requires and what completing it unlocks —
+// rather than a static hint that wrongly assumed every gate was the zone's boss.
+let tooltip = $state<TooltipComponent>();
+let challengeId = $state<number | undefined>();
+const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+
+const showLock = (locked: boolean, gateChallengeId: number | undefined, ev: MouseEvent) => {
+	if (!locked) {
+		return;
+	}
+	challengeId = gateChallengeId;
+	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+	showTooltip();
+};
+const moveLock = (ev: MouseEvent) => setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+const hideLock = () => {
+	hideTooltip();
+	challengeId = undefined;
+};
 
 const orderedZones = $derived(zonesByOrder(staticData.zones ?? []));
 const currentIndex = $derived(orderedZones.findIndex((z) => z.id === playerManager.currentZone));
@@ -73,6 +109,10 @@ const handleClickRight = () => goToZone(nextZone);
 	padding: 6px 10px 6px 6px;
 }
 
+.zone-btn-wrap {
+	display: inline-flex;
+}
+
 .zone-btn {
 	width: 24px;
 	height: 24px;
@@ -97,11 +137,13 @@ const handleClickRight = () => goToZone(nextZone);
 		cursor: not-allowed;
 	}
 
-	// A locked neighbour (boss not yet cleared) reads more clearly than a plain end-of-list disabled
-	// arrow, so the lock glyph stays legible.
+	// A locked neighbour (gating challenge not yet completed) reads more clearly than a plain
+	// end-of-list disabled arrow, so the lock glyph stays legible. Disabling the button suppresses
+	// its own pointer events, so the wrapping span receives the hover that drives the lock tooltip.
 	&.locked:disabled {
 		opacity: 0.6;
 		color: color-mix(in srgb, var(--text-primary) 65%, transparent);
+		pointer-events: none;
 	}
 }
 
