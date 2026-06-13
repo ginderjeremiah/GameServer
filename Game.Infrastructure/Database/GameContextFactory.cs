@@ -23,11 +23,11 @@ namespace Game.Infrastructure.Database
                     optionsBuilder.UseNpgsql(connectionString)
                         .EnableSensitiveDataLogging(config.EnableSensitiveLogging);
                     break;
-                case SqlServer:
                 default:
-                    optionsBuilder.UseSqlServer(config.DbConnectionString)
-                        .EnableSensitiveDataLogging(config.EnableSensitiveLogging);
-                    break;
+                    throw new InvalidOperationException(
+                        $"Unsupported DatabaseSystem '{config.DatabaseSystem}'. The application only supports "
+                        + $"{nameof(Postgres)} (DataAccessOptions:DatabaseSystem = {(int)Postgres}); a missing or "
+                        + "unrecognized value is rejected rather than defaulted because there is no other supported provider.");
             }
 
             return new GameContext(optionsBuilder.Options);
