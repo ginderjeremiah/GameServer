@@ -57,6 +57,9 @@ export class InventoryManager {
 	 */
 	public items: Item[] = [];
 
+	/** Tail of the optimistic-mutation queue; each mutation chains off it so rollback baselines never interleave. */
+	private lastOperation: Promise<unknown> = Promise.resolve();
+
 	public initialize() {
 		this.unlockedItems.clear();
 		this.unlockedMods.clear();
@@ -101,108 +104,116 @@ export class InventoryManager {
 		return stats;
 	}
 
-	public async equipItem(itemId: number, slotId: EEquipmentSlot) {
-		const item = this.unlockedItems.get(itemId);
-		if (!item) {
-			return false;
-		}
+	public equipItem(itemId: number, slotId: EEquipmentSlot): Promise<boolean> {
+		return this.serialize(async () => {
+			const item = this.unlockedItems.get(itemId);
+			if (!item) {
+				return false;
+			}
 
-		// Apply optimistically (instant UI), then persist; a failed persist rolls the change back so
-		// the authoritative state can never diverge from what was actually saved.
-		const affected = [item, this.equippedSlots[slotId]].filter((it): it is Item => it != null);
-		const rollback = combineSnapshots(
-			snapshotFields(this, 'equippedSlots'),
-			...affected.map((it) => snapshotFields(it, 'equipped', 'equipmentSlotId'))
-		);
-		this.applyEquip(item, slotId);
-		this.publish();
-
-		const req = new ApiRequest('Player/EquipItem');
-		const response = await req.post({ itemId, equipmentSlotId: slotId });
-		if (!response.ok) {
-			rollback();
+			// Apply optimistically (instant UI), then persist; a failed persist rolls the change back so
+			// the authoritative state can never diverge from what was actually saved.
+			const affected = [item, this.equippedSlots[slotId]].filter((it): it is Item => it != null);
+			const rollback = combineSnapshots(
+				snapshotFields(this, 'equippedSlots'),
+				...affected.map((it) => snapshotFields(it, 'equipped', 'equipmentSlotId'))
+			);
+			this.applyEquip(item, slotId);
 			this.publish();
-			return false;
-		}
 
-		return true;
+			const req = new ApiRequest('Player/EquipItem');
+			const response = await req.post({ itemId, equipmentSlotId: slotId });
+			if (!response.ok) {
+				rollback();
+				this.publish();
+				return false;
+			}
+
+			return true;
+		});
 	}
 
-	public async unequipItem(slotId: EEquipmentSlot) {
-		const item = this.equippedSlots[slotId];
-		if (!item) {
-			return false;
-		}
+	public unequipItem(slotId: EEquipmentSlot): Promise<boolean> {
+		return this.serialize(async () => {
+			const item = this.equippedSlots[slotId];
+			if (!item) {
+				return false;
+			}
 
-		const rollback = combineSnapshots(
-			snapshotFields(this, 'equippedSlots'),
-			snapshotFields(item, 'equipped', 'equipmentSlotId')
-		);
-		item.equipped = false;
-		item.equipmentSlotId = undefined;
-		const slots = [...this.equippedSlots];
-		slots[slotId] = undefined;
-		this.equippedSlots = slots;
-		this.publish();
-
-		const req = new ApiRequest('Player/UnequipItem');
-		const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
-		if (!response.ok) {
-			rollback();
+			const rollback = combineSnapshots(
+				snapshotFields(this, 'equippedSlots'),
+				snapshotFields(item, 'equipped', 'equipmentSlotId')
+			);
+			item.equipped = false;
+			item.equipmentSlotId = undefined;
+			const slots = [...this.equippedSlots];
+			slots[slotId] = undefined;
+			this.equippedSlots = slots;
 			this.publish();
-			return false;
-		}
 
-		return true;
+			const req = new ApiRequest('Player/UnequipItem');
+			const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
+			if (!response.ok) {
+				rollback();
+				this.publish();
+				return false;
+			}
+
+			return true;
+		});
 	}
 
-	public async applyMod(itemId: number, itemModId: number, itemModSlotId: number) {
-		const item = this.unlockedItems.get(itemId);
-		if (!this.unlockedMods.has(itemModId) || !item) {
-			return false;
-		}
+	public applyMod(itemId: number, itemModId: number, itemModSlotId: number): Promise<boolean> {
+		return this.serialize(async () => {
+			const item = this.unlockedItems.get(itemId);
+			if (!this.unlockedMods.has(itemModId) || !item) {
+				return false;
+			}
 
-		const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
-		item.appliedMods = [
-			...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
-			newItemMod({ itemModId, itemModSlotId })
-		];
-		this.refreshItemAttributes(item);
-		this.publish();
-
-		const req = new ApiRequest('Player/ApplyMod');
-		const response = await req.post({ itemId, itemModId, itemModSlotId });
-		if (!response.ok) {
-			rollback();
+			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
+			item.appliedMods = [
+				...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
+				newItemMod({ itemModId, itemModSlotId })
+			];
+			this.refreshItemAttributes(item);
 			this.publish();
-			return false;
-		}
 
-		logMessage(ELogType.ItemFound, 'Modifier applied.');
-		return true;
+			const req = new ApiRequest('Player/ApplyMod');
+			const response = await req.post({ itemId, itemModId, itemModSlotId });
+			if (!response.ok) {
+				rollback();
+				this.publish();
+				return false;
+			}
+
+			logMessage(ELogType.ItemFound, 'Modifier applied.');
+			return true;
+		});
 	}
 
-	public async removeMod(itemId: number, itemModSlotId: number) {
-		const item = this.unlockedItems.get(itemId);
-		if (!item) {
-			return false;
-		}
+	public removeMod(itemId: number, itemModSlotId: number): Promise<boolean> {
+		return this.serialize(async () => {
+			const item = this.unlockedItems.get(itemId);
+			if (!item) {
+				return false;
+			}
 
-		const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
-		item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
-		this.refreshItemAttributes(item);
-		this.publish();
-
-		const req = new ApiRequest('Player/RemoveMod');
-		const response = await req.post({ itemId, itemModSlotId });
-		if (!response.ok) {
-			rollback();
+			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
+			item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
+			this.refreshItemAttributes(item);
 			this.publish();
-			return false;
-		}
 
-		logMessage(ELogType.ItemFound, 'Modifier removed.');
-		return true;
+			const req = new ApiRequest('Player/RemoveMod');
+			const response = await req.post({ itemId, itemModSlotId });
+			if (!response.ok) {
+				rollback();
+				this.publish();
+				return false;
+			}
+
+			logMessage(ELogType.ItemFound, 'Modifier removed.');
+			return true;
+		});
 	}
 
 	/**
@@ -246,6 +257,24 @@ export class InventoryManager {
 		// e.g. an open mod picker's `compatibleMods` — re-derive immediately, mirroring addUnlockedSkill.
 		this.unlockedMods = new Set(this.unlockedMods).add(modId);
 		logMessage(ELogType.ItemFound, 'New modifier unlocked!');
+	}
+
+	/**
+	 * Serializes the optimistic mutations (equip/unequip/applyMod/removeMod) so each one captures its
+	 * rollback baseline only after the previous mutation has fully settled — persist and any rollback
+	 * included. Overlapping callers (a double-click equip, dragging a second item while the first
+	 * persist is still in flight) would otherwise interleave baselines: one operation's rollback could
+	 * restore a snapshot taken before another's optimistic change, silently discarding it and leaving
+	 * local state diverged from the server. Chaining onto a single promise — the same "collapse
+	 * concurrency" spirit as auth.ts's single-flight refresh — queues the actions instead, which is
+	 * better UX than dropping the second one.
+	 */
+	private serialize<T>(operation: () => Promise<T>): Promise<T> {
+		const result = this.lastOperation.then(operation, operation);
+		// The queue tracks settlement only — swallowing a failure here keeps one operation's rejection
+		// from breaking the chain or surfacing as an unhandled rejection on the shared promise.
+		this.lastOperation = result.catch(() => undefined);
+		return result;
 	}
 
 	/** The equip mutation, reassigning a fresh slot array so a captured snapshot stays a valid baseline. */
