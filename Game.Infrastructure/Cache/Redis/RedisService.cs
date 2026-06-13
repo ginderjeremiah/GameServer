@@ -75,14 +75,29 @@ namespace Game.Infrastructure.Cache.Redis
             await Redis.KeyExpireAsync(key, expiry);
         }
 
+        public void ExpireAndForget(string key, TimeSpan expiry)
+        {
+            Redis.KeyExpire(key, expiry, CommandFlags.FireAndForget);
+        }
+
         public void SetAndForget(string key, string? value)
         {
-            StringSet(key, value, CommandFlags.FireAndForget);
+            StringSet(key, value, flags: CommandFlags.FireAndForget);
         }
 
         public void SetAndForget<T>(string key, T value)
         {
             SetAndForget(key, value?.Serialize());
+        }
+
+        public void SetAndForget(string key, string? value, TimeSpan expiry)
+        {
+            StringSet(key, value, expiry: expiry, flags: CommandFlags.FireAndForget);
+        }
+
+        public void SetAndForget<T>(string key, T value, TimeSpan expiry)
+        {
+            SetAndForget(key, value?.Serialize(), expiry);
         }
 
         public async Task SetNotExists(string key, string value)
@@ -105,9 +120,9 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.KeyDelete(key, CommandFlags.FireAndForget);
         }
 
-        private void StringSet(string key, string? value, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        private void StringSet(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always)
         {
-            Redis.StringSet(key, value, flags: flags, when: when);
+            Redis.StringSet(key, value, expiry: expiry, flags: flags, when: when);
         }
 
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always)
