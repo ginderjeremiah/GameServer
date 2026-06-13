@@ -125,6 +125,67 @@ describe('ApiSocket', () => {
 		});
 	});
 
+	describe('in-flight request lifecycle', () => {
+		// The in-flight map is the internal bookkeeping the leak fix targets, so read it directly to
+		// assert entries are added on send and pruned on settle.
+		const inFlightSize = (s: ApiSocket) =>
+			(s as unknown as { inFlightRequests: Map<string, unknown> }).inFlightRequests.size;
+
+		it('prunes the in-flight entry once its response resolves', async () => {
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const ws = lastWs();
+			const sent = JSON.parse(ws.send.mock.calls[0][0]);
+			expect(inFlightSize(apiSocket)).toBe(1);
+
+			receive(ws, JSON.stringify({ id: sent.id, name: 'DefeatEnemy', data: { cooldown: 10 } }));
+
+			await promise;
+			expect(inFlightSize(apiSocket)).toBe(0);
+		});
+
+		it('settles pending in-flight requests with an error when the socket closes', async () => {
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const ws = lastWs();
+			expect(inFlightSize(apiSocket)).toBe(1);
+
+			// No refresh token (localStorage cleared in beforeEach), so the close only settles — no reconnect.
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code: 1006 });
+
+			const response = await promise;
+			expect(response.error).toBeDefined();
+			expect(inFlightSize(apiSocket)).toBe(0);
+		});
+
+		it('flushes queued-but-unsent commands after an auth-retry reconnect', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+
+			// First socket is still CONNECTING, so the command sits queued (unsent) rather than in-flight.
+			// A function expression (not an arrow) so the mock can still be invoked with `new WebSocket()`.
+			webSocketMock.mockImplementationOnce(function (url?: string) {
+				const ws = createMockWebSocket(url);
+				ws.readyState = 0;
+				return ws;
+			});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const connecting = lastWs();
+			expect(connecting.send).not.toHaveBeenCalled();
+			expect(inFlightSize(apiSocket)).toBe(0);
+
+			// Handshake auth-rejected: closes before opening, triggering the refresh-and-reconnect path.
+			connecting.readyState = connecting.CLOSED;
+			connecting.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			const reconnected = lastWs();
+			expect(reconnected).not.toBe(connecting);
+			const sent = JSON.parse(reconnected.send.mock.calls[0][0]);
+			expect(sent.name).toBe('DefeatEnemy');
+		});
+	});
+
 	describe('listenCommand', () => {
 		it('calls listener when matching command arrives', () => {
 			const listener = vi.fn();
