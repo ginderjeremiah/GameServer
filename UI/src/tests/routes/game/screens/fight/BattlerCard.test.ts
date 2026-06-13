@@ -33,6 +33,22 @@ describe('BattlerCard', () => {
 		expect(card.querySelector('.hp-text')?.textContent).toContain('80 / 100');
 	});
 
+	it('exposes the HP bar as a progressbar with rounded current/max health', () => {
+		const battler = makeBattler({
+			name: 'Aelara',
+			attributes: [{ attributeId: EAttribute.MaxHealth, amount: 100 }],
+			currentHealth: 80.6
+		});
+		const { container } = render(BattlerCard, { props: { battler, side: 'player' } });
+
+		const bar = container.querySelector('.hp-bar') as HTMLElement;
+		expect(bar.getAttribute('role')).toBe('progressbar');
+		expect(bar.getAttribute('aria-label')).toBe('Aelara health');
+		expect(bar.getAttribute('aria-valuenow')).toBe('81');
+		expect(bar.getAttribute('aria-valuemin')).toBe('0');
+		expect(bar.getAttribute('aria-valuemax')).toBe('100');
+	});
+
 	it('sizes the health bar to the remaining health percentage', () => {
 		const battler = makeBattler({
 			attributes: [{ attributeId: EAttribute.MaxHealth, amount: 200 }],
