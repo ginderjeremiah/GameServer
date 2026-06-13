@@ -14,6 +14,16 @@ import { handleAuthFailure, refreshTokens } from './auth';
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
 const NORMAL_CLOSURE = 1000;
 
+/** Per-request backstop for the case the close-handler can't cover: the socket stays open but a
+ *  response simply never arrives (e.g. the server processed the command but failed to send a reply,
+ *  or sent one that failed to parse). Without it the in-flight entry — and the caller's await — would
+ *  sit forever. Kept generous so legitimately-slow commands (e.g. a heavy admin reference read) aren't
+ *  spuriously failed; a real reply normally lands in well under a second. */
+const REQUEST_TIMEOUT_MS = 30000;
+
+/** Surfaced via the resolve-with-error contract when a sent request exceeds REQUEST_TIMEOUT_MS. */
+const REQUEST_TIMEOUT_ERROR = 'Timed out waiting for the server.';
+
 export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 	id: string;
 	name: T;
@@ -31,6 +41,8 @@ export const onPingMeasured = pingHook.onNotified;
 
 type InFlightRequest = {
 	startTime: number;
+	// Cleared when the response resolves; fires the timeout backstop if it never does.
+	timer: ReturnType<typeof setTimeout>;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	command: ApiSocketRequest<any>;
 };
@@ -116,7 +128,11 @@ export class ApiSocket {
 		if (socket && socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
-				this.inFlightRequests.set(request.id, { startTime: performance.now(), command: request });
+				// Arm the timeout only now that the command is actually sent — a command can sit queued
+				// during a reconnect, and that wait shouldn't count against its per-request budget.
+				const id = request.id;
+				const timer = setTimeout(() => this.timeoutRequest(id), REQUEST_TIMEOUT_MS);
+				this.inFlightRequests.set(id, { startTime: performance.now(), timer, command: request });
 				socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
@@ -146,7 +162,9 @@ export class ApiSocket {
 			if (data.id) {
 				const inFlight = this.inFlightRequests.get(data.id);
 				if (inFlight) {
-					// Prune as soon as it resolves so the map can't grow without bound over a long session.
+					// Prune as soon as it resolves so the map can't grow without bound over a long session,
+					// and clear its timeout so the backstop can't later settle an already-resolved request.
+					clearTimeout(inFlight.timer);
 					this.inFlightRequests.delete(data.id);
 					inFlight.command.resolve(data);
 					console.debug(`Response to '${inFlight.command.commandName}' received after ${now - inFlight.startTime}ms.`);
@@ -161,10 +179,25 @@ export class ApiSocket {
 	 *  Reuses the transport's resolve-with-error contract (rather than rejecting) so existing callers handle
 	 *  a dropped connection through the same `response.error` path they already use for server errors. */
 	private settleInFlightRequests(error: string) {
-		for (const { command } of this.inFlightRequests.values()) {
+		for (const { command, timer } of this.inFlightRequests.values()) {
+			clearTimeout(timer);
 			command.settleWithError(error);
 		}
 		this.inFlightRequests.clear();
+	}
+
+	/** Backstop for a request that was sent but whose response never arrived while the socket stayed
+	 *  open (so the close-handler never settled it). Settles it through the same resolve-with-error
+	 *  contract and prunes the entry, so the caller surfaces it via `response.error` rather than
+	 *  awaiting forever. A no-op if the request already resolved (its timer would have been cleared). */
+	private timeoutRequest(id: string) {
+		const inFlight = this.inFlightRequests.get(id);
+		if (!inFlight) {
+			return;
+		}
+		this.inFlightRequests.delete(id);
+		inFlight.command.settleWithError(REQUEST_TIMEOUT_ERROR);
+		console.warn(`Request '${inFlight.command.commandName}' timed out after ${REQUEST_TIMEOUT_MS}ms.`);
 	}
 
 	private handleError(ev: Event) {

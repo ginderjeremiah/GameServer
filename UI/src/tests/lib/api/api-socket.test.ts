@@ -186,6 +186,84 @@ describe('ApiSocket', () => {
 		});
 	});
 
+	describe('per-request timeout', () => {
+		const inFlightSize = (s: ApiSocket) =>
+			(s as unknown as { inFlightRequests: Map<string, unknown> }).inFlightRequests.size;
+
+		it('settles a sent request with an error once the timeout elapses', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			vi.useFakeTimers();
+			try {
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				expect(inFlightSize(apiSocket)).toBe(1);
+
+				// No response arrives and the socket never closes, so only the backstop can settle it.
+				vi.advanceTimersByTime(30000);
+
+				const response = await promise;
+				expect(response.error).toBe('Timed out waiting for the server.');
+				expect(inFlightSize(apiSocket)).toBe(0);
+				expect(warnSpy).toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+
+		it('clears the timer when a real response arrives, so a later tick never spuriously settles', async () => {
+			vi.useFakeTimers();
+			try {
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const ws = lastWs();
+				const sent = JSON.parse(ws.send.mock.calls[0][0]);
+
+				receive(ws, JSON.stringify({ id: sent.id, name: 'DefeatEnemy', data: { cooldown: 5 } }));
+				const response = await promise;
+				expect(response.data).toEqual({ cooldown: 5 });
+				expect(inFlightSize(apiSocket)).toBe(0);
+
+				// Advancing well past the cap must not re-settle — the timer was cleared on resolve.
+				vi.advanceTimersByTime(60000);
+				expect(inFlightSize(apiSocket)).toBe(0);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not time out a queued-but-unsent command while the socket is still connecting', async () => {
+			vi.useFakeTimers();
+			try {
+				// First socket stays CONNECTING, so the command sits queued (unsent) — no timer is armed yet.
+				webSocketMock.mockImplementationOnce(function (url?: string) {
+					const ws = createMockWebSocket(url);
+					ws.readyState = 0;
+					return ws;
+				});
+
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const connecting = lastWs();
+				expect(connecting.send).not.toHaveBeenCalled();
+				expect(inFlightSize(apiSocket)).toBe(0);
+
+				// Even well past the cap, a never-sent command isn't timed out — it has no armed timer.
+				vi.advanceTimersByTime(60000);
+				expect(inFlightSize(apiSocket)).toBe(0);
+
+				// Once the socket opens the command is flushed and resolves normally (onStart pings first,
+				// so pick the command payload out of the send calls rather than assuming it's the first).
+				connecting.readyState = connecting.OPEN;
+				connecting.onopen?.();
+				const sentRaw = connecting.send.mock.calls.map((c) => c[0]).find((d) => d !== 'ping' && d !== 'pong');
+				const sent = JSON.parse(sentRaw);
+				expect(sent.name).toBe('DefeatEnemy');
+				receive(connecting, JSON.stringify({ id: sent.id, name: 'DefeatEnemy', data: { cooldown: 1 } }));
+				await expect(promise).resolves.toMatchObject({ data: { cooldown: 1 } });
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+	});
+
 	describe('listenCommand', () => {
 		it('calls listener when matching command arrives', () => {
 			const listener = vi.fn();

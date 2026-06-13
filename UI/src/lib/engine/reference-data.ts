@@ -7,30 +7,10 @@
    (`routes/loading/loading-view.svelte.ts`) and the silent session-resume path (`session.ts`). It
    therefore lives in `$lib` rather than under either route. */
 
-import { apiSocket } from '$lib/api';
+import { fetchSocketData } from '$lib/api';
 import type { ApiSocketCommandNoRequest, ApiSocketResponseTypes } from '$lib/api/types/api-socket-type-map';
 import { staticData } from '$stores';
 import { readReferenceCache, writeReferenceCache } from './reference-cache';
-
-/* The socket has no built-in per-command timeout; without one a dead or unreachable backend would
-   leave a caller hanging on a command that never resolves. Bounding each socket call surfaces the
-   error to the caller (the loading screen's retry UI, or a resume falling back) instead of hanging. */
-const SOCKET_TIMEOUT_MS = 15000;
-
-export const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
-	new Promise<T>((resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error('Timed out waiting for the server.')), SOCKET_TIMEOUT_MS);
-		promise.then(
-			(value) => {
-				clearTimeout(timer);
-				resolve(value);
-			},
-			(error) => {
-				clearTimeout(timer);
-				reject(error);
-			}
-		);
-	});
 
 /* One row per reference-data set. Keeping them in a single table keeps both the manifest and the
    resume check DRY — adding/removing a set is a one-line edit here. */
@@ -63,7 +43,9 @@ function refSource<C extends ApiSocketCommandNoRequest>(
 		label,
 		command,
 		loaded: () => read() != null,
-		load: async () => write((await withTimeout(apiSocket.sendSocketCommand(command))).data),
+		// fetchSocketData throws on a socket error (including the transport's per-request timeout), so a
+		// failed load surfaces to the loading screen's retry UI / the resume fallback rather than hanging.
+		load: async () => write(await fetchSocketData(command)),
 		hydrate: (data) => write(data as ApiSocketResponseTypes[C]),
 		current: () => read()
 	};
@@ -145,9 +127,9 @@ export type ReferenceVersions = Map<string, string>;
  */
 export async function fetchReferenceVersions(): Promise<ReferenceVersions | null> {
 	try {
-		const response = await withTimeout(apiSocket.sendSocketCommand('GetReferenceDataVersions'));
+		const versions = await fetchSocketData('GetReferenceDataVersions');
 		// A plain Map: this only drives load orchestration and is never rendered, so it needn't be reactive.
-		return new Map(response.data.map((v) => [v.command, v.version]));
+		return new Map(versions.map((v) => [v.command, v.version]));
 	} catch {
 		return null;
 	}

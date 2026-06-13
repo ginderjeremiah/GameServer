@@ -13,7 +13,17 @@ const { goto, resolve, sendSocketCommand, staticData, readReferenceCache, writeR
 
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve }));
-vi.mock('$lib/api', () => ({ apiSocket: { sendSocketCommand } }));
+// reference-data drives the socket through fetchSocketData, which throws on a socket error. The mock
+// delegates to the per-test sendSocketCommand spy so each test still configures behaviour the same way.
+vi.mock('$lib/api', () => ({
+	fetchSocketData: async (command: string) => {
+		const response = await sendSocketCommand(command);
+		if (response.error) {
+			throw new Error(response.error);
+		}
+		return response.data;
+	}
+}));
 vi.mock('$stores', () => ({ staticData }));
 vi.mock('$lib/engine/reference-cache', () => ({ readReferenceCache, writeReferenceCache }));
 
@@ -260,13 +270,15 @@ describe('LoadingView', () => {
 		expect(view.currentItem?.error).toBe('Network error — could not reach server.');
 	});
 
-	it('surfaces a timeout error when a set load never resolves', async () => {
+	it('surfaces a timeout error when the socket reports a per-request timeout for a set load', async () => {
+		// The transport's built-in timeout settles a hung request via the resolve-with-error contract
+		// (an `error` field, not a rejection); fetchSocketData turns that into a throw the view surfaces.
 		sendSocketCommand.mockImplementation((command: string) => {
 			if (command === 'GetReferenceDataVersions') {
 				return Promise.resolve(versionsResponse());
 			}
 			if (command === 'GetZones') {
-				return new Promise(() => {}); // never settles
+				return Promise.resolve({ error: 'Timed out waiting for the server.' });
 			}
 			return Promise.resolve({ data: [] });
 		});
@@ -274,7 +286,7 @@ describe('LoadingView', () => {
 		const view = await loadView();
 		vi.useFakeTimers();
 		const run = view.start();
-		await vi.runAllTimersAsync(); // advances past the socket timeout
+		await vi.runAllTimersAsync();
 		await run;
 		vi.useRealTimers();
 
