@@ -20,7 +20,7 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { effectDirection, effectDirectionColor, formatEffectMagnitude, formatNum, normalizeText } from '$lib/common';
+import { effectDirection, effectDirectionColor, formatEffectMagnitude, normalizeText } from '$lib/common';
 import { staticData } from '$stores';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
@@ -35,7 +35,7 @@ const { battler, reversed = false }: Props = $props();
 const attributeName = (id: EAttribute) =>
 	staticData.attributes?.find((attr) => attr.id === id)?.name ?? normalizeText(EAttribute[id]);
 
-const remainingSeconds = (effect: ActiveEffectView) => formatNum(effect.renderRemainingMs / 1000);
+const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>
 	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
 const chipTitle = (effect: ActiveEffectView) =>

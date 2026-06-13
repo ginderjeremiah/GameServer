@@ -63,7 +63,7 @@ describe('ActiveEffectChips', () => {
 
 		const fill = container.querySelector('.chip-fill') as HTMLElement;
 		expect(fill.style.width).toBe('50%');
-		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('0.5s');
+		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('0.50s');
 	});
 
 	it('right-aligns the row when reversed (enemy/boss layout)', () => {
