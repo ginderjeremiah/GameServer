@@ -13,29 +13,27 @@ const {
 	statistics,
 	playerChallenges,
 	registerTooltipComponent
-} = vi.hoisted(
-	() => ({
-		mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
-		mockPlayerManager: { currentZone: 0 },
-		mockEnemyManager: {
-			mode: 'idle' as 'idle' | 'boss',
-			autoFight: false,
-			bossOutcome: undefined as 'victory' | undefined,
-			bossUnlockedNextZone: false,
-			challengeBoss: vi.fn(),
-			retreatFromBoss: vi.fn(),
-			setAutoFight: vi.fn()
-		},
-		staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
-		statistics: { isZoneCleared: vi.fn(() => false) },
-		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
-		registerTooltipComponent: vi.fn(() => ({
-			setTooltipPosition: vi.fn(),
-			showTooltip: vi.fn(),
-			hideTooltip: vi.fn()
-		}))
-	})
-);
+} = vi.hoisted(() => ({
+	mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
+	mockPlayerManager: { currentZone: 0 },
+	mockEnemyManager: {
+		mode: 'idle' as 'idle' | 'boss',
+		autoFight: false,
+		bossOutcome: undefined as 'victory' | undefined,
+		bossUnlockedNextZone: false,
+		challengeBoss: vi.fn(),
+		retreatFromBoss: vi.fn(),
+		setAutoFight: vi.fn()
+	},
+	staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
+	statistics: { isZoneCleared: vi.fn(() => false) },
+	playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
+	registerTooltipComponent: vi.fn(() => ({
+		setTooltipPosition: vi.fn(),
+		showTooltip: vi.fn(),
+		hideTooltip: vi.fn()
+	}))
+}));
 
 vi.mock('$lib/engine', () => ({
 	battleEngine: mockBattleEngine,
