@@ -520,7 +520,9 @@ namespace Game.Infrastructure.Database
         {
             foreach (var entry in ChangeTracker.Entries())
             {
-                var tempProps = entry.Properties.Where(p => p.IsTemporary);
+                // Materialize once so the PK and FK branches share a single pre-mutation snapshot;
+                // the PK branch clears IsTemporary, which the deferred predicate would otherwise re-filter on.
+                var tempProps = entry.Properties.Where(p => p.IsTemporary).ToList();
                 if (entry.State is not EntityState.Added)
                 {
                     var idProp = tempProps.FirstOrDefault(p => p.Metadata.IsPrimaryKey());
