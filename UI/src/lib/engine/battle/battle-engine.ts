@@ -2,7 +2,7 @@ import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { staticData } from '$stores';
 import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
-import { formatNum, createHook, Action, effectLogMessage, attributeEnumName } from '$lib/common';
+import { formatNum, createHook, Action, effectLogMessage, attributeName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
 import { inventoryManager } from '../engine';
@@ -138,9 +138,7 @@ export class BattleEngine {
 	 *  (#297), falling back to the formatted enum name when the reference set is unavailable. */
 	private logEffectApplications() {
 		for (const { effect, onPlayer } of this.stepLog.appliedEffects) {
-			const name =
-				staticData.attributes?.find((attr) => attr.id === effect.attributeId)?.name ??
-				attributeEnumName(effect.attributeId);
+			const name = attributeName(effect.attributeId, staticData.attributes);
 			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, onPlayer, this.enemy.name));
 		}
 	}

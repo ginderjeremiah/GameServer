@@ -1,4 +1,4 @@
-import { EAttribute } from '$lib/api';
+import { EAttribute, type IAttribute } from '$lib/api';
 import { normalizeText } from './functions';
 
 /*
@@ -44,3 +44,12 @@ export const attributeCode = (id: EAttribute): string => ATTRIBUTE_CODE[id] ?? '
  *  used when the live `Attributes` reference data is unavailable. An unknown/out-of-range id
  *  has no enum key, so it degrades to a readable `Unknown` rather than a blank label. */
 export const attributeEnumName = (id: EAttribute): string => normalizeText(EAttribute[id]) || 'Unknown';
+
+/**
+ * The attribute's display name — the authored name from the `Attributes` reference set when
+ * available, falling back to the normalised enum name. The reference set is passed in (rather
+ * than read from `$stores`) so this module stays free of a store dependency, mirroring the other
+ * param-based `$lib/common` helpers (e.g. `challengeTypeName`).
+ */
+export const attributeName = (id: EAttribute, attributes?: IAttribute[]): string =>
+	attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);

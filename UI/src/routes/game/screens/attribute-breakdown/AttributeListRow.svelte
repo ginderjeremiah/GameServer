@@ -9,7 +9,7 @@
 	onclick={() => onSelect(meta.id)}
 >
 	<span class="info">
-		<span class="name">{attributeName(meta.id)}</span>
+		<span class="name">{attributeName(meta.id, staticData.attributes)}</span>
 		<StackBar {computed} height={6} radius={1} />
 	</span>
 	<span class="total">{fmtNum(computed.total, meta.dec)}</span>
@@ -17,8 +17,10 @@
 
 <script lang="ts">
 import type { ComputedAttribute } from '$lib/battle';
+import { attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import StackBar from './StackBar.svelte';
-import { attributeName, fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';
+import { fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';
 
 interface Props {
 	meta: BreakdownAttrMeta;

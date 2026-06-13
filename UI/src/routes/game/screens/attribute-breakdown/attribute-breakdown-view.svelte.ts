@@ -28,7 +28,7 @@ import {
 	type AppliedModifier,
 	type ComputedAttribute
 } from '$lib/battle';
-import { attributeEnumName } from '$lib/common';
+import { attributeName } from '$lib/common';
 import { playerManager, inventoryManager, type EEquipmentSlot } from '$lib/engine';
 import { staticData } from '$stores';
 
@@ -76,12 +76,6 @@ export const ATTRIBUTE_GROUPS: { key: AttributeGroup; label: string }[] = [
 	{ key: 'core', label: 'Core' },
 	{ key: 'derived', label: 'Derived' }
 ];
-
-/** Display name for an attribute, preferring the live reference data and falling
- *  back to a normalised enum key (e.g. `MaxHealth` → `Max Health`). */
-export function attributeName(id: EAttribute): string {
-	return staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
-}
 
 /** Reference-data description for an attribute (empty when not yet loaded). */
 export function attributeDescription(id: EAttribute): string {

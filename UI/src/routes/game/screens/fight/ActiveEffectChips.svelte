@@ -8,7 +8,7 @@
 			{@const color = effectDirectionColor(effectDirection(effect.attribute, effect.modifierType, effect.amount))}
 			<div class="effect-chip" style:--chip-accent={color} title={chipTitle(effect)}>
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
-				<span class="chip-attr">{attributeName(effect.attribute)}</span>
+				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
 				<span class="chip-time">{remainingSeconds(effect)}s</span>
 				<div class="chip-track">
 					<div class="chip-fill" style:width="{remainingPercent(effect)}%"></div>
@@ -19,8 +19,7 @@
 {/if}
 
 <script lang="ts">
-import { EAttribute } from '$lib/api';
-import { attributeEnumName, effectDirection, effectDirectionColor, formatEffectMagnitude } from '$lib/common';
+import { attributeName, effectDirection, effectDirectionColor, formatEffectMagnitude } from '$lib/common';
 import { staticData } from '$stores';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
@@ -32,14 +31,11 @@ type Props = {
 
 const { battler, reversed = false }: Props = $props();
 
-const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((attr) => attr.id === id)?.name ?? attributeEnumName(id);
-
 const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>
 	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
 const chipTitle = (effect: ActiveEffectView) =>
-	`${formatEffectMagnitude(effect.modifierType, effect.amount)} ${attributeName(effect.attribute)}`;
+	`${formatEffectMagnitude(effect.modifierType, effect.amount)} ${attributeName(effect.attribute, staticData.attributes)}`;
 </script>
 
 <style lang="scss">

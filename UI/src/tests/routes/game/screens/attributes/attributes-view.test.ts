@@ -23,6 +23,7 @@ vi.mock('$lib/api', async (importOriginal) => {
 	return { ...actual, apiSocket: { sendSocketCommand } };
 });
 
+import { attributeName } from '$lib/common';
 import {
 	AttributesView,
 	CORE_ATTRIBUTES,
@@ -32,7 +33,6 @@ import {
 	feedsFor,
 	derivedShortLabel,
 	derivedUnit,
-	attributeName,
 	radarValueAtPointer
 } from '$routes/game/screens/attributes/attributes-view.svelte';
 

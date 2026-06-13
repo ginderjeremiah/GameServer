@@ -23,7 +23,8 @@
 
 <script lang="ts">
 import { type IItemMod } from '$lib/api';
-import { attributeEnumName, modTypeColor, modTypeLabel, rarityColor } from '$lib/common';
+import { attributeName, modTypeColor, modTypeLabel, rarityColor } from '$lib/common';
+import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
@@ -37,7 +38,7 @@ const { mod }: Props = $props();
 
 const typeColor = $derived(modTypeColor(mod.itemModTypeId));
 const effects = $derived(
-	(mod.attributes ?? []).map((a) => ({ name: attributeEnumName(a.attributeId), value: a.amount }))
+	(mod.attributes ?? []).map((a) => ({ name: attributeName(a.attributeId, staticData.attributes), value: a.amount }))
 );
 </script>
 

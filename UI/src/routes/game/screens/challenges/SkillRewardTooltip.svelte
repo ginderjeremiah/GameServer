@@ -46,8 +46,8 @@
 </TooltipShell>
 
 <script lang="ts">
-import { EAttribute, type ISkill } from '$lib/api';
-import { attributeColor, attributeEnumName, describeEffect, effectDirectionColor, formatNum } from '$lib/common';
+import type { ISkill } from '$lib/api';
+import { attributeColor, attributeName, describeEffect, effectDirectionColor, formatNum } from '$lib/common';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
@@ -59,15 +59,10 @@ interface Props {
 
 const { skill }: Props = $props();
 
-// Reference-data attribute name (the full names live in the `Attributes` set); falls back to the
-// humanised enum key, matching the battle skill tooltip.
-const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
-
 const scaling = $derived(
 	skill.damageMultipliers.map((m) => ({
 		attributeId: m.attributeId,
-		name: attributeName(m.attributeId),
+		name: attributeName(m.attributeId, staticData.attributes),
 		multiplier: m.multiplier
 	}))
 );
@@ -75,7 +70,10 @@ const cooldownSeconds = $derived(formatNum(skill.cooldownMs / 1000));
 // One display line per authored effect, reusing the shared helper so wording/direction match the
 // battle tooltip's "On hit" lines; `id` is kept for a stable each-key.
 const effectLines = $derived(
-	skill.effects.map((effect) => ({ id: effect.id, ...describeEffect(effect, attributeName(effect.attributeId)) }))
+	skill.effects.map((effect) => ({
+		id: effect.id,
+		...describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
+	}))
 );
 </script>
 

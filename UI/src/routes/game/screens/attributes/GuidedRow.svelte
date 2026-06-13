@@ -12,7 +12,7 @@
 				<span class="feed empty" title="No derived-stat contribution yet">—</span>
 			{:else}
 				{#each feeds as fid (fid)}
-					<span class="feed" class:changed={changed.has(fid)}>{attributeName(fid)}</span>
+					<span class="feed" class:changed={changed.has(fid)}>{attributeName(fid, staticData.attributes)}</span>
 				{/each}
 			{/if}
 		</div>
@@ -23,10 +23,11 @@
 </div>
 
 <script lang="ts">
-import { attributeColor, attributeCode } from '$lib/common';
+import { attributeColor, attributeCode, attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import Delta from './Delta.svelte';
 import Stepper from './Stepper.svelte';
-import { CORE_ATTRIBUTES, DERIVED_STATS, attributeName, feedsFor, type AttributesView } from './attributes-view.svelte';
+import { CORE_ATTRIBUTES, DERIVED_STATS, feedsFor, type AttributesView } from './attributes-view.svelte';
 
 interface Props {
 	i: number;
@@ -38,7 +39,7 @@ const { i, view }: Props = $props();
 const id = $derived(CORE_ATTRIBUTES[i]);
 const color = $derived(attributeColor(id));
 const code = $derived(attributeCode(id));
-const name = $derived(attributeName(id));
+const name = $derived(attributeName(id, staticData.attributes));
 const feeds = $derived(feedsFor(i));
 
 // The set of derived stats whose value differs between the saved and pending

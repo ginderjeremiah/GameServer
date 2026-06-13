@@ -15,7 +15,10 @@
 				<div class="line">
 					<span class="line-label">
 						{#if line.source === EAttributeModifierSource.Derived}
-							{attributeName(line.derivedSource)} ({line.amount}× of {fmtNum(line.derivedValue ?? 0, 1)})
+							{attributeName(line.derivedSource, staticData.attributes)} ({line.amount}× of {fmtNum(
+								line.derivedValue ?? 0,
+								1
+							)})
 						{:else if line.source === EAttributeModifierSource.ItemMod && line.modType !== undefined}
 							{modifierLabel(line)} · {modTypeLabel(line.modType)}
 						{:else}
@@ -31,15 +34,10 @@
 
 <script lang="ts">
 import { EAttributeModifierSource, type SourceGroup } from '$lib/battle';
-import { modTypeLabel } from '$lib/common';
+import { modTypeLabel, attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import { sourceColor, sourceLabel } from './source-display';
-import {
-	attributeName,
-	fmtNum,
-	fmtSigned,
-	modifierLabel,
-	type LabeledModifier
-} from './attribute-breakdown-view.svelte';
+import { fmtNum, fmtSigned, modifierLabel, type LabeledModifier } from './attribute-breakdown-view.svelte';
 
 interface Props {
 	groups: SourceGroup<LabeledModifier>[];
