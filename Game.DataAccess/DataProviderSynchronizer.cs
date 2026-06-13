@@ -319,24 +319,36 @@ namespace Game.DataAccess
 
         private static async Task HandleSelectedSkillsChanged(GameContext context, SelectedSkillsChangedEvent evt)
         {
-            // Delete-then-rebuild for idempotency: first clear every Selected/Order flag for the
-            // player, then mark each id in the ordered loadout Selected = true with its index as Order.
-            // Re-applying the event converges to the same state (same shape as the mod-applied handler).
-            await context.PlayerSkills
+            // Delete-then-rebuild for idempotency, applied as a single write (the same shape as the
+            // attribute-allocations handler): fetch the player's skill rows, reset every flag, then mark
+            // each id in the ordered loadout Selected = true with its index as Order. Re-applying the event
+            // converges to the same state, and EF batches the touched rows into one round-trip rather than
+            // issuing one ExecuteUpdate per skill.
+            var playerSkills = await context.PlayerSkills
                 .Where(ps => ps.PlayerId == evt.PlayerId)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(ps => ps.Selected, false)
-                    .SetProperty(ps => ps.Order, 0));
+                .ToListAsync();
 
+            var orderBySkillId = new Dictionary<int, int>(evt.OrderedSkillIds.Count);
             for (var index = 0; index < evt.OrderedSkillIds.Count; index++)
             {
-                var skillId = evt.OrderedSkillIds[index];
-                await context.PlayerSkills
-                    .Where(ps => ps.PlayerId == evt.PlayerId && ps.SkillId == skillId)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(ps => ps.Selected, true)
-                        .SetProperty(ps => ps.Order, index));
+                orderBySkillId[evt.OrderedSkillIds[index]] = index;
             }
+
+            foreach (var playerSkill in playerSkills)
+            {
+                if (orderBySkillId.TryGetValue(playerSkill.SkillId, out var order))
+                {
+                    playerSkill.Selected = true;
+                    playerSkill.Order = order;
+                }
+                else
+                {
+                    playerSkill.Selected = false;
+                    playerSkill.Order = 0;
+                }
+            }
+
+            await context.SaveChangesAsync();
         }
 
         private static async Task HandleModApplied(GameContext context, ModAppliedEvent evt)
@@ -374,14 +386,15 @@ namespace Game.DataAccess
         private static async Task HandleLogPreferenceChanged(GameContext context, LogPreferenceChangedEvent evt)
         {
             var logTypeId = (int)evt.LogType;
-            var existing = await context.LogPreferences
-                .FirstOrDefaultAsync(lp => lp.PlayerId == evt.PlayerId && lp.LogTypeId == logTypeId);
 
-            if (existing is not null)
-            {
-                existing.Enabled = evt.Enabled;
-            }
-            else
+            // Idempotent upsert mirroring HandleItemFavoriteChanged: attempt the absolute update first as a
+            // single self-committing write; if no row exists yet (rows-affected 0) fall through to the insert.
+            // Re-applying the event converges to the same state under the write-behind retry policy.
+            var updated = await context.LogPreferences
+                .Where(lp => lp.PlayerId == evt.PlayerId && lp.LogTypeId == logTypeId)
+                .ExecuteUpdateAsync(s => s.SetProperty(lp => lp.Enabled, evt.Enabled));
+
+            if (updated == 0)
             {
                 context.LogPreferences.Add(new LogPreference
                 {
@@ -389,9 +402,8 @@ namespace Game.DataAccess
                     LogTypeId = logTypeId,
                     Enabled = evt.Enabled,
                 });
+                await context.SaveChangesAsync();
             }
-
-            await context.SaveChangesAsync();
         }
 
         private static T Deserialize<T>(string json)

@@ -547,6 +547,74 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_LogPreferenceChangedEvent_UpdatesExistingPreferenceIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            // The player already has an enabled Damage-log preference; the event toggles it off.
+            await TestDataSeeder.AddLogPreferenceAsync(context, player.Id, ELogType.Damage, enabled: true);
+
+            var evt = new LogPreferenceChangedEvent(player.Id, ELogType.Damage, Enabled: false);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice: the absolute update must converge to a single row toggled off.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.LogPreferences
+                .Where(lp => lp.PlayerId == player.Id && lp.LogTypeId == (int)ELogType.Damage)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.False(row.Enabled);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_LogPreferenceChangedEvent_FirstTimeInsertsPreferenceIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            // No preference row exists yet for this log type: the first apply must insert it, the second update it.
+            var evt = new LogPreferenceChangedEvent(player.Id, ELogType.Exp, Enabled: false);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice: the update-then-insert path must leave exactly one row (no duplicate-key failure).
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.LogPreferences
+                .Where(lp => lp.PlayerId == player.Id && lp.LogTypeId == (int)ELogType.Exp)
+                .ToListAsync(CancellationToken);
+            var row = Assert.Single(rows);
+            Assert.False(row.Enabled);
+        }
+
+        [Fact]
         public async Task StopAsync_CompletesWithoutError()
         {
             using var scope = CreateScope();
