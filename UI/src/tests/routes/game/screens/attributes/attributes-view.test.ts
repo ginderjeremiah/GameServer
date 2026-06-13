@@ -4,13 +4,13 @@ import { EAttribute, type IBattlerAttribute } from '$lib/api';
 // Mutable player-manager stand-in: `save()` reassigns `attributes` and bumps
 // `statPointsUsed`, so they are plain writable properties. `vi.hoisted` keeps it
 // initialised before the hoisted vi.mock factory runs.
-const { mockPlayerManager, mockPost, toastError, staticData } = vi.hoisted(() => ({
+const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: {
 		attributes: [] as IBattlerAttribute[],
 		statPointsGained: 0,
 		statPointsUsed: 0
 	},
-	mockPost: vi.fn(),
+	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
 	// Reference data is intentionally absent so the view falls back to enum names.
 	staticData: { attributes: undefined as unknown }
@@ -20,10 +20,7 @@ vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
-	class MockApiRequest {
-		post = mockPost;
-	}
-	return { ...actual, ApiRequest: MockApiRequest };
+	return { ...actual, apiSocket: { sendSocketCommand } };
 });
 
 import {
@@ -53,7 +50,7 @@ const idx = {
 let view: AttributesView;
 
 beforeEach(() => {
-	mockPost.mockReset().mockResolvedValue({ status: 200, data: allFives() });
+	sendSocketCommand.mockReset().mockResolvedValue({ data: allFives() });
 	toastError.mockReset();
 	localStorage.clear();
 	mockPlayerManager.attributes = allFives();
@@ -303,18 +300,20 @@ describe('AttributesView mode persistence', () => {
 });
 
 describe('AttributesView.save', () => {
-	it('posts the deltas, applies the result, and clears dirty on success', async () => {
+	it('sends the deltas over the socket, applies the result, and clears dirty on success', async () => {
 		const serverResult: IBattlerAttribute[] = CORE_ATTRIBUTES.map((id) => ({
 			attributeId: id,
 			amount: id === EAttribute.Strength ? 6 : 5
 		}));
-		mockPost.mockResolvedValue({ status: 200, data: serverResult });
+		sendSocketCommand.mockResolvedValue({ data: serverResult });
 
 		view.inc(idx.str);
 		await view.save();
 
-		expect(mockPost).toHaveBeenCalledTimes(1);
-		expect(mockPost).toHaveBeenCalledWith([{ attributeId: EAttribute.Strength, amount: 1 }]);
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(sendSocketCommand).toHaveBeenCalledWith('UpdatePlayerStats', [
+			{ attributeId: EAttribute.Strength, amount: 1 }
+		]);
 		// Applied to the player manager so battles and other screens see it.
 		expect(mockPlayerManager.attributes).toBe(serverResult);
 		expect(mockPlayerManager.statPointsUsed).toBe(1);
@@ -326,7 +325,7 @@ describe('AttributesView.save', () => {
 	});
 
 	it('warns and keeps the changes when the server rejects the save', async () => {
-		mockPost.mockResolvedValue({ status: 500, data: undefined });
+		sendSocketCommand.mockResolvedValue({ error: 'Unable to update player stats.', data: undefined });
 		view.inc(idx.str);
 		await view.save();
 
@@ -337,7 +336,7 @@ describe('AttributesView.save', () => {
 	});
 
 	it('warns and keeps the changes when the request throws', async () => {
-		mockPost.mockRejectedValue(new Error('network'));
+		sendSocketCommand.mockRejectedValue(new Error('network'));
 		view.inc(idx.str);
 		await view.save();
 
@@ -347,7 +346,7 @@ describe('AttributesView.save', () => {
 
 	it('does nothing when there are no changes', async () => {
 		await view.save();
-		expect(mockPost).not.toHaveBeenCalled();
+		expect(sendSocketCommand).not.toHaveBeenCalled();
 		expect(toastError).not.toHaveBeenCalled();
 	});
 });

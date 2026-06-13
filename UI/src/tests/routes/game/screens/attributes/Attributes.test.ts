@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { EAttribute, type IAttribute, type IBattlerAttribute } from '$lib/api';
 
-const { mockPlayerManager, mockPost, toastError, staticData } = vi.hoisted(() => ({
+const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: {
 		attributes: [] as IBattlerAttribute[],
 		statPointsGained: 0,
 		statPointsUsed: 0
 	},
-	mockPost: vi.fn(),
+	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
 	staticData: { attributes: [] as IAttribute[] }
 }));
@@ -17,10 +17,7 @@ vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
-	class MockApiRequest {
-		post = mockPost;
-	}
-	return { ...actual, ApiRequest: MockApiRequest };
+	return { ...actual, apiSocket: { sendSocketCommand } };
 });
 
 import Attributes from '$routes/game/screens/attributes/Attributes.svelte';
@@ -38,7 +35,7 @@ const refAttributes: IAttribute[] = [
 ];
 
 beforeEach(() => {
-	mockPost.mockReset().mockResolvedValue({ status: 200, data: [] });
+	sendSocketCommand.mockReset().mockResolvedValue({ data: [] });
 	toastError.mockReset();
 	localStorage.clear();
 	staticData.attributes = refAttributes;
@@ -90,8 +87,7 @@ describe('Attributes screen', () => {
 	});
 
 	it('persists the saved allocation deltas when Confirm is clicked', async () => {
-		mockPost.mockResolvedValue({
-			status: 200,
+		sendSocketCommand.mockResolvedValue({
 			data: [
 				{ attributeId: EAttribute.Strength, amount: 6 },
 				{ attributeId: EAttribute.Endurance, amount: 5 },
@@ -106,6 +102,8 @@ describe('Attributes screen', () => {
 		await fireEvent.click(screen.getAllByLabelText('Add a point', { exact: true })[0]);
 		await fireEvent.click(screen.getByText('Confirm'));
 
-		expect(mockPost).toHaveBeenCalledWith([{ attributeId: EAttribute.Strength, amount: 1 }]);
+		expect(sendSocketCommand).toHaveBeenCalledWith('UpdatePlayerStats', [
+			{ attributeId: EAttribute.Strength, amount: 1 }
+		]);
 	});
 });

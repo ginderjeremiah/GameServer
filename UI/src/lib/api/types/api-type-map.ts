@@ -6,9 +6,7 @@ import type {
 	IAddEditAttributesData,
 	IAdminUserSearchResults,
 	IApplyModRequest,
-	IAttributeUpdate,
 	IAuthTokens,
-	IBattlerAttribute,
 	IChallenge,
 	IChange,
 	IDeviceInfoRequest,
@@ -77,7 +75,6 @@ export type ApiResponseTypes = {
 	'Player/EquipItem': undefined;
 	'Player/RemoveMod': undefined;
 	'Player/UnequipItem': undefined;
-	'Player/UpdatePlayerStats': IBattlerAttribute[];
 	'Statistics': IPlayerStatistic[];
 	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
@@ -116,7 +113,6 @@ export type ApiRequestTypes = {
 	'Player/EquipItem': IEquipRequest;
 	'Player/RemoveMod': IRemoveModRequest;
 	'Player/UnequipItem': IEquipRequest;
-	'Player/UpdatePlayerStats': IAttributeUpdate[];
 };
 
 export type ApiEndpoint = keyof ApiResponseTypes;
