@@ -219,7 +219,8 @@ export class InventoryManager {
 	/**
 	 * Toggles whether an item is favorited and persists it via a websocket command. The local flag is
 	 * updated optimistically; a failed send keeps the local state (it re-syncs on the next toggle or
-	 * on reload) rather than rolling back, since a favourite flag is low-stakes.
+	 * on reload) rather than rolling back, since a favourite flag is low-stakes. The transport resolves
+	 * every failure with `response.error` (it never rejects), so the failure is observed and logged.
 	 */
 	public async setFavorite(itemId: number, favorite: boolean) {
 		const item = this.unlockedItems.get(itemId);
@@ -229,10 +230,9 @@ export class InventoryManager {
 
 		item.favorite = favorite;
 		this.publish();
-		try {
-			await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
-		} catch {
-			// Keep the optimistic local state; it re-syncs on the next toggle/reload.
+		const response = await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
+		if (response.error) {
+			logMessage(ELogType.Debug, 'There was an error setting the item favorite: ' + response.error);
 		}
 		return true;
 	}
