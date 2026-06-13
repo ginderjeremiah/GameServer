@@ -85,8 +85,11 @@ namespace Game.Api.Sockets
             do
             {
                 result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
-                message.Append(ReadBuffer());
-                buffersRead++;
+                if (result.Count > 0)
+                {
+                    message.Append(Encoding.UTF8.GetString(_buffer, 0, result.Count));
+                    buffersRead++;
+                }
             }
             while (!result.EndOfMessage && buffersRead < 1024);
 
@@ -110,35 +113,6 @@ namespace Game.Api.Sockets
             if (_socket.State is WebSocketState.Open)
             {
                 await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
-            }
-        }
-
-        private string ReadBuffer()
-        {
-            var lastNonZeroByte = -1;
-            for (var i = _buffer.Length - 1; i >= 0 && lastNonZeroByte == -1; i--)
-            {
-                if (_buffer[i] != 0)
-                {
-                    lastNonZeroByte = i;
-                }
-            }
-
-            if (lastNonZeroByte == -1)
-            {
-                return "";
-            }
-
-            var str = Encoding.UTF8.GetString(_buffer, 0, lastNonZeroByte + 1);
-            ClearBuffer(lastNonZeroByte);
-            return str;
-        }
-
-        private void ClearBuffer(int end)
-        {
-            for (var i = 0; i <= end; i++)
-            {
-                _buffer[i] = 0;
             }
         }
     }
