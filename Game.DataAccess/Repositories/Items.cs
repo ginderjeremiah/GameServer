@@ -9,7 +9,7 @@ namespace Game.DataAccess.Repositories
 {
     internal class Items(ItemsCacheHolder holder) : IItems, IItemEntityCache
     {
-        private IReadOnlyList<Item> Entities => holder.Current;
+        private IReadOnlyList<Item> Entities => holder.Current.Entities;
 
         public List<Contracts.Item> All()
         {
@@ -24,7 +24,11 @@ namespace Game.DataAccess.Repositories
 
         public CoreItem GetItem(int itemId)
         {
-            return ItemMapper.ToCore(Entities[itemId]);
+            // Returns the snapshot's shared, pre-materialized instance rather than rebuilding a fresh graph
+            // per call. The model is reference data treated as immutable by every caller (the battle path
+            // composes modifiers into a separate AttributeCollection; applied mods live on the player's
+            // UnlockedItemSlot, never on the shared Item.ModSlots), so sharing is safe.
+            return holder.Current.CoreItems[itemId];
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Game.DataAccess.Repositories
 {
     internal class Skills(SkillsCacheHolder holder) : ISkills, ISkillEntityCache
     {
-        private IReadOnlyList<Skill> Entities => holder.Current;
+        private IReadOnlyList<Skill> Entities => holder.Current.Entities;
 
         public IReadOnlyList<Skill> AllSkillEntities()
         {
@@ -29,7 +29,10 @@ namespace Game.DataAccess.Repositories
 
         public CoreSkill GetSkill(int skillId)
         {
-            return SkillMapper.ToCore(Entities[skillId]);
+            // Returns the snapshot's shared, pre-materialized instance rather than rebuilding a fresh graph
+            // per call. The skill template is reference data treated as immutable by every caller — BattleSkill
+            // only reads from it — so sharing is safe.
+            return holder.Current.CoreSkills[skillId];
         }
     }
 }
