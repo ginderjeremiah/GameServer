@@ -123,7 +123,9 @@ namespace Game.DataAccess.Repositories.Admin
             {
                 if (!data.TagIds.Contains(currentTag.Id))
                 {
-                    currentTag.Items.Clear();
+                    // Remove only this item's join row; Clear() would delete the rows for every
+                    // item carrying the tag, since the navigation eager-loads the full membership.
+                    currentTag.Items.RemoveAll(i => i.Id == data.Id);
                 }
             }
 

@@ -1306,6 +1306,64 @@ namespace Game.Api.Tests.Integration
             Assert.Equal("Item mod not found.", result.ErrorMessage);
         }
 
+        [Fact]
+        public async Task SetTagsForItem_RemovesUnlistedTag_LeavesOtherItemsTagged()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemA = await TestDataSeeder.CreateItemAsync(context, "Item A");
+            var itemB = await TestDataSeeder.CreateItemAsync(context, "Item B");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "Shared");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Both items carry the shared tag.
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemA.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemB.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+
+            // Re-set item A to drop the tag.
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemA.Id, TagIds = Array.Empty<int>() }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Item A lost the tag; item B must keep it.
+            Assert.Empty(await GetTagsForItem(itemA.Id));
+            var bTags = await GetTagsForItem(itemB.Id);
+            var remaining = Assert.Single(bTags);
+            Assert.Equal(tag.Id, remaining.Id);
+        }
+
+        [Fact]
+        public async Task SetTagsForItemMod_RemovesUnlistedTag_LeavesOtherModsTagged()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var modA = await TestDataSeeder.CreateItemModAsync(context, "Mod A");
+            var modB = await TestDataSeeder.CreateItemModAsync(context, "Mod B");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "SharedMod");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Both mods carry the shared tag.
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modA.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modB.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+
+            // Re-set mod A to drop the tag.
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modA.Id, TagIds = Array.Empty<int>() }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Mod A lost the tag; mod B must keep it.
+            Assert.Empty(await GetTagsForItemMod(modA.Id));
+            var bTags = await GetTagsForItemMod(modB.Id);
+            var remaining = Assert.Single(bTags);
+            Assert.Equal(tag.Id, remaining.Id);
+        }
+
         private async Task<List<Tag>> GetTagsForItem(int itemId)
         {
             using var scope = CreateScope();

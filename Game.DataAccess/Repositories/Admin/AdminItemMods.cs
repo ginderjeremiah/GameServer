@@ -100,7 +100,9 @@ namespace Game.DataAccess.Repositories.Admin
             {
                 if (!data.TagIds.Contains(currentTag.Id))
                 {
-                    currentTag.ItemMods.Clear();
+                    // Remove only this mod's join row; Clear() would delete the rows for every
+                    // mod carrying the tag, since the navigation eager-loads the full membership.
+                    currentTag.ItemMods.RemoveAll(im => im.Id == data.Id);
                 }
             }
 
