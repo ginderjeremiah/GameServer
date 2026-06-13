@@ -5,7 +5,15 @@ import type { IAttribute, IEnemy, IZone } from '$lib/api';
 // Fight composes the screen from the live battle engine (the two battlers), the zone nav
 // (player manager + reference data) and the boss affordance (engine boss mode + the per-zone
 // cleared statistic); all data sources are mocked.
-const { mockBattleEngine, mockPlayerManager, mockEnemyManager, staticData, statistics, playerChallenges } = vi.hoisted(
+const {
+	mockBattleEngine,
+	mockPlayerManager,
+	mockEnemyManager,
+	staticData,
+	statistics,
+	playerChallenges,
+	registerTooltipComponent
+} = vi.hoisted(
 	() => ({
 		mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
 		mockPlayerManager: { currentZone: 0 },
@@ -20,7 +28,12 @@ const { mockBattleEngine, mockPlayerManager, mockEnemyManager, staticData, stati
 		},
 		staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
 		statistics: { isZoneCleared: vi.fn(() => false) },
-		playerChallenges: { isChallengeCompleted: vi.fn(() => false) }
+		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
+		registerTooltipComponent: vi.fn(() => ({
+			setTooltipPosition: vi.fn(),
+			showTooltip: vi.fn(),
+			hideTooltip: vi.fn()
+		}))
 	})
 );
 
@@ -29,7 +42,7 @@ vi.mock('$lib/engine', () => ({
 	playerManager: mockPlayerManager,
 	enemyManager: mockEnemyManager
 }));
-vi.mock('$stores', () => ({ staticData, statistics, playerChallenges }));
+vi.mock('$stores', () => ({ staticData, statistics, playerChallenges, registerTooltipComponent }));
 
 import Fight from '$routes/game/screens/fight/Fight.svelte';
 import { makeBattler } from './fight-fixtures';

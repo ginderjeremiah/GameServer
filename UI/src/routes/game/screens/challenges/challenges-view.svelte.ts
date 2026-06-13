@@ -16,7 +16,8 @@ import {
 	rarityColor,
 	rarityGlow,
 	rarityLabel,
-	rarityLevel
+	rarityLevel,
+	zonesUnlockedBy
 } from '$lib/common';
 import { staticData } from '$stores';
 import { challengeTypeUnit } from './challenge-meta';
@@ -77,6 +78,8 @@ export interface ChallengeVM {
 	/** Target entity name for scoped challenges ("Goblin", "Frostspire"), else null. */
 	target: string | null;
 	reward: ResolvedReward | null;
+	/** Names of zones this challenge unlocks (gated on it via `unlockChallengeId`), in authored order. */
+	unlocksZones: string[];
 }
 
 export interface TypeGroup {
@@ -202,7 +205,8 @@ export function buildChallengeVM(ch: IChallenge, player?: IPlayerChallenge): Cha
 		typeAccent: challengeTypeColor(ch.challengeTypeId),
 		target: targetName(ch),
 		// A reward is only revealed (and inspectable) once its challenge completes.
-		reward: resolveReward(ch, completed)
+		reward: resolveReward(ch, completed),
+		unlocksZones: zonesUnlockedBy(ch.id, staticData.zones ?? []).map((z) => z.name)
 	};
 }
 
