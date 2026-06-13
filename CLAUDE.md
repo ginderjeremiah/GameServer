@@ -31,11 +31,15 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 
 When creating follow-up issues, add any of the follow tags (if applicable):
 
-- claude: this tag will mark things as something claude should prioritize. You should usually add this unless there is very serious design considerations that need to be made.
+- claude - this tag will mark things as something claude should prioritize. You should usually add this unless there is very serious design considerations that need to be made.
 - bug: This issue addresses an actual defect in the application. Do no use this for partially complete or otherwise unimplemented code.
-- tech debt: This issue is for refactoring or cleanup of existing code to increase code maintainability. In other words, there should be no tangible user-facing effect from the change.
-- enhancement: The issue implements new or previously unimplemented functionality.
-- spike: This issue is for researching a large-scale problem or refactor and creating new issues to resolve it
+- tech debt - This issue is for refactoring or cleanup of existing code to increase code maintainability. In other words, there should be no tangible user-facing effect from the change.
+- enhancement - The issue implements new or previously unimplemented functionality.
+- spike - This issue is for researching a large-scale problem or refactor and creating new issues to resolve it
+- scope: [small/medium/large] - Roughly alludes to the amount of changes required to complete the issue:
+  - small - Small, self-contained, low-risk, no unmet open-issue dependency.
+  - medium - Moderate scope, some design ambiguity, or multi-file but bounded.
+  - large - Big features, spikes, architectural decisions, or cross-issue dependencies.
 
 # Overall Project Guidelines
 
