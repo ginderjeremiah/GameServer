@@ -27,7 +27,19 @@ vi.mock('$stores', async () => {
 	};
 });
 
-const { listenCommand } = vi.hoisted(() => ({ listenCommand: vi.fn() }));
+const { listenCommand, unlistenSocketReplaced, unlistenChallengeCompleted } = vi.hoisted(() => {
+	const unlistenSocketReplaced = vi.fn();
+	const unlistenChallengeCompleted = vi.fn();
+	const listenCommand = vi.fn().mockImplementation((command: string) => {
+		if (command === 'SocketReplaced') {
+			return unlistenSocketReplaced;
+		}
+		if (command === 'ChallengeCompleted') {
+			return unlistenChallengeCompleted;
+		}
+	});
+	return { listenCommand, unlistenSocketReplaced, unlistenChallengeCompleted };
+});
 // Partial mock: keep $lib/api's real exports (other modules in the graph, e.g. $lib/common, rely on
 // them) but swap apiSocket for a stub whose listenCommand we can assert against.
 vi.mock('$lib/api', async (importOriginal) => ({
@@ -163,6 +175,14 @@ describe('startGame', () => {
 
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
 		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
+	});
+
+	it('stopGame unregisters SocketReplaced and ChallengeCompleted listeners', () => {
+		startGame();
+		void handleSocketReplaced();
+
+		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
+		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
 	});
 });
 

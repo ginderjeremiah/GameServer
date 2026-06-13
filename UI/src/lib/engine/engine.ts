@@ -2,7 +2,7 @@ import { onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { BattleEngine } from './battle/battle-engine';
-import { statify } from '$lib/common';
+import { statify, type Action } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
@@ -22,6 +22,9 @@ export const SESSION_REPLACED_TITLE = 'Session Replaced';
 export const SESSION_REPLACED_BODY =
 	'Another session has started elsewhere. You have been disconnected. You will be taken to the login screen.';
 
+let socketReplacedUnhook: Action | undefined;
+let challengeCompletedUnhook: Action | undefined;
+
 export const startGame = () => {
 	if (staticData.loaded) {
 		inventoryManager.initialize();
@@ -34,8 +37,8 @@ export const startGame = () => {
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
-		apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
-		apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
+		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
+		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
 	}
 };
 
@@ -87,6 +90,8 @@ const stopGame = () => {
 	battleEngine.stop();
 	statistics.reset();
 	playerChallenges.reset();
+	socketReplacedUnhook?.();
+	challengeCompletedUnhook?.();
 };
 
 const startLogicEngine = () => {
