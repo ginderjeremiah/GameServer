@@ -39,11 +39,11 @@
 </div>
 
 <script lang="ts">
-import { formatNum, attributeColor, attributeCode } from '$lib/common';
+import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import Stepper from './Stepper.svelte';
 import {
 	CORE_ATTRIBUTES,
-	attributeName,
 	derivedShortLabel,
 	derivedUnit,
 	perPointYields,
@@ -60,7 +60,7 @@ const { i, view }: Props = $props();
 const id = $derived(CORE_ATTRIBUTES[i]);
 const color = $derived(attributeColor(id));
 const code = $derived(attributeCode(id));
-const name = $derived(attributeName(id));
+const name = $derived(attributeName(id, staticData.attributes));
 
 const value = $derived(view.values[i]);
 const saved = $derived(view.savedValues[i]);

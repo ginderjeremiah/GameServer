@@ -12,7 +12,7 @@
 					{@const isChanged = from !== to}
 					<div class="stat" class:changed={isChanged}>
 						<div class="info">
-							<div class="name">{attributeName(d.id)}</div>
+							<div class="name">{attributeName(d.id, staticData.attributes)}</div>
 							<div class="fed-by">
 								{#each contributorsFor(d.id) as cid (cid)}
 									<span class="src" style="color: {attributeColor(cid)}">{attributeCode(cid)}</span>
@@ -33,12 +33,12 @@
 </div>
 
 <script lang="ts">
-import { formatNum, attributeColor, attributeCode } from '$lib/common';
+import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import {
 	DERIVED_GROUPS,
 	DERIVED_STATS,
 	CORE_ATTRIBUTES,
-	attributeName,
 	derivedUnit,
 	feedsFor,
 	type AttributesView,

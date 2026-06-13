@@ -15,10 +15,10 @@ const { mockPlayerManager, mockInventoryManager, staticData } = vi.hoisted(() =>
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
 vi.mock('$stores', () => ({ staticData }));
 
+import { attributeName } from '$lib/common';
 import {
 	AttributeBreakdownView,
 	BREAKDOWN_ATTRS,
-	attributeName,
 	buildPlayerModifiers,
 	fmtNum,
 	fmtSigned,

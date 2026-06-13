@@ -102,11 +102,10 @@
 </div>
 
 <script lang="ts">
-import { EAttribute } from '$lib/api';
 import {
 	attributeCode,
 	attributeColor,
-	attributeEnumName,
+	attributeName,
 	describeEffect,
 	effectDirectionColor,
 	formatNum
@@ -128,15 +127,12 @@ const full = $derived(view.equipped.length >= view.cap);
 
 const fmt = (n: number) => formatNum(Math.round(n));
 
-const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
-
 // One display description per authored effect, reusing the shared helper so wording/direction
 // match the battle tooltip's "On hit" lines; `id` is kept for a stable each-key.
 const effects = $derived(
 	(metrics?.skill.effects ?? []).map((effect) => ({
 		id: effect.id,
-		...describeEffect(effect, attributeName(effect.attributeId))
+		...describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
 	}))
 );
 
