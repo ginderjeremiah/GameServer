@@ -264,9 +264,11 @@ namespace Game.Application.Services
             return zone.IsUnlocked(completedChallengeIds);
         }
 
-        // Derives the simulation RNG seed from the battle-start timestamp. Shared by both start paths so
-        // seed generation stays in one place if it ever changes.
-        private static uint CreateBattleSeed(DateTime now) => (uint)(now.Ticks % uint.MaxValue);
+        // Derives the simulation RNG seed from the battle-start timestamp by truncating the 64-bit tick
+        // count to its low 32 bits. A modulo by uint.MaxValue (2^32 - 1) biases the fold — it can never
+        // produce uint.MaxValue and does not cleanly truncate — and this seed must reproduce identically
+        // under the frontend Mulberry32 port for battle-replay parity (#178). Shared by both start paths.
+        internal static uint CreateBattleSeed(DateTime now) => unchecked((uint)now.Ticks);
 
         private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
         {
