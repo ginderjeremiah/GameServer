@@ -5,20 +5,41 @@ import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
-const refresh = async (): Promise<IEnemy[]> => {
-	const enemies = await fetchSocketData('GetEnemies');
+/** An enemy plus the zones it is the dedicated boss of, derived from the zones' boss FK. */
+export interface WorkbenchEnemy extends IEnemy {
+	/**
+	 * Zone ids this enemy is the dedicated boss of (derived from each zone's `bossEnemyId`).
+	 * Read-only here — the assignment is authored on the zone side; this is the inverse view.
+	 */
+	bossZones: number[];
+}
+
+const refresh = async (): Promise<WorkbenchEnemy[]> => {
+	const [enemies, zones] = await Promise.all([fetchSocketData('GetEnemies'), fetchSocketData('GetZones')]);
 	staticData.enemies = enemies;
-	return enemies;
+	staticData.zones = zones;
+	return enemies.map((enemy) => ({
+		...enemy,
+		bossZones: zones.flatMap((zone) => (zone.bossEnemyId === enemy.id ? [zone.id] : []))
+	}));
 };
 
-export const enemyEntity: EntityConfig<IEnemy> = {
+export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 	key: 'enemies',
 	label: 'Enemies',
 	singular: 'Enemy',
 	glyph: 'skull',
 	blankName: 'Unnamed enemy',
 	retireable: true,
-	newItem: (id) => ({ id, name: '', isBoss: false, attributeDistribution: [], skillPool: [], spawns: [] }),
+	newItem: (id) => ({
+		id,
+		name: '',
+		isBoss: false,
+		attributeDistribution: [],
+		skillPool: [],
+		spawns: [],
+		bossZones: []
+	}),
 	listBadge: (e) => (e.isBoss ? 'Boss' : null),
 	badgeColor: () => 'var(--enemy-accent)',
 	meta: (e) => [
@@ -26,6 +47,15 @@ export const enemyEntity: EntityConfig<IEnemy> = {
 		['skill', e.skillPool.length],
 		['zone', e.spawns.length]
 	],
+	// Surface the dedicated-boss assignment (the inverse of the zone's boss FK) so it's
+	// visible here too; blank for an enemy that isn't any zone's dedicated boss.
+	headline: (e) => {
+		if (!e.bossZones.length) {
+			return '';
+		}
+		const names = e.bossZones.map((id) => staticData.zones?.[id]?.name ?? `#${id}`).join(', ');
+		return `Dedicated boss of ${names}`;
+	},
 	sections: [
 		{
 			key: 'identity',
@@ -103,7 +133,9 @@ export const enemyEntity: EntityConfig<IEnemy> = {
 			glyph: 'pin',
 			desc: 'Zones this enemy appears in',
 			count: (e) => e.spawns.length,
-			warn: (e) => (e.spawns.length ? null : 'Not assigned to any zone'),
+			// A boss appears in the world via a zone's dedicated-boss FK, not its random spawn
+			// table, so an assigned boss with no random spawns is valid — only warn when neither holds.
+			warn: (e) => (e.spawns.length || e.bossZones.length ? null : 'Not assigned to any zone'),
 			kind: 'table',
 			itemsKey: 'spawns',
 			addLabel: 'Assign zone',
@@ -135,7 +167,16 @@ export const enemyEntity: EntityConfig<IEnemy> = {
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: (e) => ({ ...e, attributeDistribution: [], skillPool: [], spawns: [] }),
+			// Strip the child collections and the derived (read-only) bossZones off the identity DTO.
+			toPrimaryDto: ({ id, name, isBoss, retiredAt }) => ({
+				id,
+				name,
+				isBoss,
+				attributeDistribution: [],
+				skillPool: [],
+				spawns: [],
+				retiredAt
+			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditEnemies', changes),
 			refresh,
 			childSavers: [

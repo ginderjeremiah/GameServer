@@ -26,7 +26,18 @@
 
 	{#if available.length > 0}
 		<div class="fld add-select">
-			<select class="sel" value="" onchange={(e) => add(+e.currentTarget.value)}>
+			<select
+				class="sel"
+				value=""
+				onchange={(e) => {
+					const { value } = e.currentTarget;
+					// The placeholder's empty value coerces to 0 — the same as the zero-based id of
+					// the first catalogue entry — so guard on the raw string before adding.
+					if (value !== '') {
+						add(+value);
+					}
+				}}
+			>
 				<option value="">＋ {section.addLabel}</option>
 				{#each available as entry (entry.id)}
 					<option value={entry.id}>{section.labelOf(entry)} · {section.metaOf(entry)}</option>
@@ -62,7 +73,8 @@ const catalogue = $derived(section.catalogue());
 const available = $derived(catalogue.filter((c) => !ids.includes(c.id) && !c.retired));
 
 const add = (id: number) => {
-	if (id && !ids.includes(id)) {
+	// No truthiness guard on `id`: ids are zero-based, so id 0 is a valid first entry.
+	if (!ids.includes(id)) {
 		store.patch(record.id, (draft) => {
 			(fieldsOf(draft)[itemsKey] as number[]).push(id);
 		});
