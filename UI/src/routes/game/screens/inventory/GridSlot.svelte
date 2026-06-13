@@ -25,11 +25,15 @@
 		onHoverLeave?.();
 	}}
 >
-	<CategoryGlyph
-		cat={item.itemCategoryId}
-		color={item.equipped ? tintColor('var(--text-primary)', 0.95) : tintColor('var(--text-primary)', 0.6)}
-		size={Math.round(size * 0.42)}
-	/>
+	{#if item.iconPath}
+		<img class="item-icon" src={item.iconPath} alt={item.name} />
+	{:else}
+		<CategoryGlyph
+			cat={item.itemCategoryId}
+			color={item.equipped ? tintColor('var(--text-primary)', 0.95) : tintColor('var(--text-primary)', 0.6)}
+			size={Math.round(size * 0.42)}
+		/>
+	{/if}
 
 	<button
 		class="fav-star"
@@ -158,6 +162,7 @@ const handleDragStart = (e: DragEvent) => {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	overflow: hidden;
 	transition:
 		box-shadow 120ms,
 		border-color 120ms,
@@ -166,6 +171,15 @@ const handleDragStart = (e: DragEvent) => {
 	&:active {
 		cursor: grabbing;
 	}
+}
+
+.item-icon {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.92;
 }
 
 .fav-star {

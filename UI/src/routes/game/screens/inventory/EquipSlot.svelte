@@ -38,7 +38,11 @@
 		}}
 	>
 		{#if item}
-			<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={20} />
+			{#if item.iconPath}
+				<img class="item-icon" src={item.iconPath} alt={item.name} />
+			{:else}
+				<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={40} />
+			{/if}
 			{#if hover}
 				<button class="unequip" title="Unequip" onclick={stopPropagation(() => onUnequip?.(slot.id))}>×</button>
 			{/if}
@@ -46,7 +50,7 @@
 				<span class="mod-count">{item.appliedMods.length}◈</span>
 			{/if}
 		{:else}
-			<CategoryGlyph cat={slot.category} color={tintColor('var(--text-primary)', 0.18)} size={19} />
+			<CategoryGlyph cat={slot.category} color={tintColor('var(--text-primary)', 0.18)} size={38} />
 		{/if}
 	</div>
 
@@ -138,14 +142,15 @@ const handleDrop = (e: DragEvent) => {
 
 .equip-tile {
 	position: relative;
-	width: 48px;
-	height: 48px;
+	width: 64px;
+	height: 64px;
 	flex-shrink: 0;
 	border: 1px dashed;
 	border-radius: 3px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	overflow: hidden;
 	transition: all 120ms;
 
 	&.filled {
@@ -160,6 +165,15 @@ const handleDrop = (e: DragEvent) => {
 	&.selected {
 		box-shadow: 0 0 0 1px var(--accent);
 	}
+}
+
+.item-icon {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.92;
 }
 
 .unequip {

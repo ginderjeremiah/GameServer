@@ -109,12 +109,12 @@ const isReady = (skill: Skill) => {
 	flex-direction: column;
 	align-items: center;
 	gap: 4px;
-	min-width: 46px;
+	min-width: 64px;
 }
 
 .skill-slot {
-	width: 46px;
-	height: 46px;
+	width: 64px;
+	height: 64px;
 	position: relative;
 	background: color-mix(in srgb, var(--white) 5%, transparent);
 	border: 1px solid var(--border-light);
