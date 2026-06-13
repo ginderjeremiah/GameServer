@@ -23,9 +23,10 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditZones([FromBody] List<Change<Zone>> changes)
         {
-            return _adminZones.SaveZones(changes)
+            var error = _adminZones.SaveZones(changes);
+            return error is null
                 ? ApiResponse.Success()
-                : ApiResponse.Error("Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.");
+                : ApiResponse.Error(error);
         }
 
         [HttpPost]
