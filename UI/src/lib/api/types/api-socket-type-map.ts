@@ -3,7 +3,9 @@
 
 import type {
 	IAttribute,
+	IAttributeUpdate,
 	IBattleLostResponse,
+	IBattlerAttribute,
 	IChallenge,
 	IChallengeBossRequest,
 	IChallengeCompletedModel,
@@ -43,6 +45,7 @@ export type ApiSocketResponseTypes = {
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
+	'UpdatePlayerStats': IBattlerAttribute[];
 };
 
 export type ApiSocketRequestTypes = {
@@ -52,6 +55,7 @@ export type ApiSocketRequestTypes = {
 	'SaveLogPreferences': ILogPreference[];
 	'SetItemFavorite': ISetItemFavoriteRequest;
 	'SetSelectedSkills': number[];
+	'UpdatePlayerStats': IAttributeUpdate[];
 };
 
 export type ApiSocketCommand = keyof ApiSocketResponseTypes;

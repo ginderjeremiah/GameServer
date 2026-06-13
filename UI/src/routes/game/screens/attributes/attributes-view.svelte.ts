@@ -21,7 +21,7 @@
    freely — any attribute can be decremented back to 0, refunding its points to
    the pool — so there is no respec cost or locked baseline here. */
 
-import { ApiRequest, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
+import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
 import { normalizeText } from '$lib/common';
 import { playerManager } from '$lib/engine';
@@ -299,8 +299,8 @@ export class AttributesView {
 		this.saving = true;
 		let result: IBattlerAttribute[] | undefined;
 		try {
-			const response = await new ApiRequest('Player/UpdatePlayerStats').post(updates);
-			if (response.status >= 200 && response.status < 300) {
+			const response = await apiSocket.sendSocketCommand('UpdatePlayerStats', updates);
+			if (!response.error) {
 				result = response.data;
 			}
 		} catch {

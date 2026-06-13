@@ -1,5 +1,3 @@
-using Game.Abstractions.Contracts;
-using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
 using Game.Api.Models.Player;
@@ -69,51 +67,6 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Player", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        }
-
-        [Fact]
-        public async Task UpdatePlayerStats_ValidUpdate_ReturnsUpdatedAttributes()
-        {
-            // Give extra stat points so we can allocate
-            var (authClient, _) = await CreateAuthenticatedPlayerAsync(
-                username: "statsuser", password: "statspass", statPointsGained: 106);
-            using var client = authClient;
-
-            var updates = new List<AttributeUpdate>
-            {
-                new() { AttributeId = (int)Game.Core.EAttribute.Strength, Amount = 3 },
-            };
-
-            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates, CancellationToken);
-
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>(CancellationToken);
-            Assert.NotNull(result);
-            Assert.Null(result.ErrorMessage);
-            Assert.NotNull(result.Data);
-
-            var attributes = result.Data.ToList();
-            Assert.NotEmpty(attributes);
-        }
-
-        [Fact]
-        public async Task UpdatePlayerStats_SpendMoreThanAvailable_ReturnsError()
-        {
-            var (authClient, _) = await CreateAuthenticatedPlayerAsync(
-                username: "overspend", password: "overspend");
-            using var client = authClient;
-
-            var updates = new List<AttributeUpdate>
-            {
-                new() { AttributeId = (int)Game.Core.EAttribute.Strength, Amount = 999 },
-            };
-
-            var response = await client.PostAsJsonAsync("/api/Player/UpdatePlayerStats", updates, CancellationToken);
-
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<BattlerAttribute>>(CancellationToken);
-            Assert.NotNull(result);
-            Assert.NotNull(result.ErrorMessage);
         }
 
         // The inventory endpoints exercise the HTTP adapter path only — routing, model binding, and the

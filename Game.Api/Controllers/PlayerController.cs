@@ -1,12 +1,9 @@
-using Game.Abstractions.Contracts;
-using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
 using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Application.Services;
 using Game.Core;
-using Game.Core.Players;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -77,26 +74,6 @@ namespace Game.Api.Controllers
             return success
                 ? ApiResponse.Success()
                 : ApiResponse.Error("Failed to remove modifier.");
-        }
-
-        [HttpPost]
-        public async Task<ApiEnumerableResponse<BattlerAttribute>> UpdatePlayerStats([FromBody] List<AttributeUpdate> changedAttributes)
-        {
-            var player = await _sessionService.LoadPlayer();
-            var success = await _playerService.TryUpdateAttributes(player, changedAttributes.Cast<IAttributeUpdate>());
-            if (!success)
-            {
-                return ApiResponse.Error("Unable to update player stats.");
-            }
-
-            var result = player.StatPoints.StatAllocations
-                .Select(a => new BattlerAttribute
-                {
-                    AttributeId = a.Attribute,
-                    Amount = (decimal)a.Amount,
-                });
-
-            return ApiResponse.Success(result);
         }
     }
 }
