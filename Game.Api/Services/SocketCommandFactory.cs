@@ -7,6 +7,17 @@ namespace Game.Api.Services
     public class SocketCommandFactory
     {
         private static readonly ConcurrentDictionary<string, Func<IServiceProvider, AbstractSocketCommand>> _socketCommandGenerators = [];
+        private static readonly ConcurrentDictionary<string, byte> _serverInitiatedCommandNames = [];
+
+        /// <summary>
+        /// Whether the named command is server-initiated only (<see cref="IServerInitiatedCommand"/>) and
+        /// must therefore be rejected on the inbound client path. An O(1) lookup against the set built once
+        /// at registration, so the inbound path pays no per-message reflection.
+        /// </summary>
+        public bool IsServerInitiatedOnly(string commandName)
+        {
+            return _serverInitiatedCommandNames.ContainsKey(commandName);
+        }
 
         /// <summary>
         /// Creates the requested socket command inside a fresh DI scope.
@@ -43,6 +54,11 @@ namespace Game.Api.Services
                 var compiledGenerator = commandGenerator.Compile();
 
                 _socketCommandGenerators.TryAdd(type.Name, compiledGenerator);
+
+                if (type.IsAssignableTo(typeof(IServerInitiatedCommand)))
+                {
+                    _serverInitiatedCommandNames.TryAdd(type.Name, 0);
+                }
             }
         }
     }

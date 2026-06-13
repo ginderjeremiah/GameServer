@@ -2,7 +2,7 @@
 
 namespace Game.Api.Sockets.Commands
 {
-    public class SocketReplaced : AbstractSocketCommand
+    public class SocketReplaced : AbstractSocketCommand, IServerInitiatedCommand
     {
         public override string Name { get; set; } = nameof(SocketReplaced);
 
