@@ -286,6 +286,37 @@ describe('AttributesView allocation', () => {
 	});
 });
 
+describe('AttributesView radar scale lock', () => {
+	// The radar maps a pointer position to a value through hexMax, so while a drag
+	// is in progress the scale must stay fixed — otherwise allocating points would
+	// rescale the radar and inflate the value under the pointer (#433).
+	it('pins hexMax to its lock-time value even as the draft grows', () => {
+		expect(view.hexMax).toBe(10); // peak 5 → 10
+		view.lockScale();
+		// Spend the whole pool on one axis; the unpinned scale would jump to 20.
+		view.setValue(idx.str, 15);
+		expect(view.values[idx.str]).toBe(15);
+		expect(view.hexMax).toBe(10); // still pinned
+	});
+
+	it('recomputes hexMax from the allocation once unlocked', () => {
+		view.lockScale();
+		view.setValue(idx.str, 15);
+		view.unlockScale();
+		expect(view.hexMax).toBe(20); // peak 15 → ceil(18/5)*5
+	});
+
+	it('captures the current scale at lock time, not a stale one', () => {
+		view.setValue(idx.str, 9); // peak 9 → 15 while unpinned
+		expect(view.hexMax).toBe(15);
+		view.lockScale();
+		view.setValue(idx.str, 5); // refund back down; the scale stays pinned at 15
+		expect(view.hexMax).toBe(15);
+		view.unlockScale();
+		expect(view.hexMax).toBe(10); // peak 5 again
+	});
+});
+
 describe('AttributesView mode persistence', () => {
 	it('defaults to guided and persists the chosen mode', () => {
 		expect(view.mode).toBe('guided');

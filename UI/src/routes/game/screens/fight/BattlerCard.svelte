@@ -9,7 +9,14 @@
 	</div>
 
 	<!-- HP Bar -->
-	<div class="hp-bar">
+	<div
+		class="hp-bar"
+		role="progressbar"
+		aria-label="{battler.name} health"
+		aria-valuenow={Math.round(battler.currentHealth)}
+		aria-valuemin={0}
+		aria-valuemax={maxHealth}
+	>
 		<div class="hp-disappearing" style:width="{healthPerc}%"></div>
 		<div class="hp-remaining" style:width="{healthPerc}%"></div>
 		<div class="hp-text">{healthText}</div>
@@ -38,7 +45,7 @@ const { battler, side }: Props = $props();
 
 const accent = $derived(side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
-const healthText = $derived(`${formatNum(battler.currentHealth)} / ${maxHealth}`);
+const healthText = $derived(`${formatNum(battler.currentHealth)} / ${formatNum(maxHealth)}`);
 const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100);
 </script>
 

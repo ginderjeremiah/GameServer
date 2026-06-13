@@ -25,7 +25,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, skillContributions, type Skill } from '$lib/battle';
-import { describeEffect, normalizeText } from '$lib/common';
+import { attributeEnumName, describeEffect } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -73,5 +73,5 @@ const effectLines = $derived(
 );
 
 const attributeName = (attrId: number) =>
-	staticData.attributes?.find((a) => a.id === attrId)?.name ?? normalizeText(EAttribute[attrId]);
+	staticData.attributes?.find((a) => a.id === attrId)?.name ?? attributeEnumName(attrId);
 </script>

@@ -24,6 +24,18 @@
 	</div>
 	<ProgressReadout {c} />
 	<RewardAffordance reward={c.reward} variant="tile" />
+	{#if c.unlocksZones.length > 0}
+		<div class="card-unlocks">
+			<span class="unlocks-label">Unlocks</span>
+			{#each c.unlocksZones as zoneName (zoneName)}
+				<span
+					class="unlocks-zone"
+					style:color={tintColor(c.typeAccent, 0.85)}
+					style:border="1px solid {tintColor(c.typeAccent, 0.3)}">Zone · {zoneName}</span
+				>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <script lang="ts">
@@ -95,5 +107,28 @@ const completedAtDisplay = $derived(
 	color: var(--text-tertiary);
 	margin-top: 6px;
 	line-height: 1.5;
+}
+
+.card-unlocks {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 7px;
+}
+
+.unlocks-label {
+	font-family: var(--mono);
+	font-size: 8.5px;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.unlocks-zone {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 0.5px;
+	border-radius: 2px;
+	padding: 1px 6px;
 }
 </style>

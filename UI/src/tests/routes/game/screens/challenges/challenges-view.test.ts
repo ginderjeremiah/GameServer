@@ -24,7 +24,7 @@ const { staticData } = vi.hoisted(() => ({
 		items: [] as IItem[],
 		itemMods: [] as IItemMod[],
 		enemies: [] as { id: number; name: string }[],
-		zones: [] as { id: number; name: string }[],
+		zones: [] as { id: number; name: string; order?: number; unlockChallengeId?: number }[],
 		skills: [] as { id: number; name: string }[]
 	}
 }));
@@ -135,6 +135,39 @@ describe('resolveReward', () => {
 		expect(reward?.mod?.id).toBe(213);
 	});
 
+	it('resolves a skill reward with the neutral skill accent and "Skill" sub-line', () => {
+		const ch = challenge({
+			id: 7,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 2
+		});
+		const reward = resolveReward(ch, true);
+		expect(reward).toMatchObject({ kind: 'skill', revealed: true, name: 'Firebolt', sub: 'Skill' });
+		expect(reward?.accent).toBe('var(--accent-light)');
+		expect(reward?.skill?.id).toBe(2);
+	});
+
+	it('honours the revealed flag for a skill reward', () => {
+		const ch = challenge({
+			id: 8,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 2
+		});
+		expect(resolveReward(ch, false)?.revealed).toBe(false);
+	});
+
+	it('returns null when the rewarded skill is missing from the pool', () => {
+		const ch = challenge({
+			id: 8,
+			name: 'Pyromancer',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			rewardSkillId: 999
+		});
+		expect(resolveReward(ch, true)).toBeNull();
+	});
+
 	it('returns null when the challenge has no reward', () => {
 		expect(
 			resolveReward(challenge({ id: 99, name: 'No Reward', challengeTypeId: EChallengeType.EnemiesKilled }), true)
@@ -204,6 +237,17 @@ describe('buildChallengeVM', () => {
 		const vm = buildChallengeVM(staticData.challenges[2], { challengeId: 9, progress: 52, completed: false });
 		expect(vm.prog.atMost).toBe(true);
 		expect(vm.prog.target).toBe(60);
+	});
+
+	it('lists the zones the challenge unlocks (gated on it), in authored order', () => {
+		staticData.zones = [];
+		staticData.zones[40] = { id: 40, name: 'Sunken Vault', order: 4, unlockChallengeId: 1 };
+		staticData.zones[30] = { id: 30, name: 'Ashen Pass', order: 3, unlockChallengeId: 1 };
+		staticData.zones[20] = { id: 20, name: 'Other', order: 2, unlockChallengeId: 2 };
+
+		expect(buildChallengeVM(staticData.challenges[0]).unlocksZones).toEqual(['Ashen Pass', 'Sunken Vault']);
+		// A challenge that gates no zone reports none.
+		expect(buildChallengeVM(staticData.challenges[2]).unlocksZones).toEqual([]);
 	});
 });
 

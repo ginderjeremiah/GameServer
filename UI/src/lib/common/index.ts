@@ -1,6 +1,7 @@
 export * from './functions';
 export * from './rarity';
 export * from './challenge-type';
+export * from './challenge-unlocks';
 export * from './zone-progression';
 export * from './attribute-display';
 export * from './skill-effect-display';

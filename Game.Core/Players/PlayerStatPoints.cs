@@ -37,7 +37,17 @@ namespace Game.Core.Players
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             var availablePoints = StatPointsGained - StatPointsUsed;
-            var matchedAttributes = StatAllocations.Select(att => (att, upd: changedAttributes.FirstOrDefault(chg => chg.Attribute == att.Attribute)));
+            // Index the updates by attribute once (first update wins per attribute, matching the prior
+            // FirstOrDefault), then materialize the matched pairs so the Sum/All/foreach below run a single pass.
+            var updatesByAttribute = new Dictionary<EAttribute, IAttributeUpdate>();
+            foreach (var update in changedAttributes)
+            {
+                updatesByAttribute.TryAdd(update.Attribute, update);
+            }
+
+            var matchedAttributes = StatAllocations
+                .Select(att => (att, upd: updatesByAttribute.GetValueOrDefault(att.Attribute)))
+                .ToList();
             var changedPoints = matchedAttributes.Sum(match => match.upd?.Amount ?? 0);
             if (availablePoints - changedPoints >= 0 && matchedAttributes.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
             {

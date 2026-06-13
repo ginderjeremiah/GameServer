@@ -67,7 +67,7 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { attributeColor, normalizeText } from '$lib/common';
+import { attributeColor, attributeEnumName } from '$lib/common';
 import { staticData } from '$stores';
 import { SKILL_SORTS, type SkillsView } from './skills-view.svelte';
 
@@ -78,7 +78,7 @@ type Props = {
 const { view }: Props = $props();
 
 const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+	staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
 
 /** Escape closes the open filter overlay (the backdrop click / Apply are the other paths). */
 const onKeydown = (e: KeyboardEvent) => {

@@ -18,6 +18,12 @@ Attributes are somewhat of a work-in-progress feature, but the general idea is t
 
 The attribute system is the substrate for timed skill effects (see [Skills](#skills)): applying an effect adds a real attribute modifier to the target mid-battle and expiry removes it, so derived attributes cascade naturally (a temporary Strength buff also raises MaxHealth, exactly like a permanent one). Damage-over-time and heal-over-time are realized the same way, through two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — that an end-of-tick simulator phase consumes (a poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration). See [Skill Effects](#skill-effects) for the DoT/HoT runtime rules.
 
+## Experience Rewards
+
+The XP a victory awards scales with how well the enemy is matched to the player's power, so fighting something around (or above) your level pays off and grinding trivial enemies does not. The reward (`DefeatRewards`, computed server-side and sent to the client) is the enemy's attribute power times a difficulty multiplier derived from the ratio of the enemy's power to the player's: within a ±20% band the multiplier is `1`, and outside it the reward scales quadratically with the ratio (over-level enemies pay out more, under-level enemies far less).
+
+"Power" on both sides is measured the same way — **the sum of the additive *core* attribute amounts** (Strength, Endurance, Intellect, Agility, Dexterity, Luck). Comparing like with like is the key invariant: derived attributes (e.g. MaxHealth) are excluded because they are computed *from* the core attributes (counting both double-counts the same investment, and a player's derived attributes are not part of their raw modifier set), and multiplicative modifiers are excluded because their amount is a scaling factor rather than a flat point total. Notably the player's measure is their **allocated** attribute total (allocations plus equipment), **not** the count of stat points they have been granted — a new player's starter allocation counts even though it was never "gained" from a level-up.
+
 # Skills
 
 Skills are a fairly underdeveloped feature in the game, but the general idea is that they will provide active abilities for players that are automatically used during battles. Beyond dealing damage, a skill can carry **timed effects** — buffs/debuffs that raise or lower an attribute on the caster or the opponent for a duration (see [Skill Effects](#skill-effects)).

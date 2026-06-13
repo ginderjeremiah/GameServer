@@ -1,10 +1,20 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EItemCategory, EItemModType, ERarity, type IItemMod } from '$lib/api';
+import {
+	EAttribute,
+	EItemCategory,
+	EItemModType,
+	ERarity,
+	EModifierType,
+	ESkillEffectTarget,
+	type IItemMod,
+	type ISkill
+} from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import type { Item } from '$lib/battle';
 import SealedItemTooltip from '$routes/game/screens/challenges/SealedItemTooltip.svelte';
 import SealedModTooltip from '$routes/game/screens/challenges/SealedModTooltip.svelte';
+import SealedSkillTooltip from '$routes/game/screens/challenges/SealedSkillTooltip.svelte';
 import SealedHeader from '$routes/game/screens/challenges/SealedHeader.svelte';
 
 const makeItem = (over: Partial<Item> = {}): Item =>
@@ -33,6 +43,30 @@ const makeItem = (over: Partial<Item> = {}): Item =>
 		),
 		...over
 	}) as unknown as Item;
+
+const makeSkill = (over: Partial<ISkill> = {}): ISkill => ({
+	id: 1,
+	name: 'Firebolt',
+	baseDamage: 12,
+	description: 'Hidden.',
+	damageMultipliers: [
+		{ attributeId: EAttribute.Intellect, multiplier: 1.5 },
+		{ attributeId: EAttribute.Dexterity, multiplier: 0.5 }
+	],
+	effects: [
+		{
+			id: 1,
+			target: ESkillEffectTarget.Self,
+			attributeId: EAttribute.Strength,
+			modifierTypeId: EModifierType.Additive,
+			amount: 5,
+			durationMs: 5000
+		}
+	],
+	cooldownMs: 3000,
+	iconPath: '',
+	...over
+});
 
 const makeMod = (over: Partial<IItemMod> = {}): IItemMod => ({
 	id: 1,
@@ -113,6 +147,30 @@ describe('SealedModTooltip', () => {
 
 	it('omits the effects section for a mod with no attributes', () => {
 		const { container } = render(SealedModTooltip, { props: { mod: makeMod({ attributes: [] }) } });
+		expect(container.querySelector('.tt-qmark')).toBeNull();
+	});
+});
+
+describe('SealedSkillTooltip', () => {
+	it('accents the panel with the neutral skill hue and masks the name', () => {
+		const { container } = render(SealedSkillTooltip, { props: { skill: makeSkill() } });
+		expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
+			'var(--accent-light)'
+		);
+		expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('?????????');
+		expect((container.querySelector('.tt-category-label') as HTMLElement).textContent).toBe('Skill');
+	});
+
+	it('teases one masked row per scaling attribute and per effect', () => {
+		const { container } = render(SealedSkillTooltip, { props: { skill: makeSkill() } });
+		// Two damage multipliers + one effect → three masked rows.
+		expect(container.querySelectorAll('.tt-qmark')).toHaveLength(3);
+	});
+
+	it('omits the scaling and on-hit sections for a skill with neither', () => {
+		const { container } = render(SealedSkillTooltip, {
+			props: { skill: makeSkill({ damageMultipliers: [], effects: [] }) }
+		});
 		expect(container.querySelector('.tt-qmark')).toBeNull();
 	});
 });

@@ -1,5 +1,5 @@
 import { IBattlerAttribute, EAttribute } from '$lib/api';
-import { normalizeText } from '$lib/common';
+import { attributeEnumName } from '$lib/common';
 import {
 	STATIC_ATTRIBUTE_MODIFIERS,
 	EModifierType,
@@ -78,7 +78,7 @@ export class BattleAttributes {
 
 	public getAttributeMap = (includeZeroes: boolean = false) => {
 		return this.attributeValues
-			.map((att, i) => ({ name: normalizeText(EAttribute[i]), value: att }))
+			.map((att, i) => ({ name: attributeEnumName(i), value: att }))
 			.filter((att) => att.value != 0 || includeZeroes);
 	};
 

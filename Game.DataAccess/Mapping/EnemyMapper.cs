@@ -41,8 +41,6 @@ namespace Game.DataAccess.Mapping
             int level,
             IReadOnlyList<EntitySkill> allSkills)
         {
-            var skillLookup = allSkills.ToDictionary(s => s.Id);
-
             return new Enemy
             {
                 Id = entity.Id,
@@ -56,9 +54,13 @@ namespace Game.DataAccess.Mapping
                         BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
+                // The cached skill list is the zero-based, contiguous-id reference set (docs/backend.md
+                // → Reference Data), so a skill resolves by direct index instead of a per-call dictionary.
+                // The bounds check skips a malformed out-of-range ref, matching the prior skip-if-missing
+                // behaviour (a persisted EnemySkill.SkillId is FK-guaranteed in range, so it is defensive).
                 AvailableSkills = entity.EnemySkills
-                    .Where(es => skillLookup.ContainsKey(es.SkillId))
-                    .Select(es => SkillMapper.ToCore(skillLookup[es.SkillId]))
+                    .Where(es => es.SkillId >= 0 && es.SkillId < allSkills.Count)
+                    .Select(es => SkillMapper.ToCore(allSkills[es.SkillId]))
                     .ToList(),
             };
         }

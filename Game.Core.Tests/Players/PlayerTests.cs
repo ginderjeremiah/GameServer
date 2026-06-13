@@ -322,6 +322,21 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
+        public void TrySetSelectedSkills_DuplicateAtCapBoundary_ReturnsFalseAndRaisesNoEvent()
+        {
+            // A full-size loadout whose duplicate is the last pair — exercises the nested duplicate scan
+            // across the whole list, not just an early-out at the front.
+            var player = MakePlayerWithUnlockedSkills(1, 2, 3, 4);
+            player.ClearEvents();
+
+            var result = player.TrySetSelectedSkills([1, 2, 3, 1]);
+
+            Assert.False(result);
+            Assert.Empty(player.SelectedSkills);
+            Assert.Empty(player.DomainEvents.OfType<SelectedSkillsChangedEvent>());
+        }
+
+        [Fact]
         public void TrySetSelectedSkills_NotUnlockedId_ReturnsFalseAndRaisesNoEvent()
         {
             var player = MakePlayerWithUnlockedSkills(1, 2, 3);

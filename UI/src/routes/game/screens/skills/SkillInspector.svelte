@@ -106,10 +106,10 @@ import { EAttribute } from '$lib/api';
 import {
 	attributeCode,
 	attributeColor,
+	attributeEnumName,
 	describeEffect,
 	effectDirectionColor,
-	formatNum,
-	normalizeText
+	formatNum
 } from '$lib/common';
 import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
@@ -129,7 +129,7 @@ const full = $derived(view.equipped.length >= view.cap);
 const fmt = (n: number) => formatNum(Math.round(n));
 
 const attributeName = (id: EAttribute) =>
-	staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+	staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
 
 // One display description per authored effect, reusing the shared helper so wording/direction
 // match the battle tooltip's "On hit" lines; `id` is kept for a stable each-key.

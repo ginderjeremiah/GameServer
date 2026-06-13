@@ -23,7 +23,7 @@
 
 import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
-import { normalizeText } from '$lib/common';
+import { attributeEnumName } from '$lib/common';
 import { playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -140,7 +140,7 @@ export function radarValueAtPointer(
 /** The display name for an attribute, preferring the live reference data and
  *  falling back to a normalised enum key (e.g. `MaxHealth` → `Max Health`). */
 export function attributeName(id: EAttribute): string {
-	return staticData.attributes?.find((a) => a.id === id)?.name ?? normalizeText(EAttribute[id]);
+	return staticData.attributes?.find((a) => a.id === id)?.name ?? attributeEnumName(id);
 }
 
 /** Compact labels for the dense theorycraft "per point" line. Falls back to the
@@ -178,6 +178,9 @@ export class AttributesView {
 	saved = $state(false);
 	/** True while a save request is in flight (guards against double-submit). */
 	saving = $state(false);
+	/** While a radar drag is active the scale is pinned to the value captured at
+	 *  gesture start (see {@link lockScale}); null when unpinned. */
+	#lockedHexMax = $state<number | null>(null);
 
 	#flashTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -212,8 +215,10 @@ export class AttributesView {
 	readonly derived = $derived(deriveStats(this.draft));
 	readonly savedDerived = $derived(deriveStats(this.committed));
 
-	/** A radar scale that keeps the build shape readable as values grow. */
-	readonly hexMax = $derived(computeHexMax(this.draft, this.committed));
+	/** A radar scale that keeps the build shape readable as values grow, pinned to
+	 *  a fixed value for the duration of a drag so allocating points mid-gesture
+	 *  can't rescale the radar (see {@link lockScale}). */
+	readonly hexMax = $derived(this.#lockedHexMax ?? computeHexMax(this.draft, this.committed));
 
 	isDirtyIndex(i: number): boolean {
 		return this.draft[i] !== this.committed[i];
@@ -263,6 +268,18 @@ export class AttributesView {
 		} else if (delta < 0) {
 			this.dec(i, -delta);
 		}
+	}
+
+	/** Pin the radar scale to its current value for the duration of a drag, so
+	 *  points allocated mid-gesture can't rescale the radar and shift the
+	 *  pointer→value mapping out from under the pointer (#433). */
+	lockScale(): void {
+		this.#lockedHexMax = computeHexMax(this.draft, this.committed);
+	}
+
+	/** Release the pinned scale so it tracks the allocation again. */
+	unlockScale(): void {
+		this.#lockedHexMax = null;
 	}
 
 	setMode(mode: AttributeMode): void {

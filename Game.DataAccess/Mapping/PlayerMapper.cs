@@ -112,8 +112,7 @@ namespace Game.DataAccess.Mapping
                         .FirstOrDefault(s => (int)s.Value == ui.EquipmentSlotId.Value);
                     if (eSlot is not null)
                     {
-                        eSlot.Item = coreItem;
-                        eSlot.ItemId = ui.ItemId;
+                        eSlot.Set(coreItem);
                     }
                 }
             }

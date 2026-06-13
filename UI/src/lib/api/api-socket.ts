@@ -38,7 +38,9 @@ type InFlightRequest = {
 export class ApiSocket {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	private socketCommandQueue: ApiSocketRequest<any>[] = [];
-	private inFlightRequests: InFlightRequest[] = [];
+	// Keyed by command id so a response is an O(1) lookup and a settled request can be pruned (rather
+	// than scanned for and left in an ever-growing array over a long, chatty session).
+	private inFlightRequests = new Map<string, InFlightRequest>();
 	private commandCounter = 0;
 	private commandHooks: Partial<{
 		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
@@ -114,7 +116,7 @@ export class ApiSocket {
 		if (socket && socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
-				this.inFlightRequests.push({ startTime: performance.now(), command: request });
+				this.inFlightRequests.set(request.id, { startTime: performance.now(), command: request });
 				socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
@@ -142,15 +144,27 @@ export class ApiSocket {
 			}
 
 			if (data.id) {
-				const request = this.inFlightRequests.find((c) => c.command.id === data.id);
-				if (request) {
-					request.command.resolve(data);
-					console.debug(`Response to '${request.command.commandName}' received after ${now - request.startTime}ms.`);
+				const inFlight = this.inFlightRequests.get(data.id);
+				if (inFlight) {
+					// Prune as soon as it resolves so the map can't grow without bound over a long session.
+					this.inFlightRequests.delete(data.id);
+					inFlight.command.resolve(data);
+					console.debug(`Response to '${inFlight.command.commandName}' received after ${now - inFlight.startTime}ms.`);
 				}
 			}
 		} catch (ex) {
 			console.error('Failed to handle socket response', ex);
 		}
+	}
+
+	/** Resolves every still-pending in-flight request with an error response and clears the tracking map.
+	 *  Reuses the transport's resolve-with-error contract (rather than rejecting) so existing callers handle
+	 *  a dropped connection through the same `response.error` path they already use for server errors. */
+	private settleInFlightRequests(error: string) {
+		for (const { command } of this.inFlightRequests.values()) {
+			command.settleWithError(error);
+		}
+		this.inFlightRequests.clear();
 	}
 
 	private handleError(ev: Event) {
@@ -166,6 +180,12 @@ export class ApiSocket {
 	 * against a server that keeps closing the connection.
 	 */
 	private handleClose(ev: CloseEvent) {
+		// A command sent before the drop will never get a response on this dead socket, and we deliberately
+		// don't blind-resend (commands like DefeatEnemy aren't idempotent). Settle each pending request with
+		// an error so the awaiting caller surfaces a toast / retries instead of hanging forever. Queued-but-
+		// unsent commands are untouched, so the auth-retry path below still re-sends them on reconnect.
+		this.settleInFlightRequests('Connection lost. Please try again.');
+
 		if (this.socketOpened || this.socketAuthRetried || ev.code === NORMAL_CLOSURE) {
 			return;
 		}

@@ -1306,6 +1306,64 @@ namespace Game.Api.Tests.Integration
             Assert.Equal("Item mod not found.", result.ErrorMessage);
         }
 
+        [Fact]
+        public async Task SetTagsForItem_RemovesUnlistedTag_LeavesOtherItemsTagged()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemA = await TestDataSeeder.CreateItemAsync(context, "Item A");
+            var itemB = await TestDataSeeder.CreateItemAsync(context, "Item B");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "Shared");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Both items carry the shared tag.
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemA.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemB.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+
+            // Re-set item A to drop the tag.
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItem",
+                new { Id = itemA.Id, TagIds = Array.Empty<int>() }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Item A lost the tag; item B must keep it.
+            Assert.Empty(await GetTagsForItem(itemA.Id));
+            var bTags = await GetTagsForItem(itemB.Id);
+            var remaining = Assert.Single(bTags);
+            Assert.Equal(tag.Id, remaining.Id);
+        }
+
+        [Fact]
+        public async Task SetTagsForItemMod_RemovesUnlistedTag_LeavesOtherModsTagged()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var modA = await TestDataSeeder.CreateItemModAsync(context, "Mod A");
+            var modB = await TestDataSeeder.CreateItemModAsync(context, "Mod B");
+            var tag = await TestDataSeeder.CreateTagAsync(context, "SharedMod");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Both mods carry the shared tag.
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modA.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+            await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modB.Id, TagIds = new[] { tag.Id } }, CancellationToken);
+
+            // Re-set mod A to drop the tag.
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetTagsForItemMod",
+                new { Id = modA.Id, TagIds = Array.Empty<int>() }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Mod A lost the tag; mod B must keep it.
+            Assert.Empty(await GetTagsForItemMod(modA.Id));
+            var bTags = await GetTagsForItemMod(modB.Id);
+            var remaining = Assert.Single(bTags);
+            Assert.Equal(tag.Id, remaining.Id);
+        }
+
         private async Task<List<Tag>> GetTagsForItem(int itemId)
         {
             using var scope = CreateScope();
@@ -1349,6 +1407,484 @@ namespace Game.Api.Tests.Integration
             var changes = Array.Empty<object>();
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        // -------------------------------------------------------------------------------------------------
+        // Coverage fill (#407): the admin repositories' edit/retire field-mapping paths and the not-found
+        // guards their controllers map to a user-facing error. These pin the easy-to-get-subtly-wrong
+        // hand-mapping (a save→read-back round-trip) and the false-returning branches callers depend on.
+        // -------------------------------------------------------------------------------------------------
+
+        [Fact]
+        public async Task AddEditChallenges_EditRetireReinstate_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var challenge = await TestDataSeeder.CreateChallengeAsync(context, "Original"); // Id 0, EnemiesKilled, goal 10
+            var rewardItem = await TestDataSeeder.CreateItemAsync(context, "Trophy");
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = GetChallenges();
+
+            // Every field is re-mapped on edit; only RetiredAt differs between the three saves below.
+            Task<HttpResponseMessage> SaveChallenge(DateTime? retiredAt) =>
+                authClient.PostAsJsonAsync("/api/AdminTools/AddEditChallenges", new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            challenge.Id,
+                            Name = "Renamed",
+                            Description = "Updated description.",
+                            ChallengeTypeId = (int)EChallengeType.BossesDefeated,
+                            TargetEntityId = (int?)null,
+                            ProgressGoal = 42m,
+                            RewardItemId = (int?)rewardItem.Id,
+                            RewardItemModId = (int?)null,
+                            RewardSkillId = (int?)null,
+                            RetiredAt = retiredAt
+                        },
+                        ChangeType = 1 // Edit
+                    }
+                }, CancellationToken);
+
+            // Edit in place — editing record 0 must not insert a duplicate, and every field round-trips.
+            Assert.Equal(HttpStatusCode.OK, (await SaveChallenge(null)).StatusCode);
+            var after = GetChallenges();
+            Assert.Equal(before.Count, after.Count);
+            var edited = Assert.Single(after, c => c.Id == challenge.Id);
+            Assert.Equal("Renamed", edited.Name);
+            Assert.Equal("Updated description.", edited.Description);
+            Assert.Equal(EChallengeType.BossesDefeated, edited.Type.Id);
+            Assert.Equal(42m, edited.ProgressGoal);
+            Assert.Equal(rewardItem.Id, edited.RewardItemId);
+            Assert.Null(edited.RetiredAt);
+
+            // Retiring is an ordinary edit that stamps RetiredAt; the challenge stays resolvable by id.
+            Assert.Equal(HttpStatusCode.OK, (await SaveChallenge(DateTime.UtcNow)).StatusCode);
+            Assert.NotNull(Assert.Single(GetChallenges(), c => c.Id == challenge.Id).RetiredAt);
+
+            // Reinstating clears it.
+            Assert.Equal(HttpStatusCode.OK, (await SaveChallenge(null)).StatusCode);
+            Assert.Null(Assert.Single(GetChallenges(), c => c.Id == challenge.Id).RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditTags_EditTag_UpdatesNameAndCategory()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var tag = await TestDataSeeder.CreateTagAsync(context, "Old", ETagCategory.Accessory);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new { tag.Id, Name = "New", TagCategoryId = (int)ETagCategory.Armor },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditTags", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var edited = Assert.Single(await GetTags(), t => t.Id == tag.Id);
+            Assert.Equal("New", edited.Name);
+            Assert.Equal((int)ETagCategory.Armor, edited.TagCategoryId);
+        }
+
+        [Fact]
+        public async Task AddEditItems_EditRetireReinstate_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Original"); // Id 0, Weapon/Common
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = GetItems();
+
+            Task<HttpResponseMessage> SaveItem(DateTime? retiredAt) =>
+                authClient.PostAsJsonAsync("/api/AdminTools/AddEditItems", new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            item.Id,
+                            Name = "Renamed",
+                            Description = "Updated",
+                            ItemCategoryId = (int)EItemCategory.Helm,
+                            RarityId = (int)ERarity.Rare,
+                            IconPath = "items/new.png",
+                            Attributes = Array.Empty<object>(),
+                            ModSlots = Array.Empty<object>(),
+                            Tags = Array.Empty<int>(),
+                            RetiredAt = retiredAt
+                        },
+                        ChangeType = 1 // Edit
+                    }
+                }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItem(null)).StatusCode);
+            var after = GetItems();
+            Assert.Equal(before.Count, after.Count); // editing record 0 must not insert a new item
+            var edited = Assert.Single(after, i => i.Id == item.Id);
+            Assert.Equal("Renamed", edited.Name);
+            Assert.Equal(EItemCategory.Helm, edited.ItemCategoryId);
+            Assert.Equal(ERarity.Rare, edited.RarityId);
+            Assert.Null(edited.RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItem(DateTime.UtcNow)).StatusCode);
+            Assert.NotNull(Assert.Single(GetItems(), i => i.Id == item.Id).RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItem(null)).StatusCode);
+            Assert.Null(Assert.Single(GetItems(), i => i.Id == item.Id).RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditItemAttributes_UnknownItem_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new { Id = 999999, Changes = Array.Empty<object>() };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task AddEditItemAttributes_EditOrDeleteAbsentAttribute_LeavesAttributesUnchanged()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Sword"); // Strength = 5
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Editing/deleting attributes the item doesn't have are guarded no-ops (the .Any() match fails),
+            // so the batch succeeds without touching the existing Strength attribute.
+            var data = new
+            {
+                Id = item.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Agility, Amount = 9m }, ChangeType = 1 }, // Edit absent
+                    new { Item = new { AttributeId = (int)EAttribute.Endurance, Amount = 0m }, ChangeType = 2 } // Delete absent
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemAttributes", data, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var saved = Assert.Single(GetItems(), i => i.Id == item.Id);
+            var attribute = Assert.Single(saved.Attributes);
+            Assert.Equal(EAttribute.Strength, attribute.AttributeId);
+            Assert.Equal(5m, attribute.Amount);
+        }
+
+        [Fact]
+        public async Task AddEditItemModSlots_EditAndDelete_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var item = await TestDataSeeder.CreateItemAsync(context, "Slotted");
+            var slot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id, EItemModType.Prefix);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Edit the slot's type in place.
+            var edit = new[]
+            {
+                new
+                {
+                    Item = new { slot.Id, ItemId = item.Id, ItemModSlotTypeId = (int)EItemModType.Suffix },
+                    ChangeType = 1 // Edit
+                }
+            };
+            var editResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModSlots", edit, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
+            var afterEdit = Assert.Single(GetItems(), i => i.Id == item.Id);
+            Assert.Equal(EItemModType.Suffix, Assert.Single(afterEdit.ModSlots).ItemModSlotTypeId);
+
+            // Delete it.
+            var delete = new[]
+            {
+                new
+                {
+                    Item = new { slot.Id, ItemId = item.Id, ItemModSlotTypeId = (int)EItemModType.Suffix },
+                    ChangeType = 2 // Delete
+                }
+            };
+            var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModSlots", delete, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+            Assert.Empty(Assert.Single(GetItems(), i => i.Id == item.Id).ModSlots);
+        }
+
+        [Fact]
+        public async Task AddEditItemMods_EditRetireReinstate_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemMod = await TestDataSeeder.CreateItemModAsync(context, "Original"); // Id 0, Prefix/Common
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = GetItemMods();
+
+            Task<HttpResponseMessage> SaveItemMod(DateTime? retiredAt) =>
+                authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemMods", new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            itemMod.Id,
+                            Name = "Renamed",
+                            Description = "Updated",
+                            ItemModTypeId = (int)EItemModType.Suffix,
+                            RarityId = (int)ERarity.Rare,
+                            Attributes = Array.Empty<object>(),
+                            Tags = Array.Empty<int>(),
+                            RetiredAt = retiredAt
+                        },
+                        ChangeType = 1 // Edit
+                    }
+                }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItemMod(null)).StatusCode);
+            var after = GetItemMods();
+            Assert.Equal(before.Count, after.Count);
+            var edited = Assert.Single(after, m => m.Id == itemMod.Id);
+            Assert.Equal("Renamed", edited.Name);
+            Assert.Equal(EItemModType.Suffix, edited.ItemModTypeId);
+            Assert.Equal(ERarity.Rare, edited.RarityId);
+            Assert.Null(edited.RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItemMod(DateTime.UtcNow)).StatusCode);
+            Assert.NotNull(Assert.Single(GetItemMods(), m => m.Id == itemMod.Id).RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveItemMod(null)).StatusCode);
+            Assert.Null(Assert.Single(GetItemMods(), m => m.Id == itemMod.Id).RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditItemModAttributes_UnknownItemMod_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new { Id = 999999, Changes = Array.Empty<object>() };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemModAttributes", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item Mod does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetSkillMultipliers_UnknownSkill_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new { Id = 999999, Changes = Array.Empty<object>() };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillMultipliers", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Skill does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetSkillMultipliers_AddAndDelete_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball"); // seeds Strength x1.0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Add a second multiplier alongside the seeded Strength one.
+            var add = new
+            {
+                Id = skill.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Agility, Amount = 2.0m }, ChangeType = 0 } // Add
+                }
+            };
+            var addResponse = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillMultipliers", add, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, addResponse.StatusCode);
+
+            var afterAdd = Assert.Single(GetSkills(), s => s.Id == skill.Id);
+            Assert.Equal(2, afterAdd.DamageMultipliers.Count());
+            var added = Assert.Single(afterAdd.DamageMultipliers, m => m.AttributeId == EAttribute.Agility);
+            Assert.Equal(2.0m, added.Multiplier);
+
+            // Delete it again, leaving only the seeded Strength multiplier.
+            var delete = new
+            {
+                Id = skill.Id,
+                Changes = new[]
+                {
+                    new { Item = new { AttributeId = (int)EAttribute.Agility, Amount = 2.0m }, ChangeType = 2 } // Delete
+                }
+            };
+            var deleteResponse = await authClient.PostAsJsonAsync("/api/AdminTools/SetSkillMultipliers", delete, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            var afterDelete = Assert.Single(GetSkills(), s => s.Id == skill.Id);
+            Assert.Equal(EAttribute.Strength, Assert.Single(afterDelete.DamageMultipliers).AttributeId);
+        }
+
+        [Fact]
+        public async Task AddEditZones_EditRetireReinstate_RoundTripsThroughTheDatabase()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Original"); // Id 0
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+            var before = GetZones();
+
+            Task<HttpResponseMessage> SaveZone(DateTime? retiredAt) =>
+                authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", new[]
+                {
+                    new
+                    {
+                        Item = new
+                        {
+                            zone.Id,
+                            Name = "Renamed",
+                            Description = "Updated",
+                            Order = 7,
+                            LevelMin = 15,
+                            LevelMax = 25,
+                            BossEnemyId = (int?)null,
+                            BossLevel = 1,
+                            UnlockChallengeId = (int?)null,
+                            RetiredAt = retiredAt
+                        },
+                        ChangeType = 1 // Edit
+                    }
+                }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveZone(null)).StatusCode);
+            var after = GetZones();
+            Assert.Equal(before.Count, after.Count);
+            var edited = Assert.Single(after, z => z.Id == zone.Id);
+            Assert.Equal("Renamed", edited.Name);
+            Assert.Equal(7, edited.Order);
+            Assert.Equal(15, edited.LevelMin);
+            Assert.Equal(25, edited.LevelMax);
+            Assert.Null(edited.RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveZone(DateTime.UtcNow)).StatusCode);
+            Assert.NotNull(Assert.Single(GetZones(), z => z.Id == zone.Id).RetiredAt);
+
+            Assert.Equal(HttpStatusCode.OK, (await SaveZone(null)).StatusCode);
+            Assert.Null(Assert.Single(GetZones(), z => z.Id == zone.Id).RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditZones_WithValidUnlockChallenge_PersistsGate()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var challenge = await TestDataSeeder.CreateChallengeAsync(context); // Id 0 — a valid in-range gate
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Gated Zone",
+                        Description = "Sealed until the challenge is met.",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5,
+                        BossEnemyId = (int?)null,
+                        BossLevel = 1,
+                        UnlockChallengeId = (int?)challenge.Id
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var saved = Assert.Single(GetZones(), z => z.Name == "Gated Zone");
+            Assert.Equal(challenge.Id, saved.UnlockChallengeId);
+        }
+
+        [Fact]
+        public async Task AddEditZones_WithOutOfRangeUnlockChallenge_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // No challenge with this id exists, so the in-range index check rejects the whole batch.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Phantom Gate",
+                        Description = "x",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5,
+                        BossEnemyId = (int?)null,
+                        BossLevel = 1,
+                        UnlockChallengeId = (int?)999999
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.DoesNotContain(GetZones(), z => z.Name == "Phantom Gate");
+        }
+
+        [Fact]
+        public async Task SetZoneEnemies_UnknownZone_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new { ZoneId = 999999, ZoneEnemies = Array.Empty<object>() };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetZoneEnemies", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Zone not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetEnemySkills_UnknownEnemy_ReturnsError()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var data = new { EnemyId = 999999, SkillIds = Array.Empty<int>() };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/SetEnemySkills", data, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
         }
     }
 }

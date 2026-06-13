@@ -33,11 +33,7 @@ namespace Game.Api.Sockets.Commands
             var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>());
 
             var allocations = player.StatPoints.StatAllocations
-                .Select(a => new BattlerAttribute
-                {
-                    AttributeId = a.Attribute,
-                    Amount = (decimal)a.Amount,
-                })
+                .Select(allocation => BattlerAttribute.From(allocation.Attribute, allocation.Amount))
                 .ToList();
 
             return success
