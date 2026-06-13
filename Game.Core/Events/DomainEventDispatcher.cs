@@ -39,6 +39,7 @@ namespace Game.Core.Events
             // until the aggregate is quiescent so those secondary events are dispatched in this same
             // cycle; otherwise they linger on the aggregate until the next save, delaying their
             // persistence and any client notification driven off them.
+            var failures = new List<Exception>();
             var iterations = 0;
             while (aggregateRoot.DomainEvents.Count > 0)
             {
@@ -50,11 +51,28 @@ namespace Game.Core.Events
 
                 var events = aggregateRoot.DomainEvents.ToArray();
                 aggregateRoot.ClearEvents();
-                await DispatchAsync(events, cancellationToken);
+                await DispatchBatchAsync(events, failures, cancellationToken);
             }
+
+            ThrowIfAnyHandlerFailed(failures);
         }
 
         public async Task DispatchAsync(IEnumerable<IDomainEvent> events, CancellationToken cancellationToken = default)
+        {
+            var failures = new List<Exception>();
+            await DispatchBatchAsync(events, failures, cancellationToken);
+            ThrowIfAnyHandlerFailed(failures);
+        }
+
+        /// <summary>
+        /// Dispatches each event in <paramref name="events"/> to every registered handler, isolating each
+        /// handler invocation so one handler throwing cannot prevent the remaining handlers (or later
+        /// events in the batch, or events the drain loop raises afterwards) from being dispatched. Any
+        /// thrown exceptions are collected into <paramref name="failures"/> for the caller to surface once
+        /// the whole batch (or drain) has run, rather than aborting the dispatch and silently dropping the
+        /// undispatched events.
+        /// </summary>
+        private async Task DispatchBatchAsync(IEnumerable<IDomainEvent> events, List<Exception> failures, CancellationToken cancellationToken)
         {
             foreach (var domainEvent in events)
             {
@@ -65,10 +83,26 @@ namespace Game.Core.Events
                     {
                         foreach (var handler in handlers)
                         {
-                            await handler(_serviceProvider, domainEvent, cancellationToken);
+                            try
+                            {
+                                await handler(_serviceProvider, domainEvent, cancellationToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                failures.Add(ex);
+                            }
                         }
                     }
                 }
+            }
+        }
+
+        private static void ThrowIfAnyHandlerFailed(List<Exception> failures)
+        {
+            if (failures.Count > 0)
+            {
+                throw new AggregateException(
+                    "One or more domain event handlers failed during dispatch.", failures);
             }
         }
 
