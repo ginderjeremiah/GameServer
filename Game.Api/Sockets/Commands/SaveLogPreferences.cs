@@ -29,7 +29,7 @@ namespace Game.Api.Sockets.Commands
                 return Error("Unknown log type.");
             }
 
-            var player = await context.Session.LoadPlayer();
+            var player = context.Session.Player;
             await _playerService.SaveLogPreferences(
                 player,
                 Parameters.Select(p => new CoreLogPreference { LogType = p.Id, Enabled = p.Enabled }));

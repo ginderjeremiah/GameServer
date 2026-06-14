@@ -1,5 +1,4 @@
 using Game.Abstractions.DataAccess;
-using Game.Application.Services;
 using Game.Core.Players;
 
 namespace Game.Api.Services
@@ -8,9 +7,8 @@ namespace Game.Api.Services
     /// Manages authentication state and player identity for the current request.
     /// This is a presentation-layer concern (cookies, tokens, session identity).
     /// </summary>
-    public class SessionService(PlayerService playerService, ISessionStore sessionStore)
+    public class SessionService(ISessionStore sessionStore)
     {
-        private readonly PlayerService _playerService = playerService;
         private readonly ISessionStore _sessionStore = sessionStore;
         private Player? _player;
 
@@ -77,10 +75,19 @@ namespace Game.Api.Services
             Roles = [];
         }
 
-        public async Task<Player> LoadPlayer()
+        /// <summary>
+        /// The player aggregate for this session. On a socket connection it is loaded once up front when the
+        /// socket connects (<c>SocketInterceptorMiddleware</c>) and held in memory for the connection's
+        /// lifetime, so socket commands read it synchronously and the connection never re-reads the cache per
+        /// command (see docs/backend.md -> Caching and Pub/Sub). Throws if accessed before <see cref="SetPlayer"/>.
+        /// </summary>
+        public Player Player => _player
+            ?? throw new InvalidOperationException("Player has not been loaded for this session.");
+
+        /// <summary>Stores the loaded player aggregate on the session for synchronous access by commands.</summary>
+        public void SetPlayer(Player player)
         {
-            return _player ??= await _playerService.LoadPlayer(SelectedPlayerId)
-                ?? throw new InvalidOperationException("Player data not loaded.");
+            _player = player;
         }
 
         public void CreateSession(int userId, int playerId)

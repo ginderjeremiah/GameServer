@@ -1,4 +1,5 @@
-﻿using Game.Api.Services;
+using Game.Api.Services;
+using Game.Application.Services;
 
 namespace Game.Api.Middleware
 {
@@ -9,11 +10,7 @@ namespace Game.Api.Middleware
         /// <summary>
         /// The application request pipeline hook.
         /// </summary>
-        /// <param name="context"></param>
-        /// <param name="sessionService"></param>
-        /// <param name="socketManager"></param>
-        /// <returns></returns>
-        public async Task InvokeAsync(HttpContext context, SessionService sessionService, SocketManagerService socketManager)
+        public async Task InvokeAsync(HttpContext context, SessionService sessionService, SocketManagerService socketManager, IServiceScopeFactory scopeFactory)
         {
             if (context.Request.Path != "/socket")
             {
@@ -27,6 +24,12 @@ namespace Game.Api.Middleware
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
             }
+            else if (!await TryLoadPlayer(sessionService, scopeFactory))
+            {
+                // An authenticated session whose player can't be loaded can't play, so fail before
+                // upgrading the socket rather than erroring on the first command.
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            }
             else
             {
                 using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
@@ -34,6 +37,26 @@ namespace Game.Api.Middleware
                 await socketContext.WaitSocketClosed();
                 await socketManager.UnRegisterSocket(socketContext);
             }
+        }
+
+        /// <summary>
+        /// Loads the player aggregate up front into the session so socket commands read it synchronously for
+        /// the connection's lifetime (the connection never re-reads the cache per command). The load runs in a
+        /// disposable scope so its <c>GameContext</c> is not held open for the whole connection. Returns false
+        /// when the authenticated player has no loadable aggregate.
+        /// </summary>
+        private static async Task<bool> TryLoadPlayer(SessionService sessionService, IServiceScopeFactory scopeFactory)
+        {
+            using var scope = scopeFactory.CreateScope();
+            var player = await scope.ServiceProvider.GetRequiredService<PlayerService>()
+                .LoadPlayer(sessionService.SelectedPlayerId);
+            if (player is null)
+            {
+                return false;
+            }
+
+            sessionService.SetPlayer(player);
+            return true;
         }
     }
 

@@ -20,7 +20,7 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<BattleLostResponse>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var state = context.Session.PlayerState;
-            var player = await context.Session.LoadPlayer();
+            var player = context.Session.Player;
 
             if (!state.HasActiveBattle)
             {
