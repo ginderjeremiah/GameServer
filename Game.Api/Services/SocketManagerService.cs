@@ -128,9 +128,23 @@ namespace Game.Api.Services
                         _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
                         await socket.ExecuteCommand(nextCommandInfo);
                     }
+                    catch (OperationCanceledException ex)
+                    {
+                        // A cancellation reaching here is the socket tearing down (a lifetime cancel escaping
+                        // ExecuteCommand), not a command defect — log as informational and keep draining rather
+                        // than raising a misleading error for a normal cancel. This is a defensive backstop:
+                        // ExecuteCommand already absorbs both a command's own fault and its per-command timeout,
+                        // and no lifetime token is plumbed into it today, so in practice this branch is unhit.
+                        _logger.LogDebug(ex, "Socket command processing was cancelled: {CommandInfo}", nextCommandInfo);
+                    }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "An error occured while executing a socket command: {CommandInfo}", nextCommandInfo);
+                        // Backstop for a genuine fault that escapes ExecuteCommand: log and keep draining the
+                        // queue. ExecuteCommand handles command faults itself (error response to the client), so
+                        // server-initiated (pub/sub) command failures have no client surfacing or dead-lettering
+                        // here today; escalation is tracked as follow-up. See docs/backend.md →
+                        // "Challenge-completion notifications (server push)".
+                        _logger.LogError(ex, "An error occurred while executing a socket command: {CommandInfo}", nextCommandInfo);
                     }
 
                     nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
