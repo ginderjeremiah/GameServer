@@ -113,6 +113,18 @@ namespace Game.Core.Tests.Enemies
             Assert.Throws<InvalidOperationException>(() => _ = enemy.BattleSkills);
         }
 
+        [Fact]
+        public void SetBattleSkills_UnknownSkillId_ThrowsDescriptiveInvalidOperation()
+        {
+            // A snapshot id no longer among the enemy's available skills (e.g. SetEnemySkills changed the
+            // loadout between battle start and validation) fails meaningfully rather than with a bare
+            // KeyNotFoundException from the dictionary indexer.
+            var enemy = MakeEnemy(Skills(3));
+
+            var ex = Assert.Throws<InvalidOperationException>(() => enemy.SetBattleSkills([0, 99]));
+            Assert.Contains("99", ex.Message);
+        }
+
         private static List<Skill> Skills(int count) =>
             [.. Enumerable.Range(0, count).Select(MakeSkill)];
 

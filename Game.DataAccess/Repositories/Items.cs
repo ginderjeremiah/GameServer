@@ -18,8 +18,7 @@ namespace Game.DataAccess.Repositories
 
         public Item? LookupItem(int itemId)
         {
-            var items = Entities;
-            return items.Count <= itemId || itemId < 0 ? null : items[itemId];
+            return Entities.Lookup(itemId);
         }
 
         public CoreItem GetItem(int itemId)
@@ -28,7 +27,7 @@ namespace Game.DataAccess.Repositories
             // per call. The model is reference data treated as immutable by every caller (the battle path
             // composes modifiers into a separate AttributeCollection; applied mods live on the player's
             // UnlockedItemSlot, never on the shared Item.ModSlots), so sharing is safe.
-            return holder.Current.CoreItems[itemId];
+            return holder.Current.CoreItems.GetById(itemId, "item");
         }
     }
 }

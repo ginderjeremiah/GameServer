@@ -15,7 +15,7 @@ namespace Game.DataAccess.Repositories
 
         public Challenge GetChallenge(int challengeId)
         {
-            return holder.Current[challengeId];
+            return holder.Current.GetById(challengeId, "challenge");
         }
     }
 }
