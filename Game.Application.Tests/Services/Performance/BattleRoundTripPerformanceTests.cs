@@ -1,13 +1,16 @@
 using System.Diagnostics;
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Application;
 using Game.Application.Services;
 using Game.Core.Players;
+using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Game.Application.Tests.Services.Performance
@@ -18,11 +21,11 @@ namespace Game.Application.Tests.Services.Performance
     /// simulator in isolation with stubbed dependencies), these measure the synchronous I/O the response
     /// path actually pays per battle and log a per-phase breakdown so the write-behind spike has data:
     /// <list type="bullet">
-    ///   <item><c>EndBattleVictory</c> — sim + progress <c>Load</c> (2 SELECTs) + progress <c>Save</c>
-    ///   staging + <c>SavePlayer</c> (Redis publishes + cache write).</item>
-    ///   <item><c>CommitAsync</c> — the Postgres write (<c>SaveChanges</c>) flushing the staged
-    ///   stat/challenge rows.</item>
-    ///   <item>progress <c>Load</c> — the cold 2-SELECT read, isolated.</item>
+    ///   <item><c>EndBattleVictory</c> — sim + progress <c>Load</c> (a cache hit since #556) + progress
+    ///   <c>Save</c> (cache write + one queued event) + <c>SavePlayer</c> (Redis publish + cache write).</item>
+    ///   <item><c>CommitAsync</c> — the per-command unit-of-work commit; a no-op for progress since the
+    ///   write-behind moved the stat/challenge DB write off the response path (#556).</item>
+    ///   <item>progress <c>Load</c> — measured both as a warm cache hit and a cold cache-miss DB reload.</item>
     ///   <item><c>SavePlayer</c> — the Redis publish + cache write, isolated.</item>
     /// </list>
     /// This test intentionally runs a short, lopsided victory whose simulation is sub-ms, so these figures
@@ -98,18 +101,17 @@ namespace Game.Application.Tests.Services.Performance
         }
 
         [Fact]
-        public async Task ProgressLoad_Cold_TwoSelectReads()
+        public async Task ProgressLoad_CacheHit_ServedFromCache()
         {
             var fixture = await SeedBattleFixtureAsync();
-            // Run a few battles so the player has a realistic spread of stat/challenge rows to read back.
+            // The battles populate the progress cache via write-behind Save, so every Load below is a hit —
+            // the common case since #556, and what makes the per-battle progress read effectively free.
             await RunBattlesAsync(fixture, count: 5);
 
             var stats = new List<double>(SampleCount);
 
             for (var i = 0; i < WarmupIterations + SampleCount; i++)
             {
-                // A fresh scope means a cold IPlayerProgressRepository (its per-scope snapshot cache is empty),
-                // so every measured Load issues the two real SELECT round trips rather than a cached read.
                 using var scope = CreateScope();
                 var (_, player) = await LoadPlayerAsync(scope, fixture.PlayerId);
                 var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
@@ -124,8 +126,59 @@ namespace Game.Application.Tests.Services.Performance
                 stats.Add(await TimeAsync(() => progressRepo.Load(player)));
             }
 
-            LogStats("Progress Load (cold, 2 SELECT round trips)", stats);
+            LogStats("Progress Load (cache hit)", stats);
             Assert.NotEmpty(stats);
+        }
+
+        [Fact]
+        public async Task ProgressLoad_CacheMiss_ReloadsFromDatabase()
+        {
+            var fixture = await SeedBattleFixtureAsync();
+            await RunBattlesAsync(fixture, count: 5);
+            // The harness disables the synchronizer, so drain the write-behind queue into the DB by hand —
+            // a cache miss must have real rows (a realistic battle-generated spread) to reload.
+            await DrainPlayerUpdateQueueAsync();
+
+            var key = $"{Constants.CACHE_PROGRESS_PREFIX}_{fixture.PlayerId}";
+            var stats = new List<double>(SampleCount);
+
+            for (var i = 0; i < WarmupIterations + SampleCount; i++)
+            {
+                using var scope = CreateScope();
+                var (_, player) = await LoadPlayerAsync(scope, fixture.PlayerId);
+                var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+                // Evict the progress key so this Load is a true cache miss — the two SELECT reloads + re-cache.
+                await cache.Delete(key);
+
+                if (i < WarmupIterations)
+                {
+                    await progressRepo.Load(player);
+                    continue;
+                }
+
+                Settle();
+                stats.Add(await TimeAsync(() => progressRepo.Load(player)));
+            }
+
+            LogStats("Progress Load (cache miss -> DB reload, 2 SELECTs)", stats);
+            Assert.NotEmpty(stats);
+        }
+
+        // Drains the player update queue into the database via the synchronizer (the hosted service is
+        // disabled in the integration harness), so cache-miss reloads have persisted rows to read.
+        private async Task DrainPlayerUpdateQueueAsync()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider,
+                pubsub,
+                scope.ServiceProvider.GetRequiredService<ILogger<DataProviderSynchronizer>>(),
+                new PlayerUpdateRetryPolicy(maxAttempts: 3, baseDelay: TimeSpan.Zero));
+
+            await synchronizer.ProcessQueue(pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         [Fact]

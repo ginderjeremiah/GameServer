@@ -41,8 +41,12 @@ namespace Game.Infrastructure.PubSub.Redis
         public async Task Publish(string channel, string queueName, string queueData)
         {
             var queue = GetQueue(queueName);
+            // The queue write is the durable part and stays awaited. The channel publish is only a wake
+            // signal for the queue consumer, and Redis pub/sub is already at-most-once (awaiting it confirms
+            // the command was sent, not that any subscriber received it), so it is fire-and-forget: the data
+            // is safely enqueued regardless, and the consumer drains the whole queue on its next wake (#552).
             await queue.AddToQueueAsync(queueData);
-            await Redis.PublishAsync(RedisChannel.Literal(channel), "");
+            await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
         }
 
         public async Task Publish<T>(string channel, string queueName, T queueData)
