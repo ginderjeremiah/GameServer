@@ -57,6 +57,41 @@ namespace Game.Api.Tests.CodeGen
         Pending = 3
     }
 
+    // A byte-backed enum: casting its members to int (the old enum-rendering path) would have worked
+    // here but throwing/truncation risk exists for larger backing types; this pins that the raw
+    // constant value is rendered regardless of backing type.
+    public enum ByteBackedEnum : byte
+    {
+        Zero = 0,
+        TwoHundred = 200
+    }
+
+    // A long-backed enum with a value outside the int range: the old (int)value cast would overflow,
+    // so this pins that GetRawConstantValue renders the true value.
+    public enum LongBackedEnum : long
+    {
+        Small = 1,
+        Huge = 5_000_000_000
+    }
+
+    // An enum with an aliased member (two names sharing a value): rendering from field.Name keeps both
+    // distinct names, where value.ToString() would have emitted the same canonical name twice.
+    public enum AliasedEnum
+    {
+        First = 1,
+        Second = 2,
+        AliasOfFirst = 1
+    }
+
+    // A model whose property types (byte, char) have no TypeScript mapping and are rejected by
+    // NeedsInterface (they are primitives), so GetTypeText must throw rather than emit a reference to an
+    // interface that is never generated.
+    public class ModelWithUnmappedType : IModel
+    {
+        public byte ByteValue { get; set; }
+        public char CharValue { get; set; }
+    }
+
     public class NestedModel : IModel
     {
         public SimpleModel Child { get; set; } = new();
@@ -114,6 +149,32 @@ namespace Game.Api.Tests.CodeGen
         public ApiResponse Save([FromBody] SimpleModel model)
         {
             return new ApiResponse();
+        }
+    }
+
+    // Resolves to the route "api/Prefix" (no [action]); pins that the "api/" prefix is removed cleanly
+    // to "Prefix" with no leading slash and no dropped character (the route["api/".Length..] slice).
+    [Route("/api/[controller]")]
+    [ApiController]
+    public class PrefixController : ControllerBase
+    {
+        [HttpGet]
+        public ApiResponse<SimpleModel> Get()
+        {
+            return new ApiResponse<SimpleModel>();
+        }
+    }
+
+    // Resolves to a route that does NOT start with "api/"; pins that such a route is left intact rather
+    // than being silently mis-sliced.
+    [Route("/health/[action]")]
+    [ApiController]
+    public class NonApiRouteController : ControllerBase
+    {
+        [HttpGet]
+        public ApiResponse<SimpleModel> Check()
+        {
+            return new ApiResponse<SimpleModel>();
         }
     }
 

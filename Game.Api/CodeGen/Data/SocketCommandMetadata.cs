@@ -1,4 +1,5 @@
 ﻿using Game.Api.Sockets.Commands;
+using System.Reflection;
 
 namespace Game.Api.CodeGen.Data
 {
@@ -12,16 +13,27 @@ namespace Game.Api.CodeGen.Data
         {
             CommandName = socketCommand.Name;
 
-            var method = socketCommand.GetMethods().FirstOrDefault(m => m.Name == nameof(AbstractSocketCommandWithResponseData<>.HandleExecute));
-            if (method is not null)
+            // Resolve the response/parameter members against the typed generic bases rather than by raw
+            // member name: that way a rename or an added overload of HandleExecute/Parameters surfaces as
+            // a missed extraction or a loud error here instead of silently mis-extracting a same-named
+            // member, and the generic argument is read with a guarded index.
+            if (socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommandWithResponseData<>)) is not null)
             {
-                ResponseDescriptor = new CodeGenTypeDescriptor(method.ReturnParameter.GetNullabilityInfo().GenericTypeArguments[0]);
+                var method = socketCommand.GetMethod(nameof(AbstractSocketCommandWithResponseData<>.HandleExecute));
+                if (method is not null && method.ReturnParameter.GetNullabilityInfo().GenericTypeArguments is [var responseArg, ..])
+                {
+                    ResponseDescriptor = new CodeGenTypeDescriptor(responseArg);
+                }
             }
 
-            var property = socketCommand.GetProperties().FirstOrDefault(p => p.Name == nameof(AbstractSocketCommandWithParams<>.Parameters));
-            if (property is not null)
+            if (socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommandWithParams<>)) is not null
+                || socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommand<,>)) is not null)
             {
-                ParameterDescriptor = new CodeGenTypeDescriptor(property);
+                var property = socketCommand.GetProperty(nameof(AbstractSocketCommandWithParams<>.Parameters));
+                if (property is not null)
+                {
+                    ParameterDescriptor = new CodeGenTypeDescriptor(property);
+                }
             }
         }
     }

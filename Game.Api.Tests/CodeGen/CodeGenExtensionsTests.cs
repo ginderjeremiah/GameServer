@@ -1,10 +1,38 @@
 using Game.Api.CodeGen;
+using Game.Api.Sockets.Commands;
 using Xunit;
 
 namespace Game.Api.Tests.CodeGen
 {
     public class CodeGenExtensionsTests
     {
+        [Fact]
+        public void GetClosedGenericBase_DirectBase_ReturnsClosedType()
+        {
+            var result = typeof(TestSocketCommandFull).GetClosedGenericBase(typeof(AbstractSocketCommand<,>));
+
+            Assert.NotNull(result);
+            Assert.Equal(typeof(AbstractSocketCommand<SimpleModel, SocketParamModel>), result);
+        }
+
+        [Fact]
+        public void GetClosedGenericBase_AncestorBase_WalksChain()
+        {
+            // AbstractSocketCommandWithResponseData<SimpleModel> is a grandparent of the full command.
+            var result = typeof(TestSocketCommandFull).GetClosedGenericBase(typeof(AbstractSocketCommandWithResponseData<>));
+
+            Assert.NotNull(result);
+            Assert.Equal(typeof(AbstractSocketCommandWithResponseData<SimpleModel>), result);
+        }
+
+        [Fact]
+        public void GetClosedGenericBase_NotDerived_ReturnsNull()
+        {
+            var result = typeof(TestSocketCommandBasic).GetClosedGenericBase(typeof(AbstractSocketCommandWithParams<>));
+
+            Assert.Null(result);
+        }
+
         [Fact]
         public void IsEnumerable_List_ReturnsTrue()
         {

@@ -16,6 +16,25 @@ namespace Game.Api.CodeGen
             return nullabilityContext.Create(parameter);
         }
 
+        /// <summary>
+        /// Walks <paramref name="type"/>'s base-class chain for the closed constructed type that
+        /// matches the supplied open generic base definition (e.g. <c>AbstractSocketCommand&lt;,&gt;</c>),
+        /// or <c>null</c> if the type does not derive from it. Used by the codegen to resolve a command's
+        /// response/parameter members against the typed generic base instead of by raw member name.
+        /// </summary>
+        internal static Type? GetClosedGenericBase(this Type type, Type openGenericBase)
+        {
+            for (var current = type; current is not null; current = current.BaseType)
+            {
+                if (current.IsGenericType && current.GetGenericTypeDefinition() == openGenericBase)
+                {
+                    return current;
+                }
+            }
+
+            return null;
+        }
+
         internal static bool NeedsInterface(this Type type)
         {
             if (type.IsEnumerable())

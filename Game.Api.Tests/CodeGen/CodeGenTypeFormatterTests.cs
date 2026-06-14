@@ -286,6 +286,24 @@ namespace Game.Api.Tests.CodeGen
             var descriptor = GetPropertyDescriptor<ModelWithDictionary>("StringToInt");
             Assert.Null(CodeGenTypeFormatter.GetImportText(descriptor));
         }
+
+        [Fact]
+        public void GetTypeText_UnmappedByte_Throws()
+        {
+            // byte has no TypeScript mapping and is rejected by NeedsInterface (it is a primitive), so the
+            // formatter must throw rather than silently emit a reference to a never-generated interface.
+            var descriptor = GetPropertyDescriptor<ModelWithUnmappedType>("ByteValue");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("Byte", ex.Message);
+        }
+
+        [Fact]
+        public void GetTypeText_UnmappedChar_Throws()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithUnmappedType>("CharValue");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("Char", ex.Message);
+        }
     }
 
     public class GenericHolder

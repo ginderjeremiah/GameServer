@@ -53,6 +53,28 @@ namespace Game.Api.Tests.CodeGen
             Assert.Null(metadata.ResponseDescriptor);
             Assert.Null(metadata.ParameterDescriptor);
         }
+
+        [Fact]
+        public void Constructor_DerivedCommand_ResolvesGenericBaseFromChain()
+        {
+            var metadata = new SocketCommandMetadata(typeof(TestSocketCommandDerivedFull));
+
+            Assert.NotNull(metadata.ResponseDescriptor);
+            Assert.NotNull(metadata.ParameterDescriptor);
+            Assert.Equal(typeof(SimpleModel), metadata.ResponseDescriptor.UnderlyingType);
+            Assert.Equal(typeof(SocketParamModel), metadata.ParameterDescriptor.UnderlyingType);
+        }
+
+        [Fact]
+        public void Constructor_DecoyMembers_NotExtractedWithoutGenericBase()
+        {
+            // Members named "Parameters"/"HandleExecute" that are not from the typed generic base must
+            // not be mistaken for the real descriptors.
+            var metadata = new SocketCommandMetadata(typeof(TestSocketCommandWithDecoyMembers));
+
+            Assert.Null(metadata.ResponseDescriptor);
+            Assert.Null(metadata.ParameterDescriptor);
+        }
     }
 
     public class SocketParamModel
@@ -94,6 +116,33 @@ namespace Game.Api.Tests.CodeGen
     public class TestSocketCommandBasic : AbstractSocketCommand
     {
         public override string Name { get; set; } = "TestBasic";
+
+        public override ApiSocketResponse Execute(SocketContext context)
+        {
+            return Success();
+        }
+    }
+
+    // A multi-level hierarchy: the response/parameter generic bases are not the direct base, so the
+    // metadata must walk the base chain to find the closed generic base rather than only inspecting it.
+    public class TestSocketCommandDerivedFull : TestSocketCommandFull
+    {
+        public override string Name { get; set; } = "TestDerivedFull";
+    }
+
+    // A basic command (no params/response generic base) that nonetheless declares members named
+    // "Parameters" and "HandleExecute". Resolving by raw member name would mis-extract these; gating on
+    // the typed generic base means neither descriptor is set.
+    public class TestSocketCommandWithDecoyMembers : AbstractSocketCommand
+    {
+        public override string Name { get; set; } = "TestDecoy";
+
+        public string Parameters { get; set; } = "";
+
+        public int HandleExecute(SocketContext context)
+        {
+            return 0;
+        }
 
         public override ApiSocketResponse Execute(SocketContext context)
         {

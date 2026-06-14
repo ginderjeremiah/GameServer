@@ -48,15 +48,16 @@ namespace Game.Api.CodeGen.Data
                 ? routeTemplate.Replace("[controller]", _name).Replace("[action]", endpoint.Name)
                 : $"/api/{_name}/{endpoint.Name}";
 
+            const string apiPrefix = "api/";
             route = route.TrimStart('/');
-            if (route.StartsWith("api/"))
+            if (route.StartsWith(apiPrefix))
             {
-                route = route[3..];
+                route = route[apiPrefix.Length..];
             }
 
             return new EndpointMetadata(endpoint)
             {
-                Endpoint = route.TrimStart('/'),
+                Endpoint = route,
                 IsGet = methodAtt?.HttpMethods?.Contains("GET") ?? true
             };
         }

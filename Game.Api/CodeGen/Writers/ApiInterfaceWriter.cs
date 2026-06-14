@@ -1,5 +1,6 @@
 ﻿using Game.Api.CodeGen.Data;
 using Game.Core;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 
@@ -97,14 +98,18 @@ namespace Game.Api.CodeGen.Writers
             var fields = descriptor.UnderlyingType.GetFields(BindingFlags.Public | BindingFlags.Static);
             foreach (var field in fields)
             {
-                var value = field.GetValue(null) ?? throw new InvalidOperationException($"Failed to get enum value for {descriptor.Name}->{field.Name}");
+                // Render from the member name and its declared raw constant value rather than casting
+                // to int: that keeps the right name for aliased members and avoids truncating/throwing
+                // on a non-int backing type (e.g. byte/long-backed enums) — the same approach
+                // ConstantsWriter.RenderValue takes.
+                var rawValue = field.GetRawConstantValue() ?? throw new InvalidOperationException($"Failed to get enum value for {descriptor.Name}->{field.Name}");
                 var obsoleteAttribute = field.GetCustomAttribute<ObsoleteAttribute>();
                 if (obsoleteAttribute is not null)
                 {
                     builder.AppendLine($"\t/** @deprecated {obsoleteAttribute.Message} */");
                 }
 
-                builder.AppendLine($"\t{value.ToString()} = {(int)value},");
+                builder.AppendLine($"\t{field.Name} = {Convert.ToString(rawValue, CultureInfo.InvariantCulture)},");
             }
 
             builder.Append('}');
