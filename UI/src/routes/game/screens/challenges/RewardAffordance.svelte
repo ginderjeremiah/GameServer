@@ -1,10 +1,11 @@
 {#if !reward}
 	<span class="no-reward">No reward</span>
 {:else if variant === 'chip'}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<span
+	<button
+		type="button"
 		class="chip"
 		class:hovered
+		aria-label={ariaLabel}
 		style:background={tintColor(accent, hovered ? 0.16 : 0.08)}
 		style:border="1px {reward.revealed ? 'solid' : 'dashed'}
 		{tintColor(accent, hovered ? 0.6 : 0.34)}"
@@ -12,20 +13,25 @@
 		onmouseenter={onEnter}
 		onmousemove={onMove}
 		onmouseleave={onLeave}
+		onfocus={onFocus}
+		onblur={onLeave}
 	>
 		<RewardIcon {reward} size={18} {glow} />
 		<span class="chip-name" style:color={accent}>{reward.revealed ? reward.name : '???'}</span>
-	</span>
+	</button>
 {:else}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
+	<button
+		type="button"
 		class="tile"
+		aria-label={ariaLabel}
 		style:background={tintColor(accent, hovered ? 0.1 : 0.05)}
 		style:border="1px {reward.revealed ? 'solid' : 'dashed'}
 		{tintColor(accent, hovered ? 0.6 : 0.3)}"
 		onmouseenter={onEnter}
 		onmousemove={onMove}
 		onmouseleave={onLeave}
+		onfocus={onFocus}
+		onblur={onLeave}
 	>
 		<RewardIcon {reward} size={46} {glow} animate={!reward.revealed} />
 		<div class="tile-text">
@@ -41,6 +47,7 @@
 		</div>
 		<svg
 			class="tile-info"
+			aria-hidden="true"
 			width="13"
 			height="13"
 			viewBox="0 0 16 16"
@@ -51,7 +58,7 @@
 			<circle cx="8" cy="8" r="6" />
 			<path d="M8 5.2v.2M8 7.4v3.4" stroke-linecap="round" />
 		</svg>
-	</div>
+	</button>
 {/if}
 
 <script lang="ts">
@@ -74,6 +81,15 @@ let hovered = $state(false);
 
 const accent = $derived(reward?.accent ?? 'var(--text-tertiary)');
 
+// Describe the reward for assistive tech: the revealed name, or a sealed teaser.
+const ariaLabel = $derived(
+	reward == null
+		? undefined
+		: reward.revealed
+			? `Reward: ${reward.name}, ${reward.sub}`
+			: `Sealed reward: ${reward.sub}`
+);
+
 const onEnter = (ev: MouseEvent) => {
 	hovered = true;
 	if (reward) {
@@ -81,6 +97,13 @@ const onEnter = (ev: MouseEvent) => {
 	}
 };
 const onMove = (ev: MouseEvent) => tooltip?.move(ev);
+// Keyboard focus opens the same tooltip, positioned off the element's box.
+const onFocus = (ev: FocusEvent) => {
+	hovered = true;
+	if (reward && ev.currentTarget instanceof HTMLElement) {
+		tooltip?.show(reward, ev.currentTarget);
+	}
+};
 const onLeave = () => {
 	hovered = false;
 	tooltip?.hide();
@@ -94,12 +117,27 @@ const onLeave = () => {
 	font-style: italic;
 }
 
+.chip,
+.tile {
+	// Reset native button chrome; the visual treatment is the inline rarity styles.
+	appearance: none;
+	margin: 0;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: help;
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+}
+
 .chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
 	padding: 4px 11px 4px 5px;
-	cursor: help;
 	max-width: 100%;
 	border-radius: 2px;
 	transition: all 120ms;
@@ -118,7 +156,7 @@ const onLeave = () => {
 	align-items: center;
 	gap: 13px;
 	padding: 10px 12px;
-	cursor: help;
+	width: 100%;
 	border-radius: 3px;
 	transition: all 130ms;
 }

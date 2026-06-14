@@ -63,7 +63,7 @@ import { Loading } from '$components';
 import { playerChallenges, registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
 import { onMount } from 'svelte';
 import { ChallengesView, type ResolvedReward } from './challenges-view.svelte';
-import { setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
+import { anchorPosition, setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
 import ChallengeDetailCard from './ChallengeDetailCard.svelte';
 import OverviewPane from './OverviewPane.svelte';
 import RewardTooltip from './RewardTooltip.svelte';
@@ -82,12 +82,12 @@ const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponen
 // One reward tooltip for the whole screen, driven through context so nested
 // reward affordances don't have to thread hover handlers down the tree.
 const controller: RewardTooltipController = {
-	show: (reward, ev) => {
+	show: (reward, anchor) => {
 		hoveredReward = reward;
-		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+		setTooltipPosition(anchorPosition(anchor));
 		showTooltip();
 	},
-	move: (ev) => setTooltipPosition({ x: ev.clientX, y: ev.clientY }),
+	move: (anchor) => setTooltipPosition(anchorPosition(anchor)),
 	hide: () => {
 		hoveredReward = undefined;
 		hideTooltip();
