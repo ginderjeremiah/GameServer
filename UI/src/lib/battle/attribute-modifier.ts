@@ -20,22 +20,25 @@ import { STATIC_ATTRIBUTE_MODIFIERS as GENERATED_STATIC_ATTRIBUTE_MODIFIERS } fr
 
 export { EModifierType, EAttributeModifierSource };
 
-/** A modifier whose amount is scaled by the final value of another attribute. */
+/** A modifier whose amount is scaled by the final value of another attribute.
+ *  Properties are `readonly`, mirroring the backend's immutable `AttributeModifier`
+ *  value object (#603): an instance is shared and added/removed whole, never mutated. */
 export interface DerivedAttributeModifier {
-	attribute: EAttribute;
-	amount: number;
-	type: EModifierType;
-	source: EAttributeModifierSource.Derived;
+	readonly attribute: EAttribute;
+	readonly amount: number;
+	readonly type: EModifierType;
+	readonly source: EAttributeModifierSource.Derived;
 	/** The attribute whose final value scales this modifier's amount. */
-	derivedSource: EAttribute;
+	readonly derivedSource: EAttribute;
 }
 
-/** A modifier with a fixed amount not derived from another attribute. */
+/** A modifier with a fixed amount not derived from another attribute. Properties are
+ *  `readonly`, mirroring the backend's immutable `AttributeModifier` value object (#603). */
 export interface BaseAttributeModifier {
-	attribute: EAttribute;
-	amount: number;
-	type: EModifierType;
-	source: Exclude<EAttributeModifierSource, EAttributeModifierSource.Derived>;
+	readonly attribute: EAttribute;
+	readonly amount: number;
+	readonly type: EModifierType;
+	readonly source: Exclude<EAttributeModifierSource, EAttributeModifierSource.Derived>;
 }
 
 /** Mirrors `Game.Core.Attributes.Modifiers.AttributeModifier`. Discriminated on
