@@ -271,7 +271,7 @@ export class ChallengesView {
 	sort = $state<SortKey>('progress');
 	playerChallenges = $state<IPlayerChallenge[]>([]);
 	loading = $state(true);
-	/** A failed `Challenges/Player` load — kept distinct from a genuine
+	/** A failed `GetPlayerChallenges` load — kept distinct from a genuine
 	 *  no-progress result so it isn't shown as a wall of zero-progress cards. */
 	error = $state(false);
 

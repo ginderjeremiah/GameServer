@@ -3,8 +3,8 @@
      entity in a stat card pivots to its dossier; clicking a stat in a dossier
      jumps back to its category.
 
-     Values come from GET /api/Statistics; the statistic-type catalogue and the
-     entity reference lists come from the in-memory staticData. A brand-new
+     Values come from the GetPlayerStatistics socket command; the statistic-type
+     catalogue and the entity reference lists come from the in-memory staticData. A brand-new
      player with no recorded statistics gets a friendly empty state. -->
 <div class="stats-frame" data-testid="statistics-screen">
 	<div class="header">

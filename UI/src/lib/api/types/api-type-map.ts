@@ -15,9 +15,7 @@ import type {
 	IItemModSlot,
 	ILoginCredentials,
 	ILoginResult,
-	IPlayerChallenge,
 	IPlayerData,
-	IPlayerStatistic,
 	IRefreshRequest,
 	IRole,
 	ISetEnemyAttributeDistributions,
@@ -58,7 +56,6 @@ export type ApiResponseTypes = {
 	'AdminTools/SetTagsForItemMod': undefined;
 	'AdminTools/SetUserRoles': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
-	'Challenges/Player': IPlayerChallenge[];
 	'Login': ILoginResult;
 	'Login/ActiveSession': IActiveSessionResult;
 	'Login/CreateAccount': undefined;
@@ -66,7 +63,6 @@ export type ApiResponseTypes = {
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
-	'Statistics': IPlayerStatistic[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 };
