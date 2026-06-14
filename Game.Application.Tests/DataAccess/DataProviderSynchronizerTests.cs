@@ -386,6 +386,78 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_ItemEquippedEvent_ClearsPriorOccupantAndEquipsIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var occupant = await TestDataSeeder.CreateItemAsync(context, name: "Occupant");
+            var incoming = await TestDataSeeder.CreateItemAsync(context, name: "Incoming");
+
+            // The slot already holds one item; the incoming item is unlocked but unequipped.
+            await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, occupant.Id, equipmentSlot: EEquipmentSlot.HelmSlot);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, incoming.Id, equipmentSlot: null);
+
+            var evt = new ItemEquippedEvent(player.Id, incoming.Id, (int)EEquipmentSlot.HelmSlot);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Delivered twice: the single-statement absolute upsert must converge — the incoming item holds the
+            // slot, the prior occupant is cleared, and re-applying changes nothing.
+            var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.UnlockedItems
+                .Where(ui => ui.PlayerId == player.Id)
+                .ToListAsync(CancellationToken);
+
+            Assert.Equal((int)EEquipmentSlot.HelmSlot, Assert.Single(rows, ui => ui.ItemId == incoming.Id).EquipmentSlotId);
+            Assert.Null(Assert.Single(rows, ui => ui.ItemId == occupant.Id).EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ItemEquippedEvent_MovingItemBetweenSlots_VacatesOldSlot()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+
+            // The item starts equipped in the Helm slot; the event re-equips it into the Chest slot.
+            await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id, equipmentSlot: EEquipmentSlot.HelmSlot);
+
+            var evt = new ItemEquippedEvent(player.Id, item.Id, (int)EEquipmentSlot.ChestSlot);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            await synchronizer.ProcessQueue(new InMemoryPubSubQueue(Serialize(evt)));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await verifyContext.UnlockedItems
+                .SingleAsync(ui => ui.PlayerId == player.Id && ui.ItemId == item.Id, CancellationToken);
+
+            // The item moved to the new slot; reassigning its own row vacates the old slot in the same statement.
+            Assert.Equal((int)EEquipmentSlot.ChestSlot, row.EquipmentSlotId);
+        }
+
+        [Fact]
         public async Task ProcessQueue_ModUnlockedEvent_InsertsUnlockedModIdempotently()
         {
             using var scope = CreateScope();
