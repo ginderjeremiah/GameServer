@@ -44,8 +44,7 @@ export const createHook = <T extends unknown[] = []>() => {
 	};
 
 	const onNotified = (callback: Action<[...T, Action]>, cleanupOnDestroy: boolean = true) => {
-		const tracker: HookTracker<T> = { callback, removed: false, unhook: () => {} };
-		tracker.unhook = () => {
+		const unhook = () => {
 			if (tracker.removed) {
 				return;
 			}
@@ -60,13 +59,14 @@ export const createHook = <T extends unknown[] = []>() => {
 				}
 			}
 		};
+		const tracker: HookTracker<T> = { callback, removed: false, unhook };
 		trackers.push(tracker);
 
 		if (cleanupOnDestroy) {
-			onDestroy(tracker.unhook);
+			onDestroy(unhook);
 		}
 
-		return tracker.unhook;
+		return unhook;
 	};
 
 	const nextNotification = () => {
