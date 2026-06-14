@@ -1,6 +1,6 @@
 import { ELogType } from '$lib/api';
 import { playerManager } from './player/player-manager';
-import { logs } from '$stores';
+import { addLog } from '$stores';
 
 export interface LogMessage {
 	id: number;
@@ -8,20 +8,8 @@ export interface LogMessage {
 	message: string;
 }
 
-const maxLogEntries = 40;
-
-let id = (logs()?.[0]?.id ?? -1) + 1;
-
 export const logMessage = (logType: ELogType, message: string) => {
 	if (playerManager.logTypeEnabled(logType)) {
-		if (logs().length >= maxLogEntries) {
-			logs().pop();
-		}
-		id++;
-		logs().unshift({
-			id,
-			logType,
-			message
-		});
+		addLog(logType, message);
 	}
 };
