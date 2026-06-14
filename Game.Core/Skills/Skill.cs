@@ -3,22 +3,25 @@
 namespace Game.Core.Skills
 {
     /// <summary>
-    /// Represents a skill definition — immutable template data, not runtime battle state.
+    /// Represents a skill definition — immutable template data, not runtime battle state. Shared, cached
+    /// reference-data instance: structurally immutable (init-only properties, read-only collections) so the
+    /// cached instance returned to every player cannot be corrupted (#547). Per-battle runtime state
+    /// (charge time) lives on the <see cref="Battle.BattleSkill"/> wrapper, not here.
     /// </summary>
     public class Skill
     {
-        public required int Id { get; set; }
+        public required int Id { get; init; }
 
-        public required string Name { get; set; }
+        public required string Name { get; init; }
 
-        public required double BaseDamage { get; set; }
+        public required double BaseDamage { get; init; }
 
-        public required string Description { get; set; }
+        public required string Description { get; init; }
 
-        public required int CooldownMs { get; set; }
+        public required int CooldownMs { get; init; }
 
-        public required List<AttributeModifier> DamageMultipliers { get; set; }
+        public required IReadOnlyList<AttributeModifier> DamageMultipliers { get; init; }
 
-        public required List<SkillEffect> Effects { get; set; }
+        public required IReadOnlyList<SkillEffect> Effects { get; init; }
     }
 }

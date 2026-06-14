@@ -4,45 +4,47 @@ using Game.Core.Tags;
 namespace Game.Core.Items
 {
     /// <summary>
-    /// Represents an item that can be equipped.
+    /// Represents an item that can be equipped. Shared, cached reference-data instance: structurally
+    /// immutable (init-only properties, read-only collections) so it can be safely returned from the
+    /// reference cache to every player without a consumer corrupting the shared graph (#547).
     /// </summary>
     public class Item
     {
         /// <summary>
         /// The unique identifier of the item.
         /// </summary>
-        public required int Id { get; set; }
+        public required int Id { get; init; }
 
         /// <summary>
         /// The name of the item.
         /// </summary>
-        public required string Name { get; set; }
+        public required string Name { get; init; }
 
         /// <summary>
         /// A short description of the item.
         /// </summary>
-        public required string Description { get; set; }
+        public required string Description { get; init; }
 
         /// <inheritdoc cref="EItemCategory" />
-        public required EItemCategory Category { get; set; }
+        public required EItemCategory Category { get; init; }
 
         /// <inheritdoc cref="ERarity" />
-        public required ERarity Rarity { get; set; }
+        public required ERarity Rarity { get; init; }
 
         /// <summary>
         /// The attribute modifiers that the item applies.
         /// </summary>
-        public required List<AttributeModifier> Attributes { get; set; }
+        public required IReadOnlyList<AttributeModifier> Attributes { get; init; }
 
         /// <summary>
         /// The mod slots that the item has.
         /// </summary>
-        public required List<ItemModSlot> ModSlots { get; set; }
+        public required IReadOnlyList<ItemModSlot> ModSlots { get; init; }
 
         /// <summary>
         /// The tags that describe the item.
         /// </summary>
-        public required List<Tag> Tags { get; set; }
+        public required IReadOnlyList<Tag> Tags { get; init; }
 
         /// <summary>
         /// The attribute modifiers this item contributes when equipped: its own <see cref="Attributes"/>
