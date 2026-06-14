@@ -1,12 +1,4 @@
-import {
-	IInventoryItem,
-	IBattlerAttribute,
-	ELogType,
-	EItemCategory,
-	EEquipmentSlot,
-	ApiRequest,
-	apiSocket
-} from '$lib/api';
+import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, EEquipmentSlot, apiSocket } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
@@ -121,9 +113,11 @@ export class InventoryManager {
 			this.applyEquip(item, slotId);
 			this.publish();
 
-			const req = new ApiRequest('Player/EquipItem');
-			const response = await req.post({ itemId, equipmentSlotId: slotId });
-			if (!response.ok) {
+			const response = await apiSocket.sendSocketCommand('EquipItem', {
+				itemId,
+				equipmentSlotId: slotId
+			});
+			if (response.error) {
 				rollback();
 				this.publish();
 				return false;
@@ -151,9 +145,11 @@ export class InventoryManager {
 			this.equippedSlots = slots;
 			this.publish();
 
-			const req = new ApiRequest('Player/UnequipItem');
-			const response = await req.post({ itemId: item.itemId, equipmentSlotId: slotId });
-			if (!response.ok) {
+			const response = await apiSocket.sendSocketCommand('UnequipItem', {
+				itemId: item.itemId,
+				equipmentSlotId: slotId
+			});
+			if (response.error) {
 				rollback();
 				this.publish();
 				return false;
@@ -178,9 +174,12 @@ export class InventoryManager {
 			this.refreshItemAttributes(item);
 			this.publish();
 
-			const req = new ApiRequest('Player/ApplyMod');
-			const response = await req.post({ itemId, itemModId, itemModSlotId });
-			if (!response.ok) {
+			const response = await apiSocket.sendSocketCommand('ApplyMod', {
+				itemId,
+				itemModId,
+				itemModSlotId
+			});
+			if (response.error) {
 				rollback();
 				this.publish();
 				return false;
@@ -203,9 +202,11 @@ export class InventoryManager {
 			this.refreshItemAttributes(item);
 			this.publish();
 
-			const req = new ApiRequest('Player/RemoveMod');
-			const response = await req.post({ itemId, itemModSlotId });
-			if (!response.ok) {
+			const response = await apiSocket.sendSocketCommand('RemoveMod', {
+				itemId,
+				itemModSlotId
+			});
+			if (response.error) {
 				rollback();
 				this.publish();
 				return false;

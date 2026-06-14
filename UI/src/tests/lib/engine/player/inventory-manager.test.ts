@@ -29,27 +29,19 @@ vi.mock('$stores', () => ({
 	}
 }));
 
-// Controllable stubs for the network boundary the inventory mutations cross. `mockPost` resolves
-// the `{ ok }` an `ApiRequest` response exposes (mirroring `ApiResponse.ok` — a success boolean,
-// since `ApiResponse.error` is an always-truthy message accessor), so a test can flip an endpoint to
-// the error/rollback path; `mockSendSocketCommand` backs `setFavorite`'s websocket persistence.
-const { mockPost, mockSendSocketCommand } = vi.hoisted(() => {
-	const mockPost = vi.fn();
+// Controllable stub for the network boundary every inventory mutation crosses. The socket transport
+// always resolves an `IApiSocketResponse` (it never rejects) — a success resolves an object with no
+// `error` field, a failure resolves one carrying `error` — so a test flips an endpoint to the
+// error/rollback path by resolving `{ error }`.
+const { mockSendSocketCommand } = vi.hoisted(() => {
 	const mockSendSocketCommand = vi.fn();
-	return { mockPost, mockSendSocketCommand };
+	return { mockSendSocketCommand };
 });
 
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return {
 		...actual,
-		ApiRequest: vi.fn().mockImplementation(function (
-			this: { endpoint: string; post: typeof mockPost },
-			endpoint: string
-		) {
-			this.endpoint = endpoint;
-			this.post = mockPost;
-		}),
 		apiSocket: {
 			sendSocketCommand: mockSendSocketCommand
 		}
@@ -61,7 +53,6 @@ vi.mock('$lib/engine/log', () => ({
 }));
 
 import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from '$lib/engine/player/inventory-manager';
-import { ApiRequest } from '$lib/api';
 import { logMessage } from '$lib/engine/log';
 import type { IInventoryItem } from '$lib/api';
 
@@ -103,12 +94,10 @@ describe('InventoryManager', () => {
 	beforeEach(() => {
 		manager = new InventoryManager();
 		vi.mocked(logMessage).mockClear();
-		vi.mocked(ApiRequest).mockClear();
 
 		// Default the network boundary to success; error-path tests override per case. The socket
 		// transport always resolves an `IApiSocketResponse` (never rejects), so a success resolves an
 		// object with no `error` field rather than `undefined`.
-		mockPost.mockReset().mockResolvedValue({ ok: true });
 		mockSendSocketCommand.mockReset().mockResolvedValue({});
 
 		mockItems.length = 0;
@@ -242,7 +231,7 @@ describe('InventoryManager', () => {
 	});
 
 	describe('equipItem', () => {
-		it('equips an item into an empty slot and posts to the API', async () => {
+		it('equips an item into an empty slot and sends the socket command', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
@@ -250,8 +239,10 @@ describe('InventoryManager', () => {
 			const result = await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 
 			expect(result).toBe(true);
-			expect(ApiRequest).toHaveBeenCalledWith('Player/EquipItem');
-			expect(mockPost).toHaveBeenCalledWith({ itemId: 1, equipmentSlotId: EEquipmentSlot.WeaponSlot });
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('EquipItem', {
+				itemId: 1,
+				equipmentSlotId: EEquipmentSlot.WeaponSlot
+			});
 			const equipped = manager.equippedSlots[EEquipmentSlot.WeaponSlot];
 			expect(equipped?.itemId).toBe(1);
 			expect(equipped?.equipped).toBe(true);
@@ -291,21 +282,21 @@ describe('InventoryManager', () => {
 			expect(manager.equippedSlots[EEquipmentSlot.ChestSlot]?.equipmentSlotId).toBe(EEquipmentSlot.ChestSlot);
 		});
 
-		it('returns false and makes no API call for an unknown item', async () => {
+		it('returns false and makes no socket call for an unknown item', async () => {
 			manager.initialize();
 
 			const result = await manager.equipItem(99, EEquipmentSlot.WeaponSlot);
 
 			expect(result).toBe(false);
-			expect(ApiRequest).not.toHaveBeenCalled();
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
 		});
 
-		it('leaves state unchanged when the API returns an error', async () => {
+		it('leaves state unchanged when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 
@@ -322,7 +313,7 @@ describe('InventoryManager', () => {
 				makeInventoryItem({ itemId: 2 })
 			];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.equipItem(2, EEquipmentSlot.WeaponSlot);
 
@@ -341,8 +332,8 @@ describe('InventoryManager', () => {
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
 
-			let resolvePost: (value: { ok: boolean; error?: string }) => void = () => {};
-			mockPost.mockReturnValue(new Promise((resolve) => (resolvePost = resolve)));
+			let resolveSend: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
 
 			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 			// The mutation queues onto the serialization chain, so the optimistic apply lands on the next
@@ -351,7 +342,7 @@ describe('InventoryManager', () => {
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 
-			resolvePost({ ok: false, error: 'nope' });
+			resolveSend({ error: 'nope' });
 			await pending;
 
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
@@ -377,8 +368,8 @@ describe('InventoryManager', () => {
 		});
 
 		it('queues the second mutation until the first has settled before it snapshots and persists', async () => {
-			let resolveFirst: (value: { ok: boolean }) => void = () => {};
-			mockPost.mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)));
+			let resolveFirst: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)));
 
 			const first = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 			const second = manager.equipItem(3, EEquipmentSlot.HelmSlot);
@@ -388,12 +379,12 @@ describe('InventoryManager', () => {
 			await flush();
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
 			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]).toBeUndefined();
-			expect(mockPost).toHaveBeenCalledTimes(1);
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(1);
 
-			resolveFirst({ ok: true });
+			resolveFirst({});
 			await Promise.all([first, second]);
 
-			expect(mockPost).toHaveBeenCalledTimes(2);
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(2);
 			expect(manager.equippedSlots[EEquipmentSlot.HelmSlot]?.itemId).toBe(3);
 		});
 
@@ -401,9 +392,9 @@ describe('InventoryManager', () => {
 			// First equip fails, second succeeds. Without serialization the first op's rollback baseline
 			// (captured before the second applied) would restore an empty slot, discarding the second
 			// change while the server has it applied — the desync this issue fixes.
-			mockPost.mockReset();
-			mockPost.mockResolvedValueOnce({ ok: false, error: 'nope' });
-			mockPost.mockResolvedValue({ ok: true });
+			mockSendSocketCommand.mockReset();
+			mockSendSocketCommand.mockResolvedValueOnce({ error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({});
 
 			const [firstResult, secondResult] = await Promise.all([
 				manager.equipItem(1, EEquipmentSlot.WeaponSlot),
@@ -424,8 +415,8 @@ describe('InventoryManager', () => {
 			// Both persists fail. Without serialization the second op's rollback restores a baseline taken
 			// after the first op's optimistic apply, resurrecting the first item even though its own
 			// persist already rolled it back — leaving an item shown as equipped that the server never saved.
-			mockPost.mockReset();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockReset();
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const [firstResult, secondResult] = await Promise.all([
 				manager.equipItem(1, EEquipmentSlot.WeaponSlot),
@@ -442,12 +433,12 @@ describe('InventoryManager', () => {
 		});
 
 		it('keeps the queue alive when a mutation rejects, so the next mutation still runs', async () => {
-			// ApiRequest.post never rejects in practice (it maps network failures to a 0-status response),
+			// The socket transport never rejects in practice (it resolves failures with an `error` field),
 			// but a thrown operation must not wedge the chain: the rejection is isolated and the queued
 			// follow-up still snapshots and persists.
-			mockPost.mockReset();
-			mockPost.mockRejectedValueOnce(new Error('boom'));
-			mockPost.mockResolvedValue({ ok: true });
+			mockSendSocketCommand.mockReset();
+			mockSendSocketCommand.mockRejectedValueOnce(new Error('boom'));
+			mockSendSocketCommand.mockResolvedValue({});
 
 			const first = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 			const second = manager.equipItem(3, EEquipmentSlot.HelmSlot);
@@ -460,8 +451,8 @@ describe('InventoryManager', () => {
 		it('serializes across mutation types — applyMod waits for a pending equip to settle', async () => {
 			// All four mutations route through the same chain, so an apply-mod queued behind an in-flight
 			// equip must not snapshot or persist until the equip settles.
-			let resolveEquip: (value: { ok: boolean }) => void = () => {};
-			mockPost.mockReturnValueOnce(new Promise((resolve) => (resolveEquip = resolve)));
+			let resolveEquip: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveEquip = resolve)));
 
 			const equip = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
 			const mod = manager.applyMod(1, 10, 0);
@@ -469,19 +460,19 @@ describe('InventoryManager', () => {
 			await flush();
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
-			expect(mockPost).toHaveBeenCalledTimes(1);
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(1);
 
-			resolveEquip({ ok: true });
+			resolveEquip({});
 			await Promise.all([equip, mod]);
 
-			expect(mockPost).toHaveBeenCalledTimes(2);
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(2);
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 			expect(manager.unlockedItems.get(1)?.appliedMods.map((m) => m.id)).toEqual([10]);
 		});
 	});
 
 	describe('unequipItem', () => {
-		it('unequips the item in a slot and posts to the API', async () => {
+		it('unequips the item in a slot and sends the socket command', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [
 				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
@@ -492,29 +483,31 @@ describe('InventoryManager', () => {
 			const result = await manager.unequipItem(EEquipmentSlot.WeaponSlot);
 
 			expect(result).toBe(true);
-			expect(ApiRequest).toHaveBeenCalledWith('Player/UnequipItem');
-			expect(mockPost).toHaveBeenCalledWith({ itemId: 1, equipmentSlotId: EEquipmentSlot.WeaponSlot });
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('UnequipItem', {
+				itemId: 1,
+				equipmentSlotId: EEquipmentSlot.WeaponSlot
+			});
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
 			expect(item?.equipped).toBe(false);
 			expect(item?.equipmentSlotId).toBeUndefined();
 		});
 
-		it('returns false and makes no API call for an empty slot', async () => {
+		it('returns false and makes no socket call for an empty slot', async () => {
 			manager.initialize();
 
 			const result = await manager.unequipItem(EEquipmentSlot.WeaponSlot);
 
 			expect(result).toBe(false);
-			expect(ApiRequest).not.toHaveBeenCalled();
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
-		it('leaves the item equipped when the API returns an error', async () => {
+		it('leaves the item equipped when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [
 				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
 			];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.unequipItem(EEquipmentSlot.WeaponSlot);
 
@@ -524,7 +517,7 @@ describe('InventoryManager', () => {
 	});
 
 	describe('applyMod', () => {
-		it('posts to the API and logs on success', async () => {
+		it('sends the socket command and logs on success', async () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
@@ -534,8 +527,11 @@ describe('InventoryManager', () => {
 			const result = await manager.applyMod(1, 10, 0);
 
 			expect(result).toBe(true);
-			expect(ApiRequest).toHaveBeenCalledWith('Player/ApplyMod');
-			expect(mockPost).toHaveBeenCalledWith({ itemId: 1, itemModId: 10, itemModSlotId: 0 });
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('ApplyMod', {
+				itemId: 1,
+				itemModId: 10,
+				itemModSlotId: 0
+			});
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'Modifier applied.');
 		});
 
@@ -588,13 +584,13 @@ describe('InventoryManager', () => {
 			]);
 		});
 
-		it('leaves the authoritative item unchanged when the API returns an error', async () => {
+		it('leaves the authoritative item unchanged when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.applyMod(1, 10, 0);
 
@@ -602,7 +598,7 @@ describe('InventoryManager', () => {
 			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
 		});
 
-		it('returns false and makes no API call when the mod is not unlocked', async () => {
+		it('returns false and makes no socket call when the mod is not unlocked', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
@@ -610,10 +606,10 @@ describe('InventoryManager', () => {
 			const result = await manager.applyMod(1, 10, 0);
 
 			expect(result).toBe(false);
-			expect(ApiRequest).not.toHaveBeenCalled();
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
-		it('returns false and makes no API call when the item is not unlocked', async () => {
+		it('returns false and makes no socket call when the item is not unlocked', async () => {
 			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
@@ -621,16 +617,16 @@ describe('InventoryManager', () => {
 			const result = await manager.applyMod(1, 10, 0);
 
 			expect(result).toBe(false);
-			expect(ApiRequest).not.toHaveBeenCalled();
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
-		it('returns false and does not log when the API returns an error', async () => {
+		it('returns false and does not log when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.applyMod(1, 10, 0);
 
@@ -640,7 +636,7 @@ describe('InventoryManager', () => {
 	});
 
 	describe('removeMod', () => {
-		it('posts to the API and logs on success', async () => {
+		it('sends the socket command and logs on success', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
@@ -648,8 +644,10 @@ describe('InventoryManager', () => {
 			const result = await manager.removeMod(1, 0);
 
 			expect(result).toBe(true);
-			expect(ApiRequest).toHaveBeenCalledWith('Player/RemoveMod');
-			expect(mockPost).toHaveBeenCalledWith({ itemId: 1, itemModSlotId: 0 });
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('RemoveMod', {
+				itemId: 1,
+				itemModSlotId: 0
+			});
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'Modifier removed.');
 		});
 
@@ -675,20 +673,20 @@ describe('InventoryManager', () => {
 			expect(manager.equipmentStats).toEqual([{ attributeId: EAttribute.Strength, amount: 5 }]);
 		});
 
-		it('returns false and makes no API call when the item is not unlocked', async () => {
+		it('returns false and makes no socket call when the item is not unlocked', async () => {
 			manager.initialize();
 
 			const result = await manager.removeMod(1, 0);
 
 			expect(result).toBe(false);
-			expect(ApiRequest).not.toHaveBeenCalled();
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
-		it('returns false and does not log when the API returns an error', async () => {
+		it('returns false and does not log when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.removeMod(1, 0);
 
@@ -696,7 +694,7 @@ describe('InventoryManager', () => {
 			expect(logMessage).not.toHaveBeenCalled();
 		});
 
-		it('leaves the applied mod in place when the API returns an error', async () => {
+		it('leaves the applied mod in place when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
 			mockInventoryData.unlockedItems = [
@@ -704,7 +702,7 @@ describe('InventoryManager', () => {
 			];
 			mockInventoryData.unlockedMods = [10];
 			manager.initialize();
-			mockPost.mockResolvedValue({ ok: false, error: 'nope' });
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
 
 			const result = await manager.removeMod(1, 0);
 
