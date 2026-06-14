@@ -24,7 +24,7 @@ namespace Game.Api.Sockets.Commands
                 ?? throw new ArgumentNullException(nameof(parameters));
         }
 
-        public override Task<ApiSocketResponse<ChallengeCompletedModel>> HandleExecuteAsync(SocketContext context)
+        public override Task<ApiSocketResponse<ChallengeCompletedModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             if (_model is null)
             {

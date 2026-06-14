@@ -22,7 +22,7 @@ namespace Game.Api.Sockets.Commands
             _playerService = playerService;
         }
 
-        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
+        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             if (Parameters.Any(p => !Enum.IsDefined(p.Id)))
             {

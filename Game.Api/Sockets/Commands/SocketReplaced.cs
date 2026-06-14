@@ -6,7 +6,7 @@ namespace Game.Api.Sockets.Commands
     {
         public override string Name { get; set; } = nameof(SocketReplaced);
 
-        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
+        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             await context.SendData(Success());
             await context.Close(ESocketCloseReason.SocketReplaced);
