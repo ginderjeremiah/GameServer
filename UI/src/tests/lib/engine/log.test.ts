@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ELogType } from '$lib/api';
 
-const { mockLogs, mockPlayerManager } = vi.hoisted(() => {
-	const mockLogs: { id: number; logType: number; message: string }[] = [];
+const { addLog, mockPlayerManager } = vi.hoisted(() => {
+	const addLog = vi.fn();
 	// Mirrors PlayerManager's prebuilt map: an unknown type defaults to enabled.
 	const mockPlayerManager = {
 		logPreferences: [] as { id: number; enabled: boolean }[],
@@ -10,7 +10,7 @@ const { mockLogs, mockPlayerManager } = vi.hoisted(() => {
 			return mockPlayerManager.logPreferences.find((pref) => pref.id === logType)?.enabled ?? true;
 		}
 	};
-	return { mockLogs, mockPlayerManager };
+	return { addLog, mockPlayerManager };
 });
 
 vi.mock('$lib/engine/player/player-manager', () => ({
@@ -19,15 +19,14 @@ vi.mock('$lib/engine/player/player-manager', () => ({
 	}
 }));
 
-vi.mock('$stores', () => ({
-	logs: () => mockLogs
-}));
+// logMessage only gates on the player's preferences and delegates the append to the logs store.
+vi.mock('$stores', () => ({ addLog }));
 
 import { logMessage } from '$lib/engine/log';
 
 describe('logMessage', () => {
 	beforeEach(() => {
-		mockLogs.length = 0;
+		addLog.mockClear();
 		mockPlayerManager.logPreferences = [
 			{ id: ELogType.Damage, enabled: false },
 			{ id: ELogType.Exp, enabled: true },
@@ -36,47 +35,21 @@ describe('logMessage', () => {
 		];
 	});
 
-	it('adds message for enabled log type', () => {
+	it('forwards an enabled log type to the store', () => {
 		logMessage(ELogType.Exp, 'Earned 50 exp.');
 
-		expect(mockLogs.length).toBe(1);
-		expect(mockLogs[0].logType).toBe(ELogType.Exp);
-		expect(mockLogs[0].message).toBe('Earned 50 exp.');
+		expect(addLog).toHaveBeenCalledWith(ELogType.Exp, 'Earned 50 exp.');
 	});
 
-	it('does not add message for disabled log type', () => {
+	it('does not forward a disabled log type', () => {
 		logMessage(ELogType.Damage, 'Hit for 10 damage.');
 
-		expect(mockLogs.length).toBe(0);
+		expect(addLog).not.toHaveBeenCalled();
 	});
 
-	it('adds message for unknown log type (defaults to enabled)', () => {
+	it('forwards an unknown log type (defaults to enabled)', () => {
 		logMessage(ELogType.EnemyDefeated, 'Enemy defeated!');
 
-		expect(mockLogs.length).toBe(1);
-		expect(mockLogs[0].message).toBe('Enemy defeated!');
-	});
-
-	it('prepends new messages to the front', () => {
-		logMessage(ELogType.Exp, 'First');
-		logMessage(ELogType.Exp, 'Second');
-
-		expect(mockLogs[0].message).toBe('Second');
-		expect(mockLogs[1].message).toBe('First');
-	});
-
-	it('assigns incrementing ids', () => {
-		logMessage(ELogType.Exp, 'A');
-		logMessage(ELogType.LevelUp, 'B');
-
-		expect(mockLogs[0].id).toBeGreaterThan(mockLogs[1].id);
-	});
-
-	it('caps log list at 40 entries', () => {
-		for (let i = 0; i < 45; i++) {
-			logMessage(ELogType.Exp, `Message ${i}`);
-		}
-
-		expect(mockLogs.length).toBeLessThanOrEqual(40);
+		expect(addLog).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Enemy defeated!');
 	});
 });

@@ -12,10 +12,11 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 // Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
-const { staticDataStub, statisticsStub, playerChallengesStub } = vi.hoisted(() => ({
+const { staticDataStub, statisticsStub, playerChallengesStub, resetLogs } = vi.hoisted(() => ({
 	staticDataStub: { loaded: true },
 	statisticsStub: { load: vi.fn(), reset: vi.fn() },
-	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() }
+	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
+	resetLogs: vi.fn()
 }));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
@@ -23,7 +24,8 @@ vi.mock('$stores', async () => {
 		...modal,
 		staticData: staticDataStub,
 		statistics: statisticsStub,
-		playerChallenges: playerChallengesStub
+		playerChallenges: playerChallengesStub,
+		resetLogs
 	};
 });
 
@@ -122,6 +124,12 @@ describe('handleSocketReplaced', () => {
 		expect(renderEngine.stop).toHaveBeenCalledTimes(1);
 		expect(enemyManager.stop).toHaveBeenCalledTimes(1);
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
+	});
+
+	it('resets the combat log so its entries do not leak into the next session', () => {
+		void handleSocketReplaced();
+
+		expect(resetLogs).toHaveBeenCalledTimes(1);
 	});
 
 	it('shows an acknowledgement modal with the session-replaced title and body', () => {

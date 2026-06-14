@@ -7,7 +7,7 @@ import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
-import { staticData, statistics, playerChallenges, acknowledgeModal } from '$stores';
+import { staticData, statistics, playerChallenges, acknowledgeModal, resetLogs } from '$stores';
 import { apiSocket, type IApiSocketResponse } from '$lib/api';
 import { playerManager } from './player/player-manager';
 
@@ -90,6 +90,7 @@ const stopGame = () => {
 	battleEngine.stop();
 	statistics.reset();
 	playerChallenges.reset();
+	resetLogs();
 	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();
 };
