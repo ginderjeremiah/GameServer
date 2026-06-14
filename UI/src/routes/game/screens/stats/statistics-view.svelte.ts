@@ -14,7 +14,7 @@
    not model (unit, aggregation, comparison direction, category, display order)
    is a presentation concern defined here in STAT_PRESENTATION and merged with
    the server metadata by buildStatTypes(). The actual values come from
-   `GET /api/Statistics`; entity ids resolve against the live staticData. */
+   the `GetPlayerStatistics` socket command; entity ids resolve against the live staticData. */
 
 import { EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
 import { staticData } from '$stores';
@@ -272,7 +272,7 @@ export class StatisticsData {
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class StatisticsView {
-	/** The player's statistic values, fetched from `GET /api/Statistics` on mount. */
+	/** The player's statistic values, fetched via the `GetPlayerStatistics` socket command on mount. */
 	stats = $state<IPlayerStatistic[]>([]);
 	/** True until the statistic values have been fetched. */
 	loading = $state(true);
