@@ -262,6 +262,28 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SetUserRoles_DuplicateValidRoleIds_GrantsRoleOnce()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int targetId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var target = await TestDataSeeder.CreateUserAsync(context, "dupe", "pw");
+                targetId = target.Id;
+            }
+
+            // The relocated validation dedups submitted ids, so repeating a valid role is not rejected.
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/SetUserRoles",
+                new { UserId = targetId, RoleIds = new[] { (int)ERole.Admin, (int)ERole.Admin } },
+                CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(new[] { nameof(ERole.Admin) }, await LoadRoleNamesAsync(targetId));
+        }
+
+        [Fact]
         public async Task SetUserRoles_UnknownUser_ReturnsError()
         {
             using var authClient = await SetupAdminClientAsync();

@@ -101,7 +101,7 @@ namespace Game.DataAccess.Repositories
             return FilteredUsers(search, roleId, archived).CountAsync();
         }
 
-        public async Task<bool> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds)
+        public async Task<SetUserRolesStatus> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds)
         {
             var user = await _context.Users
                 .Include(u => u.Roles)
@@ -109,19 +109,27 @@ namespace Game.DataAccess.Repositories
 
             if (user is null)
             {
-                return false;
+                return SetUserRolesStatus.UserNotFound;
             }
 
-            user.Roles.RemoveAll(r => !roleIds.Contains(r.Id));
-
-            var existingRoleIds = user.Roles.Select(r => r.Id).ToList();
-            var rolesToAdd = await _context.Roles
-                .Where(r => roleIds.Contains(r.Id) && !existingRoleIds.Contains(r.Id))
+            // Reject the whole assignment if any submitted id is not a real role, validated against the
+            // persistence layer's own role set rather than a caller-side check.
+            var requestedRoleIds = roleIds.Distinct().ToList();
+            var knownRoles = await _context.Roles
+                .Where(r => requestedRoleIds.Contains(r.Id))
                 .ToListAsync();
 
-            user.Roles.AddRange(rolesToAdd);
+            if (knownRoles.Count != requestedRoleIds.Count)
+            {
+                return SetUserRolesStatus.UnknownRole;
+            }
 
-            return true;
+            user.Roles.RemoveAll(r => !requestedRoleIds.Contains(r.Id));
+
+            var existingRoleIds = user.Roles.Select(r => r.Id).ToHashSet();
+            user.Roles.AddRange(knownRoles.Where(r => !existingRoleIds.Contains(r.Id)));
+
+            return SetUserRolesStatus.Success;
         }
 
         public Task<bool> ArchiveUser(int userId)
