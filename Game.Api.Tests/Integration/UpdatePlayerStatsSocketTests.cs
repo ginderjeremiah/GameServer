@@ -1,12 +1,10 @@
 using Game.Abstractions.Contracts;
-using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Json;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -24,7 +22,7 @@ namespace Game.Api.Tests.Integration
         /// Strength/Endurance at 50 each (StatPointsUsed = 100), so the available pool is
         /// <paramref name="statPointsGained"/> − 100.
         /// </summary>
-        private async Task<int> SeedPlayerAsync(int statPointsGained)
+        private async Task<(int UserId, int PlayerId)> SeedPlayerAsync(int statPointsGained)
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -36,15 +34,15 @@ namespace Game.Api.Tests.Integration
             // The caches no longer lazily refill, so reload them to resolve the player on load.
             await ReloadReferenceCachesAsync();
 
-            return user.Id;
+            return (user.Id, player.Id);
         }
 
         [Fact]
         public async Task UpdatePlayerStats_ValidUpdate_ReturnsAndPersistsNewAllocation()
         {
             // 6 available points (106 gained − 100 used).
-            var userId = await SeedPlayerAsync(statPointsGained: 106);
-            var (client, _) = await LoginAndBuildClientAsync(Username, Password);
+            var (userId, playerId) = await SeedPlayerAsync(statPointsGained: 106);
+            await LoginAsync(Username, Password);
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
@@ -59,7 +57,7 @@ namespace Game.Api.Tests.Integration
 
             // The save writes the cached player fire-and-forget, so poll the player snapshot until the
             // new allocation lands (this is the persistence the bug report said could silently revert).
-            var persisted = await WaitForStrengthAsync(client, expected: 53m);
+            var persisted = await WaitForStrengthAsync(playerId, expected: 53m);
             Assert.Equal(53m, persisted);
         }
 
@@ -67,7 +65,7 @@ namespace Game.Api.Tests.Integration
         public async Task UpdatePlayerStats_SpendMoreThanAvailable_ReturnsError()
         {
             // Default seeded player has 0 available points (100 gained − 100 used).
-            var userId = await SeedPlayerAsync(statPointsGained: 100);
+            var (userId, _) = await SeedPlayerAsync(statPointsGained: 100);
             await LoginAsync(Username, Password);
 
             await using var socketClient = new TestSocketClient();
@@ -81,19 +79,15 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Polls <c>GET /api/Player</c> until the player's Strength allocation reaches the expected value
-        /// (the cache write is fire-and-forget), failing after a short budget.
+        /// Polls the persisted player snapshot until the player's Strength allocation reaches the expected
+        /// value (the cache write is fire-and-forget), failing after a short budget.
         /// </summary>
-        private async Task<decimal> WaitForStrengthAsync(HttpClient client, decimal expected)
+        private async Task<decimal> WaitForStrengthAsync(int playerId, decimal expected)
         {
             for (var attempt = 0; attempt < 20; attempt++)
             {
-                var response = await client.GetAsync("/api/Player", CancellationToken);
-                response.EnsureSuccessStatusCode();
-                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
-                Assert.NotNull(result);
-                Assert.NotNull(result.Data);
-                var strength = result.Data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount;
+                var data = await GetPersistedPlayerAsync(playerId);
+                var strength = data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount;
                 if (strength == expected)
                 {
                     return strength;

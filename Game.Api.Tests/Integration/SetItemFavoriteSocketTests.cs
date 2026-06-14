@@ -1,11 +1,8 @@
-using Game.Api.Models.Common;
 using Game.Api.Models.InventoryItems;
-using Game.Api.Models.Player;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Json;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -22,9 +19,10 @@ namespace Game.Api.Tests.Integration
 
         public SetItemFavoriteSocketTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
-        private async Task<(int UserId, int ItemId)> SeedPlayerWithUnlockedItemAsync()
+        private async Task<(int UserId, int PlayerId, int ItemId)> SeedPlayerWithUnlockedItemAsync()
         {
             int userId;
+            int playerId;
             int itemId;
             using (var scope = CreateScope())
             {
@@ -35,19 +33,20 @@ namespace Game.Api.Tests.Integration
                 var item = await TestDataSeeder.CreateItemAsync(context);
                 await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id);
                 userId = user.Id;
+                playerId = player.Id;
                 itemId = item.Id;
             }
 
             // The caches no longer lazily refill, so reload them to resolve the seeded item on load.
             await ReloadReferenceCachesAsync();
-            return (userId, itemId);
+            return (userId, playerId, itemId);
         }
 
         [Fact]
         public async Task SetItemFavorite_PersistsFavoriteFlagToCachedPlayer()
         {
-            var (userId, itemId) = await SeedPlayerWithUnlockedItemAsync();
-            var (client, _) = await LoginAndBuildClientAsync(Username, Password);
+            var (userId, playerId, itemId) = await SeedPlayerWithUnlockedItemAsync();
+            await LoginAsync(Username, Password);
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
@@ -57,14 +56,14 @@ namespace Game.Api.Tests.Integration
 
             Assert.Null(response.Error);
 
-            var items = await WaitForFavoriteAsync(client, itemId, favorite: true);
+            var items = await WaitForFavoriteAsync(playerId, itemId, favorite: true);
             Assert.True(items.Single(i => i.ItemId == itemId).Favorite);
         }
 
         [Fact]
         public async Task SetItemFavorite_ItemNotUnlocked_ReturnsError()
         {
-            var (userId, _) = await SeedPlayerWithUnlockedItemAsync();
+            var (userId, _, _) = await SeedPlayerWithUnlockedItemAsync();
             // Logging in creates the session the WebSocket handshake requires.
             await LoginAsync(Username, Password);
 
@@ -78,25 +77,15 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Error);
         }
 
-        private async Task<List<InventoryItem>> GetInventoryItemsAsync(HttpClient client)
-        {
-            var response = await client.GetAsync("/api/Player", CancellationToken);
-            response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
-            Assert.NotNull(result);
-            Assert.NotNull(result.Data);
-            return result.Data.InventoryData.UnlockedItems;
-        }
-
         /// <summary>
         /// The command writes the cached player fire-and-forget, so poll the player snapshot until the
         /// expected favorite flag lands (or fail after a short budget).
         /// </summary>
-        private async Task<List<InventoryItem>> WaitForFavoriteAsync(HttpClient client, int itemId, bool favorite)
+        private async Task<List<InventoryItem>> WaitForFavoriteAsync(int playerId, int itemId, bool favorite)
         {
             for (var attempt = 0; attempt < 20; attempt++)
             {
-                var items = await GetInventoryItemsAsync(client);
+                var items = (await GetPersistedPlayerAsync(playerId)).InventoryData.UnlockedItems;
                 if (items.Any(i => i.ItemId == itemId && i.Favorite == favorite))
                 {
                     return items;

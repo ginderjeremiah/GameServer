@@ -1,5 +1,7 @@
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
+using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -93,6 +95,20 @@ namespace Game.Api.Tests.Integration
         /// Creates a scoped service provider for direct DB access in test setup.
         /// </summary>
         protected IServiceScope CreateScope() => Factory.Services.CreateScope();
+
+        /// <summary>
+        /// Reads the persisted player snapshot directly from the write-behind cache (cache-first, with a DB
+        /// miss-reload) and projects it the same way the API does. Socket-write tests poll this to confirm a
+        /// fire-and-forget cache write has landed.
+        /// </summary>
+        protected async Task<PlayerData> GetPersistedPlayerAsync(int playerId)
+        {
+            using var scope = CreateScope();
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerId);
+            Assert.NotNull(player);
+            return PlayerData.FromPlayer(player);
+        }
 
         /// <summary>
         /// Rebuilds the reference-data cache snapshots from the current database state. Call after seeding
