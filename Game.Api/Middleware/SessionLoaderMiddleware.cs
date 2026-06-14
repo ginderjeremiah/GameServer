@@ -1,4 +1,3 @@
-using Game.Api.Auth;
 using Game.Api.Services;
 using Microsoft.IdentityModel.JsonWebTokens;
 using System.Security.Claims;
@@ -9,7 +8,7 @@ namespace Game.Api.Middleware
     /// Populates the request-scoped <see cref="SessionService"/> from the authenticated
     /// <see cref="ClaimsPrincipal"/> produced by JWT bearer authentication. Authentication and
     /// authorization themselves are handled by the standard ASP.NET Core middleware; this only bridges
-    /// the validated token claims to the player session loaded from the cache.
+    /// the validated token's user id to the player session loaded from the cache.
     /// </summary>
     public class SessionLoaderMiddleware(RequestDelegate next)
     {
@@ -22,11 +21,6 @@ namespace Game.Api.Middleware
                 && int.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var userId))
             {
                 await sessionService.LoadPlayerState(userId);
-                if (sessionService.Authenticated)
-                {
-                    var roles = principal.FindAll(JwtTokenService.RoleClaimType).Select(claim => claim.Value).ToList();
-                    sessionService.SetRoles(roles);
-                }
             }
 
             await _next(context);
