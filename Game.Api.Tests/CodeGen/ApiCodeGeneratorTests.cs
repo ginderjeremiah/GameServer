@@ -45,6 +45,8 @@ namespace Game.Api.Tests.CodeGen
         [InlineData(nameof(GameConstants.MaxSelectedSkills))]
         [InlineData(nameof(GameConstants.ExpPerLevel))]
         [InlineData(nameof(GameConstants.StatPointsPerLevel))]
+        [InlineData(nameof(GameConstants.MaxExpRewardMultiplier))]
+        [InlineData(nameof(GameConstants.MaxExpPerGrant))]
         public void GetClientMirroredConstantFields_IncludesGameConstants(string fieldName)
         {
             var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
