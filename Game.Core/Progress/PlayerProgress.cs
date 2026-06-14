@@ -9,9 +9,21 @@ namespace Game.Core.Progress
         private readonly Dictionary<(EStatisticType Type, int? EntityId), PlayerStatistic> _statistics;
         private readonly Dictionary<int, PlayerChallenge> _challenges;
 
+        // Rows mutated since this aggregate was loaded. The write-behind save enqueues only these (as
+        // absolute values) rather than the whole, ever-growing stat set; the full snapshot still goes to
+        // the cache, which is the source of truth.
+        private readonly HashSet<(EStatisticType Type, int? EntityId)> _dirtyStatistics = [];
+        private readonly HashSet<int> _dirtyChallenges = [];
+
         public Player Player { get; }
         public IEnumerable<PlayerStatistic> Statistics => _statistics.Values;
         public IEnumerable<PlayerChallenge> ChallengeProgress => _challenges.Values;
+
+        /// <summary>The statistics changed since load — what the write-behind save persists.</summary>
+        public IEnumerable<PlayerStatistic> DirtyStatistics => _dirtyStatistics.Select(key => _statistics[key]);
+
+        /// <summary>The challenge-progress rows changed since load — what the write-behind save persists.</summary>
+        public IEnumerable<PlayerChallenge> DirtyChallenges => _dirtyChallenges.Select(id => _challenges[id]);
 
         public PlayerProgress(
             Player player,
@@ -106,13 +118,23 @@ namespace Game.Core.Progress
                     continue;
                 }
 
+                var isNew = playerChallenge is null;
                 if (playerChallenge is null)
                 {
                     playerChallenge = new PlayerChallenge(challenge, progress: 0, completed: false);
                     _challenges[challenge.Id] = playerChallenge;
                 }
 
+                var beforeProgress = playerChallenge.Progress;
+                var beforeCompleted = playerChallenge.Completed;
+
                 challenge.UpdateChallengeProgress(playerChallenge, this);
+
+                if (isNew || playerChallenge.Progress != beforeProgress || playerChallenge.Completed != beforeCompleted)
+                {
+                    _dirtyChallenges.Add(challenge.Id);
+                }
+
                 if (playerChallenge.Completed)
                 {
                     completed.Add(new CompletedChallenge
@@ -172,6 +194,11 @@ namespace Game.Core.Progress
                 _statistics[key] = stat;
             }
 
+            // GetOrCreate is reached only from the mutators (Increment/SetMax/SetMin); reads use
+            // GetStatisticValue, which never lands here. So marking dirty here covers exactly the mutated
+            // stats. A no-op SetMax/SetMin over-marks at worst, which is harmless — the persist is an
+            // idempotent absolute write.
+            _dirtyStatistics.Add(key);
             return stat;
         }
     }

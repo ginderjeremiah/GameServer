@@ -18,8 +18,7 @@ namespace Game.DataAccess.Repositories
 
         public Enemy? GetEnemy(int enemyId)
         {
-            var enemies = Snapshot.Enemies;
-            return enemyId < 0 || enemies.Count <= enemyId ? null : enemies[enemyId];
+            return Snapshot.Enemies.Lookup(enemyId);
         }
 
         public Enemy GetRandomEnemy(int zoneId)

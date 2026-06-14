@@ -9,7 +9,6 @@ using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -113,13 +112,11 @@ namespace Game.Application.Tests.Events
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
-            // The challenge genuinely completed (so the unlock loop ran) — confirm the persisted progress
-            // rather than relying on the absence of unlocks, which would also hold if it never completed.
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var challengeRow = await context.PlayerChallenges.AsNoTracking()
-                .SingleAsync(c => c.PlayerId == setup.PlayerId, CancellationToken);
-            Assert.True(challengeRow.Completed);
+            // The challenge genuinely completed (so the unlock loop ran) — confirm via the progress cache the
+            // handler wrote, rather than relying on the absence of unlocks (which would also hold if it never
+            // completed). The write-behind save makes the cache the source of truth, so the DB is not read.
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            Assert.NotEmpty(await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
 
             // A challenge with all-null reward ids is a clean no-op for unlocks.
             Assert.Empty(player.Inventory.UnlockedItems);

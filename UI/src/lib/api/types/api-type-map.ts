@@ -5,13 +5,11 @@ import type {
 	IActiveSessionResult,
 	IAddEditAttributesData,
 	IAdminUserSearchResults,
-	IApplyModRequest,
 	IAuthTokens,
 	IChallenge,
 	IChange,
 	IDeviceInfoRequest,
 	IEnemy,
-	IEquipRequest,
 	IItem,
 	IItemMod,
 	IItemModSlot,
@@ -21,7 +19,6 @@ import type {
 	IPlayerData,
 	IPlayerStatistic,
 	IRefreshRequest,
-	IRemoveModRequest,
 	IRole,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
@@ -71,10 +68,6 @@ export type ApiResponseTypes = {
 	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
 	'Player': IPlayerData;
-	'Player/ApplyMod': undefined;
-	'Player/EquipItem': undefined;
-	'Player/RemoveMod': undefined;
-	'Player/UnequipItem': undefined;
 	'Statistics': IPlayerStatistic[];
 	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
@@ -109,10 +102,6 @@ export type ApiRequestTypes = {
 	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;
-	'Player/ApplyMod': IApplyModRequest;
-	'Player/EquipItem': IEquipRequest;
-	'Player/RemoveMod': IRemoveModRequest;
-	'Player/UnequipItem': IEquipRequest;
 };
 
 export type ApiEndpoint = keyof ApiResponseTypes;

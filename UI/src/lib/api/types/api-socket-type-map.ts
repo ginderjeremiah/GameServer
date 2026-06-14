@@ -2,6 +2,7 @@
 // Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 
 import type {
+	IApplyModRequest,
 	IAttribute,
 	IAttributeUpdate,
 	IBattleLostResponse,
@@ -13,12 +14,14 @@ import type {
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
 	IEnemy,
+	IEquipRequest,
 	IItem,
 	IItemMod,
 	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
 	IReferenceDataVersion,
+	IRemoveModRequest,
 	ISetItemFavoriteRequest,
 	ISkill,
 	IStatisticType,
@@ -26,10 +29,12 @@ import type {
 } from './';
 
 export type ApiSocketResponseTypes = {
+	'ApplyMod': undefined;
 	'BattleLost': IBattleLostResponse;
 	'ChallengeBoss': INewEnemyModel;
 	'ChallengeCompleted': IChallengeCompletedModel;
 	'DefeatEnemy': IDefeatEnemyResponse;
+	'EquipItem': undefined;
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];
 	'GetChallengeTypes': IChallengeType[];
@@ -41,20 +46,26 @@ export type ApiSocketResponseTypes = {
 	'GetStatisticTypes': IStatisticType[];
 	'GetZones': IZone[];
 	'NewEnemy': INewEnemyModel;
+	'RemoveMod': undefined;
 	'SaveLogPreferences': undefined;
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
+	'UnequipItem': undefined;
 	'UpdatePlayerStats': IBattlerAttribute[];
 };
 
 export type ApiSocketRequestTypes = {
+	'ApplyMod': IApplyModRequest;
 	'ChallengeBoss': IChallengeBossRequest;
 	'DefeatEnemy': IDefeatEnemyRequest;
+	'EquipItem': IEquipRequest;
 	'NewEnemy': INewEnemyRequest;
+	'RemoveMod': IRemoveModRequest;
 	'SaveLogPreferences': ILogPreference[];
 	'SetItemFavorite': ISetItemFavoriteRequest;
 	'SetSelectedSkills': number[];
+	'UnequipItem': IEquipRequest;
 	'UpdatePlayerStats': IAttributeUpdate[];
 };
 

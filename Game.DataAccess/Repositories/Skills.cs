@@ -23,8 +23,7 @@ namespace Game.DataAccess.Repositories
 
         public Skill? LookupSkill(int skillId)
         {
-            var skills = Entities;
-            return skills.Count <= skillId || skillId < 0 ? null : skills[skillId];
+            return Entities.Lookup(skillId);
         }
 
         public CoreSkill GetSkill(int skillId)
@@ -32,7 +31,7 @@ namespace Game.DataAccess.Repositories
             // Returns the snapshot's shared, pre-materialized instance rather than rebuilding a fresh graph
             // per call. The skill template is reference data treated as immutable by every caller — BattleSkill
             // only reads from it — so sharing is safe.
-            return holder.Current.CoreSkills[skillId];
+            return holder.Current.CoreSkills.GetById(skillId, "skill");
         }
     }
 }

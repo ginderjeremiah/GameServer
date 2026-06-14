@@ -48,11 +48,11 @@ Measured baseline (dev box; ms):
 
 ## Implementation issues
 
-Created as sub-issues of #548, in landing order:
+Created as sub-issues of #548:
 
-- **[#550](https://github.com/ginderjeremiah/GameServer/issues/550)** _(tech debt, claude, scope: medium)_ — Cache `PlayerProgress` as a read-through cached aggregate (cache-first `Load` + DB miss-reload + sliding TTL; route `GetStatistics` / `GetChallenges` / `GetCompletedChallengeIds` through the cache; keep the synchronous commit for now). Removes the ~2.2 ms `Load`. Standalone, lower-risk first slice.
-- **[#551](https://github.com/ginderjeremiah/GameServer/issues/551)** _(tech debt, claude, scope: medium)_ — Write-behind the progress persistence: dirty-tracking in `PlayerProgress`, the batched absolute `ProgressUpdated` event on `PlayerUpdateQueue`, the `DataProviderSynchronizer` handler, and removal of the synchronous commit. Depends on #550.
-- **[#552](https://github.com/ginderjeremiah/GameServer/issues/552)** _(tech debt, claude, scope: small)_ — Trim the write-behind publish: `FireAndForget` the wake-publish in `RedisPubSubService.Publish(channel, queue, data)` and batch a save's events into one multi-value LPUSH. Benefits both player and progress paths. Independent of #550/#551.
+- **[#550](https://github.com/ginderjeremiah/GameServer/issues/550)** _(tech debt, claude)_ — Cache `PlayerProgress` as a cache-as-source-of-truth, write-behind aggregate: cache-first reads (`Load` / `GetStatistics` / `GetChallenges` / `GetCompletedChallengeIds`) with DB miss-reload and sliding TTL, plus dirty-tracking in `PlayerProgress`, the batched absolute `ProgressUpdated` event on `PlayerUpdateQueue`, and the `DataProviderSynchronizer` handler. **Originally split as #550 (read side) + #551 (write side); folded into one PR** because `Load` and `Save` share a tracked DB read — caching `Load` alone just moves the SELECTs into `Save`, so cache-as-source-of-truth only pays off once writes are async. The two are one coupled change.
+- **[#551](https://github.com/ginderjeremiah/GameServer/issues/551)** — **Folded into #550** (see above); closed as superseded.
+- **[#552](https://github.com/ginderjeremiah/GameServer/issues/552)** _(tech debt, claude, scope: small)_ — Trim the write-behind publish: `FireAndForget` the wake-publish in `RedisPubSubService.Publish(channel, queue, data)` and batch a save's events into one multi-value LPUSH. Benefits both player and progress paths. Independent of #550.
 
 **Dropped during the spike:** parallelizing the two `Load` SELECTs. EF Core forbids concurrent operations on one `DbContext` (`Task.WhenAll` throws), and combining them via `Player`-navigation `Include`s just trades two clean independent queries for a cartesian-explosion / `AsSplitQuery` wash (`AsSplitQuery` issues ~the same number of round-trips). The cache in #550 removes both queries entirely, making the micro-optimization moot.
 

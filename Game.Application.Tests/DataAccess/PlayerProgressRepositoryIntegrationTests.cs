@@ -1,26 +1,31 @@
 using Game.Abstractions.DataAccess;
-using Game.Application;
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
+using Game.Core.Events;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Progress;
+using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Verifies <see cref="IPlayerProgressRepository"/> persists statistics and challenge progress.
-    /// In particular, <see cref="IPlayerProgressRepository.Save"/> no longer depends on a prior
-    /// <see cref="IPlayerProgressRepository.Load"/> on the same instance (the temporal coupling removed
-    /// in #164): it fetches the existing snapshot on demand, so a standalone save upserts correctly.
+    /// Verifies the write-behind <see cref="IPlayerProgressRepository"/> (#550): reads are served
+    /// cache-first with a database miss-reload, and <see cref="IPlayerProgressRepository.Save"/> writes the
+    /// cache (the source of truth) and enqueues a single batched, absolute-value <c>ProgressUpdated</c>
+    /// event rather than writing the database synchronously. The database is converged off the response
+    /// path by <see cref="DataProviderSynchronizer"/> (covered in its own tests). The integration harness
+    /// disables that hosted service, so here a Save leaves the database untouched — which is exactly what
+    /// lets these tests prove the reads come from the cache.
     /// </summary>
     [Collection("Integration")]
     public class PlayerProgressRepositoryIntegrationTests : ApplicationIntegrationTestBase
@@ -29,145 +34,88 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task Save_WithoutPriorLoad_InsertsNewStatistics()
+        public async Task Save_EnqueuesBatchedProgressUpdatedEvent_WithoutWritingTheDatabase()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], []);
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats { PlayerDamageDealt = 12.5 }, isBossBattle: false, zoneId: 0);
+
+                await repo.Save(progress);
+            }
+
+            // Exactly one batched event was enqueued, carrying the changed stats as absolute values.
+            Assert.Equal(1, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+            var evt = await DequeueProgressEvent(redis);
+            Assert.Equal(playerId, evt.PlayerId);
+            Assert.Contains(evt.Statistics, s => s.StatisticTypeId == (int)EStatisticType.DamageDealt && s.Value == 12.5m);
+            Assert.Contains(evt.Statistics, s => s.StatisticTypeId == (int)EStatisticType.EnemiesKilled && s.EntityId == null);
+
+            // Nothing was written to the database synchronously (the synchronizer is disabled in tests).
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Empty(await context.PlayerStatistics.AsNoTracking()
+                    .Where(s => s.PlayerId == playerId).ToListAsync(CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task Save_NoMutationsSinceLoad_DoesNotEnqueue()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
+            await repo.Save(progress); // nothing changed -> nothing to persist
+
+            Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
+        public async Task Save_WritesCache_SoASubsequentReadIsServedWithoutTheDatabase()
         {
             var playerId = await SeedPlayerAsync();
 
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId)); // cache miss -> empty
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
 
-                var progress = new PlayerProgress(
-                    MakeDomainPlayer(playerId),
-                    [new PlayerStatistic { Type = EStatisticType.EnemiesKilled, EntityId = null, Value = 7m }],
-                    []);
-
-                // Save is called without ever calling Load — this previously threw NullReferenceException.
-                await repo.Save(progress);
-                await unitOfWork.CommitAsync();
+                await repo.Save(progress); // writes the full snapshot to the cache (the source of truth)
             }
 
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await context.PlayerStatistics.AsNoTracking()
-                    .SingleAsync(s => s.PlayerId == playerId, CancellationToken);
-
-                Assert.Equal((int)EStatisticType.EnemiesKilled, stat.StatisticTypeId);
-                Assert.Null(stat.EntityId);
-                Assert.Equal(7m, stat.Value);
-            }
-        }
-
-        [Fact]
-        public async Task Save_WithoutPriorLoad_UpdatesExistingStatisticsWithoutDuplicating()
-        {
-            var playerId = await SeedPlayerAsync();
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 3m);
-            }
-
+            // A fresh scope reads the value straight from the cache — the database was never written.
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-                var progress = new PlayerProgress(
-                    MakeDomainPlayer(playerId),
-                    [new PlayerStatistic { Type = EStatisticType.EnemiesKilled, EntityId = null, Value = 10m }],
-                    []);
-
-                // No Load first: Save must fetch the existing (tracked) row on demand and update it.
-                await repo.Save(progress);
-                await unitOfWork.CommitAsync();
+                var stats = await repo.GetStatistics(playerId);
+                Assert.Contains(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null && s.Value == 1m);
             }
 
             using (var scope = CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await context.PlayerStatistics.AsNoTracking()
-                    .SingleAsync(s => s.PlayerId == playerId, CancellationToken);
-
-                Assert.Equal(10m, stat.Value);
+                Assert.Empty(await context.PlayerStatistics.AsNoTracking()
+                    .Where(s => s.PlayerId == playerId).ToListAsync(CancellationToken));
             }
         }
 
         [Fact]
-        public async Task LoadThenSave_UpdatesExistingStatisticWithoutDuplicating()
-        {
-            var playerId = await SeedPlayerAsync();
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 3m);
-            }
-
-            using (var scope = CreateScope())
-            {
-                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-                var progress = await repo.Load(MakeDomainPlayer(playerId));
-                progress.Statistics.Single().Value = 12m;
-
-                // The common flow: the snapshot from Load is reused, so the existing row is updated in place.
-                await repo.Save(progress);
-                await unitOfWork.CommitAsync();
-            }
-
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await context.PlayerStatistics.AsNoTracking()
-                    .SingleAsync(s => s.PlayerId == playerId, CancellationToken);
-
-                Assert.Equal(12m, stat.Value);
-            }
-        }
-
-        [Fact]
-        public async Task Save_WithoutPriorLoad_InsertsNewChallengeProgress()
-        {
-            var playerId = await SeedPlayerAsync();
-            int challengeId;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var challenge = await TestDataSeeder.CreateChallengeAsync(context);
-                challengeId = challenge.Id;
-            }
-
-            var completedAt = DateTime.UtcNow;
-            using (var scope = CreateScope())
-            {
-                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-                var playerChallenge = new PlayerChallenge(MakeDomainChallenge(challengeId), progress: 10m, completed: true, completedAt);
-                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [playerChallenge]);
-
-                await repo.Save(progress);
-                await unitOfWork.CommitAsync();
-            }
-
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var entity = await context.PlayerChallenges.AsNoTracking()
-                    .SingleAsync(c => c.PlayerId == playerId, CancellationToken);
-
-                Assert.Equal(challengeId, entity.ChallengeId);
-                Assert.Equal(10m, entity.Progress);
-                Assert.True(entity.Completed);
-                Assert.NotNull(entity.CompletedAt);
-            }
-        }
-
-        [Fact]
-        public async Task Load_ReturnsPersistedStatisticsAndChallengeProgress()
+        public async Task Load_CacheMiss_ReloadsStatisticsAndChallengeProgressFromDatabase()
         {
             var playerId = await SeedPlayerAsync();
             int challengeId;
@@ -187,6 +135,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
 
+                // The progress cache key is empty (Redis was flushed on setup), so Load reloads from the DB.
                 var progress = await repo.Load(MakeDomainPlayer(playerId));
 
                 var stat = progress.Statistics.Single();
@@ -227,37 +176,24 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
-        [Fact]
-        public async Task RecordBattleCompleted_PersistsDamageHealedStatistic()
+        private async Task<ConnectionMultiplexer> ConnectRedisAsync()
         {
-            // The DamageHealed statistic (fed by the DoT/HoT phase's PlayerDamageHealed) was defined but
-            // unused before #334; this verifies it now flows through RecordBattleCompleted to a persisted row.
-            var playerId = await SeedPlayerAsync();
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            return await ConnectionMultiplexer.ConnectAsync(options);
+        }
 
-            using (var scope = CreateScope())
-            {
-                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        private static async Task<ProgressUpdatedEvent> DequeueProgressEvent(IDatabase redis)
+        {
+            var raw = await redis.ListLeftPopAsync(Constants.PUBSUB_PLAYER_QUEUE);
+            Assert.False(raw.IsNull);
 
-                var progress = await repo.Load(MakeDomainPlayer(playerId));
-                progress.RecordBattleCompleted(
-                    MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
-                    new BattleStats { PlayerDamageHealed = 12.5 }, isBossBattle: false, zoneId: 0);
+            var envelope = raw.ToString().Deserialize<DomainEventEnvelope>();
+            Assert.NotNull(envelope);
+            Assert.Equal(nameof(ProgressUpdatedEvent), envelope.Type);
 
-                await repo.Save(progress);
-                await unitOfWork.CommitAsync();
-            }
-
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await context.PlayerStatistics.AsNoTracking()
-                    .SingleAsync(
-                        s => s.PlayerId == playerId && s.StatisticTypeId == (int)EStatisticType.DamageHealed,
-                        CancellationToken);
-
-                Assert.Equal(12.5m, stat.Value);
-            }
+            var evt = envelope.Payload.Deserialize<ProgressUpdatedEvent>();
+            Assert.NotNull(evt);
+            return evt;
         }
 
         private static Enemy MakeEnemy(int id = 1) => new()
@@ -291,16 +227,6 @@ namespace Game.Application.Tests.DataAccess
             SelectedSkills = [],
             Skills = [],
             LogPreferences = [],
-        };
-
-        private static Challenge MakeDomainChallenge(int id) => new()
-        {
-            Id = id,
-            Name = "Test Challenge",
-            Description = string.Empty,
-            Type = new ChallengeType(EChallengeType.EnemiesKilled),
-            TargetEntityId = null,
-            ProgressGoal = 10m,
         };
     }
 }
