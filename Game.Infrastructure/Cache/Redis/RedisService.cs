@@ -1,20 +1,17 @@
 ﻿using Game.Abstractions.Infrastructure;
 using Game.Core;
-using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Game.Infrastructure.Cache.Redis
 {
     internal class RedisService : ICacheService
     {
-        private readonly ILogger<RedisService> _logger;
         private ConnectionMultiplexer Multiplexer { get; }
         public IDatabase Redis => Multiplexer.GetDatabase();
 
-        public RedisService(ConnectionMultiplexer multiplexer, ILogger<RedisService> logger)
+        public RedisService(ConnectionMultiplexer multiplexer)
         {
             Multiplexer = multiplexer;
-            _logger = logger;
         }
 
         public async Task<string?> Get(string key)

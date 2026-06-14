@@ -15,7 +15,7 @@ namespace Game.DataAccess.Mapping
             {
                 Id = entity.Id,
                 Name = entity.Name,
-                Description = entity.Description ?? string.Empty,
+                Description = entity.Description,
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
                 Attributes = entity.ItemAttributes
@@ -43,7 +43,7 @@ namespace Game.DataAccess.Mapping
             {
                 Id = entity.Id,
                 Name = entity.Name,
-                Description = entity.Description ?? string.Empty,
+                Description = entity.Description,
                 Type = (EItemModType)entity.ItemModTypeId,
                 Rarity = (ERarity)entity.RarityId,
                 Attributes = entity.ItemModAttributes
