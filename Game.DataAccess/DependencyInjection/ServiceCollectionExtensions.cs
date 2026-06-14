@@ -86,7 +86,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<ISkillEntityCache>(sp => sp.GetRequiredService<Skills>())
                 .AddScoped<Tags>()
                 .AddScoped<ITags>(sp => sp.GetRequiredService<Tags>())
-                .AddScoped<ITagEntityQueries>(sp => sp.GetRequiredService<Tags>())
+                .AddScoped<ITagAssignmentQueries>(sp => sp.GetRequiredService<Tags>())
                 .AddScoped<ITagCategories, TagCategories>()
                 .AddSingleton<ZonesCacheHolder>()
                 .AddSingleton<IReloadableReferenceCache>(sp => sp.GetRequiredService<ZonesCacheHolder>())
