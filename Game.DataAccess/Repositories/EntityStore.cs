@@ -13,11 +13,6 @@ namespace Game.DataAccess.Repositories
             _context.Add(entity);
         }
 
-        public void InsertAll<TEntity>(IEnumerable<TEntity> entities) where TEntity : class
-        {
-            _context.AddRange(entities);
-        }
-
         public void Delete<TEntity>(TEntity entity) where TEntity : class
         {
             var entry = _context.Entry(entity);

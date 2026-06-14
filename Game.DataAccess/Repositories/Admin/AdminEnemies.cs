@@ -41,40 +41,31 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            var newIds = data.AttributeDistributions.Select(ad => (int)ad.AttributeId).ToList();
-            foreach (var dist in enemy.AttributeDistributions.Where(ad => !newIds.Contains(ad.AttributeId)))
-            {
-                _entityStore.Delete(new Entities.AttributeDistribution
+            ChildCollectionReconciler.Reconcile(
+                existing: enemy.AttributeDistributions,
+                desired: data.AttributeDistributions,
+                existingKey: ad => ad.AttributeId,
+                desiredKey: ad => (int)ad.AttributeId,
+                delete: ad => _entityStore.Delete(new Entities.AttributeDistribution
                 {
                     EnemyId = enemy.Id,
-                    AttributeId = dist.AttributeId,
-                });
-            }
-
-            foreach (var dist in enemy.AttributeDistributions.Where(ad => newIds.Contains(ad.AttributeId)))
-            {
-                var newData = data.AttributeDistributions.First(ad => (int)ad.AttributeId == dist.AttributeId);
-                _entityStore.Update(new Entities.AttributeDistribution
-                {
-                    EnemyId = enemy.Id,
-                    AttributeId = dist.AttributeId,
-                    BaseAmount = newData.BaseAmount,
-                    AmountPerLevel = newData.AmountPerLevel
-                });
-            }
-
-            var existingIds = enemy.AttributeDistributions.Select(ad => ad.AttributeId).ToList();
-            var newDistributions = data.AttributeDistributions
-                .Where(ad => !existingIds.Contains((int)ad.AttributeId))
-                .Select(ad => new Entities.AttributeDistribution
+                    AttributeId = ad.AttributeId,
+                }),
+                insert: ad => _entityStore.Insert(new Entities.AttributeDistribution
                 {
                     EnemyId = enemy.Id,
                     AttributeId = (int)ad.AttributeId,
                     BaseAmount = ad.BaseAmount,
-                    AmountPerLevel = ad.AmountPerLevel
-                }).ToList();
+                    AmountPerLevel = ad.AmountPerLevel,
+                }),
+                update: ad => _entityStore.Update(new Entities.AttributeDistribution
+                {
+                    EnemyId = enemy.Id,
+                    AttributeId = (int)ad.AttributeId,
+                    BaseAmount = ad.BaseAmount,
+                    AmountPerLevel = ad.AmountPerLevel,
+                }));
 
-            _entityStore.InsertAll(newDistributions);
             return true;
         }
 
@@ -86,26 +77,24 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            var newIds = data.SkillIds;
-            foreach (var skill in enemy.EnemySkills.Where(e => !newIds.Contains(e.SkillId)))
-            {
-                _entityStore.Delete(new Entities.EnemySkill
+            // An EnemySkill is a pure join row (no payload beyond its key), so a skill present on both
+            // sides needs no update — only deletes and inserts apply.
+            ChildCollectionReconciler.Reconcile(
+                existing: enemy.EnemySkills,
+                desired: data.SkillIds,
+                existingKey: es => es.SkillId,
+                desiredKey: id => id,
+                delete: es => _entityStore.Delete(new Entities.EnemySkill
                 {
                     EnemyId = enemy.Id,
-                    SkillId = skill.SkillId,
-                });
-            }
-
-            var existingIds = enemy.EnemySkills.Select(es => es.SkillId).ToList();
-            var enemySkills = data.SkillIds
-                .Where(id => !existingIds.Contains(id))
-                .Select(id => new Entities.EnemySkill
+                    SkillId = es.SkillId,
+                }),
+                insert: id => _entityStore.Insert(new Entities.EnemySkill
                 {
                     EnemyId = enemy.Id,
                     SkillId = id,
-                }).ToList();
+                }));
 
-            _entityStore.InsertAll(enemySkills);
             return true;
         }
 
@@ -117,38 +106,29 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            var newZoneIds = data.Spawns.Select(s => s.ZoneId).ToList();
-            foreach (var spawn in enemy.ZoneEnemies.Where(ze => !newZoneIds.Contains(ze.ZoneId)))
-            {
-                _entityStore.Delete(new Entities.ZoneEnemy
+            ChildCollectionReconciler.Reconcile(
+                existing: enemy.ZoneEnemies,
+                desired: data.Spawns,
+                existingKey: ze => ze.ZoneId,
+                desiredKey: s => s.ZoneId,
+                delete: ze => _entityStore.Delete(new Entities.ZoneEnemy
                 {
-                    ZoneId = spawn.ZoneId,
+                    ZoneId = ze.ZoneId,
                     EnemyId = enemy.Id,
-                });
-            }
-
-            foreach (var spawn in enemy.ZoneEnemies.Where(ze => newZoneIds.Contains(ze.ZoneId)))
-            {
-                var newData = data.Spawns.First(s => s.ZoneId == spawn.ZoneId);
-                _entityStore.Update(new Entities.ZoneEnemy
-                {
-                    ZoneId = spawn.ZoneId,
-                    EnemyId = enemy.Id,
-                    Weight = newData.Weight,
-                });
-            }
-
-            var existingZoneIds = enemy.ZoneEnemies.Select(ze => ze.ZoneId).ToList();
-            var newSpawns = data.Spawns
-                .Where(s => !existingZoneIds.Contains(s.ZoneId))
-                .Select(s => new Entities.ZoneEnemy
+                }),
+                insert: s => _entityStore.Insert(new Entities.ZoneEnemy
                 {
                     ZoneId = s.ZoneId,
                     EnemyId = enemy.Id,
                     Weight = s.Weight,
-                }).ToList();
+                }),
+                update: s => _entityStore.Update(new Entities.ZoneEnemy
+                {
+                    ZoneId = s.ZoneId,
+                    EnemyId = enemy.Id,
+                    Weight = s.Weight,
+                }));
 
-            _entityStore.InsertAll(newSpawns);
             return true;
         }
     }

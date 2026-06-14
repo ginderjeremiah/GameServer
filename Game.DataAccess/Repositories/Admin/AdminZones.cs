@@ -87,38 +87,29 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            var newIds = data.ZoneEnemies.Select(ze => ze.EnemyId).ToList();
-            foreach (var enemy in zone.ZoneEnemies.Where(e => !newIds.Contains(e.EnemyId)))
-            {
-                _entityStore.Delete(new Entities.ZoneEnemy
+            ChildCollectionReconciler.Reconcile(
+                existing: zone.ZoneEnemies,
+                desired: data.ZoneEnemies,
+                existingKey: ze => ze.EnemyId,
+                desiredKey: ze => ze.EnemyId,
+                delete: ze => _entityStore.Delete(new Entities.ZoneEnemy
                 {
-                    ZoneId = enemy.ZoneId,
-                    EnemyId = enemy.EnemyId,
-                });
-            }
-
-            foreach (var enemy in zone.ZoneEnemies.Where(e => newIds.Contains(e.EnemyId)))
-            {
-                var newData = data.ZoneEnemies.First(ze => ze.EnemyId == enemy.EnemyId);
-                _entityStore.Update(new Entities.ZoneEnemy
-                {
-                    ZoneId = enemy.ZoneId,
-                    EnemyId = enemy.EnemyId,
-                    Weight = newData.Weight,
-                });
-            }
-
-            var existingIds = zone.ZoneEnemies.Select(ze => ze.EnemyId).ToList();
-            var zoneEnemies = data.ZoneEnemies
-                .Where(ze => !existingIds.Contains(ze.EnemyId))
-                .Select(ze => new Entities.ZoneEnemy
+                    ZoneId = ze.ZoneId,
+                    EnemyId = ze.EnemyId,
+                }),
+                insert: ze => _entityStore.Insert(new Entities.ZoneEnemy
                 {
                     ZoneId = data.ZoneId,
                     EnemyId = ze.EnemyId,
                     Weight = ze.Weight,
-                }).ToList();
+                }),
+                update: ze => _entityStore.Update(new Entities.ZoneEnemy
+                {
+                    ZoneId = data.ZoneId,
+                    EnemyId = ze.EnemyId,
+                    Weight = ze.Weight,
+                }));
 
-            _entityStore.InsertAll(zoneEnemies);
             return true;
         }
     }
