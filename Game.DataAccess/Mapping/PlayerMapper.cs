@@ -78,6 +78,7 @@ namespace Game.DataAccess.Mapping
                 .GroupBy(am => am.ItemId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
+            var unlockedItems = new List<UnlockedItemSlot>();
             foreach (var ui in entity.UnlockedItems)
             {
                 var coreItem = items.GetItem(ui.ItemId);
@@ -96,15 +97,13 @@ namespace Game.DataAccess.Mapping
                     }
                 }
 
-                var slot = new UnlockedItemSlot
+                unlockedItems.Add(new UnlockedItemSlot
                 {
                     ItemId = ui.ItemId,
                     Item = coreItem,
                     AppliedMods = appliedMods,
                     Favorite = ui.Favorite,
-                };
-
-                inventory.UnlockedItems.Add(slot);
+                });
 
                 if (ui.EquipmentSlotId.HasValue)
                 {
@@ -116,6 +115,9 @@ namespace Game.DataAccess.Mapping
                     }
                 }
             }
+
+            // Assign through the setter so the inventory builds its id-keyed index once.
+            inventory.UnlockedItems = unlockedItems;
 
             // Map unlocked mods
             foreach (var um in entity.UnlockedMods)

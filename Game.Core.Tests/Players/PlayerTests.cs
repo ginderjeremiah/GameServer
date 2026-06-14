@@ -130,7 +130,7 @@ namespace Game.Core.Tests.Players
             player.UnlockItem(item);
 
             Assert.Single(player.Inventory.UnlockedItems);
-            Assert.Equal(item, player.Inventory.UnlockedItems[0].Item);
+            Assert.Equal(item, player.Inventory.UnlockedItems.Single().Item);
         }
 
         [Fact]

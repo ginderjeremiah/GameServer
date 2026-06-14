@@ -10,8 +10,31 @@ namespace Game.Core.Players.Inventories
     {
         private static readonly int EquipSlots = (int)Enum.GetValues<EEquipmentSlot>().Max();
 
-        /// <summary>All items the player has unlocked.</summary>
-        public List<UnlockedItemSlot> UnlockedItems { get; set; }
+        /// <summary>
+        /// All unlocked items indexed by <see cref="UnlockedItemSlot.ItemId"/>. The index is the backing
+        /// store for the public <see cref="UnlockedItems"/> view, so every per-item lookup
+        /// (<see cref="GetUnlockedItem"/> and the Try* methods below) is O(1) rather than a linear scan —
+        /// the unlocked set grows unbounded as a player progresses and is read on the battle-start hot path.
+        /// </summary>
+        private readonly Dictionary<int, UnlockedItemSlot> _unlockedItems = [];
+
+        /// <summary>
+        /// All items the player has unlocked. The setter rebuilds the id-keyed index, keeping the aggregate
+        /// round-trippable through the player cache's JSON serialization; the getter is a read-only view, so
+        /// unlocked items can only be added through the inventory's domain methods.
+        /// </summary>
+        public IReadOnlyCollection<UnlockedItemSlot> UnlockedItems
+        {
+            get => _unlockedItems.Values;
+            set
+            {
+                _unlockedItems.Clear();
+                foreach (var slot in value)
+                {
+                    _unlockedItems[slot.ItemId] = slot;
+                }
+            }
+        }
 
         /// <summary>IDs of all modifiers the player has unlocked.</summary>
         public HashSet<int> UnlockedMods { get; set; }
@@ -21,9 +44,17 @@ namespace Game.Core.Players.Inventories
 
         public Inventory()
         {
-            UnlockedItems = [];
             UnlockedMods = [];
             EquipmentSlots = NewEquippedList();
+        }
+
+        /// <summary>
+        /// Returns the unlocked-item slot for <paramref name="itemId"/>, or null if the player has not
+        /// unlocked that item. O(1) via the id-keyed index.
+        /// </summary>
+        public UnlockedItemSlot? GetUnlockedItem(int itemId)
+        {
+            return _unlockedItems.GetValueOrDefault(itemId);
         }
 
         public IEnumerable<AttributeModifier> GetEquippedAttributeModifiers()
@@ -40,7 +71,7 @@ namespace Game.Core.Players.Inventories
         /// </summary>
         private IEnumerable<ItemMod> GetAppliedMods(int itemId)
         {
-            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
                 return [];
@@ -51,7 +82,7 @@ namespace Game.Core.Players.Inventories
 
         public bool TryEquipItem(int itemId, EEquipmentSlot slot)
         {
-            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
                 return false;
@@ -96,7 +127,7 @@ namespace Game.Core.Players.Inventories
                 return false;
             }
 
-            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
                 return false;
@@ -133,7 +164,7 @@ namespace Game.Core.Players.Inventories
 
         public bool TryRemoveMod(int itemId, int itemModSlotId)
         {
-            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
                 return false;
@@ -150,7 +181,7 @@ namespace Game.Core.Players.Inventories
 
         public bool TrySetFavorite(int itemId, bool favorite)
         {
-            var unlocked = UnlockedItems.FirstOrDefault(u => u.ItemId == itemId);
+            var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
                 return false;
@@ -162,17 +193,17 @@ namespace Game.Core.Players.Inventories
 
         public void UnlockItem(Item item)
         {
-            if (UnlockedItems.Any(u => u.ItemId == item.Id))
+            if (_unlockedItems.ContainsKey(item.Id))
             {
                 return;
             }
 
-            UnlockedItems.Add(new UnlockedItemSlot
+            _unlockedItems[item.Id] = new UnlockedItemSlot
             {
                 ItemId = item.Id,
                 Item = item,
                 AppliedMods = [],
-            });
+            };
         }
 
         public void UnlockMod(int itemModId)
