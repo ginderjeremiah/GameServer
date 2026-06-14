@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import {
 	EAttribute,
 	EModifierType,
@@ -13,7 +13,15 @@ import {
 
 // Same engine/stores/api mocks as the view-model test: the rendered screen builds
 // its own SkillsView from these at mount.
-const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
+const {
+	mockPlayerManager,
+	mockInventoryManager,
+	sendSocketCommand,
+	toastError,
+	staticData,
+	playerChallenges,
+	registerTooltipComponent
+} = vi.hoisted(() => {
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
 		currentZone: 0,
@@ -30,18 +38,29 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
+		// The rail registers a ChallengeTooltip; the registration is stubbed and the tooltip
+		// resolves the gating challenge from this same reference data (completion from the store).
+		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
+		registerTooltipComponent: vi.fn(() => ({
+			setTooltipPosition: vi.fn(),
+			showTooltip: vi.fn(),
+			hideTooltip: vi.fn()
+		})),
 		staticData: {
 			skills: [] as ISkill[],
 			challenges: [] as IChallenge[],
 			zones: undefined as IZone[] | undefined,
 			enemies: undefined as IEnemy[] | undefined,
-			attributes: undefined as unknown
+			attributes: undefined as unknown,
+			challengeTypes: undefined as unknown,
+			items: undefined as unknown,
+			itemMods: undefined as unknown
 		}
 	};
 });
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$stores', () => ({ staticData, toastError, playerChallenges, registerTooltipComponent }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
@@ -106,6 +125,7 @@ const rowByName = (container: HTMLElement, name: string): HTMLElement | undefine
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
+	playerChallenges.isChallengeCompleted.mockReset().mockReturnValue(false);
 	staticData.skills = SKILLS;
 	staticData.challenges = CHALLENGES;
 	staticData.zones = ZONES;
@@ -337,5 +357,44 @@ describe('Skills screen', () => {
 		await fireEvent.input(search, { target: { value: 'delta' } });
 		expect(container.querySelectorAll('.row').length).toBe(1);
 		expect(rowByName(container, 'Delta')).toBeTruthy();
+	});
+
+	it('surfaces the gating challenge tooltip when hovering a locked, challenge-gated skill', async () => {
+		// Echo (id 4) is locked and is the reward of challenge 0; give that challenge a requirement.
+		staticData.challenges = [
+			{
+				id: 0,
+				name: 'Slay Ten',
+				description: 'Defeat 10 enemies',
+				challengeTypeId: 0,
+				progressGoal: 10,
+				rewardSkillId: 4
+			}
+		] as unknown as IChallenge[];
+		const { container } = render(Skills);
+
+		// Reveal locked skills so Echo (gated) appears in the rail.
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
+		const echo = rowByName(container, 'Echo')!;
+
+		// Nothing is shown until the locked row is hovered.
+		expect(screen.queryByText('Slay Ten')).toBeNull();
+
+		await fireEvent.mouseEnter(echo, { clientX: 5, clientY: 5 });
+		// The gating challenge's name + requirement surface; the skill reward stays sealed (incomplete).
+		expect(screen.getByText('Slay Ten')).toBeTruthy();
+		expect(screen.getByText('Defeat 10 enemies')).toBeTruthy();
+
+		// Leaving the row clears the gate so it no longer renders.
+		await fireEvent.mouseLeave(echo);
+		expect(screen.queryByText('Slay Ten')).toBeNull();
+	});
+
+	it('does not surface a challenge tooltip when hovering an unlocked skill', async () => {
+		const { container } = render(Skills);
+		// Alpha is an unlocked, equipped skill — hovering it must not show any gate.
+		await fireEvent.mouseEnter(rowByName(container, 'Alpha')!, { clientX: 5, clientY: 5 });
+		expect(screen.queryByText('Slay Ten')).toBeNull();
 	});
 });

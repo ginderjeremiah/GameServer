@@ -1,9 +1,6 @@
 using Game.Api.Models.Common;
-using Game.Api.Models.InventoryItems;
 using Game.Api.Models.Player;
 using Game.Api.Services;
-using Game.Application.Services;
-using Game.Core;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers
@@ -13,12 +10,10 @@ namespace Game.Api.Controllers
     public class PlayerController : ControllerBase
     {
         private readonly SessionService _sessionService;
-        private readonly PlayerService _playerService;
 
-        public PlayerController(SessionService sessionService, PlayerService playerService)
+        public PlayerController(SessionService sessionService)
         {
             _sessionService = sessionService;
-            _playerService = playerService;
         }
 
         [HttpGet("/api/[controller]")]
@@ -26,54 +21,6 @@ namespace Game.Api.Controllers
         {
             var player = await _sessionService.LoadPlayer();
             return ApiResponse.Success(PlayerData.FromPlayer(player));
-        }
-
-        [HttpPost]
-        public async Task<ApiResponse> EquipItem([FromBody] EquipRequest request)
-        {
-            var player = await _sessionService.LoadPlayer();
-            var success = await _playerService.EquipItem(
-                player, request.ItemId, (EEquipmentSlot)request.EquipmentSlotId);
-
-            return success
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Failed to equip item.");
-        }
-
-        [HttpPost]
-        public async Task<ApiResponse> UnequipItem([FromBody] EquipRequest request)
-        {
-            var player = await _sessionService.LoadPlayer();
-            var success = await _playerService.UnequipItem(
-                player, (EEquipmentSlot)request.EquipmentSlotId);
-
-            return success
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Failed to unequip item.");
-        }
-
-        [HttpPost]
-        public async Task<ApiResponse> ApplyMod([FromBody] ApplyModRequest request)
-        {
-            var player = await _sessionService.LoadPlayer();
-            var success = await _playerService.ApplyMod(
-                player, request.ItemId, request.ItemModId, request.ItemModSlotId);
-
-            return success
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Failed to apply modifier.");
-        }
-
-        [HttpPost]
-        public async Task<ApiResponse> RemoveMod([FromBody] RemoveModRequest request)
-        {
-            var player = await _sessionService.LoadPlayer();
-            var success = await _playerService.RemoveMod(
-                player, request.ItemId, request.ItemModSlotId);
-
-            return success
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Failed to remove modifier.");
         }
     }
 }

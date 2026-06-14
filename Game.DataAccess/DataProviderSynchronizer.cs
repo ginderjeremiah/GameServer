@@ -186,6 +186,11 @@ namespace Game.DataAccess
                     await HandleLogPreferenceChanged(context, logEvt);
                     break;
 
+                case nameof(ProgressUpdatedEvent):
+                    var progressEvt = Deserialize<ProgressUpdatedEvent>(envelope.Payload);
+                    await HandleProgressUpdated(context, progressEvt);
+                    break;
+
                 // PlayerLeveledUpEvent is handled in-process only — it has no persistence
                 // handler registered, so it is never published to this queue.
 
@@ -404,6 +409,79 @@ namespace Game.DataAccess
                 });
                 await context.SaveChangesAsync();
             }
+        }
+
+        private static async Task HandleProgressUpdated(GameContext context, ProgressUpdatedEvent evt)
+        {
+            // Absolute upserts so re-applying the event under the retry policy converges to the same state.
+            // Batched like HandleAttributeAllocationsChanged: load the touched rows, set/insert, save once.
+            if (evt.Statistics.Count > 0)
+            {
+                // Constrain the load to the touched (type, entity) space, not every row of the touched
+                // types: a long-lived account accrues one row per enemy/skill, so filtering on typeIds alone
+                // would load hundreds to upsert the ~10-20 this battle changed (aggregate-DB-load concern,
+                // #548). The exact-key match still happens in memory below; this only bounds the fetch.
+                // entityIds includes null for the global rows — EF turns Contains over a List<int?> into
+                // "EntityId IN (...) OR EntityId IS NULL".
+                var typeIds = evt.Statistics.Select(s => s.StatisticTypeId).Distinct().ToList();
+                var entityIds = evt.Statistics.Select(s => s.EntityId).Distinct().ToList();
+                var existing = await context.PlayerStatistics
+                    .Where(ps => ps.PlayerId == evt.PlayerId
+                        && typeIds.Contains(ps.StatisticTypeId)
+                        && entityIds.Contains(ps.EntityId))
+                    .ToListAsync();
+                var byKey = existing.ToDictionary(ps => (ps.StatisticTypeId, ps.EntityId));
+
+                foreach (var stat in evt.Statistics)
+                {
+                    if (byKey.TryGetValue((stat.StatisticTypeId, stat.EntityId), out var row))
+                    {
+                        row.Value = stat.Value;
+                    }
+                    else
+                    {
+                        context.PlayerStatistics.Add(new PlayerStatistic
+                        {
+                            PlayerId = evt.PlayerId,
+                            StatisticTypeId = stat.StatisticTypeId,
+                            EntityId = stat.EntityId,
+                            Value = stat.Value,
+                        });
+                    }
+                }
+            }
+
+            if (evt.Challenges.Count > 0)
+            {
+                var challengeIds = evt.Challenges.Select(c => c.ChallengeId).ToList();
+                var existing = await context.PlayerChallenges
+                    .Where(pc => pc.PlayerId == evt.PlayerId && challengeIds.Contains(pc.ChallengeId))
+                    .ToListAsync();
+                var byId = existing.ToDictionary(pc => pc.ChallengeId);
+
+                foreach (var challenge in evt.Challenges)
+                {
+                    if (byId.TryGetValue(challenge.ChallengeId, out var row))
+                    {
+                        row.Progress = challenge.Progress;
+                        row.Completed = challenge.Completed;
+                        row.CompletedAt = challenge.CompletedAt;
+                    }
+                    else
+                    {
+                        context.PlayerChallenges.Add(new PlayerChallenge
+                        {
+                            PlayerId = evt.PlayerId,
+                            ChallengeId = challenge.ChallengeId,
+                            Progress = challenge.Progress,
+                            Completed = challenge.Completed,
+                            CompletedAt = challenge.CompletedAt,
+                        });
+                    }
+                }
+            }
+
+            await context.SaveChangesAsync();
         }
 
         private static T Deserialize<T>(string json)

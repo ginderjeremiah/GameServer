@@ -4,6 +4,9 @@
 	class:sel={view.selectedId === metrics.skill.id}
 	class:lock={!metrics.unlocked}
 	onclick={() => view.select(metrics.skill.id)}
+	onmouseenter={gated ? (e) => onGateEnter?.(metrics, e) : undefined}
+	onmousemove={gated ? onGateMove : undefined}
+	onmouseleave={gated ? onGateLeave : undefined}
 >
 	<SkillIcon skill={metrics.skill} locked={!metrics.unlocked} size={30} />
 	<span class="body">
@@ -27,11 +30,20 @@ import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 type Props = {
 	metrics: SkillMetrics;
 	view: SkillsView;
+	/** Hover callbacks that surface a gated skill's gating challenge. Fired only when the row is
+	 *  gated (locked + rewarded by a challenge); unlocked rows never invoke them. */
+	onGateEnter?: (metrics: SkillMetrics, ev: MouseEvent) => void;
+	onGateMove?: (ev: MouseEvent) => void;
+	onGateLeave?: () => void;
 };
 
-const { metrics, view }: Props = $props();
+const { metrics, view, onGateEnter, onGateMove, onGateLeave }: Props = $props();
 
 const fmt = (n: number) => formatNum(Math.round(n));
+
+// A locked skill that is some challenge's reward is gated behind that challenge — hovering it
+// surfaces the gate. Unlocked skills (and locked ones with no challenge source) show no tooltip.
+const gated = $derived(!metrics.unlocked && metrics.source != null);
 </script>
 
 <style lang="scss">

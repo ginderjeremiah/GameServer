@@ -23,15 +23,14 @@ namespace Game.DataAccess.Repositories
 
         public ItemMod? LookupItemMod(int itemModId)
         {
-            var itemMods = Entities;
-            return itemMods.Count <= itemModId || itemModId < 0 ? null : itemMods[itemModId];
+            return Entities.Lookup(itemModId);
         }
 
         public CoreItemMod GetItemMod(int itemModId)
         {
             // Returns the snapshot's shared, pre-materialized instance rather than rebuilding a fresh graph
             // per call. Applied mods are reference data treated as immutable by every caller, so sharing is safe.
-            return holder.Current.CoreItemMods[itemModId];
+            return holder.Current.CoreItemMods.GetById(itemModId, "item mod");
         }
     }
 }
