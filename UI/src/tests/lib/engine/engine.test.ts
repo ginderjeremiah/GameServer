@@ -29,7 +29,7 @@ vi.mock('$stores', async () => {
 	};
 });
 
-const { listenCommand, unlistenSocketReplaced, unlistenChallengeCompleted } = vi.hoisted(() => {
+const { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted } = vi.hoisted(() => {
 	const unlistenSocketReplaced = vi.fn();
 	const unlistenChallengeCompleted = vi.fn();
 	const listenCommand = vi.fn().mockImplementation((command: string) => {
@@ -40,13 +40,14 @@ const { listenCommand, unlistenSocketReplaced, unlistenChallengeCompleted } = vi
 			return unlistenChallengeCompleted;
 		}
 	});
-	return { listenCommand, unlistenSocketReplaced, unlistenChallengeCompleted };
+	const disconnect = vi.fn();
+	return { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted };
 });
 // Partial mock: keep $lib/api's real exports (other modules in the graph, e.g. $lib/common, rely on
-// them) but swap apiSocket for a stub whose listenCommand we can assert against.
+// them) but swap apiSocket for a stub whose listenCommand/disconnect we can assert against.
 vi.mock('$lib/api', async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
-	apiSocket: { listenCommand }
+	apiSocket: { listenCommand, disconnect }
 }));
 
 // Lightweight engine/manager stubs whose lifecycle methods are spies.
@@ -191,6 +192,13 @@ describe('startGame', () => {
 
 		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
+	});
+
+	it('stopGame disconnects the socket so the keepalive ping cannot reconnect after takeover', () => {
+		startGame();
+		void handleSocketReplaced();
+
+		expect(disconnect).toHaveBeenCalledTimes(1);
 	});
 });
 

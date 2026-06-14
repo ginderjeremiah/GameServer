@@ -14,6 +14,21 @@ import { handleAuthFailure, refreshTokens } from './auth';
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
 const NORMAL_CLOSURE = 1000;
 
+/** Keepalive / latency-probe cadence. Also doubles as a background reconnect for an idle session whose
+ *  socket dropped, so it is deliberately torn down (not just left firing) once the session ends. */
+const PING_INTERVAL_MS = 10000;
+
+/** A handshake auth-rejection refreshes the token pair and reconnects, but only this many times in a row
+ *  before giving up — so a server that keeps rejecting a freshly-refreshed token (a flapping or broken
+ *  server) can't drive an unbounded refresh/reconnect loop that rapidly burns single-use refresh tokens. */
+const MAX_SOCKET_AUTH_RETRIES = 5;
+
+/** The auth-retry budget above is refilled only once a reconnected socket has stayed open at least this
+ *  long, never the instant it opens — so a socket that opens then is immediately closed (a post-open
+ *  rejection / flap) can't reset the count every cycle and re-enable the loop. A healthy connection
+ *  trivially clears this bar and regains a full budget for a genuine future re-auth. */
+const STABLE_CONNECTION_MS = 10000;
+
 /** Per-request backstop for the case the close-handler can't cover: the socket stays open but a
  *  response simply never arrives (e.g. the server processed the command but failed to send a reply,
  *  or sent one that failed to parse). Without it the in-flight entry — and the caller's await — would
@@ -59,8 +74,16 @@ export class ApiSocket {
 	}> = {};
 	private lastPing = 0;
 	private socketOpened = false;
-	private socketAuthRetried = false;
-	private pingIntervalStarted = false;
+	// Consecutive handshake-auth refresh/reconnect attempts since the last *stable* open; bounded by
+	// MAX_SOCKET_AUTH_RETRIES so a flapping/post-open-rejecting server can't loop and burn refresh tokens.
+	private socketAuthRetries = 0;
+	// The keepalive interval handle (null = not running) so it can be cleared on a clean close, an
+	// unrecoverable auth failure, or an explicit disconnect — rather than firing for the lifetime of the
+	// module singleton and trying to resurrect a socket for a logged-out user.
+	private pingIntervalId: ReturnType<typeof setInterval> | null = null;
+	// Pending "the connection has proven stable" timer that refills the auth-retry budget; cleared if the
+	// socket closes before it fires (so a brief open doesn't reset the count mid-loop).
+	private connectionStableTimer: ReturnType<typeof setTimeout> | null = null;
 
 	private ensureSocket() {
 		if (!socket || socket.readyState === socket.CLOSED) {
@@ -74,9 +97,8 @@ export class ApiSocket {
 			socket.onmessage = this.receiveResponse.bind(this);
 			socket.onerror = this.handleError.bind(this);
 			socket.onclose = this.handleClose.bind(this);
-			if (!this.pingIntervalStarted) {
-				this.pingIntervalStarted = true;
-				setInterval(() => apiSocket.attemptPing(), 10000);
+			if (this.pingIntervalId === null) {
+				this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
 			}
 		}
 	}
@@ -105,10 +127,45 @@ export class ApiSocket {
 	}
 
 	public attemptPing() {
+		// The keepalive must not resurrect a socket for a session that has ended: once the tokens are gone
+		// (logout / unrecoverable auth failure) stop the interval instead of reconnecting on a cleared
+		// token, which would otherwise produce post-logout reconnect noise.
+		if (!getAccessToken()) {
+			this.stopPingInterval();
+			return;
+		}
 		this.ensureSocket();
 		if (socket && socket.readyState === socket.OPEN) {
 			this.lastPing = performance.now();
 			socket.send('ping');
+		}
+	}
+
+	/**
+	 * Fully tears down the live connection for a session that is ending without a full-page reload (the
+	 * SocketReplaced handler navigates client-side, so the module singleton — and this interval — survive):
+	 * stops the keepalive ping and closes the socket so a background ping can't silently reconnect and, in
+	 * the SocketReplaced case, fight the session that just took over.
+	 */
+	public disconnect() {
+		this.stopPingInterval();
+		this.clearConnectionStableTimer();
+		if (socket && socket.readyState !== socket.CLOSED) {
+			socket.close(NORMAL_CLOSURE);
+		}
+	}
+
+	private stopPingInterval() {
+		if (this.pingIntervalId !== null) {
+			clearInterval(this.pingIntervalId);
+			this.pingIntervalId = null;
+		}
+	}
+
+	private clearConnectionStableTimer() {
+		if (this.connectionStableTimer !== null) {
+			clearTimeout(this.connectionStableTimer);
+			this.connectionStableTimer = null;
 		}
 	}
 
@@ -207,10 +264,12 @@ export class ApiSocket {
 
 	/**
 	 * A handshake rejected for auth reasons (expired/invalid access token) closes the socket without it
-	 * ever opening. When that happens we refresh the token pair once and reconnect. A socket that did
-	 * open before dropping (e.g. SocketReplaced, or a transient network blip) is left alone — its own
-	 * handler manages the teardown, and retrying here risks fighting an intentional close or looping
-	 * against a server that keeps closing the connection.
+	 * ever opening. When that happens we refresh the token pair and reconnect — but only up to
+	 * MAX_SOCKET_AUTH_RETRIES times in a row, so a server that keeps rejecting a freshly-refreshed token
+	 * can't loop and burn rotating refresh tokens; the budget is refilled once a reconnect proves stable
+	 * (see onStart). A socket that did open before dropping (SocketReplaced, or a transient network blip)
+	 * is left for the keepalive ping to reconnect — refreshing wouldn't help, and retrying here risks
+	 * fighting an intentional close.
 	 */
 	private handleClose(ev: CloseEvent) {
 		// A command sent before the drop will never get a response on this dead socket, and we deliberately
@@ -219,7 +278,23 @@ export class ApiSocket {
 		// unsent commands are untouched, so the auth-retry path below still re-sends them on reconnect.
 		this.settleInFlightRequests('Connection lost. Please try again.');
 
-		if (this.socketOpened || this.socketAuthRetried || ev.code === NORMAL_CLOSURE) {
+		// The socket didn't stay open, so cancel any pending "connection is now stable" budget refill.
+		this.clearConnectionStableTimer();
+
+		if (ev.code === NORMAL_CLOSURE) {
+			// A clean, intentional close (e.g. an explicit disconnect or a server-side graceful shutdown):
+			// stop the keepalive rather than reconnecting. A later user-initiated command re-arms it via
+			// ensureSocket.
+			this.stopPingInterval();
+			return;
+		}
+
+		if (this.socketOpened) {
+			return;
+		}
+
+		if (this.socketAuthRetries >= MAX_SOCKET_AUTH_RETRIES) {
+			console.warn(`Socket auth retry limit (${MAX_SOCKET_AUTH_RETRIES}) reached; not refreshing again.`);
 			return;
 		}
 
@@ -227,12 +302,15 @@ export class ApiSocket {
 			return;
 		}
 
-		this.socketAuthRetried = true;
+		this.socketAuthRetries++;
 		refreshTokens().then((tokens) => {
 			if (tokens) {
 				this.ensureSocket();
 				this.processCommandQueue();
 			} else {
+				// Refresh is spent/revoked — the session is unrecoverable. Stop the keepalive before routing
+				// to login so it can't fire a reconnect on the now-cleared token during the teardown.
+				this.stopPingInterval();
 				handleAuthFailure();
 			}
 		});
@@ -240,7 +318,14 @@ export class ApiSocket {
 
 	private onStart() {
 		this.socketOpened = true;
-		this.socketAuthRetried = false;
+		// Refill the auth-retry budget only after the connection proves stable (stays open a while), not
+		// the instant it opens — otherwise a socket that opens then is immediately closed would reset the
+		// count every cycle and let the refresh/reconnect loop run unbounded against a flapping server.
+		this.clearConnectionStableTimer();
+		this.connectionStableTimer = setTimeout(() => {
+			this.socketAuthRetries = 0;
+			this.connectionStableTimer = null;
+		}, STABLE_CONNECTION_MS);
 		this.attemptPing();
 		this.processCommandQueue();
 	}

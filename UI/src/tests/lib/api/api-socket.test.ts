@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 
 vi.mock('svelte', () => ({
 	onDestroy: vi.fn()
@@ -16,6 +16,7 @@ interface MockWebSocket {
 	OPEN: number;
 	CLOSED: number;
 	send: Mock;
+	close: Mock;
 	onopen: (() => void) | null;
 	onmessage: ((ev: { data: string }) => void) | null;
 	onerror: (() => void) | null;
@@ -32,6 +33,7 @@ function createMockWebSocket(url?: string): MockWebSocket {
 		OPEN: 1,
 		CLOSED: 3,
 		send: vi.fn(),
+		close: vi.fn(),
 		onopen: null,
 		onmessage: null,
 		onerror: null,
@@ -67,7 +69,17 @@ describe('ApiSocket', () => {
 		apiSocket = new ApiSocket();
 	});
 
+	afterEach(() => {
+		// Tear down the keepalive interval the instance may have armed so it doesn't leak across tests.
+		apiSocket.disconnect();
+	});
+
 	const lastWs = () => socketInstances[socketInstances.length - 1];
+
+	// The lifecycle fixes touch internal timer/counter bookkeeping, so read it directly to assert the
+	// keepalive interval is cleared and the auth-retry budget is bounded.
+	const internals = (s: ApiSocket) =>
+		s as unknown as { pingIntervalId: ReturnType<typeof setInterval> | null; socketAuthRetries: number };
 
 	const receive = (ws: MockWebSocket, data: string) => {
 		if (!ws.onmessage) {
@@ -479,6 +491,127 @@ describe('ApiSocket', () => {
 
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 			expect(listener).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('keepalive ping lifecycle', () => {
+		it('arms the keepalive interval when a socket is created', () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+		});
+
+		it('stops the keepalive and does not reconnect once the session is gone (post-logout)', () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+				const socketsBefore = socketInstances.length;
+
+				// Session ends (logout / unrecoverable auth failure clears the stored tokens).
+				localStorage.clear();
+
+				// The next keepalive tick must clear the interval and must not resurrect a socket.
+				vi.advanceTimersByTime(10000);
+
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+				expect(socketInstances.length).toBe(socketsBefore);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('stops the keepalive on a normal (clean) closure', () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const ws = lastWs();
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code: 1000 });
+
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+		});
+
+		it('disconnect() stops the keepalive and closes the socket', () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const ws = lastWs();
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+
+			apiSocket.disconnect();
+
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			expect(ws.close).toHaveBeenCalledWith(1000);
+		});
+	});
+
+	describe('bounded auth retries', () => {
+		// Reject a handshake before it ever opens (the auth-rejection signature), without calling onopen.
+		const rejectHandshake = (ws: MockWebSocket, code = 1006) => {
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code });
+		};
+
+		it('stops refreshing after the retry limit when no reconnect ever becomes stable', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+
+			// Each reconnect is rejected pre-open again; without a stable open the budget is never refilled.
+			for (let i = 0; i < 10; i++) {
+				rejectHandshake(lastWs());
+				await flushMicrotasks();
+			}
+
+			// Bounded at MAX_SOCKET_AUTH_RETRIES (5), not once per rejection — no unbounded refresh storm.
+			expect(refreshTokens).toHaveBeenCalledTimes(5);
+			expect(warnSpy).toHaveBeenCalled();
+			warnSpy.mockRestore();
+		});
+
+		it('refills the retry budget only after the connection stays open (stable), not on open', () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				internals(apiSocket).socketAuthRetries = 3;
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const ws = lastWs();
+				ws.onopen?.();
+				// Opening alone does not refill the budget — it only arms the stability timer.
+				expect(internals(apiSocket).socketAuthRetries).toBe(3);
+
+				// Staying open past the stability window refills it.
+				vi.advanceTimersByTime(10000);
+				expect(internals(apiSocket).socketAuthRetries).toBe(0);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not refill the retry budget when the socket closes before becoming stable', () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				internals(apiSocket).socketAuthRetries = 3;
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const ws = lastWs();
+				ws.onopen?.(); // arms the stability timer
+				ws.readyState = ws.CLOSED;
+				ws.onclose?.({ code: 1006 }); // closes before the window elapses → cancels the refill
+
+				vi.advanceTimersByTime(20000);
+				expect(internals(apiSocket).socketAuthRetries).toBe(3);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 });
