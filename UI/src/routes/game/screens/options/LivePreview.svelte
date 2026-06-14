@@ -19,8 +19,10 @@
 
 <script lang="ts">
 import { LogRow } from '$components';
+import { untrack } from 'svelte';
 import type { LogMessage } from '$lib/engine/log';
 import { ELogType } from '$lib/api';
+import { prefersReducedMotion } from '$lib/common';
 import type { LogPrefMap } from './options-view.svelte';
 
 interface Props {
@@ -71,9 +73,11 @@ let nextId = 1;
 
 function makeEvent(): LogMessage {
 	const logType = WEIGHTS[Math.floor(Math.random() * WEIGHTS.length)];
-	const sample = SAMPLES.find((s) => s.logType === logType)!;
+	// Every weighted type has a sample, but guard the lookup rather than asserting it: fall back
+	// to the first sample so a future WEIGHTS/SAMPLES mismatch degrades instead of crashing.
+	const sample = SAMPLES.find((s) => s.logType === logType) ?? SAMPLES[0];
 	const message = sample.messages[Math.floor(Math.random() * sample.messages.length)];
-	return { id: nextId++, logType, message };
+	return { id: nextId++, logType: sample.logType, message };
 }
 
 // Stored oldest → newest; rendered newest-first to mirror the real LogPanel.
@@ -88,8 +92,16 @@ const shown = $derived(
 );
 
 $effect(() => {
+	// Skip the perpetual JS ticker under prefers-reduced-motion (the global CSS rule can't collapse
+	// a timer); the seeded feed stays static. The seed already produced the visible rows.
+	if (prefersReducedMotion()) {
+		return;
+	}
 	const timer = setInterval(() => {
-		events = [...events.slice(-(PREVIEW_BUFFER - 1)), makeEvent()];
+		// Read `events` untracked: the effect depends on nothing reactive, so reassigning `events`
+		// here must not tear down and recreate the timer every tick (cadence churn).
+		const current = untrack(() => events);
+		events = [...current.slice(-(PREVIEW_BUFFER - 1)), makeEvent()];
 	}, TICK_MS);
 	return () => clearInterval(timer);
 });

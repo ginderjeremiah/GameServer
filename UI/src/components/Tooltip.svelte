@@ -7,11 +7,13 @@ import type { TooltipData } from '$stores';
 
 let { component, position, visible }: TooltipData = $props();
 
-let container: HTMLDivElement;
+let container = $state<HTMLDivElement>();
 
 $effect(() => {
 	const node = component()?.getBaseNode();
-	if (node) {
+	// Guard `container`: the effect tracks `component`, which can change before the bind:this
+	// binding establishes, so the node could be present while `container` is still unbound.
+	if (node && container) {
 		// eslint-disable-next-line svelte/no-dom-manipulating
 		container.replaceChildren();
 		// eslint-disable-next-line svelte/no-dom-manipulating

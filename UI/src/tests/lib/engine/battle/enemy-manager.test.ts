@@ -56,6 +56,9 @@ describe('EnemyManager.getNewEnemy', () => {
 
 	beforeEach(() => {
 		manager = new EnemyManager();
+		// The retry loop runs while the manager is started; flip it on directly (start() would also
+		// hook battle-stage changes, which these focused unit tests don't exercise).
+		manager.started = true;
 		vi.mocked(logMessage).mockClear();
 		vi.mocked(delay).mockClear();
 		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
@@ -105,5 +108,28 @@ describe('EnemyManager.getNewEnemy', () => {
 		// Backs off by the default retry delay (no explicit cooldown was provided).
 		expect(delay).toHaveBeenCalledWith(1000);
 		expect(manager.currentEnemy).toEqual(makeEnemy(4));
+	});
+
+	it('does not request an enemy when the manager is not started', async () => {
+		manager.started = false;
+
+		await manager.getNewEnemy();
+
+		expect(sendSocketCommand).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toBeUndefined();
+	});
+
+	it('stops retrying once the manager is stopped mid-backoff (a sustained outage is bounded)', async () => {
+		sendSocketCommand.mockResolvedValue(errorResponse('outage'));
+		// Simulate stop() landing during the retry backoff: the loop must not request again.
+		vi.mocked(delay).mockImplementationOnce(() => {
+			manager.started = false;
+			return Promise.resolve();
+		});
+
+		await manager.getNewEnemy();
+
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(manager.currentEnemy).toBeUndefined();
 	});
 });

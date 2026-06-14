@@ -54,8 +54,8 @@ describe('Tooltip', () => {
 			window.innerHeight = 800;
 		});
 
-		// The style derived reads the (non-reactive) container binding, so it only recomputes once a
-		// reactive prop changes after mount — mirroring the real store toggling `visible` post-mount.
+		// Toggle `visible` after mount — mirroring the real store — so the style derived recomputes
+		// with the bound container in place.
 		const renderVisible = async (position: { x: number; y: number }) => {
 			const props = makeProps({ visible: false, position });
 			const result = render(Tooltip, { props });

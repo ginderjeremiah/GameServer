@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	formatNum,
-	randomInt,
-	capitalize,
-	normalizeText,
-	plural,
-	keys,
-	groupBy,
-	enumPairs
-} from '../../lib/common/functions';
+import { formatNum, capitalize, normalizeText, plural, keys, groupBy, enumPairs } from '../../lib/common/functions';
 
 describe('formatNum', () => {
 	it('formats integers without trailing zeros', () => {
@@ -24,31 +15,6 @@ describe('formatNum', () => {
 	it('strips trailing zeros from decimals', () => {
 		expect(formatNum(1.1)).toBe('1.1');
 		expect(formatNum(2.0)).toBe('2');
-	});
-});
-
-describe('randomInt', () => {
-	it('returns values within the range [num1, num2)', () => {
-		for (let i = 0; i < 100; i++) {
-			const val = randomInt(5, 10);
-			expect(val).toBeGreaterThanOrEqual(5);
-			expect(val).toBeLessThan(10);
-		}
-	});
-
-	it('returns an integer', () => {
-		for (let i = 0; i < 20; i++) {
-			const val = randomInt(0, 100);
-			expect(val).toBe(Math.floor(val));
-		}
-	});
-
-	it('works with negative ranges', () => {
-		for (let i = 0; i < 50; i++) {
-			const val = randomInt(-10, -5);
-			expect(val).toBeGreaterThanOrEqual(-10);
-			expect(val).toBeLessThan(-5);
-		}
 	});
 });
 

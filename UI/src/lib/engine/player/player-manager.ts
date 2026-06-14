@@ -77,16 +77,23 @@ export class PlayerManager implements IPlayerData {
 		logMessage(ELogType.ItemFound, 'New skill unlocked!');
 	}
 
+	/** Exp required to advance the current level (`Level * EXP_PER_LEVEL`, mirroring the backend).
+	 *  The level is clamped to ≥ 1 so the pre-`initialize` `level = 0` default can't produce a
+	 *  zero threshold that would let `grantExp` over-level. A real level (≥ 1) is unaffected. */
+	private get nextLevelThreshold(): number {
+		return Math.max(1, this.level) * EXP_PER_LEVEL;
+	}
+
 	public grantExp(exp: number) {
 		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
-		while (this.exp >= this.level * EXP_PER_LEVEL) {
+		while (this.exp >= this.nextLevelThreshold) {
 			this.levelUp();
 		}
 	}
 
 	public levelUp() {
-		this.exp -= this.level * EXP_PER_LEVEL;
+		this.exp -= this.nextLevelThreshold;
 		this.level++;
 		this.statPointsGained += STAT_POINTS_PER_LEVEL;
 		logMessage(ELogType.LevelUp, 'Congratulations, you leveled up!');
