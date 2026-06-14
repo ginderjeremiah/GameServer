@@ -56,7 +56,9 @@
 						<span class="achip">{attributeCode(contribution.attributeId, staticData.attributes)}</span>
 						<div class="bar"><i style:width="{Math.round((contribution.value / maxContribution) * 100)}%"></i></div>
 						<span class="contrib"
-							>{attributeName(contribution.attributeId)} ×{contribution.multiplier} = +{fmt(contribution.value)}</span
+							>{attributeName(contribution.attributeId, staticData.attributes)} ×{contribution.multiplier} = +{fmt(
+								contribution.value
+							)}</span
 						>
 					</div>
 				{/each}

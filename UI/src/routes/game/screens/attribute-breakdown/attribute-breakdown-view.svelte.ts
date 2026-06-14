@@ -155,7 +155,7 @@ export function slotLabel(slot: number | undefined): string {
 export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
-			return attributeName(line.derivedSource);
+			return attributeName(line.derivedSource, staticData.attributes);
 		case EAttributeModifierSource.PlayerStatPoints:
 			return 'Allocated stat points';
 		case EAttributeModifierSource.BaseValue:
@@ -170,7 +170,7 @@ export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
 export function traceLabel(line: AppliedModifier<LabeledModifier>): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
-			return attributeName(line.derivedSource);
+			return attributeName(line.derivedSource, staticData.attributes);
 		case EAttributeModifierSource.PlayerStatPoints:
 			return 'Stat points';
 		case EAttributeModifierSource.BaseValue:
