@@ -81,9 +81,19 @@ namespace Game.Api.CodeGen
                 var typeText = genericParameter.IsNullable ? $"({GetTypeText(genericParameter)} | undefined)" : GetTypeText(genericParameter);
                 return $"{typeText}[]";
             }
-            else
+            else if (type.NeedsInterface())
             {
                 return GetInterfaceName(descriptor);
+            }
+            else
+            {
+                // A type with no TypeScript mapping that NeedsInterface() also rejects (e.g. Guid,
+                // TimeSpan, byte, char) would otherwise silently emit a reference to an interface that
+                // is never generated, breaking the frontend build with nothing flagged here. Throw so
+                // the unmapped type surfaces at generation time instead.
+                throw new InvalidOperationException(
+                    $"CodeGen has no TypeScript mapping for type '{type.FullName ?? type.Name}'. " +
+                    "Add an explicit mapping in CodeGenTypeFormatter.GetTypeText (and CodeGenExtensions.NeedsInterface if it should generate an interface).");
             }
         }
 

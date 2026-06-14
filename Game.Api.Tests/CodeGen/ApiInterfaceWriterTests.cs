@@ -118,6 +118,48 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void WriteApiInterfaces_ByteBackedEnum_RendersRawValues()
+        {
+            var writer = new ApiInterfaceWriter(_options);
+            var descriptor = new CodeGenTypeDescriptor(typeof(ByteBackedEnum));
+
+            writer.WriteApiInterfaces([descriptor], "// Auto-generated");
+
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "enums.ts"));
+            Assert.Contains("export enum ByteBackedEnum {", content);
+            Assert.Contains("Zero = 0,", content);
+            Assert.Contains("TwoHundred = 200,", content);
+        }
+
+        [Fact]
+        public void WriteApiInterfaces_LongBackedEnum_RendersValueOutsideIntRange()
+        {
+            var writer = new ApiInterfaceWriter(_options);
+            var descriptor = new CodeGenTypeDescriptor(typeof(LongBackedEnum));
+
+            writer.WriteApiInterfaces([descriptor], "// Auto-generated");
+
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "enums.ts"));
+            // The old (int)value cast would have overflowed; rendering the raw long keeps the true value.
+            Assert.Contains("Huge = 5000000000,", content);
+        }
+
+        [Fact]
+        public void WriteApiInterfaces_AliasedEnum_RendersBothMemberNames()
+        {
+            var writer = new ApiInterfaceWriter(_options);
+            var descriptor = new CodeGenTypeDescriptor(typeof(AliasedEnum));
+
+            writer.WriteApiInterfaces([descriptor], "// Auto-generated");
+
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "enums.ts"));
+            // Rendering from field.Name keeps the alias distinct; value.ToString() would emit "First"
+            // twice and drop "AliasOfFirst".
+            Assert.Contains("First = 1,", content);
+            Assert.Contains("AliasOfFirst = 1,", content);
+        }
+
+        [Fact]
         public void WriteApiInterfaces_NestedClass_WritesImports()
         {
             var writer = new ApiInterfaceWriter(_options);

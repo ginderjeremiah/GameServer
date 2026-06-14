@@ -129,6 +129,27 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void Endpoint_ApiPrefix_RemovedCleanlyWithoutLeadingSlash()
+        {
+            var extractor = new ControllerMetadataExtractor(typeof(PrefixController));
+            var get = extractor.Endpoints.Single();
+
+            // Route "/api/Prefix" → after removing the "api/" prefix → "Prefix" (no leading slash, no
+            // dropped character).
+            Assert.Equal("Prefix", get.Endpoint);
+        }
+
+        [Fact]
+        public void Endpoint_NonApiRoute_LeftIntact()
+        {
+            var extractor = new ControllerMetadataExtractor(typeof(NonApiRouteController));
+            var check = extractor.Endpoints.Single();
+
+            // A route that does not start with "api/" must not be sliced at all.
+            Assert.Equal("health/Check", check.Endpoint);
+        }
+
+        [Fact]
         public void ExcludesNonActionMethods()
         {
             var extractor = new ControllerMetadataExtractor(typeof(ControllerWithNonAction));
