@@ -121,23 +121,32 @@ namespace Game.Api.Sockets
 
         public async Task Close(ESocketCloseReason closeReason = ESocketCloseReason.Finished, CancellationToken cancellationToken = default)
         {
-            _socketClosedSource.TrySetResult(closeReason);
-            if (_socket.State is WebSocketState.Open)
+            try
             {
-                // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
-                // SendData; re-check state inside the lock so a racing close only sends one close frame.
-                await _sendLock.WaitAsync(cancellationToken);
-                try
+                if (_socket.State is WebSocketState.Open)
                 {
-                    if (_socket.State is WebSocketState.Open)
+                    // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
+                    // SendData; re-check state inside the lock so a racing close only sends one close frame.
+                    await _sendLock.WaitAsync(cancellationToken);
+                    try
                     {
-                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), cancellationToken);
+                        if (_socket.State is WebSocketState.Open)
+                        {
+                            await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), cancellationToken);
+                        }
+                    }
+                    finally
+                    {
+                        _sendLock.Release();
                     }
                 }
-                finally
-                {
-                    _sendLock.Release();
-                }
+            }
+            finally
+            {
+                // Settle WaitSocketClosed only after the close frame has been sent, so the middleware that
+                // awaits it can't dispose the socket and race the flush. Best-effort: the finally still
+                // releases waiters if CloseAsync throws or the drain token cancels the send.
+                _socketClosedSource.TrySetResult(closeReason);
             }
         }
     }
