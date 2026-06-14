@@ -36,17 +36,20 @@ namespace Game.DataAccess.Mapping
             };
         }
 
-        public static Enemy ToCore(
-            EntityEnemy entity,
-            int level,
-            IReadOnlyList<EntitySkill> allSkills)
+        /// <summary>
+        /// Maps an entity <see cref="EntityEnemy"/> (with its child collections loaded) to a level-independent
+        /// <see cref="EnemyTemplate"/>: the pre-mapped attribute distributions and available-skill loadout that
+        /// a per-encounter <see cref="Enemy"/> is cloned from. Built once per snapshot so the gameplay reads
+        /// (<c>GetDomainEnemy</c>/<c>GetRandomDomainEnemy</c>) reuse this graph rather than re-mapping it on
+        /// every battle setup (#584).
+        /// </summary>
+        public static EnemyTemplate ToTemplate(EntityEnemy entity, IReadOnlyList<EntitySkill> allSkills)
         {
-            return new Enemy
+            return new EnemyTemplate
             {
                 Id = entity.Id,
                 Name = entity.Name,
                 IsBoss = entity.IsBoss,
-                Level = level,
                 AttributeDistributions = entity.AttributeDistributions
                     .Select(ad => new AttributeDistribution
                     {
