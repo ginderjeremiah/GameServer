@@ -19,11 +19,5 @@ namespace Game.Api.Controllers
             var stats = await _playerProgress.GetStatistics(_sessionService.SelectedPlayerId);
             return ApiResponse.Success(stats.To().Model<PlayerStatistic>());
         }
-
-        [HttpGet]
-        public ApiEnumerableResponse<StatisticType> StatisticTypes()
-        {
-            return ApiResponse.Success(Core.Progress.StatisticType.GetAll().To().Model<StatisticType>());
-        }
     }
 }
