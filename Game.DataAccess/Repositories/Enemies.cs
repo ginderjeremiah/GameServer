@@ -7,7 +7,7 @@ using CoreEnemy = Game.Core.Enemies.Enemy;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Enemies(EnemiesCacheHolder holder, ISkillEntityCache skills, IZones zones) : IEnemies, IEnemyEntityCache
+    internal class Enemies(EnemiesCacheHolder holder, IZones zones) : IEnemies, IEnemyEntityCache
     {
         private EnemySnapshot Snapshot => holder.Current;
 
@@ -23,32 +23,39 @@ namespace Game.DataAccess.Repositories
 
         public Enemy GetRandomEnemy(int zoneId)
         {
+            var snapshot = Snapshot;
+            return snapshot.Enemies[GetRandomEnemyId(snapshot, zoneId)];
+        }
+
+        public CoreEnemy? GetDomainEnemy(int enemyId, int level)
+        {
+            // Clones the snapshot's pre-mapped, level-independent template rather than re-mapping the enemy's
+            // skill graph per call; the level (and the encounter's battle-skill selection) is applied per clone.
+            return Snapshot.Templates.Lookup(enemyId)?.ToEnemy(level);
+        }
+
+        public CoreEnemy GetRandomDomainEnemy(int zoneId, int level)
+        {
+            var snapshot = Snapshot;
+            return snapshot.Templates[GetRandomEnemyId(snapshot, zoneId)].ToEnemy(level);
+        }
+
+        // Resolves a random enemy id from the requested zone's spawn table against the captured snapshot,
+        // validating the zone and that it has a spawn table. Shared by the entity and domain random reads so
+        // both apply the same zone checks and read a single consistent snapshot.
+        private int GetRandomEnemyId(EnemySnapshot snapshot, int zoneId)
+        {
             if (!zones.ValidateZoneId(zoneId))
             {
                 throw new ArgumentOutOfRangeException(nameof(zoneId), zoneId, $"No zone exists with Id {zoneId}.");
             }
 
-            var snapshot = Snapshot;
             if (!snapshot.ZoneEnemyTables.TryGetValue(zoneId, out var table))
             {
                 throw new InvalidOperationException($"Zone {zoneId} has no enemies to spawn.");
             }
 
-            return snapshot.Enemies[table.GetRandomValue()];
-        }
-
-        public CoreEnemy? GetDomainEnemy(int enemyId, int level)
-        {
-            var entity = GetEnemy(enemyId);
-            return entity is null
-                ? null
-                : EnemyMapper.ToCore(entity, level, skills.AllSkillEntities());
-        }
-
-        public CoreEnemy GetRandomDomainEnemy(int zoneId, int level)
-        {
-            var entity = GetRandomEnemy(zoneId);
-            return EnemyMapper.ToCore(entity, level, skills.AllSkillEntities());
+            return table.GetRandomValue();
         }
     }
 }

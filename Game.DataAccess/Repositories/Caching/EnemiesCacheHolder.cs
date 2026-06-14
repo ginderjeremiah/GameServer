@@ -1,18 +1,22 @@
 using Game.Core.Probability;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using EnemyTemplate = Game.Core.Enemies.EnemyTemplate;
 
 namespace Game.DataAccess.Repositories.Caching
 {
     /// <summary>
-    /// An immutable snapshot of the enemy reference set: the ordered enemy list plus the per-zone spawn
-    /// tables derived from it. Both are built and published together so a reader can never observe a new
-    /// enemy list against stale (or null) spawn tables.
+    /// An immutable snapshot of the enemy reference set: the ordered enemy entity list, the level-independent
+    /// pre-mapped <see cref="EnemyTemplate"/>s the gameplay reads clone from (aligned by zero-based id with the
+    /// entity list), and the per-zone spawn tables derived from the list. All are built and published together
+    /// so a reader can never observe a new enemy list against stale (or null) templates or spawn tables.
     /// </summary>
     internal sealed record EnemySnapshot(
         IReadOnlyList<Enemy> Enemies,
+        IReadOnlyList<EnemyTemplate> Templates,
         IReadOnlyDictionary<int, ProbabilityTable<int>> ZoneEnemyTables);
 
     /// <summary>
@@ -34,7 +38,21 @@ namespace Game.DataAccess.Repositories.Caching
                 .OrderBy(e => e.Id)
                 .ToListAsync(cancellationToken);
 
-            return new EnemySnapshot(enemies, BuildZoneEnemyTables(enemies));
+            // Map each enemy's available-skill loadout once here so the gameplay reads clone a pre-built
+            // template rather than re-mapping the skill graph per encounter (#584). Skills are loaded directly
+            // rather than read from the skill cache: holders reload independently and this one reloads before
+            // the skill holder, so a cross-cache read could observe a stale skill snapshot mid-reload-sweep.
+            var skills = await context.Skills
+                .AsNoTracking()
+                .Include(s => s.SkillDamageMultipliers)
+                .Include(s => s.SkillEffects)
+                .AsSplitQuery()
+                .OrderBy(s => s.Id)
+                .ToListAsync(cancellationToken);
+
+            var templates = enemies.Select(enemy => EnemyMapper.ToTemplate(enemy, skills)).ToList();
+
+            return new EnemySnapshot(enemies, templates, BuildZoneEnemyTables(enemies));
         }
 
         /// <summary>

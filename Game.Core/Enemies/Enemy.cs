@@ -18,7 +18,7 @@ namespace Game.Core.Enemies
         public required string Name { get; init; }
         public required int Level { get; init; }
         public required bool IsBoss { get; init; }
-        public required List<AttributeDistribution> AttributeDistributions { get; init; }
+        public required IReadOnlyList<AttributeDistribution> AttributeDistributions { get; init; }
         public required IReadOnlyList<Skill> AvailableSkills { get; init; }
 
         /// <summary>

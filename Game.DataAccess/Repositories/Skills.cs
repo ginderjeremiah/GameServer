@@ -11,11 +11,6 @@ namespace Game.DataAccess.Repositories
     {
         private IReadOnlyList<Skill> Entities => holder.Current.Entities;
 
-        public IReadOnlyList<Skill> AllSkillEntities()
-        {
-            return Entities;
-        }
-
         public List<Contracts.Skill> AllSkills()
         {
             return [.. Entities.Select(SkillMapper.ToContract)];

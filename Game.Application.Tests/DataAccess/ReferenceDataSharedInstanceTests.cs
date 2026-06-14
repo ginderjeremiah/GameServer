@@ -93,6 +93,41 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetDomainEnemy_ReusesPreMappedTemplateAcrossCalls()
+        {
+            int enemyId;
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+                enemyId = (await TestDataSeeder.CreateEnemyAsync(context, name: "Shared Enemy")).Id;
+                await TestDataSeeder.LinkSkillToEnemyAsync(context, enemyId, skillId);
+            }
+
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+
+            var first = enemies.GetDomainEnemy(enemyId, level: 3);
+            var second = enemies.GetDomainEnemy(enemyId, level: 9);
+
+            Assert.NotNull(first);
+            Assert.NotNull(second);
+
+            // The optimization (#584): each encounter gets its own level-parameterized instance, but the
+            // pre-mapped available-skill graph is shared from the template rather than re-mapped per call.
+            Assert.NotSame(first, second);
+            Assert.Same(first.AvailableSkills, second.AvailableSkills);
+            Assert.Equal(3, first.Level);
+            Assert.Equal(9, second.Level);
+            Assert.Equal(enemyId, first.Id);
+            Assert.Equal("Shared Enemy", first.Name);
+            Assert.Contains(first.AvailableSkills, s => s.Id == skillId);
+        }
+
+        [Fact]
         public async Task ChallengesAll_ReturnsSnapshotDirectlyWithoutCopying()
         {
             int challengeId;

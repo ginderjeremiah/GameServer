@@ -9,7 +9,7 @@ namespace Game.DataAccess.Repositories.Caching
 {
     /// <summary>
     /// An immutable snapshot of the skill reference set: the ordered entity list (used for the contract
-    /// <c>AllSkills()</c> projection, <c>AllSkillEntities()</c>, and the admin entity lookups) plus the
+    /// <c>AllSkills()</c> projection and the admin entity lookups) plus the
     /// pre-materialized lean <see cref="CoreSkill"/> domain models, built and published together so a reader
     /// can never observe a new entity list against stale core models. The shared <see cref="CoreSkill"/>
     /// instances are returned from <c>Skills.GetSkill</c> instead of rebuilding a fresh graph per call
