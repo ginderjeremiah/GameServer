@@ -79,24 +79,6 @@
                 ErrorMessage = message
             };
         }
-
-        public static ApiResponse<T> ErrorWithData<T>(string message, T data) where T : IModel
-        {
-            return new ApiResponse<T>
-            {
-                Data = data,
-                ErrorMessage = message
-            };
-        }
-
-        public static ApiEnumerableResponse<T> ErrorWithListData<T>(string message, List<T> data) where T : IModel
-        {
-            return new ApiEnumerableResponse<T>
-            {
-                Data = data,
-                ErrorMessage = message
-            };
-        }
     }
 
     public interface IApiAsyncEnumerableResponse<T> : IApiCollectionResponse where T : IModel

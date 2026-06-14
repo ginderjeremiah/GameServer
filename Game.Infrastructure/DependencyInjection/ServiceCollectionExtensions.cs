@@ -36,8 +36,7 @@ namespace Game.Infrastructure.DependencyInjection
             return services.AddTransient(sp =>
             {
                 var options = sp.GetRequiredService<InfrastructureOptions>();
-                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                return CacheServiceFactory.GetCacheService(options, loggerFactory);
+                return CacheServiceFactory.GetCacheService(options);
             });
         }
 

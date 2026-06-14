@@ -11,7 +11,7 @@ namespace Game.DataAccess
         public async Task Migrate()
         {
             var start = Stopwatch.GetTimestamp();
-            logger.LogDebug($"Beginning migration.");
+            logger.LogDebug("Beginning migration.");
 
             await context.Database.MigrateAsync();
 

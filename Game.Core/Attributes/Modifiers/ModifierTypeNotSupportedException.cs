@@ -9,6 +9,6 @@
         /// The default constructor.
         /// </summary>
         /// <param name="type"></param>
-        public ModifierTypeNotSupportedException(EModifierType type) : base($"The type ${type} is not supported by this class.") { }
+        public ModifierTypeNotSupportedException(EModifierType type) : base($"The type {type} is not supported by this class.") { }
     }
 }

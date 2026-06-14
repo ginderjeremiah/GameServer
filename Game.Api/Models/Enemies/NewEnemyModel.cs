@@ -1,6 +1,4 @@
-﻿using Game.Api.Models;
-
-namespace Game.Api.Models.Enemies
+﻿namespace Game.Api.Models.Enemies
 {
     public class NewEnemyModel : IModel
     {
