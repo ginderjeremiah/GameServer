@@ -9,17 +9,8 @@
 	</div>
 
 	<!-- HP Bar -->
-	<div
-		class="hp-bar"
-		role="progressbar"
-		aria-label="{battler.name} health"
-		aria-valuenow={Math.round(battler.currentHealth)}
-		aria-valuemin={0}
-		aria-valuemax={maxHealth}
-	>
-		<div class="hp-disappearing" style:width="{healthPerc}%"></div>
-		<div class="hp-remaining" style:width="{healthPerc}%"></div>
-		<div class="hp-text">{healthText}</div>
+	<div class="hp-bar-slot">
+		<HpBar currentHealth={battler.currentHealth} {maxHealth} ariaLabel="{battler.name} health" />
 	</div>
 
 	<!-- Active timed effects -->
@@ -32,7 +23,8 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
-import { formatNum, tintColor } from '$lib/common';
+import { tintColor } from '$lib/common';
+import { HpBar } from '$components';
 import ActiveEffectChips from './ActiveEffectChips.svelte';
 import Skills from './Skills.svelte';
 
@@ -45,8 +37,6 @@ const { battler, side }: Props = $props();
 
 const accent = $derived(side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
-const healthText = $derived(`${formatNum(battler.currentHealth)} / ${formatNum(maxHealth)}`);
-const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealth * 100) / maxHealth, 0)) : 100);
 </script>
 
 <style lang="scss">
@@ -114,40 +104,7 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((battler.currentHealt
 	letter-spacing: 0.6px;
 }
 
-.hp-bar {
-	position: relative;
-	height: 20px;
-	background: var(--health-missing-color);
-	border: 1px solid color-mix(in srgb, var(--white) 12%, transparent);
-	border-radius: 2px;
-	overflow: hidden;
+.hp-bar-slot {
 	margin-bottom: 14px;
-}
-
-.hp-disappearing {
-	position: absolute;
-	inset: 0;
-	background: var(--health-disappearing-color);
-	transition: width 1s ease-out;
-}
-
-.hp-remaining {
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(180deg, var(--health-remaining-color) 0%, var(--health-remaining-dark) 100%);
-	transition: width 120ms ease-out;
-}
-
-.hp-text {
-	position: absolute;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-family: var(--mono);
-	font-size: 11px;
-	color: var(--white);
-	text-shadow: 0 1px 2px color-mix(in srgb, var(--black) 70%, transparent);
-	letter-spacing: 0.3px;
 }
 </style>
