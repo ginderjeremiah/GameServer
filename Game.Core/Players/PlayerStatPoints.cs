@@ -36,28 +36,32 @@ namespace Game.Core.Players
         /// <returns><see langword="true"/> if successful, otherwise <see langword="false"/></returns>
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
-            var availablePoints = StatPointsGained - StatPointsUsed;
-            // Index the updates by attribute once (first update wins per attribute, matching the prior
-            // FirstOrDefault), then materialize the matched pairs so the Sum/All/foreach below run a single pass.
-            var updatesByAttribute = new Dictionary<EAttribute, IAttributeUpdate>();
+            var allocationsByAttribute = StatAllocations.ToDictionary(allocation => allocation.Attribute);
+            // Match each update to the player's existing allocation row, keeping the first update per
+            // attribute (matching the prior FirstOrDefault). An update targeting an attribute the player
+            // has no allocation row for is rejected outright (#488): only the core attributes are seeded
+            // as rows, so allocating into an unknown (or derived) attribute is an invalid request, not a
+            // silent no-op that still reports success.
+            var matchedUpdates = new Dictionary<EAttribute, (StatAllocation Allocation, IAttributeUpdate Update)>();
             foreach (var update in changedAttributes)
             {
-                updatesByAttribute.TryAdd(update.Attribute, update);
+                if (!allocationsByAttribute.TryGetValue(update.Attribute, out var allocation))
+                {
+                    return false;
+                }
+
+                matchedUpdates.TryAdd(update.Attribute, (allocation, update));
             }
 
-            var matchedAttributes = StatAllocations
-                .Select(att => (att, upd: updatesByAttribute.GetValueOrDefault(att.Attribute)))
-                .ToList();
-            var changedPoints = matchedAttributes.Sum(match => match.upd?.Amount ?? 0);
-            if (availablePoints - changedPoints >= 0 && matchedAttributes.All(match => match.att.Amount + (match.upd?.Amount ?? 0) >= 0))
+            var changedPoints = matchedUpdates.Values.Sum(match => match.Update.Amount);
+            var availablePoints = StatPointsGained - StatPointsUsed;
+            if (availablePoints - changedPoints >= 0
+                && matchedUpdates.Values.All(match => match.Allocation.Amount + match.Update.Amount >= 0))
             {
                 StatPointsUsed += changedPoints;
-                foreach (var (att, upd) in matchedAttributes)
+                foreach (var (allocation, update) in matchedUpdates.Values)
                 {
-                    if (upd is not null)
-                    {
-                        att.Amount += upd.Amount;
-                    }
+                    allocation.Amount += update.Amount;
                 }
 
                 return true;

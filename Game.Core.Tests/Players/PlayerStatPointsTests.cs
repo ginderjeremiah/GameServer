@@ -126,10 +126,11 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TryUpdateAttributes_UnknownAttribute_IsIgnoredButStillSucceeds()
+        public void TryUpdateAttributes_UnknownAttribute_RejectsWithoutMutating()
         {
-            // An update targeting an attribute the player has no allocation row for is silently ignored
-            // (current contract — the separate concern of #488). It neither spends points nor mutates state.
+            // An update targeting an attribute the player has no allocation row for is rejected rather
+            // than silently succeeding as a no-op (#488). Only core attributes are seeded as rows, so an
+            // allocation into an unknown (or derived) attribute is an invalid request, not success.
             var allocations = new List<StatAllocation>
             {
                 new() { Attribute = EAttribute.Strength, Amount = 0 },
@@ -138,7 +139,28 @@ namespace Game.Core.Tests.Players
 
             var result = stats.TryUpdateAttributes([new Update(EAttribute.Luck, 3)]);
 
-            Assert.True(result);
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.Single().Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_KnownAndUnknownAttributes_RejectsEntireSet()
+        {
+            // A set mixing a valid allocation with one for an attribute that has no row is rejected as a
+            // whole, leaving the valid allocation and the point pool untouched (#488).
+            var allocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.Strength, Amount = 0 },
+            };
+            var stats = new PlayerStatPoints(allocations) { StatPointsGained = 10, StatPointsUsed = 0 };
+
+            var result = stats.TryUpdateAttributes([
+                new Update(EAttribute.Strength, 2),
+                new Update(EAttribute.Luck, 3),
+            ]);
+
+            Assert.False(result);
             Assert.Equal(0, stats.StatPointsUsed);
             Assert.Equal(0, stats.StatAllocations.Single().Amount);
         }

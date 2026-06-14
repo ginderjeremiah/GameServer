@@ -78,6 +78,31 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Error);
         }
 
+        [Fact]
+        public async Task UpdatePlayerStats_UnknownAttribute_ReturnsErrorAndLeavesAllocationsUnchanged()
+        {
+            // 6 available points (106 gained − 100 used). The seeded player only has rows for Strength and
+            // Endurance, so Luck has no allocation row — allocating into it must be rejected rather than
+            // silently reporting success, and the valid Strength delta in the same set must not apply (#488).
+            var (userId, _) = await SeedPlayerAsync(statPointsGained: 106);
+            await LoginAsync(Username, Password);
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            var updates = new[]
+            {
+                new { attributeId = (int)EAttribute.Strength, amount = 3 },
+                new { attributeId = (int)EAttribute.Luck, amount = 2 },
+            };
+            var response = await socketClient.SendCommandAsync<List<BattlerAttribute>>("UpdatePlayerStats", updates);
+
+            Assert.NotNull(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Equal(50m, response.Data.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+        }
+
         /// <summary>
         /// Polls the persisted player snapshot until the player's Strength allocation reaches the expected
         /// value (the cache write is fire-and-forget), failing after a short budget.
