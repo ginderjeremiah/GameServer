@@ -4,7 +4,17 @@
 			<span class="name"><span class="glyph"></span>The Warden</span>
 			<span class="hpnum">{game.enemyHP} / {game.enemyMax}</span>
 		</div>
-		<div class="bar enemy"><i style:width="{(game.enemyHP / game.enemyMax) * 100}%"></i></div>
+		<div
+			class="bar enemy"
+			role="progressbar"
+			aria-label="The Warden health"
+			aria-valuenow={Math.round(game.enemyHP)}
+			aria-valuemin={0}
+			aria-valuemax={game.enemyMax}
+			aria-valuetext="{game.enemyHP} / {game.enemyMax}"
+		>
+			<i style:width="{(game.enemyHP / game.enemyMax) * 100}%"></i>
+		</div>
 	</div>
 
 	<div class="combatant you">
@@ -12,13 +22,31 @@
 			<span class="name"><span class="glyph"></span>You</span>
 			<span class="hpnum">{game.playerHP} / {game.playerMax}</span>
 		</div>
-		<div class="bar player"><i style:width="{(game.playerHP / game.playerMax) * 100}%"></i></div>
+		<div
+			class="bar player"
+			role="progressbar"
+			aria-label="Your health"
+			aria-valuenow={Math.round(game.playerHP)}
+			aria-valuemin={0}
+			aria-valuemax={game.playerMax}
+			aria-valuetext="{game.playerHP} / {game.playerMax}"
+		>
+			<i style:width="{(game.playerHP / game.playerMax) * 100}%"></i>
+		</div>
 	</div>
 
 	<div class="drawcluster">
 		<span class="mono">deck</span><b>{game.deck.length}</b>
-		<div class="drawbar" title="next draw">
-			<i style:width="{Math.min(100, (game.drawAcc / game.drawIntervalSec) * 100)}%"></i>
+		<div
+			class="drawbar"
+			title="next draw"
+			role="progressbar"
+			aria-label="Next draw progress"
+			aria-valuenow={Math.round(drawPerc)}
+			aria-valuemin={0}
+			aria-valuemax={100}
+		>
+			<i style:width="{drawPerc}%"></i>
 		</div>
 		<span class="mono">used</span><b>{game.discard.length}</b>
 	</div>
@@ -31,6 +59,8 @@ interface Props {
 	game: LoomGame;
 }
 const { game }: Props = $props();
+
+const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 100));
 </script>
 
 <style lang="scss">

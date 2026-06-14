@@ -25,6 +25,16 @@ describe('Loading', () => {
 		expect(container.querySelector('.overlay')).toBeNull();
 	});
 
+	it('announces a loading status with a visually-hidden label', () => {
+		const { container } = render(Loading, { props: { loading: true } });
+		const status = container.querySelector('.loading-spinner-container') as HTMLElement;
+		expect(status.getAttribute('role')).toBe('status');
+		expect(status.getAttribute('aria-live')).toBe('polite');
+		expect(container.querySelector('.sr-only')?.textContent).toContain('Loading');
+		// The decorative spinner itself is hidden from assistive tech.
+		expect(container.querySelector('.loading-spinner')?.getAttribute('aria-hidden')).toBe('true');
+	});
+
 	it('suppresses the spinner immediately when a delay is set', () => {
 		// With delay > 0, waitingOnDelay stays true after onMount, so the spinner is hidden
 		// until the timeout fires even though loading=true.
