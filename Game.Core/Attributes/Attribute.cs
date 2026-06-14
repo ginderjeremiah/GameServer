@@ -108,26 +108,28 @@ namespace Game.Core.Attributes
         private static AttributeDisplayMetadata GetDisplayMetadata(EAttribute value)
         {
 #pragma warning disable CS0618 // DropBonus is obsolete but still seeded for data integrity.
+            // The two adjacent bools are named at every call site so a future arm cannot silently
+            // transpose IsPercentage/IsHarmful (the enum/string/int columns are type-distinct).
             return value switch
             {
-                Strength => new(EAttributeType.Primary, false, false, "STR", 0, 0),
-                Endurance => new(EAttributeType.Primary, false, false, "END", 1, 0),
-                Intellect => new(EAttributeType.Primary, false, false, "INT", 2, 0),
-                Agility => new(EAttributeType.Primary, false, false, "AGI", 3, 0),
-                Dexterity => new(EAttributeType.Primary, false, false, "DEX", 4, 0),
-                Luck => new(EAttributeType.Primary, false, false, "LUK", 5, 0),
-                MaxHealth => new(EAttributeType.Secondary, false, false, "", 6, 0),
-                Defense => new(EAttributeType.Secondary, false, false, "", 7, 0),
-                CooldownRecovery => new(EAttributeType.Secondary, true, false, "", 8, 2),
-                CriticalChance => new(EAttributeType.Secondary, true, false, "", 9, 0),
-                CriticalDamage => new(EAttributeType.Secondary, true, false, "", 10, 0),
-                DodgeChance => new(EAttributeType.Secondary, true, false, "", 11, 0),
-                BlockChance => new(EAttributeType.Secondary, true, false, "", 12, 0),
-                BlockReduction => new(EAttributeType.Secondary, false, false, "", 13, 0),
-                DamageTakenPerSecond => new(EAttributeType.Status, false, true, "", 14, 0),
-                HealthRegenPerSecond => new(EAttributeType.Status, false, false, "", 15, 0),
+                Strength => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "STR", 0, 0),
+                Endurance => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "END", 1, 0),
+                Intellect => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "INT", 2, 0),
+                Agility => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "AGI", 3, 0),
+                Dexterity => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "DEX", 4, 0),
+                Luck => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "LUK", 5, 0),
+                MaxHealth => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "", 6, 0),
+                Defense => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "", 7, 0),
+                CooldownRecovery => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "", 8, 2),
+                CriticalChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "", 9, 0),
+                CriticalDamage => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "", 10, 0),
+                DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "", 11, 0),
+                BlockChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "", 12, 0),
+                BlockReduction => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "", 13, 0),
+                DamageTakenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "", 14, 0),
+                HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.
-                DropBonus => new(EAttributeType.Secondary, false, false, "", 16, 0),
+                DropBonus => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "", 16, 0),
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No display metadata defined for the given attribute.")
             };
 #pragma warning restore CS0618
