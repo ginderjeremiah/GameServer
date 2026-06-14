@@ -60,10 +60,10 @@
 
 <script lang="ts">
 import { Loading } from '$components';
-import { playerChallenges, registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
+import { anchorPosition, playerChallenges, registerTooltipComponent, toastError, type TooltipComponent } from '$stores';
 import { onMount } from 'svelte';
 import { ChallengesView, type ResolvedReward } from './challenges-view.svelte';
-import { anchorPosition, setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
+import { setRewardTooltip, type RewardTooltipController } from './reward-tooltip-context';
 import ChallengeDetailCard from './ChallengeDetailCard.svelte';
 import OverviewPane from './OverviewPane.svelte';
 import RewardTooltip from './RewardTooltip.svelte';

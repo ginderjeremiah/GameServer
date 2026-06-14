@@ -1,5 +1,5 @@
 import { getContext, setContext } from 'svelte';
-import type { Position } from '$stores';
+import type { TooltipAnchor } from '$stores';
 import type { ResolvedReward } from './challenges-view.svelte';
 
 /**
@@ -9,26 +9,15 @@ import type { ResolvedReward } from './challenges-view.svelte';
  * component tree. Mirrors how the inventory grid drives the shared tooltip, but
  * shared through context rather than props.
  *
- * `show`/`move` accept either a pointer event (positioned at the cursor) or a
- * focused element (positioned at the element's box), so the same affordance is
- * reachable by keyboard/screen reader as well as by mouse.
+ * `show`/`move` accept a {@link TooltipAnchor} — either a pointer event (positioned
+ * at the cursor) or a focused element (positioned off its box) — so the same
+ * affordance is reachable by keyboard/screen reader as well as by mouse.
  */
-export type RewardAnchor = MouseEvent | HTMLElement;
-
 export interface RewardTooltipController {
-	show: (reward: ResolvedReward, anchor: RewardAnchor) => void;
-	move: (anchor: RewardAnchor) => void;
+	show: (reward: ResolvedReward, anchor: TooltipAnchor) => void;
+	move: (anchor: TooltipAnchor) => void;
 	hide: () => void;
 }
-
-/** Resolve the tooltip position from a cursor (pointer) or an element's box (focus). */
-export const anchorPosition = (anchor: RewardAnchor): Position => {
-	if (anchor instanceof HTMLElement) {
-		const rect = anchor.getBoundingClientRect();
-		return { x: rect.left + rect.width / 2, y: rect.bottom };
-	}
-	return { x: anchor.clientX, y: anchor.clientY };
-};
 
 const REWARD_TOOLTIP_KEY = Symbol('reward-tooltip');
 

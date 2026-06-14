@@ -18,6 +18,19 @@ export interface Position {
 	y: number;
 }
 
+/** A tooltip anchor: a pointer event (positioned at the cursor) or an element
+ *  (positioned off its box), so a tooltip is reachable by both mouse and keyboard focus. */
+export type TooltipAnchor = MouseEvent | HTMLElement;
+
+/** Resolve a tooltip {@link Position} from a cursor (pointer) or an element's box (focus). */
+export const anchorPosition = (anchor: TooltipAnchor): Position => {
+	if (anchor instanceof HTMLElement) {
+		const rect = anchor.getBoundingClientRect();
+		return { x: rect.left + rect.width / 2, y: rect.bottom };
+	}
+	return { x: anchor.clientX, y: anchor.clientY };
+};
+
 // Keyed by the tooltip's stable id rather than held in a reactive array. An
 // array relied on `findIndex(... === data)` + `splice` to unregister, which is
 // not robust when screens overlap during navigation (the new screen mounts its

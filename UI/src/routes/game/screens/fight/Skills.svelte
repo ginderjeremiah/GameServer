@@ -1,18 +1,21 @@
-<div class="skills-row" class:reversed={side === 'enemy'} style:--ready-accent={readyAccent} role="grid">
+<div class="skills-row" class:reversed={side === 'enemy'} style:--ready-accent={readyAccent}>
 	{#each battler.skills as skill, index (skill?.id ?? -index - 1)}
 		<div class="skill-column">
-			<div
-				class="skill-slot"
-				class:ready={skill && isReady(skill)}
-				style:--skill-sweep="{skillSweep(skill)}deg"
-				style:--pulse-color={pulseColor}
-				role="gridcell"
-				tabindex="-1"
-				onmousemove={handleMouseMove}
-				onmouseenter={(ev) => handleMouseEnter(ev, index)}
-				onmouseleave={(ev) => handleMouseLeave(ev, index)}
-			>
-				{#if skill}
+			{#if skill}
+				<!-- A focusable button so the per-skill combat tooltip is reachable by keyboard
+				     and screen reader, not just on hover. Its accessible name is the icon's alt. -->
+				<button
+					type="button"
+					class="skill-slot"
+					class:ready={isReady(skill)}
+					style:--skill-sweep="{skillSweep(skill)}deg"
+					style:--pulse-color={pulseColor}
+					onmousemove={handleMouseMove}
+					onmouseenter={(ev) => handleEnter(ev, index)}
+					onmouseleave={() => handleLeave(index)}
+					onfocus={(ev) => handleFocus(ev, index)}
+					onblur={() => handleLeave(index)}
+				>
 					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
 					<div class="cooldown-overlay"></div>
 					{#if isReady(skill)}
@@ -21,10 +24,10 @@
 					{#if skill.effects.length > 0}
 						<div class="effect-badge-anchor"><SkillEffectBadge /></div>
 					{/if}
-				{/if}
-			</div>
-			{#if skill}
+				</button>
 				<span class="skill-label" class:ready-label={isReady(skill)}>{skill.name}</span>
+			{:else}
+				<div class="skill-slot" aria-hidden="true"></div>
 			{/if}
 		</div>
 	{/each}
@@ -34,7 +37,12 @@
 <script lang="ts">
 import type { Battler, Skill } from '$lib/battle';
 import { formatNum, tintColor } from '$lib/common';
-import { registerTooltipComponent, type TooltipComponent } from '$stores/tooltip.svelte';
+import {
+	anchorPosition,
+	registerTooltipComponent,
+	type TooltipAnchor,
+	type TooltipComponent
+} from '$stores/tooltip.svelte';
 import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 import SkillTooltip from './SkillTooltip.svelte';
 
@@ -59,34 +67,36 @@ const pulseColor = $derived(tintColor(accent ?? (side === 'player' ? 'var(--acce
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 const handleMouseMove = (ev: MouseEvent) => {
-	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+	setTooltipPosition(anchorPosition(ev));
 };
 
-const handleMouseEnter = (ev: MouseEvent, index: number) => {
+// Reveal the per-skill tooltip, anchoring at the cursor (mouse) or the slot's box (focus).
+const reveal = (index: number, anchor: TooltipAnchor) => {
 	tooltipSkillIndex = index;
-	if (battler.skills[index]) {
-		setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-		showTooltip();
+	setTooltipPosition(anchorPosition(anchor));
+	showTooltip();
+};
+
+const handleEnter = (ev: MouseEvent, index: number) => {
+	reveal(index, ev);
+};
+
+const handleFocus = (ev: FocusEvent, index: number) => {
+	if (ev.currentTarget instanceof HTMLElement) {
+		reveal(index, ev.currentTarget);
 	}
 };
 
-const handleMouseLeave = (ev: MouseEvent, index: number) => {
+const handleLeave = (index: number) => {
 	if (tooltipSkillIndex === index) {
 		tooltipSkillIndex = -1;
 		hideTooltip();
 	}
 };
 
-const skillPercent = (skill: Skill | undefined) => {
-	if (skill) {
-		return +formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
-	}
-	return 0;
-};
+const skillPercent = (skill: Skill) => +formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
 
-const skillSweep = (skill: Skill | undefined) => {
-	return (skillPercent(skill) / 100) * 360;
-};
+const skillSweep = (skill: Skill) => (skillPercent(skill) / 100) * 360;
 
 const isReady = (skill: Skill) => {
 	return skillPercent(skill) >= 99.9;
@@ -113,6 +123,13 @@ const isReady = (skill: Skill) => {
 }
 
 .skill-slot {
+	// Reset native button chrome (the slot is a <button> so its tooltip is keyboard-reachable);
+	// the visual treatment below is shared with the empty placeholder <div>.
+	appearance: none;
+	margin: 0;
+	padding: 0;
+	font: inherit;
+	color: inherit;
 	width: 64px;
 	height: 64px;
 	position: relative;
@@ -128,6 +145,11 @@ const isReady = (skill: Skill) => {
 	&.ready {
 		border-color: color-mix(in srgb, var(--ready-accent) 53%, transparent);
 		box-shadow: inset 0 0 8px color-mix(in srgb, var(--ready-accent) 35%, transparent);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--ready-accent);
+		outline-offset: 2px;
 	}
 }
 
