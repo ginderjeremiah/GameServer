@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Api.Auth;
 using Game.Api.CodeGen;
+using Game.Api.Cors;
 using Game.Api.Events;
 using Game.Api.Filters;
 using Game.Api.Middleware;
@@ -15,6 +16,7 @@ using Game.DataAccess;
 using Game.DataAccess.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -65,6 +67,14 @@ namespace Game.Api
 
             builder.Services.AddOptions<DataAccessOptions>()
                 .BindConfiguration(nameof(DataAccessOptions));
+
+            // Allowed CORS origins are deployment-specific; the local dev origin is supplied in
+            // appsettings.Development.json. Validated on start so a deployment with no configured origin
+            // fails fast rather than silently rejecting every browser request.
+            builder.Services.AddOptions<CorsOptions>()
+                .BindConfiguration(CorsOptions.SectionName)
+                .Validate(options => options.AllowedOrigins.Count > 0, "Cors:AllowedOrigins not set")
+                .ValidateOnStart();
 
             ConfigureAuth(builder);
 
@@ -142,6 +152,8 @@ namespace Game.Api
                 await migrator.Migrate();
             }
 
+            var corsOptions = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value;
+
             // Eagerly load the in-memory reference-data caches before serving traffic so a database
             // problem surfaces as a boot failure rather than on the first player request (#357), and so
             // every cache has a published snapshot before any read (#358).
@@ -149,7 +161,7 @@ namespace Game.Api
 
             app.UseCors(builder =>
             {
-                builder.WithOrigins("http://localhost:5174")
+                builder.WithOrigins([.. corsOptions.AllowedOrigins])
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
