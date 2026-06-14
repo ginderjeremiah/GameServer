@@ -3,6 +3,8 @@
 
 export const DEFAULT_MAX_BATTLE_MS = 400000;
 export const EXP_PER_LEVEL = 100;
+export const MAX_EXP_PER_GRANT = 100000;
+export const MAX_EXP_REWARD_MULTIPLIER = 4;
 export const MAX_SELECTED_SKILLS = 4;
 export const MS_PER_TICK = 40;
 export const STAT_POINTS_PER_LEVEL = 6;

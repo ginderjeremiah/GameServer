@@ -52,13 +52,53 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void ExpReward_StrongEnemy_IncreasedExp()
         {
+            var player = MakePlayer(allocations: [(Strength, 50)]);
+            var enemy = MakeEnemy(strength: 50, endurance: 25);
+
+            var rewards = new DefeatRewards(player, enemy);
+
+            // ratio = 75/50 = 1.5 > 1.2 → multiplier 1.5^2 = 2.25 (below the cap) → exp = floor(75 * 2.25) = 168
+            Assert.Equal(168, rewards.ExpReward);
+        }
+
+        [Fact]
+        public void ExpReward_FarOverLevelEnemy_MultiplierClampedAtMax()
+        {
             var player = MakePlayer(allocations: [(Strength, 10)]);
             var enemy = MakeEnemy(strength: 50, endurance: 50);
 
             var rewards = new DefeatRewards(player, enemy);
 
-            // ratio = 100/10 = 10 > 1.2 → multiplier 10^2 = 100 → exp = floor(100 * 100) = 10000
-            Assert.Equal(10000, rewards.ExpReward);
+            // ratio = 100/10 = 10 → uncapped multiplier would be 100; clamped to MaxExpRewardMultiplier (4)
+            // → exp = floor(100 * 4) = 400 instead of the unbounded floor(100 * 100) = 10000.
+            Assert.Equal(4.0, GameConstants.MaxExpRewardMultiplier);
+            Assert.Equal(400, rewards.ExpReward);
+        }
+
+        [Fact]
+        public void ExpReward_AtTwicePlayerPower_MultiplierExactlyAtCap()
+        {
+            var player = MakePlayer(allocations: [(Strength, 25)]);
+            var enemy = MakeEnemy(strength: 30, endurance: 20);
+
+            var rewards = new DefeatRewards(player, enemy);
+
+            // ratio = 50/25 = 2.0 → multiplier 2^2 = 4.0, exactly MaxExpRewardMultiplier (the saturation
+            // boundary) → exp = floor(50 * 4) = 200.
+            Assert.Equal(200, rewards.ExpReward);
+        }
+
+        [Fact]
+        public void ExpReward_FarUnderLevelEnemy_QuadraticDropOffUnaffectedByCap()
+        {
+            var player = MakePlayer(allocations: [(Strength, 100)]);
+            var enemy = MakeEnemy(strength: 10);
+
+            var rewards = new DefeatRewards(player, enemy);
+
+            // ratio = 10/100 = 0.1 ≪ 0.8 → multiplier 0.1^2 = 0.01 (the cap only bounds the upper tail) →
+            // exp = floor(10 * 0.01) = 0.
+            Assert.Equal(0, rewards.ExpReward);
         }
 
         [Fact]

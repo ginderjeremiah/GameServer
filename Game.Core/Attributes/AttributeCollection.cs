@@ -8,7 +8,10 @@ namespace Game.Core.Attributes
     public class AttributeCollection
     {
         private static readonly int _attributesMaxId = GetMaxAttribute();
-        private readonly List<AttributeCollectionNode> _attributeNodeList = GetNodeList();
+
+        // One slot per attribute id; nodes are created lazily on first access so a freshly
+        // constructed collection allocates no per-attribute nodes for the (common) empty slots.
+        private readonly AttributeCollectionNode?[] _attributeNodes = new AttributeCollectionNode?[_attributesMaxId + 1];
 
         /// <inheritdoc cref="GetAttributeValue(EAttribute)"/>
         public double this[EAttribute index] => GetAttributeValue(index);
@@ -34,7 +37,7 @@ namespace Game.Core.Attributes
         public void AddModifier(AttributeModifier modifier)
         {
             AddModifierWithoutCacheInvalidation(modifier);
-            _attributeNodeList[(int)modifier.Attribute].SetCachedValue(null);
+            GetOrCreateNode((int)modifier.Attribute).SetCachedValue(null);
         }
 
         /// <summary>
@@ -45,12 +48,13 @@ namespace Game.Core.Attributes
         /// <param name="modifier"></param>
         public bool RemoveModifier(AttributeModifier modifier)
         {
-            var node = _attributeNodeList[(int)modifier.Attribute];
+            // A null slot (never created) holds no modifiers, so there is nothing to remove.
+            var node = _attributeNodes[(int)modifier.Attribute];
 
             // Identity removal: a node can hold several modifiers with the same Type (the
             // collection's sort key), so the exact instance must be matched, not a sort-equal one.
             // AttributeModifier does not override Equals, so the default comparer is reference equality.
-            if (node.Modifiers is null || !node.Modifiers.Remove(modifier, EqualityComparer<AttributeModifier>.Default))
+            if (node?.Modifiers is null || !node.Modifiers.Remove(modifier, EqualityComparer<AttributeModifier>.Default))
             {
                 return false;
             }
@@ -71,7 +75,9 @@ namespace Game.Core.Attributes
         /// <returns></returns>
         public double GetAttributeValue(EAttribute attribute)
         {
-            var node = _attributeNodeList[(int)attribute];
+            // Create the node lazily so the computed value can be cached, matching the
+            // pre-laziness behavior where every read populates the cache.
+            var node = GetOrCreateNode((int)attribute);
             if (node.CachedValue is not null)
             {
                 return node.CachedValue.Value;
@@ -97,18 +103,18 @@ namespace Game.Core.Attributes
         /// <returns></returns>
         public IEnumerable<AttributeModifier> AllModifiers()
         {
-            return _attributeNodeList.SelectNotNull(n => n.Modifiers).SelectMany(v => v);
+            return _attributeNodes.SelectNotNull(n => n?.Modifiers).SelectMany(v => v);
         }
 
         private void AddModifierWithoutCacheInvalidation(AttributeModifier modifier)
         {
-            var node = _attributeNodeList[(int)modifier.Attribute];
+            var node = GetOrCreateNode((int)modifier.Attribute);
 
             node.GetModifiersOrNew().Add(modifier);
 
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
-                var sourceNode = _attributeNodeList[(int)modifier.DerivedSource];
+                var sourceNode = GetOrCreateNode((int)modifier.DerivedSource);
                 if (node.DerivedNodes.Contains(sourceNode))
                 {
                     throw new AttributeCircularDerivedModifierException(modifier);
@@ -133,7 +139,8 @@ namespace Game.Core.Attributes
                 }
             }
 
-            _attributeNodeList[(int)derivedSource].DerivedNodes.Remove(node);
+            // The source node exists because removing a Derived modifier implies it was hooked here.
+            GetOrCreateNode((int)derivedSource).DerivedNodes.Remove(node);
         }
 
         private void AddStaticModifiers()
@@ -144,12 +151,11 @@ namespace Game.Core.Attributes
             }
         }
 
-        private static List<AttributeCollectionNode> GetNodeList()
+        // Returns the node for the slot, creating its own instance on first access. Each slot
+        // gets a distinct node — they must never share one, since they hold per-attribute state.
+        private AttributeCollectionNode GetOrCreateNode(int index)
         {
-            // Enumerable.Repeat would share a single instance — each slot must be its own object.
-            return Enumerable.Range(0, _attributesMaxId + 1)
-                             .Select(_ => new AttributeCollectionNode())
-                             .ToList();
+            return _attributeNodes[index] ??= new AttributeCollectionNode();
         }
 
         private static int GetMaxAttribute()

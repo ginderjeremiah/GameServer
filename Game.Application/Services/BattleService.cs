@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
 using Game.Core.Attributes;
 using Game.Core.Battle;
@@ -124,18 +125,10 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp)
         {
-            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
+            if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
                 return null;
             }
-
-            var level = state.ActiveEnemyLevel ?? 1;
-            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
-
-            var enemy = _enemies.GetDomainEnemy(enemyId, level)
-                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
-
-            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot);
 
             if (!result.Victory)
             {
@@ -169,18 +162,10 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state)
         {
-            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
+            if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
                 return false;
             }
-
-            var level = state.ActiveEnemyLevel ?? 1;
-            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
-
-            var enemy = _enemies.GetDomainEnemy(enemyId, level)
-                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
-
-            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot);
 
             if (result.Victory)
             {
@@ -199,26 +184,15 @@ namespace Game.Application.Services
 
         private async Task AbandonBattle(Player player, PlayerState state)
         {
-            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
-            {
-                state.ClearBattle();
-                return;
-            }
-
-            var level = state.ActiveEnemyLevel ?? 1;
-            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
-
-            var enemy = _enemies.GetDomainEnemy(enemyId, level)
-                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
-
             var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
-            if (elapsedMs <= 0)
+
+            // No active battle (nothing to resolve) or no elapsed window to re-simulate against — clear
+            // and return without recording an outcome or persisting.
+            if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, elapsedMs))
             {
                 state.ClearBattle();
                 return;
             }
-
-            var result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, elapsedMs);
 
             if (result.Victory)
             {
@@ -241,6 +215,14 @@ namespace Game.Application.Services
         // challenge rewards driven off BattleCompletedEvent). Shared by the explicit victory path and
         // the won-abandon path so the two cannot drift — a battle that resolved as a win always pays
         // out the same way, regardless of how the battle was ended.
+        //
+        // Anti-cheat note: the two callers gate this payout differently and that asymmetry is intentional.
+        // EndBattleVictory validates the *client-supplied* claimed timestamp (within 100ms of the simulated
+        // earliest defeat, and not in the future) before paying out. The won-abandon path performs no such
+        // timestamp check because it re-simulates capped at the *server-measured* elapsed wall-clock time
+        // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
+        // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
+        // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
         private static DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state)
         {
             var rewards = new DefeatRewards(player, enemy);
@@ -271,6 +253,33 @@ namespace Game.Application.Services
         // RNG (#178). The seed is server-generated and transmitted to the client as-is, so changing the source
         // does not affect how it is consumed. Shared by both start paths.
         internal static uint CreateBattleSeed() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint)));
+
+        // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
+        // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
+        // active battle, so each caller keeps only its outcome-specific branching. Centralising the guard, the
+        // ?? 1 / ?? [] fallbacks, and the simulate call here keeps the replay surface from silently drifting.
+        private bool TryResolveActiveBattle(
+            PlayerState state,
+            [MaybeNullWhen(false)] out CoreEnemy enemy,
+            [MaybeNullWhen(false)] out BattleResult result,
+            int? maxMs = null)
+        {
+            if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
+            {
+                enemy = default;
+                result = default;
+                return false;
+            }
+
+            var level = state.ActiveEnemyLevel ?? 1;
+            var enemySkillIds = state.ActiveEnemySkillIds ?? [];
+
+            enemy = _enemies.GetDomainEnemy(enemyId, level)
+                ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
+
+            result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, maxMs);
+            return true;
+        }
 
         private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
         {

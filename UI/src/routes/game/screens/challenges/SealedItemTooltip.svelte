@@ -48,7 +48,7 @@ const { item }: Props = $props();
 const accent = $derived(rarityColor(item.rarityId));
 const categoryName = $derived(itemCategoryName(item.itemCategoryId));
 // One masked row per non-zero stat bonus, so the *count* still reads true.
-const statCount = $derived(item.totalAttributes.getAttributeMap().length);
+const statCount = $derived(item.totalAttributes.getAttributeCount());
 
 const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 </script>

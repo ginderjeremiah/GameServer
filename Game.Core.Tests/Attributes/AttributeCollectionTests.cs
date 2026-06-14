@@ -249,6 +249,89 @@ namespace Game.Core.Tests.Attributes
             Assert.True(allMods.Count >= 10);
         }
 
+        [Fact]
+        public void AllModifiers_EmptyCollection_ReturnsOnlyStaticModifiers()
+        {
+            // Untouched (lazily-uncreated) slots must not surface as null entries; an empty
+            // collection still carries exactly the static modifier set.
+            var collection = new AttributeCollection([]);
+
+            var allMods = collection.AllModifiers().ToList();
+
+            Assert.Equal(StaticAttributeModifiers.All.Count, allMods.Count);
+            Assert.All(allMods, modifier => Assert.NotNull(modifier));
+        }
+
+        [Fact]
+        public void Indexer_ReadingUntouchedAttribute_DoesNotAffectOtherAttributes()
+        {
+            // Reading an attribute lazily creates and caches its node; this must not leak any
+            // value into unrelated slots that were never written.
+            var collection = new AttributeCollection([Additive(EAttribute.Strength, 10)]);
+
+            Assert.Equal(0, collection[EAttribute.Intellect]);
+            Assert.Equal(0, collection[EAttribute.Dexterity]);
+            Assert.Equal(10, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
+        public void Indexer_RepeatedReadOfUntouchedAttribute_IsStable()
+        {
+            // The first read of an empty slot creates the node and caches 0; subsequent reads
+            // must return the same cached value rather than diverging.
+            var collection = new AttributeCollection([]);
+
+            Assert.Equal(0, collection[EAttribute.Luck]);
+            Assert.Equal(0, collection[EAttribute.Luck]);
+        }
+
+        [Fact]
+        public void AddModifier_ToAttributeAlreadyReadWhileEmpty_UpdatesValue()
+        {
+            // Read first (lazily creates + caches the empty node), then add — the add must
+            // invalidate that cache so the next read reflects the new modifier.
+            var collection = new AttributeCollection([]);
+
+            Assert.Equal(0, collection[EAttribute.Strength]);
+            collection.AddModifier(Additive(EAttribute.Strength, 8));
+
+            Assert.Equal(8, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
+        public void DerivedModifier_FromOtherwiseUntouchedSource_StillCascades()
+        {
+            // The derived source attribute is never read or directly modified, so its node only
+            // exists because the derived link lazily created it. The cascade must still fire.
+            var endurance = Additive(EAttribute.Endurance, 10);
+            var collection = new AttributeCollection([]);
+
+            // MaxHealth before any Endurance: base 50 only.
+            Assert.Equal(50, collection[EAttribute.MaxHealth]);
+
+            collection.AddModifier(endurance);
+
+            // 50 + 20*10 = 250 once Endurance feeds the static derived MaxHealth modifier.
+            Assert.Equal(250, collection[EAttribute.MaxHealth]);
+        }
+
+        [Fact]
+        public void SeparateCollections_DoNotShareNodeState()
+        {
+            // Lazy creation must give each collection its own nodes; a write to one must never
+            // bleed into another (the per-instance analogue of "each slot is its own object").
+            var first = new AttributeCollection([Additive(EAttribute.Strength, 10)]);
+            var second = new AttributeCollection([]);
+
+            Assert.Equal(10, first[EAttribute.Strength]);
+            Assert.Equal(0, second[EAttribute.Strength]);
+
+            second.AddModifier(Additive(EAttribute.Strength, 3));
+
+            Assert.Equal(10, first[EAttribute.Strength]);
+            Assert.Equal(3, second[EAttribute.Strength]);
+        }
+
         private static AttributeModifier Additive(EAttribute attribute, double amount) => new()
         {
             Attribute = attribute,

@@ -80,9 +80,15 @@ onMount(async () => {
 
 // Safety net once booted: if the in-memory player state is lost (e.g. an auth failure tore it down)
 // while on a protected route, return to login. Inert during boot and on the login route itself.
+// `redirecting` latches the in-flight navigation so a reactive re-run (a tracked dep changing before
+// `pathname` settles) can't fire a redundant second goto; it clears once the navigation completes.
+let redirecting = false;
 $effect(() => {
-	if (booted && !playerManager.name && page.url.pathname !== '/') {
-		goto(resolve('/'));
+	if (booted && !playerManager.name && page.url.pathname !== '/' && !redirecting) {
+		redirecting = true;
+		goto(resolve('/')).finally(() => {
+			redirecting = false;
+		});
 	}
 });
 </script>
