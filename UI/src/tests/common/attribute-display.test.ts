@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EAttribute, type IAttribute } from '$lib/api';
 import { attributeEnumName, attributeName } from '../../lib/common/attribute-display';
+import { makeAttribute } from '../fixtures/attributes';
 
 describe('attributeEnumName', () => {
 	it('returns the normalized enum key for a known attribute id', () => {
@@ -22,8 +23,8 @@ describe('attributeEnumName', () => {
 
 describe('attributeName', () => {
 	const mockAttributes: IAttribute[] = [
-		{ id: EAttribute.Strength, name: 'Physical Power', description: '' },
-		{ id: EAttribute.MaxHealth, name: 'Maximum Life', description: '' }
+		makeAttribute(EAttribute.Strength, 'Physical Power'),
+		makeAttribute(EAttribute.MaxHealth, 'Maximum Life')
 	];
 
 	it('returns the reference-data name when attributes are provided', () => {

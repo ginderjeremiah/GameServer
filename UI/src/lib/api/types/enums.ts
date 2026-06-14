@@ -32,6 +32,12 @@ export enum EAttributeModifierSource {
 	SkillEffect = 7,
 }
 
+export enum EAttributeType {
+	Primary = 1,
+	Secondary = 2,
+	Status = 3,
+}
+
 export enum EChallengeGoalComparison {
 	AtLeast = 1,
 	AtMost = 2,

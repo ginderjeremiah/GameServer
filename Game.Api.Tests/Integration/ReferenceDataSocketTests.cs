@@ -130,7 +130,7 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task GetAttributes_ReturnsIntrinsicAttributes()
+        public async Task GetAttributes_SerializesAttributeDisplayMetadata()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
             await using var socketClient = await ConnectAsync(userId);
@@ -140,6 +140,22 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.NotEmpty(response.Data);
+
+            // The enriched display metadata round-trips through the API model and socket serialization.
+            var strength = Assert.Single(response.Data, a => a.Id == EAttribute.Strength);
+            Assert.Equal(EAttributeType.Primary, strength.AttributeType);
+            Assert.Equal("STR", strength.Code);
+            Assert.False(strength.IsPercentage);
+            Assert.False(strength.IsHarmful);
+            Assert.Equal(0, strength.Decimals);
+
+            var cooldownRecovery = Assert.Single(response.Data, a => a.Id == EAttribute.CooldownRecovery);
+            Assert.True(cooldownRecovery.IsPercentage);
+            Assert.Equal(2, cooldownRecovery.Decimals);
+
+            var damageTaken = Assert.Single(response.Data, a => a.Id == EAttribute.DamageTakenPerSecond);
+            Assert.Equal(EAttributeType.Status, damageTaken.AttributeType);
+            Assert.True(damageTaken.IsHarmful);
         }
 
         [Fact]
