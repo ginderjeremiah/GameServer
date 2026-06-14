@@ -83,12 +83,17 @@ namespace Game.Api
                 .AddApplication()
                 .AddScoped<SessionService>()
                 .AddSingleton<IAccessTokenService, JwtTokenService>()
+                .AddSingleton<SocketConnectionRegistry>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
                 .AddReferenceDataCommands()
                 .AddSingleton<ApiCodeGenerator>()
                 .AddScoped<AdminCacheReloadFilter>()
                 .AddScoped<AdminRoleAuthorizationFilter>();
+
+            // The socket registry is the shutdown hook that gracefully drains live player sockets (#526);
+            // it shares the single singleton instance the SocketManagerService registers connections into.
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<SocketConnectionRegistry>());
 
             // Push a completed challenge's rewards to the player's live socket. This handler lives in the
             // API layer because it depends on the socket infrastructure, so it is registered here rather
