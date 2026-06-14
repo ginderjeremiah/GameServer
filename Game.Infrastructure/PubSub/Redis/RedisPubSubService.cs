@@ -54,6 +54,22 @@ namespace Game.Infrastructure.PubSub.Redis
             await Publish(channel, queueName, queueData.Serialize());
         }
 
+        public async Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData)
+        {
+            var values = queueData.Select(data => data.Serialize()).ToArray();
+            if (values.Length == 0)
+            {
+                return;
+            }
+
+            // One multi-value LPUSH carries the whole batch durably; the single wake publish is fire-and-forget
+            // for the same reason as the per-event Publish above — the data is already enqueued and the consumer
+            // drains the whole queue on its next wake (#559).
+            var queue = GetQueue(queueName);
+            await queue.AddRangeToQueueAsync(values);
+            await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
+        }
+
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)
         {
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}'.", channel);

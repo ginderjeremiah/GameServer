@@ -73,5 +73,12 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             return AddToQueueAsync(value.Serialize());
         }
+
+        public Task AddRangeToQueueAsync(IEnumerable<string> values)
+        {
+            var redisValues = values.Select(value => (RedisValue)value).ToArray();
+            _logger.LogTrace("Added {Count} values to RedisQueue: {QueueName}", redisValues.Length, QueueName);
+            return _redis.ListRightPushAsync(QueueName, redisValues);
+        }
     }
 }

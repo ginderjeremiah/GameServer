@@ -774,6 +774,15 @@ namespace Game.Application.Tests.DataAccess
                 return Task.CompletedTask;
             }
 
+            public Task AddRangeToQueueAsync(IEnumerable<string> values)
+            {
+                foreach (var value in values)
+                {
+                    _items.Enqueue(value);
+                }
+                return Task.CompletedTask;
+            }
+
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
             public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
@@ -822,6 +831,7 @@ namespace Game.Application.Tests.DataAccess
             public Task Publish(string channel, string message) => Task.CompletedTask;
             public Task Publish(string channel, string queueName, string queueData) => Task.CompletedTask;
             public Task Publish<T>(string channel, string queueName, T queueData) => Task.CompletedTask;
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
             public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");

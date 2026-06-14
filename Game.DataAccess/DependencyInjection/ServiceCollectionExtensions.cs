@@ -44,6 +44,9 @@ namespace Game.DataAccess.DependencyInjection
                 .AddHostedService(sp => sp.GetRequiredService<ReferenceCacheSynchronizer>())
                 // Player aggregate (write-behind: Redis + async sync)
                 .AddScoped<IPlayerRepository, PlayerRepository>()
+                // Scoped buffer that batches a save's player events into one LPUSH (#559). Shared by the
+                // PlayerPersistencePublisher (which fills it) and PlayerRepository (which flushes it).
+                .AddScoped<PlayerUpdateBatch>()
                 // Entity store (admin tools)
                 .AddScoped<IEntityStore, EntityStore>()
                 // UnitOfWork (stats/challenges persistence)

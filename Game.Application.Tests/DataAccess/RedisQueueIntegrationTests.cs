@@ -66,6 +66,22 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(await queue.GetNextAsync());
         }
 
+        [Fact]
+        public async Task AddRangeToQueueAsync_PushesAllValuesInOneCall_PreservingOrder()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            // A single multi-value LPUSH appends all values, left-to-right, so they pop back in FIFO order.
+            await queue.AddRangeToQueueAsync(["first", "second", "third"]);
+
+            Assert.Equal("first", await queue.GetNextAsync());
+            Assert.Equal("second", await queue.GetNextAsync());
+            Assert.Equal("third", await queue.GetNextAsync());
+            Assert.Null(await queue.GetNextAsync());
+        }
+
         private sealed record SamplePayload(int Id, string Name);
     }
 }
