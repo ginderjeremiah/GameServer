@@ -14,6 +14,7 @@ vi.mock('$stores', () => ({ staticData }));
 
 import SkillTooltip from '$routes/game/screens/fight/SkillTooltip.svelte';
 import { makeBattler, makeSkill } from './fight-fixtures';
+import { makeAttribute } from '../../../../fixtures/attributes';
 import type { Battler } from '$lib/battle';
 
 let owner: Battler;
@@ -48,7 +49,7 @@ describe('SkillTooltip', () => {
 	});
 
 	it('shows the damage breakdown: base, per-attribute multiplier, enemy defense and total', () => {
-		staticData.attributes = [{ id: EAttribute.Strength, name: 'Strength', description: '' }];
+		staticData.attributes = [makeAttribute(EAttribute.Strength, 'Strength')];
 		const skill = makeSkill(owner, {
 			name: 'Cleave',
 			baseDamage: 10,
@@ -110,8 +111,8 @@ describe('SkillTooltip', () => {
 	it('renders an "On hit" effect line per authored effect, tinted by buff/debuff direction', async () => {
 		const { EModifierType, ESkillEffectTarget } = await import('$lib/api');
 		staticData.attributes = [
-			{ id: EAttribute.Strength, name: 'Strength', description: '' },
-			{ id: EAttribute.Defense, name: 'Defense', description: '' }
+			makeAttribute(EAttribute.Strength, 'Strength'),
+			makeAttribute(EAttribute.Defense, 'Defense')
 		];
 		const skill = makeSkill(owner, {
 			name: 'Warcry',

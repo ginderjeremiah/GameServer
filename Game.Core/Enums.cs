@@ -98,6 +98,32 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// The display/classification taxonomy for an <see cref="EAttribute"/>, surfaced on the attribute
+    /// reference data so the client groups and renders attributes from a single backend source of truth.
+    /// This is a display-only taxonomy and is intentionally kept distinct from the core/derived power-calc
+    /// invariant (the <see cref="Primary"/> set is expected to equal the core attribute set, but the two
+    /// are not collapsed).
+    /// </summary>
+    [ClientMirrored]
+    public enum EAttributeType
+    {
+        /// <summary>A core, directly-allocatable attribute (STR/END/INT/AGI/DEX/LUK).</summary>
+        Primary = 1,
+
+        /// <summary>
+        /// An aggregate stat computed from a base/derived formula (MaxHealth, Defense, CooldownRecovery,
+        /// and the crit/dodge/block set).
+        /// </summary>
+        Secondary = 2,
+
+        /// <summary>
+        /// A transient per-second combat channel fed only by effects/gear (DamageTakenPerSecond,
+        /// HealthRegenPerSecond).
+        /// </summary>
+        Status = 3,
+    }
+
+    /// <summary>
     /// Represents the category for an item. Some items can only be equipped based on their category.
     /// </summary>
     public enum EItemCategory

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { EAttribute, type IAttribute, type IBattlerAttribute } from '$lib/api';
+import { makeAttribute } from '../../../../fixtures/attributes';
 
 const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: {
@@ -23,15 +24,15 @@ vi.mock('$lib/api', async (importOriginal) => {
 import Attributes from '$routes/game/screens/attributes/Attributes.svelte';
 
 const refAttributes: IAttribute[] = [
-	{ id: EAttribute.Strength, name: 'Strength', description: '' },
-	{ id: EAttribute.Endurance, name: 'Endurance', description: '' },
-	{ id: EAttribute.Intellect, name: 'Intellect', description: '' },
-	{ id: EAttribute.Agility, name: 'Agility', description: '' },
-	{ id: EAttribute.Dexterity, name: 'Dexterity', description: '' },
-	{ id: EAttribute.Luck, name: 'Luck', description: '' },
-	{ id: EAttribute.MaxHealth, name: 'Max Health', description: '' },
-	{ id: EAttribute.Defense, name: 'Defense', description: '' },
-	{ id: EAttribute.CooldownRecovery, name: 'Cooldown Recovery', description: '' }
+	makeAttribute(EAttribute.Strength, 'Strength'),
+	makeAttribute(EAttribute.Endurance, 'Endurance'),
+	makeAttribute(EAttribute.Intellect, 'Intellect'),
+	makeAttribute(EAttribute.Agility, 'Agility'),
+	makeAttribute(EAttribute.Dexterity, 'Dexterity'),
+	makeAttribute(EAttribute.Luck, 'Luck'),
+	makeAttribute(EAttribute.MaxHealth, 'Max Health'),
+	makeAttribute(EAttribute.Defense, 'Defense'),
+	makeAttribute(EAttribute.CooldownRecovery, 'Cooldown Recovery')
 ];
 
 beforeEach(() => {

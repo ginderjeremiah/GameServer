@@ -8,6 +8,7 @@ vi.mock('$stores', () => ({ staticData }));
 
 import ActiveEffectChips from '$routes/game/screens/fight/ActiveEffectChips.svelte';
 import { makeBattler } from './fight-fixtures';
+import { makeAttribute } from '../../../../fixtures/attributes';
 import type { Battler } from '$lib/battle';
 
 const effect = (over: Partial<ISkillEffect> = {}): ISkillEffect => ({
@@ -24,8 +25,8 @@ let battler: Battler;
 
 beforeEach(() => {
 	staticData.attributes = [
-		{ id: EAttribute.Strength, name: 'Strength', description: '' },
-		{ id: EAttribute.Defense, name: 'Defense', description: '' }
+		makeAttribute(EAttribute.Strength, 'Strength'),
+		makeAttribute(EAttribute.Defense, 'Defense')
 	];
 	battler = makeBattler();
 });

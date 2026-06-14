@@ -46,6 +46,79 @@ namespace Game.Core.Tests.Attributes
             Assert.Equal(expectedIds, all.Select(a => a.Id).ToArray());
         }
 
+        [Theory]
+        [MemberData(nameof(AllAttributes))]
+        public void Constructor_PopulatesDisplayMetadataForEveryAttribute(EAttribute id)
+        {
+            var attribute = new Attribute(id);
+
+            Assert.True(Enum.IsDefined(attribute.AttributeType));
+            Assert.NotNull(attribute.Code);
+            Assert.True(attribute.DisplayOrder >= 0);
+            Assert.True(attribute.Decimals >= 0);
+        }
+
+        [Fact]
+        public void PrimaryAttributeType_MatchesCoreAttributes()
+        {
+            var primary = Attribute.GetAllAttributes()
+                .Where(a => a.AttributeType == EAttributeType.Primary)
+                .Select(a => a.Id);
+
+            // The Primary display taxonomy is expected to coincide with the core/derived power-calc
+            // invariant, but the two are deliberately distinct concepts (this asserts the coincidence).
+            Assert.Equal(Attribute.CoreAttributes.OrderBy(a => a), primary.OrderBy(a => a));
+        }
+
+        [Fact]
+        public void DisplayOrder_IsDistinctAcrossAttributes()
+        {
+            var orders = Attribute.GetAllAttributes().Select(a => a.DisplayOrder).ToList();
+
+            Assert.Equal(orders.Count, orders.Distinct().Count());
+        }
+
+        [Theory]
+        [InlineData(EAttribute.Strength, EAttributeType.Primary, "STR")]
+        [InlineData(EAttribute.Luck, EAttributeType.Primary, "LUK")]
+        [InlineData(EAttribute.MaxHealth, EAttributeType.Secondary, "")]
+        [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "")]
+        [InlineData(EAttribute.DamageTakenPerSecond, EAttributeType.Status, "")]
+        [InlineData(EAttribute.HealthRegenPerSecond, EAttributeType.Status, "")]
+        public void Constructor_AssignsTypeAndCode(EAttribute id, EAttributeType expectedType, string expectedCode)
+        {
+            var attribute = new Attribute(id);
+
+            Assert.Equal(expectedType, attribute.AttributeType);
+            Assert.Equal(expectedCode, attribute.Code);
+        }
+
+        [Theory]
+        [InlineData(EAttribute.DamageTakenPerSecond, true)]
+        [InlineData(EAttribute.HealthRegenPerSecond, false)]
+        [InlineData(EAttribute.Strength, false)]
+        [InlineData(EAttribute.MaxHealth, false)]
+        public void Constructor_FlagsHarmfulAttributes(EAttribute id, bool expectedHarmful)
+        {
+            Assert.Equal(expectedHarmful, new Attribute(id).IsHarmful);
+        }
+
+        [Theory]
+        [InlineData(EAttribute.CooldownRecovery, true, 2)]
+        [InlineData(EAttribute.CriticalChance, true, 0)]
+        [InlineData(EAttribute.DodgeChance, true, 0)]
+        [InlineData(EAttribute.BlockChance, true, 0)]
+        [InlineData(EAttribute.BlockReduction, false, 0)]
+        [InlineData(EAttribute.Strength, false, 0)]
+        [InlineData(EAttribute.MaxHealth, false, 0)]
+        public void Constructor_AssignsPercentageAndDecimals(EAttribute id, bool expectedPercentage, int expectedDecimals)
+        {
+            var attribute = new Attribute(id);
+
+            Assert.Equal(expectedPercentage, attribute.IsPercentage);
+            Assert.Equal(expectedDecimals, attribute.Decimals);
+        }
+
         public static IEnumerable<object[]> AllAttributes()
         {
             return Enum.GetValues<EAttribute>().Select(a => new object[] { a });
