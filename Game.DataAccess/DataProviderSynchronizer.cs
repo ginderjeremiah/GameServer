@@ -18,6 +18,20 @@ namespace Game.DataAccess
         private readonly ILogger<DataProviderSynchronizer> _logger;
         private readonly PlayerUpdateRetryPolicy _retryPolicy;
 
+        // Serializes queue drains so at most one runs at a time. The pub/sub background worker re-arms its wait
+        // independently of callback completion, so a second wake arriving mid-drain can dispatch a second
+        // ProcessQueue on another thread-pool thread; both then pop from the same queue via atomic LPOP and can
+        // apply two order-sensitive same-player events (equip→unequip, the delete-then-rebuild loadout handler)
+        // out of order, persisting stale state until the cache self-heals on the next save (#578). WaitAsync(0)
+        // never materializes a wait handle, so the semaphore is intentionally left undisposed (this is a
+        // process-lifetime hosted service anyway) — the same rationale as the per-socket command/send locks.
+        private readonly SemaphoreSlim _drainGate = new(1, 1);
+
+        // 0/1 wake flag, accessed only through Interlocked/Volatile. A caller sets it before trying to claim the
+        // gate, and the active drainer re-checks it after releasing, so a wake that races the drainer's exit is
+        // never stranded — it is coalesced into one follow-up pass rather than dropped.
+        private int _drainRequested;
+
         public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy)
         {
             _services = services;
@@ -42,6 +56,35 @@ namespace Game.DataAccess
         }
 
         internal async Task ProcessQueue(IPubSubQueue queue)
+        {
+            // Record the wake before attempting to claim the gate. If another drain is already in progress it
+            // will observe this flag when it re-checks after releasing (below) and drain on our behalf, so the
+            // events we were woken for are never missed even though we return without draining ourselves.
+            Interlocked.Exchange(ref _drainRequested, 1);
+
+            // Re-check after each release: a wake that set the flag while we held the gate failed to claim it
+            // (WaitAsync(0) returned false for that caller), so we loop back to honor it rather than strand it.
+            while (Volatile.Read(ref _drainRequested) == 1 && await _drainGate.WaitAsync(0))
+            {
+                try
+                {
+                    // Claim the pending wake(s) one pass at a time. Exchanging the flag to 0 before draining means
+                    // a wake arriving during the drain re-sets it to 1, so the loop runs another pass and picks up
+                    // the freshly enqueued events — the whole queue is drained without ever running two passes
+                    // concurrently.
+                    while (Interlocked.Exchange(ref _drainRequested, 0) == 1)
+                    {
+                        await DrainQueueAsync(queue);
+                    }
+                }
+                finally
+                {
+                    _drainGate.Release();
+                }
+            }
+        }
+
+        private async Task DrainQueueAsync(IPubSubQueue queue)
         {
             var deadLetterQueue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
 
