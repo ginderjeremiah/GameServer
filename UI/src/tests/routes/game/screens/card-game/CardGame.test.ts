@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import CardGame from '../../../../../routes/game/screens/card-game/CardGame.svelte';
 
 // jsdom lacks ResizeObserver, which Svelte 5 uses to back the board's
@@ -33,5 +33,29 @@ describe('CardGame screen', () => {
 		expect(container.querySelectorAll('.card')).toHaveLength(4);
 		// the sandbox attribute strip is present
 		expect(getByText('sandbox')).toBeTruthy();
+	});
+
+	// The Reflex button is press-and-hold: the global release listener must end the hold even when
+	// the pointer is released off the button, on touch as on mouse (the old code listened to mouseup).
+	it('ends a held Reflex when the pointer is released anywhere', async () => {
+		const { container } = render(CardGame);
+		const reflex = container.querySelector('.btn.reflex') as HTMLElement;
+
+		await fireEvent.pointerDown(reflex);
+		expect(reflex.classList.contains('on')).toBe(true);
+
+		await fireEvent.pointerUp(window);
+		expect(reflex.classList.contains('on')).toBe(false);
+	});
+
+	it('ends a held Reflex when the pointer gesture is cancelled', async () => {
+		const { container } = render(CardGame);
+		const reflex = container.querySelector('.btn.reflex') as HTMLElement;
+
+		await fireEvent.pointerDown(reflex);
+		expect(reflex.classList.contains('on')).toBe(true);
+
+		await fireEvent.pointerCancel(window);
+		expect(reflex.classList.contains('on')).toBe(false);
 	});
 });

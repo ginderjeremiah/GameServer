@@ -196,6 +196,40 @@ describe('CardGameView — drag completion', () => {
 	});
 });
 
+describe('CardGameView — drag cancellation', () => {
+	beforeEach(() => {
+		view.game.hand = [{ id: 1, key: 'slash' }];
+	});
+
+	it('aborts an in-flight drag without casting', () => {
+		view.beginDrag(0, 'slash', 100, 100);
+		view.moveDrag(110, 100); // armed
+		view.cancelDrag();
+		expect(view.drag).toBeNull();
+		expect(view.game.hand).toHaveLength(1); // nothing cast
+		expect(view.game.ents).toHaveLength(0);
+	});
+
+	it('does not quick-cast an un-armed drag on cancel (unlike a release)', () => {
+		view.beginDrag(0, 'slash', 100, 100); // never armed — a release here would quick-cast
+		view.cancelDrag();
+		expect(view.drag).toBeNull();
+		expect(view.game.hand).toHaveLength(1);
+	});
+
+	it('clears the hover hint on cancel', () => {
+		view.setHover('slash');
+		view.beginDrag(0, 'slash', 100, 100);
+		view.cancelDrag();
+		expect(view.hoverKey).toBeNull();
+	});
+
+	it('is a no-op when there is no active drag', () => {
+		expect(() => view.cancelDrag()).not.toThrow();
+		expect(view.drag).toBeNull();
+	});
+});
+
 describe('CardGameView — input passthroughs', () => {
 	it('delegates castSlot to the game', () => {
 		view.game.hand = [{ id: 1, key: 'slash' }];
