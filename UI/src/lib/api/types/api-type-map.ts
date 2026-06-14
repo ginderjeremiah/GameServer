@@ -66,7 +66,6 @@ export type ApiResponseTypes = {
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
 	'Login/Status': IPlayerData;
-	'Player': IPlayerData;
 	'Statistics': IPlayerStatistic[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];

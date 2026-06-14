@@ -1,12 +1,9 @@
-using Game.Api.Models.Common;
-using Game.Api.Models.Player;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http.Json;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -14,8 +11,7 @@ namespace Game.Api.Tests.Integration
     /// <summary>
     /// Exercises the player-write inventory socket commands (Equip/Unequip/ApplyMod/RemoveMod) through the
     /// real socket adapter path — command routing, parameter deserialization, and the success/error
-    /// mapping onto <see cref="ApiSocketResponse"/>. These replace the former HTTP inventory tests on
-    /// <see cref="PlayerControllerTests"/>; the commands moved to the socket so they serialize with the
+    /// mapping onto the socket response. These commands moved to the socket so they serialize with the
     /// idle battle loop and can't lose a concurrent read-modify-write race against a background battle
     /// save (#463). The underlying domain logic is covered in Game.Application.Tests.
     /// </summary>
@@ -27,10 +23,10 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task EquipItem_UnlockedItem_SucceedsAndPersists()
         {
-            var (userId, itemId) = await SeedPlayerWithInventoryAsync("equipuser", "equippass",
+            var (userId, playerId, itemId) = await SeedPlayerWithInventoryAsync("equipuser", "equippass",
                 async (context, playerId, item) =>
                     await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, item.Id));
-            var (client, _) = await LoginAndBuildClientAsync("equipuser", "equippass");
+            await LoginAsync("equipuser", "equippass");
             await using var socketClient = await ConnectSocketAsync(userId);
 
             var parameters = new { itemId, equipmentSlotId = (int)EEquipmentSlot.WeaponSlot };
@@ -39,7 +35,7 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             // The save writes the cached player fire-and-forget, so poll the player snapshot until the
             // equip lands — the persistence the lost-update race could silently revert.
-            await WaitForEquippedAsync(client, itemId);
+            await WaitForEquippedAsync(playerId, itemId);
         }
 
         [Fact]
@@ -59,7 +55,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task UnequipItem_EquippedItem_Succeeds()
         {
-            var (userId, _) = await SeedPlayerWithInventoryAsync("unequipuser", "unequippass",
+            var (userId, _, _) = await SeedPlayerWithInventoryAsync("unequipuser", "unequippass",
                 async (context, playerId, item) =>
                     await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, item.Id, EEquipmentSlot.WeaponSlot));
             await LoginAsync("unequipuser", "unequippass");
@@ -90,7 +86,7 @@ namespace Game.Api.Tests.Integration
         {
             var modSlotId = 0;
             var modId = 0;
-            var (userId, itemId) = await SeedPlayerWithInventoryAsync("applymoduser", "applymodpass",
+            var (userId, _, itemId) = await SeedPlayerWithInventoryAsync("applymoduser", "applymodpass",
                 async (context, playerId, item) =>
                 {
                     var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
@@ -127,7 +123,7 @@ namespace Game.Api.Tests.Integration
         public async Task RemoveMod_AppliedMod_Succeeds()
         {
             var modSlotId = 0;
-            var (userId, itemId) = await SeedPlayerWithInventoryAsync("removemoduser", "removemodpass",
+            var (userId, _, itemId) = await SeedPlayerWithInventoryAsync("removemoduser", "removemodpass",
                 async (context, playerId, item) =>
                 {
                     var modSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
@@ -149,7 +145,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task RemoveMod_NoAppliedMod_ReturnsError()
         {
-            var (userId, itemId) = await SeedPlayerWithInventoryAsync("noremovemoduser", "noremovemodpass",
+            var (userId, _, itemId) = await SeedPlayerWithInventoryAsync("noremovemoduser", "noremovemodpass",
                 async (context, playerId, item) =>
                 {
                     await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
@@ -186,13 +182,14 @@ namespace Game.Api.Tests.Integration
         /// caches so the cached player aggregate already carries the inventory. Returns the seeded user
         /// and item ids.
         /// </summary>
-        private async Task<(int UserId, int ItemId)> SeedPlayerWithInventoryAsync(
+        private async Task<(int UserId, int PlayerId, int ItemId)> SeedPlayerWithInventoryAsync(
             string username,
             string password,
             Func<GameContext, int, Item, Task> seedInventory)
         {
             int itemId;
             int userId;
+            int playerId;
             using (var scope = CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -202,11 +199,12 @@ namespace Game.Api.Tests.Integration
                 await seedInventory(context, player.Id, item);
                 itemId = item.Id;
                 userId = user.Id;
+                playerId = player.Id;
             }
 
             // The caches no longer lazily refill, so reload them to resolve the seeded item on load.
             await ReloadReferenceCachesAsync();
-            return (userId, itemId);
+            return (userId, playerId, itemId);
         }
 
         /// <summary>
@@ -223,19 +221,15 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Polls <c>GET /api/Player</c> until the given item shows as equipped (the cache write is
+        /// Polls the persisted player snapshot until the given item shows as equipped (the cache write is
         /// fire-and-forget), failing after a short budget.
         /// </summary>
-        private async Task WaitForEquippedAsync(HttpClient client, int itemId)
+        private async Task WaitForEquippedAsync(int playerId, int itemId)
         {
             for (var attempt = 0; attempt < 20; attempt++)
             {
-                var response = await client.GetAsync("/api/Player", CancellationToken);
-                response.EnsureSuccessStatusCode();
-                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerData>>(CancellationToken);
-                Assert.NotNull(result);
-                Assert.NotNull(result.Data);
-                var item = result.Data.InventoryData.UnlockedItems.SingleOrDefault(i => i.ItemId == itemId);
+                var data = await GetPersistedPlayerAsync(playerId);
+                var item = data.InventoryData.UnlockedItems.SingleOrDefault(i => i.ItemId == itemId);
                 if (item is not null && item.Equipped)
                 {
                     return;
