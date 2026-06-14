@@ -7,7 +7,17 @@
 	>
 		⏳ REFLEX
 	</button>
-	<div class="reflexmeter" title="Agility reserve"><i style:width="{view.game.reflex}%"></i></div>
+	<div
+		class="reflexmeter"
+		title="Agility reserve"
+		role="progressbar"
+		aria-label="Agility reserve"
+		aria-valuenow={Math.round(view.game.reflex)}
+		aria-valuemin={0}
+		aria-valuemax={100}
+	>
+		<i style:width="{view.game.reflex}%"></i>
+	</div>
 
 	<button class="btn reset" onclick={() => view.reset()}>↺ RESET</button>
 </div>

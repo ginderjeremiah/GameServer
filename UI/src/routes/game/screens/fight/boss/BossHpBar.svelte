@@ -1,6 +1,15 @@
 <!-- The boss's HP bar: the same green-over-missing treatment as a normal battler,
      taller and overlaid with phase pips at 25 / 50 / 75% to telegraph boss phases. -->
-<div class="boss-hp-bar" data-testid="boss-hp-bar">
+<div
+	class="boss-hp-bar"
+	data-testid="boss-hp-bar"
+	role="progressbar"
+	aria-label="Boss health"
+	aria-valuenow={Math.round(currentHealth)}
+	aria-valuemin={0}
+	aria-valuemax={maxHealth}
+	aria-valuetext={healthText}
+>
 	<div class="hp-disappearing" style:width="{healthPerc}%"></div>
 	<div class="hp-remaining" style:width="{healthPerc}%"></div>
 	{#each PHASE_PIPS as pip (pip)}

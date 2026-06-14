@@ -2,8 +2,8 @@
 	{#if !hideOverlay}
 		<div class="overlay"></div>
 	{/if}
-	<div class="loading-spinner-container" {style}>
-		<div class="loading-spinner">
+	<div class="loading-spinner-container" {style} role="status" aria-live="polite">
+		<div class="loading-spinner" aria-hidden="true">
 			<div class="spinner-dot-container">
 				<div class="loading-spinner-dot"></div>
 			</div>
@@ -20,6 +20,7 @@
 				<div class="loading-spinner-dot"></div>
 			</div>
 		</div>
+		<span class="sr-only">Loading…</span>
 	</div>
 {/if}
 
@@ -58,6 +59,19 @@ $outer-rotation-count: 3;
 	z-index: 10;
 	inset: 0;
 	background: color-mix(in srgb, var(--black) 50%, transparent);
+}
+
+// Accessible label for screen readers without showing visible text.
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 .loading-spinner-container {
