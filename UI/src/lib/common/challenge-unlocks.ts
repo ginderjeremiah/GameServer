@@ -1,4 +1,4 @@
-import type { IChallenge, IItem, IItemMod, ISkill, IZone } from '$lib/api';
+import { ERarity, type IChallenge, type IItem, type IItemMod, type ISkill, type IZone } from '$lib/api';
 import { itemCategoryName, modTypeLabel } from './item-display';
 import { rarityColor, rarityLabel } from './rarity';
 
@@ -6,19 +6,42 @@ import { rarityColor, rarityLabel } from './rarity';
    `unlockChallengeId`) and award a single reward (an item, a mod, or a skill). These pure helpers
    resolve that "what does this unlock" view from the reference data so it can be surfaced wherever
    a challenge appears — the locked-zone tooltip, the challenges screen, etc. — without each call
-   site re-deriving the relationship. */
+   site re-deriving the relationship. This is the single home for the item > mod > skill precedence
+   and the rarity/accent/sub-label of a reward; richer surfaces (the challenges screen's
+   `resolveReward`) build their preview on top of this resolution rather than re-deriving it. */
 
 export type UnlockRewardKind = 'item' | 'mod' | 'skill';
 
-export interface UnlockReward {
-	kind: UnlockRewardKind;
+interface UnlockRewardBase {
 	/** The reward's real name. Callers mask it themselves (e.g. `???`) while the challenge is sealed. */
 	name: string;
 	/** Themeable accent: the rarity hue for items/mods, a neutral skill accent for skills. */
 	accent: string;
 	/** Teaser sub-label, e.g. `Rare · Helm`, `Epic · Prefix`, or `Skill`. */
 	sub: string;
+	/** Rarity tier (drives the rarity sort/glow on richer surfaces). Skills carry none, so they resolve to `Common`. */
+	rarity: ERarity;
 }
+
+export interface ItemUnlockReward extends UnlockRewardBase {
+	kind: 'item';
+	/** The rewarded item's reference record; the screen builds its preview item from this. */
+	item: IItem;
+}
+
+export interface ModUnlockReward extends UnlockRewardBase {
+	kind: 'mod';
+	/** The rewarded mod's reference record, passed through to the mod tooltip. */
+	mod: IItemMod;
+}
+
+export interface SkillUnlockReward extends UnlockRewardBase {
+	kind: 'skill';
+	/** The rewarded skill's reference record, passed through to the skill tooltip. */
+	skill: ISkill;
+}
+
+export type UnlockReward = ItemUnlockReward | ModUnlockReward | SkillUnlockReward;
 
 /** The zero-based-id reference pools the reward resolver reads (any may be undefined before load). */
 export interface RewardRefs {
@@ -49,9 +72,11 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 		if (item) {
 			return {
 				kind: 'item',
+				item,
 				name: item.name,
 				accent: rarityColor(item.rarityId),
-				sub: `${rarityLabel(item.rarityId)} · ${itemCategoryName(item.itemCategoryId)}`
+				sub: `${rarityLabel(item.rarityId)} · ${itemCategoryName(item.itemCategoryId)}`,
+				rarity: item.rarityId
 			};
 		}
 	}
@@ -60,9 +85,11 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 		if (mod) {
 			return {
 				kind: 'mod',
+				mod,
 				name: mod.name,
 				accent: rarityColor(mod.rarityId),
-				sub: `${rarityLabel(mod.rarityId)} · ${modTypeLabel(mod.itemModTypeId)}`
+				sub: `${rarityLabel(mod.rarityId)} · ${modTypeLabel(mod.itemModTypeId)}`,
+				rarity: mod.rarityId
 			};
 		}
 	}
@@ -71,9 +98,12 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 		if (skill) {
 			return {
 				kind: 'skill',
+				skill,
 				name: skill.name,
 				accent: 'var(--accent-light)',
-				sub: 'Skill'
+				sub: 'Skill',
+				// Skills carry no rarity tier; resolve to the lowest so they sort with Common.
+				rarity: ERarity.Common
 			};
 		}
 	}

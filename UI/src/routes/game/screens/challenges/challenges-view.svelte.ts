@@ -2,8 +2,9 @@ import {
 	EChallengeGoalComparison,
 	EChallengeType,
 	EEntityType,
-	ERarity,
+	type ERarity,
 	type IChallenge,
+	type IItem,
 	type IItemMod,
 	type IPlayerChallenge,
 	type ISkill
@@ -12,12 +13,9 @@ import { BattleAttributes, type Item } from '$lib/battle';
 import {
 	challengeTypeColor,
 	challengeTypeName,
-	itemCategoryName,
-	modTypeLabel,
-	rarityColor,
 	rarityGlow,
-	rarityLabel,
 	rarityLevel,
+	resolveUnlockReward,
 	zonesUnlockedBy
 } from '$lib/common';
 import { staticData } from '$stores';
@@ -117,11 +115,7 @@ function targetName(ch: IChallenge): string | null {
 }
 
 /** A non-owned preview item (base stats, empty mod slots) for the item tooltip. */
-function buildPreviewItem(itemId: number): Item | null {
-	const itemData = staticData.items?.[itemId];
-	if (!itemData) {
-		return null;
-	}
+function buildPreviewItem(itemData: IItem): Item {
 	return {
 		...itemData,
 		itemId: itemData.id,
@@ -133,58 +127,40 @@ function buildPreviewItem(itemId: number): Item | null {
 }
 
 /* ─── Reward resolution (+ reveal gating) ────────────────────────────── */
+/** Build the rich, reveal-gated reward view on top of the shared `resolveUnlockReward` resolution:
+ *  the precedence, accent, rarity and sub-label come from the shared helper, and this layer adds the
+ *  reveal flag, the rarity glow, and the per-kind tooltip preview (battle item / raw mod / raw skill). */
 export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward | null {
-	if (ch.rewardItemId != null) {
-		const item = buildPreviewItem(ch.rewardItemId);
-		if (!item) {
-			return null;
-		}
-		return {
-			kind: 'item',
-			revealed,
-			rarity: item.rarityId,
-			accent: rarityColor(item.rarityId),
-			glow: rarityGlow(item.rarityId),
-			name: item.name,
-			sub: `${rarityLabel(item.rarityId)} · ${itemCategoryName(item.itemCategoryId)}`,
-			item
-		};
+	const base = resolveUnlockReward(ch, {
+		items: staticData.items,
+		itemMods: staticData.itemMods,
+		skills: staticData.skills
+	});
+	if (base == null) {
+		return null;
 	}
-	if (ch.rewardItemModId != null) {
-		const mod = staticData.itemMods?.[ch.rewardItemModId];
-		if (!mod) {
-			return null;
-		}
-		return {
-			kind: 'mod',
-			revealed,
-			rarity: mod.rarityId,
-			accent: rarityColor(mod.rarityId),
-			glow: rarityGlow(mod.rarityId),
-			name: mod.name,
-			sub: `${rarityLabel(mod.rarityId)} · ${modTypeLabel(mod.itemModTypeId)}`,
-			mod
-		};
+	const resolved: ResolvedReward = {
+		kind: base.kind,
+		revealed,
+		rarity: base.rarity,
+		accent: base.accent,
+		// Skills carry no rarity tier, so they get no glow; items/mods glow by tier.
+		glow: base.kind === 'skill' ? '0' : rarityGlow(base.rarity),
+		name: base.name,
+		sub: base.sub
+	};
+	switch (base.kind) {
+		case 'item':
+			resolved.item = buildPreviewItem(base.item);
+			break;
+		case 'mod':
+			resolved.mod = base.mod;
+			break;
+		case 'skill':
+			resolved.skill = base.skill;
+			break;
 	}
-	if (ch.rewardSkillId != null) {
-		const skill = staticData.skills?.[ch.rewardSkillId];
-		if (!skill) {
-			return null;
-		}
-		// Skills carry no rarity tier; sort with the lowest and use the neutral skill accent
-		// (mirroring the shared `resolveUnlockReward` so both reward surfaces agree).
-		return {
-			kind: 'skill',
-			revealed,
-			rarity: ERarity.Common,
-			accent: 'var(--accent-light)',
-			glow: '0',
-			name: skill.name,
-			sub: 'Skill',
-			skill
-		};
-	}
-	return null;
+	return resolved;
 }
 
 /* ─── Progress maths (branches on comparison direction) ──────────────── */

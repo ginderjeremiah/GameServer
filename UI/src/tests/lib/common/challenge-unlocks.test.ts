@@ -59,20 +59,24 @@ describe('resolveUnlockReward', () => {
 	skills[5] = { id: 5, name: 'Cleave' } as ISkill;
 	const refs = { items, itemMods, skills };
 
-	it('resolves an item reward with rarity accent and a "rarity · category" sub-label', () => {
+	it('resolves an item reward with rarity tier/accent, "rarity · category" sub-label and the source record', () => {
 		const reward = resolveUnlockReward(challenge({ rewardItemId: 3 }), refs);
-		expect(reward).toMatchObject({ kind: 'item', name: 'Iron Helm', sub: 'Rare · Helm' });
+		expect(reward).toMatchObject({ kind: 'item', name: 'Iron Helm', sub: 'Rare · Helm', rarity: ERarity.Rare });
 		expect(reward?.accent).toContain('--rarity-');
+		// The matched reference record is carried so richer surfaces build their preview without re-looking-up.
+		expect(reward?.kind === 'item' && reward.item).toBe(items[3]);
 	});
 
-	it('resolves a mod reward with rarity accent and a "rarity · modtype" sub-label', () => {
+	it('resolves a mod reward with rarity tier/accent, a "rarity · modtype" sub-label and the source record', () => {
 		const reward = resolveUnlockReward(challenge({ rewardItemModId: 4 }), refs);
-		expect(reward).toMatchObject({ kind: 'mod', name: 'of Fury', sub: 'Epic · Suffix' });
+		expect(reward).toMatchObject({ kind: 'mod', name: 'of Fury', sub: 'Epic · Suffix', rarity: ERarity.Epic });
+		expect(reward?.kind === 'mod' && reward.mod).toBe(itemMods[4]);
 	});
 
-	it('resolves a skill reward (no rarity) with a neutral accent and "Skill" sub-label', () => {
+	it('resolves a skill reward (Common tier) with a neutral accent, "Skill" sub-label and the source record', () => {
 		const reward = resolveUnlockReward(challenge({ rewardSkillId: 5 }), refs);
-		expect(reward).toMatchObject({ kind: 'skill', name: 'Cleave', sub: 'Skill' });
+		expect(reward).toMatchObject({ kind: 'skill', name: 'Cleave', sub: 'Skill', rarity: ERarity.Common });
+		expect(reward?.kind === 'skill' && reward.skill).toBe(skills[5]);
 	});
 
 	it('returns null when the challenge grants no reward', () => {
