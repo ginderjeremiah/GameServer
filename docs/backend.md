@@ -24,6 +24,20 @@ Unit tests should be written according to the classical (Detroit) school of test
 
 When deciding whether to cover a branch, evaluate per-branch whether a worthwhile test exists rather than chasing the coverage number. The Redis primitives in `Game.Infrastructure` (`RedisMultiplexerFactory`, `RedisPubSubService`, `RedisQueue`) are the canonical example (#387, #399): their genuine logic is pinned by integration tests against the DI-resolved interface (`RedisQueueIntegrationTests`, `RedisPubSubServiceIntegrationTests` — typed queue round-trips, FIFO order, duplicate-handle-id rejection, and the `UnSubscribe` remove/unknown branches), while the residual uncovered branches are accepted as **measure-only**: the `RedisMultiplexerFactory` null-connection-string guards (defensive — config always supplies one) and the cache↔pub/sub multiplexer reuse-vs-connect branches (incidentally exercised at startup; provoking them deterministically would require disposing the process-wide shared multiplexer mid-suite, which is riskier than the branch is worth).
 
+### Running tests (Microsoft.Testing.Platform)
+
+The test projects run on **Microsoft.Testing.Platform** (MTP — xunit.v3 with `TestingPlatformDotnetTestSupport`), not the legacy VSTest runner. The practical gotcha: **the VSTest `dotnet test --filter "…"` syntax is silently ignored** — MTP rejects it as `Unknown option '--filter'`, and because the flag sits *before* `--` it is swallowed by the `dotnet test` wrapper, so the **entire suite runs** instead of erroring. Filter like this instead:
+
+- **Via `dotnet test`** — pass MTP filter options *after* `--`:
+  - `dotnet test Game.Api.Tests/Game.Api.Tests.csproj -- --filter-class "*SessionServiceTests"`
+  - simple filters: `--filter-class`, `--filter-method`, `--filter-namespace`, `--filter-trait "name=value"` (each has a `--filter-not-*` negation). Repeated filters of the same type OR together; different types AND together.
+  - query filter: `--filter-query "/assembly/namespace/class/method[trait=value]"` (`*` wildcards; [xUnit query filter language](https://xunit.net/docs/query-filter-language)). Simple and query filters cannot be mixed.
+- **Running the built test binary directly** (faster — skips the `dotnet test` wrapper) uses xunit.v3's *native single-dash* CLI:
+  - `dotnet Game.Api.Tests/bin/Debug/net10.0/Game.Api.Tests.dll -class "Game.Api.Tests.Unit.SessionServiceTests"`
+  - native flags: `-class` / `-method` / `-namespace` / `-trait` (append `-` to exclude, e.g. `-class-`) or `-filter "/asm/ns/class/method"`; run the binary with `--help` to list them.
+
+A filtered run is a dev convenience; CI runs the whole solution under coverage via `build/coverage.ps1`, so run the full suite before pushing.
+
 # Important Architectural Design Decisions
 
 ## Entity model location and isolation
