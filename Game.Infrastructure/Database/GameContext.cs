@@ -97,7 +97,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Challenge>(entity =>
             {
                 entity.Property(c => c.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(c => c.Name)
@@ -132,7 +131,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Enemy>(entity =>
             {
                 entity.Property(e => e.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(e => e.Name)
@@ -165,7 +163,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Item>(entity =>
             {
                 entity.Property(i => i.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(i => i.Name)
@@ -205,7 +202,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<ItemMod>(entity =>
             {
                 entity.Property(im => im.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(im => im.Name)
@@ -325,7 +321,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Skill>(entity =>
             {
                 entity.Property(s => s.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(s => s.BaseDamage)
@@ -484,7 +479,6 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<Zone>(entity =>
             {
                 entity.Property(z => z.Id)
-                    .UseIdentityColumn(0, 1)
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(z => z.Name)
