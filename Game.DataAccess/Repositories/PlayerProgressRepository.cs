@@ -69,9 +69,12 @@ namespace Game.DataAccess.Repositories
 
             var playerId = progress.Player.Id;
 
-            // The cache is the source of truth, so write the full current snapshot (absolute values).
+            // The cache is the source of truth, so write the full current snapshot (absolute values). The
+            // save-path write is awaited so a dropped write surfaces as an error instead of silently retaining
+            // the stale snapshot (#580); fire-and-forget stays on the read path (the load-miss re-cache and the
+            // sliding-TTL refresh), where a lost write just reloads from the database on the next miss.
             var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress);
-            _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
+            await _cache.Set(ProgressKey(playerId), snapshot, ProgressCacheTtl);
 
             // Persist only the rows that changed this save, as one batched write-behind event; the consumer
             // upserts them to their absolute values off the response path.

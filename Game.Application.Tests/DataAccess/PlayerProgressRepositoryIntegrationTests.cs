@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
@@ -7,6 +8,7 @@ using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Progress;
 using Game.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -174,6 +176,30 @@ namespace Game.Application.Tests.DataAccess
 
                 Assert.Equal(new HashSet<int> { completedId }, ids);
             }
+        }
+
+        [Fact]
+        public async Task Save_WhenSourceOfTruthCacheWriteFails_SurfacesTheFailure()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            using var scope = CreateScope();
+            var sp = scope.ServiceProvider;
+
+            // Wrap the real cache so the awaited source-of-truth write fails while reads/load still work. The
+            // fix awaits that write, so a dropped write must propagate instead of being swallowed (#580).
+            var throwingCache = new ThrowingOnSetCacheService(sp.GetRequiredService<ICacheService>());
+            var repo = new PlayerProgressRepository(
+                sp.GetRequiredService<GameContext>(),
+                sp.GetRequiredService<IChallenges>(),
+                throwingCache,
+                sp.GetRequiredService<IPubSubService>());
+
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            await Assert.ThrowsAsync<CacheWriteFailedException>(() => repo.Save(progress));
         }
 
         private async Task<ConnectionMultiplexer> ConnectRedisAsync()

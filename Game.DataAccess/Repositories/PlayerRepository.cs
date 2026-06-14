@@ -84,7 +84,12 @@ namespace Game.DataAccess.Repositories
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
-            _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
+            // The cache is the source of truth for player state, so the save-path write is awaited: a dropped
+            // write surfaces as an error instead of silently leaving the pre-mutation value behind to seed the
+            // next read-modify-write as a lost update (#580). Fire-and-forget is reserved for the read path
+            // (the load-miss re-cache in GetPlayer and the sliding-TTL refresh), where a lost write is harmless
+            // because the next miss simply reloads from the database.
+            await _cache.Set(playerKey, player, PlayerCacheTtl);
         }
 
         private async Task<Player?> GetPlayerFromDb(int playerId)

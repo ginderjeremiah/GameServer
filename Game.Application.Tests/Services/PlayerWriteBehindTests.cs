@@ -1,7 +1,10 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Game.Core.Events;
 using Game.Core.Players;
 using Game.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -71,6 +74,38 @@ namespace Game.Application.Tests.Services
             await playerRepo.SavePlayer(player);
 
             Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
+        public async Task SavePlayer_WhenSourceOfTruthCacheWriteFails_SurfacesTheFailure()
+        {
+            using var scope = CreateScope();
+            var sp = scope.ServiceProvider;
+            var context = sp.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Wrap the real cache so the awaited source-of-truth write fails while reads/load still work,
+            // standing in for a dropped Redis write. The fix awaits that write, so the failure must propagate
+            // rather than being swallowed by the old fire-and-forget SetAndForget (#580).
+            var throwingCache = new ThrowingOnSetCacheService(sp.GetRequiredService<ICacheService>());
+            var repo = new PlayerRepository(
+                context,
+                throwingCache,
+                sp.GetRequiredService<IPubSubService>(),
+                sp.GetRequiredService<IDomainEventDispatcher>(),
+                sp.GetRequiredService<PlayerUpdateBatch>(),
+                sp.GetRequiredService<IItems>(),
+                sp.GetRequiredService<IItemMods>(),
+                sp.GetRequiredService<ISkills>());
+
+            var player = await repo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            player.ChangeZone(1);
+
+            await Assert.ThrowsAsync<CacheWriteFailedException>(() => repo.SavePlayer(player));
         }
 
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;

@@ -13,8 +13,8 @@ namespace Game.Application.Tests.Services
     /// <summary>
     /// Covers the player-cache eviction policy (#439): the cached <c>Player</c> aggregate is written with a
     /// sliding idle TTL rather than living forever, and an expired/evicted key transparently reloads from the
-    /// database. These exercise the fire-and-forget cache writes through the DI-resolved repository, so the
-    /// TTL assertions poll Redis until the write lands.
+    /// database. The read-path re-cache/refresh are fire-and-forget while the save-path write is awaited
+    /// (#580), so the TTL assertions poll Redis until the write lands to tolerate the fire-and-forget cases.
     /// </summary>
     [Collection("Integration")]
     public class PlayerCacheEvictionTests : ApplicationIntegrationTestBase
