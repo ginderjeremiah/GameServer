@@ -7,7 +7,7 @@ using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class Tags : ITags, ITagEntityQueries
+    internal class Tags : ITags, ITagAssignmentQueries
     {
         // Single source of truth for the entity -> read-contract projection so EF can translate it in SQL.
         private static readonly Expression<Func<Tag, Contracts.Tag>> ToContract =
@@ -25,25 +25,19 @@ namespace Game.DataAccess.Repositories
             return _context.Tags.Select(ToContract).AsAsyncEnumerable();
         }
 
-        public IAsyncEnumerable<Tag> GetTags(IEnumerable<int> tagIds)
+        public IAsyncEnumerable<int> GetExistingTagIds(IEnumerable<int> tagIds)
         {
-            return _context.Tags.Where(t => tagIds.Contains(t.Id)).AsAsyncEnumerable();
+            return _context.Tags.Where(t => tagIds.Contains(t.Id)).Select(t => t.Id).AsAsyncEnumerable();
         }
 
-        public IAsyncEnumerable<Tag> GetTagEntitiesForItem(int itemId)
+        public IAsyncEnumerable<int> GetTagIdsForItem(int itemId)
         {
-            return _context.Tags
-                .Include(t => t.Items)
-                .Where(t => t.Items.Any(im => im.Id == itemId))
-                .AsAsyncEnumerable();
+            return _context.ItemTags.Where(it => it.ItemId == itemId).Select(it => it.TagId).AsAsyncEnumerable();
         }
 
-        public IAsyncEnumerable<Tag> GetTagEntitiesForItemMod(int itemModId)
+        public IAsyncEnumerable<int> GetTagIdsForItemMod(int itemModId)
         {
-            return _context.Tags
-                .Include(t => t.ItemMods)
-                .Where(t => t.ItemMods.Any(im => im.Id == itemModId))
-                .AsAsyncEnumerable();
+            return _context.ItemModTags.Where(imt => imt.ItemModId == itemModId).Select(imt => imt.TagId).AsAsyncEnumerable();
         }
     }
 }

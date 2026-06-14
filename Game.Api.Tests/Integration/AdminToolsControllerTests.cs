@@ -1370,7 +1370,7 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             return await context.Tags
-                .Where(t => t.Items.Any(i => i.Id == itemId))
+                .Where(t => context.ItemTags.Any(it => it.ItemId == itemId && it.TagId == t.Id))
                 .Select(t => new Tag { Id = t.Id, Name = t.Name, TagCategoryId = t.TagCategoryId })
                 .ToListAsync();
         }
@@ -1380,7 +1380,7 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             return await context.Tags
-                .Where(t => t.ItemMods.Any(im => im.Id == itemModId))
+                .Where(t => context.ItemModTags.Any(imt => imt.ItemModId == itemModId && imt.TagId == t.Id))
                 .Select(t => new Tag { Id = t.Id, Name = t.Name, TagCategoryId = t.TagCategoryId })
                 .ToListAsync();
         }

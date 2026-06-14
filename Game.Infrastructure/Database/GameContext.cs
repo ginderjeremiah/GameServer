@@ -30,8 +30,10 @@ namespace Game.Infrastructure.Database
         public DbSet<ItemCategory> ItemCategories { get; set; }
         public DbSet<ItemModAttribute> ItemModAttributes { get; set; }
         public DbSet<ItemMod> ItemMods { get; set; }
+        public DbSet<ItemModTag> ItemModTags { get; set; }
         public DbSet<Item> Items { get; set; }
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
+        public DbSet<ItemTag> ItemTags { get; set; }
         public DbSet<LogPreference> LogPreferences { get; set; }
         public DbSet<LogType> LogTypes { get; set; }
         public DbSet<Player> Players { get; set; }
@@ -168,9 +170,15 @@ namespace Game.Infrastructure.Database
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
 
+                // Explicit join entity (ItemTag) backs the Item.Tags skip navigation so the admin tag-setting
+                // path can add/remove a single assignment without loading a tag's full membership. Cascade is
+                // load-bearing: hard-deleting an in-use tag (#297) relies on its join rows cascading away.
                 entity.HasMany(i => i.Tags)
-                    .WithMany(t => t.Items)
-                    .UsingEntity(join => join.ToTable("ItemTags"));
+                    .WithMany()
+                    .UsingEntity<ItemTag>(
+                        r => r.HasOne<Tag>().WithMany().HasForeignKey(it => it.TagId).OnDelete(DeleteBehavior.Cascade),
+                        l => l.HasOne<Item>().WithMany().HasForeignKey(it => it.ItemId).OnDelete(DeleteBehavior.Cascade),
+                        j => j.HasKey(it => new { it.ItemId, it.TagId }));
             });
 
             modelBuilder.Entity<ItemAttribute>(entity =>
@@ -207,9 +215,14 @@ namespace Game.Infrastructure.Database
                 entity.Property(im => im.Name)
                     .HasMaxLength(50);
 
+                // Explicit join entity (ItemModTag) backs the ItemMod.Tags skip navigation; see the Item.Tags
+                // configuration above for the rationale and the load-bearing cascade.
                 entity.HasMany(im => im.Tags)
-                    .WithMany(t => t.ItemMods)
-                    .UsingEntity(join => join.ToTable("ItemModTags"));
+                    .WithMany()
+                    .UsingEntity<ItemModTag>(
+                        r => r.HasOne<Tag>().WithMany().HasForeignKey(imt => imt.TagId).OnDelete(DeleteBehavior.Cascade),
+                        l => l.HasOne<ItemMod>().WithMany().HasForeignKey(imt => imt.ItemModId).OnDelete(DeleteBehavior.Cascade),
+                        j => j.HasKey(imt => new { imt.ItemModId, imt.TagId }));
             });
 
             modelBuilder.Entity<ItemModAttribute>(entity =>

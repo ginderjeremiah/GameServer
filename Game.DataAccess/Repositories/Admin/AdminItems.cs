@@ -1,6 +1,5 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
-using Microsoft.EntityFrameworkCore;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -8,14 +7,14 @@ namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
     /// Content Authoring persistence for items and their related collections. Reuses the cached entity
-    /// lookup (<see cref="IItemEntityCache.LookupItem"/>) for existence/diff and the tag-graph queries on
-    /// <see cref="ITagEntityQueries"/>; all writes go through the entity store. Changes are staged on the
-    /// unit of work; the per-action commit filter persists them.
+    /// lookup (<see cref="IItemEntityCache.LookupItem"/>) for existence/diff and the tag-assignment queries
+    /// on <see cref="ITagAssignmentQueries"/>; all writes go through the entity store. Changes are staged on
+    /// the unit of work; the per-action commit filter persists them.
     /// </summary>
-    internal class AdminItems(IItemEntityCache items, ITagEntityQueries tags, IEntityStore entityStore) : IAdminItems
+    internal class AdminItems(IItemEntityCache items, ITagAssignmentQueries tags, IEntityStore entityStore) : IAdminItems
     {
         private readonly IItemEntityCache _items = items;
-        private readonly ITagEntityQueries _tags = tags;
+        private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
         public void SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
@@ -111,31 +110,30 @@ namespace Game.DataAccess.Repositories.Admin
 
         public async Task<bool> SetTags(SetTagsData data)
         {
-            var item = _items.LookupItem(data.Id);
-            if (item is null)
+            if (_items.LookupItem(data.Id) is null)
             {
                 return false;
             }
 
-            _entityStore.Track(item);
-            var currentTags = await _tags.GetTagEntitiesForItem(data.Id).ToListAsync();
-            foreach (var currentTag in currentTags)
+            // Reconcile this item's join rows directly: read only its current tag ids and the desired ids
+            // that actually exist, then add/remove a single navigation-free join row per difference — never
+            // loading a tag's full item membership.
+            var currentTagIds = await _tags.GetTagIdsForItem(data.Id).ToHashSetAsync();
+            var desiredTagIds = await _tags.GetExistingTagIds(data.TagIds).ToHashSetAsync();
+
+            foreach (var tagId in currentTagIds)
             {
-                if (!data.TagIds.Contains(currentTag.Id))
+                if (!desiredTagIds.Contains(tagId))
                 {
-                    // Remove only this item's join row; Clear() would delete the rows for every
-                    // item carrying the tag, since the navigation eager-loads the full membership.
-                    currentTag.Items.RemoveAll(i => i.Id == data.Id);
+                    _entityStore.Delete(new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
                 }
             }
 
-            var tags = _tags.GetTags(data.TagIds);
-            await foreach (var tag in tags)
+            foreach (var tagId in desiredTagIds)
             {
-                if (!currentTags.Any(t => t.Id == tag.Id))
+                if (!currentTagIds.Contains(tagId))
                 {
-                    tag.Items = [];
-                    tag.Items.Add(item);
+                    _entityStore.Insert(new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
                 }
             }
 
