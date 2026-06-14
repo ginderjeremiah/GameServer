@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { formatNum, capitalize, normalizeText, plural, keys, groupBy, enumPairs } from '../../lib/common/functions';
+import { describe, it, expect, vi } from 'vitest';
+import {
+	formatNum,
+	capitalize,
+	normalizeText,
+	plural,
+	keys,
+	groupBy,
+	enumPairs,
+	delay
+} from '../../lib/common/functions';
 
 describe('formatNum', () => {
 	it('formats integers without trailing zeros', () => {
@@ -135,5 +144,26 @@ describe('enumPairs', () => {
 		}
 		const pairs = enumPairs(TestEnum);
 		expect(pairs[0].name).toBe('My Value');
+	});
+});
+
+describe('delay', () => {
+	it('resolves only after the given number of milliseconds elapses', async () => {
+		vi.useFakeTimers();
+		try {
+			const settled = vi.fn();
+			const promise = delay(100).then(settled);
+
+			// Not yet elapsed: the promise must still be pending.
+			await vi.advanceTimersByTimeAsync(99);
+			expect(settled).not.toHaveBeenCalled();
+
+			// The final tick crosses the delay and resolves the promise.
+			await vi.advanceTimersByTimeAsync(1);
+			await promise;
+			expect(settled).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });

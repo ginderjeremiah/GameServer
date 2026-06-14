@@ -48,6 +48,26 @@ describe('createHook', () => {
 		expect(cb).toHaveBeenCalledTimes(1);
 	});
 
+	it('unhook outside dispatch splices only the targeted subscriber', () => {
+		const hook = createHook<[number]>();
+		const cb1 = vi.fn();
+		const cb2 = vi.fn();
+		const cb3 = vi.fn();
+
+		hook.onNotified(cb1);
+		const unhook2 = hook.onNotified(cb2);
+		hook.onNotified(cb3);
+
+		// Removing a middle subscriber while no dispatch is in progress takes the
+		// immediate-splice path; its siblings must keep firing afterwards.
+		unhook2();
+		hook.notify(1);
+
+		expect(cb1).toHaveBeenCalledWith(1, expect.any(Function));
+		expect(cb2).not.toHaveBeenCalled();
+		expect(cb3).toHaveBeenCalledWith(1, expect.any(Function));
+	});
+
 	it('unhook is idempotent', () => {
 		const hook = createHook<[number]>();
 		const cb = vi.fn();
