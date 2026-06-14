@@ -3,9 +3,9 @@ import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { SERVER_STAT_TYPES } from './stat-fixtures';
 
-// Statistics fetches values via ApiRequest and resolves entities from staticData.
-const { mockGet, mockToastError, staticData } = vi.hoisted(() => ({
-	mockGet: vi.fn(),
+// Statistics fetches values over the socket (GetPlayerStatistics) and resolves entities from staticData.
+const { mockFetchSocket, mockToastError, staticData } = vi.hoisted(() => ({
+	mockFetchSocket: vi.fn(),
 	mockToastError: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any
@@ -13,7 +13,7 @@ const { mockGet, mockToastError, staticData } = vi.hoisted(() => ({
 
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/api')>();
-	return { ...actual, ApiRequest: { get: mockGet } };
+	return { ...actual, fetchSocketData: mockFetchSocket };
 });
 // Override staticData + toastError; keep the other real stores ($components →
 // log-panel pulls in the engine, which reads the logs store).
@@ -42,7 +42,7 @@ beforeEach(() => {
 	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 1 }];
 	staticData.skills = [{ id: 0, name: 'Cleave' }];
 	mockToastError.mockClear();
-	mockGet.mockResolvedValue(STATS);
+	mockFetchSocket.mockResolvedValue(STATS);
 });
 
 afterEach(() => cleanup());
@@ -54,7 +54,7 @@ describe('Statistics screen', () => {
 		// The Combat category is active by default → its stat cards appear once loaded.
 		expect(await screen.findByText('Enemies Killed')).toBeTruthy();
 		expect(screen.getByTestId('stat-card-grid')).toBeTruthy();
-		expect(mockGet).toHaveBeenCalledWith('Statistics');
+		expect(mockFetchSocket).toHaveBeenCalledWith('GetPlayerStatistics');
 	});
 
 	it('switches to the by-entity view via the top toggle', async () => {
@@ -85,7 +85,7 @@ describe('Statistics screen', () => {
 	});
 
 	it('shows a friendly empty state for a player with no statistics', async () => {
-		mockGet.mockResolvedValue([]);
+		mockFetchSocket.mockResolvedValue([]);
 		render(Statistics);
 		expect(await screen.findByTestId('statistics-empty')).toBeTruthy();
 		expect(screen.queryByTestId('stat-card-grid')).toBeNull();
@@ -93,7 +93,7 @@ describe('Statistics screen', () => {
 	});
 
 	it('surfaces an error (not the empty state) when the fetch fails', async () => {
-		mockGet.mockRejectedValue(new Error('network down'));
+		mockFetchSocket.mockRejectedValue(new Error('network down'));
 		render(Statistics);
 		expect(await screen.findByTestId('statistics-error')).toBeTruthy();
 		// A failed load must not masquerade as the new-player empty state.

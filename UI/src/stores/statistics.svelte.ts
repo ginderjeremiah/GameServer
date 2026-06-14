@@ -1,10 +1,10 @@
 /* Player statistics store — the player's tracked statistic values
-   (`GET /api/Statistics`), shared across screens so the source is fetched once and
-   stays consistent. The Statistics screen renders the full breakdown from it; the
+   (`GetPlayerStatistics` socket command), shared across screens so the source is fetched
+   once and stays consistent. The Statistics screen renders the full breakdown from it; the
    Fight screen reads the per-zone `ZonesCleared` value to show the boss "Cleared"
    seal and marks a zone cleared optimistically the moment its boss is defeated. */
 
-import { ApiRequest, EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { fetchSocketData, EStatisticType, type IPlayerStatistic } from '$lib/api';
 
 let stats = $state<IPlayerStatistic[]>([]);
 let loaded = $state(false);
@@ -14,7 +14,8 @@ let inFlight: Promise<void> | undefined;
 
 const fetchStats = async () => {
 	try {
-		stats = (await ApiRequest.get('Statistics')) ?? [];
+		// fetchSocketData throws on a socket error, preserving this try/catch contract.
+		stats = (await fetchSocketData('GetPlayerStatistics')) ?? [];
 		error = false;
 		loaded = true;
 	} catch {
