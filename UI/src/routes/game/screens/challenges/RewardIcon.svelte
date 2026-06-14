@@ -32,7 +32,15 @@
 		style:border="1px dashed {tintColor(accent, 0.5)}"
 		style:--seal-glow={glow ? tintColor(accent, 0.5) : 'transparent'}
 	>
-		<svg width={size * 0.42} height={size * 0.42} viewBox="0 0 16 16" fill="none" stroke={accent} stroke-width="1.3">
+		<svg
+			aria-hidden="true"
+			width={size * 0.42}
+			height={size * 0.42}
+			viewBox="0 0 16 16"
+			fill="none"
+			stroke={accent}
+			stroke-width="1.3"
+		>
 			<rect x="3.5" y="7" width="9" height="6.5" rx="1" />
 			<path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" />
 		</svg>

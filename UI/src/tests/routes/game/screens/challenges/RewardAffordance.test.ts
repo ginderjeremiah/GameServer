@@ -1,7 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/svelte';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EAttribute, ERarity, EItemModType, type IItemMod, type ISkill } from '$lib/api';
 import RewardAffordance from '$routes/game/screens/challenges/RewardAffordance.svelte';
+import RewardAffordanceFixture from './RewardAffordanceFixture.svelte';
+import type { RewardTooltipController } from '$routes/game/screens/challenges/reward-tooltip-context';
 import type { ResolvedReward } from '$routes/game/screens/challenges/challenges-view.svelte';
 
 const sampleMod: IItemMod = {
@@ -90,5 +92,62 @@ describe('RewardAffordance', () => {
 	it('shows a fallback when there is no reward', () => {
 		const { getByText } = render(RewardAffordance, { props: { reward: null } });
 		expect(getByText('No reward')).toBeTruthy();
+	});
+
+	describe('keyboard / screen-reader accessibility', () => {
+		const stubController = (): RewardTooltipController => ({
+			show: vi.fn(),
+			move: vi.fn(),
+			hide: vi.fn()
+		});
+
+		it('renders each variant as a focusable button so keyboard users can reach it', () => {
+			for (const variant of ['tile', 'chip'] as const) {
+				const { getByRole } = render(RewardAffordance, { props: { reward: modReward(true), variant } });
+				// A real <button> is in the tab order without any explicit tabindex.
+				expect(getByRole('button').tabIndex).toBe(0);
+				cleanup();
+			}
+		});
+
+		it('labels a revealed reward with its name and teaser for assistive tech', () => {
+			const { getByRole } = render(RewardAffordance, { props: { reward: modReward(true), variant: 'tile' } });
+			expect(getByRole('button').getAttribute('aria-label')).toBe('Reward: Honed, Rare · Prefix');
+		});
+
+		it('labels a sealed reward as sealed rather than leaking its name', () => {
+			const { getByRole } = render(RewardAffordance, { props: { reward: modReward(false), variant: 'tile' } });
+			expect(getByRole('button').getAttribute('aria-label')).toBe('Sealed reward: Rare · Prefix');
+		});
+
+		it('hides the decorative tile info icon from assistive tech', () => {
+			const { container } = render(RewardAffordance, { props: { reward: modReward(true), variant: 'tile' } });
+			expect(container.querySelector('.tile-info')?.getAttribute('aria-hidden')).toBe('true');
+		});
+
+		it('opens the shared tooltip on focus, anchored to the focused element', async () => {
+			const controller = stubController();
+			const reward = modReward(true);
+			const { getByRole } = render(RewardAffordanceFixture, { props: { reward, variant: 'tile', controller } });
+
+			const button = getByRole('button');
+			await fireEvent.focus(button);
+
+			// Focus drives the same controller hover does, anchored to the element (not a cursor).
+			expect(controller.show).toHaveBeenCalledWith(reward, button);
+		});
+
+		it('closes the shared tooltip on blur', async () => {
+			const controller = stubController();
+			const { getByRole } = render(RewardAffordanceFixture, {
+				props: { reward: modReward(true), variant: 'chip', controller }
+			});
+
+			const button = getByRole('button');
+			await fireEvent.focus(button);
+			await fireEvent.blur(button);
+
+			expect(controller.hide).toHaveBeenCalledTimes(1);
+		});
 	});
 });
