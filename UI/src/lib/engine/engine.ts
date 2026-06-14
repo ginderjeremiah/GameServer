@@ -93,6 +93,10 @@ const stopGame = () => {
 	resetLogs();
 	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();
+	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
+	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
+	// just took over.
+	apiSocket.disconnect();
 };
 
 const startLogicEngine = () => {
