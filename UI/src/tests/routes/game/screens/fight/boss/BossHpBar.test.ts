@@ -21,4 +21,14 @@ describe('BossHpBar', () => {
 		const { getByTestId } = render(BossHpBar, { props: { currentHealth: 50, maxHealth: 200 } });
 		expect(getByTestId('boss-hp-bar').querySelector('.hp-text')?.textContent).toContain('50 / 200');
 	});
+
+	it('formats a fractional max health instead of rendering floating-point noise', () => {
+		const { getByTestId } = render(BossHpBar, { props: { currentHealth: 412.55, maxHealth: 523.4999999999 } });
+		expect(getByTestId('boss-hp-bar').querySelector('.hp-text')?.textContent).toContain('412.55 / 523.5');
+	});
+
+	it('renders the phase pips that telegraph boss phases', () => {
+		const { getByTestId } = render(BossHpBar, { props: { currentHealth: 50, maxHealth: 100 } });
+		expect(getByTestId('boss-hp-bar').querySelectorAll('.phase-pip')).toHaveLength(3);
+	});
 });

@@ -1,7 +1,7 @@
 <div class="tt-dmg-list">
 	<div class="tt-dmg-row">
 		<span class="tt-dmg-label">Base</span>
-		<span class="tt-dmg-value">{base}</span>
+		<span class="tt-dmg-value">{formatNum(base)}</span>
 	</div>
 	{#each multipliers as mult (mult.name)}
 		<div class="tt-dmg-row">
