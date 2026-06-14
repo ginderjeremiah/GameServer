@@ -35,9 +35,12 @@ namespace Game.Core.Battle
 
         private void ApplyEffects(BattleContext context)
         {
-            foreach (var effect in Skill.Effects)
+            // Index loop, not foreach: Skill.Effects is an IReadOnlyList<> (#547), whose foreach would box an
+            // interface enumerator on every skill fire — the same per-fire allocation the hot path avoids below.
+            var effects = Skill.Effects;
+            for (var i = 0; i < effects.Count; i++)
             {
-                context.ApplySkillEffect(effect);
+                context.ApplySkillEffect(effects[i]);
             }
         }
 
@@ -46,12 +49,15 @@ namespace Game.Core.Battle
             // Accumulate the multiplier bonus separately and add BaseDamage last, exactly mirroring the
             // previous `BaseDamage + DamageMultipliers.Sum(...)`. Floating-point addition is not
             // associative, so preserving this order keeps the result bit-for-bit identical — required
-            // for frontend/backend battle parity. The manual loop avoids the per-fire allocations the
-            // LINQ Sum incurred on this hot path (a boxed list enumerator plus a closure capturing
-            // `context`, allocated on every skill fire) — see #286.
+            // for frontend/backend battle parity. The manual index loop avoids the per-fire allocations on
+            // this hot path: the old LINQ Sum boxed a list enumerator plus a closure capturing `context`
+            // (#286), and a foreach over the IReadOnlyList<> DamageMultipliers (#547) would itself box an
+            // interface enumerator — indexing the list allocates nothing.
             var multiplierBonus = 0.0;
-            foreach (var multiplier in Skill.DamageMultipliers)
+            var multipliers = Skill.DamageMultipliers;
+            for (var i = 0; i < multipliers.Count; i++)
             {
+                var multiplier = multipliers[i];
                 multiplierBonus += context.GetActiveBattlerAttribute(multiplier.Attribute) * multiplier.Amount;
             }
 
