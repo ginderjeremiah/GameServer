@@ -40,10 +40,23 @@ namespace Game.Api.Sockets
 
         private readonly TimeSpan _commandTimeout;
 
+        /// <summary>How long a socket may go without inbound traffic before the watchdog closes it.</summary>
+        private static readonly TimeSpan InactivityTimeout = TimeSpan.FromSeconds(60);
+
+        /// <summary>How often the inactivity watchdog re-checks the last-activity timestamp.</summary>
+        private static readonly TimeSpan InactivityPollInterval = TimeSpan.FromSeconds(10);
+
         private DateTime _lastResponse = DateTime.UtcNow;
+
+        // The read and inactivity loops, tracked (rather than pure fire-and-forget) so a host shutdown can
+        // await their completion within a bounded drain window — see SocketConnectionRegistry.
+        private Task _loops = Task.CompletedTask;
 
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
+
+        /// <summary>Completes once both the read and inactivity loops have wound down.</summary>
+        public Task Completion => _loops;
 
         public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Func<Task> onActivity, TimeSpan? commandTimeout = null)
         {
@@ -55,10 +68,41 @@ namespace Game.Api.Sockets
             _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
         }
 
-        public void Listen()
+        /// <summary>
+        /// Starts the per-socket read and inactivity loops, tying both to the host lifetime so a draining
+        /// instance can tear them down cleanly (#526). The two tokens carry different shutdown phases:
+        /// <paramref name="hostStopping"/> fires the moment graceful shutdown begins and stops the
+        /// inactivity watchdog (its job is moot once the drain owns teardown), while
+        /// <paramref name="drainDeadline"/> fires only if the bounded drain window elapses and aborts a
+        /// blocking <see cref="SocketContext.ReadMessage"/> that is still waiting on a client that never
+        /// completed the closing handshake. Outside of shutdown neither token is cancelled, so behaviour is
+        /// unchanged.
+        /// </summary>
+        public void Listen(CancellationToken hostStopping = default, CancellationToken drainDeadline = default)
         {
-            Task.Run(ReadLoop);
-            Task.Run(InactivityCheckerLoop);
+            _loops = Task.WhenAll(
+                Task.Run(() => ReadLoop(drainDeadline)),
+                Task.Run(() => InactivityCheckerLoop(hostStopping)));
+        }
+
+        /// <summary>
+        /// Gracefully closes the socket for a host shutdown: sends a <see cref="ESocketCloseReason.ServerShuttingDown"/>
+        /// close frame so the client reconnects to a healthy instance rather than hanging on a half-open
+        /// socket, then waits for the loops to wind down. <paramref name="drainDeadline"/> bounds the close
+        /// frame's own send; the loops are awaited unconditionally since they never fault on cancellation.
+        /// </summary>
+        public async Task ShutdownAsync(CancellationToken drainDeadline)
+        {
+            try
+            {
+                await _context.Close(ESocketCloseReason.ServerShuttingDown, drainDeadline);
+            }
+            catch (OperationCanceledException)
+            {
+                // The drain window elapsed mid-close; the read loop is aborted via the same token below.
+            }
+
+            await Completion;
         }
 
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
@@ -159,11 +203,20 @@ namespace Game.Api.Sockets
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
 
-        private async Task InactivityCheckerLoop()
+        private async Task InactivityCheckerLoop(CancellationToken hostStopping)
         {
-            while (DateTime.UtcNow - _lastResponse < TimeSpan.FromSeconds(60) && _context.State is Open)
+            try
             {
-                await Task.Delay(10000);
+                while (DateTime.UtcNow - _lastResponse < InactivityTimeout && _context.State is Open)
+                {
+                    await Task.Delay(InactivityPollInterval, hostStopping);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The host is shutting down; the drain coordinator now owns closing this socket, so the
+                // watchdog simply stops rather than racing it with an Inactivity close.
+                return;
             }
 
             if (_context.State is Open)
@@ -172,13 +225,13 @@ namespace Game.Api.Sockets
             }
         }
 
-        private async Task ReadLoop()
+        private async Task ReadLoop(CancellationToken drainDeadline)
         {
             do
             {
                 try
                 {
-                    var message = await _context.ReadMessage();
+                    var message = await _context.ReadMessage(drainDeadline);
                     if (!string.IsNullOrWhiteSpace(message))
                     {
                         _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Message}", PlayerId, Id, message);
@@ -188,6 +241,12 @@ namespace Game.Api.Sockets
                         await _onActivity();
                         await HandleMessage(message);
                     }
+                }
+                catch (OperationCanceledException) when (drainDeadline.IsCancellationRequested)
+                {
+                    // The graceful drain window elapsed and the blocking receive was aborted; stop reading
+                    // so the loop (and thus the drain) can complete.
+                    break;
                 }
                 catch (Exception ex)
                 {

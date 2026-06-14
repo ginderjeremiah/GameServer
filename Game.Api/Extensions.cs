@@ -10,6 +10,7 @@ namespace Game.Api
             {
                 ESocketCloseReason.Inactivity => "The socket has been closed due to inactivity.",
                 ESocketCloseReason.SocketReplaced => "The socket has been closed because a new one was established.",
+                ESocketCloseReason.ServerShuttingDown => "The socket has been closed because the server is shutting down.",
                 _ => "The socket has been closed normally."
             };
         }

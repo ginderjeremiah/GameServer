@@ -13,6 +13,7 @@ namespace Game.Api.Services
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<SocketManagerService> _logger;
         private readonly SocketCommandFactory _commandFactory;
+        private readonly SocketConnectionRegistry _socketRegistry;
 
         /// <summary>
         /// Time-to-live on the per-player socket-presence key. The client heartbeats every 10s
@@ -24,7 +25,7 @@ namespace Game.Api.Services
         /// </summary>
         private static readonly TimeSpan SocketPresenceTtl = TimeSpan.FromSeconds(30);
 
-        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory)
+        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory, SocketConnectionRegistry socketRegistry)
         {
             _pubSub = pubSub;
             _cache = cache;
@@ -32,6 +33,7 @@ namespace Game.Api.Services
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<SocketManagerService>();
             _commandFactory = commandFactory;
+            _socketRegistry = socketRegistry;
         }
 
         public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService)
@@ -48,7 +50,9 @@ namespace Game.Api.Services
             }
 
             await RegisterSocketCommandListener(socketHandler);
-            socketHandler.Listen();
+            // Register before starting the loops so the registry tracks the socket — and threads its
+            // shutdown tokens into Listen — for a graceful drain on host shutdown (#526).
+            _socketRegistry.Register(socketHandler);
             _logger.LogDebug("Initiated socket for player: ({Id}), with Id: {SocketId}", playerId, socketContext.SocketId);
             return socketContext;
         }
@@ -76,6 +80,7 @@ namespace Game.Api.Services
 
         public async Task UnRegisterSocket(SocketContext context)
         {
+            _socketRegistry.Unregister(context.SocketId);
             await UnRegisterSocketCommandListener(context.SocketId);
             await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
         }

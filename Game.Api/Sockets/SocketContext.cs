@@ -37,7 +37,7 @@ namespace Game.Api.Sockets
             _logger = logger;
         }
 
-        public async Task<bool> SendData(string data)
+        public async Task<bool> SendData(string data, CancellationToken cancellationToken = default)
         {
             if (_socket.State is not Open)
             {
@@ -46,7 +46,7 @@ namespace Game.Api.Sockets
 
             _logger.LogDebug("Sending data to playerId ({PlayerId}) from socket ({Id}): {Data}", PlayerId, SocketId, data);
             var dataBytes = Encoding.UTF8.GetBytes(data);
-            await _sendLock.WaitAsync();
+            await _sendLock.WaitAsync(cancellationToken);
             try
             {
                 for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
@@ -57,7 +57,7 @@ namespace Game.Api.Sockets
                             buffer: new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i),
                             messageType: WebSocketMessageType.Text,
                             endOfMessage: true,
-                            CancellationToken.None
+                            cancellationToken
                         );
                     }
                     else
@@ -66,7 +66,7 @@ namespace Game.Api.Sockets
                             buffer: new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE),
                             messageType: WebSocketMessageType.Text,
                             endOfMessage: false,
-                            CancellationToken.None
+                            cancellationToken
                         );
                     }
                 }
@@ -84,19 +84,19 @@ namespace Game.Api.Sockets
             return true;
         }
 
-        public async Task<bool> SendData<T>(T data) where T : ApiSocketResponse
+        public async Task<bool> SendData<T>(T data, CancellationToken cancellationToken = default) where T : ApiSocketResponse
         {
-            return await SendData(data.Serialize<object>());
+            return await SendData(data.Serialize<object>(), cancellationToken);
         }
 
-        public async Task<string> ReadMessage()
+        public async Task<string> ReadMessage(CancellationToken cancellationToken = default)
         {
             var message = new StringBuilder();
             WebSocketReceiveResult result;
             var buffersRead = 0;
             do
             {
-                result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), CancellationToken.None);
+                result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), cancellationToken);
                 if (result.Count > 0)
                 {
                     message.Append(Encoding.UTF8.GetString(_buffer, 0, result.Count));
@@ -119,19 +119,19 @@ namespace Game.Api.Sockets
             await _socketClosedSource.Task;
         }
 
-        public async Task Close(ESocketCloseReason closeReason = ESocketCloseReason.Finished)
+        public async Task Close(ESocketCloseReason closeReason = ESocketCloseReason.Finished, CancellationToken cancellationToken = default)
         {
             _socketClosedSource.TrySetResult(closeReason);
             if (_socket.State is WebSocketState.Open)
             {
                 // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
                 // SendData; re-check state inside the lock so a racing close only sends one close frame.
-                await _sendLock.WaitAsync();
+                await _sendLock.WaitAsync(cancellationToken);
                 try
                 {
                     if (_socket.State is WebSocketState.Open)
                     {
-                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), CancellationToken.None);
+                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), cancellationToken);
                     }
                 }
                 finally
