@@ -110,4 +110,33 @@ describe('Skills', () => {
 		await fireEvent.mouseLeave(slot);
 		expect(queryByText('Damage breakdown')).toBeNull();
 	});
+
+	it('reveals the skill tooltip on keyboard focus and hides it on blur', async () => {
+		battler.skills = [makeSkill(battler, { name: 'Slash' })];
+		const { container, queryByText } = render(Skills, { props: { battler, side: 'player' } });
+
+		expect(queryByText('Damage breakdown')).toBeNull();
+
+		const slot = container.querySelector('.skill-slot') as HTMLElement;
+		await fireEvent.focus(slot);
+		expect(queryByText('Damage breakdown')).not.toBeNull();
+
+		await fireEvent.blur(slot);
+		expect(queryByText('Damage breakdown')).toBeNull();
+	});
+
+	it('makes filled slots focusable buttons and leaves empty slots inert', () => {
+		battler.skills = [makeSkill(battler, { name: 'Slash' }), undefined];
+		const { container } = render(Skills, { props: { battler, side: 'player' } });
+
+		const slots = container.querySelectorAll('.skill-slot');
+		expect(slots).toHaveLength(2);
+		// The filled slot is a focusable <button>; the empty placeholder is an inert <div>.
+		expect(slots[0].tagName).toBe('BUTTON');
+		expect(slots[1].tagName).toBe('DIV');
+		expect(slots[1].getAttribute('aria-hidden')).toBe('true');
+		// The misleading grid semantics are gone — no grid roles remain.
+		expect(container.querySelector('[role="grid"]')).toBeNull();
+		expect(container.querySelector('[role="gridcell"]')).toBeNull();
+	});
 });

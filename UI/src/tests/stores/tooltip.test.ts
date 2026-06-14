@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
-import { tooltips } from '$stores/tooltip.svelte';
+import { anchorPosition, tooltips } from '$stores/tooltip.svelte';
 import Registrar from './TooltipRegistrarFixture.svelte';
 import Consumer from './TooltipConsumerFixture.svelte';
 import Nav from './TooltipNavFixture.svelte';
@@ -66,5 +66,30 @@ describe('tooltip store', () => {
 
 		expect([...tooltips.data].every((t) => t !== undefined)).toBe(true);
 		expect([...tooltips.data]).toHaveLength(2);
+	});
+});
+
+describe('anchorPosition', () => {
+	it('positions a pointer anchor at the cursor coordinates', () => {
+		const ev = { clientX: 120, clientY: 45 } as MouseEvent;
+		expect(anchorPosition(ev)).toEqual({ x: 120, y: 45 });
+	});
+
+	it('positions a focus anchor under the centre of the element box', () => {
+		// Focus has no cursor, so the tooltip anchors off the element's rect instead.
+		const el = document.createElement('button');
+		el.getBoundingClientRect = () =>
+			({
+				left: 100,
+				width: 40,
+				bottom: 200,
+				top: 180,
+				right: 140,
+				height: 20,
+				x: 100,
+				y: 180,
+				toJSON: () => ({})
+			}) as DOMRect;
+		expect(anchorPosition(el)).toEqual({ x: 120, y: 200 });
 	});
 });
