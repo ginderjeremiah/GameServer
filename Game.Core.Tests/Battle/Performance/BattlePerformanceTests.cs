@@ -23,11 +23,17 @@ namespace Game.Core.Tests.Battle.Performance
     ///   per-multiplier loop into an accidental O(n²) blows far past the budget while ordinary CI
     ///   noise cannot.</item>
     ///   <item><b>Throughput backstop (coarse, machine-dependent).</b> One deliberately generous
-    ///   absolute ceiling on the worst-case battle catches catastrophic <em>uniform</em> regressions
-    ///   (e.g. a new per-tick allocation that inflates every battle equally — which a ratio cannot
-    ///   see). Its margin is large enough to never flake on a slow runner; subtle regressions are
-    ///   meant to be spotted by watching the logged numbers, not by this gate.</item>
+    ///   absolute ceiling on the realistic worst-case battle (the full 4-skill loadout with effects, run
+    ///   to the tick cap) catches catastrophic <em>uniform</em> regressions (e.g. a new per-tick
+    ///   allocation that inflates every battle equally — which a ratio cannot see). Its margin is large
+    ///   enough to never flake on a slow runner; subtle regressions are meant to be spotted by watching
+    ///   the logged numbers, not by this gate.</item>
     /// </list>
+    /// <para>
+    /// Scenarios reflect the real loadout cap (<see cref="GameConstants.MaxSelectedSkills"/> = 4 skills,
+    /// 1–2 multipliers each, a handful of active effects). The 8× <em>scaling</em> configs below are a
+    /// deliberate sensitivity stressor for the ratio gates, not a claim that such a loadout occurs.
+    /// </para>
     /// <para>
     /// Every measurement also logs its raw figures via <see cref="ITestOutputHelper"/> so the actual
     /// costs/ratios can be tracked over time and the thresholds tightened from data.
@@ -66,14 +72,24 @@ namespace Game.Core.Tests.Battle.Performance
         // far above 8 * 2.0 = 16x.
         private const double LinearScalingTolerance = 2.0;
 
-        // Coarse catastrophic-regression ceiling for one worst-case battle (8 skills/side, 8
-        // multipliers each, run to the full default tick cap). This is the one machine-dependent gate
-        // (a uniform per-tick regression inflates every battle equally, which a ratio cannot see), so
-        // its margin is deliberately huge: a slow CI runner measures this battle in tens of
-        // milliseconds, an order of magnitude under the ceiling, while a regression that makes the
-        // per-tick path ~10x slower still trips it. If extreme runner contention ever makes even this
-        // flake, the Performance trait excludes it from the gate in one line.
-        private const double WorstCaseCeilingMs = 500.0;
+        // Representative "typical" battle for the current feature set (per design discussion): a full
+        // 4-skill loadout per side with a couple of damage multipliers each, a handful of concurrent
+        // active effects, and a ~30s fight. The worst case reuses this loadout but runs to the
+        // simulation's hard tick cap (a fight neither side can finish) — uncommon, but it must stay
+        // tolerable, especially as the server may be slower than a dev box and concurrent CPU-bound
+        // simulations contend where async I/O would overlap.
+        private const int TypicalSkillCount = 4;            // == GameConstants.MaxSelectedSkills
+        private const int TypicalMultiplierCount = 2;       // upper end of the "1 or 2" estimate
+        private const int TypicalEffectsPerSkill = 1;       // 4 skills x 1 => ~4 concurrent active effects
+        private const int TypicalBattleTicks = 750;         // ~30s at MsPerTick = 40
+
+        // Coarse catastrophic-regression ceiling for the realistic worst-case battle (the typical full
+        // loadout — 4 skills, 2 multipliers + an effect each — run to the 10,000-tick cap). This is the
+        // one machine-dependent gate: a uniform per-tick regression inflates every battle equally, which
+        // the ratio gates cannot see. The margin is deliberately huge (the battle measures ~10ms on a dev
+        // box, an order of magnitude under the ceiling); if extreme runner contention ever makes it flake,
+        // the Performance trait excludes it in one line.
+        private const double MaxLengthRealisticCeilingMs = 250.0;
 
         private readonly ITestOutputHelper _output;
 
@@ -124,27 +140,44 @@ namespace Game.Core.Tests.Battle.Performance
         }
 
         [Fact]
-        public void WorstCaseBattle_SimulatesWellWithinRealtimeBudget()
+        public void TypicalBattle_SimulationCost()
         {
             var result = Measure(
-                "worst case (8 skills x 8 multipliers, full battle)",
-                ComplexSkillCount,
-                ComplexMultiplierCount,
-                WorstCaseTicks,
-                warmup: 3,
-                samples: 6,
-                operationsPerSample: 3);
+                "typical (4 skills x 2 multipliers, ~4 active effects, ~30s)",
+                TypicalSkillCount, TypicalMultiplierCount, TypicalBattleTicks,
+                WarmupIterations, SampleCount, OperationsPerSample, TypicalEffectsPerSkill);
+
+            var perTickNanoseconds = result.MinMicroseconds / TypicalBattleTicks * 1000.0;
+            _output.WriteLine(
+                $"Typical battle: {result.MinMicroseconds / 1000.0:F3} ms (min), "
+                + $"{result.MedianMicroseconds / 1000.0:F3} ms (median) over {TypicalBattleTicks} ticks; "
+                + $"{perTickNanoseconds:F1} ns/tick");
+        }
+
+        /// <summary>
+        /// The realistic worst case for the current feature set: the full typical loadout (4 skills, 2
+        /// multipliers + an effect each) run to the simulation's hard tick cap — a fight neither side can
+        /// finish. This deliberately replaces an earlier contrived 8-skill x 8-multiplier scenario that
+        /// can never occur in play; an effect on every skill is contrived but actually reachable. Doubles
+        /// as the coarse uniform-regression backstop (see <see cref="MaxLengthRealisticCeilingMs"/>).
+        /// </summary>
+        [Fact]
+        public void WorstCaseBattle_StaysTolerable()
+        {
+            var result = Measure(
+                "worst case (4 skills x 2 multipliers, an effect each, full cap)",
+                TypicalSkillCount, TypicalMultiplierCount, WorstCaseTicks,
+                warmup: 3, samples: 6, operationsPerSample: 3, effectsPerSkill: TypicalEffectsPerSkill);
 
             var minMs = result.MinMicroseconds / 1000.0;
             _output.WriteLine(
-                $"Worst-case full battle: {minMs:F3} ms (min), {result.MedianMicroseconds / 1000.0:F3} ms (median) "
-                + $"over {WorstCaseTicks} ticks; ceiling {WorstCaseCeilingMs:F0} ms");
+                $"Worst-case realistic battle: {minMs:F3} ms (min), {result.MedianMicroseconds / 1000.0:F3} ms "
+                + $"(median) over {WorstCaseTicks} ticks; ceiling {MaxLengthRealisticCeilingMs:F0} ms");
 
             Assert.True(
-                minMs < WorstCaseCeilingMs,
-                $"Worst-case battle simulated in {minMs:F3} ms, exceeding the coarse {WorstCaseCeilingMs:F0} ms "
-                + "backstop. The simulation should be far faster than this; a breach indicates a large uniform "
-                + "performance regression in the per-tick path.");
+                minMs < MaxLengthRealisticCeilingMs,
+                $"Worst-case realistic battle simulated in {minMs:F3} ms, exceeding the "
+                + $"{MaxLengthRealisticCeilingMs:F0} ms tolerance for a full-cap battle with a realistic loadout.");
         }
 
         /// <summary>
@@ -168,31 +201,31 @@ namespace Game.Core.Tests.Battle.Performance
 
         private MeasurementResult Measure(
             string label, int skillCount, int multiplierCount, int ticks,
-            int warmup, int samples, int operationsPerSample)
+            int warmup, int samples, int operationsPerSample, int effectsPerSkill = 0)
         {
             var maxMs = ticks * GameConstants.MsPerTick;
 
             // Validate the scenario really runs to the tick cap: both combatants must survive so the
             // battle does a fixed, known amount of per-tick work (required for the per-tick figures to
             // mean anything). A scenario that ended early would silently measure a different workload.
-            var probe = CreateSimulator(skillCount, multiplierCount).Simulate(maxMs);
+            var probe = CreateSimulator(skillCount, multiplierCount, effectsPerSkill).Simulate(maxMs);
             Assert.False(probe.Victory, $"{label}: expected a run-to-the-cap battle, but the player won.");
             Assert.False(probe.PlayerDied, $"{label}: expected a run-to-the-cap battle, but the player died.");
             Assert.Equal(maxMs, probe.TotalMs);
 
             return PerformanceMeasurement.Measure(
-                createInput: () => CreateSimulator(skillCount, multiplierCount),
+                createInput: () => CreateSimulator(skillCount, multiplierCount, effectsPerSkill),
                 timedOperation: simulator => simulator.Simulate(maxMs),
                 warmupIterations: warmup,
                 sampleCount: samples,
                 operationsPerSample: operationsPerSample);
         }
 
-        private static BattleSimulator CreateSimulator(int skillCount, int multiplierCount)
+        private static BattleSimulator CreateSimulator(int skillCount, int multiplierCount, int effectsPerSkill = 0)
         {
             return new BattleSimulator(
-                BuildBattler(skillCount, multiplierCount),
-                BuildBattler(skillCount, multiplierCount));
+                BuildBattler(skillCount, multiplierCount, effectsPerSkill),
+                BuildBattler(skillCount, multiplierCount, effectsPerSkill));
         }
 
         /// <summary>
@@ -202,7 +235,7 @@ namespace Game.Core.Tests.Battle.Performance
         /// <see cref="BattleSkill.CalculateDamage"/>, stat recording) is fully exercised; only the
         /// life-total bookkeeping is neutralised.
         /// </summary>
-        private static Battler BuildBattler(int skillCount, int multiplierCount)
+        private static Battler BuildBattler(int skillCount, int multiplierCount, int effectsPerSkill = 0)
         {
             var attributes = new AttributeCollection(
             [
@@ -213,13 +246,13 @@ namespace Game.Core.Tests.Battle.Performance
             var skills = new List<Skill>(skillCount);
             for (var id = 0; id < skillCount; id++)
             {
-                skills.Add(BuildSkill(id, multiplierCount));
+                skills.Add(BuildSkill(id, multiplierCount, effectsPerSkill));
             }
 
             return new Battler(attributes, skills, level: 1);
         }
 
-        private static Skill BuildSkill(int id, int multiplierCount)
+        private static Skill BuildSkill(int id, int multiplierCount, int effectsPerSkill = 0)
         {
             var multipliers = new List<AttributeModifier>(multiplierCount);
             for (var i = 0; i < multiplierCount; i++)
@@ -233,6 +266,23 @@ namespace Game.Core.Tests.Battle.Performance
                 });
             }
 
+            var effects = new List<SkillEffect>(effectsPerSkill);
+            for (var i = 0; i < effectsPerSkill; i++)
+            {
+                // A self-targeted buff whose duration spans many cooldowns: once each skill has fired, its
+                // effect stays continuously active (refreshed on every fire), so the per-tick AdvanceEffects
+                // pass and the buffed-attribute cascade are exercised the way a real loadout would.
+                effects.Add(new SkillEffect
+                {
+                    Id = (id * 10) + i,
+                    Target = ESkillEffectTarget.Self,
+                    AttributeId = EAttribute.Strength,
+                    ModifierType = EModifierType.Additive,
+                    Amount = 5,
+                    DurationMs = 400,
+                });
+            }
+
             return new Skill
             {
                 Id = id,
@@ -241,7 +291,7 @@ namespace Game.Core.Tests.Battle.Performance
                 CooldownMs = 80, // fires every couple of ticks, so the damage path runs heavily
                 BaseDamage = 10,
                 DamageMultipliers = multipliers,
-                Effects = [],
+                Effects = effects,
             };
         }
 
