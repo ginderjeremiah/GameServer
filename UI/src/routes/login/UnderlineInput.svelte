@@ -1,7 +1,12 @@
 <div class="field-group">
+	{#if label}
+		<label class="sr-only" for={id}>{label}</label>
+	{/if}
 	<input
+		{id}
 		{type}
 		{placeholder}
+		{autocomplete}
 		bind:value
 		data-testid={testid}
 		{onblur}
@@ -23,6 +28,7 @@
 
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import type { HTMLInputAttributes } from 'svelte/elements';
 
 interface Props {
 	/** Two-way bound input value. */
@@ -30,6 +36,12 @@ interface Props {
 	type?: 'text' | 'password';
 	placeholder: string;
 	testid: string;
+	/** DOM id, associating the input with its label and enabling label-driven focus. */
+	id?: string;
+	/** Visually-hidden accessible name for the input (announced by screen readers). */
+	label?: string;
+	/** Autofill hint for password managers (e.g. 'username', 'current-password', 'new-password'). */
+	autocomplete?: HTMLInputAttributes['autocomplete'];
 	/** Applies the error accent to the underline. */
 	error?: boolean;
 	/** Applies the valid accent to the underline. */
@@ -48,6 +60,9 @@ let {
 	type = 'text',
 	placeholder,
 	testid,
+	id,
+	label,
+	autocomplete,
 	error = false,
 	valid = false,
 	onblur,
@@ -62,6 +77,19 @@ let {
 .field-group {
 	position: relative;
 	margin-bottom: 22px;
+}
+
+// Accessible label for screen readers without showing visible text.
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 .underline-input {
