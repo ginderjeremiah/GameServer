@@ -417,9 +417,18 @@ namespace Game.DataAccess
             // Batched like HandleAttributeAllocationsChanged: load the touched rows, set/insert, save once.
             if (evt.Statistics.Count > 0)
             {
+                // Constrain the load to the touched (type, entity) space, not every row of the touched
+                // types: a long-lived account accrues one row per enemy/skill, so filtering on typeIds alone
+                // would load hundreds to upsert the ~10-20 this battle changed (aggregate-DB-load concern,
+                // #548). The exact-key match still happens in memory below; this only bounds the fetch.
+                // entityIds includes null for the global rows — EF turns Contains over a List<int?> into
+                // "EntityId IN (...) OR EntityId IS NULL".
                 var typeIds = evt.Statistics.Select(s => s.StatisticTypeId).Distinct().ToList();
+                var entityIds = evt.Statistics.Select(s => s.EntityId).Distinct().ToList();
                 var existing = await context.PlayerStatistics
-                    .Where(ps => ps.PlayerId == evt.PlayerId && typeIds.Contains(ps.StatisticTypeId))
+                    .Where(ps => ps.PlayerId == evt.PlayerId
+                        && typeIds.Contains(ps.StatisticTypeId)
+                        && entityIds.Contains(ps.EntityId))
                     .ToListAsync();
                 var byKey = existing.ToDictionary(ps => (ps.StatisticTypeId, ps.EntityId));
 

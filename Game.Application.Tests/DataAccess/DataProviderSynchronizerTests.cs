@@ -654,37 +654,51 @@ namespace Game.Application.Tests.DataAccess
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
-            // First event inserts the rows.
+            // First event inserts the rows. A global (null entity) stat and its per-entity twin exercise the
+            // (StatisticTypeId, EntityId) keying and the entity-id-constrained load.
             await synchronizer.ProcessQueue(new InMemoryPubSubQueue(SerializeProgress(new ProgressUpdatedEvent
             {
                 PlayerId = player.Id,
-                Statistics = [new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 3m }],
+                Statistics =
+                [
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 3m },
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = 7, Value = 1m },
+                ],
                 Challenges = [new CachedPlayerChallenge { ChallengeId = challenge.Id, Progress = 4m, Completed = false, CompletedAt = null }],
             })));
 
             using (var verify = CreateScope())
             {
                 var ctx = verify.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await ctx.PlayerStatistics.AsNoTracking().SingleAsync(s => s.PlayerId == player.Id, CancellationToken);
-                Assert.Equal(3m, stat.Value);
+                var stats = await ctx.PlayerStatistics.AsNoTracking().Where(s => s.PlayerId == player.Id).ToListAsync(CancellationToken);
+                Assert.Equal(2, stats.Count);
+                Assert.Equal(3m, stats.Single(s => s.EntityId == null).Value);
+                Assert.Equal(1m, stats.Single(s => s.EntityId == 7).Value);
                 var ch = await ctx.PlayerChallenges.AsNoTracking().SingleAsync(c => c.PlayerId == player.Id, CancellationToken);
                 Assert.Equal(4m, ch.Progress);
                 Assert.False(ch.Completed);
             }
 
-            // Re-applying with new absolute values converges in place — no duplicate rows (idempotent upsert).
+            // Re-applying with new absolute values converges in place — each (type, entity) key updates its own
+            // row with no duplicates and no cross-contamination between the global and per-entity rows.
             await synchronizer.ProcessQueue(new InMemoryPubSubQueue(SerializeProgress(new ProgressUpdatedEvent
             {
                 PlayerId = player.Id,
-                Statistics = [new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 10m }],
+                Statistics =
+                [
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 10m },
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = 7, Value = 5m },
+                ],
                 Challenges = [new CachedPlayerChallenge { ChallengeId = challenge.Id, Progress = 10m, Completed = true, CompletedAt = DateTime.UtcNow }],
             })));
 
             using (var verify = CreateScope())
             {
                 var ctx = verify.ServiceProvider.GetRequiredService<GameContext>();
-                var stat = await ctx.PlayerStatistics.AsNoTracking().SingleAsync(s => s.PlayerId == player.Id, CancellationToken);
-                Assert.Equal(10m, stat.Value);
+                var stats = await ctx.PlayerStatistics.AsNoTracking().Where(s => s.PlayerId == player.Id).ToListAsync(CancellationToken);
+                Assert.Equal(2, stats.Count);
+                Assert.Equal(10m, stats.Single(s => s.EntityId == null).Value);
+                Assert.Equal(5m, stats.Single(s => s.EntityId == 7).Value);
                 var ch = await ctx.PlayerChallenges.AsNoTracking().SingleAsync(c => c.PlayerId == player.Id, CancellationToken);
                 Assert.Equal(10m, ch.Progress);
                 Assert.True(ch.Completed);

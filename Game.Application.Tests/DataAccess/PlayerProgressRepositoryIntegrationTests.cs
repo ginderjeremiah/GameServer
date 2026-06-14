@@ -91,10 +91,9 @@ namespace Game.Application.Tests.DataAccess
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var progress = new PlayerProgress(
-                    MakeDomainPlayer(playerId),
-                    [new PlayerStatistic { Type = EStatisticType.EnemiesKilled, EntityId = null, Value = 7m }],
-                    []);
+                var progress = await repo.Load(MakeDomainPlayer(playerId)); // cache miss -> empty
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
 
                 await repo.Save(progress); // writes the full snapshot to the cache (the source of truth)
             }
@@ -103,9 +102,8 @@ namespace Game.Application.Tests.DataAccess
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var stat = Assert.Single(await repo.GetStatistics(playerId));
-                Assert.Equal(EStatisticType.EnemiesKilled, stat.Type);
-                Assert.Equal(7m, stat.Value);
+                var stats = await repo.GetStatistics(playerId);
+                Assert.Contains(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null && s.Value == 1m);
             }
 
             using (var scope = CreateScope())

@@ -59,6 +59,14 @@ namespace Game.DataAccess.Repositories
 
         public async Task Save(PlayerProgress progress)
         {
+            // Nothing mutated since load -> the cache already holds the current snapshot (and reads slide its
+            // TTL), so there is nothing to persist and no reason to rewrite the cache.
+            var changed = ToCached(progress.DirtyStatistics, progress.DirtyChallenges);
+            if (changed.Statistics.Count == 0 && changed.Challenges.Count == 0)
+            {
+                return;
+            }
+
             var playerId = progress.Player.Id;
 
             // The cache is the source of truth, so write the full current snapshot (absolute values).
@@ -66,13 +74,7 @@ namespace Game.DataAccess.Repositories
             _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
 
             // Persist only the rows that changed this save, as one batched write-behind event; the consumer
-            // upserts them to their absolute values off the response path. Nothing changed -> nothing to enqueue.
-            var changed = ToCached(progress.DirtyStatistics, progress.DirtyChallenges);
-            if (changed.Statistics.Count == 0 && changed.Challenges.Count == 0)
-            {
-                return;
-            }
-
+            // upserts them to their absolute values off the response path.
             var envelope = new DomainEventEnvelope
             {
                 Type = nameof(ProgressUpdatedEvent),
