@@ -146,6 +146,11 @@ export function equipmentFactory(itemRegistry: IItem[], itemModRegistry: IItemMo
 		});
 
 		const item = newItem({ itemId, equipped: true, favorite: false, appliedMods });
+		// The item was just registered, so resolution is guaranteed; assert it to satisfy the nullable
+		// return and surface a clear failure if that invariant is ever broken.
+		if (!item) {
+			throw new Error(`equipmentFactory failed to resolve just-registered item ${itemId}`);
+		}
 
 		// Mirror InventoryManager.equipmentStats: the equipped item's own
 		// attributes followed by every applied mod's attributes.

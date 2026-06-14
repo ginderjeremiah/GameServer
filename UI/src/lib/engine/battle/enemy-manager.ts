@@ -241,11 +241,15 @@ export class EnemyManager {
 	 * and boss victory paths so the two cannot drift. Returns the post-victory cooldown (ms).
 	 */
 	private async claimVictory(): Promise<number> {
-		if (this.currentEnemy) {
-			logMessage(ELogType.EnemyDefeated, (staticData.enemies ?? [])[this.currentEnemy.id].name + ' was defeated!');
-		}
+		// Resolve the enemy's name up front (guarding a missing/retired id), but only log the defeat
+		// after a successful DefeatEnemy so a failed command can't show "X was defeated!" with no rewards.
+		const enemyId = this.currentEnemy?.id;
+		const enemyName = enemyId != null ? staticData.enemies?.[enemyId]?.name : undefined;
 		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: Date.now() });
 		if (!defeatResponse.error && defeatResponse.data?.rewards) {
+			if (enemyName) {
+				logMessage(ELogType.EnemyDefeated, enemyName + ' was defeated!');
+			}
 			playerManager.grantExp(defeatResponse.data.rewards.expReward);
 		} else {
 			logMessage(ELogType.Debug, 'There was an error defeating the enemy: ' + defeatResponse.error);

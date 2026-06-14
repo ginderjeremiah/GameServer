@@ -67,6 +67,11 @@ export class InventoryManager {
 		// Load unlocked items
 		for (const invItem of data.unlockedItems) {
 			const item = newItem(invItem);
+			// Skip an item whose reference record is missing/retired rather than crashing inventory load.
+			if (!item) {
+				logMessage(ELogType.Debug, `Skipped unlocked item with unknown id ${invItem.itemId}.`);
+				continue;
+			}
 			this.unlockedItems.set(invItem.itemId, item);
 
 			// Place equipped items into their equipment slots
@@ -162,15 +167,14 @@ export class InventoryManager {
 	public applyMod(itemId: number, itemModId: number, itemModSlotId: number): Promise<boolean> {
 		return this.serialize(async () => {
 			const item = this.unlockedItems.get(itemId);
-			if (!this.unlockedMods.has(itemModId) || !item) {
+			const mod = newItemMod({ itemModId, itemModSlotId });
+			// Bail if the item, the mod's unlock, or the mod's reference record (missing/retired) is absent.
+			if (!this.unlockedMods.has(itemModId) || !item || !mod) {
 				return false;
 			}
 
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
-			item.appliedMods = [
-				...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId),
-				newItemMod({ itemModId, itemModSlotId })
-			];
+			item.appliedMods = [...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId), mod];
 			this.refreshItemAttributes(item);
 			this.publish();
 
@@ -244,6 +248,11 @@ export class InventoryManager {
 			return;
 		}
 		const item = newItem(invItem);
+		// Ignore a reward referencing a missing/retired item rather than crashing the grant path.
+		if (!item) {
+			logMessage(ELogType.Debug, `Skipped unlocking item with unknown id ${invItem.itemId}.`);
+			return;
+		}
 		this.unlockedItems.set(invItem.itemId, item);
 		this.publish();
 		logMessage(ELogType.ItemFound, `Unlocked: ${item.name}!`);

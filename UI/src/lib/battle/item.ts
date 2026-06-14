@@ -12,9 +12,15 @@ export interface Item extends IItem {
 	totalAttributes: BattleAttributes;
 }
 
-export const newItem = (invItem: IInventoryItem): Item => {
-	const itemData = (staticData.items ?? [])[invItem.itemId];
-	const appliedMods = invItem.appliedMods.map((am) => newItemMod(am));
+export const newItem = (invItem: IInventoryItem): Item | undefined => {
+	// Resolve the item's static definition by id; a missing/retired id yields no record, so degrade
+	// gracefully (mirroring resolveUnlockReward) rather than spreading `undefined` and crashing.
+	const itemData = staticData.items?.[invItem.itemId];
+	if (!itemData) {
+		return undefined;
+	}
+	// Drop any applied mod whose own definition is missing/retired so one stale mod can't crash the item.
+	const appliedMods = invItem.appliedMods.map((am) => newItemMod(am)).filter((mod): mod is ItemMod => mod != null);
 	const allAttributes = [...itemData.attributes, ...appliedMods.flatMap((mod) => mod.attributes)];
 	const totalAttributes = new BattleAttributes(allAttributes, false);
 	return {
