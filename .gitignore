@@ -13,6 +13,9 @@
 # Backing-service marker written by .claude/hooks/session-start.sh in constrained sandboxes
 .container-info.json
 
+# Transient isolated git worktrees created for background agents
+.claude/worktrees/
+
 # Redis persistence dump generated when running redis-server locally
 dump.rdb
 
