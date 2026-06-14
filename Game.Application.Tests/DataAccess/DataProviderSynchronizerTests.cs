@@ -779,6 +779,48 @@ namespace Game.Application.Tests.DataAccess
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
         }
 
+        [Fact]
+        public async Task ProcessQueue_ConcurrentDrains_SerializeAndApplyOrderSensitiveEventsInOrder()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id, equipmentSlot: null);
+
+            // Order-sensitive pair for the same player: equip the item into a slot, then unequip it. Applied in
+            // order the slot ends empty; applied out of order (unequip before equip) it ends wrongly occupied —
+            // the corruption two concurrent drains popping the same queue could cause (#578).
+            var equip = new ItemEquippedEvent(player.Id, item.Id, (int)EEquipmentSlot.HelmSlot);
+            var unequip = new ItemUnequippedEvent(player.Id, item.Id);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // The pop delay widens the window so two drains would overlap if the synchronizer let them run
+            // concurrently — turning the otherwise-racy bug into a deterministic failure on the unfixed code.
+            var queue = new ConcurrencyTrackingQueue(TimeSpan.FromMilliseconds(25), Serialize(equip), Serialize(unequip));
+
+            // Two wakes fire at once, modelling the background worker dispatching a second drain mid-drain.
+            await Task.WhenAll(synchronizer.ProcessQueue(queue), synchronizer.ProcessQueue(queue));
+
+            // The drains were serialized: no two pops ever overlapped, so the atomic LPOPs could not interleave.
+            Assert.Equal(1, queue.MaxObservedConcurrency);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Null(await queue.GetNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await verifyContext.UnlockedItems
+                .SingleAsync(ui => ui.PlayerId == player.Id && ui.ItemId == item.Id, CancellationToken);
+
+            // Events applied in order, so the final state is the unequip: the slot is empty.
+            Assert.Null(row.EquipmentSlotId);
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -856,6 +898,58 @@ namespace Game.Application.Tests.DataAccess
             }
 
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
+            public T? GetNext<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public void AddToQueue<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubQueue"/> whose <see cref="GetNextAsync"/> delays each pop (to widen the overlap
+        /// window) and records the peak number of pops in flight at once. A serialized drainer keeps that peak at
+        /// 1; two concurrent drains would push it to 2, so it deterministically catches the #578 regression.
+        /// </summary>
+        private sealed class ConcurrencyTrackingQueue : IPubSubQueue
+        {
+            private readonly object _gate = new();
+            private readonly Queue<string?> _items;
+            private readonly TimeSpan _popDelay;
+            private int _activePops;
+
+            public int MaxObservedConcurrency { get; private set; }
+
+            public ConcurrencyTrackingQueue(TimeSpan popDelay, params string?[] items)
+            {
+                _popDelay = popDelay;
+                _items = new Queue<string?>(items);
+            }
+
+            public async Task<string?> GetNextAsync()
+            {
+                var active = Interlocked.Increment(ref _activePops);
+                lock (_gate)
+                {
+                    MaxObservedConcurrency = Math.Max(MaxObservedConcurrency, active);
+                }
+
+                try
+                {
+                    await Task.Delay(_popDelay);
+                    lock (_gate)
+                    {
+                        return _items.Count > 0 ? _items.Dequeue() : null;
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _activePops);
+                }
+            }
+
+            public string? GetNext() => throw new NotSupportedException();
+            public void AddToQueue(string value) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
