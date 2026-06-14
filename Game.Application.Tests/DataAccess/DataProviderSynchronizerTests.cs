@@ -2,6 +2,7 @@ using Game.Abstractions.Infrastructure;
 using Game.Core;
 using Game.Core.Events;
 using Game.Core.Players.Events;
+using Game.Core.Progress;
 using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -639,6 +640,73 @@ namespace Game.Application.Tests.DataAccess
             await Assert.ThrowsAsync<InvalidOperationException>(() => synchronizer.StartAsync(CancellationToken.None));
         }
 
+        [Fact]
+        public async Task ProcessQueue_ProgressUpdatedEvent_UpsertsStatisticsAndChallengesIdempotently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(context);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // First event inserts the rows. A global (null entity) stat and its per-entity twin exercise the
+            // (StatisticTypeId, EntityId) keying and the entity-id-constrained load.
+            await synchronizer.ProcessQueue(new InMemoryPubSubQueue(SerializeProgress(new ProgressUpdatedEvent
+            {
+                PlayerId = player.Id,
+                Statistics =
+                [
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 3m },
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = 7, Value = 1m },
+                ],
+                Challenges = [new CachedPlayerChallenge { ChallengeId = challenge.Id, Progress = 4m, Completed = false, CompletedAt = null }],
+            })));
+
+            using (var verify = CreateScope())
+            {
+                var ctx = verify.ServiceProvider.GetRequiredService<GameContext>();
+                var stats = await ctx.PlayerStatistics.AsNoTracking().Where(s => s.PlayerId == player.Id).ToListAsync(CancellationToken);
+                Assert.Equal(2, stats.Count);
+                Assert.Equal(3m, stats.Single(s => s.EntityId == null).Value);
+                Assert.Equal(1m, stats.Single(s => s.EntityId == 7).Value);
+                var ch = await ctx.PlayerChallenges.AsNoTracking().SingleAsync(c => c.PlayerId == player.Id, CancellationToken);
+                Assert.Equal(4m, ch.Progress);
+                Assert.False(ch.Completed);
+            }
+
+            // Re-applying with new absolute values converges in place — each (type, entity) key updates its own
+            // row with no duplicates and no cross-contamination between the global and per-entity rows.
+            await synchronizer.ProcessQueue(new InMemoryPubSubQueue(SerializeProgress(new ProgressUpdatedEvent
+            {
+                PlayerId = player.Id,
+                Statistics =
+                [
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = null, Value = 10m },
+                    new CachedPlayerStatistic { StatisticTypeId = (int)EStatisticType.EnemiesKilled, EntityId = 7, Value = 5m },
+                ],
+                Challenges = [new CachedPlayerChallenge { ChallengeId = challenge.Id, Progress = 10m, Completed = true, CompletedAt = DateTime.UtcNow }],
+            })));
+
+            using (var verify = CreateScope())
+            {
+                var ctx = verify.ServiceProvider.GetRequiredService<GameContext>();
+                var stats = await ctx.PlayerStatistics.AsNoTracking().Where(s => s.PlayerId == player.Id).ToListAsync(CancellationToken);
+                Assert.Equal(2, stats.Count);
+                Assert.Equal(10m, stats.Single(s => s.EntityId == null).Value);
+                Assert.Equal(5m, stats.Single(s => s.EntityId == 7).Value);
+                var ch = await ctx.PlayerChallenges.AsNoTracking().SingleAsync(c => c.PlayerId == player.Id, CancellationToken);
+                Assert.Equal(10m, ch.Progress);
+                Assert.True(ch.Completed);
+            }
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -665,6 +733,19 @@ namespace Game.Application.Tests.DataAccess
             var envelope = new DomainEventEnvelope
             {
                 Type = typeof(T).Name,
+                Payload = evt.Serialize(),
+            };
+
+            return envelope.Serialize();
+        }
+
+        // ProgressUpdatedEvent is a data-tier persistence payload (not an IDomainEvent), published by the
+        // progress repo directly, so it gets its own envelope wrapper rather than the IDomainEvent helper.
+        private static string SerializeProgress(ProgressUpdatedEvent evt)
+        {
+            var envelope = new DomainEventEnvelope
+            {
+                Type = nameof(ProgressUpdatedEvent),
                 Payload = evt.Serialize(),
             };
 
