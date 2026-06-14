@@ -1,3 +1,4 @@
+using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Events;
@@ -16,13 +17,15 @@ namespace Game.DataAccess.Repositories
         /// Idle TTL for the cached player aggregate. It is written on every save and load-miss re-cache
         /// and refreshed on every cache hit (sliding expiration), so an actively-playing player — whose
         /// socket commands read/write the key continuously — never expires, while a dormant player ages
-        /// out of Redis instead of occupying memory forever. The 48h budget mirrors the refresh-token
-        /// lifetime: a player idle long enough for the key to lapse can no longer hold a live session, so
-        /// the only cost of expiry is one transparent DB reload on their next access (the cache-miss path
-        /// in <see cref="GetPlayer"/>). It also dwarfs the sub-second write-behind queue-drain window, so a
-        /// refreshed key never expires mid-drain (see docs/backend.md → Caching and Pub/Sub).
+        /// out of Redis instead of occupying memory forever. The budget mirrors the refresh-token
+        /// lifetime (the shared <see cref="AuthConstants.RefreshTokenLifetime"/> anchor, also used by the
+        /// session key — #537): a player idle long enough for the key to lapse can no longer hold a live
+        /// session, so the only cost of expiry is one transparent DB reload on their next access (the
+        /// cache-miss path in <see cref="GetPlayer"/>). It also dwarfs the sub-second write-behind
+        /// queue-drain window, so a refreshed key never expires mid-drain (see docs/backend.md → Caching
+        /// and Pub/Sub).
         /// </summary>
-        private static readonly TimeSpan PlayerCacheTtl = TimeSpan.FromHours(48);
+        private static readonly TimeSpan PlayerCacheTtl = AuthConstants.RefreshTokenLifetime;
 
         private readonly GameContext _context;
         private readonly ICacheService _cache;
