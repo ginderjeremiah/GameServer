@@ -25,7 +25,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, skillContributions, type Skill } from '$lib/battle';
-import { attributeName, describeEffect } from '$lib/common';
+import { attributeIsHarmful, attributeName, describeEffect } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -70,7 +70,11 @@ const remainingCdFormatted = $derived(remainingCd.toFixed(2));
 
 const effectLines = $derived(
 	(skill?.effects ?? []).map((effect) =>
-		describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
+		describeEffect(
+			effect,
+			attributeName(effect.attributeId, staticData.attributes),
+			attributeIsHarmful(effect.attributeId, staticData.attributes)
+		)
 	)
 );
 </script>

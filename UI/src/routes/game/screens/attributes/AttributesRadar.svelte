@@ -48,7 +48,7 @@
 				class:big
 				style="fill: {attributeColor(l.id)}"
 			>
-				{attributeCode(l.id)}
+				{attributeCode(l.id, staticData.attributes)}
 			</text>
 			<text x={l.lx} y={l.ly + (big ? 11 : 9)} text-anchor="middle" class="val" class:big>
 				{view.values[i]}

@@ -11,13 +11,14 @@
    tested against `BattleAttributes` (the battle calculator), so this screen can
    never disagree with the totals the simulation actually uses.
 
-   Per the project decision, only the *implemented* attributes are surfaced — the
-   six core attributes plus MaxHealth / Defense / CooldownRecovery. The obsolete
-   DropBonus and the not-yet-implemented crit/dodge/block attributes are omitted
-   (they have no real contributors today) and will appear here automatically once
-   they gain real modifiers. */
+   The breakdown is self-selecting: an attribute is surfaced when it has at least one *non-combat*
+   contributor (any modifier whose source is not a transient `SkillEffect`), grouped by the
+   reference-data display taxonomy (Primary / Secondary / Status) and formatted with its reference
+   `decimals`. Obsolete/unimplemented attributes (no contributors) and the per-second Status channels
+   (combat-only modifiers) stay off the inspector, while crit/dodge/regen-gear appear automatically
+   once they gain real contributors. */
 
-import { EAttribute, type EItemModType } from '$lib/api';
+import { EAttribute, EAttributeType, type EItemModType, type IAttribute } from '$lib/api';
 import {
 	computeAttributes,
 	groupBySource,
@@ -46,35 +47,21 @@ export type LabeledModifier = AttributeModifier & {
 	modType?: EItemModType;
 };
 
-export type AttributeGroup = 'core' | 'derived';
-
 export interface BreakdownAttrMeta {
 	id: EAttribute;
-	group: AttributeGroup;
+	/** Display taxonomy (Primary / Secondary / Status), from the reference set. */
+	type: EAttributeType;
 	/** Decimal places to render the value with. */
 	dec: number;
 }
 
-/** The implemented attributes the breakdown surfaces, in display order. Core
- *  attributes accept allocation/gear directly; the three derived stats are the
- *  only ones the engine currently produces a real formula for. */
-export const BREAKDOWN_ATTRS: BreakdownAttrMeta[] = [
-	{ id: EAttribute.Strength, group: 'core', dec: 0 },
-	{ id: EAttribute.Endurance, group: 'core', dec: 0 },
-	{ id: EAttribute.Intellect, group: 'core', dec: 0 },
-	{ id: EAttribute.Agility, group: 'core', dec: 0 },
-	{ id: EAttribute.Dexterity, group: 'core', dec: 0 },
-	{ id: EAttribute.Luck, group: 'core', dec: 0 },
-	{ id: EAttribute.MaxHealth, group: 'derived', dec: 0 },
-	{ id: EAttribute.Defense, group: 'derived', dec: 0 },
-	{ id: EAttribute.CooldownRecovery, group: 'derived', dec: 2 }
-];
-
-const META_BY_ID = new Map(BREAKDOWN_ATTRS.map((m) => [m.id, m]));
-
-export const ATTRIBUTE_GROUPS: { key: AttributeGroup; label: string }[] = [
-	{ key: 'core', label: 'Core' },
-	{ key: 'derived', label: 'Derived' }
+/** The display-taxonomy groups, in render order. Status normally stays empty here — its per-second
+ *  channels only ever receive combat modifiers, which the inspector excludes — but it is listed so a
+ *  Status attribute that ever gains a non-combat contributor self-selects in. */
+export const ATTRIBUTE_TYPE_GROUPS: { type: EAttributeType; label: string }[] = [
+	{ type: EAttributeType.Primary, label: 'Primary' },
+	{ type: EAttributeType.Secondary, label: 'Secondary' },
+	{ type: EAttributeType.Status, label: 'Status' }
 ];
 
 /** Reference-data description for an attribute (empty when not yet loaded). */
@@ -82,8 +69,59 @@ export function attributeDescription(id: EAttribute): string {
 	return staticData.attributes?.find((a) => a.id === id)?.description ?? '';
 }
 
-export function attributeMeta(id: EAttribute): BreakdownAttrMeta {
-	return META_BY_ID.get(id) ?? { id, group: 'derived', dec: 0 };
+/** An attribute's breakdown display metadata (taxonomy + precision) from the reference set, with
+ *  safe fallbacks (Secondary / 0 decimals) when it is unavailable. */
+export function attributeMeta(id: EAttribute, attributes: IAttribute[] | undefined): BreakdownAttrMeta {
+	const attribute = attributes?.find((a) => a.id === id);
+	return {
+		id,
+		type: attribute?.attributeType ?? EAttributeType.Secondary,
+		dec: attribute?.decimals ?? 0
+	};
+}
+
+/** An attribute's canonical UI ordering from the reference set, falling back to its enum value. */
+function attributeDisplayOrder(id: EAttribute, attributes: IAttribute[] | undefined): number {
+	return attributes?.find((a) => a.id === id)?.displayOrder ?? id;
+}
+
+/** Whether a computed attribute has at least one *non-combat* contributor — a line whose source is
+ *  not a transient `SkillEffect`. This is the breakdown's self-selecting membership rule: an
+ *  attribute the player has actually invested in (base/points/gear/mods/derived) is shown; one that
+ *  only ever receives combat effects — or nothing — is not. */
+export function hasNonCombatModifier<T extends AttributeModifier>(computed: ComputedAttribute<T>): boolean {
+	return computed.lines.some((line) => line.source !== EAttributeModifierSource.SkillEffect);
+}
+
+/** One displayed attribute with its resolved metadata and decomposition. */
+export interface BreakdownAttrEntry {
+	meta: BreakdownAttrMeta;
+	computed: ComputedAttribute<LabeledModifier>;
+}
+
+/** A display-taxonomy group of displayed attributes. */
+export interface BreakdownGroup {
+	type: EAttributeType;
+	label: string;
+	attrs: BreakdownAttrEntry[];
+}
+
+/** Groups the displayed attributes — those with a non-combat contributor (see
+ *  {@link hasNonCombatModifier}) — by display taxonomy, each sorted by the reference set's canonical
+ *  display order, dropping empty groups. Pure over its inputs so the self-selecting membership and
+ *  ordering are unit-testable independent of the live stores. */
+export function buildGroups(
+	computed: Map<EAttribute, ComputedAttribute<LabeledModifier>>,
+	attributes: IAttribute[] | undefined
+): BreakdownGroup[] {
+	const displayed = [...computed.values()].filter(hasNonCombatModifier);
+	return ATTRIBUTE_TYPE_GROUPS.flatMap((group) => {
+		const attrs = displayed
+			.filter((c) => attributeMeta(c.attribute, attributes).type === group.type)
+			.sort((a, b) => attributeDisplayOrder(a.attribute, attributes) - attributeDisplayOrder(b.attribute, attributes))
+			.map((c) => ({ meta: attributeMeta(c.attribute, attributes), computed: c }));
+		return attrs.length > 0 ? [{ type: group.type, label: group.label, attrs }] : [];
+	});
 }
 
 /* ── number formatting ────────────────────────────────────────────────────── */
@@ -226,19 +264,11 @@ export class AttributeBreakdownView {
 	/** Per-attribute decompositions, keyed by attribute. */
 	readonly computed = $derived.by(() => computeAttributes(this.modifiers));
 
-	/** The displayed attributes grouped into Core / Derived, each with its
-	 *  resolved decomposition (defaulting to zero when nothing contributes). */
-	readonly groups = $derived.by(() =>
-		ATTRIBUTE_GROUPS.map((g) => ({
-			...g,
-			attrs: BREAKDOWN_ATTRS.filter((m) => m.group === g.key).map((m) => ({
-				meta: m,
-				computed: this.computedFor(m.id)
-			}))
-		}))
-	);
+	/** The displayed attributes grouped by display taxonomy (Primary / Secondary / Status), each
+	 *  self-selected by having a non-combat contributor and sorted by canonical display order. */
+	readonly groups = $derived.by(() => buildGroups(this.computed, staticData.attributes));
 
-	readonly selectedMeta = $derived(attributeMeta(this.selected));
+	readonly selectedMeta = $derived(attributeMeta(this.selected, staticData.attributes));
 	readonly selectedComputed = $derived(this.computedFor(this.selected));
 	readonly selectedGrouped = $derived(groupBySource(this.selectedComputed));
 

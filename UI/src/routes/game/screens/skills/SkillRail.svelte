@@ -54,7 +54,7 @@ import { SKILL_SORTS, type SkillMetrics, type SkillsView } from './skills-view.s
 import SkillRow from './SkillRow.svelte';
 import { attributeCode } from '$lib/common';
 import { ChallengeTooltip } from '$components';
-import { registerTooltipComponent, type TooltipComponent } from '$stores';
+import { registerTooltipComponent, staticData, type TooltipComponent } from '$stores';
 
 type Props = {
 	view: SkillsView;
@@ -86,7 +86,7 @@ const hideChallenge = () => {
 const sortLabel = $derived(SKILL_SORTS.find((s) => s.key === view.sort)?.label ?? 'DPS');
 const filterLabel = $derived.by(() => {
 	const attrs = view.filterAttributes.length
-		? 'Attr: ' + view.filterAttributes.map((a) => attributeCode(a)).join(', ')
+		? 'Attr: ' + view.filterAttributes.map((a) => attributeCode(a, staticData.attributes)).join(', ')
 		: 'All attributes';
 	return attrs + (view.showLocked ? ' · +locked' : '');
 });

@@ -47,7 +47,14 @@
 
 <script lang="ts">
 import type { ISkill } from '$lib/api';
-import { attributeColor, attributeName, describeEffect, effectDirectionColor, formatNum } from '$lib/common';
+import {
+	attributeColor,
+	attributeIsHarmful,
+	attributeName,
+	describeEffect,
+	effectDirectionColor,
+	formatNum
+} from '$lib/common';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
@@ -72,7 +79,11 @@ const cooldownSeconds = $derived(formatNum(skill.cooldownMs / 1000));
 const effectLines = $derived(
 	skill.effects.map((effect) => ({
 		id: effect.id,
-		...describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
+		...describeEffect(
+			effect,
+			attributeName(effect.attributeId, staticData.attributes),
+			attributeIsHarmful(effect.attributeId, staticData.attributes)
+		)
 	}))
 );
 </script>

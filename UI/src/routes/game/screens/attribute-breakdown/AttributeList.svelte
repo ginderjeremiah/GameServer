@@ -1,7 +1,7 @@
-<!-- The left rail: every implemented attribute, grouped Core / Derived, each a
-     selectable row. -->
+<!-- The left rail: every displayed attribute, grouped by display taxonomy
+     (Primary / Secondary / Status), each a selectable row. -->
 <div class="list" data-testid="attribute-list">
-	{#each view.groups as group (group.key)}
+	{#each view.groups as group (group.type)}
 		<div class="group">
 			<span class="group-label">{group.label}</span>
 			{#each group.attrs as entry (entry.meta.id)}

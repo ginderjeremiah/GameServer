@@ -2,7 +2,7 @@ import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { staticData } from '$stores';
 import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
-import { formatNum, createHook, Action, effectLogMessage, attributeName } from '$lib/common';
+import { formatNum, createHook, Action, effectLogMessage, attributeIsHarmful, attributeName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
 import { inventoryManager } from '../engine';
@@ -139,7 +139,8 @@ export class BattleEngine {
 	private logEffectApplications() {
 		for (const { effect, onPlayer } of this.stepLog.appliedEffects) {
 			const name = attributeName(effect.attributeId, staticData.attributes);
-			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, onPlayer, this.enemy.name));
+			const isHarmful = attributeIsHarmful(effect.attributeId, staticData.attributes);
+			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, isHarmful, onPlayer, this.enemy.name));
 		}
 	}
 

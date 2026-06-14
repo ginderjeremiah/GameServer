@@ -38,7 +38,7 @@ const { i, view }: Props = $props();
 
 const id = $derived(CORE_ATTRIBUTES[i]);
 const color = $derived(attributeColor(id));
-const code = $derived(attributeCode(id));
+const code = $derived(attributeCode(id, staticData.attributes));
 const name = $derived(attributeName(id, staticData.attributes));
 const feeds = $derived(feedsFor(i));
 
