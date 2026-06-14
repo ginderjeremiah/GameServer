@@ -118,6 +118,22 @@ describe('PlayerManager', () => {
 			expect(manager.level).toBe(2);
 			expect(manager.exp).toBe(199);
 		});
+
+		it('does not over-level from the pre-initialize level=0 default (threshold clamps to ≥ 1)', () => {
+			// Before initialize, level defaults to 0; a 0 * EXP_PER_LEVEL threshold would otherwise
+			// loop. The clamp keeps the threshold at one level's worth of exp.
+			manager.grantExp(50);
+
+			expect(manager.level).toBe(0);
+			expect(manager.exp).toBe(50);
+		});
+
+		it('levels up exactly once past the clamped threshold from a level=0 default', () => {
+			manager.grantExp(150);
+
+			expect(manager.level).toBe(1);
+			expect(manager.exp).toBe(50);
+		});
 	});
 
 	describe('levelUp', () => {

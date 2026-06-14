@@ -42,16 +42,10 @@
 		title={item.favorite ? 'Unfavorite' : 'Favorite'}
 		onclick={stopPropagation(() => onToggleFav?.(item))}
 	>
-		<svg
-			width="12"
-			height="12"
-			viewBox="0 0 16 16"
-			style:fill={item.favorite ? 'var(--category-accessory)' : 'none'}
-			style:stroke={item.favorite ? 'var(--category-accessory)' : tintColor('var(--text-primary)', 0.85)}
-			stroke-width="1.3"
-		>
-			<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
-		</svg>
+		<FavoriteStar
+			filled={item.favorite}
+			stroke={item.favorite ? 'var(--category-accessory)' : tintColor('var(--text-primary)', 0.85)}
+		/>
 	</button>
 
 	<div class="cat-corner">
@@ -72,6 +66,7 @@ import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
 import { stopPropagation } from '$lib/common/event-wrappers';
 import CategoryGlyph from './CategoryGlyph.svelte';
+import FavoriteStar from './FavoriteStar.svelte';
 
 interface Props {
 	item: Item;

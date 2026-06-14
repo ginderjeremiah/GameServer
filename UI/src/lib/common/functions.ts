@@ -1,9 +1,4 @@
-﻿// randomInt between num1 (inclusive) and num2 (exclusive)
-export function randomInt(num1: number, num2: number): number {
-	return Math.floor(num1 + Math.random() * (num2 - num1));
-}
-
-// formats a number to a specific string representation
+﻿// formats a number to a specific string representation
 export function formatNum(num: number): string {
 	return '' + parseFloat(num.toFixed(2));
 }
@@ -12,6 +7,16 @@ export async function delay(delay: number) {
 	return new Promise<void>((res) => {
 		setTimeout(res, delay);
 	});
+}
+
+/** Whether the OS `prefers-reduced-motion: reduce` preference is set (false during SSR). Use to
+ *  skip JS-driven motion the global CSS rule can't collapse (e.g. a perpetual ticker). */
+export function prefersReducedMotion(): boolean {
+	return (
+		typeof window !== 'undefined' &&
+		!!window.matchMedia &&
+		window.matchMedia('(prefers-reduced-motion: reduce)').matches
+	);
 }
 
 export function keys<T>(obj?: T) {

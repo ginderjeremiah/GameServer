@@ -103,6 +103,7 @@ export class EntityStore<T extends Identified> {
 
 	restoreItem(id: number) {
 		this.deleted.delete(id);
+		this.saved = false;
 	}
 
 	/** True when a record is retired (out of circulation but kept at its slot and resolvable by id). */

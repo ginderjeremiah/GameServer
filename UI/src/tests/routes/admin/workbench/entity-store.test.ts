@@ -84,6 +84,13 @@ describe('EntityStore', () => {
 		expect(store.counts.total).toBe(0);
 	});
 
+	it('clears the saved flag on restore so the "Changes saved" banner cannot linger', () => {
+		const store = new EntityStore(makeConfig(), seed);
+		store.saved = true;
+		store.restoreItem(0);
+		expect(store.saved).toBe(false);
+	});
+
 	it('discard reverts every pending change', () => {
 		const store = new EntityStore(makeConfig(), seed);
 		store.addItem();

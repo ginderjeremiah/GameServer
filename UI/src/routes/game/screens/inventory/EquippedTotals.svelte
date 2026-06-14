@@ -57,7 +57,7 @@ const { view }: { view: InventoryView } = $props();
 	color: var(--text-muted);
 
 	&.accent {
-		color: var(--text-muted);
+		color: var(--accent-light);
 	}
 }
 

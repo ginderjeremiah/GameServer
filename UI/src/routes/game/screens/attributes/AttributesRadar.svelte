@@ -59,7 +59,7 @@
 
 <script lang="ts">
 import { onMount, untrack } from 'svelte';
-import { attributeColor, attributeCode, attributeName } from '$lib/common';
+import { attributeColor, attributeCode, attributeName, prefersReducedMotion } from '$lib/common';
 import { staticData } from '$stores';
 import { CORE_ATTRIBUTES, radarValueAtPointer, type AttributesView } from './attributes-view.svelte';
 
@@ -236,14 +236,6 @@ onMount(() => {
 		window.removeEventListener('pointercancel', onEnd);
 	};
 });
-
-function prefersReducedMotion(): boolean {
-	return (
-		typeof window !== 'undefined' &&
-		!!window.matchMedia &&
-		window.matchMedia('(prefers-reduced-motion: reduce)').matches
-	);
-}
 </script>
 
 <style lang="scss">

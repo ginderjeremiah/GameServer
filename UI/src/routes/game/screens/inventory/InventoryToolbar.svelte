@@ -29,16 +29,7 @@
 			title="Show favorites only"
 			onclick={() => (view.favOnly = !view.favOnly)}
 		>
-			<svg
-				width="11"
-				height="11"
-				viewBox="0 0 16 16"
-				style:fill={view.favOnly ? 'var(--category-accessory)' : 'none'}
-				style:stroke="var(--category-accessory)"
-				stroke-width="1.3"
-			>
-				<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.3 13.4l.7-4.3-3.1-3 4.3-.6z" stroke-linejoin="round" />
-			</svg>
+			<FavoriteStar filled={view.favOnly} size={11} />
 			Favorites <span class="chip-count">{view.counts.fav}</span>
 		</button>
 	</div>
@@ -58,6 +49,7 @@
 <script lang="ts">
 import { itemCategoryColor, itemCategoryName } from '$lib/common';
 import { FILTER_CATEGORIES, SORTS, type InventoryView, type SortKey } from './inventory-view.svelte';
+import FavoriteStar from './FavoriteStar.svelte';
 
 const { view }: { view: InventoryView } = $props();
 const sortKeys = Object.keys(SORTS) as SortKey[];

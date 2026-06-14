@@ -66,18 +66,24 @@ export class EnemyManager {
 	}
 
 	public async getNewEnemy() {
-		if (!this.newEnemyPromise) {
-			this.newEnemyPromise = apiSocket.sendSocketCommand('NewEnemy', {
-				newZoneId: playerManager.currentZone
-			});
-		}
+		// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
+		// (a sustained outage no longer grows the async chain without bound) and `stop()` cancels
+		// the loop by flipping `started`.
+		while (this.started) {
+			if (!this.newEnemyPromise) {
+				this.newEnemyPromise = apiSocket.sendSocketCommand('NewEnemy', {
+					newZoneId: playerManager.currentZone
+				});
+			}
 
-		const result = await this.newEnemyPromise;
-		this.newEnemyPromise = undefined;
-		if (result.data?.enemyInstance) {
-			this.currentEnemy = result.data.enemyInstance;
-			notifyNewEnemyLoaded(this.currentEnemy);
-		} else {
+			const result = await this.newEnemyPromise;
+			this.newEnemyPromise = undefined;
+			if (result.data?.enemyInstance) {
+				this.currentEnemy = result.data.enemyInstance;
+				notifyNewEnemyLoaded(this.currentEnemy);
+				return;
+			}
+
 			// No enemy this time: either the zone is on cooldown (wait it out) or the request failed
 			// (`data` is absent — note the optional chaining; the original code dereferenced `data`
 			// here and threw on an error response). Back off in both cases, then retry.
@@ -85,7 +91,6 @@ export class EnemyManager {
 				logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
 			}
 			await delay(result.data?.cooldown ?? NEW_ENEMY_RETRY_DELAY_MS);
-			await this.getNewEnemy();
 		}
 	}
 
