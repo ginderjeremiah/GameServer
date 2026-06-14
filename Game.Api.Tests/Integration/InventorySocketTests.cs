@@ -39,8 +39,7 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             // The save writes the cached player fire-and-forget, so poll the player snapshot until the
             // equip lands — the persistence the lost-update race could silently revert.
-            var equipped = await WaitForEquippedAsync(client, itemId, expected: true);
-            Assert.True(equipped);
+            await WaitForEquippedAsync(client, itemId);
         }
 
         [Fact]
@@ -224,10 +223,10 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Polls <c>GET /api/Player</c> until the given item's equipped flag reaches the expected value
-        /// (the cache write is fire-and-forget), failing after a short budget.
+        /// Polls <c>GET /api/Player</c> until the given item shows as equipped (the cache write is
+        /// fire-and-forget), failing after a short budget.
         /// </summary>
-        private async Task<bool> WaitForEquippedAsync(HttpClient client, int itemId, bool expected)
+        private async Task WaitForEquippedAsync(HttpClient client, int itemId)
         {
             for (var attempt = 0; attempt < 20; attempt++)
             {
@@ -237,16 +236,15 @@ namespace Game.Api.Tests.Integration
                 Assert.NotNull(result);
                 Assert.NotNull(result.Data);
                 var item = result.Data.InventoryData.UnlockedItems.SingleOrDefault(i => i.ItemId == itemId);
-                if (item is not null && item.Equipped == expected)
+                if (item is not null && item.Equipped)
                 {
-                    return item.Equipped;
+                    return;
                 }
 
                 await Task.Delay(50, CancellationToken);
             }
 
             Assert.Fail("Player inventory did not reach the expected equipped state.");
-            return false;
         }
     }
 }
