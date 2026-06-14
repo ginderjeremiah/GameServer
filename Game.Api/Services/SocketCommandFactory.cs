@@ -46,7 +46,9 @@ namespace Game.Api.Services
             var serviceExtensions = typeof(ServiceProviderServiceExtensions);
             foreach (var type in types.Where(t => t.IsAssignableTo(typeof(AbstractSocketCommand)) && !t.IsAbstract))
             {
-                var constructor = type.GetConstructors().First();
+                // Single() fails fast at registration if a command ever gains a second public constructor,
+                // rather than First() silently binding an arbitrary one that fails at invoke time.
+                var constructor = type.GetConstructors().Single();
                 var serviceDependencies = constructor.GetParameters();
                 var serviceProvider = Expression.Parameter(typeof(IServiceProvider));
                 var serviceInjectors = serviceDependencies.Select(p => Expression.Call(serviceExtensions, "GetRequiredService", [p.ParameterType], serviceProvider));
