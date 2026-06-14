@@ -21,6 +21,13 @@ namespace Game.Core.Battle
         /// </summary>
         private List<ActiveEffect>? _activeEffects;
 
+        /// <summary>
+        /// This battler's elapsed simulated time in ms, advanced one tick at a time by
+        /// <see cref="AdvanceEffects"/>. Active effects store an absolute expiry against this clock, so expiry
+        /// is a comparison rather than a per-tick countdown and <see cref="ActiveEffect"/> stays immutable.
+        /// </summary>
+        private long _elapsedMs;
+
         public double CurrentHealth { get; private set; }
 
         public List<BattleSkill> Skills { get; private set; }
@@ -106,13 +113,18 @@ namespace Game.Core.Battle
         /// </summary>
         public void ApplyEffect(SkillEffect effect)
         {
+            var expiresAtMs = _elapsedMs + effect.DurationMs;
+
             if (_activeEffects is not null)
             {
-                foreach (var active in _activeEffects)
+                for (var i = 0; i < _activeEffects.Count; i++)
                 {
+                    var active = _activeEffects[i];
                     if (active.Source.Id == effect.Id)
                     {
-                        active.RemainingMs = effect.DurationMs;
+                        // Refresh: the modifier is already on the collection, so only its expiry moves out.
+                        // ActiveEffect is immutable, so replace the element rather than mutating it.
+                        _activeEffects[i] = new ActiveEffect(active.Source, active.Modifier, expiresAtMs);
                         return;
                     }
                 }
@@ -126,18 +138,22 @@ namespace Game.Core.Battle
                 Source = EAttributeModifierSource.SkillEffect,
             };
             _attributes.AddModifier(modifier);
-            (_activeEffects ??= []).Add(new ActiveEffect(effect, modifier, effect.DurationMs));
+            (_activeEffects ??= []).Add(new ActiveEffect(effect, modifier, expiresAtMs));
             ClampHealthToMaxHealth();
         }
 
         /// <summary>
-        /// Advances every active effect by <paramref name="ms"/>, removing any whose remaining duration has
-        /// elapsed (its modifier is removed and the affected caches invalidated). Called at the start of each
-        /// tick before any skill fires, so an effect influences exactly <c>DurationMs / tickSize</c> ticks
-        /// counting the one it was applied on.
+        /// Advances this battler's simulated-time clock by <paramref name="ms"/> and removes any active effect
+        /// whose absolute expiry has been reached (its modifier removed and health re-clamped). Called at the
+        /// start of each tick before any skill fires, so an effect influences exactly <c>DurationMs / tickSize</c>
+        /// ticks counting the one it was applied on.
         /// </summary>
         public void AdvanceEffects(int ms)
         {
+            // Advance the clock every tick, even with no active effects, so an effect applied on a later tick
+            // still computes its absolute expiry from the correct elapsed time.
+            _elapsedMs += ms;
+
             if (_activeEffects is null || _activeEffects.Count == 0)
             {
                 return;
@@ -146,11 +162,9 @@ namespace Game.Core.Battle
             var removedAny = false;
             for (var i = _activeEffects.Count - 1; i >= 0; i--)
             {
-                var active = _activeEffects[i];
-                active.RemainingMs -= ms;
-                if (active.RemainingMs <= 0)
+                if (_activeEffects[i].ExpiresAtMs <= _elapsedMs)
                 {
-                    _attributes.RemoveModifier(active.Modifier);
+                    _attributes.RemoveModifier(_activeEffects[i].Modifier);
                     _activeEffects.RemoveAt(i);
                     removedAny = true;
                 }
@@ -177,14 +191,15 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// A timed skill effect active on a battler: the authored <see cref="SkillEffect"/> it came from, the
-        /// modifier it added to the collection (kept for identity removal on expiry), and the remaining
-        /// duration in ms.
+        /// modifier it added to the collection (kept for identity removal on expiry), and the absolute
+        /// simulated time (in <see cref="_elapsedMs"/> ms) at which it expires. Immutable — a refresh replaces
+        /// the instance rather than mutating it, so no per-tick state is rewritten.
         /// </summary>
-        private sealed class ActiveEffect(SkillEffect source, AttributeModifier modifier, int remainingMs)
+        private sealed class ActiveEffect(SkillEffect source, AttributeModifier modifier, long expiresAtMs)
         {
             public SkillEffect Source { get; } = source;
             public AttributeModifier Modifier { get; } = modifier;
-            public int RemainingMs { get; set; } = remainingMs;
+            public long ExpiresAtMs { get; } = expiresAtMs;
         }
     }
 }
