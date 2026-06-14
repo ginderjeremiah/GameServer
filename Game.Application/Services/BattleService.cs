@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
 using Game.Core.Attributes;
@@ -52,7 +53,7 @@ namespace Game.Application.Services
             var zone = _zones.GetDomainZone(zoneId);
 
             var now = DateTime.UtcNow;
-            var seed = CreateBattleSeed(now);
+            var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBattleEnemy(
                 zone,
@@ -102,7 +103,7 @@ namespace Game.Application.Services
             }
 
             var now = DateTime.UtcNow;
-            var seed = CreateBattleSeed(now);
+            var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBossEnemy(
                 zone,
@@ -246,11 +247,12 @@ namespace Game.Application.Services
             return zone.IsUnlocked(completedChallengeIds);
         }
 
-        // Derives the simulation RNG seed from the battle-start timestamp by truncating the 64-bit tick
-        // count to its low 32 bits. A modulo by uint.MaxValue (2^32 - 1) biases the fold — it can never
-        // produce uint.MaxValue and does not cleanly truncate — and this seed must reproduce identically
-        // under the frontend Mulberry32 port for battle-replay parity (#178). Shared by both start paths.
-        internal static uint CreateBattleSeed(DateTime now) => unchecked((uint)now.Ticks);
+        // Generates the simulation RNG seed from a cryptographic (non-time) entropy source. A wall-clock seed
+        // (DateTime.Ticks) is monotonic and low-entropy in its low 32 bits — correlated and predictable between
+        // battles — which makes it unsuitable as the shared starting point for the parity-identical crit/dodge
+        // RNG (#178). The seed is server-generated and transmitted to the client as-is, so changing the source
+        // does not affect how it is consumed. Shared by both start paths.
+        internal static uint CreateBattleSeed() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint)));
 
         // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
