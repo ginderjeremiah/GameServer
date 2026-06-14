@@ -31,8 +31,10 @@ namespace Game.Api.Sockets
         /// only recovers when the 60s inactivity check closes it because no responses flow). On expiry the
         /// command is abandoned with a timeout response so the read/pub-sub loop keeps draining. Sits below
         /// the client's 30s per-request backstop (api-socket.ts) so the server's own timeout reaches the
-        /// client first, and well above the 5s Redis / Npgsql command timeouts so it only catches genuine
-        /// hangs rather than pre-empting an ordinary slow call.
+        /// client first, and above StackExchange.Redis's 5s command timeout. Postgres (Npgsql) defaults to a
+        /// 30s command timeout, so a genuinely slow DB call could be cut off a few seconds early — an
+        /// accepted trade-off, since a >25s player command is already pathological and the client abandons it
+        /// at 30s regardless.
         /// </summary>
         private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(25);
 
@@ -71,11 +73,12 @@ namespace Game.Api.Sockets
             try
             {
                 var commandTask = RunCommand(commandInfo, cts.Token);
+                ApiSocketResponse response;
                 try
                 {
-                    // Bound the wait without abandoning the underlying task: WaitAsync returns when the
-                    // command settles, or throws once the budget elapses (the command keeps running).
-                    await commandTask.WaitAsync(cts.Token);
+                    // Bound the wait without abandoning the underlying task: WaitAsync returns the command's
+                    // response when it settles, or throws once the budget elapses (the command keeps running).
+                    response = await commandTask.WaitAsync(cts.Token);
                 }
                 catch (OperationCanceledException) when (cts.IsCancellationRequested)
                 {
@@ -84,7 +87,9 @@ namespace Game.Api.Sockets
                     // mid read-modify-write of the shared cached Player, and releasing would let the next
                     // command race it (the lost-update class the per-socket command lock prevents — see
                     // docs/backend.md). Hand the lock to a continuation that releases it once the abandoned
-                    // task finally settles.
+                    // task finally settles. The abandoned command still commits its write (so it isn't lost),
+                    // but its now-late response is dropped: RunCommand never sends — this method owns the single
+                    // send — so the client never receives a second response for the same id.
                     _logger.LogWarning("Socket command timed out after {Timeout} and was abandoned: {CommandInfo} on socket: {Id}", _commandTimeout, commandInfo, Id);
                     await _context.SendData(new ApiSocketResponse
                     {
@@ -94,7 +99,10 @@ namespace Game.Api.Sockets
                     });
                     ReleaseCommandLockWhenSettled(commandTask, cts, commandInfo);
                     lockHandedOff = true;
+                    return;
                 }
+
+                await _context.SendData(response);
             }
             catch (Exception ex)
             {
@@ -102,6 +110,7 @@ namespace Game.Api.Sockets
                 await _context.SendData(new ApiSocketResponse
                 {
                     Id = commandInfo.Id,
+                    Name = commandInfo.Name,
                     Error = "Internal Server Error"
                 });
             }
@@ -115,13 +124,17 @@ namespace Game.Api.Sockets
             }
         }
 
-        private async Task RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
+        // Executes the command and commits its unit of work, returning the response for the caller to send.
+        // It deliberately does not send: ExecuteCommand owns the single send so that a command abandoned on
+        // timeout (whose task runs on here in the background) commits its write but never emits a second,
+        // late response for an id the client already saw time out.
+        private async Task<ApiSocketResponse> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
             var command = _commandFactory.CreateCommand(commandInfo, scope);
             var response = await command.ExecuteAsync(_context, cancellationToken);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-            await _context.SendData(response);
+            return response;
         }
 
         /// <summary>

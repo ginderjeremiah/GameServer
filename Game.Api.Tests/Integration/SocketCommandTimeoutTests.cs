@@ -56,6 +56,12 @@ namespace Game.Api.Tests.Integration
             await second.WaitAsync(WaitTimeout, CancellationToken);
             Assert.Equal(2, scopeFactory.ScopesCreated);
             Assert.Contains(socket.SentMessages, m => m.Contains("next-1") && !m.Contains("timed out"));
+
+            // The abandoned command commits but its now-late response is suppressed: the client only ever
+            // saw the timeout for hung-1, never a second (success) response for the same id.
+            var hungResponses = socket.SentMessages.Where(m => m.Contains("hung-1")).ToList();
+            Assert.Single(hungResponses);
+            Assert.Contains("timed out", hungResponses[0]);
         }
 
         [Fact]
@@ -92,6 +98,31 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(1, scopeFactory.ScopesCreated);
             Assert.Contains(socket.SentMessages, m => m.Contains("fast-1"));
             Assert.DoesNotContain(socket.SentMessages, m => m.Contains("timed out"));
+        }
+
+        [Fact]
+        public async Task AbandonedCommandThatLaterFaults_StillReleasesLock_SoNextCommandRuns()
+        {
+            using var scope = CreateScope();
+            var faultGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var (socket, handler, scopeFactory) = CreateHandler(scope, ShortTimeout,
+                new GatedCommand("Faulty", faultGate.Task, observeToken: false, faultWith: new InvalidOperationException("boom")),
+                new GatedCommand("Next", Task.CompletedTask, observeToken: false));
+
+            var first = handler.ExecuteCommand(new SocketCommandInfo("Faulty") { Id = "faulty-1" });
+            await WaitForSentMessageAsync(socket, m => m.Contains("Command timed out"));
+
+            var second = handler.ExecuteCommand(new SocketCommandInfo("Next") { Id = "next-1" });
+            await Task.Delay(300, CancellationToken);
+            Assert.Equal(1, scopeFactory.ScopesCreated);
+
+            // The abandoned command faults after the timeout; the release continuation observes the fault
+            // (so it isn't an unobserved exception) and still releases the lock, so the queued command runs.
+            faultGate.SetResult();
+            await first;
+            await second.WaitAsync(WaitTimeout, CancellationToken);
+            Assert.Equal(2, scopeFactory.ScopesCreated);
+            Assert.Contains(socket.SentMessages, m => m.Contains("next-1") && !m.Contains("timed out"));
         }
 
         private (FakeWebSocket Socket, SocketHandler Handler, CountingServiceScopeFactory ScopeFactory) CreateHandler(
@@ -132,7 +163,7 @@ namespace Game.Api.Tests.Integration
         /// dependency. When <c>observeToken</c> is set it parks cooperatively (honoring the cancellation
         /// token); otherwise it ignores the token, modelling a command wedged on a non-cancellable wait.
         /// </summary>
-        private sealed class GatedCommand(string name, Task gate, bool observeToken) : AbstractSocketCommand
+        private sealed class GatedCommand(string name, Task gate, bool observeToken, Exception? faultWith = null) : AbstractSocketCommand
         {
             public override string Name { get; set; } = name;
 
@@ -145,6 +176,11 @@ namespace Game.Api.Tests.Integration
                 else
                 {
                     await gate;
+                }
+
+                if (faultWith is not null)
+                {
+                    throw faultWith;
                 }
 
                 return Success();
