@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Skills;
 using Xunit;
@@ -7,7 +8,8 @@ using Xunit;
 namespace Game.Core.Tests.Items
 {
     /// <summary>
-    /// Structural-immutability guard for the shared, cached reference-data domain models (#547).
+    /// Structural-immutability guard for the shared, cached reference-data domain models (#547) and the
+    /// <see cref="AttributeModifier"/> element type held inside their read-only collections (#603).
     /// <c>GetItem</c>/<c>GetItemMod</c>/<c>GetSkill</c> hand the same pre-materialized instance to every
     /// player straight from the reference cache, so these types must stay structurally immutable — every
     /// property init-only and every collection an <see cref="IReadOnlyList{T}"/> — or a stray mutation would
@@ -24,6 +26,7 @@ namespace Game.Core.Tests.Items
             yield return new object[] { typeof(ItemModSlot) };
             yield return new object[] { typeof(Skill) };
             yield return new object[] { typeof(SkillEffect) };
+            yield return new object[] { typeof(AttributeModifier) };
         }
 
         [Theory]
