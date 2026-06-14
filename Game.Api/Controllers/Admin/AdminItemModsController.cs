@@ -23,8 +23,9 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
-            _adminItemMods.SaveItemMods(changes);
-            return ApiResponse.Success();
+            return _adminItemMods.SaveItemMods(changes)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Item mod not found.");
         }
 
         [HttpPost]

@@ -9,8 +9,9 @@ namespace Game.Abstractions.DataAccess.Admin
     /// </summary>
     public interface IAdminItems
     {
-        /// <summary>Applies an identity-level Add/Edit/Delete change set to the item catalogue.</summary>
-        void SaveItems(IReadOnlyList<Change<Item>> changes);
+        /// <summary>Applies an identity-level Add/Edit/Delete change set to the item catalogue.
+        /// Returns <c>false</c> (applying nothing) if an edit targets an item that does not exist.</summary>
+        bool SaveItems(IReadOnlyList<Change<Item>> changes);
 
         /// <summary>Applies a change set to an item's attributes. Returns <c>false</c> if the item does not exist.</summary>
         bool SetAttributes(AddEditAttributesData data);

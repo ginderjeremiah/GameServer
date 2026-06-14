@@ -1546,6 +1546,58 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditItems_EditUnknownItem_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent item is a not-found rejection (not a silent no-op),
+            // and the whole batch is rejected up front — so the valid Add alongside it is not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Item",
+                        Description = "Should never be saved",
+                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        RarityId = (int)ERarity.Common,
+                        IconPath = "items/ghost.png",
+                        Attributes = Array.Empty<object>(),
+                        ModSlots = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        Description = "x",
+                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        RarityId = (int)ERarity.Common,
+                        IconPath = "items/phantom.png",
+                        Attributes = Array.Empty<object>(),
+                        ModSlots = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItems", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetItems(), i => i.Name == "Ghost Item");
+        }
+
+        [Fact]
         public async Task AddEditItemAttributes_UnknownItem_ReturnsError()
         {
             using var authClient = await SetupAuthenticatedClientAsync();
@@ -1671,6 +1723,54 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(HttpStatusCode.OK, (await SaveItemMod(null)).StatusCode);
             Assert.Null(Assert.Single(GetItemMods(), m => m.Id == itemMod.Id).RetiredAt);
+        }
+
+        [Fact]
+        public async Task AddEditItemMods_EditUnknownItemMod_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent item mod is a not-found rejection (not a silent no-op),
+            // and the whole batch is rejected up front — so the valid Add alongside it is not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Mod",
+                        Description = "Should never be saved",
+                        ItemModTypeId = (int)EItemModType.Prefix,
+                        RarityId = (int)ERarity.Common,
+                        Attributes = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        Description = "x",
+                        ItemModTypeId = (int)EItemModType.Prefix,
+                        RarityId = (int)ERarity.Common,
+                        Attributes = Array.Empty<object>(),
+                        Tags = Array.Empty<int>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditItemMods", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Item mod not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetItemMods(), m => m.Name == "Ghost Mod");
         }
 
         [Fact]

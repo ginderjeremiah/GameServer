@@ -16,8 +16,16 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public void SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)
+        public bool SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)
         {
+            // An edit must target an existing item mod; a missing id is a not-found rejection (matching the
+            // relationship setters), not a silent success. Validate the whole batch up front so the
+            // commit filter doesn't persist the rest of the batch alongside an invalid edit.
+            if (changes.Any(c => c.ChangeType == EChangeType.Edit && _itemMods.LookupItemMod(c.Item.Id) is null))
+            {
+                return false;
+            }
+
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.ItemMod
                 {
@@ -26,19 +34,19 @@ namespace Game.DataAccess.Repositories.Admin
                     ItemModTypeId = (int)item.ItemModTypeId,
                     RarityId = (int)item.RarityId,
                 }),
-                edit: item =>
+                // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
+                // graph would otherwise be dragged into the change tracker.
+                edit: item => _entityStore.Update(new Entities.ItemMod
                 {
-                    var existing = _itemMods.LookupItemMod(item.Id);
-                    if (existing is not null)
-                    {
-                        existing.Name = item.Name;
-                        existing.Description = item.Description;
-                        existing.ItemModTypeId = (int)item.ItemModTypeId;
-                        existing.RarityId = (int)item.RarityId;
-                        existing.RetiredAt = item.RetiredAt;
-                        _entityStore.Update(existing);
-                    }
-                });
+                    Id = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    ItemModTypeId = (int)item.ItemModTypeId,
+                    RarityId = (int)item.RarityId,
+                    RetiredAt = item.RetiredAt,
+                }));
+
+            return true;
         }
 
         public bool SetAttributes(AddEditAttributesData data)

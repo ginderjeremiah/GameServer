@@ -9,8 +9,9 @@ namespace Game.Abstractions.DataAccess.Admin
     /// </summary>
     public interface IAdminItemMods
     {
-        /// <summary>Applies an identity-level Add/Edit/Delete change set to the item-mod catalogue.</summary>
-        void SaveItemMods(IReadOnlyList<Change<ItemMod>> changes);
+        /// <summary>Applies an identity-level Add/Edit/Delete change set to the item-mod catalogue.
+        /// Returns <c>false</c> (applying nothing) if an edit targets an item mod that does not exist.</summary>
+        bool SaveItemMods(IReadOnlyList<Change<ItemMod>> changes);
 
         /// <summary>Applies a change set to an item mod's attributes. Returns <c>false</c> if the item mod does not exist.</summary>
         bool SetAttributes(AddEditAttributesData data);

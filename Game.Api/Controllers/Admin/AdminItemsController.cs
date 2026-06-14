@@ -23,8 +23,9 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItems([FromBody] List<Change<Item>> changes)
         {
-            _adminItems.SaveItems(changes);
-            return ApiResponse.Success();
+            return _adminItems.SaveItems(changes)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Item not found.");
         }
 
         [HttpPost]
