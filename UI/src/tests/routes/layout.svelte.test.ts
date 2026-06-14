@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, screen, waitFor } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
+import { SvelteURL } from 'svelte/reactivity';
 
+// The layout's boot guard reads `page.url.pathname` reactively, so the URL mock must be reactive too —
+// otherwise the post-boot $effect never re-runs and the latch can't be exercised. A single stable
+// `SvelteURL` (created in beforeEach, mutated in place by `setPath`) makes the `.pathname` read inside
+// the effect track it. The URL is filled in beforeEach because vi.hoisted runs before module imports
+// resolve, so `SvelteURL` isn't available inside the factory.
 const { goto, getTokens, onSocketError, resumeSession, playerManager, page } = vi.hoisted(() => ({
 	goto: vi.fn(() => Promise.resolve()),
 	getTokens: vi.fn(),
 	onSocketError: vi.fn(),
 	resumeSession: vi.fn(),
 	playerManager: { name: '' },
-	page: { url: new URL('http://localhost/') }
+	page: { url: new URL('http://localhost/') as URL }
 }));
 
 vi.mock('$app/navigation', () => ({ goto }));
@@ -32,8 +38,10 @@ const childSnippet = createRawSnippet(() => ({
 
 const renderLayout = () => render(Layout, { props: { children: childSnippet } });
 
+// Mutate the stable reactive URL in place (don't reassign) so the effect's `page.url.pathname` read
+// re-fires.
 const setPath = (pathname: string) => {
-	page.url = new URL(`http://localhost${pathname}`);
+	page.url.href = `http://localhost${pathname}`;
 };
 
 beforeEach(() => {
@@ -41,7 +49,8 @@ beforeEach(() => {
 	getTokens.mockReturnValue(null);
 	resumeSession.mockResolvedValue('login');
 	playerManager.name = '';
-	setPath('/');
+	// Fresh reactive URL per test so an in-place mutation re-runs the boot-guard effect.
+	page.url = new SvelteURL('http://localhost/');
 });
 
 afterEach(cleanup);
@@ -109,5 +118,32 @@ describe('root layout boot gate', () => {
 		resolveResume('game');
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
 		await waitFor(() => expect(screen.queryByTestId('boot-splash')).toBeNull());
+	});
+});
+
+describe('root layout boot-guard redirect latch', () => {
+	it('issues only one redirect while the post-boot safety net navigation is still settling', async () => {
+		// Boot completes in place (a `game` resume on a real in-app route stays put), so the post-boot
+		// $effect — not the boot gate's onMount — owns the redirect. With no player name on a protected
+		// route it fires goto('/'), which we hold open so `pathname` never settles.
+		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
+		resumeSession.mockResolvedValue('game');
+		playerManager.name = '';
+		setPath('/admin');
+		let resolveGoto!: () => void;
+		goto.mockReturnValue(new Promise<void>((r) => (resolveGoto = r)));
+		renderLayout();
+
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
+		expect(goto).toHaveBeenCalledTimes(1);
+
+		// A tracked dep (pathname) changes mid-navigation; without the latch this re-run would fire a
+		// redundant second goto('/') before the first navigation resolves.
+		setPath('/game');
+		await waitFor(() => expect(page.url.pathname).toBe('/game'));
+		expect(goto).toHaveBeenCalledTimes(1);
+
+		// Once the navigation settles the latch releases for any genuine future redirect.
+		resolveGoto();
 	});
 });
