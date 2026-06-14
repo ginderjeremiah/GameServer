@@ -117,6 +117,52 @@ describe('createHook', () => {
 		expect(cb).toHaveBeenCalledWith(expect.any(Function));
 	});
 
+	it('still fires remaining subscribers when one unhooks itself during dispatch', () => {
+		const hook = createHook<[number]>();
+		const cb1 = vi.fn();
+		const cb2 = vi.fn();
+
+		// cb1 unhooks itself from inside its own callback, shifting cb2 into
+		// the just-visited slot — cb2 must not be skipped for this dispatch.
+		hook.onNotified((value, unhook) => {
+			cb1(value);
+			unhook();
+		});
+		hook.onNotified(cb2);
+
+		hook.notify(1);
+
+		expect(cb1).toHaveBeenCalledTimes(1);
+		expect(cb2).toHaveBeenCalledTimes(1);
+		expect(cb2).toHaveBeenCalledWith(1, expect.any(Function));
+
+		// cb1 is gone for the next dispatch; cb2 keeps firing.
+		hook.notify(2);
+		expect(cb1).toHaveBeenCalledTimes(1);
+		expect(cb2).toHaveBeenCalledTimes(2);
+	});
+
+	it('still fires remaining subscribers when one unhooks another during dispatch', () => {
+		const hook = createHook<[number]>();
+		const cb1 = vi.fn();
+		const cb3 = vi.fn();
+
+		hook.onNotified((value) => {
+			cb1(value);
+			// Unhook the next subscriber before it has been visited.
+			unhookSecond();
+		});
+		const unhookSecond = hook.onNotified(vi.fn());
+		hook.onNotified(cb3);
+
+		hook.notify(7);
+
+		// Removing a not-yet-visited subscriber mid-dispatch must not knock the
+		// snapshot off and skip the subscriber after it.
+		expect(cb1).toHaveBeenCalledTimes(1);
+		expect(cb3).toHaveBeenCalledWith(7, expect.any(Function));
+	});
+
 	it('subscriber added after notify does not receive past notifications', () => {
 		const hook = createHook<[number]>();
 
