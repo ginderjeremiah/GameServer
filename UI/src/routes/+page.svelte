@@ -7,6 +7,9 @@
 		<form onsubmit={preventDefault(handleSubmit)}>
 			<UnderlineInput
 				testid="username-input"
+				id="username"
+				label="Username"
+				autocomplete="username"
 				placeholder="Username"
 				bind:value={username}
 				onblur={() => (touched.username = true)}
@@ -22,6 +25,9 @@
 
 			<UnderlineInput
 				testid="password-input"
+				id="password"
+				label="Password"
+				autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
 				type={showPassword ? 'text' : 'password'}
 				placeholder="Password"
 				bind:value={password}
@@ -36,6 +42,8 @@
 						type="button"
 						class="eye-button"
 						data-testid="password-toggle"
+						aria-label={showPassword ? 'Hide password' : 'Show password'}
+						aria-pressed={showPassword}
 						onclick={() => (showPassword = !showPassword)}
 					>
 						<EyeIcon visible={showPassword} />
@@ -43,7 +51,7 @@
 				{/snippet}
 				{#snippet below()}
 					{#if mode === 'signup' && password}
-						<PasswordStrengthMeter score={strength.score} />
+						<PasswordStrengthMeter score={strength.score} label={strength.label} />
 					{/if}
 				{/snippet}
 			</UnderlineInput>
@@ -51,6 +59,9 @@
 			{#if mode === 'signup'}
 				<UnderlineInput
 					testid="confirm-input"
+					id="confirm-password"
+					label="Confirm password"
+					autocomplete="new-password"
 					type={showPassword ? 'text' : 'password'}
 					placeholder="Confirm password"
 					bind:value={confirm}
