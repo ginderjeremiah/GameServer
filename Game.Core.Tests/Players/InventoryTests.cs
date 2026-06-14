@@ -18,7 +18,7 @@ namespace Game.Core.Tests.Players
             inventory.UnlockItem(item);
 
             Assert.Single(inventory.UnlockedItems);
-            Assert.Equal(item, inventory.UnlockedItems[0].Item);
+            Assert.Equal(item, inventory.UnlockedItems.Single().Item);
         }
 
         [Fact]
@@ -185,7 +185,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryApplyMod(1, 10, 0, mod);
 
             Assert.True(result);
-            var applied = inventory.UnlockedItems[0].AppliedMods;
+            var applied = inventory.UnlockedItems.Single().AppliedMods;
             Assert.Single(applied);
             Assert.Equal(mod, applied[0].ItemMod);
         }
@@ -260,7 +260,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryApplyMod(1, 11, 0, MakeMod(11, EItemModType.Prefix));
 
             Assert.True(result);
-            var applied = inventory.UnlockedItems[0].AppliedMods;
+            var applied = inventory.UnlockedItems.Single().AppliedMods;
             Assert.Single(applied);
             Assert.Equal(11, applied[0].ItemModId);
         }
@@ -311,7 +311,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryApplyMod(1, 10, 4, MakeMod(10, EItemModType.Suffix));
 
             Assert.True(result);
-            var applied = Assert.Single(inventory.UnlockedItems[0].AppliedMods);
+            var applied = Assert.Single(inventory.UnlockedItems.Single().AppliedMods);
             Assert.Equal(4, applied.ItemModSlotId);
             Assert.Equal(10, applied.ItemModId);
         }
@@ -333,7 +333,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryRemoveMod(1, 4);
 
             Assert.True(result);
-            Assert.Empty(inventory.UnlockedItems[0].AppliedMods);
+            Assert.Empty(inventory.UnlockedItems.Single().AppliedMods);
         }
 
         // ── TryRemoveMod ────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TryRemoveMod(1, 0);
 
             Assert.True(result);
-            Assert.Empty(inventory.UnlockedItems[0].AppliedMods);
+            Assert.Empty(inventory.UnlockedItems.Single().AppliedMods);
         }
 
         [Fact]
@@ -400,7 +400,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TrySetFavorite(1, true);
 
             Assert.True(result);
-            Assert.True(inventory.UnlockedItems[0].Favorite);
+            Assert.True(inventory.UnlockedItems.Single().Favorite);
         }
 
         [Fact]
@@ -413,7 +413,7 @@ namespace Game.Core.Tests.Players
             var result = inventory.TrySetFavorite(1, false);
 
             Assert.True(result);
-            Assert.False(inventory.UnlockedItems[0].Favorite);
+            Assert.False(inventory.UnlockedItems.Single().Favorite);
         }
 
         [Fact]
@@ -560,6 +560,56 @@ namespace Game.Core.Tests.Players
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Dexterity && m.Amount == 4.0);
         }
 
+        // ── GetUnlockedItem ─────────────────────────────────────────────────
+
+        [Fact]
+        public void GetUnlockedItem_UnlockedItem_ReturnsSlot()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(42);
+            inventory.UnlockItem(item);
+
+            var slot = inventory.GetUnlockedItem(42);
+
+            Assert.NotNull(slot);
+            Assert.Equal(42, slot.ItemId);
+            Assert.Equal(item, slot.Item);
+        }
+
+        [Fact]
+        public void GetUnlockedItem_NotUnlocked_ReturnsNull()
+        {
+            var inventory = new Inventory();
+
+            Assert.Null(inventory.GetUnlockedItem(999));
+        }
+
+        // ── JSON round-trip (player cache) ──────────────────────────────────
+
+        [Fact]
+        public void UnlockedItems_SurviveJsonRoundTrip_AndStayLookupableById()
+        {
+            // The Player aggregate (and its Inventory) round-trips through the Redis player cache as JSON,
+            // so the id-keyed index must rebuild on deserialization — a get-only view would silently drop
+            // every unlocked item. The setter rebuild is what guards that.
+            var inventory = new Inventory();
+            var item = MakeItem(3, modSlots: [new ItemModSlot { Id = 0, Type = EItemModType.Prefix }]);
+            inventory.UnlockItem(item);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(3, 10, 0, MakeMod(10, EItemModType.Prefix));
+            inventory.TrySetFavorite(3, true);
+
+            var restored = inventory.Serialize().Deserialize<Inventory>();
+
+            Assert.NotNull(restored);
+            var slot = restored.GetUnlockedItem(3);
+            Assert.NotNull(slot);
+            Assert.True(slot.Favorite);
+            Assert.Equal(10, Assert.Single(slot.AppliedMods).ItemModId);
+            // The rebuilt index is live, so a lookup-driven operation against the restored item resolves it.
+            Assert.True(restored.TryEquipItem(3, EEquipmentSlot.AccessorySlot));
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
@@ -577,12 +627,7 @@ namespace Game.Core.Tests.Players
 
         private static void AddUnlockedItem(Inventory inventory, Item item)
         {
-            inventory.UnlockedItems.Add(new UnlockedItemSlot
-            {
-                ItemId = item.Id,
-                Item = item,
-                AppliedMods = [],
-            });
+            inventory.UnlockItem(item);
         }
 
         private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier>? attributes = null) => new()

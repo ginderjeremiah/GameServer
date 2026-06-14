@@ -86,7 +86,7 @@ namespace Game.Core.Tests.Battle
 
             // Corrupt the inventory invariant: an item stays equipped but is no longer unlocked. The
             // snapshot must fail loudly rather than silently capturing the item without its mods.
-            player.Inventory.UnlockedItems.Clear();
+            player.Inventory.UnlockedItems = [];
 
             var ex = Assert.Throws<InvalidOperationException>(() => BattleSnapshot.FromPlayer(player));
             Assert.Contains("Equipped item 7", ex.Message);
