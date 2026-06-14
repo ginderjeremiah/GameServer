@@ -26,7 +26,9 @@ namespace Game.DataAccess.Repositories
 
         private readonly GameContext _context;
         private readonly ICacheService _cache;
+        private readonly IPubSubService _pubsub;
         private readonly IDomainEventDispatcher _dispatcher;
+        private readonly PlayerUpdateBatch _updateBatch;
         private readonly IItems _items;
         private readonly IItemMods _itemMods;
         private readonly ISkills _skills;
@@ -34,14 +36,18 @@ namespace Game.DataAccess.Repositories
         public PlayerRepository(
             GameContext context,
             ICacheService cache,
+            IPubSubService pubsub,
             IDomainEventDispatcher dispatcher,
+            PlayerUpdateBatch updateBatch,
             IItems items,
             IItemMods itemMods,
             ISkills skills)
         {
             _context = context;
             _cache = cache;
+            _pubsub = pubsub;
             _dispatcher = dispatcher;
+            _updateBatch = updateBatch;
             _items = items;
             _itemMods = itemMods;
             _skills = skills;
@@ -70,7 +76,11 @@ namespace Game.DataAccess.Repositories
 
         public async Task SavePlayer(Player player)
         {
+            // Dispatching the player's events buffers each one into the scoped PlayerUpdateBatch (via
+            // PlayerPersistencePublisher) rather than publishing it individually; flushing the whole batch
+            // here as a single multi-value LPUSH collapses a multi-event save into one queue round-trip (#559).
             await _dispatcher.DispatchAsync(player);
+            await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain());
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
