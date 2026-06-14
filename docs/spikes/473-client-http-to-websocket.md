@@ -1,7 +1,7 @@
 # Spike #473 — Remaining client HTTP usage and the plan to move it to WebSockets
 
 - **Spike issue:** [#473](https://github.com/ginderjeremiah/GameServer/issues/473)
-- **Status:** Research complete; direction proposed. Implementation sub-issues are **proposed below pending owner review** (per the spike process in `CLAUDE.md`, the issues are finalized/created after the direction is reviewed).
+- **Status:** Research complete; direction reviewed and approved by the project owner (spike PR #562 merged); split into implementation sub-issues of #473 (see [Implementation issues](#implementation-issues)).
 
 ## Goal
 
@@ -103,23 +103,27 @@ reference commands — proposed `GetPlayerStatistics` and `GetPlayerChallenges`.
    the stats screen is ever wanted, scope it narrowly to the handful of always-visible counters
    with explicit server reconciliation — not a wholesale logic port.
 
-## Proposed implementation issues (pending review)
+## Implementation issues
 
-To be created as sub-issues of #473 after the direction is reviewed:
+Created as sub-issues of #473:
 
-- **Add `GetPlayerStatistics` socket command and migrate `stores/statistics.svelte.ts` off HTTP.**
-  _(claude, tech debt, scope: small)_ — new player-scoped command delegating to
-  `IPlayerProgressRepository.GetStatistics`; store swaps `ApiRequest.get('Statistics')` →
-  `fetchSocketData('GetPlayerStatistics')`; codegen the type map; unit/integration tests mirroring
-  the existing store test.
-- **Add `GetPlayerChallenges` socket command and migrate `stores/challenges.svelte.ts` off HTTP.**
-  _(claude, tech debt, scope: small)_ — as above for `Challenges/Player` →
-  `GetChallenges`(progress); name disambiguated from the existing reference `GetChallenges`.
-- **Remove the unused `GET /api/Statistics/StatisticTypes` HTTP endpoint** (keep the
-  `GetStatisticTypes` socket command). _(claude, tech debt, scope: small)_
-- **Remove the dead `GET /api/Player` endpoint and `PlayerController`.** _(claude, tech debt,
-  scope: small)_ — confirm no consumer, delete, update `backend.md`.
-- **(Cleanup, do last)** Once the four above land, prune the now-unused `Statistics`,
+- **[#563](https://github.com/ginderjeremiah/GameServer/issues/563)** _(claude, tech debt, scope:
+  small)_ — Add `GetPlayerStatistics` socket command and migrate `stores/statistics.svelte.ts` off
+  HTTP. New player-scoped command delegating to `IPlayerProgressRepository.GetStatistics`; store
+  swaps `ApiRequest.get('Statistics')` → `fetchSocketData('GetPlayerStatistics')`; codegen the type
+  map; unit/integration tests mirroring the existing store test.
+- **[#564](https://github.com/ginderjeremiah/GameServer/issues/564)** _(claude, tech debt, scope:
+  small)_ — Add `GetPlayerChallenges` socket command and migrate `stores/challenges.svelte.ts` off
+  HTTP. As above for `Challenges/Player`; name disambiguated from the existing reference
+  `GetChallenges`.
+- **[#565](https://github.com/ginderjeremiah/GameServer/issues/565)** _(claude, tech debt, scope:
+  small)_ — Remove the unused `GET /api/Statistics/StatisticTypes` HTTP endpoint (keep the
+  `GetStatisticTypes` socket command).
+- **[#566](https://github.com/ginderjeremiah/GameServer/issues/566)** _(claude, tech debt, scope:
+  small)_ — Remove the dead `GET /api/Player` endpoint and `PlayerController`; confirm no consumer,
+  delete, update `backend.md`.
+- **[#567](https://github.com/ginderjeremiah/GameServer/issues/567)** _(claude, tech debt, scope:
+  small)_ — **Do last.** Once the four above land, prune the now-unused `Statistics`,
   `Challenges/Player`, `Player`, and `Statistics/StatisticTypes` entries from the HTTP type map and
   refresh `backend.md` → _HTTP vs WebSocket_ to reflect that the only client-game HTTP left is the
   auth flow (plus the admin persistence/Tags exceptions).
