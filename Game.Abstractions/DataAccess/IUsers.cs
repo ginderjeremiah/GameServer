@@ -3,6 +3,17 @@ using Game.Core.Players;
 
 namespace Game.Abstractions.DataAccess
 {
+    /// <summary>
+    /// Outcome of a <see cref="IUsers.SetUserRoles"/> attempt, so the caller can surface the
+    /// appropriate message. The data tier owns validating the assignment against the role set.
+    /// </summary>
+    public enum SetUserRolesStatus
+    {
+        Success,
+        UserNotFound,
+        UnknownRole,
+    }
+
     public interface IUsers
     {
         /// <summary>
@@ -45,9 +56,11 @@ namespace Game.Abstractions.DataAccess
         Task<int> CountUsers(string? search, int? roleId, bool? archived);
 
         /// <summary>
-        /// Replaces the set of roles granted to the user with the given role ids. Returns false if the user does not exist.
+        /// Replaces the set of roles granted to the user with the given role ids, validating that every id
+        /// refers to a real role. Returns <see cref="SetUserRolesStatus.UserNotFound"/> if the user does not
+        /// exist or <see cref="SetUserRolesStatus.UnknownRole"/> if any id is not a known role.
         /// </summary>
-        Task<bool> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds);
+        Task<SetUserRolesStatus> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds);
 
         /// <summary>
         /// Archives (soft-deletes) the user, freeing their username for reuse. Returns false if the user does not exist.

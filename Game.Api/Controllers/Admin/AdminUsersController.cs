@@ -60,15 +60,14 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> SetUserRoles([FromBody] SetUserRolesData data)
         {
-            var roleIds = data.RoleIds.Distinct().ToList();
-            var knownRoleIds = _roles.GetRoles().Select(r => r.Id).ToHashSet();
-            if (roleIds.Any(id => !knownRoleIds.Contains(id)))
+            var status = await _users.SetUserRoles(data.UserId, data.RoleIds);
+            return status switch
             {
-                return ApiResponse.Error("One or more roles do not exist.");
-            }
-
-            var updated = await _users.SetUserRoles(data.UserId, roleIds);
-            return updated ? ApiResponse.Success() : ApiResponse.Error("User not found.");
+                SetUserRolesStatus.Success => ApiResponse.Success(),
+                SetUserRolesStatus.UserNotFound => ApiResponse.Error("User not found."),
+                SetUserRolesStatus.UnknownRole => ApiResponse.Error("One or more roles do not exist."),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
         }
 
         [HttpPost]
