@@ -1,10 +1,10 @@
 /* Player challenge-completion store — which challenges the player has completed
-   (`GET /api/Challenges/Player`), shared across screens so the source is fetched once and
-   stays consistent. The Challenges screen renders the full progress breakdown from it; the
+   (`GetPlayerChallenges` socket command), shared across screens so the source is fetched once
+   and stays consistent. The Challenges screen renders the full progress breakdown from it; the
    Fight screen reads completion to gate zone navigation (a zone unlocks once its gating
    challenge is completed). */
 
-import { ApiRequest, type IPlayerChallenge } from '$lib/api';
+import { fetchSocketData, type IPlayerChallenge } from '$lib/api';
 
 let challenges = $state<IPlayerChallenge[]>([]);
 let loaded = $state(false);
@@ -14,7 +14,8 @@ let inFlight: Promise<void> | undefined;
 
 const fetchChallenges = async () => {
 	try {
-		challenges = (await ApiRequest.get('Challenges/Player')) ?? [];
+		// fetchSocketData throws on a socket error, preserving this try/catch contract.
+		challenges = (await fetchSocketData('GetPlayerChallenges')) ?? [];
 		error = false;
 		loaded = true;
 	} catch {

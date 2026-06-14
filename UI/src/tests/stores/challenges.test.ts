@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ApiRequest, type IPlayerChallenge } from '$lib/api';
+
+// The store reads over the socket via fetchSocketData; stub just that export while keeping the real
+// IPlayerChallenge type from the barrel.
+const { mockFetchSocket } = vi.hoisted(() => ({ mockFetchSocket: vi.fn() }));
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	return { ...actual, fetchSocketData: mockFetchSocket };
+});
+
+import { type IPlayerChallenge } from '$lib/api';
 import { playerChallenges } from '$stores/challenges.svelte';
 
 const challenge = (challengeId: number, completed: boolean): IPlayerChallenge => ({
@@ -9,48 +18,46 @@ const challenge = (challengeId: number, completed: boolean): IPlayerChallenge =>
 });
 
 describe('challenges store', () => {
-	let get: ReturnType<typeof vi.spyOn>;
-
 	beforeEach(() => {
 		playerChallenges.reset();
-		get = vi.spyOn(ApiRequest, 'get');
-		get.mockReset();
+		mockFetchSocket.mockReset();
 	});
 
 	it('loads the player challenges once and exposes them', async () => {
-		get.mockResolvedValue([challenge(3, true)]);
+		mockFetchSocket.mockResolvedValue([challenge(3, true)]);
 
 		await playerChallenges.load();
 
 		expect(playerChallenges.loaded).toBe(true);
 		expect(playerChallenges.all).toEqual([challenge(3, true)]);
+		expect(mockFetchSocket).toHaveBeenCalledWith('GetPlayerChallenges');
 
 		// Idempotent: a second (non-forced) load does not re-fetch.
 		await playerChallenges.load();
-		expect(get).toHaveBeenCalledTimes(1);
+		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
 	});
 
 	it('re-fetches when forced', async () => {
-		get.mockResolvedValue([]);
+		mockFetchSocket.mockResolvedValue([]);
 		await playerChallenges.load();
 
-		get.mockResolvedValue([challenge(3, true)]);
+		mockFetchSocket.mockResolvedValue([challenge(3, true)]);
 		await playerChallenges.load(true);
 
-		expect(get).toHaveBeenCalledTimes(2);
+		expect(mockFetchSocket).toHaveBeenCalledTimes(2);
 		expect(playerChallenges.all).toEqual([challenge(3, true)]);
 	});
 
 	it('coalesces concurrent loads onto a single request', async () => {
-		get.mockResolvedValue([]);
+		mockFetchSocket.mockResolvedValue([]);
 
 		await Promise.all([playerChallenges.load(), playerChallenges.load()]);
 
-		expect(get).toHaveBeenCalledTimes(1);
+		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
 	});
 
 	it('flags an error and leaves challenges empty when the fetch fails', async () => {
-		get.mockRejectedValue(new Error('boom'));
+		mockFetchSocket.mockRejectedValue(new Error('boom'));
 
 		await playerChallenges.load();
 
@@ -60,7 +67,7 @@ describe('challenges store', () => {
 	});
 
 	it('reports whether a given challenge is completed', async () => {
-		get.mockResolvedValue([challenge(3, true), challenge(4, false)]);
+		mockFetchSocket.mockResolvedValue([challenge(3, true), challenge(4, false)]);
 		await playerChallenges.load();
 
 		expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
@@ -70,7 +77,7 @@ describe('challenges store', () => {
 
 	describe('markCompleted', () => {
 		it('flips an existing recorded challenge to completed', async () => {
-			get.mockResolvedValue([challenge(3, false)]);
+			mockFetchSocket.mockResolvedValue([challenge(3, false)]);
 			await playerChallenges.load();
 
 			playerChallenges.markCompleted(3);
@@ -85,7 +92,7 @@ describe('challenges store', () => {
 		});
 
 		it('is a no-op when the challenge is already completed (no duplicate row)', async () => {
-			get.mockResolvedValue([challenge(3, true)]);
+			mockFetchSocket.mockResolvedValue([challenge(3, true)]);
 			await playerChallenges.load();
 
 			playerChallenges.markCompleted(3);
@@ -95,14 +102,14 @@ describe('challenges store', () => {
 	});
 
 	it('reset() clears state and allows a fresh load', async () => {
-		get.mockResolvedValue([challenge(3, true)]);
+		mockFetchSocket.mockResolvedValue([challenge(3, true)]);
 		await playerChallenges.load();
 
 		playerChallenges.reset();
 		expect(playerChallenges.loaded).toBe(false);
 		expect(playerChallenges.all).toEqual([]);
 
-		get.mockResolvedValue([challenge(4, true)]);
+		mockFetchSocket.mockResolvedValue([challenge(4, true)]);
 		await playerChallenges.load();
 		expect(playerChallenges.isChallengeCompleted(4)).toBe(true);
 	});

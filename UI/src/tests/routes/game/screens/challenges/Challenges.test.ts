@@ -8,10 +8,10 @@ import {
 	type IPlayerChallenge
 } from '$lib/api';
 
-// Challenges fetches the player's progress via ApiRequest and resolves the
-// challenge catalogue + reward pools from staticData.
-const { mockGet, mockToastError, staticData } = vi.hoisted(() => ({
-	mockGet: vi.fn(),
+// Challenges fetches the player's progress over the socket (via the playerChallenges store) and
+// resolves the challenge catalogue + reward pools from staticData.
+const { mockFetchSocket, mockToastError, staticData } = vi.hoisted(() => ({
+	mockFetchSocket: vi.fn(),
 	mockToastError: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any
@@ -19,7 +19,7 @@ const { mockGet, mockToastError, staticData } = vi.hoisted(() => ({
 
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/api')>();
-	return { ...actual, ApiRequest: { get: mockGet } };
+	return { ...actual, fetchSocketData: mockFetchSocket };
 });
 // Override staticData + toastError; keep the other real stores (the screen also
 // uses registerTooltipComponent, and $components pulls in the engine/log store).
@@ -52,8 +52,8 @@ beforeEach(() => {
 		challenge({ id: 1, name: 'First Blood', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 })
 	];
 	mockToastError.mockClear();
-	mockGet.mockClear();
-	mockGet.mockResolvedValue(PLAYER_CHALLENGES);
+	mockFetchSocket.mockClear();
+	mockFetchSocket.mockResolvedValue(PLAYER_CHALLENGES);
 });
 
 afterEach(() => cleanup());
@@ -65,12 +65,12 @@ describe('Challenges screen', () => {
 		// The type rail's "Overview" entry only renders in the normal body.
 		expect(await screen.findByText('Overview')).toBeTruthy();
 		expect(screen.queryByTestId('challenges-error')).toBeNull();
-		expect(mockGet).toHaveBeenCalledWith('Challenges/Player');
+		expect(mockFetchSocket).toHaveBeenCalledWith('GetPlayerChallenges');
 		expect(mockToastError).not.toHaveBeenCalled();
 	});
 
 	it('renders normally (no error) for a player with no recorded progress', async () => {
-		mockGet.mockResolvedValue([]);
+		mockFetchSocket.mockResolvedValue([]);
 		render(Challenges);
 		// A genuine empty result is the normal "no progress yet" view, not an error.
 		expect(await screen.findByText('Overview')).toBeTruthy();
@@ -79,7 +79,7 @@ describe('Challenges screen', () => {
 	});
 
 	it('surfaces an error (not the zero-progress view) when the fetch fails', async () => {
-		mockGet.mockRejectedValue(new Error('network down'));
+		mockFetchSocket.mockRejectedValue(new Error('network down'));
 		render(Challenges);
 		expect(await screen.findByTestId('challenges-error')).toBeTruthy();
 		// A failed load must not masquerade as a player with zero progress.
