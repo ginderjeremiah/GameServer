@@ -2,13 +2,16 @@
 	{#each battler.skills as skill, index (skill?.id ?? -index - 1)}
 		<div class="skill-column">
 			{#if skill}
+				<!-- Charge sweep/ready computed once per skill per frame (this row re-renders
+				     every animation frame for the player, enemy, and boss cards). -->
+				{@const charge = chargeState(skill)}
 				<!-- A focusable button so the per-skill combat tooltip is reachable by keyboard
 				     and screen reader, not just on hover. Its accessible name is the icon's alt. -->
 				<button
 					type="button"
 					class="skill-slot"
-					class:ready={isReady(skill)}
-					style:--skill-sweep="{skillSweep(skill)}deg"
+					class:ready={charge.ready}
+					style:--skill-sweep="{charge.sweep}deg"
 					style:--pulse-color={pulseColor}
 					onmousemove={handleMouseMove}
 					onmouseenter={(ev) => handleEnter(ev, index)}
@@ -18,14 +21,14 @@
 				>
 					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
 					<div class="cooldown-overlay"></div>
-					{#if isReady(skill)}
+					{#if charge.ready}
 						<div class="ready-glow"></div>
 					{/if}
 					{#if skill.effects.length > 0}
 						<div class="effect-badge-anchor"><SkillEffectBadge /></div>
 					{/if}
 				</button>
-				<span class="skill-label" class:ready-label={isReady(skill)}>{skill.name}</span>
+				<span class="skill-label" class:ready-label={charge.ready}>{skill.name}</span>
 			{:else}
 				<div class="skill-slot" aria-hidden="true"></div>
 			{/if}
@@ -36,7 +39,7 @@
 
 <script lang="ts">
 import type { Battler, Skill } from '$lib/battle';
-import { formatNum, tintColor } from '$lib/common';
+import { tintColor } from '$lib/common';
 import {
 	anchorPosition,
 	registerTooltipComponent,
@@ -94,12 +97,12 @@ const handleLeave = (index: number) => {
 	}
 };
 
-const skillPercent = (skill: Skill) => +formatNum((100 * skill.renderChargeTime) / skill.cooldownMs);
-
-const skillSweep = (skill: Skill) => (skillPercent(skill) / 100) * 360;
-
-const isReady = (skill: Skill) => {
-	return skillPercent(skill) >= 99.9;
+/** Per-frame charge projection for a slot, computed once per skill from the raw charge
+ *  fraction — no string round-trip. `sweep` feeds the cooldown conic-gradient (in degrees)
+ *  and `ready` thresholds the (clamped-to-1) fraction at 99.9%. */
+const chargeState = (skill: Skill) => {
+	const fraction = skill.renderChargeTime / skill.cooldownMs;
+	return { sweep: fraction * 360, ready: fraction >= 0.999 };
 };
 </script>
 
