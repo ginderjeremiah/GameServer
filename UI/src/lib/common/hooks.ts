@@ -19,7 +19,9 @@ export const createHook = <T extends unknown[] = []>() => {
 
 		promiseResolvers = [];
 
-		for (const tracker of trackers) {
+		// Iterate over a snapshot so a subscriber unhooking during dispatch
+		// (which splices `trackers`) can't cause a sibling to be skipped.
+		for (const tracker of [...trackers]) {
 			tracker.callback(...data, tracker.unhook);
 		}
 	};
