@@ -25,18 +25,32 @@ namespace Game.Api.Sockets
         // race against an in-flight pub/sub command during socket teardown.
         private readonly SemaphoreSlim _commandLock = new(1, 1);
 
+        /// <summary>
+        /// Per-command execution budget. A command wedged on a slow or dead dependency would otherwise hold
+        /// the command lock — and thus the player's whole command stream — indefinitely (today the socket
+        /// only recovers when the 60s inactivity check closes it because no responses flow). On expiry the
+        /// command is abandoned with a timeout response so the read/pub-sub loop keeps draining. Sits below
+        /// the client's 30s per-request backstop (api-socket.ts) so the server's own timeout reaches the
+        /// client first, and well above the 5s Redis / Npgsql command timeouts so it only catches genuine
+        /// hangs rather than pre-empting an ordinary slow call.
+        /// </summary>
+        private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(25);
+
+        private readonly TimeSpan _commandTimeout;
+
         private DateTime _lastResponse = DateTime.UtcNow;
 
         public string Id => _context.SocketId;
         public int PlayerId => _context.PlayerId;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Func<Task> onActivity)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Func<Task> onActivity, TimeSpan? commandTimeout = null)
         {
             _context = context;
             _commandFactory = commandFactory;
             _scopeFactory = scopeFactory;
             _logger = logger;
             _onActivity = onActivity;
+            _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
         }
 
         public void Listen()
@@ -49,13 +63,38 @@ namespace Game.Api.Sockets
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             await _commandLock.WaitAsync();
+
+            // Cancels at the budget, both signalling cancellation-aware commands to unwind cooperatively and
+            // bounding the WaitAsync below for commands that ignore the token.
+            var cts = new CancellationTokenSource(_commandTimeout);
+            var lockHandedOff = false;
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var command = _commandFactory.CreateCommand(commandInfo, scope);
-                var response = await command.ExecuteAsync(_context);
-                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-                await _context.SendData(response);
+                var commandTask = RunCommand(commandInfo, cts.Token);
+                try
+                {
+                    // Bound the wait without abandoning the underlying task: WaitAsync returns when the
+                    // command settles, or throws once the budget elapses (the command keeps running).
+                    await commandTask.WaitAsync(cts.Token);
+                }
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                {
+                    // Budget elapsed. Surface a timeout so the client — and the read/pub-sub loop — isn't
+                    // left hanging, but do NOT release the command lock here: the abandoned task may still be
+                    // mid read-modify-write of the shared cached Player, and releasing would let the next
+                    // command race it (the lost-update class the per-socket command lock prevents — see
+                    // docs/backend.md). Hand the lock to a continuation that releases it once the abandoned
+                    // task finally settles.
+                    _logger.LogWarning("Socket command timed out after {Timeout} and was abandoned: {CommandInfo} on socket: {Id}", _commandTimeout, commandInfo, Id);
+                    await _context.SendData(new ApiSocketResponse
+                    {
+                        Id = commandInfo.Id,
+                        Name = commandInfo.Name,
+                        Error = "Command timed out."
+                    });
+                    ReleaseCommandLockWhenSettled(commandTask, cts, commandInfo);
+                    lockHandedOff = true;
+                }
             }
             catch (Exception ex)
             {
@@ -68,8 +107,43 @@ namespace Game.Api.Sockets
             }
             finally
             {
-                _commandLock.Release();
+                if (!lockHandedOff)
+                {
+                    cts.Dispose();
+                    _commandLock.Release();
+                }
             }
+        }
+
+        private async Task RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var command = _commandFactory.CreateCommand(commandInfo, scope);
+            var response = await command.ExecuteAsync(_context, cancellationToken);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            await _context.SendData(response);
+        }
+
+        /// <summary>
+        /// Releases the command lock once an abandoned (timed-out) command finally settles, preserving the
+        /// per-socket serialization guarantee: the next command waits on the lock rather than racing the
+        /// still-running one. The continuation runs immediately when the command already completed (e.g. a
+        /// cooperative cancellation), so this is used for both the cooperative and the wedged paths.
+        /// </summary>
+        private void ReleaseCommandLockWhenSettled(Task commandTask, CancellationTokenSource cts, SocketCommandInfo commandInfo)
+        {
+            _ = commandTask.ContinueWith(task =>
+            {
+                // The client already received a timeout response; a cooperative cancellation surfaces here as
+                // the expected OperationCanceledException, while any other fault is genuine and worth logging.
+                if (task.Exception is { } fault && fault.InnerExceptions.Any(e => e is not OperationCanceledException))
+                {
+                    _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
+                }
+
+                cts.Dispose();
+                _commandLock.Release();
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
 
         private async Task InactivityCheckerLoop()

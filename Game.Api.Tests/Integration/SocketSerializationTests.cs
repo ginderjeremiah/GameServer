@@ -82,22 +82,5 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(2, countingScopeFactory.ScopesCreated);
             Assert.Equal(1, socket.MaxConcurrentSends);
         }
-
-        /// <summary>
-        /// Wraps a real scope factory to count how many work scopes have been opened, so a test can tell
-        /// whether a second command began executing while a first still held the per-socket command lock.
-        /// </summary>
-        private sealed class CountingServiceScopeFactory(IServiceScopeFactory inner) : IServiceScopeFactory
-        {
-            private int _scopesCreated;
-
-            public int ScopesCreated => Volatile.Read(ref _scopesCreated);
-
-            public IServiceScope CreateScope()
-            {
-                Interlocked.Increment(ref _scopesCreated);
-                return inner.CreateScope();
-            }
-        }
     }
 }

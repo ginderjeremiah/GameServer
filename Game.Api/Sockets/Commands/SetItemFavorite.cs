@@ -20,7 +20,7 @@ namespace Game.Api.Sockets.Commands
             _playerService = playerService;
         }
 
-        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
+        public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = await context.Session.LoadPlayer();
             var success = await _playerService.SetFavorite(player, Parameters.ItemId, Parameters.Favorite);

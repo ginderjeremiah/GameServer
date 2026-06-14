@@ -27,7 +27,7 @@ namespace Game.Api.Sockets.Commands
             _playerService = playerService;
         }
 
-        public override async Task<ApiSocketResponse<List<BattlerAttribute>>> HandleExecuteAsync(SocketContext context)
+        public override async Task<ApiSocketResponse<List<BattlerAttribute>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = await context.Session.LoadPlayer();
             var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>());

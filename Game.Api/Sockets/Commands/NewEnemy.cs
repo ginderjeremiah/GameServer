@@ -17,7 +17,7 @@ namespace Game.Api.Sockets.Commands
             _logger = logger;
         }
 
-        public override async Task<ApiSocketResponse<NewEnemyModel>> HandleExecuteAsync(SocketContext context)
+        public override async Task<ApiSocketResponse<NewEnemyModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
             var state = context.Session.PlayerState;

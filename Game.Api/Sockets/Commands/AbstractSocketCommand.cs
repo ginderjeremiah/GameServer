@@ -8,7 +8,7 @@ namespace Game.Api.Sockets.Commands
         public string? Id { get; set; }
         public abstract string Name { get; set; }
 
-        public virtual Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
+        public virtual Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var result = Execute(context);
             return Task.FromResult(result);
@@ -64,9 +64,9 @@ namespace Game.Api.Sockets.Commands
 
     public abstract class AbstractSocketCommandWithResponseData<T> : AbstractSocketCommand
     {
-        public sealed override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context)
+        public sealed override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return await HandleExecuteAsync(context);
+            return await HandleExecuteAsync(context, cancellationToken);
         }
 
         public sealed override ApiSocketResponse Execute(SocketContext context)
@@ -74,7 +74,7 @@ namespace Game.Api.Sockets.Commands
             return base.Execute(context);
         }
 
-        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync(SocketContext context)
+        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var result = HandleExecute(context);
             return Task.FromResult(result);

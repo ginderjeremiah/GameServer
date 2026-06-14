@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Text;
 
 namespace Game.TestInfrastructure.Helpers
 {
@@ -16,6 +17,8 @@ namespace Game.TestInfrastructure.Helpers
         private readonly TimeSpan _sendDuration;
         private readonly TaskCompletionSource _firstSendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly object _lock = new();
+        private readonly List<byte> _pendingMessage = [];
+        private readonly List<string> _sentMessages = [];
         private int _activeSends;
 
         /// <summary>Completes once the first <see cref="SendAsync"/> call has begun.</summary>
@@ -26,6 +29,18 @@ namespace Game.TestInfrastructure.Helpers
 
         /// <summary>The total number of completed sends.</summary>
         public int CompletedSends { get; private set; }
+
+        /// <summary>The fully-sent messages, reassembled from their chunks (one entry per end-of-message).</summary>
+        public IReadOnlyList<string> SentMessages
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _sentMessages.ToList();
+                }
+            }
+        }
 
         /// <param name="sendGate">When supplied, each send awaits this task before completing, parking the
         /// caller inside the send. When null, each send instead lingers for <paramref name="sendDuration"/>
@@ -39,6 +54,7 @@ namespace Game.TestInfrastructure.Helpers
 
         public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
         {
+            var chunk = buffer.ToArray();
             lock (_lock)
             {
                 _activeSends++;
@@ -63,6 +79,12 @@ namespace Game.TestInfrastructure.Helpers
                 {
                     _activeSends--;
                     CompletedSends++;
+                    _pendingMessage.AddRange(chunk);
+                    if (endOfMessage)
+                    {
+                        _sentMessages.Add(Encoding.UTF8.GetString(_pendingMessage.ToArray()));
+                        _pendingMessage.Clear();
+                    }
                 }
             }
         }

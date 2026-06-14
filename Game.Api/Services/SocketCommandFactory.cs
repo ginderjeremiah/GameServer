@@ -24,7 +24,7 @@ namespace Game.Api.Services
         /// The caller is responsible for disposing the returned <see cref="IServiceScope"/>
         /// after the command has executed (and after any post-execution work such as UoW commit).
         /// </summary>
-        public AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
+        public virtual AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
         {
             if (_socketCommandGenerators.TryGetValue(commandInfo.Name, out var generator))
             {
