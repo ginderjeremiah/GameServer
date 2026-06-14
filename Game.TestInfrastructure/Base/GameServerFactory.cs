@@ -41,6 +41,7 @@ namespace Game.TestInfrastructure.Base
                     ["Jwt:SigningKey"] = TestAuthHelper.TestSigningKey,
                     ["Jwt:Issuer"] = Game.Api.Constants.SERVER_PRINCIPAL,
                     ["Jwt:Audience"] = Game.Api.Constants.SERVER_PRINCIPAL,
+                    ["Cors:AllowedOrigins:0"] = "http://localhost:5174",
                     ["DataAccessOptions:DatabaseSystem"] = "1",
                     ["DataAccessOptions:EnableSensitiveLogging"] = "true",
                     ["DataAccessOptions:CacheSystem"] = "0",
