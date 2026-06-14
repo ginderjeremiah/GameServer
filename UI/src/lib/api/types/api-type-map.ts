@@ -28,7 +28,6 @@ import type {
 	ISetUserRolesData,
 	ISetZoneEnemiesData,
 	ISkill,
-	IStatisticType,
 	ITag,
 	ITagCategory,
 	IUserActionData,
@@ -69,7 +68,6 @@ export type ApiResponseTypes = {
 	'Login/Status': IPlayerData;
 	'Player': IPlayerData;
 	'Statistics': IPlayerStatistic[];
-	'Statistics/StatisticTypes': IStatisticType[];
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 };
