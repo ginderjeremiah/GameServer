@@ -24,7 +24,7 @@ namespace Game.Api.Sockets.Commands
 
         public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            var player = await context.Session.LoadPlayer();
+            var player = context.Session.Player;
             var success = await _playerService.SetSelectedSkills(player, Parameters);
 
             return success ? Success() : Error("Failed to set selected skills.");

@@ -15,12 +15,14 @@ namespace Game.Api.Controllers
         SessionService sessionService,
         AccountService accountService,
         LoginTrackingService loginTrackingService,
-        SocketManagerService socketManager) : ControllerBase
+        SocketManagerService socketManager,
+        PlayerService playerService) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly AccountService _accountService = accountService;
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
         private readonly SocketManagerService _socketManager = socketManager;
+        private readonly PlayerService _playerService = playerService;
 
         [AllowAnonymous]
         [HttpPost("/api/[controller]")]
@@ -80,7 +82,8 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in");
             }
 
-            var player = await _sessionService.LoadPlayer();
+            var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId)
+                ?? throw new InvalidOperationException("Player data not loaded.");
             return ApiResponse.Success(PlayerData.FromPlayer(player));
         }
 

@@ -26,7 +26,7 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<NewEnemyModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var state = context.Session.PlayerState;
-            var player = await context.Session.LoadPlayer();
+            var player = context.Session.Player;
             var zoneId = Parameters.ZoneId ?? player.CurrentZoneId;
 
             var result = await _battleService.StartBossBattle(player, state, zoneId);
