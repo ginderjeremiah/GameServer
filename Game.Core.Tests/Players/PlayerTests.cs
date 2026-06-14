@@ -119,6 +119,56 @@ namespace Game.Core.Tests.Players
             Assert.Equal(0, player.Exp);
         }
 
+        // ── GrantExp — bounded against pathological input ────────────────────
+
+        [Fact]
+        public void GrantExp_HugeGrant_ClampsExpAndBoundsTheLevelUpLoop()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            // A tampered/replayed value far beyond MaxExpPerGrant: the grant is clamped to the ceiling,
+            // so it applies the same as MaxExpPerGrant and produces a finite, bounded set of level-ups
+            // rather than spinning the loop on int.MaxValue.
+            player.GrantExp(int.MaxValue);
+
+            var clamped = MakePlayer(level: 1, exp: 0);
+            clamped.GrantExp(GameConstants.MaxExpPerGrant);
+
+            Assert.Equal(clamped.Level, player.Level);
+            Assert.Equal(clamped.Exp, player.Exp);
+            // The event burst is bounded: one event per level gained, with the same finite count both ways.
+            Assert.Equal(
+                clamped.DomainEvents.OfType<PlayerLeveledUpEvent>().Count(),
+                player.DomainEvents.OfType<PlayerLeveledUpEvent>().Count());
+        }
+
+        [Fact]
+        public void GrantExp_MaxExpPerGrant_ProducesBoundedLevelUpCount()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            player.GrantExp(GameConstants.MaxExpPerGrant);
+
+            // The per-level cost grows linearly (Level * ExpPerLevel), so a clamped grant can only ever
+            // produce a small, finite number of levels — proving the loop is bounded rather than the
+            // amount/ExpPerLevel runaway an unclamped grant would allow.
+            var levelUps = player.DomainEvents.OfType<PlayerLeveledUpEvent>().Count();
+            Assert.True(levelUps is > 0 and < 100, $"Expected a bounded level-up count, got {levelUps}.");
+        }
+
+        [Fact]
+        public void GrantExp_NegativeAmount_IsClampedToZeroAndDoesNotReduceExp()
+        {
+            var player = MakePlayer(level: 2, exp: 50);
+
+            player.GrantExp(-1000);
+
+            // A negative grant is clamped to 0, so exp is unchanged and no level/de-level occurs.
+            Assert.Equal(2, player.Level);
+            Assert.Equal(50, player.Exp);
+            Assert.Empty(player.DomainEvents.OfType<PlayerLeveledUpEvent>());
+        }
+
         // ── UnlockItem ──────────────────────────────────────────────────────
 
         [Fact]

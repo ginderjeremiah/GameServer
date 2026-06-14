@@ -47,15 +47,20 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Awards experience to the player. Raises <see cref="PlayerLeveledUpEvent"/> if a
-        /// level-up occurs.
+        /// Awards experience to the player. The grant is clamped to <c>[0, MaxExpPerGrant]</c> so a
+        /// tampered/replayed value can't drive an unbounded level-up loop on the serialized per-player
+        /// command path; legitimate per-battle exp is already far below that ceiling. Raises one
+        /// <see cref="PlayerLeveledUpEvent"/> per level gained, so the per-level event burst is bounded
+        /// along with the loop.
         /// </summary>
         public void GrantExp(int amount)
         {
-            Exp += amount;
-            while (Exp >= Level * GameConstants.ExpPerLevel)
+            Exp += Math.Clamp(amount, 0, GameConstants.MaxExpPerGrant);
+            // Guard the threshold against a non-positive level so a pre-initialized Level of 0 can't make
+            // the threshold 0 and spin the loop.
+            while (Exp >= Math.Max(1, Level) * GameConstants.ExpPerLevel)
             {
-                Exp -= Level * GameConstants.ExpPerLevel;
+                Exp -= Math.Max(1, Level) * GameConstants.ExpPerLevel;
                 Level++;
                 StatPoints.StatPointsGained += GameConstants.StatPointsPerLevel;
                 RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
