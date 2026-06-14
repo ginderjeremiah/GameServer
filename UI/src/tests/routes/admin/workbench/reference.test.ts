@@ -313,13 +313,13 @@ describe('tag lookups and colour', () => {
 		]);
 	});
 
-	it('derives a deterministic low-chroma colour per category', () => {
+	it('derives a deterministic themeable colour per category', () => {
 		const a = reference.tagColor(100);
 		const b = reference.tagColor(100);
 		expect(a).toEqual(b); // deterministic
-		expect(a.fg).toMatch(/^oklch\(/);
-		expect(a.bd).toContain('/ 0.45');
-		expect(a.bg).toContain('/ 0.12');
+		expect(a.fg).toMatch(/^oklch\(var\(--tag-lightness\) var\(--tag-chroma\)/);
+		expect(a.bd).toContain('/ var(--tag-border-alpha))');
+		expect(a.bg).toContain('/ var(--tag-bg-alpha))');
 		// Different categories yield different hues.
 		expect(reference.tagColor(200).fg).not.toBe(a.fg);
 	});
