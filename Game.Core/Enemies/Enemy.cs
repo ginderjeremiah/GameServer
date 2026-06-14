@@ -66,7 +66,10 @@ namespace Game.Core.Enemies
         public void SetBattleSkills(IReadOnlyList<int> skillIds)
         {
             var available = AvailableSkills.ToDictionary(skill => skill.Id);
-            _battleSkills = [.. skillIds.Select(id => available[id])];
+            _battleSkills = [.. skillIds.Select(id => available.TryGetValue(id, out var skill)
+                ? skill
+                : throw new InvalidOperationException(
+                    $"Cannot restore battle skill {id}: it is not among enemy {Id}'s available skills."))];
         }
     }
 }
