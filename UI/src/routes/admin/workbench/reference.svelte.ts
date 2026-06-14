@@ -14,15 +14,9 @@ import {
 	type ITag,
 	type ITagCategory
 } from '$lib/api';
-import { enumPairs, rarityColor as rarityVar, rarityLabel } from '$lib/common';
+import { enumPairs, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
 import { staticData } from '$stores';
 import type { SelectOption } from './entities/types';
-
-export interface TagColor {
-	fg: string;
-	bd: string;
-	bg: string;
-}
 
 const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 	pairs.map((p) => ({ value: p.id, text: p.name }));
@@ -185,15 +179,8 @@ class WorkbenchReference {
 	tagById = (id: number) => this.tags.find((t) => t.id === id);
 	tagsByCategory = (catId: number) => this.tags.filter((t) => t.tagCategoryId === catId);
 
-	/** Deterministic, well-spread low-chroma hue per category so the set is scannable. */
-	tagColor = (catId: number): TagColor => {
-		const hue = Math.round((catId * 137.508) % 360);
-		return {
-			fg: `oklch(0.85 0.06 ${hue})`,
-			bd: `oklch(0.85 0.06 ${hue} / 0.45)`,
-			bg: `oklch(0.85 0.06 ${hue} / 0.12)`
-		};
-	};
+	/** Themeable tag-category accent trio (procedural hue, `--tag-*` lightness/chroma/alpha). */
+	tagColor = (catId: number) => tagColor(catId);
 
 	/** Items and mods that reference a tag — drives the read-only Tags "Usage" tab. */
 	tagUsage = (tagId: number) => {

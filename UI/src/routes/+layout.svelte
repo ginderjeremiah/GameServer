@@ -195,6 +195,14 @@ $effect(() => {
 	--category-weapon: #{colors.$category-weapon};
 	--category-accessory: #{colors.$category-accessory};
 
+	// Tag-category accents (workbench tag UI). The hue is procedural per category,
+	// but the oklch lightness/chroma and border/background alphas are themeable here.
+	// Consumed via the tagColor helper in $lib/common/tag-color.
+	--tag-lightness: 0.85;
+	--tag-chroma: 0.06;
+	--tag-border-alpha: 0.45;
+	--tag-bg-alpha: 0.12;
+
 	// Challenge-type accents (one per EChallengeType). Consumed via the helpers
 	// in $lib/common/challenge-type.
 	--challenge-enemies-killed: #{colors.$challenge-enemies-killed};
