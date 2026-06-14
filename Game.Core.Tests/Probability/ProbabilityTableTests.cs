@@ -29,6 +29,122 @@ namespace Game.Core.Tests.Probability
         }
 
         [Fact]
+        public void SingleZeroWeightList_ProducesValueFromList()
+        {
+            List<WeightedValue<int>> list = [new WeightedValue<int>(42, 0)];
+            var table = new ProbabilityTable<int>(list);
+
+            Assert.Equal(42, table.GetRandomValue());
+        }
+
+        [Fact]
+        public void AllZeroWeights_ProducesUniformDistribution()
+        {
+            // An all-zero set makes the average weight zero; entries should fall back to uniform.
+            List<WeightedValue<int>> list = [
+                new WeightedValue<int>(0, 0),
+                new WeightedValue<int>(1, 0),
+                new WeightedValue<int>(2, 0),
+            ];
+            var table = new ProbabilityTable<int>(list);
+            var buckets = list.Select(x => 0L).ToList();
+            var iterations = 300_000;
+
+            for (int i = 0; i < iterations; i++)
+            {
+                buckets[table.GetRandomValue()]++;
+            }
+
+            for (int i = 0; i < buckets.Count; i++)
+            {
+                var sampleProbability = (double)buckets[i] / iterations;
+                Assert.True(Math.Abs(sampleProbability - (1.0 / buckets.Count)) < 0.01);
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(UnevenWeightSets))]
+        public void UnevenlyDividingWeights_AlwaysProduceValidIndex(WeightedValue<int>[] entries)
+        {
+            // Unevenly-dividing weights previously risked leaving an unpopulated _values slot,
+            // which would surface as a NullReferenceException or an out-of-range alias lookup.
+            var table = new ProbabilityTable<int>([.. entries]);
+            var validValues = entries.Select(x => x.Value).ToHashSet();
+
+            for (int i = 0; i < 500_000; i++)
+            {
+                var value = table.GetRandomValue();
+                Assert.Contains(value, validValues);
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(UnevenWeightSets))]
+        public void UnevenlyDividingWeights_ProduceReasonableDistribution(WeightedValue<int>[] entries)
+        {
+            var list = entries.ToList();
+            var table = new ProbabilityTable<int>(list);
+            var buckets = list.Select(x => 0L).ToList();
+            var iterations = 1_000_000;
+
+            for (int i = 0; i < iterations; i++)
+            {
+                buckets[table.GetRandomValue()]++;
+            }
+
+            AssertDistributionIsReasonable(list, buckets);
+        }
+
+        public static IEnumerable<object[]> UnevenWeightSets()
+        {
+            // Three thirds: 1/3 cannot be represented exactly, so residual weights never land on 1.0.
+            yield return new object[]
+            {
+                new[]
+                {
+                    new WeightedValue<int>(0, 1),
+                    new WeightedValue<int>(1, 1),
+                    new WeightedValue<int>(2, 1),
+                },
+            };
+            // Prime weights over a prime total produce repeating-decimal normalized weights.
+            yield return new object[]
+            {
+                new[]
+                {
+                    new WeightedValue<int>(0, 1),
+                    new WeightedValue<int>(1, 2),
+                    new WeightedValue<int>(2, 4),
+                    new WeightedValue<int>(3, 7),
+                    new WeightedValue<int>(4, 9),
+                    new WeightedValue<int>(5, 11),
+                },
+            };
+            // A heavy skew mixed with several tiny weights stresses the small/big rebalancing.
+            yield return new object[]
+            {
+                new[]
+                {
+                    new WeightedValue<int>(0, 997),
+                    new WeightedValue<int>(1, 1),
+                    new WeightedValue<int>(2, 1),
+                    new WeightedValue<int>(3, 1),
+                },
+            };
+            // Zero-weight entries should never be returned but must not break construction.
+            yield return new object[]
+            {
+                new[]
+                {
+                    new WeightedValue<int>(0, 0),
+                    new WeightedValue<int>(1, 3),
+                    new WeightedValue<int>(2, 0),
+                    new WeightedValue<int>(3, 5),
+                },
+            };
+        }
+
+        [Fact]
         public void MultiInitializationList_ProducesReasonableDistribution()
         {
             var list = SetupMultiElementList();

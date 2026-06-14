@@ -1,20 +1,26 @@
-﻿namespace Game.Core.Probability
+namespace Game.Core.Probability
 {
     /// <summary>
     /// A class for generating a random value based on a collection of values with probability weights.
     /// </summary>
     public class ProbabilityTable<T>
     {
+        // Tolerance used when classifying normalized weights so that values which are
+        // mathematically equal to the average but land just off 1.0 due to floating-point
+        // rounding are still treated as "exactly average" rather than small/big.
+        private const double Epsilon = 1e-9;
+
         private readonly ProbabilityData<T>[] _values;
         private readonly T[] _aliases;
 
         /// <summary>
-        /// Generates a probability table based on a collection of <see cref="WeightedValue{T}"/> objects.
+        /// Generates a probability table based on a collection of <see cref="WeightedValue{T}"/> objects
+        /// using Vose's alias method.
         /// </summary>
-        /// <param name="values"></param>
+        /// <param name="values">The weighted values to build the table from.</param>
         public ProbabilityTable(IEnumerable<WeightedValue<T>> values)
         {
-            // Convert to list to avoid repeated enumeration of a potential linq expression
+            // Convert to list to avoid repeated enumeration of a potential linq expression.
             var valueList = values.ToList();
 
             if (valueList.Count <= 0)
@@ -23,14 +29,13 @@
             }
 
             _values = new ProbabilityData<T>[valueList.Count];
-            _aliases = new T[_values.Length];
-            var valuesCurrentIndex = 0;
-            var aliasesCurrentIndex = 0;
+            _aliases = new T[valueList.Count];
             var averageWeight = valueList.Average(x => x.Weight);
-            var smallList = new List<NormalizedWeightedValue<T>>(valueList.Count); //List to hold values where probability is less than average;
-            var bigList = new List<NormalizedWeightedValue<T>>(valueList.Count); //List to hold values where probability is greater than average;
 
-            // sort each value into either the small list, big list, or final list (_values) based on weight relative to average;
+            // Lists hold values whose normalized weight is below/at-or-above the average (1.0).
+            var smallList = new List<NormalizedWeightedValue<T>>(valueList.Count);
+            var bigList = new List<NormalizedWeightedValue<T>>(valueList.Count);
+
             foreach (var value in valueList)
             {
                 if (value.Weight < 0)
@@ -38,15 +43,11 @@
                     throw new ArgumentException($"{nameof(values)} cannot contain an element with a negative weight.", nameof(values));
                 }
 
-                var weight = value.Weight / averageWeight;
-                if (weight < 1)
+                // When every weight is zero the average is zero; treat all entries as uniform (weight 1.0).
+                var weight = averageWeight == 0 ? 1.0 : value.Weight / averageWeight;
+                if (weight < 1.0 - Epsilon)
                 {
                     smallList.Add(new(value.Value, weight));
-                }
-                else if (weight == 1.0)
-                {
-                    _values[valuesCurrentIndex] = new ProbabilityData<T>(value.Value, 1.0, -1);
-                    valuesCurrentIndex++;
                 }
                 else
                 {
@@ -54,47 +55,46 @@
                 }
             }
 
-            if (bigList.Count == 0)
-            {
-                return;
-            }
+            var valuesIndex = 0;
+            var aliasesIndex = 0;
 
-            var bigIndex = 0;
-
-            // For each element in the small list, fill its missing weight from an element in the bigList.
-            // Don't use foreach because smallList will have items added to it as we take weight from items in the bigList.
-            for (int smallIndex = 0; smallIndex < smallList.Count; smallIndex++)
+            // While both lists have entries, pair a small entry with a big one to fill a full column.
+            while (smallList.Count > 0 && bigList.Count > 0)
             {
-                if (bigIndex < bigList.Count)
+                var small = smallList[^1];
+                smallList.RemoveAt(smallList.Count - 1);
+                var big = bigList[^1];
+                bigList.RemoveAt(bigList.Count - 1);
+
+                _values[valuesIndex] = new ProbabilityData<T>(small.Value, small.NormalizedWeight, aliasesIndex);
+                valuesIndex++;
+                _aliases[aliasesIndex] = big.Value;
+                aliasesIndex++;
+
+                // Reduce the big entry by the portion donated to the small column and requeue it.
+                big.NormalizedWeight -= 1.0 - small.NormalizedWeight;
+                if (big.NormalizedWeight < 1.0 - Epsilon)
                 {
-                    var currentBig = bigList[bigIndex];
-                    var currentSmall = smallList[smallIndex];
-
-                    // Remove portion of big probability to give to small.
-                    currentBig.NormalizedWeight -= 1.0 - currentSmall.NormalizedWeight;
-
-                    // Add new entry in probabilities table for small and alias for big.
-                    _values[valuesCurrentIndex] = new ProbabilityData<T>(currentSmall.Value, currentSmall.NormalizedWeight, aliasesCurrentIndex);
-                    valuesCurrentIndex++;
-                    _aliases[aliasesCurrentIndex] = currentBig.Value;
-                    aliasesCurrentIndex++;
-
-                    // If big now has probability less than one than move to small list.
-                    if (currentBig.NormalizedWeight < 1.0)
-                    {
-                        bigIndex++;
-                        smallList.Add(currentBig);
-                    }
+                    smallList.Add(big);
                 }
                 else
                 {
-                    _values[valuesCurrentIndex] = new ProbabilityData<T>(smallList[smallIndex].Value, 1.0, -1);
+                    bigList.Add(big);
                 }
             }
 
-            if (bigIndex < bigList.Count)
+            // Any remaining entries occupy a full column on their own (alias unused).
+            foreach (var big in bigList)
             {
-                _values[valuesCurrentIndex] = new ProbabilityData<T>(bigList[bigIndex].Value, 1.0, -1);
+                _values[valuesIndex] = new ProbabilityData<T>(big.Value, 1.0, -1);
+                valuesIndex++;
+            }
+
+            // Leftover small entries arise only from floating-point residue; they also fill a full column.
+            foreach (var small in smallList)
+            {
+                _values[valuesIndex] = new ProbabilityData<T>(small.Value, 1.0, -1);
+                valuesIndex++;
             }
         }
 
@@ -109,11 +109,16 @@
         public T GetRandomValue()
         {
             var rand = Random.Shared.NextDouble() * _values.Length;
-            var randInt = (int)double.Floor(rand);
-            var remainder = rand - randInt;
-            var data = _values[randInt];
+            // Clamp to a valid index in case NextDouble() returns a value close enough to 1.0
+            // that the scaled product rounds up to _values.Length.
+            var index = Math.Clamp((int)double.Floor(rand), 0, _values.Length - 1);
+            var remainder = rand - index;
+            var data = _values[index];
 
-            return remainder <= data.Probability ? data.Value : _aliases[data.AliasIndex];
+            // Use the alias only when the draw falls into the donated portion and an alias exists.
+            return remainder < data.Probability || data.AliasIndex < 0
+                ? data.Value
+                : _aliases[data.AliasIndex];
         }
     }
 }
