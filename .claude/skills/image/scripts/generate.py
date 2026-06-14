@@ -27,8 +27,11 @@ API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 # Friendly aliases -> real model ids. Any other value is passed through as-is.
 MODEL_ALIASES = {
-    "pro": "gemini-3-pro-image-preview",            # Nano Banana Pro
-    "nano-banana-pro": "gemini-3-pro-image-preview",
+    "pro": "gemini-3-pro-image",                    # Nano Banana Pro (GA)
+    "nano-banana-pro": "gemini-3-pro-image",
+    "nb2": "gemini-3.1-flash-image",               # Nano Banana 2 (GA)
+    "flash2": "gemini-3.1-flash-image",
+    "nano-banana-2": "gemini-3.1-flash-image",
     "flash": "gemini-2.5-flash-image",              # Nano Banana
     "nano-banana": "gemini-2.5-flash-image",
 }

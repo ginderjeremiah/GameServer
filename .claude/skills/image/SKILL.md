@@ -55,21 +55,26 @@ $env:GEMINI_API_KEY = [System.Environment]::GetEnvironmentVariable('GEMINI_API_K
 
 ## Models
 
-The user chose to support both, selectable per call via `--model`:
+Selectable per call via `--model` (aliases resolve to the current model ids):
 
 - **`flash`** (default) -> `gemini-2.5-flash-image` (the original Nano Banana).
-  Fast and cheap -- great for everyday generation and rapid iteration.
-- **`pro`** -> `gemini-3-pro-image-preview` (Nano Banana Pro). Best quality,
-  prompt adherence, and legible in-image text; supports `--size` (1K/2K/4K).
-  Slower and pricier -- reach for it via `--model pro` for a final polish.
+  Fast and cheap, and the only tier that returns a lossless **PNG** -- great for
+  everyday generation and rapid iteration.
+- **`nb2`** (a.k.a. `flash2`, `nano-banana-2`) -> `gemini-3.1-flash-image`
+  (Nano Banana 2). A generation newer than 2.5 flash with markedly better prompt
+  adherence; ~2× flash's cost but still cheap. Returns **JPEG**.
+- **`pro`** (a.k.a. `nano-banana-pro`) -> `gemini-3-pro-image` (Nano Banana Pro,
+  GA). Best quality and legible in-image text; supports `--size` (1K/2K/4K).
+  Slower and pricier. Returns **JPEG**.
 
-A full model id can also be passed through directly. Stick with the default
-`flash` unless the user wants top quality or large sizes, then use `--model pro`.
+A full model id can also be passed through directly. Default to `flash` for
+iteration; switch to `nb2` (or `pro`) for a higher-quality final render.
 
-Output format differs: **`flash` returns a lossless PNG, `pro` returns a JPEG.**
-This matters whenever you need clean, crisp edges — e.g. before chroma-keying a
-background out to transparency (JPEG's edge artifacts make keying messy), prefer
-`flash`. See [Transparent backgrounds](#transparent-backgrounds).
+**Output format: only `flash` returns PNG; `nb2` and `pro` return JPEG.** This
+matters when you need clean edges — e.g. before chroma-keying to transparency. But
+JPEG is *not* disqualifying: a hue key (see below and `docs/icon-art.md`) tolerates
+the JPEG ringing as long as the backdrop hue is far from the subject's colours.
+See [Transparent backgrounds](#transparent-backgrounds).
 
 ## Workflow
 
@@ -150,7 +155,8 @@ PNG, **chroma-key** it instead:
    ones. Explicitly tell the model to **fill the whole frame edge-to-edge** — it
    otherwise tends to frame the subject in a rounded panel, trapping un-keyable
    colour in the corners.
-2. Use **`--model flash`** so the output is a lossless PNG with clean edges.
+2. Prefer **`--model flash`** for a lossless PNG, but `nb2`/`pro` JPEG output also
+   keys cleanly via a hue key (the backdrop hue is far from the subject's colours).
 3. **Key the colour out** to transparency. In this repo, `image-editing/strip-bg.py`
    does this — a hue key (so it doesn't eat same-ish-hued subject colours) with
    `--trim-corners` and `--fill-holes` cleanup for the panel/hole artifacts above.
