@@ -1,6 +1,6 @@
 import { EItemCategory } from '$lib/api';
 import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager } from '$lib/engine';
-import { BattleAttributes, type Item, type ItemMod } from '$lib/battle';
+import { BattleAttributes, type AttributeEntry, type Item, type ItemMod } from '$lib/battle';
 import { staticData } from '$stores';
 
 /* ─── Static config ─────────────────────────────────────────────────────
@@ -42,10 +42,8 @@ export const SORTS: Record<SortKey, { label: string; cmp: (a: Item, b: Item) => 
 	category: { label: 'Category', cmp: (a, b) => a.itemCategoryId - b.itemCategoryId || a.name.localeCompare(b.name) }
 };
 
-export interface StatEntry {
-	name: string;
-	value: number;
-}
+/** The inventory's named-stat row, sharing the projection shape produced by `BattleAttributes`. */
+export type StatEntry = AttributeEntry;
 
 /* ─── Reactive view-model ────────────────────────────────────────────────
    Holds only the UI state for the inventory screen (sort/filter/selection).
