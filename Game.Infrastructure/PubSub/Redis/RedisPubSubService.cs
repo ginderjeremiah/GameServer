@@ -98,21 +98,7 @@ namespace Game.Infrastructure.PubSub.Redis
                 Name = $"RedisSubWorker_{queueName}"
             };
 
-            if (id is not null)
-            {
-                if (!_handles.TryAdd(id, (handle, worker)))
-                {
-                    worker.Dispose();
-                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
-                }
-            }
-
-            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
-
-            void handle(RedisChannel _c, RedisValue _v)
-            {
-                worker.Start();
-            }
+            await SubscribeWithWorker(channel, worker, id);
         }
 
         public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
@@ -124,16 +110,33 @@ namespace Game.Infrastructure.PubSub.Redis
                 Name = $"RedisSubWorker_{queueName}"
             };
 
-            if (id is not null)
+            await SubscribeWithWorker(channel, worker, id);
+        }
+
+        // Registers a queue worker's handle and subscribes it, keeping the two atomic: a SubscribeAsync failure
+        // rolls back the partial registration (removes the id and disposes the worker) so a transient Redis error
+        // can't wedge the id permanently with "a handle already exists" while nothing is actually subscribed (#655).
+        private async Task SubscribeWithWorker(string channel, BackgroundWorker worker, string? id)
+        {
+            if (id is not null && !_handles.TryAdd(id, (handle, worker)))
             {
-                if (!_handles.TryAdd(id, (handle, worker)))
-                {
-                    worker.Dispose();
-                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
-                }
+                worker.Dispose();
+                throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
             }
 
-            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+            try
+            {
+                await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+            }
+            catch
+            {
+                if (id is not null)
+                {
+                    _handles.TryRemove(id, out _);
+                }
+                worker.Dispose();
+                throw;
+            }
 
             void handle(RedisChannel _c, RedisValue _v)
             {
