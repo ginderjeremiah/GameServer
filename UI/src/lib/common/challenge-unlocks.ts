@@ -10,8 +10,6 @@ import { rarityColor, rarityLabel } from './rarity';
    and the rarity/accent/sub-label of a reward; richer surfaces (the challenges screen's
    `resolveReward`) build their preview on top of this resolution rather than re-deriving it. */
 
-export type UnlockRewardKind = 'item' | 'mod' | 'skill';
-
 interface UnlockRewardBase {
 	/** The reward's real name. Callers mask it themselves (e.g. `???`) while the challenge is sealed. */
 	name: string;
