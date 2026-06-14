@@ -554,7 +554,9 @@ namespace Game.Application.Tests.Services
             var defeat = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
             Assert.NotNull(defeat);
 
-            // The write-behind progress handler stages the clear; commit the unit of work and read it back.
+            // The write-behind handler wrote the clear to the progress cache (its source of truth); the
+            // command's unit-of-work commit still runs (now a no-op for progress), then read the stats back
+            // from the cache.
             await unitOfWork.CommitAsync();
             var stats = await progressRepo.GetStatistics(playerEntity.Id);
 
@@ -660,7 +662,9 @@ namespace Game.Application.Tests.Services
             // Starting a new battle abandons the in-progress one.
             await battleService.StartBattle(player, state, zoneId: zone.Id);
 
-            // The write-behind progress handler stages the abandon; commit the unit of work and read it back.
+            // The write-behind handler wrote the abandon to the progress cache (its source of truth); the
+            // command's unit-of-work commit still runs (now a no-op for progress), then read the stats back
+            // from the cache.
             await unitOfWork.CommitAsync();
             var stats = await progressRepo.GetStatistics(playerEntity.Id);
 

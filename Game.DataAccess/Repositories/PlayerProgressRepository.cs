@@ -1,143 +1,163 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
+using Game.Core;
+using Game.Core.Events;
 using Game.Core.Players;
 using Game.Core.Progress;
-using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
 using CoreStat = Game.Core.Progress.PlayerStatistic;
-using EntityChallenge = Game.Infrastructure.Entities.PlayerChallenge;
-using EntityStat = Game.Infrastructure.Entities.PlayerStatistic;
 
 namespace Game.DataAccess.Repositories
 {
-    internal class PlayerProgressRepository(GameContext context, IChallenges challenges) : IPlayerProgressRepository
+    internal class PlayerProgressRepository(
+        GameContext context,
+        IChallenges challenges,
+        ICacheService cache,
+        IPubSubService pubsub) : IPlayerProgressRepository
     {
         private readonly GameContext _context = context;
         private readonly IChallenges _challenges = challenges;
+        private readonly ICacheService _cache = cache;
+        private readonly IPubSubService _pubsub = pubsub;
 
-        private Dictionary<(int StatTypeId, int? EntityId), EntityStat>? _loadedStats;
-        private Dictionary<int, EntityChallenge>? _loadedChallenges;
+        // Sliding idle TTL for the cached progress aggregate, mirroring the player cache (#439): written on
+        // every save and load-miss re-cache, refreshed on every hit, so an active player never ages out while
+        // a dormant one does. It dwarfs the sub-second write-behind drain window, so a key never expires
+        // mid-drain (see docs/backend.md -> Caching and Pub/Sub).
+        private static readonly TimeSpan ProgressCacheTtl = TimeSpan.FromHours(48);
+
+        private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
 
         public async Task<PlayerProgress> Load(Player player)
         {
-            var loadedStats = await GetLoadedStats(player.Id);
-            var loadedChallenges = await GetLoadedChallenges(player.Id);
-
-            var coreStats = loadedStats.Values.Select(PlayerProgressMapper.ToCore);
-
-            var coreChallenges = loadedChallenges.Values
-                .Select(e => PlayerProgressMapper.ToCore(e, _challenges.GetChallenge(e.ChallengeId)));
-
-            return new PlayerProgress(player, coreStats, coreChallenges);
+            var cached = await GetCachedProgress(player.Id);
+            return new PlayerProgress(
+                player,
+                cached.Statistics.Select(ToCoreStatistic),
+                cached.Challenges.Select(ToCoreChallenge));
         }
 
         public async Task<List<CoreStat>> GetStatistics(int playerId)
         {
-            var entities = await _context.PlayerStatistics
-                .AsNoTracking()
-                .Where(ps => ps.PlayerId == playerId)
-                .ToListAsync();
-
-            return entities.Select(PlayerProgressMapper.ToCore).ToList();
+            var cached = await GetCachedProgress(playerId);
+            return cached.Statistics.Select(ToCoreStatistic).ToList();
         }
 
         public async Task<List<CoreChallenge>> GetChallenges(int playerId)
         {
-            var entities = await _context.PlayerChallenges
-                .AsNoTracking()
-                .Where(pc => pc.PlayerId == playerId)
-                .ToListAsync();
-
-            return entities
-                .Select(e => PlayerProgressMapper.ToCore(e, _challenges.GetChallenge(e.ChallengeId)))
-                .ToList();
+            var cached = await GetCachedProgress(playerId);
+            return cached.Challenges.Select(ToCoreChallenge).ToList();
         }
 
         public async Task<HashSet<int>> GetCompletedChallengeIds(int playerId)
         {
-            var ids = await _context.PlayerChallenges
-                .AsNoTracking()
-                .Where(pc => pc.PlayerId == playerId && pc.Completed)
-                .Select(pc => pc.ChallengeId)
-                .ToListAsync();
-
-            return [.. ids];
+            var cached = await GetCachedProgress(playerId);
+            return [.. cached.Challenges.Where(c => c.Completed).Select(c => c.ChallengeId)];
         }
 
         public async Task Save(PlayerProgress progress)
         {
-            var loadedStats = await GetLoadedStats(progress.Player.Id);
-            var loadedChallenges = await GetLoadedChallenges(progress.Player.Id);
+            var playerId = progress.Player.Id;
 
-            foreach (var stat in progress.Statistics)
+            // The cache is the source of truth, so write the full current snapshot (absolute values).
+            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress);
+            _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
+
+            // Persist only the rows that changed this save, as one batched write-behind event; the consumer
+            // upserts them to their absolute values off the response path. Nothing changed -> nothing to enqueue.
+            var changed = ToCached(progress.DirtyStatistics, progress.DirtyChallenges);
+            if (changed.Statistics.Count == 0 && changed.Challenges.Count == 0)
             {
-                var key = ((int)stat.Type, stat.EntityId);
-                if (loadedStats.TryGetValue(key, out var entity))
-                {
-                    entity.Value = stat.Value;
-                }
-                else
-                {
-                    _context.PlayerStatistics.Add(new EntityStat
-                    {
-                        PlayerId = progress.Player.Id,
-                        StatisticTypeId = (int)stat.Type,
-                        EntityId = stat.EntityId,
-                        Value = stat.Value,
-                    });
-                }
+                return;
             }
 
-            foreach (var cp in progress.ChallengeProgress)
+            var envelope = new DomainEventEnvelope
             {
-                if (loadedChallenges.TryGetValue(cp.Challenge.Id, out var entity))
+                Type = nameof(ProgressUpdatedEvent),
+                Payload = new ProgressUpdatedEvent
                 {
-                    entity.Progress = cp.Progress;
-                    entity.Completed = cp.Completed;
-                    entity.CompletedAt = cp.CompletedAt;
-                }
-                else
-                {
-                    _context.PlayerChallenges.Add(new EntityChallenge
-                    {
-                        PlayerId = progress.Player.Id,
-                        ChallengeId = cp.Challenge.Id,
-                        Progress = cp.Progress,
-                        Completed = cp.Completed,
-                        CompletedAt = cp.CompletedAt,
-                    });
-                }
+                    PlayerId = playerId,
+                    Statistics = changed.Statistics,
+                    Challenges = changed.Challenges,
+                }.Serialize(),
+            };
+            await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope);
+        }
+
+        private async Task<CachedPlayerProgress> GetCachedProgress(int playerId)
+        {
+            var key = ProgressKey(playerId);
+            var cached = await _cache.Get<CachedPlayerProgress>(key);
+            if (cached is null)
+            {
+                cached = await LoadFromDb(playerId);
+                _cache.SetAndForget(key, cached, ProgressCacheTtl);
             }
+            else
+            {
+                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
+                _cache.ExpireAndForget(key, ProgressCacheTtl);
+            }
+
+            return cached;
         }
 
-        /// <summary>
-        /// Lazily loads (and caches for the lifetime of this scoped repository) the player's existing
-        /// statistic rows as tracked entities, keyed by their statistic-type/entity pair. Shared by
-        /// <see cref="Load"/> and <see cref="Save"/> so that <see cref="Save"/> no longer depends on
-        /// <see cref="Load"/> having run first: it fetches the snapshot on demand when it isn't already
-        /// cached. The common load-then-save flow reuses the cached snapshot, so no redundant query is
-        /// issued.
-        /// </summary>
-        private async Task<Dictionary<(int StatTypeId, int? EntityId), EntityStat>> GetLoadedStats(int playerId)
+        private async Task<CachedPlayerProgress> LoadFromDb(int playerId)
         {
-            return _loadedStats ??= (await _context.PlayerStatistics
-                    .Where(ps => ps.PlayerId == playerId)
-                    .ToListAsync())
-                .ToDictionary(e => (e.StatisticTypeId, e.EntityId));
+            var statistics = await _context.PlayerStatistics
+                .AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId)
+                .Select(ps => new CachedPlayerStatistic
+                {
+                    StatisticTypeId = ps.StatisticTypeId,
+                    EntityId = ps.EntityId,
+                    Value = ps.Value,
+                })
+                .ToListAsync();
+
+            var challenges = await _context.PlayerChallenges
+                .AsNoTracking()
+                .Where(pc => pc.PlayerId == playerId)
+                .Select(pc => new CachedPlayerChallenge
+                {
+                    ChallengeId = pc.ChallengeId,
+                    Progress = pc.Progress,
+                    Completed = pc.Completed,
+                    CompletedAt = pc.CompletedAt,
+                })
+                .ToListAsync();
+
+            return new CachedPlayerProgress { Statistics = statistics, Challenges = challenges };
         }
 
-        /// <summary>
-        /// Lazily loads (and caches for the lifetime of this scoped repository) the player's existing
-        /// challenge-progress rows as tracked entities, keyed by challenge id. See
-        /// <see cref="GetLoadedStats"/> for the rationale behind the on-demand load.
-        /// </summary>
-        private async Task<Dictionary<int, EntityChallenge>> GetLoadedChallenges(int playerId)
+        private static CoreStat ToCoreStatistic(CachedPlayerStatistic cached) => new()
         {
-            return _loadedChallenges ??= (await _context.PlayerChallenges
-                    .Where(pc => pc.PlayerId == playerId)
-                    .ToListAsync())
-                .ToDictionary(e => e.ChallengeId);
-        }
+            Type = (EStatisticType)cached.StatisticTypeId,
+            EntityId = cached.EntityId,
+            Value = cached.Value,
+        };
+
+        private CoreChallenge ToCoreChallenge(CachedPlayerChallenge cached) =>
+            new(_challenges.GetChallenge(cached.ChallengeId), cached.Progress, cached.Completed, cached.CompletedAt);
+
+        private static CachedPlayerProgress ToCached(
+            IEnumerable<CoreStat> statistics, IEnumerable<CoreChallenge> challenges) => new()
+            {
+                Statistics = statistics.Select(s => new CachedPlayerStatistic
+                {
+                    StatisticTypeId = (int)s.Type,
+                    EntityId = s.EntityId,
+                    Value = s.Value,
+                }).ToList(),
+                Challenges = challenges.Select(c => new CachedPlayerChallenge
+                {
+                    ChallengeId = c.Challenge.Id,
+                    Progress = c.Progress,
+                    Completed = c.Completed,
+                    CompletedAt = c.CompletedAt,
+                }).ToList(),
+            };
     }
 }

@@ -526,6 +526,64 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(0, Assert.Single(completed).ChallengeId);
         }
 
+        // ── Dirty tracking (write-behind persist set) ────────────────────────
+
+        [Fact]
+        public void DirtyStatistics_OnFreshlyLoadedProgress_IsEmpty()
+        {
+            // Statistics supplied at construction (a cache/DB load) are not dirty — only mutations are.
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.EnemiesKilled, null, 5m)]);
+
+            Assert.Empty(progress.DirtyStatistics);
+            Assert.Empty(progress.DirtyChallenges);
+        }
+
+        [Fact]
+        public void GetStatisticValue_DoesNotMarkDirty()
+        {
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.EnemiesKilled, null, 5m)]);
+
+            progress.GetStatisticValue(EStatisticType.EnemiesKilled, null);
+
+            // A read must never enter the persist set.
+            Assert.Empty(progress.DirtyStatistics);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_MarksOnlyTheTouchedStatisticsDirty()
+        {
+            var progress = MakeProgress();
+
+            progress.RecordBattleCompleted(MakeEnemy(id: 3), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { PlayerDamageDealt = 10.0 }, isBossBattle: false, zoneId: 0);
+
+            // The rows the battle touched are dirty (e.g. the global kill counter and its per-enemy twin)...
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == 3);
+            // ...while stats this battle never touched stay out of the persist set (BattlesLost on a win).
+            // Note a touched stat can legitimately be dirty with value 0 (e.g. zero DamageTaken this battle),
+            // which is the same set the pre-cache Save persisted.
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.BattlesLost);
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.BattlesWon && s.EntityId == 999);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_MarksNewAndChangedChallengesDirty_ButNotSkippedCompletedOnes()
+        {
+            var progressed = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5);
+            var alreadyDone = MakeChallenge(id: 1, EChallengeType.EnemiesKilled, goal: 5);
+            var doneRow = new PlayerChallenge(alreadyDone, progress: 5m, completed: true, completedAt: DateTime.UtcNow);
+            var progress = MakeProgress(
+                statistics: [Stat(EStatisticType.EnemiesKilled, null, 5m)],
+                challenges: [doneRow]);
+
+            progress.EvaluateChallenges([progressed, alreadyDone]);
+
+            // The challenge that advanced this evaluation is dirty; the already-completed one is skipped untouched.
+            Assert.Contains(0, progress.DirtyChallenges.Select(c => c.Challenge.Id));
+            Assert.DoesNotContain(1, progress.DirtyChallenges.Select(c => c.Challenge.Id));
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static PlayerProgress MakeProgress(
