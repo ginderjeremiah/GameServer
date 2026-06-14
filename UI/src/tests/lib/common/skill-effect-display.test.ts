@@ -34,21 +34,17 @@ describe('effectRaisesAttribute', () => {
 });
 
 describe('effectDirection', () => {
-	it('is a buff when a beneficial attribute is raised and a debuff when lowered', () => {
-		expect(effectDirection(EAttribute.Strength, EModifierType.Additive, 5)).toBe('buff');
-		expect(effectDirection(EAttribute.Strength, EModifierType.Additive, -5)).toBe('debuff');
-		expect(effectDirection(EAttribute.MaxHealth, EModifierType.Multiplicative, 1.5)).toBe('buff');
-		expect(effectDirection(EAttribute.MaxHealth, EModifierType.Multiplicative, 0.5)).toBe('debuff');
+	it('is a buff when a beneficial (non-harmful) attribute is raised and a debuff when lowered', () => {
+		expect(effectDirection(false, EModifierType.Additive, 5)).toBe('buff');
+		expect(effectDirection(false, EModifierType.Additive, -5)).toBe('debuff');
+		expect(effectDirection(false, EModifierType.Multiplicative, 1.5)).toBe('buff');
+		expect(effectDirection(false, EModifierType.Multiplicative, 0.5)).toBe('debuff');
 	});
 
-	it('inverts for a harmful-when-raised attribute (DamageTakenPerSecond)', () => {
+	it('inverts for a harmful-when-raised attribute (e.g. DamageTakenPerSecond)', () => {
 		// Raising incoming damage is a debuff; lowering it is a buff — the opposite of a normal attribute.
-		expect(effectDirection(EAttribute.DamageTakenPerSecond, EModifierType.Additive, 12)).toBe('debuff');
-		expect(effectDirection(EAttribute.DamageTakenPerSecond, EModifierType.Additive, -12)).toBe('buff');
-	});
-
-	it('treats HealthRegenPerSecond as beneficial when raised', () => {
-		expect(effectDirection(EAttribute.HealthRegenPerSecond, EModifierType.Additive, 8)).toBe('buff');
+		expect(effectDirection(true, EModifierType.Additive, 12)).toBe('debuff');
+		expect(effectDirection(true, EModifierType.Additive, -12)).toBe('buff');
 	});
 });
 
@@ -87,7 +83,8 @@ describe('describeEffect', () => {
 	it('assembles the structured pieces and one-line summary', () => {
 		const description = describeEffect(
 			effect({ attributeId: EAttribute.Strength, amount: 15, durationMs: 5000, target: ESkillEffectTarget.Self }),
-			'Strength'
+			'Strength',
+			false
 		);
 
 		expect(description).toEqual({
@@ -109,7 +106,8 @@ describe('describeEffect', () => {
 				amount: -10,
 				durationMs: 3000
 			}),
-			'Defense'
+			'Defense',
+			false
 		);
 
 		expect(description.direction).toBe('debuff');
@@ -122,6 +120,7 @@ describe('effectLogMessage', () => {
 		const message = effectLogMessage(
 			effect({ attributeId: EAttribute.Strength, amount: 15, durationMs: 5000 }),
 			'Strength',
+			false,
 			true,
 			'Goblin'
 		);
@@ -138,16 +137,18 @@ describe('effectLogMessage', () => {
 			}),
 			'Defense',
 			false,
+			false,
 			'Goblin'
 		);
 		expect(message).toBe('Goblin is weakened: -10 Defense for 3s');
 	});
 
 	it('classifies the direction by what the effect does to its target, not the magnitude sign', () => {
-		// A positive DamageTakenPerSecond is detrimental, so applying it to the enemy is a weakening debuff.
+		// A positive DamageTakenPerSecond is detrimental (isHarmful), so applying it to the enemy is a weakening debuff.
 		const message = effectLogMessage(
 			effect({ attributeId: EAttribute.DamageTakenPerSecond, amount: 12, durationMs: 3000 }),
 			'Damage Taken Per Second',
+			true,
 			false,
 			'Goblin'
 		);

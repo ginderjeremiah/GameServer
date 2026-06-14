@@ -53,10 +53,12 @@
 			{#if metrics.contributions.length}
 				{#each metrics.contributions as contribution (contribution.attributeId)}
 					<div class="scale" style:--ac={attributeColor(contribution.attributeId)}>
-						<span class="achip">{attributeCode(contribution.attributeId)}</span>
+						<span class="achip">{attributeCode(contribution.attributeId, staticData.attributes)}</span>
 						<div class="bar"><i style:width="{Math.round((contribution.value / maxContribution) * 100)}%"></i></div>
 						<span class="contrib"
-							>{attributeName(contribution.attributeId)} ×{contribution.multiplier} = +{fmt(contribution.value)}</span
+							>{attributeName(contribution.attributeId, staticData.attributes)} ×{contribution.multiplier} = +{fmt(
+								contribution.value
+							)}</span
 						>
 					</div>
 				{/each}
@@ -105,6 +107,7 @@
 import {
 	attributeCode,
 	attributeColor,
+	attributeIsHarmful,
 	attributeName,
 	describeEffect,
 	effectDirectionColor,
@@ -132,18 +135,23 @@ const fmt = (n: number) => formatNum(Math.round(n));
 const effects = $derived(
 	(metrics?.skill.effects ?? []).map((effect) => ({
 		id: effect.id,
-		...describeEffect(effect, attributeName(effect.attributeId, staticData.attributes))
+		...describeEffect(
+			effect,
+			attributeName(effect.attributeId, staticData.attributes),
+			attributeIsHarmful(effect.attributeId, staticData.attributes)
+		)
 	}))
 );
 
 const scalesEyebrow = $derived(
 	metrics?.skill.damageMultipliers.length
-		? 'Scales ' + metrics.skill.damageMultipliers.map((m) => attributeCode(m.attributeId)).join(' · ')
+		? 'Scales ' +
+				metrics.skill.damageMultipliers.map((m) => attributeCode(m.attributeId, staticData.attributes)).join(' · ')
 		: 'Active skill'
 );
 const scalingSummary = $derived(
 	metrics?.skill.damageMultipliers.length
-		? metrics.skill.damageMultipliers.map((m) => attributeCode(m.attributeId)).join(' · ')
+		? metrics.skill.damageMultipliers.map((m) => attributeCode(m.attributeId, staticData.attributes)).join(' · ')
 		: '—'
 );
 const sourceSummary = $derived(

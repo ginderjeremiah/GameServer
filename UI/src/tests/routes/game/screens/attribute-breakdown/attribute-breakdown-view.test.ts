@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EItemModType, type IBattlerAttribute } from '$lib/api';
-import { EAttributeModifierSource, EModifierType } from '$lib/battle';
+import { EAttribute, EAttributeType, EItemModType, type IAttribute, type IBattlerAttribute } from '$lib/api';
+import { EAttributeModifierSource, EModifierType, type AppliedModifier, type ComputedAttribute } from '$lib/battle';
 
 // Stand-ins for the player + inventory managers and the static reference data.
 // `buildPlayerModifiers` reads the player's allocations and equipped loadout
-// from these; the view aggregates them through the real attribute pipeline.
+// from these; the view aggregates them through the real attribute pipeline and
+// reads the display taxonomy / precision off `staticData.attributes`.
 const { mockPlayerManager, mockInventoryManager, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: { attributes: [] as IBattlerAttribute[], name: 'Aelara', level: 12 },
 	mockInventoryManager: { equippedSlots: [] as unknown[] },
-	// Absent reference data so attributeName falls back to the normalised enum.
-	staticData: { attributes: undefined as unknown }
+	staticData: { attributes: undefined as IAttribute[] | undefined }
 }));
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
@@ -18,13 +18,59 @@ vi.mock('$stores', () => ({ staticData }));
 import { attributeName } from '$lib/common';
 import {
 	AttributeBreakdownView,
-	BREAKDOWN_ATTRS,
+	buildGroups,
 	buildPlayerModifiers,
 	fmtNum,
 	fmtSigned,
+	hasNonCombatModifier,
 	modifierLabel,
-	slotLabel
+	slotLabel,
+	type LabeledModifier
 } from '$routes/game/screens/attribute-breakdown/attribute-breakdown-view.svelte';
+import { makeAttribute } from '../../../../fixtures/attributes';
+
+// Reference data mirroring the backend `Attribute` display metadata (taxonomy / order / decimals).
+const refAttributes: IAttribute[] = [
+	makeAttribute(EAttribute.Strength, 'Strength', {
+		code: 'STR',
+		attributeType: EAttributeType.Primary,
+		displayOrder: 0
+	}),
+	makeAttribute(EAttribute.Endurance, 'Endurance', {
+		code: 'END',
+		attributeType: EAttributeType.Primary,
+		displayOrder: 1
+	}),
+	makeAttribute(EAttribute.Intellect, 'Intellect', {
+		code: 'INT',
+		attributeType: EAttributeType.Primary,
+		displayOrder: 2
+	}),
+	makeAttribute(EAttribute.Agility, 'Agility', { code: 'AGI', attributeType: EAttributeType.Primary, displayOrder: 3 }),
+	makeAttribute(EAttribute.Dexterity, 'Dexterity', {
+		code: 'DEX',
+		attributeType: EAttributeType.Primary,
+		displayOrder: 4
+	}),
+	makeAttribute(EAttribute.Luck, 'Luck', { code: 'LUK', attributeType: EAttributeType.Primary, displayOrder: 5 }),
+	makeAttribute(EAttribute.MaxHealth, 'Max Health', { attributeType: EAttributeType.Secondary, displayOrder: 6 }),
+	makeAttribute(EAttribute.Defense, 'Defense', { attributeType: EAttributeType.Secondary, displayOrder: 7 }),
+	makeAttribute(EAttribute.CooldownRecovery, 'Cooldown Recovery', {
+		attributeType: EAttributeType.Secondary,
+		displayOrder: 8,
+		decimals: 2,
+		isPercentage: true
+	}),
+	makeAttribute(EAttribute.DamageTakenPerSecond, 'Damage Taken Per Second', {
+		attributeType: EAttributeType.Status,
+		displayOrder: 14,
+		isHarmful: true
+	}),
+	makeAttribute(EAttribute.HealthRegenPerSecond, 'Health Regen Per Second', {
+		attributeType: EAttributeType.Status,
+		displayOrder: 15
+	})
+];
 
 const mockItem = (
 	name: string,
@@ -32,10 +78,31 @@ const mockItem = (
 	appliedMods: { name: string; itemModTypeId: EItemModType; attributes: IBattlerAttribute[] }[] = []
 ) => ({ name, attributes, appliedMods });
 
+/** A minimal computed attribute carrying one line per supplied source — enough to exercise the
+ *  self-selecting membership rule, which only inspects each line's `source`. */
+const computedWithSources = (
+	attribute: EAttribute,
+	sources: EAttributeModifierSource[]
+): ComputedAttribute<LabeledModifier> => ({
+	attribute,
+	total: 0,
+	additiveSubtotal: 0,
+	multUplift: 0,
+	lines: sources.map((source) => ({
+		attribute,
+		amount: 1,
+		type: EModifierType.Additive,
+		source,
+		applied: 1,
+		running: 1,
+		multiplied: false
+	})) as AppliedModifier<LabeledModifier>[]
+});
+
 beforeEach(() => {
 	mockPlayerManager.attributes = [];
 	mockInventoryManager.equippedSlots = [];
-	staticData.attributes = undefined;
+	staticData.attributes = refAttributes;
 });
 
 describe('buildPlayerModifiers', () => {
@@ -120,23 +187,37 @@ describe('AttributeBreakdownView', () => {
 		expect(view.computedFor(EAttribute.Defense).total).toBe(46);
 	});
 
-	it('groups the displayed attributes into Core (6) and Derived (3)', () => {
+	it('groups the displayed attributes by display taxonomy (Primary / Secondary), sorted by display order', () => {
+		mockPlayerManager.attributes = [
+			{ attributeId: EAttribute.Strength, amount: 14 },
+			{ attributeId: EAttribute.Endurance, amount: 12 }
+		];
 		const view = new AttributeBreakdownView();
-		const core = view.groups.find((g) => g.key === 'core')!;
-		const derived = view.groups.find((g) => g.key === 'derived')!;
-		expect(core.attrs.map((a) => a.meta.id)).toEqual([
-			EAttribute.Strength,
-			EAttribute.Endurance,
-			EAttribute.Intellect,
-			EAttribute.Agility,
-			EAttribute.Dexterity,
-			EAttribute.Luck
-		]);
-		expect(derived.attrs.map((a) => a.meta.id)).toEqual([
+		const primary = view.groups.find((g) => g.type === EAttributeType.Primary);
+		const secondary = view.groups.find((g) => g.type === EAttributeType.Secondary);
+		// Only the allocated core attributes self-select into Primary.
+		expect(primary?.attrs.map((a) => a.meta.id)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
+		// The engine base/derived aggregates always contribute, so they stay in Secondary.
+		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Defense,
 			EAttribute.CooldownRecovery
 		]);
+		// CooldownRecovery carries its reference-data precision (2 decimals).
+		expect(secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta.dec).toBe(2);
+	});
+
+	it('self-selects only attributes with a real (non-combat) contributor', () => {
+		// No allocations or gear: only the engine base/derived formulas contribute, so just the
+		// Secondary aggregates surface — the obsolete/unimplemented attributes and the combat-only
+		// Status channels have no contributors and drop out, and no Primary group is shown.
+		const view = new AttributeBreakdownView();
+		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
+		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
+		expect(ids).not.toContain(EAttribute.DropBonus);
+		expect(ids).not.toContain(EAttribute.CriticalChance);
+		expect(ids).not.toContain(EAttribute.DamageTakenPerSecond);
 	});
 
 	it('defaults the selection to MaxHealth and can change it', () => {
@@ -146,12 +227,30 @@ describe('AttributeBreakdownView', () => {
 		view.select(EAttribute.Strength);
 		expect(view.selected).toBe(EAttribute.Strength);
 	});
+});
 
-	it('only surfaces the implemented attributes (no obsolete / unused)', () => {
-		const ids = BREAKDOWN_ATTRS.map((a) => a.id);
-		expect(ids).not.toContain(EAttribute.DropBonus);
-		expect(ids).not.toContain(EAttribute.CriticalChance);
-		expect(ids).toHaveLength(9);
+describe('self-selecting membership', () => {
+	it('treats a combat-only (SkillEffect) contributor as not a real, non-combat modifier', () => {
+		const combatOnly = computedWithSources(EAttribute.DamageTakenPerSecond, [EAttributeModifierSource.SkillEffect]);
+		expect(hasNonCombatModifier(combatOnly)).toBe(false);
+	});
+
+	it('treats any non-SkillEffect contributor (e.g. gear) as a real, non-combat modifier', () => {
+		const fromGear = computedWithSources(EAttribute.Strength, [EAttributeModifierSource.Item]);
+		expect(hasNonCombatModifier(fromGear)).toBe(true);
+	});
+
+	it('omits an attribute with only a combat modifier from the groups, but lists one with a non-combat modifier', () => {
+		const computed = new Map<EAttribute, ComputedAttribute<LabeledModifier>>([
+			[
+				EAttribute.DamageTakenPerSecond,
+				computedWithSources(EAttribute.DamageTakenPerSecond, [EAttributeModifierSource.SkillEffect])
+			],
+			[EAttribute.Strength, computedWithSources(EAttribute.Strength, [EAttributeModifierSource.PlayerStatPoints])]
+		]);
+		const ids = buildGroups(computed, refAttributes).flatMap((g) => g.attrs.map((a) => a.meta.id));
+		expect(ids).toContain(EAttribute.Strength);
+		expect(ids).not.toContain(EAttribute.DamageTakenPerSecond);
 	});
 });
 

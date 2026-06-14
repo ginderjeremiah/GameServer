@@ -34,8 +34,12 @@ const MODE_STORAGE_KEY = 'ttf.attr.mode';
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** The six core attributes that accept stat-point allocation (EAttribute 0..5),
- *  in display order. */
+/** The six core attributes that accept stat-point allocation (EAttribute 0..5), in display order.
+ *  This is the **allocation domain** (the frontend mirror of the backend `Attribute.CoreAttributes`
+ *  invariant), deliberately kept distinct from the `attributeType` display taxonomy — the spike (#528)
+ *  warns the two must not be collapsed, though the `Primary` set is expected to equal this one. The
+ *  per-attribute display metadata (name/code) is read from the reference set via `attributeName`/
+ *  `attributeCode`; only the allocatable membership stays a domain constant here. */
 export const CORE_ATTRIBUTES: EAttribute[] = [
 	EAttribute.Strength,
 	EAttribute.Endurance,

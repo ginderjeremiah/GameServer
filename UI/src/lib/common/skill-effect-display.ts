@@ -1,4 +1,4 @@
-import { EAttribute, EModifierType, ESkillEffectTarget, type ISkillEffect } from '$lib/api';
+import { EModifierType, ESkillEffectTarget, type ISkillEffect } from '$lib/api';
 import { formatNum } from './functions';
 
 /*
@@ -8,12 +8,11 @@ import { formatNum } from './functions';
  * direction stay consistent across every place an effect is shown. The accent colours are themeable
  * `--effect-*` custom properties (declared in `+layout.svelte`), referenced here rather than
  * hard-coded, mirroring the rarity/challenge-type helpers.
+ *
+ * Whether raising the affected attribute helps or harms its bearer (`isHarmful`) is supplied by the
+ * caller — resolved from the `Attributes` reference data via `attributeIsHarmful` — so this module
+ * stays pure and store-free, the same param-passing style as `attributeName`.
  */
-
-/** Attributes whose *increase* is detrimental to the battler carrying them — a positive modifier on
- *  one is a debuff and a negative one a buff. Every other attribute is beneficial when raised
- *  (HealthRegenPerSecond included), so only damage-over-second is inverted today. */
-const HARMFUL_WHEN_RAISED: ReadonlySet<EAttribute> = new Set([EAttribute.DamageTakenPerSecond]);
 
 export type EffectDirection = 'buff' | 'debuff';
 
@@ -23,14 +22,11 @@ export const effectRaisesAttribute = (modifierType: EModifierType, amount: numbe
 	modifierType === EModifierType.Multiplicative ? amount > 1 : amount > 0;
 
 /** Classifies an effect as a buff or debuff *for the battler it lands on*: raising a beneficial
- *  attribute (or lowering a harmful one) is a buff; the inverse is a debuff. */
-export const effectDirection = (
-	attribute: EAttribute,
-	modifierType: EModifierType,
-	amount: number
-): EffectDirection => {
+ *  attribute (or lowering a harmful one) is a buff; the inverse is a debuff. `isHarmful` flags an
+ *  attribute whose increase is detrimental (e.g. `DamageTakenPerSecond`), inverting the direction. */
+export const effectDirection = (isHarmful: boolean, modifierType: EModifierType, amount: number): EffectDirection => {
 	const raises = effectRaisesAttribute(modifierType, amount);
-	const beneficial = HARMFUL_WHEN_RAISED.has(attribute) ? !raises : raises;
+	const beneficial = isHarmful ? !raises : raises;
 	return beneficial ? 'buff' : 'debuff';
 };
 
@@ -68,10 +64,10 @@ export interface EffectDescription {
 }
 
 /** Builds the display pieces (and assembled one-line summary) for an authored skill effect. The
- *  attribute's display name is supplied by the caller so this stays pure — name resolution reads
- *  the reference-data store, which is the component's concern, not this helper's. */
-export const describeEffect = (effect: ISkillEffect, attributeName: string): EffectDescription => {
-	const direction = effectDirection(effect.attributeId, effect.modifierTypeId, effect.amount);
+ *  attribute's display name and `isHarmful` flag are supplied by the caller so this stays pure —
+ *  reference-data resolution is the component's concern, not this helper's. */
+export const describeEffect = (effect: ISkillEffect, attributeName: string, isHarmful: boolean): EffectDescription => {
+	const direction = effectDirection(isHarmful, effect.modifierTypeId, effect.amount);
 	const magnitude = formatEffectMagnitude(effect.modifierTypeId, effect.amount);
 	const targetLabel = effectTargetLabel(effect.target);
 	const duration = formatEffectDuration(effect.durationMs);
@@ -93,10 +89,11 @@ export const describeEffect = (effect: ISkillEffect, attributeName: string): Eff
 export const effectLogMessage = (
 	effect: ISkillEffect,
 	attributeName: string,
+	isHarmful: boolean,
 	onPlayer: boolean,
 	enemyName: string
 ): string => {
-	const { direction, magnitude, duration } = describeEffect(effect, attributeName);
+	const { direction, magnitude, duration } = describeEffect(effect, attributeName, isHarmful);
 	const subject = onPlayer ? 'You are' : `${enemyName} is`;
 	const verb = direction === 'buff' ? 'empowered' : 'weakened';
 	return `${subject} ${verb}: ${magnitude} ${attributeName} for ${duration}`;

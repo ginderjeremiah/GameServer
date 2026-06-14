@@ -15,7 +15,9 @@
 							<div class="name">{attributeName(d.id, staticData.attributes)}</div>
 							<div class="fed-by">
 								{#each contributorsFor(d.id) as cid (cid)}
-									<span class="src" style="color: {attributeColor(cid)}">{attributeCode(cid)}</span>
+									<span class="src" style="color: {attributeColor(cid)}"
+										>{attributeCode(cid, staticData.attributes)}</span
+									>
 								{/each}
 							</div>
 						</div>

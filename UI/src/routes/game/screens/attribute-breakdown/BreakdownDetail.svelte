@@ -6,7 +6,7 @@
 		<div class="heading">
 			<div class="title-row">
 				<h2 class="name">{attributeName(view.selected, staticData.attributes)}</h2>
-				<KindTag group={view.selectedMeta.group} />
+				<KindTag type={view.selectedMeta.type} />
 			</div>
 			{#if description}
 				<p class="desc">{description}</p>

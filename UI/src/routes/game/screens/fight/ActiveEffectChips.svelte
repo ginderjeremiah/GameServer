@@ -5,7 +5,9 @@
 {#if battler.activeEffects.length > 0}
 	<div class="effect-chips" class:reversed data-testid="effect-chips">
 		{#each battler.activeEffects as effect (effect.sourceId)}
-			{@const color = effectDirectionColor(effectDirection(effect.attribute, effect.modifierType, effect.amount))}
+			{@const color = effectDirectionColor(
+				effectDirection(attributeIsHarmful(effect.attribute, staticData.attributes), effect.modifierType, effect.amount)
+			)}
 			<div class="effect-chip" style:--chip-accent={color} title={chipTitle(effect)}>
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
 				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
@@ -19,7 +21,13 @@
 {/if}
 
 <script lang="ts">
-import { attributeName, effectDirection, effectDirectionColor, formatEffectMagnitude } from '$lib/common';
+import {
+	attributeIsHarmful,
+	attributeName,
+	effectDirection,
+	effectDirectionColor,
+	formatEffectMagnitude
+} from '$lib/common';
 import { staticData } from '$stores';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 

@@ -1,16 +1,23 @@
-<!-- A small pill tagging an attribute as Core or Derived. -->
-<span class="kind-tag" class:derived={group === 'derived'}>{label}</span>
+<!-- A small pill tagging an attribute by its display taxonomy (Primary / Secondary / Status). -->
+<span
+	class="kind-tag"
+	class:secondary={type === EAttributeType.Secondary}
+	class:status={type === EAttributeType.Status}
+>
+	{label}
+</span>
 
 <script lang="ts">
-import type { AttributeGroup } from './attribute-breakdown-view.svelte';
+import { EAttributeType } from '$lib/api';
+import { ATTRIBUTE_TYPE_GROUPS } from './attribute-breakdown-view.svelte';
 
 interface Props {
-	group: AttributeGroup;
+	type: EAttributeType;
 }
 
-let { group }: Props = $props();
+let { type }: Props = $props();
 
-const label = $derived(group === 'core' ? 'Core' : 'Derived');
+const label = $derived(ATTRIBUTE_TYPE_GROUPS.find((g) => g.type === type)?.label ?? '');
 </script>
 
 <style lang="scss">
@@ -26,9 +33,14 @@ const label = $derived(group === 'core' ? 'Core' : 'Derived');
 	line-height: 1;
 	white-space: nowrap;
 
-	&.derived {
+	&.secondary {
 		color: var(--warning);
 		border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+	}
+
+	&.status {
+		color: var(--text-muted);
+		border-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
 	}
 }
 </style>
