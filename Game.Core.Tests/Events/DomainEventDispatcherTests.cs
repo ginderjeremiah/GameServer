@@ -59,11 +59,25 @@ namespace Game.Core.Tests.Events
             await dispatcher.DispatchAsync(new IDomainEvent[] { new MultiEvent() }, TestContext.Current.CancellationToken);
 
             // Both handlers registered against the same event type fire — exercising the registry's
-            // add-to-existing path and the per-event handler fan-out. The handler collection is an
-            // unordered ConcurrentBag, so assert membership rather than order.
-            Assert.Equal(2, log.Handled.Count);
-            Assert.Contains("A", log.Handled);
-            Assert.Contains("B", log.Handled);
+            // add-to-existing path and the per-event handler fan-out. Handlers run in registration order
+            // (A registered before B), the guarantee the ordered handler collection provides.
+            Assert.Equal(["A", "B"], log.Handled);
+        }
+
+        [Fact]
+        public async Task DispatchAsync_MultipleHandlersForSameEvent_RunInRegistrationOrder()
+        {
+            var log = new HandledLog();
+            // Register in B-then-A order; dispatch must honour that order rather than any incidental
+            // collection ordering — the deterministic-order guarantee this issue is about.
+            DomainEventDispatcher.RegisterDomainEventHandler<OrderedEvent, OrderedHandlerB>();
+            DomainEventDispatcher.RegisterDomainEventHandler<OrderedEvent, OrderedHandlerA>();
+
+            var dispatcher = new DomainEventDispatcher(new StubServiceProvider(log));
+
+            await dispatcher.DispatchAsync(new IDomainEvent[] { new OrderedEvent() }, TestContext.Current.CancellationToken);
+
+            Assert.Equal(["B", "A"], log.Handled);
         }
 
         [Fact]
@@ -140,6 +154,8 @@ namespace Game.Core.Tests.Events
 
         private sealed record MultiEvent : IDomainEvent;
 
+        private sealed record OrderedEvent : IDomainEvent;
+
         private sealed record SharedEvent : IDomainEvent;
 
         private sealed record ThrowEvent : IDomainEvent;
@@ -189,6 +205,24 @@ namespace Game.Core.Tests.Events
         private sealed class MultiHandlerB(HandledLog log) : IDomainEventHandler<MultiEvent>
         {
             public Task HandleAsync(MultiEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("B");
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class OrderedHandlerA(HandledLog log) : IDomainEventHandler<OrderedEvent>
+        {
+            public Task HandleAsync(OrderedEvent domainEvent, CancellationToken cancellationToken = default)
+            {
+                log.Handled.Add("A");
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class OrderedHandlerB(HandledLog log) : IDomainEventHandler<OrderedEvent>
+        {
+            public Task HandleAsync(OrderedEvent domainEvent, CancellationToken cancellationToken = default)
             {
                 log.Handled.Add("B");
                 return Task.CompletedTask;

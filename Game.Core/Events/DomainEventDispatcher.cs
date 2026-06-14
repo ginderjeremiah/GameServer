@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Linq.Expressions;
 
 namespace Game.Core.Events
@@ -14,7 +15,10 @@ namespace Game.Core.Events
 
     public class DomainEventDispatcher : IDomainEventDispatcher
     {
-        private static readonly ConcurrentDictionary<Type, ConcurrentBag<Func<IServiceProvider, IDomainEvent, CancellationToken, Task>>> _domainEventHandlers = [];
+        // Handlers per event type are kept in registration order: ImmutableArray preserves insertion order
+        // (unlike the previous ConcurrentBag, whose enumeration order was unspecified), gives lock-free reads
+        // on the dispatch path, and iterates via a non-allocating struct enumerator on that hot path.
+        private static readonly ConcurrentDictionary<Type, ImmutableArray<Func<IServiceProvider, IDomainEvent, CancellationToken, Task>>> _domainEventHandlers = [];
         private static readonly ConcurrentDictionary<(Type, Type), byte> _registeredHandlers = [];
         private static readonly DomainEventTypeCache _domainEventTypeCache = new();
 
@@ -111,6 +115,8 @@ namespace Game.Core.Events
         /// </summary>
         /// <remarks>
         /// Handlers can only be registered once per given type. Duplicate registrations will be silently ignored.
+        /// When multiple handlers are registered for the same event type, they are dispatched in the order they
+        /// were registered.
         /// </remarks>
         /// <typeparam name="T1"></typeparam>
         /// <typeparam name="T2"></typeparam>
@@ -142,11 +148,7 @@ namespace Game.Core.Events
                 handlerExecutor, serviceProvider, domainEventParameter, cancellationTokenParameter
             ).Compile();
 
-            _domainEventHandlers.AddOrUpdate(eventType, [handlerAction], (key, existingHandlers) =>
-            {
-                existingHandlers.Add(handlerAction);
-                return existingHandlers;
-            });
+            _domainEventHandlers.AddOrUpdate(eventType, [handlerAction], (key, existingHandlers) => existingHandlers.Add(handlerAction));
         }
     }
 }
