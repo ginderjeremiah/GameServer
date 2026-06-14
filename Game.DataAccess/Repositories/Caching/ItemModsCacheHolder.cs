@@ -28,6 +28,7 @@ namespace Game.DataAccess.Repositories.Caching
                 .AsNoTracking()
                 .Include(im => im.ItemModAttributes)
                 .Include(im => im.Tags)
+                .AsSplitQuery()
                 .OrderBy(im => im.Id)
                 .ToListAsync(cancellationToken);
 
