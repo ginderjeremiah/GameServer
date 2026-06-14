@@ -39,21 +39,27 @@ describe('newItemMod', () => {
 			rarityId: ERarity.Legendary,
 			itemModSlotId: 10
 		});
-		expect(mod.attributes).toEqual(mockItemMods[7].attributes);
-		expect(mod.tags).toEqual([1, 2]);
+		expect(mod?.attributes).toEqual(mockItemMods[7].attributes);
+		expect(mod?.tags).toEqual([1, 2]);
 	});
 
 	it('carries the slot id through without leaking the source itemModId field', () => {
 		const mod = newItemMod({ itemModId: 7, itemModSlotId: 99 });
-		expect(mod.itemModSlotId).toBe(99);
+		expect(mod?.itemModSlotId).toBe(99);
 		// The applied model's itemModId is consumed for the lookup, not copied onto the result.
-		expect('itemModId' in mod).toBe(false);
+		expect(mod && 'itemModId' in mod).toBe(false);
 	});
 
 	it('looks the definition up positionally by itemModId', () => {
 		mockItemMods[3] = { ...mockItemMods[7], id: 3, name: 'Frosty' };
 		const mod = newItemMod({ itemModId: 3, itemModSlotId: 1 });
-		expect(mod.name).toBe('Frosty');
-		expect(mod.id).toBe(3);
+		expect(mod?.name).toBe('Frosty');
+		expect(mod?.id).toBe(3);
+	});
+
+	it('returns undefined for a missing/retired itemModId rather than spreading undefined', () => {
+		// Id 999 has no reference record (e.g. a retired or not-yet-downloaded mod); resolve to undefined
+		// so the caller can drop it instead of crashing on a spread of `undefined`.
+		expect(newItemMod({ itemModId: 999, itemModSlotId: 0 })).toBeUndefined();
 	});
 });

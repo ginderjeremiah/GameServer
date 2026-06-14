@@ -93,6 +93,8 @@ describe('EnemyManager boss mode', () => {
 		h.statistics.markZoneCleared.mockClear();
 		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
 		h.staticData.zones = undefined;
+		// Restore the enemy reference record (a missing-id test clears it).
+		h.staticData.enemies = [{ id: 0, name: 'Catacomb Lich', isBoss: true }];
 		h.playerChallenges.isChallengeCompleted.mockReset();
 		h.playerChallenges.isChallengeCompleted.mockReturnValue(false);
 		h.playerChallenges.load.mockReset();
@@ -301,5 +303,44 @@ describe('EnemyManager boss mode', () => {
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
 		expect(manager.mode).toBe('idle');
+	});
+
+	it('logs the defeat only after a successful DefeatEnemy', async () => {
+		await manager.getNewEnemy();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		// The "X was defeated!" line is logged with the resolved enemy name once rewards are granted.
+		expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Catacomb Lich was defeated!');
+	});
+
+	it('does not log the defeat when DefeatEnemy fails (no premature "defeated" line)', async () => {
+		await manager.getNewEnemy();
+		// Fail the defeat command: no rewards ⇒ the player must not see "X was defeated!".
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? Promise.resolve({ id: '1', name: 'DefeatEnemy', error: 'boom' } as IApiSocketResponse<'DefeatEnemy'>)
+				: Promise.resolve(newEnemyResponse)
+		);
+		vi.mocked(logMessage).mockClear();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(logMessage).not.toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.anything());
+		expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, 'There was an error defeating the enemy: boom');
+		expect(h.playerManager.grantExp).not.toHaveBeenCalled();
+	});
+
+	it('survives a missing/retired enemy id on victory (still grants rewards, omits the name log)', async () => {
+		// The current enemy's id has no reference record, so its name can't be resolved — the victory
+		// must not crash, and rewards still apply; the name-dependent log is simply skipped.
+		h.staticData.enemies = [];
+		await manager.getNewEnemy();
+		vi.mocked(logMessage).mockClear();
+
+		await expect(fireStage(h.BattleStage.Victorious)).resolves.not.toThrow();
+
+		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
+		expect(logMessage).not.toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.anything());
 	});
 });

@@ -132,6 +132,34 @@ describe('InventoryManager', () => {
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
 		});
 
+		it('skips an unlocked item whose reference record is missing/retired without crashing', () => {
+			// Item 1 resolves; item 2 has no reference record (retired or not yet downloaded) and must be
+			// skipped — a single stale id can't take down the whole inventory load.
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [
+				{ itemId: 1, equipped: false, appliedMods: [], favorite: false },
+				{ itemId: 2, equipped: false, appliedMods: [], favorite: false }
+			];
+
+			expect(() => manager.initialize()).not.toThrow();
+
+			expect(manager.unlockedItems.has(1)).toBe(true);
+			expect(manager.unlockedItems.has(2)).toBe(false);
+			expect(manager.unlockedItems.size).toBe(1);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, expect.stringContaining('2'));
+		});
+
+		it('does not place a skipped (unknown-id) equipped item into a slot', () => {
+			// A retired equipped item must not be slotted — its record is gone, so there's nothing to place.
+			mockInventoryData.unlockedItems = [
+				{ itemId: 2, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot, appliedMods: [], favorite: false }
+			];
+
+			manager.initialize();
+
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+		});
+
 		it('clears previous state on re-initialize', () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
@@ -620,6 +648,21 @@ describe('InventoryManager', () => {
 			expect(mockSendSocketCommand).not.toHaveBeenCalled();
 		});
 
+		it('returns false and makes no socket call when the mod has no reference record', async () => {
+			// The mod is unlocked but its reference record is missing/retired (no mockItemMods entry), so
+			// newItemMod resolves to undefined — bail rather than apply a mod that can't be resolved.
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+
+			const result = await manager.applyMod(1, 10, 0);
+
+			expect(result).toBe(false);
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
+			expect(manager.unlockedItems.get(1)?.appliedMods).toEqual([]);
+		});
+
 		it('returns false and does not log when the socket returns an error', async () => {
 			mockItems[1] = makeItem(1);
 			mockItemMods[10] = makeItemMod(10);
@@ -762,6 +805,16 @@ describe('InventoryManager', () => {
 
 			expect(manager.unlockedItems.has(3)).toBe(true);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, expect.stringContaining('Item 3'));
+		});
+
+		it('ignores a reward for an item whose reference record is missing/retired without crashing', () => {
+			// No reference record for id 5 ⇒ the grant degrades gracefully instead of crashing the reward path.
+			manager.initialize();
+
+			expect(() => manager.addUnlockedItem(makeInventoryItem({ itemId: 5 }))).not.toThrow();
+
+			expect(manager.unlockedItems.has(5)).toBe(false);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, expect.stringContaining('5'));
 		});
 
 		it('is idempotent — an already-unlocked item is not overwritten or re-logged', () => {
