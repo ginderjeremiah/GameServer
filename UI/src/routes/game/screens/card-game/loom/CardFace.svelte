@@ -1,10 +1,11 @@
+<!-- A pointer-drag surface, not a keyboard control: dragging to aim has no keyboard analogue and
+	 casting is keyboard-reachable via the global 1–7 hotkeys, so it claims no button role. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="card"
 	class:lane-b={card.kind === 'block'}
 	class:skill={card.skill}
-	role="button"
-	tabindex="-1"
-	onmousedown={(e) => {
+	onpointerdown={(e) => {
 		e.preventDefault();
 		view.beginDrag(index, card.key, e.clientX, e.clientY);
 	}}
@@ -48,6 +49,8 @@ const { card, index, slot, view }: Props = $props();
 	gap: 6px;
 	position: relative;
 	user-select: none;
+	// Keep a touch press-drag driving the cast/aim gesture instead of scrolling the page.
+	touch-action: none;
 	transition:
 		transform 0.12s ease,
 		box-shadow 0.12s ease,

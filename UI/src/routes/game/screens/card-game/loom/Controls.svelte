@@ -3,7 +3,7 @@
 		class="btn reflex"
 		class:on={view.game.slow}
 		title="Hold to slow time (Agility reserve)"
-		onmousedown={() => view.setReflex(true)}
+		onpointerdown={() => view.setReflex(true)}
 	>
 		⏳ REFLEX
 	</button>
@@ -59,6 +59,11 @@ const { view }: Props = $props();
 	&:active {
 		transform: translateY(1px);
 	}
+}
+
+.btn.reflex {
+	// Press-and-hold on touch must drive the slow-time gesture, not scroll the page.
+	touch-action: none;
 }
 
 .btn.reflex.on {

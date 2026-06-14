@@ -104,6 +104,12 @@ export class CardGameView {
 		this.hoverKey = null;
 	}
 
+	/** Abort an in-flight drag without casting (e.g. the browser cancelled the pointer). */
+	cancelDrag(): void {
+		this.drag = null;
+		this.hoverKey = null;
+	}
+
 	/** Convert a client x-coordinate to a board tick (for the aimed cast). */
 	tickAtClientX(clientX: number): number {
 		return Math.round((clientX - this.boardLeft - this.nowX) / PX_PER_TICK + this.game.playTick);

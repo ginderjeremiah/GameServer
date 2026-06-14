@@ -86,14 +86,14 @@ const critX = (c: CritMark) => view.nowX + (c.tick - game.playTick) * PXT - PXT 
 const preview = $derived(view.preview);
 
 onMount(() => {
-	const onMove = (e: MouseEvent) => {
+	const onMove = (e: PointerEvent) => {
 		if (!view.drag) {
 			return;
 		}
 		view.boardLeft = boardEl.getBoundingClientRect().left;
 		view.moveDrag(e.clientX, e.clientY);
 	};
-	const onUp = (e: MouseEvent) => {
+	const onUp = (e: PointerEvent) => {
 		if (!view.drag) {
 			return;
 		}
@@ -103,11 +103,15 @@ onMount(() => {
 			e.clientY >= rect.top - 10 && e.clientY <= rect.bottom + 50 && e.clientX >= rect.left && e.clientX <= rect.right;
 		view.completeDrag(overBoard, view.tickAtClientX(e.clientX));
 	};
-	window.addEventListener('mousemove', onMove);
-	window.addEventListener('mouseup', onUp);
+	// A browser-cancelled pointer (e.g. an interrupting gesture) aborts the drag without casting.
+	const onCancel = () => view.cancelDrag();
+	window.addEventListener('pointermove', onMove);
+	window.addEventListener('pointerup', onUp);
+	window.addEventListener('pointercancel', onCancel);
 	return () => {
-		window.removeEventListener('mousemove', onMove);
-		window.removeEventListener('mouseup', onUp);
+		window.removeEventListener('pointermove', onMove);
+		window.removeEventListener('pointerup', onUp);
+		window.removeEventListener('pointercancel', onCancel);
 	};
 });
 </script>

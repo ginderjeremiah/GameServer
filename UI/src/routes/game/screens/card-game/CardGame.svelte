@@ -77,18 +77,20 @@ onMount(() => {
 			view.setReflex(false);
 		}
 	};
-	// Releasing the mouse anywhere ends a held Reflex (the button is press-and-hold).
-	const onMouseUp = () => view.setReflex(false);
+	// Releasing or cancelling the pointer anywhere ends a held Reflex (the button is press-and-hold).
+	const endReflex = () => view.setReflex(false);
 
 	window.addEventListener('keydown', onKeyDown);
 	window.addEventListener('keyup', onKeyUp);
-	window.addEventListener('mouseup', onMouseUp);
+	window.addEventListener('pointerup', endReflex);
+	window.addEventListener('pointercancel', endReflex);
 
 	return () => {
 		cancelAnimationFrame(raf);
 		window.removeEventListener('keydown', onKeyDown);
 		window.removeEventListener('keyup', onKeyUp);
-		window.removeEventListener('mouseup', onMouseUp);
+		window.removeEventListener('pointerup', endReflex);
+		window.removeEventListener('pointercancel', endReflex);
 	};
 });
 </script>
