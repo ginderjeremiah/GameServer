@@ -5,6 +5,8 @@ using Game.Core.Players;
 
 namespace Game.DataAccess.Repositories
 {
+    // Sessions are keyed by the user/account id (single active session per user).
+    // Note PlayerState.PlayerId is a distinct value and is not used as the key.
     internal class SessionStore : ISessionStore
     {
         private static string SessionPrefix => Constants.CACHE_SESSION_PREFIX;
@@ -21,9 +23,9 @@ namespace Game.DataAccess.Repositories
             return await _cache.Get<PlayerState>($"{SessionPrefix}_{userId}");
         }
 
-        public void Update(PlayerState playerState, int playerId)
+        public void Update(PlayerState playerState, int userId)
         {
-            _cache.SetAndForget($"{SessionPrefix}_{playerId}", playerState);
+            _cache.SetAndForget($"{SessionPrefix}_{userId}", playerState);
         }
 
         public void Clear(int userId)
