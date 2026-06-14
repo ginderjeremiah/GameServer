@@ -33,6 +33,16 @@ namespace Game.Core.Tests.Events
         }
 
         [Fact]
+        public void RegisterDomainEventHandler_HandlerWithMultipleConstructors_ThrowsAtRegistration()
+        {
+            // Registration binds the handler via GetConstructors().Single(), so an ambiguous handler
+            // (more than one public constructor) fails fast here rather than silently binding an
+            // arbitrary constructor that would only fail when the event is later dispatched.
+            Assert.Throws<InvalidOperationException>(
+                DomainEventDispatcher.RegisterDomainEventHandler<AmbiguousEvent, AmbiguousCtorHandler>);
+        }
+
+        [Fact]
         public async Task DispatchAsync_HandlerRaisesEventsUnboundedly_ThrowsAfterSafetyBound()
         {
             DomainEventDispatcher.RegisterDomainEventHandler<LoopEvent, LoopEventHandler>();
@@ -166,6 +176,8 @@ namespace Game.Core.Tests.Events
 
         private sealed record MultiThrowEvent : IDomainEvent;
 
+        private sealed record AmbiguousEvent : IDomainEvent;
+
         // Records the order events were handled so the test can assert the cascade ran in one dispatch.
         private sealed class HandledLog
         {
@@ -289,6 +301,16 @@ namespace Game.Core.Tests.Events
                 log.Handled.Add("Child");
                 return Task.CompletedTask;
             }
+        }
+
+        // Two public constructors, so registration's GetConstructors().Single() throws — the ambiguity
+        // the fail-fast guard is meant to catch.
+        private sealed class AmbiguousCtorHandler : IDomainEventHandler<AmbiguousEvent>
+        {
+            public AmbiguousCtorHandler() { }
+            public AmbiguousCtorHandler(HandledLog log) { }
+            public Task HandleAsync(AmbiguousEvent domainEvent, CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
         }
 
         // Minimal provider resolving only the HandledLog the test handlers depend on, so the test needs no

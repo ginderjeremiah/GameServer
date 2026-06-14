@@ -131,7 +131,9 @@ namespace Game.Core.Events
             }
 
             var serviceExtensions = typeof(ServiceProviderServiceExtensions);
-            var handlerConstructor = handlerType.GetConstructors().First();
+            // Single() fails fast at registration if a handler ever gains a second public constructor,
+            // rather than First() silently binding an arbitrary one that fails at invoke time.
+            var handlerConstructor = handlerType.GetConstructors().Single();
             var serviceDependencies = handlerConstructor.GetParameters();
             var serviceProvider = Expression.Parameter(typeof(IServiceProvider));
             var serviceInjectors = serviceDependencies.Select(p => Expression.Call(serviceExtensions, "GetRequiredService", [p.ParameterType], serviceProvider));

@@ -1,4 +1,5 @@
 using Game.Api.Services;
+using Game.Api.Sockets.Commands;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -9,6 +10,20 @@ namespace Game.Api.Tests.Unit
         {
             // Populates the static command registry from the assembly; idempotent across tests.
             SocketCommandFactory.RegisterSocketCommandGenerators();
+        }
+
+        [Fact]
+        public void RegisterSocketCommandGenerators_AllConcreteCommandsHaveExactlyOnePublicConstructor()
+        {
+            // Registration binds each command via GetConstructors().Single(), so a concrete command
+            // gaining a second public constructor would throw at registration. Assert the invariant
+            // directly so the guard can't silently regress.
+            var concreteCommands = typeof(SocketCommandFactory).Assembly.GetTypes()
+                .Where(t => t.IsAssignableTo(typeof(AbstractSocketCommand)) && !t.IsAbstract)
+                .ToList();
+
+            Assert.NotEmpty(concreteCommands);
+            Assert.All(concreteCommands, command => Assert.Single(command.GetConstructors()));
         }
 
         [Theory]
