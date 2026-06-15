@@ -137,6 +137,8 @@ Passwords use **PBKDF2-HMAC-SHA256** behind an `IPasswordHasher` abstraction. A 
 
 Account creation and the login/refresh/logout flows are orchestrated by `AccountService` in the application layer; the controller is a thin HTTP adapter that maps the result and wires the request-scoped session (a presentation concern). The new-player defaults (starter skills, base attributes, default preferences) are a domain concern built by a `NewPlayerFactory` in `Game.Core`, so the application layer neither encodes the defaults nor constructs entity graphs. Access-token issuance sits behind an `IAccessTokenService` abstraction so the application layer stays free of the JWT libraries, while the concrete implementation lives at the presentation edge alongside the bearer-validation pipeline.
 
+At most one active account may hold a given username, enforced by a **partial unique index** (`Username WHERE ArchivedAt IS NULL`) so two concurrent creations can't both slip past the up-front availability check and insert duplicate active rows. The filter excludes archived users, preserving username reuse after archival. Account creation therefore commits its own insert in the data tier (rather than deferring to the per-request unit of work) so the index's unique-violation surfaces as a clean "username taken" result instead of a 500 raised after the action returns.
+
 ## CORS allowed origins (deployment config)
 
 The browser CORS policy's allowed origins are **configuration-bound, not hardcoded** — they are deployment-specific. The list supports multiple origins and is validated at startup (must be non-empty), so a misconfigured environment fails fast rather than silently rejecting every browser request. The local dev origin ships in the Development config.

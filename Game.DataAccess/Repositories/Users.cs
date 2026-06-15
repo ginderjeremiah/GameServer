@@ -5,6 +5,7 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using UserEntity = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Repositories
@@ -47,11 +48,11 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public void CreateAccount(NewAccount account, NewPlayer player)
+        public async Task<bool> CreateAccount(NewAccount account, NewPlayer player)
         {
-            // The account graph is persisted straight through the unit of work (no cache write or domain
-            // events): a freshly created player is only loaded into the cache later, on login. The player
-            // links to the user via navigation, so EF resolves the FK without the store-generated user id.
+            // The account graph carries no cache write or domain events: a freshly created player is only
+            // loaded into the cache later, on login. The player links to the user via navigation, so EF
+            // resolves the FK without the store-generated user id.
             var user = new UserEntity
             {
                 Username = account.Username,
@@ -61,6 +62,24 @@ namespace Game.DataAccess.Repositories
 
             _context.Users.Add(user);
             _context.Players.Add(PlayerMapper.ToEntity(player, user));
+
+            try
+            {
+                // Commit here (rather than deferring to the per-request unit of work) so the active-username
+                // unique index's rejection of a concurrent duplicate surfaces as a result, not a 500 raised
+                // outside the action by the commit filter.
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // The only unique constraint a new account can violate is the active-username index, so a
+                // unique violation means another request created the same active username concurrently.
+                // Clear the tracker (it holds only this account's rolled-back inserts) so the unit-of-work
+                // commit filter doesn't re-attempt them after the action returns.
+                _context.ChangeTracker.Clear();
+                return false;
+            }
         }
 
         public Task<AccountCredentials?> GetUser(string username)

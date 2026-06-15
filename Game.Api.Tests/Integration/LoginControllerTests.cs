@@ -163,6 +163,30 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task CreateAccount_ConcurrentDuplicate_ReturnsCleanErrorNotServerError()
+        {
+            // CreateAccount inserts PlayerSkills with SkillId 0, 1, 2.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+
+            var creds = new { Username = "raceuser", Password = "racepass" };
+
+            // Two concurrent requests racing past the existence check both reach the commit. The
+            // active-username unique index lets exactly one through; the loser must surface as a clean
+            // BadRequest, not the 500 the violation would otherwise raise outside the action.
+            var responses = await Task.WhenAll(
+                Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken),
+                Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken));
+
+            Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
+            Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.BadRequest));
+            Assert.DoesNotContain(responses, response => response.StatusCode == HttpStatusCode.InternalServerError);
+        }
+
+        [Fact]
         public async Task Status_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
