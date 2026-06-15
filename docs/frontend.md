@@ -6,10 +6,11 @@ All of the frontend code is contained in the `UI` folder which is structured as 
   - `components`: Various shared Svelte components used in the frontend.
   - `lib`: API client code, utility functions, and battle simulation logic.
     - `api`: API client code (HTTP and WebSockets) and auto-generated API client interfaces.
-    - `battle`: Battle simulation domain objects
+    - `battle`: Battle simulation domain objects, plus the shared domain mirrors (`AttributeCollection`/`AttributeModifier`/`Item`/`ItemMod`) that back the breakdown and inventory screens
+    - `card-game`: Pure mechanics for the "Initiative Loom" card minigame (`loom-core.ts`/`loom-game.ts`/`cards.ts`), free of DOM/Svelte — see [frontend-screens.md](./frontend-screens.md) for the screen detail
     - `common`: Utility functions/classes used across the frontend
     - `engine`: Core game engine logic - render/logical engine implementations, battle engine, player/enemy managers, etc.
-  - `routes`: Svelte components for each route/page in the application, also includes any route-specific components
+  - `routes`: Svelte components for each route/page in the application, also includes any route-specific components. The in-game screens under `routes/game/screens` use a config-driven **screen registry** (`screen-defs.ts` declares each screen's `key`/`label`/`group`/`built`, with one folder per screen); adding a screen means registering it there. See [frontend-screens.md](./frontend-screens.md) for per-screen detail.
   - `stores`: Svelte stores for managing application state, such as log data, static reference data, and tooltip data. NOTE: most stateful data is instead being moved to classes in the `lib` folder that are made reactive using the `statify` utility function, so avoid adding new stores if possible and consider whether the state you need can be managed using a reactive class.
   - `styles`: Global styles and theming for the frontend.
   - `tests`: Unit tests for the lib code, pages, and components

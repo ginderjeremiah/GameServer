@@ -1061,10 +1061,10 @@ namespace Game.Application.Tests.DataAccess
         /// </summary>
         private sealed class SubscribeSuppressingPubSubService(IPubSubService inner) : IPubSubService
         {
-            public Task Publish(string channel, string message) => inner.Publish(channel, message);
-            public Task Publish(string channel, string queueName, string queueData) => inner.Publish(channel, queueName, queueData);
-            public Task Publish<T>(string channel, string queueName, T queueData) => inner.Publish(channel, queueName, queueData);
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData) => inner.PublishBatch(channel, queueName, queueData);
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => inner.Publish(channel, message, cancellationToken);
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => inner.Publish(channel, queueName, queueData, cancellationToken);
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => inner.Publish(channel, queueName, queueData, cancellationToken);
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => inner.PublishBatch(channel, queueName, queueData, cancellationToken);
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
