@@ -1,6 +1,8 @@
 using System.Linq.Expressions;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
+using Game.Core;
+using Game.Core.Identity;
 using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
@@ -109,11 +111,11 @@ namespace Game.DataAccess.Repositories
             return FilteredUsers(search, roleId, archived).CountAsync();
         }
 
-        public async Task<SetUserRolesStatus> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds)
+        public async Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds)
         {
             var user = await _context.Users
                 .Include(u => u.Roles)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+                .FirstOrDefaultAsync(u => u.Id == targetUserId);
 
             if (user is null)
             {
@@ -132,6 +134,25 @@ namespace Game.DataAccess.Repositories
                 return SetUserRolesStatus.UnknownRole;
             }
 
+            // Gather the facts the lockout policy needs, then let the domain decide. "Other admins" counts
+            // only active (non-archived) accounts, matching login's notion of a usable account, so a change
+            // that would leave no admin able to log back in is blocked.
+            const int adminRoleId = (int)ERole.Admin;
+            var targetHasAdminRole = user.Roles.Any(r => r.Id == adminRoleId);
+            var requestedRolesIncludeAdmin = requestedRoleIds.Contains(adminRoleId);
+            var otherAdminsRemain = await _context.Users.AnyAsync(u =>
+                u.Id != targetUserId && u.ArchivedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
+
+            var protection = AdminLockoutPolicy.CheckRoleChange(
+                actingUserId, targetUserId, targetHasAdminRole, requestedRolesIncludeAdmin, otherAdminsRemain);
+            switch (protection)
+            {
+                case RoleChangeProtection.SelfAdminRemoval:
+                    return SetUserRolesStatus.SelfAdminRemoval;
+                case RoleChangeProtection.LastAdmin:
+                    return SetUserRolesStatus.LastAdmin;
+            }
+
             user.Roles.RemoveAll(r => !requestedRoleIds.Contains(r.Id));
 
             var existingRoleIds = user.Roles.Select(r => r.Id).ToHashSet();
@@ -140,26 +161,31 @@ namespace Game.DataAccess.Repositories
             return SetUserRolesStatus.Success;
         }
 
-        public Task<bool> ArchiveUser(int userId)
+        public Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId)
         {
-            return SetUserTimestamp(userId, user => user.ArchivedAt = DateTime.UtcNow);
+            return SetUserTimestamp(actingUserId, targetUserId, user => user.ArchivedAt = DateTime.UtcNow);
         }
 
-        public Task<bool> BanUser(int userId)
+        public Task<UserActionStatus> BanUser(int actingUserId, int targetUserId)
         {
-            return SetUserTimestamp(userId, user => user.BannedAt = DateTime.UtcNow);
+            return SetUserTimestamp(actingUserId, targetUserId, user => user.BannedAt = DateTime.UtcNow);
         }
 
-        private async Task<bool> SetUserTimestamp(int userId, Action<UserEntity> setTimestamp)
+        private async Task<UserActionStatus> SetUserTimestamp(int actingUserId, int targetUserId, Action<UserEntity> setTimestamp)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (AdminLockoutPolicy.IsSelfTarget(actingUserId, targetUserId))
+            {
+                return UserActionStatus.SelfTarget;
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId);
             if (user is null)
             {
-                return false;
+                return UserActionStatus.UserNotFound;
             }
 
             setTimestamp(user);
-            return true;
+            return UserActionStatus.Success;
         }
 
         private IQueryable<UserEntity> FilteredUsers(string? search, int? roleId, bool? archived)

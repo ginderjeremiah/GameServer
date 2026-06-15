@@ -1,3 +1,4 @@
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Users;
 using Game.Core;
@@ -24,6 +25,18 @@ namespace Game.Api.Tests.Integration
         /// </summary>
         private async Task<HttpClient> SetupAdminClientAsync(bool admin = true)
         {
+            var (client, _) = await SetupAdminClientWithIdAsync(admin);
+            return client;
+        }
+
+        /// <summary>
+        /// Like <see cref="SetupAdminClientAsync"/> but also returns the acting admin's user id. When the
+        /// caller is an admin the Admin role is granted in the database (not just the token) so the
+        /// self-protection rules — which read the persisted roles — see the caller as a real admin and
+        /// self-targeting / last-admin scenarios can be exercised.
+        /// </summary>
+        private async Task<(HttpClient Client, int UserId)> SetupAdminClientWithIdAsync(bool admin = true)
+        {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
@@ -31,7 +44,12 @@ namespace Game.Api.Tests.Integration
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
             var roles = admin ? new[] { nameof(ERole.Admin) } : [];
-            return CreateAuthenticatedClient(user.Id, player.Id, roles);
+            if (admin)
+            {
+                await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
+            }
+
+            return (CreateAuthenticatedClient(user.Id, player.Id, roles), user.Id);
         }
 
         private async Task SeedDefaultSkillsAsync()
@@ -394,6 +412,128 @@ namespace Game.Api.Tests.Integration
             using var authClient = await SetupAdminClientAsync(admin: false);
             var response = await authClient.GetAsync("/api/AdminTools/GetUsers", CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task ArchiveUser_TargetingSelf_IsRejectedAndDoesNotArchive()
+        {
+            var (authClient, adminId) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = adminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("You cannot archive your own account.", result?.ErrorMessage);
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var admin = await context.Users.AsNoTracking().FirstAsync(u => u.Id == adminId, CancellationToken);
+            Assert.Null(admin.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task BanUser_TargetingSelf_IsRejectedAndDoesNotBan()
+        {
+            var (authClient, adminId) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/BanUser", new { UserId = adminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("You cannot ban your own account.", result?.ErrorMessage);
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var admin = await context.Users.AsNoTracking().FirstAsync(u => u.Id == adminId, CancellationToken);
+            Assert.Null(admin.BannedAt);
+        }
+
+        [Fact]
+        public async Task SetUserRoles_RemovingOwnAdminRole_IsRejectedAndRetainsRole()
+        {
+            var (authClient, adminId) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/SetUserRoles",
+                new { UserId = adminId, RoleIds = Array.Empty<int>() },
+                CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("You cannot remove your own Admin role.", result?.ErrorMessage);
+
+            Assert.Equal(new[] { nameof(ERole.Admin) }, await LoadRoleNamesAsync(adminId));
+        }
+
+        [Fact]
+        public async Task SetUserRoles_RemovingAdminFromAnotherUser_WhileAdminsRemain_Succeeds()
+        {
+            var (authClient, _) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+            int otherAdminId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var other = await TestDataSeeder.CreateUserAsync(context, "otheradmin", "pw");
+                otherAdminId = other.Id;
+                await TestDataSeeder.AssignRoleToUserAsync(context, other.Id, ERole.Admin);
+            }
+
+            // The acting admin remains an admin, so demoting another admin is not a lockout.
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/SetUserRoles",
+                new { UserId = otherAdminId, RoleIds = Array.Empty<int>() },
+                CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Empty(await LoadRoleNamesAsync(otherAdminId));
+        }
+
+        [Fact]
+        public async Task SetUserRoles_RemovingAdminFromLastAdmin_IsRejected()
+        {
+            // Driven through the repository so the actor is a valid-token admin who is no longer a persisted
+            // admin (e.g. concurrently demoted), leaving the target as the last admin standing.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var soleAdmin = await TestDataSeeder.CreateUserAsync(context, "soleadmin", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, soleAdmin.Id, ERole.Admin);
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.SetUserRoles(actor.Id, soleAdmin.Id, Array.Empty<int>());
+
+            Assert.Equal(SetUserRolesStatus.LastAdmin, status);
+        }
+
+        [Fact]
+        public async Task ArchiveUser_NonPositiveUserId_Returns400()
+        {
+            using var authClient = await SetupAdminClientAsync();
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = 0 }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task SetUserRoles_NullRoleIds_Returns400()
+        {
+            using var authClient = await SetupAdminClientAsync();
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/SetUserRoles",
+                new { UserId = 1, RoleIds = (int[]?)null },
+                CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
         private async Task<string[]> LoadRoleNamesAsync(int userId)

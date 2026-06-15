@@ -5,13 +5,34 @@ namespace Game.Abstractions.DataAccess
 {
     /// <summary>
     /// Outcome of a <see cref="IUsers.SetUserRoles"/> attempt, so the caller can surface the
-    /// appropriate message. The data tier owns validating the assignment against the role set.
+    /// appropriate message. The data tier owns validating the assignment against the role set and
+    /// enforcing the admin-lockout self-protection rules.
     /// </summary>
     public enum SetUserRolesStatus
     {
         Success,
         UserNotFound,
         UnknownRole,
+
+        /// <summary>The acting admin attempted to remove their own Admin role.</summary>
+        SelfAdminRemoval,
+
+        /// <summary>The change would have removed the Admin role from the last remaining admin.</summary>
+        LastAdmin,
+    }
+
+    /// <summary>
+    /// Outcome of a single-user lifecycle action (<see cref="IUsers.ArchiveUser"/> /
+    /// <see cref="IUsers.BanUser"/>), so the caller can surface the appropriate message. The data tier
+    /// rejects an admin targeting their own account to prevent a self-inflicted lockout.
+    /// </summary>
+    public enum UserActionStatus
+    {
+        Success,
+        UserNotFound,
+
+        /// <summary>The acting admin attempted the action on their own account.</summary>
+        SelfTarget,
     }
 
     public interface IUsers
@@ -63,20 +84,26 @@ namespace Game.Abstractions.DataAccess
         Task<int> CountUsers(string? search, int? roleId, bool? archived);
 
         /// <summary>
-        /// Replaces the set of roles granted to the user with the given role ids, validating that every id
-        /// refers to a real role. Returns <see cref="SetUserRolesStatus.UserNotFound"/> if the user does not
-        /// exist or <see cref="SetUserRolesStatus.UnknownRole"/> if any id is not a known role.
+        /// Replaces the set of roles granted to the target user with the given role ids, validating that
+        /// every id refers to a real role and enforcing the admin-lockout rules: the acting admin cannot
+        /// strip their own Admin role, nor remove the Admin role from the last remaining admin. Returns the
+        /// matching <see cref="SetUserRolesStatus"/> for each rejection, or
+        /// <see cref="SetUserRolesStatus.Success"/> when the change is applied.
         /// </summary>
-        Task<SetUserRolesStatus> SetUserRoles(int userId, IReadOnlyCollection<int> roleIds);
+        Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds);
 
         /// <summary>
-        /// Archives (soft-deletes) the user, freeing their username for reuse. Returns false if the user does not exist.
+        /// Archives (soft-deletes) the target user, freeing their username for reuse. Rejects an admin
+        /// archiving their own account (<see cref="UserActionStatus.SelfTarget"/>) and returns
+        /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
         /// </summary>
-        Task<bool> ArchiveUser(int userId);
+        Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId);
 
         /// <summary>
-        /// Bans the user while keeping their username reserved. Returns false if the user does not exist.
+        /// Bans the target user while keeping their username reserved. Rejects an admin banning their own
+        /// account (<see cref="UserActionStatus.SelfTarget"/>) and returns
+        /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
         /// </summary>
-        Task<bool> BanUser(int userId);
+        Task<UserActionStatus> BanUser(int actingUserId, int targetUserId);
     }
 }

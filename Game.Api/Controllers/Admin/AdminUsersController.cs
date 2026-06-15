@@ -3,6 +3,7 @@ using Game.Abstractions.DataAccess;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Game.Api.Models.Users;
+using Game.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Controllers.Admin
@@ -20,13 +21,15 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    public class AdminUsersController(IUsers users, IRoles roles) : ControllerBase
+    public class AdminUsersController(IUsers users, IRoles roles, SessionService session) : ControllerBase
     {
         private const int MaxPageSize = 100;
         private const int DefaultPageSize = 25;
 
         private readonly IUsers _users = users;
         private readonly IRoles _roles = roles;
+        // Identifies the acting admin (from the validated token) so destructive actions can self-protect.
+        private readonly SessionService _session = session;
 
         [HttpGet]
         public async Task<ApiResponse<AdminUserSearchResults>> GetUsers(
@@ -60,12 +63,14 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> SetUserRoles([FromBody] SetUserRolesData data)
         {
-            var status = await _users.SetUserRoles(data.UserId, data.RoleIds);
+            var status = await _users.SetUserRoles(_session.UserId, data.UserId, data.RoleIds);
             return status switch
             {
                 SetUserRolesStatus.Success => ApiResponse.Success(),
                 SetUserRolesStatus.UserNotFound => ApiResponse.Error("User not found."),
                 SetUserRolesStatus.UnknownRole => ApiResponse.Error("One or more roles do not exist."),
+                SetUserRolesStatus.SelfAdminRemoval => ApiResponse.Error("You cannot remove your own Admin role."),
+                SetUserRolesStatus.LastAdmin => ApiResponse.Error("Cannot remove the Admin role from the last remaining admin."),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }
@@ -73,15 +78,26 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> ArchiveUser([FromBody] UserActionData data)
         {
-            var archived = await _users.ArchiveUser(data.UserId);
-            return archived ? ApiResponse.Success() : ApiResponse.Error("User not found.");
+            var status = await _users.ArchiveUser(_session.UserId, data.UserId);
+            return MapUserAction(status, "You cannot archive your own account.");
         }
 
         [HttpPost]
         public async Task<ApiResponse> BanUser([FromBody] UserActionData data)
         {
-            var banned = await _users.BanUser(data.UserId);
-            return banned ? ApiResponse.Success() : ApiResponse.Error("User not found.");
+            var status = await _users.BanUser(_session.UserId, data.UserId);
+            return MapUserAction(status, "You cannot ban your own account.");
+        }
+
+        private static ApiResponse MapUserAction(UserActionStatus status, string selfTargetMessage)
+        {
+            return status switch
+            {
+                UserActionStatus.Success => ApiResponse.Success(),
+                UserActionStatus.UserNotFound => ApiResponse.Error("User not found."),
+                UserActionStatus.SelfTarget => ApiResponse.Error(selfTargetMessage),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
         }
     }
 }
