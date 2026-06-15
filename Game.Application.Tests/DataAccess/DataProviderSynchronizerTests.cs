@@ -713,6 +713,53 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StartAsync_DrainsItemsAlreadyOnQueue_WithoutWaitingForAWake()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 15,
+                Exp: 5678,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100);
+
+            var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+
+            // Enqueue an event before the synchronizer starts, with no wake published — modelling an item
+            // stranded on the queue across an instance restart / dropped wake (#560). Only the startup drain
+            // can pick it up, since nothing will publish a subsequent wake.
+            await realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).AddToQueueAsync(Serialize(validEvent));
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            // Subscribe is suppressed so the test exercises only the startup drain (and leaves no lingering
+            // subscription on the shared channel that a later test's publish could trigger); GetQueue and the
+            // dead-letter writes still route to real Redis.
+            var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            await synchronizer.StartAsync(CancellationToken.None);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(realPubSub));
+
+            // The startup drain consumed the whole queue.
+            Assert.Null(await realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).GetNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(15, persisted.Level);
+            Assert.Equal(5678, persisted.Exp);
+        }
+
+        [Fact]
         public async Task ProcessQueue_ProgressUpdatedEvent_UpsertsStatisticsAndChallengesIdempotently()
         {
             using var scope = CreateScope();
@@ -1004,6 +1051,26 @@ namespace Game.Application.Tests.DataAccess
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
             public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Wraps a real <see cref="IPubSubService"/> but makes the <c>Subscribe</c> overloads no-ops, so a test can
+        /// exercise <see cref="DataProviderSynchronizer.StartAsync"/>'s startup drain against real Redis queues
+        /// without registering a lingering subscription on the shared channel. Every other member delegates to the
+        /// real service so the queue reads/writes (including the dead-letter queue) hit Redis as normal.
+        /// </summary>
+        private sealed class SubscribeSuppressingPubSubService(IPubSubService inner) : IPubSubService
+        {
+            public Task Publish(string channel, string message) => inner.Publish(channel, message);
+            public Task Publish(string channel, string queueName, string queueData) => inner.Publish(channel, queueName, queueData);
+            public Task Publish<T>(string channel, string queueName, T queueData) => inner.Publish(channel, queueName, queueData);
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData) => inner.PublishBatch(channel, queueName, queueData);
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task UnSubscribe(string channel) => inner.UnSubscribe(channel);
+            public Task UnSubscribe(string channel, string id) => inner.UnSubscribe(channel, id);
+            public IPubSubQueue GetQueue(string queueName) => inner.GetQueue(queueName);
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
