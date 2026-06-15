@@ -56,7 +56,7 @@ namespace Game.Api.Services
         /// The player aggregate for this session. On a socket connection it is loaded once up front when the
         /// socket connects (<c>SocketInterceptorMiddleware</c>) and held in memory for the connection's
         /// lifetime, so socket commands read it synchronously and the connection never re-reads the cache per
-        /// command (see docs/backend.md -> Caching and Pub/Sub). Throws if accessed before <see cref="SetPlayer"/>.
+        /// command (see docs/backend-persistence.md -> Caching and Pub/Sub). Throws if accessed before <see cref="SetPlayer"/>.
         /// </summary>
         public Player Player => _player
             ?? throw new InvalidOperationException("Player has not been loaded for this session.");

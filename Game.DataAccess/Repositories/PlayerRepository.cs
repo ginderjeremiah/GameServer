@@ -22,7 +22,7 @@ namespace Game.DataAccess.Repositories
         /// session key — #537): a player idle long enough for the key to lapse can no longer hold a live
         /// session, so the only cost of expiry is one transparent DB reload on their next access (the
         /// cache-miss path in <see cref="GetPlayer"/>). It also dwarfs the sub-second write-behind
-        /// queue-drain window, so a refreshed key never expires mid-drain (see docs/backend.md → Caching
+        /// queue-drain window, so a refreshed key never expires mid-drain (see docs/backend-persistence.md → Caching
         /// and Pub/Sub).
         /// </summary>
         private static readonly TimeSpan PlayerCacheTtl = AuthConstants.RefreshTokenLifetime;

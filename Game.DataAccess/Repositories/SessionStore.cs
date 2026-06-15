@@ -21,7 +21,7 @@ namespace Game.DataAccess.Repositories
         /// binding that <c>SessionService.Authenticated</c> relies on, and a miss has no reload path — so the
         /// budget is the refresh-token lifetime as a genuine floor: a session must not be dropped while its
         /// refresh token is still valid, and once that has lapsed the user must re-login (which re-creates the
-        /// session) anyway (see docs/backend.md → Caching and Pub/Sub).
+        /// session) anyway (see docs/backend-persistence.md → Caching and Pub/Sub).
         /// </summary>
         private static readonly TimeSpan SessionCacheTtl = AuthConstants.RefreshTokenLifetime;
 

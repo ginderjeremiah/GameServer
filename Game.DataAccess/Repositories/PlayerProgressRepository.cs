@@ -26,7 +26,7 @@ namespace Game.DataAccess.Repositories
         // Sliding idle TTL for the cached progress aggregate, mirroring the player cache (#439): written on
         // every save and load-miss re-cache, refreshed on every hit, so an active player never ages out while
         // a dormant one does. It dwarfs the sub-second write-behind drain window, so a key never expires
-        // mid-drain (see docs/backend.md -> Caching and Pub/Sub). It shares the same anchor as the player and
+        // mid-drain (see docs/backend-persistence.md -> Caching and Pub/Sub). It shares the same anchor as the player and
         // session caches (AuthConstants.RefreshTokenLifetime) so a retune of that budget keeps them aligned.
         private static readonly TimeSpan ProgressCacheTtl = AuthConstants.RefreshTokenLifetime;
 
