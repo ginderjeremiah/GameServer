@@ -1,5 +1,5 @@
 <div class="row">
-	<span class="bullet" style="--c: {color}"></span>
+	<AttributeIcon {id} size={40} />
 
 	<div class="info">
 		<div class="head">
@@ -25,6 +25,7 @@
 <script lang="ts">
 import { attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import Delta from './Delta.svelte';
 import Stepper from './Stepper.svelte';
 import { CORE_ATTRIBUTES, DERIVED_STATS, feedsFor, type AttributesView } from './attributes-view.svelte';
@@ -58,15 +59,6 @@ const changed = $derived(
 	border-radius: 4px;
 	background: color-mix(in srgb, var(--white) 2%, transparent);
 	border: 1px solid var(--border-subtle);
-}
-
-.bullet {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	flex-shrink: 0;
-	background: var(--c);
-	box-shadow: 0 0 7px color-mix(in srgb, var(--c) 60%, transparent);
 }
 
 .info {
