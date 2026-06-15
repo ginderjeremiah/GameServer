@@ -1,37 +1,42 @@
-<!-- The row of active-effect chips on a battler card: one chip per timed effect currently modifying the
-     battler, tinted by buff/debuff direction, with a render-interpolated countdown bar that depletes
-     smoothly between ticks and visibly refills when the effect is refreshed (re-applied). Reads the
-     battler's reactive `activeEffects` projection, so chips appear/expire as effects come and go. -->
+<!-- The row of active-effect chips on a battler card: one skill-style icon tile per timed effect
+     currently modifying the battler. Each tile shows the attribute's icon with a radial (conic)
+     cooldown overlay that depletes as the effect's remaining duration ticks down and refills when the
+     effect is refreshed (re-applied), a small magnitude badge, and a buff/debuff direction tint. Reads
+     the battler's reactive `activeEffects` projection, so tiles appear/expire as effects come and go. -->
 {#if battler.activeEffects.length > 0}
 	<div class="effect-chips" class:reversed data-testid="effect-chips">
 		{#each battler.activeEffects as effect (effect.sourceId)}
-			{@const color = effectDirectionColor(
-				effectDirection(attributeIsHarmful(effect.attribute, staticData.attributes), effect.modifierType, effect.amount)
+			{@const direction = effectDirection(
+				attributeIsHarmful(effect.attribute, staticData.attributes),
+				effect.modifierType,
+				effect.amount
 			)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
+			{@const magnitude = formatEffectMagnitude(effect.modifierType, effect.amount)}
+			<!-- A focusable button (mirroring the skill slots) so the attribute tooltip is reachable by
+			     keyboard and screen reader, not just on hover. Its accessible name describes the effect. -->
+			<button
+				type="button"
 				class="effect-chip"
-				style:--chip-accent={color}
+				style:--chip-accent={effectDirectionColor(direction)}
+				aria-label="{attributeName(effect.attribute, staticData.attributes)} {direction}, {magnitude}"
 				onmouseenter={(ev) => showChipTooltip(effect, ev)}
 				onmousemove={(ev) => tip.controller.move(ev)}
 				onmouseleave={hideChipTooltip}
+				onfocus={(ev) => showChipTooltip(effect, ev.currentTarget)}
+				onblur={hideChipTooltip}
 			>
-				<AttributeIcon id={effect.attribute} size={13} />
-				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
-				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
-				<span class="chip-time">{remainingSeconds(effect)}s</span>
-				<div class="chip-track">
-					<div class="chip-fill" style:width="{remainingPercent(effect)}%"></div>
-				</div>
-			</div>
+				<AttributeIcon id={effect.attribute} size={26} />
+				<CooldownOverlay sweep={remainingSweep(effect)} />
+				<span class="chip-mag">{magnitude}</span>
+			</button>
 		{/each}
 	</div>
 {/if}
 
-<!-- One tooltip instance per chip row, anchored to whichever chip is hovered. Always mounted (it
-     stays hidden until a chip is hovered) so its registration survives chips coming and going. The
-     effect context is the live `ActiveEffectView` (resolved by source id), so the tooltip's countdown
-     pill keeps depleting and the panel closes itself if the hovered effect expires under the cursor. -->
+<!-- One tooltip instance per chip row, anchored to whichever chip is hovered/focused. Always mounted
+     (it stays hidden until a chip is triggered) so its registration survives chips coming and going.
+     The effect context is the live `ActiveEffectView` (resolved by source id), so the tooltip's
+     countdown pill keeps depleting and the panel closes itself if the hovered effect expires. -->
 <AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={shownEffectContext} />
 
 <script lang="ts">
@@ -43,7 +48,9 @@ import {
 	formatEffectMagnitude
 } from '$lib/common';
 import { staticData, type TooltipComponent } from '$stores';
+import { type TooltipAnchor } from '$stores/tooltip.svelte';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import type { ActiveEffectView, Battler } from '$lib/battle';
@@ -92,12 +99,15 @@ $effect(() => {
 	}
 });
 
-const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
-const remainingPercent = (effect: ActiveEffectView) =>
-	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
-const showChipTooltip = (effect: ActiveEffectView, ev: MouseEvent) => {
+// The transparent (revealed) arc of the radial overlay: the render-interpolated remaining fraction of
+// the effect's duration, in degrees. Depletes toward 0 as the effect expires; resets to 360 (the icon
+// fully revealed) when the effect is refreshed, since refresh restores `renderRemainingMs`.
+const remainingSweep = (effect: ActiveEffectView) =>
+	effect.durationMs > 0 ? Math.max(0, Math.min(360, (effect.renderRemainingMs / effect.durationMs) * 360)) : 0;
+
+const showChipTooltip = (effect: ActiveEffectView, anchor: TooltipAnchor) => {
 	shownSourceId = effect.sourceId;
-	tip.controller.show(effect.attribute, ev);
+	tip.controller.show(effect.attribute, anchor);
 };
 const hideChipTooltip = () => {
 	shownSourceId = undefined;
@@ -110,7 +120,6 @@ const hideChipTooltip = () => {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
-	margin-bottom: 12px;
 
 	&.reversed {
 		justify-content: flex-end;
@@ -118,51 +127,49 @@ const hideChipTooltip = () => {
 }
 
 .effect-chip {
+	// Reset native button chrome (the chip is a <button> so its tooltip is keyboard-reachable),
+	// then lay out as a square icon tile mirroring the skill slots.
+	appearance: none;
+	margin: 0;
+	padding: 0;
+	font: inherit;
+	color: inherit;
 	position: relative;
+	width: 38px;
+	height: 38px;
 	display: flex;
-	align-items: baseline;
-	gap: 5px;
-	padding: 3px 7px 5px;
+	align-items: center;
+	justify-content: center;
 	border: 1px solid color-mix(in srgb, var(--chip-accent) 45%, transparent);
 	border-radius: 2px;
 	background: color-mix(in srgb, var(--chip-accent) 10%, transparent);
 	overflow: hidden;
+	cursor: default;
+	transition: border-color 140ms;
+
+	&:focus-visible {
+		outline: 2px solid var(--chip-accent);
+		outline-offset: 2px;
+	}
 
 	:global(.attr-icon) {
-		align-self: center;
+		opacity: 0.92;
 	}
 }
 
+// Sits last in the DOM (above the overlay) so the magnitude stays legible as the wedge sweeps in.
 .chip-mag {
-	font-family: var(--mono);
-	font-size: 10px;
-	font-weight: 600;
-	color: var(--chip-accent);
-}
-
-.chip-attr {
-	font-size: 10px;
-	color: var(--text-secondary);
-	white-space: nowrap;
-}
-
-.chip-time {
-	font-family: var(--mono);
-	font-size: 8.5px;
-	color: var(--text-muted);
-}
-
-.chip-track {
 	position: absolute;
 	left: 0;
 	right: 0;
 	bottom: 0;
-	height: 2px;
-	background: color-mix(in srgb, var(--white) 8%, transparent);
-}
-
-.chip-fill {
-	height: 100%;
-	background: var(--chip-accent);
+	padding: 1px 0;
+	font-family: var(--mono);
+	font-size: 9px;
+	font-weight: 600;
+	line-height: 1;
+	text-align: center;
+	color: var(--chip-accent);
+	background: color-mix(in srgb, var(--black) 55%, transparent);
 }
 </style>

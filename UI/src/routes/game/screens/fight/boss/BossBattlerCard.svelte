@@ -14,10 +14,14 @@
 
 	<BossHpBar currentHealth={battler.currentHealth} {maxHealth} />
 
-	<ActiveEffectChips {battler} reversed />
-
 	<div class="skills">
 		<Skills {battler} side="enemy" accent="var(--boss-accent)" />
+	</div>
+
+	<!-- Active timed effects float below the card (absolutely positioned) so effects coming and
+	     going never change the card's height — which would shift the vertically-centred combatants row. -->
+	<div class="effect-chips-slot">
+		<ActiveEffectChips {battler} reversed />
 	</div>
 </div>
 
@@ -91,5 +95,15 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 
 .skills {
 	margin-top: 16px;
+}
+
+// Anchored to the card's bottom edge and inset to the content padding, so the effect tiles line up
+// under the skill row without occupying card height.
+.effect-chips-slot {
+	position: absolute;
+	top: 100%;
+	left: 20px;
+	right: 20px;
+	padding-top: 12px;
 }
 </style>

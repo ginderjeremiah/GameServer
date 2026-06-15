@@ -52,7 +52,7 @@ describe('ActiveEffectChips', () => {
 		expect(queryByTestId('effect-chips')).toBeNull();
 	});
 
-	it('renders one chip per active effect, tinted by buff/debuff direction', () => {
+	it('renders one icon tile per active effect, tinted by buff/debuff direction', () => {
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
 		battler.applyEffect(
 			effect({ id: 2, target: ESkillEffectTarget.Opponent, attributeId: EAttribute.Defense, amount: -5 })
@@ -63,29 +63,29 @@ describe('ActiveEffectChips', () => {
 		expect(chips).toHaveLength(2);
 		// A raised Strength is a buff; a lowered Defense is a debuff.
 		expect((chips[0] as HTMLElement).style.getPropertyValue('--chip-accent')).toBe('var(--effect-buff)');
-		expect(chips[0].textContent).toContain('+5');
-		expect(chips[0].textContent).toContain('Strength');
+		expect(chips[0].querySelector('.chip-mag')?.textContent).toContain('+5');
 		expect((chips[1] as HTMLElement).style.getPropertyValue('--chip-accent')).toBe('var(--effect-debuff)');
-		expect(chips[1].textContent).toContain('-5');
-		expect(chips[1].textContent).toContain('Defense');
+		expect(chips[1].querySelector('.chip-mag')?.textContent).toContain('-5');
+		// The attribute name moves to the tooltip/accessible name rather than crowding the tile.
+		expect(chips[0].getAttribute('aria-label')).toContain('Strength');
+		expect(chips[1].getAttribute('aria-label')).toContain('Defense');
 	});
 
-	it('sizes the countdown fill from the render-interpolated remaining duration', () => {
+	it('sweeps the radial overlay from the render-interpolated remaining duration', () => {
 		battler.applyEffect(effect({ id: 1, durationMs: 1000 }));
-		battler.activeEffects[0].renderRemainingMs = 500; // half elapsed
+		battler.activeEffects[0].renderRemainingMs = 500; // half remaining
 		const { container } = render(ActiveEffectChips, { props: { battler } });
 
-		const fill = container.querySelector('.chip-fill') as HTMLElement;
-		expect(fill.style.width).toBe('50%');
-		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('0.50s');
+		// Half remaining -> the revealed arc is 180 of 360 degrees.
+		expect(container.querySelector('.cooldown-overlay')?.getAttribute('style')).toContain('180deg');
 	});
 
-	it('formats integer seconds with two decimal places to prevent width jitter', () => {
+	it('fully reveals the icon (360deg sweep) for a freshly applied effect', () => {
 		battler.applyEffect(effect({ id: 1, durationMs: 2000 }));
-		battler.activeEffects[0].renderRemainingMs = 2000;
+		battler.activeEffects[0].renderRemainingMs = 2000; // just applied / refreshed
 		const { container } = render(ActiveEffectChips, { props: { battler } });
 
-		expect((container.querySelector('.chip-time') as HTMLElement).textContent).toContain('2.00s');
+		expect(container.querySelector('.cooldown-overlay')?.getAttribute('style')).toContain('360deg');
 	});
 
 	it('right-aligns the row when reversed (enemy/boss layout)', () => {
@@ -118,6 +118,22 @@ describe('ActiveEffectChips', () => {
 		expect(container.querySelector('.tt-title-name')).not.toBeNull();
 
 		await fireEvent.mouseLeave(container.querySelector('.effect-chip') as HTMLElement);
+		expect(container.querySelector('.tt-title-name')).toBeNull();
+	});
+
+	it('makes each chip a focusable button that opens the tooltip on focus and hides it on blur', async () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
+		const { container } = render(ActiveEffectChips, { props: { battler } });
+
+		const chip = container.querySelector('.effect-chip') as HTMLElement;
+		// A real <button> so the tooltip is keyboard/screen-reader reachable, mirroring the skill slots.
+		expect(chip.tagName).toBe('BUTTON');
+		expect(container.querySelector('.tt-title-name')).toBeNull();
+
+		await fireEvent.focus(chip);
+		expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('Strength');
+
+		await fireEvent.blur(chip);
 		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
 

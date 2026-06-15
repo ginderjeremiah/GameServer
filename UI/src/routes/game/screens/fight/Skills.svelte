@@ -11,7 +11,6 @@
 					type="button"
 					class="skill-slot"
 					class:ready={charge.ready}
-					style:--skill-sweep="{charge.sweep}deg"
 					style:--pulse-color={pulseColor}
 					onmousemove={handleMouseMove}
 					onmouseenter={(ev) => handleEnter(ev, index)}
@@ -20,7 +19,7 @@
 					onblur={() => handleLeave(index)}
 				>
 					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
-					<div class="cooldown-overlay"></div>
+					<CooldownOverlay sweep={charge.sweep} />
 					{#if charge.ready}
 						<div class="ready-glow"></div>
 					{/if}
@@ -47,6 +46,7 @@ import {
 	type TooltipComponent
 } from '$stores/tooltip.svelte';
 import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
+import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import SkillTooltip from './SkillTooltip.svelte';
 
 type Props = {
@@ -162,16 +162,6 @@ const chargeState = (skill: Skill) => {
 	width: 100%;
 	height: 100%;
 	opacity: 0.92;
-}
-
-.cooldown-overlay {
-	position: absolute;
-	inset: 0;
-	background: conic-gradient(
-		transparent var(--skill-sweep),
-		color-mix(in srgb, var(--black) 65%, transparent) var(--skill-sweep)
-	);
-	pointer-events: none;
 }
 
 .ready-glow {

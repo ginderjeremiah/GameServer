@@ -63,7 +63,7 @@ describe('Skills', () => {
 		expect(slots[0].classList.contains('ready')).toBe(true);
 		expect(slots[1].classList.contains('ready')).toBe(false);
 		// The cooldown sweep tracks the charge percentage (50% -> 180 of 360 degrees).
-		expect((slots[1] as HTMLElement).getAttribute('style')).toContain('180deg');
+		expect(slots[1].querySelector('.cooldown-overlay')?.getAttribute('style')).toContain('180deg');
 	});
 
 	it('shows the effect badge only on skills that carry effects', () => {
