@@ -1,7 +1,6 @@
 using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Infrastructure.Entities;
-using Game.Application;
 using Game.Application.Auth;
 using Game.Application.Services;
 using Game.Core;
@@ -42,9 +41,8 @@ namespace Game.Application.Tests.Services
             var status = await accountService.CreateAccount("newaccount", "newpass");
             Assert.Equal(CreateAccountStatus.Success, status);
 
-            // The inserts are queued in the change tracker; the surrounding unit of work persists them.
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-
+            // CreateAccount commits its own insert (so the active-username guard can be honoured), so the
+            // graph is already persisted — no separate unit-of-work commit is needed.
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
             var createdUser = await verifyContext.Users
@@ -102,6 +100,81 @@ namespace Game.Application.Tests.Services
             var status = await accountService.CreateAccount("existing", "anotherpass");
 
             Assert.Equal(CreateAccountStatus.UsernameTaken, status);
+        }
+
+        [Fact]
+        public async Task CreateAccount_ConcurrentSameUsername_CreatesExactlyOneActiveAccount()
+        {
+            // The starter skills 0/1/2 must exist for each new player's player-skill FK.
+            using (var seedScope = CreateScope())
+            {
+                var seedContext = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill0");
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill1");
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill2");
+            }
+
+            // Each attempt runs on its own scope/DbContext (a context is not thread-safe). Whether both race
+            // past the existence check or one observes the other's row, the active-username unique index must
+            // ensure only one insert wins; the loser is reported as taken rather than failing.
+            async Task<CreateAccountStatus> Attempt()
+            {
+                using var scope = CreateScope();
+                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass");
+            }
+
+            var results = await Task.WhenAll(Attempt(), Attempt());
+
+            Assert.Equal(1, results.Count(status => status == CreateAccountStatus.Success));
+            Assert.Equal(1, results.Count(status => status == CreateAccountStatus.UsernameTaken));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var activeCount = await verifyContext.Users
+                .CountAsync(user => user.Username == "raceuser" && user.ArchivedAt == null, CancellationToken);
+            Assert.Equal(1, activeCount);
+        }
+
+        [Fact]
+        public async Task CreateAccount_UsernameOfArchivedAccount_SucceedsLeavingOneActiveRow()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // An archived row must not block reuse of its username — the partial index filters it out.
+            var archived = await TestDataSeeder.CreateUserAsync(context, "reusable", "oldpass");
+            archived.ArchivedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            // The starter skills 0/1/2 must exist for the new player's player-skill FK.
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+
+            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass");
+            Assert.Equal(CreateAccountStatus.Success, status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.Users
+                .Where(user => user.Username == "reusable")
+                .ToListAsync(CancellationToken);
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(1, rows.Count(user => user.ArchivedAt == null));
+        }
+
+        [Fact]
+        public async Task ActiveUsername_SecondActiveDuplicateInsert_IsRejectedByUniqueIndex()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "dupe", "pass");
+
+            // A second active row for the same username must be rejected at the DB level — the guard the
+            // concurrent-creation handling relies on — independent of any application-level pre-check.
+            context.Users.Add(new User { Username = "dupe", PassHash = "hash", LastLogin = DateTime.UtcNow });
+
+            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(CancellationToken));
         }
 
         [Fact]

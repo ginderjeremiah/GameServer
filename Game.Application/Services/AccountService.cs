@@ -33,7 +33,8 @@ namespace Game.Application.Services
         /// credential material plus the new-player blueprint to the Identity context for persistence. The
         /// new-player defaults (starter skills, attributes, and log preferences) are a domain concern
         /// owned by <see cref="NewPlayerFactory"/>; this method only orchestrates — it builds no entity
-        /// graphs. The inserts are persisted by the surrounding unit of work.
+        /// graphs. The up-front check is a fast path; the data tier's active-username uniqueness guard is
+        /// the authority, so a username claimed concurrently (past the check) is still reported as taken.
         /// </summary>
         public async Task<CreateAccountStatus> CreateAccount(string username, string password)
         {
@@ -48,9 +49,9 @@ namespace Game.Application.Services
                 PassHash = _passwordHasher.Hash(password),
             };
 
-            _users.CreateAccount(account, _newPlayerFactory.Create(username));
+            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username));
 
-            return CreateAccountStatus.Success;
+            return created ? CreateAccountStatus.Success : CreateAccountStatus.UsernameTaken;
         }
 
         /// <summary>

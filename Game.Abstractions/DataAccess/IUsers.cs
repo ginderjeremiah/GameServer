@@ -41,9 +41,11 @@ namespace Game.Abstractions.DataAccess
         /// Persists a brand-new account: the user record described by <paramref name="account"/> together
         /// with its initial player graph (built from the <paramref name="player"/> blueprint), linked via
         /// the navigation property so EF resolves the foreign key without the user's store-generated id.
-        /// The inserts are queued in the surrounding unit of work.
+        /// The insert is committed immediately (not deferred to the surrounding unit of work) so the
+        /// active-username uniqueness guard can be honoured: returns <see langword="false"/> when the
+        /// username was claimed by a concurrently-created active account, <see langword="true"/> otherwise.
         /// </summary>
-        void CreateAccount(NewAccount account, NewPlayer player);
+        Task<bool> CreateAccount(NewAccount account, NewPlayer player);
 
         /// <summary>
         /// Loads the credentials of the active (non-archived) account with the given username — the data

@@ -435,6 +435,13 @@ namespace Game.Infrastructure.Database
                 // Self-contained PBKDF2 hash: $pbkdf2-sha256$<iterations>$<base64-salt>$<base64-key>.
                 entity.Property(u => u.PassHash)
                     .HasMaxLength(128);
+
+                // At most one active (non-archived) account per username, enforced at the DB level so two
+                // concurrent CreateAccount requests can't both insert a duplicate active row. The partial
+                // filter excludes archived users, preserving username reuse after archival.
+                entity.HasIndex(u => u.Username)
+                    .IsUnique()
+                    .HasFilter("\"ArchivedAt\" IS NULL");
             });
 
             modelBuilder.Entity<BrowserInfo>(entity =>
