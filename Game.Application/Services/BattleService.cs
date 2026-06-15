@@ -28,6 +28,11 @@ namespace Game.Application.Services
         private readonly ISkills _skills = skills;
         private readonly BattleFactory _battleFactory = battleFactory;
 
+        // Symmetric clock-skew tolerance for the client-claimed victory timestamp: benign skew in either
+        // direction (client clock lagging behind or leading the server) is absorbed, while a claim outside
+        // this envelope on either side is rejected by the anti-cheat check in EndBattleVictory.
+        private static readonly TimeSpan ClaimedTimestampSkewTolerance = TimeSpan.FromMilliseconds(100);
+
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, CancellationToken cancellationToken = default)
         {
             if (state.HasActiveBattle)
@@ -138,7 +143,11 @@ namespace Game.Application.Services
             var earliestDefeat = state.BattleStartTime.AddMilliseconds(result.TotalMs);
             var now = DateTime.UtcNow;
 
-            if (earliestDefeat - claimedTimestamp > TimeSpan.FromMilliseconds(100) || claimedTimestamp > now)
+            // Reject a claim that lands outside the symmetric skew envelope on either side: too early
+            // (clock lagging) or too far in the future (clock leading) is anti-cheat, but benign skew
+            // within the tolerance is accepted so a slightly-ahead client clock does not void a real win.
+            if (earliestDefeat - claimedTimestamp > ClaimedTimestampSkewTolerance
+                || claimedTimestamp - now > ClaimedTimestampSkewTolerance)
             {
                 return null;
             }
