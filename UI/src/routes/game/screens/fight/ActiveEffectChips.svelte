@@ -8,7 +8,14 @@
 			{@const color = effectDirectionColor(
 				effectDirection(attributeIsHarmful(effect.attribute, staticData.attributes), effect.modifierType, effect.amount)
 			)}
-			<div class="effect-chip" style:--chip-accent={color} title={chipTitle(effect)}>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="effect-chip"
+				style:--chip-accent={color}
+				onmouseenter={(ev) => showChipTooltip(effect, ev)}
+				onmousemove={(ev) => tip.controller.move(ev)}
+				onmouseleave={hideChipTooltip}
+			>
 				<AttributeIcon id={effect.attribute} size={13} />
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
 				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
@@ -21,6 +28,12 @@
 	</div>
 {/if}
 
+<!-- One tooltip instance per chip row, anchored to whichever chip is hovered. Always mounted (it
+     stays hidden until a chip is hovered) so its registration survives chips coming and going. The
+     effect context is the live `ActiveEffectView` (resolved by source id), so the tooltip's countdown
+     pill keeps depleting and the panel closes itself if the hovered effect expires under the cursor. -->
+<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={shownEffectContext} />
+
 <script lang="ts">
 import {
 	attributeIsHarmful,
@@ -29,8 +42,10 @@ import {
 	effectDirectionColor,
 	formatEffectMagnitude
 } from '$lib/common';
-import { staticData } from '$stores';
+import { staticData, type TooltipComponent } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
 type Props = {
@@ -41,11 +56,53 @@ type Props = {
 
 const { battler, reversed = false }: Props = $props();
 
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
+
+// The source id of the chip the tooltip is currently anchored to (if any). Tracked so the live
+// effect can be re-resolved each tick and so an expiring chip can close the tooltip itself — a chip
+// removed under the cursor never fires `mouseleave`, which otherwise left the panel stuck open.
+let shownSourceId = $state<number>();
+const shownEffect = $derived(
+	shownSourceId != null ? battler.activeEffects.find((e) => e.sourceId === shownSourceId) : undefined
+);
+
+// The skill an active effect came from: its `sourceId` is the authored skill-effect id, so find the
+// skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown skill.
+const sourceSkillName = (sourceId: number): string | undefined =>
+	staticData.skills?.find((skill) => skill?.effects.some((e) => e.id === sourceId))?.name;
+
+// Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes.
+const shownEffectContext = $derived(
+	shownEffect
+		? {
+				modifierType: shownEffect.modifierType,
+				amount: shownEffect.amount,
+				durationMs: shownEffect.durationMs,
+				remainingMs: shownEffect.renderRemainingMs,
+				sourceName: sourceSkillName(shownEffect.sourceId)
+			}
+		: undefined
+);
+
+// Close the tooltip when the chip it's anchored to expires under the cursor (no `mouseleave` fires).
+$effect(() => {
+	if (shownSourceId != null && !shownEffect) {
+		hideChipTooltip();
+	}
+});
+
 const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>
 	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
-const chipTitle = (effect: ActiveEffectView) =>
-	`${formatEffectMagnitude(effect.modifierType, effect.amount)} ${attributeName(effect.attribute, staticData.attributes)}`;
+const showChipTooltip = (effect: ActiveEffectView, ev: MouseEvent) => {
+	shownSourceId = effect.sourceId;
+	tip.controller.show(effect.attribute, ev);
+};
+const hideChipTooltip = () => {
+	shownSourceId = undefined;
+	tip.controller.hide();
+};
 </script>
 
 <style lang="scss">

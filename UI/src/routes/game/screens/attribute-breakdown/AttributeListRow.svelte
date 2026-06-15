@@ -7,6 +7,11 @@
 	data-testid="attr-row-{meta.id}"
 	aria-pressed={active}
 	onclick={() => onSelect(meta.id)}
+	onmouseenter={(e) => attrTip?.show(meta.id, e)}
+	onmousemove={(e) => attrTip?.move(e)}
+	onmouseleave={() => attrTip?.hide()}
+	onfocus={(e) => attrTip?.show(meta.id, e.currentTarget)}
+	onblur={() => attrTip?.hide()}
 >
 	<span class="info">
 		<span class="name-row">
@@ -23,6 +28,7 @@ import type { ComputedAttribute } from '$lib/battle';
 import { attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import StackBar from './StackBar.svelte';
 import { fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';
 
@@ -34,6 +40,9 @@ interface Props {
 }
 
 let { meta, computed, active, onSelect }: Props = $props();
+
+// Hover/focus explainer for the row's attribute, driven through the screen-level controller.
+const attrTip = getAttributeTooltip();
 </script>
 
 <style lang="scss">

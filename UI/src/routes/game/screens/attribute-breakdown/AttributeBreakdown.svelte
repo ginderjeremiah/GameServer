@@ -14,15 +14,26 @@
 		<AttributeList {view} />
 		<BreakdownDetail {view} />
 	</div>
+
+	<!-- Shared attribute tooltip for the rail rows (and any future attribute surface on this screen),
+	     published via context so the rows don't have to thread hover handlers up to this owner. -->
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">
 import { playerManager } from '$lib/engine';
+import { type TooltipComponent } from '$stores';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import AttributeList from './AttributeList.svelte';
 import BreakdownDetail from './BreakdownDetail.svelte';
 import { AttributeBreakdownView } from './attribute-breakdown-view.svelte';
 
 const view = new AttributeBreakdownView();
+
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
+setAttributeTooltip(tip.controller);
 </script>
 
 <style lang="scss">

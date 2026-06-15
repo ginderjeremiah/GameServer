@@ -53,7 +53,13 @@
 			{#if metrics.contributions.length}
 				{#each metrics.contributions as contribution (contribution.attributeId)}
 					<div class="scale" style:--ac={attributeColor(contribution.attributeId)}>
-						<span class="achip">
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<span
+							class="achip"
+							onmouseenter={(e) => tip.controller.show(contribution.attributeId, e)}
+							onmousemove={(e) => tip.controller.move(e)}
+							onmouseleave={() => tip.controller.hide()}
+						>
 							<AttributeIcon id={contribution.attributeId} size={12} />
 							{attributeCode(contribution.attributeId, staticData.attributes)}
 						</span>
@@ -104,6 +110,9 @@
 			</div>
 		</div>
 	{/if}
+
+	<!-- One shared tooltip for the scaling chips, anchored to whichever chip is hovered. -->
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">
@@ -116,8 +125,10 @@ import {
 	effectDirectionColor,
 	formatNum
 } from '$lib/common';
-import { staticData } from '$stores';
+import { staticData, type TooltipComponent } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
@@ -126,6 +137,9 @@ type Props = {
 };
 
 const { view }: Props = $props();
+
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
 
 const metrics = $derived<SkillMetrics | undefined>(view.selected);
 const equipped = $derived(metrics ? view.isEquipped(metrics.skill.id) : false);
