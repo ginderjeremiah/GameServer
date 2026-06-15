@@ -1,3 +1,4 @@
+using Game.Abstractions.Auth;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core;
@@ -25,8 +26,9 @@ namespace Game.DataAccess.Repositories
         // Sliding idle TTL for the cached progress aggregate, mirroring the player cache (#439): written on
         // every save and load-miss re-cache, refreshed on every hit, so an active player never ages out while
         // a dormant one does. It dwarfs the sub-second write-behind drain window, so a key never expires
-        // mid-drain (see docs/backend.md -> Caching and Pub/Sub).
-        private static readonly TimeSpan ProgressCacheTtl = TimeSpan.FromHours(48);
+        // mid-drain (see docs/backend.md -> Caching and Pub/Sub). It shares the same anchor as the player and
+        // session caches (AuthConstants.RefreshTokenLifetime) so a retune of that budget keeps them aligned.
+        private static readonly TimeSpan ProgressCacheTtl = AuthConstants.RefreshTokenLifetime;
 
         private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
 
@@ -69,12 +71,11 @@ namespace Game.DataAccess.Repositories
 
             var playerId = progress.Player.Id;
 
-            // The cache is the source of truth, so write the full current snapshot (absolute values).
-            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress);
-            _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
-
-            // Persist only the rows that changed this save, as one batched write-behind event; the consumer
-            // upserts them to their absolute values off the response path.
+            // Enqueue the durable write-behind event first, then advance the cache — matching SavePlayer. If
+            // the publish throws, the cache must not have moved on to a snapshot that was never enqueued (and
+            // never will be), which would be a silently lost write once the cache later evicts. Persist only
+            // the rows that changed this save, as one batched event; the consumer upserts them to their
+            // absolute values off the response path.
             var envelope = new DomainEventEnvelope
             {
                 Type = nameof(ProgressUpdatedEvent),
@@ -86,6 +87,10 @@ namespace Game.DataAccess.Repositories
                 }.Serialize(),
             };
             await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope, cancellationToken);
+
+            // The cache is the source of truth, so write the full current snapshot (absolute values).
+            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress);
+            _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
         }
 
         private async Task<CachedPlayerProgress> GetCachedProgress(int playerId, CancellationToken cancellationToken)
