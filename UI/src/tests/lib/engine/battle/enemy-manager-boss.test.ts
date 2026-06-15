@@ -291,6 +291,40 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.autoFight).toBe(false);
 	});
 
+	it('does not spawn an idle enemy when a boss handoff lands during the post-victory cooldown', async () => {
+		// An idle victory enters a cooldown; mid-cooldown the player challenges the boss (mode flips to
+		// boss, and reset resolves the cooldown early). When the cooldown resolves, the idle handler must
+		// not spawn a stray idle enemy over the new boss fight.
+		await manager.getNewEnemy(); // idle enemy loaded; mode stays idle
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		// The idle victory must report a cooldown so the handler waits on startLoading.
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? Promise.resolve(
+						resp('DefeatEnemy', {
+							cooldown: 3000,
+							rewards: { expReward: 50, newLevel: 1, newExp: 50, statPointsGained: 0, statPointsUsed: 0 }
+						})
+					)
+				: Promise.resolve(newEnemyResponse)
+		);
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		// Let claimVictory settle so the handler is parked on the awaited startLoading.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(3000);
+
+		// Simulate the boss handoff during the cooldown, then release it.
+		manager.mode = 'boss';
+		send.mockClear();
+		releaseCooldown();
+		await handled;
+
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+	});
+
 	it('still resolves a normal idle victory (DefeatEnemy + next enemy)', async () => {
 		// Load a normal enemy first (idle mode), then win.
 		await manager.getNewEnemy();

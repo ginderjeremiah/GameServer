@@ -132,4 +132,24 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
 		expect(manager.currentEnemy).toBeUndefined();
 	});
+
+	it('drops a concurrent re-entrant call so a stage-change race spawns a single enemy', async () => {
+		// Two overlapping stage handlers (e.g. an idle victory racing an Idle change) can both reach
+		// getNewEnemy; each would request-and-notify an enemy, double-counting the spawn. Since the
+		// backend replays what the client reports, that is an anti-cheat hazard — the second call drops.
+		const enemy = makeEnemy(7);
+		let resolveSend!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		sendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const first = manager.getNewEnemy();
+		const second = manager.getNewEnemy(); // re-entrant while the first request is still in flight
+		resolveSend(enemyResponse(enemy));
+		await Promise.all([first, second]);
+
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(loaded).toEqual([enemy]);
+		expect(manager.currentEnemy).toEqual(enemy);
+	});
 });
