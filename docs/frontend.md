@@ -96,6 +96,8 @@ Blocking confirmation dialogs are the toast system's counterpart, from the same 
 - **Dismissal semantics depend on kind** — backdrop-click/Escape are a cancel for `confirm`/`destructive` but an acknowledgement for `acknowledge`.
 - **The host owns the interaction model so the card stays presentational** — backdrop/Escape dismissal, a focus trap, focus capture+restore, and a scroll lock; it focuses the safe action for a destructive dialog (so a stray Enter can't confirm) and the primary action otherwise. All motion is CSS so `prefers-reduced-motion` collapses it.
 
+**Non-blocking overlays compose `Popover` (`components/Popover.svelte`), not a hand-rolled backdrop.** It is the `ModalHost` counterpart for overlays that aren't a blocking confirm — driven by a plain `open` boolean + `onClose` rather than the promise queue — and owns the same chrome: backdrop/Escape dismissal, a focus trap, focus capture+restore, and a body scroll lock, with the content passed as a snippet. The layer is absolutely positioned, so it overlays its nearest positioned ancestor (mount it inside a `position: relative` container) rather than the whole viewport.
+
 ## Styling
 
 Most styling lives in each component's scoped scss; global styles and theming live in `UI/src/styles`. **All colours are CSS variables, used by semantic intent — never hard-coded.** Core colours are declared in `+layout.svelte` (pulled from `_colors.scss`); the palette is intentionally limited for consistency and contrast. The frontend is built for future custom themes that override those variables, so any colour must be a variable (added to `+layout.svelte`) and used according to its semantic meaning, even when two roles happen to share a hue.
