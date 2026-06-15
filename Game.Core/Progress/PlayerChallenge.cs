@@ -18,7 +18,12 @@ namespace Game.Core.Progress
             CompletedAt = completedAt;
         }
 
-        public void UpdateProgress(decimal value)
+        /// <param name="hasData">
+        /// Whether the tracked statistic has a recorded value. "At most" goals only count when there is
+        /// data: with none, the goal is unmet regardless of the 0 placeholder <paramref name="value"/>,
+        /// while a genuine 0 (<paramref name="hasData"/> true) can satisfy it.
+        /// </param>
+        public void UpdateProgress(decimal value, bool hasData)
         {
             if (Completed)
             {
@@ -27,11 +32,10 @@ namespace Game.Core.Progress
 
             if (Challenge.Type.GoalComparison is EChallengeGoalComparison.AtMost)
             {
-                // "At most" goals (e.g. time trials) are satisfied by reaching a value at or below
-                // the goal. A value of 0 indicates the underlying statistic has no data yet (e.g. no
-                // victory has been recorded), so it does not count as meeting the goal.
+                // "At most" goals (e.g. time trials) are met by reaching a value at or below the goal.
+                // Completion keys off whether the statistic has data, never off a magic 0 — see hasData.
                 Progress = value;
-                if (value > 0 && value <= Challenge.ProgressGoal)
+                if (hasData && value <= Challenge.ProgressGoal)
                 {
                     Completed = true;
                     CompletedAt = DateTime.UtcNow;

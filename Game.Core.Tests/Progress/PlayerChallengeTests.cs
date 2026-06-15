@@ -11,7 +11,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(4m);
+            playerChallenge.UpdateProgress(4m, hasData: true);
 
             Assert.Equal(4m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -23,7 +23,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(10m);
+            playerChallenge.UpdateProgress(10m, hasData: true);
 
             Assert.Equal(10m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
@@ -35,7 +35,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(15m);
+            playerChallenge.UpdateProgress(15m, hasData: true);
 
             Assert.Equal(10m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
@@ -46,10 +46,10 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(10m);
+            playerChallenge.UpdateProgress(10m, hasData: true);
             var firstCompletedAt = playerChallenge.CompletedAt;
 
-            playerChallenge.UpdateProgress(20m);
+            playerChallenge.UpdateProgress(20m, hasData: true);
 
             Assert.True(playerChallenge.Completed);
             Assert.Equal(firstCompletedAt, playerChallenge.CompletedAt);
@@ -62,7 +62,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(7m);
+            playerChallenge.UpdateProgress(7m, hasData: true);
 
             Assert.Equal(7m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
@@ -74,7 +74,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(10m);
+            playerChallenge.UpdateProgress(10m, hasData: true);
 
             Assert.True(playerChallenge.Completed);
         }
@@ -84,7 +84,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(15m);
+            playerChallenge.UpdateProgress(15m, hasData: true);
 
             Assert.Equal(15m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -92,15 +92,29 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void UpdateProgress_AtMost_ZeroValue_TreatedAsNoDataAndDoesNotComplete()
+        public void UpdateProgress_AtMost_NoData_DoesNotComplete()
         {
-            // 0 means the underlying statistic (e.g. fastest victory) has no data yet,
-            // so it must not satisfy a "win within N seconds" goal.
+            // With no recorded statistic the goal is unmet, even though the placeholder value is 0 and
+            // 0 is at or below the goal — the absence of data, not the value, is what blocks completion.
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(0m);
+            playerChallenge.UpdateProgress(0m, hasData: false);
 
             Assert.False(playerChallenge.Completed);
+            Assert.Null(playerChallenge.CompletedAt);
+        }
+
+        [Fact]
+        public void UpdateProgress_AtMost_GenuineZeroValue_Completes()
+        {
+            // A recorded 0 (e.g. an instant victory) is a legitimate value at or below the goal, so it
+            // must complete — the old "0 means no data" sentinel made this case unwinnable.
+            var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
+
+            playerChallenge.UpdateProgress(0m, hasData: true);
+
+            Assert.True(playerChallenge.Completed);
+            Assert.NotNull(playerChallenge.CompletedAt);
         }
 
         private static PlayerChallenge MakePlayerChallenge(decimal goal, EChallengeType type = EChallengeType.EnemiesKilled)

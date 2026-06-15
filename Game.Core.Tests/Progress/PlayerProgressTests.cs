@@ -331,7 +331,37 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(3m, progress.GetStatisticValue(EStatisticType.FastestVictory, null));
         }
 
-        // ── GetStatisticValue ────────────────────────────────────────────────
+        [Fact]
+        public void RecordBattleCompleted_FirstVictoryWithZeroDuration_RecordsZeroFastestVictory()
+        {
+            var progress = MakeProgress();
+
+            // An instant (0ms) victory is a legitimate FastestVictory of 0, not "no data".
+            progress.RecordBattleCompleted(MakeEnemy(id: 1), victory: true, playerDied: false, totalMs: 0, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+
+            Assert.True(progress.TryGetStatisticValue(EStatisticType.FastestVictory, null, out var value));
+            Assert.Equal(0m, value);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroFastestVictory_IsNotOverwrittenBySlowerVictory()
+        {
+            // Regression for the "0 means no value yet" sentinel: once a 0 minimum is recorded a slower
+            // later victory must not overwrite it (previously stat.Value == 0 pinned the stat forever).
+            var progress = MakeProgress();
+            var enemy = MakeEnemy(id: 1);
+
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 0, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+            progress.RecordBattleCompleted(enemy, victory: true, playerDied: false, totalMs: 4000, new BattleStats(),
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.FastestVictory, null));
+            Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.FastestVictory, 1));
+        }
+
+        // ── GetStatisticValue / TryGetStatisticValue ─────────────────────────
 
         [Fact]
         public void GetStatisticValue_UntrackedStatistic_ReturnsZero()
@@ -340,6 +370,25 @@ namespace Game.Core.Tests.Progress
 
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.DamageDealt, null));
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, 999));
+        }
+
+        [Fact]
+        public void TryGetStatisticValue_UntrackedStatistic_ReturnsFalseAndZero()
+        {
+            var progress = MakeProgress();
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.FastestVictory, null, out var value));
+            Assert.Equal(0m, value);
+        }
+
+        [Fact]
+        public void TryGetStatisticValue_RecordedZero_ReturnsTrueAndZero()
+        {
+            // A recorded 0 is data, not absence — the distinction the AtMost challenge path relies on.
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.FastestVictory, null, 0m)]);
+
+            Assert.True(progress.TryGetStatisticValue(EStatisticType.FastestVictory, null, out var value));
+            Assert.Equal(0m, value);
         }
 
         // ── EvaluateChallenges ───────────────────────────────────────────────
@@ -508,6 +557,23 @@ namespace Game.Core.Tests.Progress
             var completed = progress.EvaluateChallenges([challenge]);
 
             Assert.Empty(completed);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_TimeTrial_CompletesWhenFastestVictoryIsRecordedZero()
+        {
+            // A recorded FastestVictory of 0 (e.g. an instant victory) is a real value at or below the
+            // goal, so it must complete — distinct from the "no victory yet" case above.
+            var challenge = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.FastestVictory, null, 0m),
+            ]);
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Single(completed);
+            Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
         }
 
         [Fact]
