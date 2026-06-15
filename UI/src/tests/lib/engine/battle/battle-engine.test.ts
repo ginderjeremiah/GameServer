@@ -253,20 +253,62 @@ describe('BattleEngine', () => {
 
 		it('counts the loading time down each render frame and resolves + unhooks at zero', async () => {
 			const promise = engine.startLoading(100);
-			const unhook = vi.fn();
-			// startLoading registers a render hook that also receives an `unhook` third arg (provided by
-			// the real render engine); the shared RenderCallback type only models the first two.
-			const countdown = renderUpdateCallbacks[0] as (delta: number, logicalDelta: number, unhook: () => void) => void;
+			const countdown = renderUpdateCallbacks[0];
+			expect(renderUpdateCallbacks).toHaveLength(1);
 
 			// First frame doesn't reach zero — still ticking, not yet unhooked.
-			countdown(60, 0, unhook);
+			countdown(60, 0);
 			expect(engine.loadingTime).toBe(40);
-			expect(unhook).not.toHaveBeenCalled();
+			expect(renderUpdateCallbacks).toHaveLength(1);
 
 			// Second frame drives it past zero — the promise resolves and the hook removes itself.
-			countdown(60, 0, unhook);
+			countdown(60, 0);
 			await expect(promise).resolves.toBeUndefined();
-			expect(unhook).toHaveBeenCalledTimes(1);
+			expect(renderUpdateCallbacks).toHaveLength(0);
+		});
+
+		it('resolves the promise and removes the countdown hook when stopped mid-loading', async () => {
+			engine.start(); // registers the engine's own render hook
+			const promise = engine.startLoading(1000);
+			// The engine render hook plus the loading countdown are both registered.
+			expect(renderUpdateCallbacks).toHaveLength(2);
+
+			engine.stop();
+
+			// A stop mid-cooldown must release the awaiting getNewEnemy path rather than hang it forever,
+			// and tear down every render hook so a later renderEngine.start() can't resume a stale countdown.
+			await expect(promise).resolves.toBeUndefined();
+			expect(renderUpdateCallbacks).toHaveLength(0);
+		});
+
+		it('resolves the promise and removes the countdown hook when reset mid-loading', async () => {
+			engine.start();
+			const promise = engine.startLoading(1000);
+			expect(renderUpdateCallbacks).toHaveLength(2);
+
+			engine.reset({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			// Reset cancels the in-flight cooldown (releasing the awaiter) but leaves the engine's own
+			// render hook in place for the re-armed battle.
+			await expect(promise).resolves.toBeUndefined();
+			expect(renderUpdateCallbacks).toHaveLength(1);
+		});
+
+		it('does not leave a stale countdown hook behind when re-invoked while one is pending', async () => {
+			const first = engine.startLoading(1000);
+			expect(renderUpdateCallbacks).toHaveLength(1);
+
+			// Re-invoking before the first countdown completes cancels it (releasing its awaiter) instead
+			// of stacking a second leaked hook.
+			const second = engine.startLoading(500);
+			await expect(first).resolves.toBeUndefined();
+			expect(renderUpdateCallbacks).toHaveLength(1);
+
+			// The new countdown still resolves normally at zero.
+			const countdown = renderUpdateCallbacks[0];
+			countdown(500, 0);
+			await expect(second).resolves.toBeUndefined();
+			expect(renderUpdateCallbacks).toHaveLength(0);
 		});
 	});
 

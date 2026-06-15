@@ -35,6 +35,9 @@ export class BattleEngine {
 	private logicalUnhook?: Action;
 	private renderUnhook?: Action;
 	private enemyLoadedUnhook?: Action;
+	/** Tears down the in-flight post-victory loading countdown (removes its render hook and resolves the
+	 *  awaited promise); undefined when no countdown is active. */
+	private finishLoading?: Action;
 
 	/** Reused per-tick sink the shared battleStep populates with this tick's newly-applied effects and
 	 *  DoT/HoT amounts, so the engine can turn them into combat-log lines (frontend-only). */
@@ -69,6 +72,9 @@ export class BattleEngine {
 			this.renderUnhook?.();
 			this.enemyLoadedUnhook?.();
 		}
+		// A loading countdown is driven by the render engine independently of `running`, so cancel it
+		// unconditionally — otherwise its render hook leaks and the awaiting getNewEnemy path hangs.
+		this.finishLoading?.();
 	}
 
 	public pause() {
@@ -85,6 +91,9 @@ export class BattleEngine {
 
 	public reset = (enemyInstance: IEnemyInstance) => {
 		const enemyData = staticData.enemies ?? [];
+		// Re-arming the battle cancels any in-flight post-victory cooldown so its render hook is removed
+		// and the awaiting caller is released rather than stranded mid-countdown.
+		this.finishLoading?.();
 		this.timeElapsed = 0;
 		this.resetEffectDamage();
 		this.player.reset(playerManager, inventoryManager.equipmentStats);
@@ -97,16 +106,24 @@ export class BattleEngine {
 	}
 
 	public startLoading(loadingTime: number) {
+		// Cancel any countdown still in flight so re-invoking can't leak the previous render hook.
+		this.finishLoading?.();
 		this.loadingTime = loadingTime;
 		this.setBattleStage(Loading);
 		const { promise, resolve } = Promise.withResolvers<void>();
-		onRenderUpdate((delta, _, unhook) => {
+		const unhook = onRenderUpdate((delta) => {
 			this.loadingTime -= delta;
 			if (this.loadingTime <= 0) {
-				resolve();
-				unhook();
+				this.finishLoading?.();
 			}
 		}, false);
+		// Single idempotent teardown shared by the natural countdown-complete path and the stop()/reset()
+		// cancellation path: remove the render hook and release the awaiting caller exactly once.
+		this.finishLoading = () => {
+			this.finishLoading = undefined;
+			unhook();
+			resolve();
+		};
 		return promise;
 	}
 

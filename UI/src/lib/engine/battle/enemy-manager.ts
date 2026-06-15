@@ -1,4 +1,4 @@
-import { apiSocket, ELogType, IApiSocketResponse, IEnemyInstance } from '$lib/api';
+import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
 import { Action, createHook, delay, isZoneUnlocked, nextZoneByOrder } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
 import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
@@ -43,11 +43,13 @@ export class EnemyManager {
 	 *  incomplete to complete). Drives the Zone-Cleared overlay's "Next zone unlocked" line. */
 	public bossUnlockedNextZone = false;
 
-	private newEnemyPromise: Promise<IApiSocketResponse<'NewEnemy'>> | undefined;
 	private battleStageUnhook?: Action;
 	/** Guards the challenge/retreat transitions so a resolving stage change for the battle being
 	 *  swapped out is not mistaken for an outcome of the new one. */
 	private transitioning = false;
+	/** Re-entrancy guard for getNewEnemy: overlapping stage handlers must not both spawn-and-notify an
+	 *  enemy (a double-spawn the backend replay would flag as cheating). */
+	private fetchingEnemy = false;
 
 	public start() {
 		if (!this.started) {
@@ -66,31 +68,38 @@ export class EnemyManager {
 	}
 
 	public async getNewEnemy() {
-		// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
-		// (a sustained outage no longer grows the async chain without bound) and `stop()` cancels
-		// the loop by flipping `started`.
-		while (this.started) {
-			if (!this.newEnemyPromise) {
-				this.newEnemyPromise = apiSocket.sendSocketCommand('NewEnemy', {
+		// Single re-entrancy guard: overlapping stage handlers (e.g. an idle victory racing an Idle/
+		// Defeated change) can both reach here, and each would request-and-notify a new enemy —
+		// double-counting a spawn. Because the backend replays what the client reports, a double-spawn
+		// has anti-cheat consequences, so the second, re-entrant call drops; the first still spawns one.
+		if (this.fetchingEnemy) {
+			return;
+		}
+		this.fetchingEnemy = true;
+		try {
+			// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
+			// (a sustained outage no longer grows the async chain without bound) and `stop()` cancels
+			// the loop by flipping `started`.
+			while (this.started) {
+				const result = await apiSocket.sendSocketCommand('NewEnemy', {
 					newZoneId: playerManager.currentZone
 				});
-			}
+				if (result.data?.enemyInstance) {
+					this.currentEnemy = result.data.enemyInstance;
+					notifyNewEnemyLoaded(this.currentEnemy);
+					return;
+				}
 
-			const result = await this.newEnemyPromise;
-			this.newEnemyPromise = undefined;
-			if (result.data?.enemyInstance) {
-				this.currentEnemy = result.data.enemyInstance;
-				notifyNewEnemyLoaded(this.currentEnemy);
-				return;
+				// No enemy this time: either the zone is on cooldown (wait it out) or the request failed
+				// (`data` is absent — note the optional chaining; an error response carries no data).
+				// Back off in both cases, then retry.
+				if (result.error) {
+					logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
+				}
+				await delay(result.data?.cooldown ?? NEW_ENEMY_RETRY_DELAY_MS);
 			}
-
-			// No enemy this time: either the zone is on cooldown (wait it out) or the request failed
-			// (`data` is absent — note the optional chaining; the original code dereferenced `data`
-			// here and threw on an error response). Back off in both cases, then retry.
-			if (result.error) {
-				logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
-			}
-			await delay(result.data?.cooldown ?? NEW_ENEMY_RETRY_DELAY_MS);
+		} finally {
+			this.fetchingEnemy = false;
 		}
 	}
 
@@ -173,6 +182,13 @@ export class EnemyManager {
 			if (cooldown > 0) {
 				await battleEngine.startLoading(cooldown);
 			}
+		}
+
+		// The awaited claim/cooldown above can overlap a boss challenge or retreat that hands the loop
+		// off (and resolves the cooldown early via reset); if we've since left idle mode or a transition
+		// is mid-flight, don't spawn an idle enemy over the new fight.
+		if (this.transitioning || this.mode !== 'idle') {
+			return;
 		}
 
 		if (stage === BattleStage.Victorious || stage === BattleStage.Defeated || stage === BattleStage.Idle) {
