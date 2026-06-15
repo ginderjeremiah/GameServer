@@ -145,24 +145,35 @@ describe('OptionsView.save', () => {
 		expect(toastError).not.toHaveBeenCalled();
 	});
 
-	it('still applies locally but warns when the server rejects the save', async () => {
+	it('keeps the change dirty and unapplied (so Save/Discard stay enabled) when the server rejects the save', async () => {
 		mockSendSocketCommand.mockResolvedValue({ error: 'Unknown log type.' });
 		view.setOne(ELogType.Exp, false);
 		await view.save();
 
-		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Exp)?.enabled).toBe(false);
-		expect(view.isDirty).toBe(false);
+		// Not applied to the player and the baseline is unadvanced, so the change is
+		// still dirty — the SaveBar enables Save/Discard on `isDirty`, allowing retry (#701).
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Exp)?.enabled).toBe(true);
+		expect(view.isDirty).toBe(true);
+		expect(view.dirtyCount).toBe(1);
+		expect(view.saving).toBe(false);
 		expect(view.saved).toBe(false);
 		expect(toastError).toHaveBeenCalledTimes(1);
 	});
 
-	it('applies locally and warns when the request throws', async () => {
-		mockSendSocketCommand.mockRejectedValue(new Error('network'));
+	it('retries successfully after a failed save (the change survived the failure)', async () => {
+		mockSendSocketCommand.mockResolvedValueOnce({ error: 'transient' });
 		view.setOne(ELogType.Exp, false);
 		await view.save();
+		expect(view.isDirty).toBe(true);
 
+		// A second attempt resolves cleanly and commits the still-dirty change.
+		mockSendSocketCommand.mockResolvedValueOnce({});
+		await view.save();
+
+		expect(mockSendSocketCommand).toHaveBeenCalledTimes(2);
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Exp)?.enabled).toBe(false);
 		expect(view.isDirty).toBe(false);
-		expect(toastError).toHaveBeenCalledTimes(1);
+		expect(view.saved).toBe(true);
 	});
 
 	it('does nothing when there are no changes', async () => {

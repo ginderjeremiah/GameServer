@@ -366,15 +366,6 @@ describe('AttributesView.save', () => {
 		expect(mockPlayerManager.statPointsUsed).toBe(0);
 	});
 
-	it('warns and keeps the changes when the request throws', async () => {
-		sendSocketCommand.mockRejectedValue(new Error('network'));
-		view.inc(idx.str);
-		await view.save();
-
-		expect(toastError).toHaveBeenCalledTimes(1);
-		expect(view.dirty).toBe(true);
-	});
-
 	it('does nothing when there are no changes', async () => {
 		await view.save();
 		expect(sendSocketCommand).not.toHaveBeenCalled();

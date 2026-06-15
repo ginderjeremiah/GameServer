@@ -196,26 +196,21 @@ export class OptionsView {
 		}
 
 		this.saving = true;
-		let ok = false;
-		try {
-			const response = await apiSocket.sendSocketCommand('SaveLogPreferences', changed);
-			ok = !response.error;
-		} catch {
-			ok = false;
-		} finally {
-			this.saving = false;
+		const response = await apiSocket.sendSocketCommand('SaveLogPreferences', changed);
+		this.saving = false;
+
+		// On failure keep the change dirty (baseline unadvanced, not applied to the
+		// player) so Save/Discard stay enabled and the user can retry (#701).
+		if (response.error) {
+			toastError('Log preferences could not be saved. Please try again.');
+			return;
 		}
 
-		// Apply locally regardless so the combat-log filter reflects the choice
-		// for the rest of the session, then advance the baseline to clear dirty.
+		// Mirror the saved draft onto the player manager so the combat-log filter
+		// reflects the choice, then advance the baseline to clear the dirty state.
 		applyToPlayer(this.draft);
 		this.baseline = { ...this.draft };
-
-		if (ok) {
-			this.flashSaved();
-		} else {
-			toastError('Log preferences were applied for this session but could not be saved to the server.');
-		}
+		this.flashSaved();
 	}
 
 	private flashSaved(): void {
