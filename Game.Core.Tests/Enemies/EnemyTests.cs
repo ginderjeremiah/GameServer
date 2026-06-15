@@ -40,6 +40,57 @@ namespace Game.Core.Tests.Enemies
         }
 
         [Fact]
+        public void SelectBattleSkills_OverManyRuns_AlwaysYieldsADistinctCappedSubset()
+        {
+            // The selection uses Random.Shared (no injectable seam), so rather than assert an exact
+            // permutation we assert the invariants hold on every run: capped count, drawn from the
+            // available pool, and no duplicates.
+            var available = Skills(8);
+            var availableIds = available.Select(s => s.Id).ToHashSet();
+            var enemy = MakeEnemy(available);
+
+            for (var run = 0; run < 1000; run++)
+            {
+                enemy.SelectBattleSkills();
+                var selectedIds = enemy.BattleSkills.Select(s => s.Id).ToList();
+
+                Assert.Equal(4, selectedIds.Count);
+                Assert.All(selectedIds, id => Assert.Contains(id, availableIds));
+                Assert.Equal(selectedIds.Count, selectedIds.Distinct().Count());
+            }
+        }
+
+        [Fact]
+        public void SelectBattleSkills_OverManyRuns_CanSelectEverySkillAndEveryPosition()
+        {
+            // A degenerate or structurally-biased selection would systematically exclude some skill or
+            // never place a skill in some slot. Across many runs an unbiased partial Fisher–Yates must
+            // reach every available skill, in every loadout position.
+            var available = Skills(8);
+            var enemy = MakeEnemy(available);
+            var seenSkillIds = new HashSet<int>();
+            var seenAtPosition = new HashSet<int>[4];
+            for (var pos = 0; pos < seenAtPosition.Length; pos++)
+            {
+                seenAtPosition[pos] = [];
+            }
+
+            for (var run = 0; run < 2000; run++)
+            {
+                enemy.SelectBattleSkills();
+                var selectedIds = enemy.BattleSkills.Select(s => s.Id).ToList();
+                for (var pos = 0; pos < selectedIds.Count; pos++)
+                {
+                    seenSkillIds.Add(selectedIds[pos]);
+                    seenAtPosition[pos].Add(selectedIds[pos]);
+                }
+            }
+
+            Assert.Equal(8, seenSkillIds.Count);
+            Assert.All(seenAtPosition, positionIds => Assert.Equal(8, positionIds.Count));
+        }
+
+        [Fact]
         public void SelectBattleSkills_DoesNotMutateAvailableSkills()
         {
             var enemy = MakeEnemy(Skills(6));
