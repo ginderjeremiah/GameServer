@@ -132,7 +132,7 @@ namespace Game.Api.Sockets
                     {
                         if (_socket.State is WebSocketState.Open)
                         {
-                            await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, closeReason.GetDescription(), cancellationToken);
+                            await _socket.CloseAsync(closeReason.GetCloseStatus(), closeReason.GetDescription(), cancellationToken);
                         }
                     }
                     finally

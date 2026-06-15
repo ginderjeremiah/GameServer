@@ -61,6 +61,37 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Close_ErrorReason_SendsCloseFrameWithMatchingStatusCode()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new GatedCloseWebSocket();
+            var context = CreateContext(socket);
+
+            var closeTask = context.Close(ESocketCloseReason.MessageTooBig, cancellationToken);
+            await socket.CloseStarted.WaitAsync(WaitTimeout, cancellationToken);
+            socket.CompleteClose();
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+
+            // The close frame carries the error status code, not a hardcoded NormalClosure (#610).
+            Assert.Equal(WebSocketCloseStatus.MessageTooBig, socket.CloseStatusUsed);
+        }
+
+        [Fact]
+        public async Task Close_GracefulReason_SendsCloseFrameWithNormalClosure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new GatedCloseWebSocket();
+            var context = CreateContext(socket);
+
+            var closeTask = context.Close(ESocketCloseReason.Finished, cancellationToken);
+            await socket.CloseStarted.WaitAsync(WaitTimeout, cancellationToken);
+            socket.CompleteClose();
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.CloseStatusUsed);
+        }
+
+        [Fact]
         public async Task Close_WhenSocketNotOpen_SettlesWithoutSendingCloseFrame()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -91,6 +122,7 @@ namespace Game.Api.Tests.Unit
             /// <summary>Completes once <see cref="CloseAsync"/> has begun (and is blocking on the gate).</summary>
             public Task CloseStarted => _closeStarted.Task;
             public bool CloseAsyncCalled { get; private set; }
+            public WebSocketCloseStatus? CloseStatusUsed { get; private set; }
             public WebSocketState StateOverride { get; init; } = WebSocketState.Open;
 
             public void CompleteClose() => _closeGate.TrySetResult();
@@ -104,6 +136,7 @@ namespace Game.Api.Tests.Unit
             public override async Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
             {
                 CloseAsyncCalled = true;
+                CloseStatusUsed = closeStatus;
                 _closeStarted.TrySetResult();
                 await _closeGate.Task;
             }
