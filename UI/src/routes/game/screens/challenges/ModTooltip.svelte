@@ -16,7 +16,7 @@
 
 	{#if mod.description}
 		<TooltipSection label="Description" last>
-			<div class="tt-description">{mod.description}</div>
+			<TooltipDescription text={mod.description} />
 		</TooltipSection>
 	{/if}
 </TooltipShell>
@@ -29,6 +29,7 @@ import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
+import TooltipDescription from '$components/tooltip/TooltipDescription.svelte';
 
 interface Props {
 	mod: IItemMod;
@@ -41,12 +42,3 @@ const effects = $derived(
 	(mod.attributes ?? []).map((a) => ({ name: attributeName(a.attributeId, staticData.attributes), value: a.amount }))
 );
 </script>
-
-<style lang="scss">
-.tt-description {
-	font-size: 11.5px;
-	font-style: italic;
-	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
-	line-height: 1.55;
-}
-</style>

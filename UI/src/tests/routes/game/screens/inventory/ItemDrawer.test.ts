@@ -114,4 +114,32 @@ describe('ItemDrawer', () => {
 		const { getByText } = render(ItemDrawer, { props: { item: makeItem(), view: makeView() } });
 		expect(getByText('A trusty blade.')).toBeTruthy();
 	});
+
+	it('renders the Stats section through the shared tooltip stats grid', () => {
+		const { container } = render(ItemDrawer, { props: { item: makeItem(), view: makeView() } });
+		const grid = container.querySelector('.tt-stats-grid') as HTMLElement;
+		expect(grid).toBeTruthy();
+		expect(grid.textContent).toContain('Strength');
+		expect(grid.textContent).toContain('+10');
+	});
+
+	it('derives the Stats from item.totalAttributes, not a manual item+mod flatten', () => {
+		// totalAttributes carries an attribute (Agility) absent from `attributes`/`appliedMods`,
+		// so it only renders if the drawer reads the item's own merged projection.
+		const item = makeItem({
+			attributes: [{ attributeId: EAttribute.Strength, amount: 10 }],
+			appliedMods: [],
+			totalAttributes: new BattleAttributes(
+				[
+					{ attributeId: EAttribute.Strength, amount: 10 },
+					{ attributeId: EAttribute.Agility, amount: 5 }
+				],
+				false
+			)
+		});
+		const { container } = render(ItemDrawer, { props: { item, view: makeView() } });
+		const text = (container.querySelector('.tt-stats-grid') as HTMLElement).textContent ?? '';
+		expect(text).toContain('Agility');
+		expect(text).toContain('+5');
+	});
 });

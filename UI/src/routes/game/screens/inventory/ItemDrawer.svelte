@@ -17,24 +17,20 @@
 </div>
 
 <div class="drawer-body">
-	<div class="section">
-		<div class="section-rule">
-			<span class="mono-label">Stats</span>
-			<div class="line"></div>
-		</div>
-		<StatList attrs={stats} />
-	</div>
+	{#if attributeMap?.length}
+		<TooltipSection label="Stats">
+			<TooltipStatsGrid entries={attributeMap} />
+		</TooltipSection>
+	{/if}
 
-	<div class="section">
-		<div class="section-rule">
-			<span class="mono-label">Mod slots · {item.modSlots?.length ?? 0}</span>
-			<div class="line"></div>
-		</div>
+	<TooltipSection label="Mod slots · {item.modSlots?.length ?? 0}">
 		<ModSlots {item} {view} />
-	</div>
+	</TooltipSection>
 
 	{#if item.description}
-		<div class="description">{item.description}</div>
+		<TooltipSection label="Description" last>
+			<TooltipDescription text={item.description} />
+		</TooltipSection>
 	{/if}
 </div>
 
@@ -46,10 +42,12 @@
 </div>
 
 <script lang="ts">
-import StatList from './StatList.svelte';
 import ModSlots from './ModSlots.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
-import { BattleAttributes, type Item } from '$lib/battle';
+import TooltipSection from '$components/tooltip/TooltipSection.svelte';
+import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
+import TooltipDescription from '$components/tooltip/TooltipDescription.svelte';
+import { type Item } from '$lib/battle';
 import { itemCategoryColor, itemCategoryName, rarityColor, rarityLabel, rarityTint } from '$lib/common';
 import { type InventoryView } from './inventory-view.svelte';
 
@@ -59,11 +57,10 @@ const accent = $derived(itemCategoryColor(item.itemCategoryId));
 const rc = $derived(rarityColor(item.rarityId));
 const equipped = $derived(item.equipmentSlotId != null);
 
-// Recompute from the item's current attributes + applied mods so the panel
-// reflects mod changes live.
-const stats = $derived(
-	new BattleAttributes([...item.attributes, ...item.appliedMods.flatMap((m) => m.attributes)], false).getAttributeMap()
-);
+// Merged item + applied-mod attributes, from the item's own source-of-truth
+// projection (the same one ItemTooltip reads) so the drawer and tooltip can't
+// drift; it recomputes as mods are applied/removed.
+const attributeMap = $derived(item.totalAttributes?.getAttributeMap());
 </script>
 
 <style lang="scss">
@@ -108,38 +105,6 @@ const stats = $derived(
 	flex: 1;
 	overflow-y: auto;
 	padding: 14px 18px;
-}
-
-.section {
-	margin-bottom: 16px;
-}
-
-.section-rule {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 10px;
-}
-
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
-.line {
-	flex: 1;
-	height: 1px;
-	background: var(--border-subtle);
-}
-
-.description {
-	font-size: 11.5px;
-	font-style: italic;
-	color: var(--text-tertiary);
-	line-height: 1.55;
 }
 
 .drawer-footer {
