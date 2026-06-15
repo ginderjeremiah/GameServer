@@ -13,6 +13,14 @@
         public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default);
         public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default);
         public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Atomically sets <paramref name="key"/> to <paramref name="value"/> with <paramref name="expiry"/>
+        /// as its TTL and returns the previous value (null if the key was unset). Unlike a separate
+        /// <see cref="GetSet(string, string, CancellationToken)"/> followed by
+        /// <see cref="Expire(string, TimeSpan, CancellationToken)"/>, the value and its expiry are written in a
+        /// single operation, so a fault between the two can never leave the key lingering without a TTL.
+        /// </summary>
+        public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default);
         public Task Set(string key, string value, CancellationToken cancellationToken = default);
         public Task Set<T>(string key, T value, CancellationToken cancellationToken = default);
         public Task Set(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default);
