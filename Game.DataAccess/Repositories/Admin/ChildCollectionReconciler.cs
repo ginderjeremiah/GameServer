@@ -18,7 +18,7 @@ namespace Game.DataAccess.Repositories.Admin
     /// The <paramref name="delete"/> handler receives the <em>existing</em> entity (to read its key) rather than
     /// the helper removing it directly: that entity comes from the <c>AsNoTracking</c> reference cache with a
     /// loaded back-reference graph, so the caller must build a fresh, navigation-free entity to delete (see
-    /// <c>docs/backend.md</c> → Admin Tools). The <paramref name="update"/> handler is optional — a pure join row
+    /// <c>docs/backend-admin.md</c> → Admin Tools). The <paramref name="update"/> handler is optional — a pure join row
     /// (e.g. <c>EnemySkill</c>) carries no payload beyond its key, so a child present on both sides needs no update.
     /// </para>
     /// </remarks>
