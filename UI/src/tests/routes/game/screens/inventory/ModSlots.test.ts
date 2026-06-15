@@ -82,6 +82,13 @@ describe('ModSlots — empty slots', () => {
 		render(ModSlots, { props: { item, view: makeView() } });
 		expect(screen.getByText(/Click to install a/i)).toBeTruthy();
 	});
+
+	it('renders an empty slot as a real <button> (keyboard-operable, no hand-rolled keydown)', () => {
+		const item = makeItem({ modSlots: [makeModSlot(1)] });
+		const { container } = render(ModSlots, { props: { item, view: makeView() } });
+		const slot = container.querySelector('.mod-slot') as HTMLElement;
+		expect(slot.tagName).toBe('BUTTON');
+	});
 });
 
 describe('ModSlots — picker toggle', () => {
@@ -155,6 +162,25 @@ describe('ModSlots — filled slots', () => {
 		const item = makeItem({ modSlots: [slot], appliedMods: [mod as unknown as Item['appliedMods'][0]] });
 		const { container } = render(ModSlots, { props: { item, view: makeView() } });
 		expect(container.querySelector('.mod-remove')).toBeTruthy();
+	});
+
+	it('renders a filled slot as a non-interactive <div> (it carries its own remove button)', () => {
+		const slot = makeModSlot(1);
+		const mod = makeMod(10, 1);
+		const item = makeItem({ modSlots: [slot], appliedMods: [mod as unknown as Item['appliedMods'][0]] });
+		const { container } = render(ModSlots, { props: { item, view: makeView() } });
+		// A filled slot must not be a button (no nested button-in-button), unlike the empty slot.
+		expect((container.querySelector('.mod-slot') as HTMLElement).tagName).toBe('DIV');
+	});
+
+	it('labels the remove button with the applied mod name', () => {
+		const slot = makeModSlot(1);
+		const mod = makeMod(10, 1, { name: 'Power Core' });
+		const item = makeItem({ modSlots: [slot], appliedMods: [mod as unknown as Item['appliedMods'][0]] });
+		const { container } = render(ModSlots, { props: { item, view: makeView() } });
+		expect((container.querySelector('.mod-remove') as HTMLElement).getAttribute('aria-label')).toBe(
+			'Remove Power Core'
+		);
 	});
 
 	it('calls view.removeMod with itemId and slotId when the remove button is clicked', async () => {

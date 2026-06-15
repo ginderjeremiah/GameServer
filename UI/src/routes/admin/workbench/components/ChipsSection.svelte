@@ -9,16 +9,9 @@
 					<span class="nm">{entry ? section.labelOf(entry) : `#${id}`}</span>
 					<span class="dm">{entry ? section.metaOf(entry) : ''}</span>
 					{#if entry?.retired}<span class="retired-tag">retired</span>{/if}
-					<span
-						class="x"
-						role="button"
-						tabindex="0"
-						title="Remove"
-						onclick={() => remove(id)}
-						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), remove(id))}
-					>
+					<button type="button" class="x" title="Remove" aria-label="Remove" onclick={() => remove(id)}>
 						<WorkbenchIcon kind="x" size={11} />
-					</span>
+					</button>
 				</div>
 			{/each}
 		</div>

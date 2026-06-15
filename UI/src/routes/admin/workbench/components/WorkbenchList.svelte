@@ -10,7 +10,12 @@
 		</div>
 		<div class="search">
 			<WorkbenchIcon kind="search" sw={1.4} />
-			<input class="inp" placeholder="Search {entity.label.toLowerCase()}…" bind:value={q} />
+			<input
+				class="inp"
+				aria-label="Search {entity.label.toLowerCase()}"
+				placeholder="Search {entity.label.toLowerCase()}…"
+				bind:value={q}
+			/>
 		</div>
 	</div>
 

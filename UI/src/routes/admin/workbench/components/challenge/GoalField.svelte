@@ -4,6 +4,7 @@
 	<div class="num-unit">
 		<NumInput
 			class="inp num{dirty ? ' dirty' : ''}"
+			ariaLabel="Goal {isMs ? '(time)' : 'amount'}"
 			style="padding-right: {pad}px"
 			value={challenge.progressGoal}
 			onChange={(v) => store.patch(challenge.id, (d) => ((d as unknown as IChallenge).progressGoal = v))}

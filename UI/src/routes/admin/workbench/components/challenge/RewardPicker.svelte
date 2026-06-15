@@ -11,12 +11,15 @@
 			<input
 				class="inp"
 				autofocus
+				aria-label={`Search ${kind === 'item' ? 'items' : kind === 'mod' ? 'item mods' : 'skills'}`}
 				placeholder={`Search ${kind === 'item' ? 'items' : kind === 'mod' ? 'item mods' : 'skills'}…`}
 				bind:value={query}
 			/>
 		</div>
 		<span class="ch-picker-count">{availableCount} of {records.length} unclaimed</span>
-		<button type="button" class="row-x" title="Close" onclick={onClose}><WorkbenchIcon kind="x" size={11} /></button>
+		<button type="button" class="row-x" title="Close" aria-label="Close" onclick={onClose}>
+			<WorkbenchIcon kind="x" size={11} />
+		</button>
 	</div>
 	<div class="ch-picker-list">
 		{#each matches.slice(0, 80) as record (record.id)}

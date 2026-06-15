@@ -32,6 +32,13 @@ describe('TagPill', () => {
 		expect(onRemove).toHaveBeenCalledOnce();
 	});
 
+	it('renders the remove control as a real, labelled button', () => {
+		const { container } = render(TagPill, { props: { tag, onRemove: vi.fn() } });
+		const remove = container.querySelector('.x') as HTMLElement;
+		expect(remove.tagName).toBe('BUTTON');
+		expect(remove.getAttribute('aria-label')).toBe('Remove tag Fire');
+	});
+
 	it('adds the new-pill inset ring only when isNew is set', () => {
 		const { container, rerender } = render(TagPill, { props: { tag, isNew: true } });
 		expect((container.querySelector('.tag-pill') as HTMLElement).getAttribute('style')).toContain('inset');

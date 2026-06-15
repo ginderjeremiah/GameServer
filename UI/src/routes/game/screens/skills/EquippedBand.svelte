@@ -36,7 +36,13 @@
 				{#if swapping}
 					<span class="rep">↪ replace</span>
 				{:else}
-					<button type="button" class="rm" title="Remove from loadout" onclick={(e) => remove(e, id)}>✕</button>
+					<button
+						type="button"
+						class="rm"
+						title="Remove from loadout"
+						aria-label="Remove {metrics.skill.name} from loadout"
+						onclick={(e) => remove(e, id)}>✕</button
+					>
 				{/if}
 				<button type="button" class="en" onclick={(e) => pick(e, id)}>{metrics.skill.name}</button>
 				<div class="es">

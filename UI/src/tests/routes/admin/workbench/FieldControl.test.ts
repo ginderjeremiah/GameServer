@@ -107,7 +107,7 @@ describe('FieldControl — toggle field', () => {
 		expect(store.items[0].enabled).toBe(true);
 	});
 
-	it('toggles via the keyboard (Enter)', async () => {
+	it('renders the switch as a native, labelled button (keyboard-operable for free)', () => {
 		const { store, record, baseline } = setup();
 		const { container } = renderField(
 			field({ key: 'enabled', label: 'On', type: 'toggle', onLabel: 'Yes', offLabel: 'No' }),
@@ -115,8 +115,12 @@ describe('FieldControl — toggle field', () => {
 			record,
 			baseline
 		);
-		await fireEvent.keyDown(container.querySelector('.toggle') as HTMLElement, { key: 'Enter' });
-		expect(store.items[0].enabled).toBe(true);
+		// A real <button role="switch"> gets focus + Enter/Space activation natively, so there is no
+		// hand-rolled keydown handler to test — assert the accessible element instead.
+		const toggle = container.querySelector('.toggle') as HTMLElement;
+		expect(toggle.tagName).toBe('BUTTON');
+		expect(toggle.getAttribute('role')).toBe('switch');
+		expect(toggle.getAttribute('aria-label')).toBe('On');
 	});
 });
 
