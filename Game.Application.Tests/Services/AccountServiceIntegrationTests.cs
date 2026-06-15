@@ -210,6 +210,35 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task ResolveSelectedPlayerId_UserWithPlayer_ReturnsFirstPlayerId()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "rehydrateuser", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var playerId = await accountService.ResolveSelectedPlayerId(user.Id);
+
+            Assert.Equal(player.Id, playerId);
+        }
+
+        [Fact]
+        public async Task ResolveSelectedPlayerId_UserWithoutPlayer_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "noplayerrehydrate", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var playerId = await accountService.ResolveSelectedPlayerId(user.Id);
+
+            Assert.Null(playerId);
+        }
+
+        [Fact]
         public async Task Refresh_ValidToken_RotatesToNewPair()
         {
             using var scope = CreateScope();

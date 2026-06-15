@@ -19,20 +19,33 @@ namespace Game.Api.Services
         public PlayerState PlayerState { get; private set; } = new();
 
         /// <summary>
-        /// True when UserId is set to a valid authenticated user.
+        /// True when the request carries a valid authenticated user. Derived from the validated access
+        /// token (recorded by <see cref="LoadPlayerState"/>), not from a session-cache hit — the session
+        /// cache is a volatile presentation convenience, so its absence must never be mistaken for "not
+        /// logged in" (see docs/backend.md → Authentication).
         /// </summary>
         public bool Authenticated => UserId > 0;
 
         /// <summary>
-        /// Loads player state from the session store using the userId from the auth token.
-        /// Called by SessionLoaderMiddleware on every authenticated request.
+        /// True when a usable player session (a real selected player) is loaded for the authenticated user.
+        /// A session-cache miss leaves this false while <see cref="Authenticated"/> stays true, signalling
+        /// the caller to rehydrate the session (see <see cref="RehydrateSession"/>).
+        /// </summary>
+        public bool HasPlayerSession => PlayerState.PlayerId > 0;
+
+        /// <summary>
+        /// Records the authenticated user (from the validated token) and loads their in-flight player state
+        /// from the session store. The user id is the sole authority for whether the caller is
+        /// authenticated, so it is recorded regardless of a cache hit; a miss leaves
+        /// <see cref="HasPlayerSession"/> false for the caller to rehydrate. Called by
+        /// SessionLoaderMiddleware on every authenticated request.
         /// </summary>
         public async Task LoadPlayerState(int userId)
         {
+            UserId = userId;
             var sessionData = await _sessionStore.GetSession(userId);
             if (sessionData is not null)
             {
-                UserId = userId;
                 PlayerState = sessionData;
             }
         }
@@ -70,12 +83,30 @@ namespace Game.Api.Services
         public void CreateSession(int userId, int playerId)
         {
             UserId = userId;
-            PlayerState = new PlayerState { PlayerId = playerId };
-            _sessionStore.Update(PlayerState, UserId);
+            EstablishSession(playerId);
+        }
+
+        /// <summary>
+        /// Re-establishes a session for the already-authenticated user after its volatile cache entry was
+        /// evicted (Redis flush, TTL lapse, or a session never established on this instance), binding it to
+        /// the player resolved from the database and re-caching it so subsequent requests hit the cache.
+        /// </summary>
+        public void RehydrateSession(int playerId)
+        {
+            EstablishSession(playerId);
         }
 
         public void SavePlayerState()
         {
+            _sessionStore.Update(PlayerState, UserId);
+        }
+
+        // Binds the current (authenticated) user to a fresh PlayerState for the given player and caches it.
+        // Shared by the login (CreateSession) and rehydration (RehydrateSession) paths, which differ only in
+        // whether UserId was already set from the token.
+        private void EstablishSession(int playerId)
+        {
+            PlayerState = new PlayerState { PlayerId = playerId };
             _sessionStore.Update(PlayerState, UserId);
         }
     }

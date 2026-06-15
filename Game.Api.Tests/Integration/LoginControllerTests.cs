@@ -1,8 +1,10 @@
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Core;
 using Game.Infrastructure.Database;
+using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
@@ -174,6 +176,91 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Login/ActiveSession", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Status_ValidTokenWithNoSessionCache_RehydratesAndReturnsPlayer()
+        {
+            // A valid token with no cached session (evicted, aged out under the sliding TTL, or never
+            // established on this instance) must not be reported as "not logged in" (#693). The session is
+            // rehydrated from the user's player binding instead.
+            var (client, user, player) = await SeedUserWithTokenButNoSessionAsync("evictedstatus");
+
+            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Null(result.ErrorMessage);
+            Assert.Equal(player.Name, result.Data.Name);
+
+            // The rehydrated session is written back so subsequent requests hit the cache rather than re-querying.
+            await AssertSessionRehydratedAsync(user.Id, player.Id);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task ActiveSession_ValidTokenWithNoSessionCache_RehydratesAndReturnsResult()
+        {
+            // The pre-game active-session takeover warning is the user-visible breakage from #693: an evicted
+            // session must rehydrate and report the (absent) active socket, not "not logged in".
+            var (client, user, player) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
+
+            var response = await client.GetAsync("/api/Login/ActiveSession", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Null(result.ErrorMessage);
+            Assert.False(result.Data.Active);
+
+            await AssertSessionRehydratedAsync(user.Id, player.Id);
+            client.Dispose();
+        }
+
+        /// <summary>
+        /// Seeds a user with a player (and a linked skill so the aggregate loads) and returns a client
+        /// carrying a valid bearer token for that user but with no session ever established in the cache —
+        /// the "valid token, evicted/absent session" state.
+        /// </summary>
+        private async Task<(HttpClient Client, User User, Player Player)>
+            SeedUserWithTokenButNoSessionAsync(string username)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, username, "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            Assert.Null(await sessionStore.GetSession(user.Id));
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+            return (client, user, player);
+        }
+
+        // Polls the session store (the rehydration write is fire-and-forget) until the session is present.
+        private async Task AssertSessionRehydratedAsync(int userId, int expectedPlayerId)
+        {
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                var session = await sessionStore.GetSession(userId);
+                if (session is not null)
+                {
+                    Assert.Equal(expectedPlayerId, session.PlayerId);
+                    return;
+                }
+
+                await Task.Delay(25, CancellationToken);
+            }
+
+            Assert.Fail("The evicted session was not rehydrated into the cache.");
         }
 
         [Fact]

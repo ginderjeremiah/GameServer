@@ -16,12 +16,12 @@ namespace Game.DataAccess.Repositories
         /// Idle TTL for the cached session (<c>Session_{userId}</c> → the in-flight <see cref="PlayerState"/>).
         /// Written on every <see cref="Update"/> and slid on every <see cref="GetSession"/> hit, mirroring the
         /// player-aggregate eviction policy (#439) so an active session never ages out while a dormant one is
-        /// reclaimed instead of occupying Redis forever (#537). Unlike the player key the session is **not**
-        /// reconstructable from the database — it carries the cache-only battle snapshot and the user→player
-        /// binding that <c>SessionService.Authenticated</c> relies on, and a miss has no reload path — so the
-        /// budget is the refresh-token lifetime as a genuine floor: a session must not be dropped while its
-        /// refresh token is still valid, and once that has lapsed the user must re-login (which re-creates the
-        /// session) anyway (see docs/backend-persistence.md → Caching and Pub/Sub).
+        /// reclaimed instead of occupying Redis forever (#537). The user→player binding is reconstructable
+        /// (a miss is rehydrated from the database by <c>SessionLoaderMiddleware</c>, so it is never a silent
+        /// logout — authentication derives from the token, not this cache), but the in-flight battle snapshot
+        /// it also carries is cache-only and lost on eviction. The budget is therefore the refresh-token
+        /// lifetime as a genuine floor: an active player's in-flight battle should not be dropped while their
+        /// refresh token is still valid (see docs/backend-persistence.md → Caching and Pub/Sub).
         /// </summary>
         private static readonly TimeSpan SessionCacheTtl = AuthConstants.RefreshTokenLifetime;
 
