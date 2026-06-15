@@ -17,8 +17,12 @@ namespace Game.Infrastructure
         private readonly ILogger<BackgroundWorker> _logger;
         private readonly string _uniqueId = Guid.NewGuid().ToString();
         private readonly RegisteredWaitHandle _workerHandle;
-        private bool _hasBeenKilled = false;
-        private bool _disposed = false;
+
+        // Teardown flags written by Kill()/Dispose() and read by Start(), potentially from different threads, so
+        // they are volatile to publish the write promptly: without it a Start() racing a Dispose() could read a
+        // stale _disposed == false and then Set() an already-disposed _resetEvent.
+        private volatile bool _hasBeenKilled = false;
+        private volatile bool _disposed = false;
 
         // Written on the Start() caller's thread and on the thread-pool worker-loop thread, and read from
         // arbitrary threads, so it is volatile to guarantee writes are published and reads observe transitions
