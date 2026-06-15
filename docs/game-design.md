@@ -12,7 +12,7 @@ There are some choices already made in the design of the game to support this:
 
 # Character Progression and Attributes
 
-Character progression in the game is primarily driven by leveling up and allocating stat points. As players defeat monsters and complete challenges, they earn experience points (XP) that contribute to their character's level. When a player levels up, they receive stat points that can be allocated to core Attributes such as Strength, Agility, Intelligence, etc.
+Character progression in the game is primarily driven by leveling up and allocating stat points. As players defeat monsters and complete challenges, they earn experience points (XP) that contribute to their character's level. When a player levels up, they receive stat points that can be allocated to core Attributes such as Strength, Agility, Intellect, etc.
 
 Attributes are somewhat of a work-in-progress feature, but the general idea is that they will provide various bonuses and effects that influence combat, other Attributes, and potentially other mechanics in the game. Currently they come from stat allocations and equipment, but this will be expanded in the future. For example, a Skill may receive a damage bonus based on the player's Strength Attribute, and the player's MaxHealth Attribute will receive a bonus based on their Strength as well. Attributes are designed to go above and beyond the traditional RPG stats and provide a system for complex effects.
 
