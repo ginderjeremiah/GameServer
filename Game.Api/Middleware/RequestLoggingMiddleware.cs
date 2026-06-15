@@ -26,11 +26,18 @@ namespace Game.Api.Middleware
             using var scope = _logger.BeginScope(loggingContext);
             _logger.LogInformation("Request Start");
 
-            await _next(context);
-
-            stopwatch.Stop();
-            _logger.LogInformation("Request Ended {StatusCode} {ElapsedMs}ms",
-                context.Response.StatusCode, stopwatch.ElapsedMilliseconds);
+            // Emit the end event from a finally so the status/duration are logged even when the
+            // pipeline throws — the failing request is the one most worth diagnosing.
+            try
+            {
+                await _next(context);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                _logger.LogInformation("Request Ended {StatusCode} {ElapsedMs}ms",
+                    context.Response.StatusCode, stopwatch.ElapsedMilliseconds);
+            }
         }
     }
 
