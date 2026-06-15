@@ -375,6 +375,25 @@ describe('Skills screen', () => {
 		expect(container.querySelector('.effect-row')).toBeNull();
 	});
 
+	it('shows the locked CTA in the inspector for a locked skill', async () => {
+		const { container } = render(Skills);
+		// Reveal locked skills, then select Echo (locked) into the inspector.
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
+		await fireEvent.click(rowByName(container, 'Echo')!);
+		const cta = container.querySelector<HTMLButtonElement>('.d-cta .btn')!;
+		expect(cta.disabled).toBe(true);
+		expect(cta.textContent).toContain('Locked');
+		expect(container.querySelector('.d-hint')?.textContent).toContain('Unlock by completing');
+	});
+
+	it('shows the no-scaling note in the damage breakdown for a skill without multipliers', async () => {
+		const { container } = render(Skills);
+		// Charlie (id 2) has no damage multipliers, so the breakdown reports no scaling.
+		await fireEvent.click(rowByName(container, 'Charlie')!);
+		expect(screen.getByText('No attribute scaling.')).toBeTruthy();
+	});
+
 	it('filters the rail by search term', async () => {
 		const { container } = render(Skills);
 		const search = container.querySelector<HTMLInputElement>('.search input')!;

@@ -1,4 +1,12 @@
-<button class="side-item" class:active data-testid={testid} title={!expanded ? title : undefined} {onclick}>
+<button
+	class="side-item"
+	class:active
+	class:disabled
+	{disabled}
+	data-testid={testid}
+	title={!expanded ? title : undefined}
+	{onclick}
+>
 	<div class="glyph-slot">
 		{@render glyph(active)}
 	</div>
@@ -15,6 +23,8 @@ import type { Snippet } from 'svelte';
 interface Props {
 	/** Whether this item is the active screen/tool. */
 	active?: boolean;
+	/** Whether the item is non-interactive (dimmed, unfocusable, ignores clicks). */
+	disabled?: boolean;
 	/** Visible label, shown when expanded. */
 	label: string;
 	/** Tooltip title shown only when the rail is collapsed. */
@@ -30,7 +40,7 @@ interface Props {
 	trailing?: Snippet<[boolean]>;
 }
 
-const { active = false, label, title, testid, expanded, onclick, glyph, trailing }: Props = $props();
+const { active = false, disabled = false, label, title, testid, expanded, onclick, glyph, trailing }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -56,7 +66,7 @@ $collapsed: 60px;
 	white-space: nowrap;
 	overflow: hidden;
 
-	&:hover {
+	&:hover:not(.disabled) {
 		background: color-mix(in srgb, var(--white) 3%, transparent);
 		color: var(--text-primary);
 	}
@@ -64,6 +74,11 @@ $collapsed: 60px;
 	&.active {
 		background: color-mix(in srgb, var(--accent) 8%, transparent);
 		color: var(--text-primary);
+	}
+
+	&.disabled {
+		color: color-mix(in srgb, var(--text-primary) 32%, transparent);
+		cursor: default;
 	}
 }
 

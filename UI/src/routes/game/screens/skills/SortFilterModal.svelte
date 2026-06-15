@@ -1,73 +1,69 @@
-<svelte:window onkeydown={onKeydown} />
+<Popover open={view.modalOpen} onClose={() => (view.modalOpen = false)} label="Sort and filter skills">
+	<div class="modal">
+		<div class="msub">Library</div>
+		<h3>Sort &amp; Filter</h3>
 
-{#if view.modalOpen}
-	<div class="modal-layer">
-		<button type="button" class="backdrop" aria-label="Close" onclick={() => (view.modalOpen = false)}></button>
-		<div class="modal" role="dialog" aria-label="Sort and filter skills">
-			<div class="msub">Library</div>
-			<h3>Sort &amp; Filter</h3>
+		<div class="mgroup">
+			<div class="gl">Sort by</div>
+			<div class="opts">
+				{#each SKILL_SORTS as option (option.key)}
+					<button
+						type="button"
+						class="opt"
+						class:on={view.sort === option.key}
+						onclick={() => view.setSort(option.key)}
+					>
+						{option.label}
+					</button>
+				{/each}
+			</div>
+		</div>
 
+		{#if view.usedAttributes.length}
 			<div class="mgroup">
-				<div class="gl">Sort by</div>
+				<div class="gl">Filter by attribute</div>
 				<div class="opts">
-					{#each SKILL_SORTS as option (option.key)}
+					{#each view.usedAttributes as attr (attr)}
 						<button
 							type="button"
-							class="opt"
-							class:on={view.sort === option.key}
-							onclick={() => view.setSort(option.key)}
+							class="opt attr"
+							class:on={view.filterAttributes.includes(attr)}
+							style:--ac={attributeColor(attr)}
+							onclick={() => view.toggleAttributeFilter(attr)}
 						>
-							{option.label}
+							{attributeName(attr, staticData.attributes)}
 						</button>
 					{/each}
 				</div>
 			</div>
+		{/if}
 
-			{#if view.usedAttributes.length}
-				<div class="mgroup">
-					<div class="gl">Filter by attribute</div>
-					<div class="opts">
-						{#each view.usedAttributes as attr (attr)}
-							<button
-								type="button"
-								class="opt attr"
-								class:on={view.filterAttributes.includes(attr)}
-								style:--ac={attributeColor(attr)}
-								onclick={() => view.toggleAttributeFilter(attr)}
-							>
-								{attributeName(attr, staticData.attributes)}
-							</button>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<div class="mgroup">
-				<div class="mrow">
-					<span class="ml">Show locked skills</span>
-					<button
-						type="button"
-						class="switch"
-						class:on={view.showLocked}
-						role="switch"
-						aria-checked={view.showLocked}
-						aria-label="Show locked skills"
-						onclick={() => view.toggleShowLocked()}
-					></button>
-				</div>
-			</div>
-
-			<div class="mfoot">
-				<button type="button" class="btn dim" onclick={() => view.resetFilters()}>Reset</button>
-				<button type="button" class="btn" onclick={() => (view.modalOpen = false)}>Apply</button>
+		<div class="mgroup">
+			<div class="mrow">
+				<span class="ml">Show locked skills</span>
+				<button
+					type="button"
+					class="switch"
+					class:on={view.showLocked}
+					role="switch"
+					aria-checked={view.showLocked}
+					aria-label="Show locked skills"
+					onclick={() => view.toggleShowLocked()}
+				></button>
 			</div>
 		</div>
+
+		<div class="mfoot">
+			<button type="button" class="btn dim" onclick={() => view.resetFilters()}>Reset</button>
+			<button type="button" class="btn" onclick={() => (view.modalOpen = false)}>Apply</button>
+		</div>
 	</div>
-{/if}
+</Popover>
 
 <script lang="ts">
 import { attributeColor, attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import { Popover } from '$components';
 import { SKILL_SORTS, type SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -75,38 +71,12 @@ type Props = {
 };
 
 const { view }: Props = $props();
-
-/** Escape closes the open filter overlay (the backdrop click / Apply are the other paths). */
-const onKeydown = (e: KeyboardEvent) => {
-	if (e.key === 'Escape' && view.modalOpen) {
-		view.modalOpen = false;
-	}
-};
 </script>
 
 <style lang="scss">
-.modal-layer {
-	position: absolute;
-	inset: 0;
-	z-index: 40;
-}
-
-.backdrop {
-	position: absolute;
-	inset: 0;
-	border: none;
-	background: color-mix(in srgb, var(--black) 55%, transparent);
-	backdrop-filter: blur(3px);
-	cursor: pointer;
-}
-
 .modal {
-	position: absolute;
-	left: 50%;
-	top: 46%;
-	transform: translate(-50%, -50%);
 	width: 420px;
-	max-width: calc(100% - 32px);
+	max-width: 100%;
 	padding: 22px 24px 20px;
 	border: 1px solid var(--border-medium);
 	border-radius: 6px;

@@ -1,28 +1,31 @@
 <div class="settings-rail" data-testid="settings-rail">
-	<div class="rail-header">Categories</div>
-	{#each SETTINGS_CATS as cat (cat.key)}
-		{@const isActive = active === cat.key}
-		<button
-			class="rail-item"
-			class:active={isActive}
-			class:disabled={!cat.built}
-			disabled={!cat.built}
-			data-testid="settings-cat-{cat.key}"
-			onclick={() => cat.built && onPick(cat.key)}
-		>
-			{#if isActive}
-				<span class="active-bar"></span>
-			{/if}
-			<SettingsGlyph glyph={cat.glyph} color={isActive ? 'var(--accent)' : 'currentColor'} />
-			<span class="rail-label">{cat.label}</span>
-			{#if !cat.built}
-				<span class="soon-badge">soon</span>
-			{/if}
-		</button>
-	{/each}
+	<RailNavGroup label="Categories" first expanded>
+		{#each SETTINGS_CATS as cat (cat.key)}
+			<RailNavItem
+				active={active === cat.key}
+				disabled={!cat.built}
+				label={cat.label}
+				title={cat.label}
+				testid="settings-cat-{cat.key}"
+				expanded
+				onclick={() => onPick(cat.key)}
+			>
+				{#snippet glyph(isActive)}
+					<SettingsGlyph glyph={cat.glyph} color={isActive ? 'var(--accent)' : 'currentColor'} />
+				{/snippet}
+				{#snippet trailing()}
+					{#if !cat.built}
+						<span class="soon-badge">soon</span>
+					{/if}
+				{/snippet}
+			</RailNavItem>
+		{/each}
+	</RailNavGroup>
 </div>
 
 <script lang="ts">
+import RailNavGroup from '$components/sidebar/RailNavGroup.svelte';
+import RailNavItem from '$components/sidebar/RailNavItem.svelte';
 import SettingsGlyph from './SettingsGlyph.svelte';
 import { SETTINGS_CATS } from './options-view.svelte';
 
@@ -44,63 +47,8 @@ const { active, onPick }: Props = $props();
 	flex-direction: column;
 }
 
-.rail-header {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 2px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	padding: 0 22px 12px;
-}
-
-.rail-item {
-	position: relative;
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	width: 100%;
-	padding: 10px 22px;
-	border: none;
-	text-align: left;
-	background: transparent;
-	color: color-mix(in srgb, var(--text-primary) 72%, transparent);
-	font-family: inherit;
-	font-size: 13.5px;
-	cursor: pointer;
-	transition:
-		background 130ms,
-		color 130ms;
-
-	&:hover:not(.disabled) {
-		background: color-mix(in srgb, var(--white) 2.5%, transparent);
-	}
-
-	&.active {
-		background: color-mix(in srgb, var(--accent) 7%, transparent);
-		color: var(--text-primary);
-	}
-
-	&.disabled {
-		color: color-mix(in srgb, var(--text-primary) 32%, transparent);
-		cursor: default;
-	}
-}
-
-.active-bar {
-	position: absolute;
-	left: 0;
-	top: 6px;
-	bottom: 6px;
-	width: 2px;
-	background: var(--accent);
-	box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 67%, transparent);
-}
-
-.rail-label {
-	flex: 1;
-}
-
 .soon-badge {
+	margin-right: 12px;
 	font-family: var(--mono);
 	font-size: 8px;
 	letter-spacing: 0.6px;
