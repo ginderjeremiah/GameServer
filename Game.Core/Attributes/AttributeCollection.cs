@@ -83,7 +83,7 @@ namespace Game.Core.Attributes
                 return node.CachedValue.Value;
             }
 
-            var amount = 0.0;
+            var amount = 0.0d;
             var modifiers = node.Modifiers;
             if (modifiers is not null)
             {
@@ -110,7 +110,7 @@ namespace Game.Core.Attributes
         {
             var node = GetOrCreateNode((int)modifier.Attribute);
 
-            node.GetModifiersOrNew().Add(modifier);
+            node.Modifiers.Add(modifier);
 
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
@@ -131,7 +131,7 @@ namespace Game.Core.Attributes
         /// </summary>
         private void UnhookDerivedLink(AttributeCollectionNode node, EAttribute derivedSource)
         {
-            foreach (var modifier in node.GetModifiersOrNew())
+            foreach (var modifier in node.Modifiers)
             {
                 if (modifier.Source is EAttributeModifierSource.Derived && modifier.DerivedSource == derivedSource)
                 {

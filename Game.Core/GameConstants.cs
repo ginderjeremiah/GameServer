@@ -5,9 +5,7 @@ namespace Game.Core
     /// Marked <see cref="ClientMirroredAttribute"/> so the code generator
     /// (<c>Game.Api.CodeGen.ApiCodeGenerator</c>) emits each public constant into the TypeScript
     /// client (<c>UI/src/lib/api/types/game-constants.ts</c>), making this class the single source of
-    /// truth and closing the drift gap where these values were hand-copied as magic numbers on both
-    /// sides (#306). The values must never be hand-mirrored on the frontend — consume the generated
-    /// constants instead.
+    /// truth.
     /// </summary>
     [ClientMirrored]
     public static class GameConstants
@@ -16,7 +14,7 @@ namespace Game.Core
         public const int MsPerTick = 40;
 
         /// <summary>The default maximum simulated battle duration in milliseconds before a battle times out.</summary>
-        public const int DefaultMaxBattleMs = MsPerTick * 10000;
+        public const int DefaultMaxBattleMs = 2 * 60 * 1000;
 
         /// <summary>The maximum number of skills a player may equip in their battle loadout. Enemies bring the same cap into battle for player/enemy symmetry.</summary>
         public const int MaxSelectedSkills = 4;

@@ -60,7 +60,7 @@ namespace Game.Core.Tests.Battle.Performance
         // Per-tick cost cancels the tick count, so the scaling gates use a modest fixed length to stay
         // fast; the backstop uses the simulator's real default cap (DefaultMaxBattleMs / MsPerTick = 10000).
         private const int ScalingTicks = 800;
-        private const int WorstCaseTicks = 10_000;
+        private const int WorstCaseTicks = GameConstants.DefaultMaxBattleMs / GameConstants.MsPerTick;
 
         // Sampling budget — large enough that the Min statistic is stable run-to-run, small enough to
         // keep the whole class to a couple of seconds even on a slow CI runner.

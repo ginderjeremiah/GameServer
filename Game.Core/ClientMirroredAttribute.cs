@@ -10,7 +10,7 @@ namespace Game.Core
     /// across the frontend/backend boundary. Applying it at the declaration keeps the "this is
     /// mirrored to the client" decision next to the type itself rather than in a list elsewhere.
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Enum | System.AttributeTargets.Class, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Enum | AttributeTargets.Class, Inherited = false)]
     public sealed class ClientMirroredAttribute : System.Attribute
     {
     }

@@ -9,7 +9,7 @@ namespace Game.Core.Attributes.Modifiers
     /// every player (#603). The battle add/remove path swaps whole instances and relies on reference
     /// identity to remove a specific one, both of which immutability preserves.
     /// </summary>
-    public class AttributeModifier
+    public sealed class AttributeModifier
     {
         /// <summary>
         /// The enum value of the <see cref="Attributes.Attribute"/> the modifier is for.
@@ -38,7 +38,7 @@ namespace Game.Core.Attributes.Modifiers
         /// <param name="currentValue"></param>
         /// <param name="store"></param>
         /// <returns></returns>
-        public virtual double Apply(double currentValue, AttributeCollection store)
+        public double Apply(double currentValue, AttributeCollection store)
         {
             var modifierAmount = Amount;
             if (Source is EAttributeModifierSource.Derived)

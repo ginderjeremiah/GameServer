@@ -159,11 +159,8 @@ Follow `CLAUDE.md` and the area docs. The standards that bite most often:
   integration tests for interactions between dependencies, e2e only for critical user paths. If you
   touch battle logic, mirror the same test scenarios and expected results in **both** the frontend
   and backend suites.
-- If you make an important design decision, document it concisely in the right `docs/` file
-  ("Important Design Decisions" or the relevant feature section) — but don't over-document routine
-  bug fixes.
-- If during the course of implementing your PR you find anything that deserves a follow up to look at
-  then you should create a new issue with the details you've discovered. That being said, if it's a very
+- If during the course of implementing your PR you find anything that deserves a follow up then you
+  should create a new issue with the details you've discovered. That being said, if it's a very
   minor fix then you should include it in your PR.
 
 ### 8. Verify before you push
