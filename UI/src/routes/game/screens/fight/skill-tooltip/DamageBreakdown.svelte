@@ -6,6 +6,7 @@
 	{#each multipliers as mult (mult.name)}
 		<div class="tt-dmg-row">
 			<span class="tt-dmg-label">
+				<AttributeIcon id={mult.attributeId} size={13} />
 				{mult.name}
 				<span class="tt-mult-dim">x{mult.multiplier}</span>
 			</span>
@@ -26,8 +27,12 @@
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
+import type { EAttribute } from '$lib/api';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 
 interface DamageMultiplier {
+	/** The attribute this contribution scales with. */
+	attributeId: EAttribute;
 	/** Attribute name. */
 	name: string;
 	/** The skill's multiplier for the attribute. */
@@ -62,6 +67,9 @@ const { base, multipliers, enemyDefense, total }: Props = $props();
 }
 
 .tt-dmg-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	color: var(--text-secondary);
 }
 

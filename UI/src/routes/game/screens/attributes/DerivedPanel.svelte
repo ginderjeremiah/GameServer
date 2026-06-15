@@ -11,6 +11,7 @@
 					{@const to = view.derived[d.id]}
 					{@const isChanged = from !== to}
 					<div class="stat" class:changed={isChanged}>
+						<AttributeIcon id={d.id} size={24} />
 						<div class="info">
 							<div class="name">{attributeName(d.id, staticData.attributes)}</div>
 							<div class="fed-by">
@@ -37,6 +38,7 @@
 <script lang="ts">
 import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import {
 	DERIVED_GROUPS,
 	DERIVED_STATS,

@@ -205,13 +205,39 @@ BACKGROUND wording.
 | `Punch.png` | a properly formed fist in a straight forward punch, three-quarter back view driving toward the upper right; the flat front of the knuckles leads and the thumb is wrapped across the outside of the fingers (NOT a thumb-leading hammerfist). Periwinkle-blue skin. A few motion lines trail behind toward the lower left. | First attempt put the thumb as the striking surface and added an impact sparkle — both fixed on iteration. |
 | `Slap.png` | an open bare hand, fingers together and flat, mid-swing sideways slap, palm facing forward and sweeping toward the right. Periwinkle-blue skin. Three or four short curved action lines trail behind on the left. | |
 
+### Attributes
+
+The 11 currently-visible character attributes (issue #531). Like skills, these **drop
+the metal/leather palette sentence** from STYLE (they're abstract symbols, not gear) and
+bake a per-subject colour into the subject. They render **very small** — down to ~16px on
+combat effect chips and skill code chips — so each is a single bold, iconic silhouette.
+The two **green** subjects (Luck, Health Regen) can't be lime-keyed, so they generate on
+the **magenta** backdrop (`--bg-hue 300`); the rest use lime. The Strength arm uses the
+same **periwinkle-blue skin** as the skill hands. All 11 were rendered on `nb2`; the batch
+driver and exact prompts live in `image-editing/attr-icons/attr-batch.py`.
+
+| File | Subject prompt (the part before STYLE) | Notes |
+|---|---|---|
+| `Strength.png` | A single flexed muscular arm bent at the elbow with a clenched fist, a strong bulging bicep — the classic 'strength' flex, side view. Periwinkle blue-violet skin (≈ `#a8c0f0`). | Periwinkle skin like the skill hands. |
+| `Endurance.png` | A single stylized mountain peak — a bold triangular mountain with a rounded snow-capped top and simple flat facet shading. Cool blue-grey rock, lighter off-white cap. | Mountain (not a heart/shield) to avoid colliding with Max Health / Defense. |
+| `Intellect.png` | A stylized human brain, three-quarter front angle, simple rounded lobes and a few clean fold lines. Soft periwinkle-blue and lavender (not fleshy pink). | Cool/UI-tied palette, deliberately not pink. |
+| `Agility.png` | A single winged boot — a simple low boot with a small feathered wing on the heel/ankle (a Hermes winged sandal). Muted brown boot, cool blue-grey/off-white wing. Fills most of the frame. | |
+| `Dexterity.png` | A bullseye target of concentric rings, face-on, with a single slim arrow struck dead centre. Cool blue-grey and off-white rings, small bright centre. | Concentric rings stay legible even at 16px. |
+| `Luck.png` | A single four-leaf clover: four rounded heart-shaped leaves and a short stem. Fresh muted green. | **Magenta backdrop** (green subject), `--bg-hue 300`. |
+| `Max Health.png` | A single bold heart symbol, smooth and rounded. Warm red. Fills most of the frame. | |
+| `Defense.png` | A single sturdy heater-style medieval shield, face-on, with a raised central boss and a subtle vertical seam. Cool blue-grey steel face, muted gold-bronze rim. | |
+| `Cooldown Recovery.png` | A single classic hourglass (sand timer), face-on: two rounded glass bulbs in a simple frame, sand falling through. Cool blue-grey frame, pale warm sand. Fills most of the frame. | Hourglass beat a stopwatch+arrow, which blurred below ~24px. |
+| `Damage Taken Per Second.png` | Two blood droplets — one large dominant teardrop with a small highlight, plus a second much smaller drop beside/below it. Deep red. Fills most of the frame. | Two-drop motif separates it from the single Max Health heart. |
+| `Health Regen Per Second.png` | A single heart with a small upward arrow and a tiny sparkle above it. A fresh healing **green** heart (not red). | **Magenta backdrop** (green subject), `--bg-hue 300`. |
+
 ## Status
 
 All 14 current icons (11 gear + 3 skills above) were **regenerated on `nb2`
 (`gemini-3.1-flash-image`) on 2026-06-14** in this style, replacing the earlier
 2.5-flash versions — better adherence and fewer strip hacks (NB2 fixed the Fire Bolt
 paneling, the bow's arrow direction, and the Punch thumb on the first try; only
-`daggers` and `leather-pants` still needed `--trim-corners`). **Drops** (`Rat Tail`,
-`Slime Ball`) are slated for removal — do not regenerate them. Skill slots are
-expected to grow to a **64×64 minimum (possibly 96×96)**, so favour legibility at
-those sizes for new skill art.
+`daggers` and `leather-pants` still needed `--trim-corners`). The **11 attribute
+icons** (the Attributes section above) were generated the same way on `nb2` on
+2026-06-14 (issue #531). **Drops** (`Rat Tail`, `Slime Ball`) are slated for removal —
+do not regenerate them. Skill slots are expected to grow to a **64×64 minimum (possibly
+96×96)**, so favour legibility at those sizes for new skill art.

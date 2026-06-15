@@ -9,6 +9,7 @@
 				effectDirection(attributeIsHarmful(effect.attribute, staticData.attributes), effect.modifierType, effect.amount)
 			)}
 			<div class="effect-chip" style:--chip-accent={color} title={chipTitle(effect)}>
+				<AttributeIcon id={effect.attribute} size={13} />
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
 				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
 				<span class="chip-time">{remainingSeconds(effect)}s</span>
@@ -29,6 +30,7 @@ import {
 	formatEffectMagnitude
 } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
 type Props = {
@@ -68,6 +70,10 @@ const chipTitle = (effect: ActiveEffectView) =>
 	border-radius: 2px;
 	background: color-mix(in srgb, var(--chip-accent) 10%, transparent);
 	overflow: hidden;
+
+	:global(.attr-icon) {
+		align-self: center;
+	}
 }
 
 .chip-mag {

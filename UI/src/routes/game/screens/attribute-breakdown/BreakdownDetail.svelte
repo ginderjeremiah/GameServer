@@ -5,6 +5,7 @@
 	<div class="head">
 		<div class="heading">
 			<div class="title-row">
+				<AttributeIcon id={view.selected} size={26} />
 				<h2 class="name">{attributeName(view.selected, staticData.attributes)}</h2>
 				<KindTag type={view.selectedMeta.type} />
 			</div>
@@ -38,6 +39,7 @@ import BySourceBreakdown from './BySourceBreakdown.svelte';
 import ApplyOrderTrace from './ApplyOrderTrace.svelte';
 import { attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import { attributeDescription, fmtNum, type AttributeBreakdownView } from './attribute-breakdown-view.svelte';
 
 interface Props {

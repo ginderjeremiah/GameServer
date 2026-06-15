@@ -21,6 +21,7 @@
 		{#if view.mode === 'theory'}
 			<div class="alloc-table">
 				<div class="table-head">
+					<span></span>
 					<span>Attribute</span>
 					<span>Allocation</span>
 					<span class="right">Total</span>
@@ -169,7 +170,7 @@ onDestroy(() => view.dispose());
 
 .table-head {
 	display: grid;
-	grid-template-columns: 1.7fr 1.3fr 0.8fr auto;
+	grid-template-columns: 40px 1.7fr 1.3fr 0.8fr auto;
 	gap: 14px;
 	padding: 10px 16px;
 	border-bottom: 1px solid var(--border-light);

@@ -46,9 +46,10 @@
 				</div>
 				<div class="chips">
 					{#each metrics.skill.damageMultipliers as mult (mult.attributeId)}
-						<span class="achip" style:--ac={attributeColor(mult.attributeId)}
-							>{attributeCode(mult.attributeId, staticData.attributes)}</span
-						>
+						<span class="achip" style:--ac={attributeColor(mult.attributeId)}>
+							<AttributeIcon id={mult.attributeId} size={12} />
+							{attributeCode(mult.attributeId, staticData.attributes)}
+						</span>
 					{/each}
 				</div>
 			</div>
@@ -64,6 +65,7 @@
 <script lang="ts">
 import { attributeCode, attributeColor, formatNum } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -337,6 +339,9 @@ const onDragEnd = () => {
 }
 
 .achip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	padding: 2px 8px;
 	border: 1px solid color-mix(in srgb, var(--ac) 38%, transparent);
 	border-radius: 3px;

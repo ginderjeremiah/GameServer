@@ -28,6 +28,31 @@ export const attributeColor = (id: EAttribute): string => {
 	return key ? `var(--attr-${key})` : 'var(--text-secondary)';
 };
 
+/** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
+ *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
+ *  paths. Only the 11 currently-visible attributes have art; the unimplemented crit/dodge/block
+ *  set and the obsolete `DropBonus` are intentionally absent. */
+const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
+	[EAttribute.Strength]: 'Strength',
+	[EAttribute.Endurance]: 'Endurance',
+	[EAttribute.Intellect]: 'Intellect',
+	[EAttribute.Agility]: 'Agility',
+	[EAttribute.Dexterity]: 'Dexterity',
+	[EAttribute.Luck]: 'Luck',
+	[EAttribute.MaxHealth]: 'Max Health',
+	[EAttribute.Defense]: 'Defense',
+	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
+	[EAttribute.DamageTakenPerSecond]: 'Damage Taken Per Second',
+	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second'
+};
+
+/** Path to the attribute's icon under `static/img`, or `''` for an attribute with no art yet.
+ *  Prefer the `AttributeIcon` component, which renders nothing for the empty case. */
+export const attributeIcon = (id: EAttribute): string => {
+	const file = ATTRIBUTE_ICON[id];
+	return file ? `/img/${file}.png` : '';
+};
+
 /** The humanised enum-key fallback name for an attribute (e.g. `MaxHealth` → `Max Health`),
  *  used when the live `Attributes` reference data is unavailable. An unknown/out-of-range id
  *  has no enum key, so it degrades to a readable `Unknown` rather than a blank label. */
