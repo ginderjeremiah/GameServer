@@ -120,7 +120,6 @@ const hideChipTooltip = () => {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
-	margin-bottom: 12px;
 
 	&.reversed {
 		justify-content: flex-end;

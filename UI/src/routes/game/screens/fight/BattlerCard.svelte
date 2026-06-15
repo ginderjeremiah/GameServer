@@ -13,11 +13,14 @@
 		<HpBar currentHealth={battler.currentHealth} {maxHealth} ariaLabel="{battler.name} health" />
 	</div>
 
-	<!-- Active timed effects -->
-	<ActiveEffectChips {battler} reversed={side === 'enemy'} />
-
 	<!-- Skills -->
 	<Skills {battler} {side} />
+
+	<!-- Active timed effects float below the card (absolutely positioned) so effects coming and
+	     going never change the card's height — which would shift the vertically-centred combatants row. -->
+	<div class="effect-chips-slot">
+		<ActiveEffectChips {battler} reversed={side === 'enemy'} />
+	</div>
 </div>
 
 <script lang="ts">
@@ -41,6 +44,7 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 
 <style lang="scss">
 .battler-card {
+	position: relative;
 	background: color-mix(in srgb, var(--white) 3%, transparent);
 	border: 1px solid var(--border-light);
 	border-radius: 3px;
@@ -106,5 +110,15 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 
 .hp-bar-slot {
 	margin-bottom: 14px;
+}
+
+// Anchored to the card's bottom edge and inset to the content padding, so the effect tiles line up
+// under the skill row without occupying card height.
+.effect-chips-slot {
+	position: absolute;
+	top: 100%;
+	left: 20px;
+	right: 20px;
+	padding-top: 12px;
 }
 </style>
