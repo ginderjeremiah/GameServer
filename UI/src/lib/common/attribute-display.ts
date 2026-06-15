@@ -1,4 +1,4 @@
-import { EAttribute, type IAttribute } from '$lib/api';
+import { EAttribute, EAttributeType, type IAttribute } from '$lib/api';
 import { normalizeText } from './functions';
 
 /*
@@ -80,3 +80,9 @@ export const attributeCode = (id: EAttribute, attributes?: IAttribute[]): string
  *  when raised) when the reference data is unavailable. */
 export const attributeIsHarmful = (id: EAttribute, attributes?: IAttribute[]): boolean =>
 	attributes?.find((a) => a.id === id)?.isHarmful ?? false;
+
+/** Display label for an attribute's `EAttributeType` taxonomy (`Primary` / `Secondary` / `Status`).
+ *  The enum names are already display-ready, so this is the enum's reverse map; an undefined or
+ *  out-of-range type (e.g. reference data not yet loaded) degrades to an empty label. */
+export const attributeTypeName = (type: EAttributeType | undefined): string =>
+	type != null ? (EAttributeType[type] ?? '') : '';

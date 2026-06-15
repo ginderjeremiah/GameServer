@@ -55,10 +55,17 @@
 	<div class="footer">
 		<CommitBar {view} />
 	</div>
+
+	<!-- Shared attribute tooltip for the steppers' icon/name, published via context so the rows
+	     (guided or theory mode) don't have to thread hover handlers up to this owner. -->
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
 </div>
 
 <script lang="ts">
 import { onDestroy } from 'svelte';
+import { type TooltipComponent } from '$stores';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import ModeToggle from './ModeToggle.svelte';
 import BudgetMeter from './BudgetMeter.svelte';
 import AttributesRadar from './AttributesRadar.svelte';
@@ -70,6 +77,10 @@ import { AttributesView, CORE_ATTRIBUTES } from './attributes-view.svelte';
 
 const view = new AttributesView();
 const coreIndices = CORE_ATTRIBUTES.map((_, i) => i);
+
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
+setAttributeTooltip(tip.controller);
 
 onDestroy(() => view.dispose());
 </script>

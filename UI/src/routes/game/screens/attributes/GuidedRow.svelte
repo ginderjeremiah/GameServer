@@ -1,8 +1,18 @@
 <div class="row">
-	<AttributeIcon {id} size={40} />
+	<span
+		class="attr-hit"
+		role="img"
+		aria-label={name}
+		onmouseenter={showTip}
+		onmousemove={moveTip}
+		onmouseleave={hideTip}
+	>
+		<AttributeIcon {id} size={40} />
+	</span>
 
 	<div class="info">
-		<div class="head">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="head" onmouseenter={showTip} onmousemove={moveTip} onmouseleave={hideTip}>
 			<span class="code" style="color: {color}">{code}</span>
 			<span class="name">{name}</span>
 		</div>
@@ -26,6 +36,7 @@
 import { attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import Delta from './Delta.svelte';
 import Stepper from './Stepper.svelte';
 import { CORE_ATTRIBUTES, DERIVED_STATS, feedsFor, type AttributesView } from './attributes-view.svelte';
@@ -43,6 +54,12 @@ const code = $derived(attributeCode(id, staticData.attributes));
 const name = $derived(attributeName(id, staticData.attributes));
 const feeds = $derived(feedsFor(i));
 
+// Hover explainer for the attribute, driven through the screen-level controller.
+const attrTip = getAttributeTooltip();
+const showTip = (e: MouseEvent) => attrTip?.show(id, e);
+const moveTip = (e: MouseEvent) => attrTip?.move(e);
+const hideTip = () => attrTip?.hide();
+
 // The set of derived stats whose value differs between the saved and pending
 // builds — used to light up the feed chips this attribute drives.
 const changed = $derived(
@@ -59,6 +76,11 @@ const changed = $derived(
 	border-radius: 4px;
 	background: color-mix(in srgb, var(--white) 2%, transparent);
 	border: 1px solid var(--border-subtle);
+}
+
+.attr-hit {
+	display: inline-flex;
+	flex-shrink: 0;
 }
 
 .info {

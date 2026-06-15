@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EAttribute, EModifierType, ESkillEffectTarget, type IAttribute, type ISkillEffect } from '$lib/api';
 
 // The chips resolve attribute names through the reference-data store.
@@ -79,5 +79,24 @@ describe('ActiveEffectChips', () => {
 		battler.applyEffect(effect());
 		const { getByTestId } = render(ActiveEffectChips, { props: { battler, reversed: true } });
 		expect(getByTestId('effect-chips').classList.contains('reversed')).toBe(true);
+	});
+
+	it('opens the attribute tooltip with the effect detail when a chip is hovered', async () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
+		const { container } = render(ActiveEffectChips, { props: { battler } });
+
+		// The tooltip stays hidden (no title) until a chip is hovered.
+		expect(container.querySelector('.tt-title-name')).toBeNull();
+
+		await fireEvent.mouseEnter(container.querySelector('.effect-chip') as HTMLElement);
+
+		// It opens for the chip's attribute and carries the effect's magnitude/direction/duration.
+		expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('Strength');
+		const effectRow = container.querySelector('[data-testid="attr-tip-effect"]') as HTMLElement;
+		expect(effectRow.textContent).toContain('+5');
+		expect(effectRow.textContent).toContain('Buff');
+
+		await fireEvent.mouseLeave(container.querySelector('.effect-chip') as HTMLElement);
+		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
 });

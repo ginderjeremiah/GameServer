@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute, type IAttribute } from '$lib/api';
+import { EAttribute, EAttributeType, type IAttribute } from '$lib/api';
 import {
 	attributeCode,
 	attributeEnumName,
 	attributeIcon,
 	attributeIsHarmful,
-	attributeName
+	attributeName,
+	attributeTypeName
 } from '../../lib/common/attribute-display';
 import { makeAttribute } from '../fixtures/attributes';
 
@@ -93,6 +94,20 @@ describe('attributeIsHarmful', () => {
 	it('defaults to false when attributes are absent or the id is unknown', () => {
 		expect(attributeIsHarmful(EAttribute.DamageTakenPerSecond)).toBe(false);
 		expect(attributeIsHarmful(EAttribute.Luck, mockAttributes)).toBe(false);
+	});
+});
+
+describe('attributeTypeName', () => {
+	it('maps each EAttributeType to its display label', () => {
+		expect(attributeTypeName(EAttributeType.Primary)).toBe('Primary');
+		expect(attributeTypeName(EAttributeType.Secondary)).toBe('Secondary');
+		expect(attributeTypeName(EAttributeType.Status)).toBe('Status');
+	});
+
+	it('degrades to an empty label for an undefined or out-of-range type', () => {
+		// Reference data not yet loaded (undefined) or a value with no enum key must not throw.
+		expect(attributeTypeName(undefined)).toBe('');
+		expect(attributeTypeName(99 as EAttributeType)).toBe('');
 	});
 });
 

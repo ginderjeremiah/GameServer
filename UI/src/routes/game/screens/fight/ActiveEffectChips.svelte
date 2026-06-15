@@ -8,7 +8,14 @@
 			{@const color = effectDirectionColor(
 				effectDirection(attributeIsHarmful(effect.attribute, staticData.attributes), effect.modifierType, effect.amount)
 			)}
-			<div class="effect-chip" style:--chip-accent={color} title={chipTitle(effect)}>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="effect-chip"
+				style:--chip-accent={color}
+				onmouseenter={(ev) => showChipTooltip(effect, ev)}
+				onmousemove={(ev) => tip.controller.move(ev)}
+				onmouseleave={() => tip.controller.hide()}
+			>
 				<AttributeIcon id={effect.attribute} size={13} />
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
 				<span class="chip-attr">{attributeName(effect.attribute, staticData.attributes)}</span>
@@ -21,6 +28,10 @@
 	</div>
 {/if}
 
+<!-- One tooltip instance per chip row, anchored to whichever chip is hovered. Always mounted (it
+     stays hidden until a chip is hovered) so its registration survives chips coming and going. -->
+<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
+
 <script lang="ts">
 import {
 	attributeIsHarmful,
@@ -29,8 +40,10 @@ import {
 	effectDirectionColor,
 	formatEffectMagnitude
 } from '$lib/common';
-import { staticData } from '$stores';
+import { staticData, type TooltipComponent } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
 type Props = {
@@ -41,11 +54,18 @@ type Props = {
 
 const { battler, reversed = false }: Props = $props();
 
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
+
 const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>
 	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
-const chipTitle = (effect: ActiveEffectView) =>
-	`${formatEffectMagnitude(effect.modifierType, effect.amount)} ${attributeName(effect.attribute, staticData.attributes)}`;
+const showChipTooltip = (effect: ActiveEffectView, ev: MouseEvent) =>
+	tip.controller.show(effect.attribute, ev, {
+		modifierType: effect.modifierType,
+		amount: effect.amount,
+		durationMs: effect.durationMs
+	});
 </script>
 
 <style lang="scss">
