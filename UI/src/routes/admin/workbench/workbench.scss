@@ -263,6 +263,11 @@
 
 	/* toggle */
 	.toggle {
+		appearance: none;
+		background: none;
+		border: none;
+		color: inherit;
+		text-align: left;
 		display: inline-flex;
 		align-items: center;
 		gap: 9px;
@@ -397,11 +402,14 @@
 			color: var(--accent);
 		}
 		.x {
+			appearance: none;
+			border: none;
 			color: var(--text-muted);
 			cursor: pointer;
 			display: flex;
 			padding: 2px;
 			border-radius: 3px;
+			background: none;
 		}
 		.x:hover {
 			color: var(--change-removed);
@@ -744,12 +752,16 @@
 		white-space: nowrap;
 
 		.x {
+			appearance: none;
+			border: none;
+			color: inherit;
 			display: inline-flex;
 			cursor: pointer;
 			opacity: 0.65;
 			padding: 1px;
 			border-radius: 50%;
 			margin-left: 1px;
+			background: none;
 		}
 		.x:hover {
 			opacity: 1;

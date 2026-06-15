@@ -28,6 +28,7 @@
 					<select
 						class="sel"
 						class:dirty
+						aria-label="Target {entityTypeName(challenge.entityType)}"
 						value={challenge.targetEntityId}
 						onchange={(e) =>
 							store.patch(challenge.id, (d) => ((d as unknown as IChallenge).targetEntityId = +e.currentTarget.value))}

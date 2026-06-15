@@ -18,7 +18,7 @@
 			{/if}
 		</div>
 		{#if valueId != null}
-			<button type="button" class="row-x" title="Clear reward" onclick={onClear}>
+			<button type="button" class="row-x" title="Clear reward" aria-label="Clear reward" onclick={onClear}>
 				<WorkbenchIcon kind="x" size={11} />
 			</button>
 		{/if}

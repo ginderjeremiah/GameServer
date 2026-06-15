@@ -8,16 +8,15 @@
 	<span class="tdot" style:background={color.fg}></span>
 	{tag.name}
 	{#if onRemove}
-		<span
+		<button
+			type="button"
 			class="x"
-			role="button"
-			tabindex="0"
 			title="Remove"
+			aria-label="Remove tag {tag.name}"
 			onclick={stopPropagation(() => onRemove?.())}
-			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onRemove?.())}
 		>
 			<WorkbenchIcon kind="x" size={10} />
-		</span>
+		</button>
 	{/if}
 </span>
 

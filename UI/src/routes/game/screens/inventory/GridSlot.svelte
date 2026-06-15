@@ -40,6 +40,7 @@
 		class:on={item.favorite}
 		class:show={hover}
 		title={item.favorite ? 'Unfavorite' : 'Favorite'}
+		aria-label={item.favorite ? 'Unfavorite' : 'Favorite'}
 		onclick={stopPropagation(() => onToggleFav?.(item))}
 	>
 		<FavoriteStar
@@ -134,7 +135,13 @@ const handleClick = (e: MouseEvent) => {
 const handleKeydown = (e: KeyboardEvent) => {
 	if (e.key === 'Enter' || e.key === ' ') {
 		e.preventDefault();
-		onSelect?.(item);
+		// Mirror the pointer affordances: a modifier+activate equips (like ⌘/Ctrl-click and
+		// double-click), a plain activate selects — so the equip path has a keyboard equivalent.
+		if (e.metaKey || e.ctrlKey) {
+			onToggleEquip?.(item);
+		} else {
+			onSelect?.(item);
+		}
 	}
 };
 

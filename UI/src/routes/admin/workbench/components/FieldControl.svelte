@@ -1,19 +1,19 @@
 {#if field.type === 'toggle'}
 	<div class="fld">
 		{@render label()}
-		<div
+		<button
+			type="button"
 			class="toggle"
 			class:on={!!value}
 			class:dirty
 			role="switch"
 			aria-checked={!!value}
-			tabindex="0"
+			aria-label={field.label}
 			onclick={() => set(!value)}
-			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), set(!value))}
 		>
 			<span class="track"><span class="knob"></span></span>
 			<span class="tg-label">{value ? field.onLabel : field.offLabel}</span>
-		</div>
+		</button>
 	</div>
 {:else if field.type === 'textarea'}
 	<div class="fld" style:flex={field.grow ? '1 1 100%' : 'none'} style:width="100%">
@@ -22,6 +22,7 @@
 			class="txtarea"
 			class:dirty
 			class:invalid={!!warn}
+			aria-label={field.label}
 			placeholder={field.placeholder}
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}
@@ -34,6 +35,7 @@
 		<div class="num-unit">
 			<NumInput
 				class="inp num{dirty ? ' dirty' : ''}{warn ? ' invalid' : ''}"
+				ariaLabel={field.label}
 				value={(value as number) ?? 0}
 				allowNegative={field.allowNegative}
 				onChange={(n) => set(n)}
@@ -50,6 +52,7 @@
 				class="sel"
 				class:dirty
 				class:invalid={!!warn}
+				aria-label={field.label}
 				value={value as number}
 				onchange={(e) => set(+e.currentTarget.value)}
 			>
@@ -68,6 +71,7 @@
 			class="inp"
 			class:dirty
 			class:invalid={!!warn}
+			aria-label={field.label}
 			placeholder={field.placeholder}
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}

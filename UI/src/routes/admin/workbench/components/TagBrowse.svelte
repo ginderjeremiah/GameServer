@@ -15,7 +15,7 @@
 	<div class="cat-body">
 		<div class="search" style:max-width="360px" style:margin-bottom="14px">
 			<WorkbenchIcon kind="search" sw={1.4} />
-			<input class="inp" placeholder="Filter tags…" bind:value={q} />
+			<input class="inp" aria-label="Filter tags" placeholder="Filter tags…" bind:value={q} />
 		</div>
 		<div class="toggle-grid">
 			{#each shown as tag (tag.id)}

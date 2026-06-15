@@ -2,6 +2,7 @@
 	class={className}
 	type="text"
 	inputmode="decimal"
+	aria-label={ariaLabel}
 	{style}
 	value={text}
 	oninput={handleInput}
@@ -16,9 +17,18 @@ interface Props {
 	class?: string;
 	style?: string;
 	allowNegative?: boolean;
+	/** Accessible name for the input — the visible field labels are presentational `<span>`s, not associated `<label>`s. */
+	ariaLabel?: string;
 }
 
-let { value, onChange, class: className = '', style = undefined, allowNegative = false }: Props = $props();
+let {
+	value,
+	onChange,
+	class: className = '',
+	style = undefined,
+	allowNegative = false,
+	ariaLabel = undefined
+}: Props = $props();
 
 // Keep the in-progress text locally so typing "1." or "0.5" isn't clobbered by
 // re-coercion on every keystroke, and reflect external resets when not editing.

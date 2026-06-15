@@ -2,7 +2,7 @@
 	<div class="search" style:max-width="420px">
 		<WorkbenchIcon kind="search" sw={1.4} />
 		<!-- svelte-ignore a11y_autofocus -->
-		<input class="inp" autofocus placeholder="Search all tags…" bind:value={q} />
+		<input class="inp" autofocus aria-label="Search all tags" placeholder="Search all tags…" bind:value={q} />
 	</div>
 	<div class="result-summary">
 		{matchCount} match{matchCount === 1 ? '' : 'es'} across {groups.length} categor{groups.length === 1 ? 'y' : 'ies'} · click

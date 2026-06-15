@@ -148,6 +148,26 @@ describe('GridSlot — keyboard interactions', () => {
 		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: 'ArrowRight' });
 		expect(onSelect).not.toHaveBeenCalled();
 	});
+
+	it('equips (not selects) on Ctrl+Enter — the keyboard equivalent of ⌘/Ctrl-click', async () => {
+		const onSelect = vi.fn();
+		const onToggleEquip = vi.fn();
+		const item = makeItem();
+		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
+		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: 'Enter', ctrlKey: true });
+		expect(onToggleEquip).toHaveBeenCalledWith(item);
+		expect(onSelect).not.toHaveBeenCalled();
+	});
+
+	it('equips (not selects) on Meta+Space', async () => {
+		const onSelect = vi.fn();
+		const onToggleEquip = vi.fn();
+		const item = makeItem();
+		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
+		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: ' ', metaKey: true });
+		expect(onToggleEquip).toHaveBeenCalledWith(item);
+		expect(onSelect).not.toHaveBeenCalled();
+	});
 });
 
 describe('GridSlot — hover interactions', () => {

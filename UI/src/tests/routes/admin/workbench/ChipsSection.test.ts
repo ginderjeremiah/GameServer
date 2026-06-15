@@ -133,6 +133,14 @@ describe('ChipsSection', () => {
 		expect(store.items[0].skillPool).toEqual([2]);
 	});
 
+	it('renders the remove control as a real, labelled button (not a clickable span)', () => {
+		const { store, record, baseline } = setup([1]);
+		const { container } = renderChips(store, record, baseline);
+		const remove = container.querySelector('.skill-chip .x') as HTMLElement;
+		expect(remove.tagName).toBe('BUTTON');
+		expect(remove.getAttribute('aria-label')).toBe('Remove');
+	});
+
 	it('excludes a retired catalogue entry from the add select but keeps an assigned one as a chip', () => {
 		const { store, record, baseline } = setup([4]);
 		const { container } = renderChips(store, record, baseline);
