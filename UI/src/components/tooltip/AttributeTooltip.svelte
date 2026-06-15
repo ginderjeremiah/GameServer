@@ -36,6 +36,12 @@
 				<span class="at-effect-mag" style:color={effectDetail.color}>{effectDetail.magnitude}</span>
 				<span class="at-effect-dir" style:color={effectDetail.color}>{effectDetail.label}</span>
 			</div>
+			{#if effectDetail.sourceName}
+				<div class="at-effect-source">
+					<span class="at-effect-source-label">Source</span>
+					<span class="at-effect-source-name">{effectDetail.sourceName}</span>
+				</div>
+			{/if}
 		</TooltipSection>
 	{/if}
 </TooltipShell>
@@ -104,6 +110,7 @@ const effectDetail = $derived.by(() => {
 		label: direction === 'buff' ? 'Buff' : 'Debuff',
 		color: effectDirectionColor(direction),
 		magnitude: formatEffectMagnitude(effect.modifierType, effect.amount),
+		sourceName: effect.sourceName,
 		pill
 	};
 });
@@ -134,5 +141,25 @@ const effectDetail = $derived.by(() => {
 	font-size: 8.5px;
 	letter-spacing: 1.4px;
 	text-transform: uppercase;
+}
+
+.at-effect-source {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 6px;
+}
+
+.at-effect-source-label {
+	font-family: var(--mono);
+	font-size: 8px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.at-effect-source-name {
+	font-size: 12px;
+	color: var(--text-secondary);
 }
 </style>

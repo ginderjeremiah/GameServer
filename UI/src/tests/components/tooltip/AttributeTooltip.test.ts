@@ -59,12 +59,18 @@ describe('AttributeTooltip', () => {
 		);
 	});
 
-	it('shows the effect magnitude/direction and a depleting countdown pill in the chip context (a buff)', () => {
+	it('shows the effect magnitude/direction, source skill and a depleting pill in the chip context (a buff)', () => {
 		staticData.attributes = [STRENGTH];
 		const { container, getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Strength,
-				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000, remainingMs: 1000 }
+				effect: {
+					modifierType: EModifierType.Additive,
+					amount: 5,
+					durationMs: 1000,
+					remainingMs: 1000,
+					sourceName: 'Battle Cry'
+				}
 			}
 		});
 
@@ -76,6 +82,8 @@ describe('AttributeTooltip', () => {
 		// A full (remaining == duration) countdown pill shows the remaining time.
 		expect((container.querySelector('.tt-duration-text') as HTMLElement).textContent?.trim()).toBe('1.0s');
 		expect((container.querySelector('.tt-duration-fill') as HTMLElement).style.width).toBe('100%');
+		// The source skill that applied the effect is named.
+		expect((container.querySelector('.at-effect-source-name') as HTMLElement).textContent).toBe('Battle Cry');
 	});
 
 	it('classifies a lowered beneficial attribute as a debuff and depletes the pill', () => {
@@ -114,9 +122,11 @@ describe('AttributeTooltip', () => {
 				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000 }
 			}
 		});
-		// The effect summary still renders, but with no live timer there is no pill.
+		// The effect summary still renders, but with no live timer there is no pill, and with no
+		// resolvable source there is no source row.
 		expect(getByTestId('attr-tip-effect').textContent).toContain('+5');
 		expect(container.querySelector('.tt-duration-pill')).toBeNull();
+		expect(container.querySelector('.at-effect-source')).toBeNull();
 	});
 
 	it('degrades gracefully when the reference data is unavailable', () => {

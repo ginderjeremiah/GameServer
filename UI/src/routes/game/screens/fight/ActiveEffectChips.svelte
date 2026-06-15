@@ -66,6 +66,12 @@ let shownSourceId = $state<number>();
 const shownEffect = $derived(
 	shownSourceId != null ? battler.activeEffects.find((e) => e.sourceId === shownSourceId) : undefined
 );
+
+// The skill an active effect came from: its `sourceId` is the authored skill-effect id, so find the
+// skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown skill.
+const sourceSkillName = (sourceId: number): string | undefined =>
+	staticData.skills?.find((skill) => skill?.effects.some((e) => e.id === sourceId))?.name;
+
 // Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes.
 const shownEffectContext = $derived(
 	shownEffect
@@ -73,7 +79,8 @@ const shownEffectContext = $derived(
 				modifierType: shownEffect.modifierType,
 				amount: shownEffect.amount,
 				durationMs: shownEffect.durationMs,
-				remainingMs: shownEffect.renderRemainingMs
+				remainingMs: shownEffect.renderRemainingMs,
+				sourceName: sourceSkillName(shownEffect.sourceId)
 			}
 		: undefined
 );

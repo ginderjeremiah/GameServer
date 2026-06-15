@@ -1,11 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
-import { EAttribute, EModifierType, ESkillEffectTarget, type IAttribute, type ISkillEffect } from '$lib/api';
+import {
+	EAttribute,
+	EModifierType,
+	ESkillEffectTarget,
+	type IAttribute,
+	type ISkill,
+	type ISkillEffect
+} from '$lib/api';
 import { statify } from '$lib/common';
 
-// The chips resolve attribute names through the reference-data store.
-const { staticData } = vi.hoisted(() => ({ staticData: { attributes: [] as IAttribute[] } }));
+// The chips resolve attribute names and the effect's source skill through the reference-data store.
+const { staticData } = vi.hoisted(() => ({
+	staticData: { attributes: [] as IAttribute[], skills: [] as (ISkill | undefined)[] }
+}));
 vi.mock('$stores', () => ({ staticData }));
 
 import ActiveEffectChips from '$routes/game/screens/fight/ActiveEffectChips.svelte';
@@ -30,6 +39,8 @@ beforeEach(() => {
 		makeAttribute(EAttribute.Strength, 'Strength'),
 		makeAttribute(EAttribute.Defense, 'Defense')
 	];
+	// A skill owning the effect id the fixtures use, so the tooltip can resolve the source.
+	staticData.skills = [{ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] } as ISkill];
 	battler = makeBattler();
 });
 
@@ -99,6 +110,8 @@ describe('ActiveEffectChips', () => {
 		expect(effectRow.textContent).toContain('Buff');
 		// The live effect drives a countdown pill (the chip just applied, so it's at full duration).
 		expect((container.querySelector('.tt-duration-text') as HTMLElement).textContent?.trim()).toBe('1.0s');
+		// The source skill is resolved from the reference data.
+		expect((container.querySelector('.at-effect-source-name') as HTMLElement).textContent).toBe('Battle Cry');
 
 		// Moving over the chip keeps it open (the controller repositions the panel).
 		await fireEvent.mouseMove(container.querySelector('.effect-chip') as HTMLElement);

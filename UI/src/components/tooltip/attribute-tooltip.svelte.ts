@@ -20,6 +20,8 @@ export interface AttributeEffectContext {
 	durationMs: number;
 	/** Live remaining time, driving the countdown pill. Omit for a non-timed/static context. */
 	remainingMs?: number;
+	/** Display name of the skill that applied the effect, when it can be resolved. */
+	sourceName?: string;
 }
 
 /**
