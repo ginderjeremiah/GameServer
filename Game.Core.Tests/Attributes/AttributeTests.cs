@@ -81,10 +81,10 @@ namespace Game.Core.Tests.Attributes
         [Theory]
         [InlineData(EAttribute.Strength, EAttributeType.Primary, "STR")]
         [InlineData(EAttribute.Luck, EAttributeType.Primary, "LUK")]
-        [InlineData(EAttribute.MaxHealth, EAttributeType.Secondary, "")]
-        [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "")]
-        [InlineData(EAttribute.DamageTakenPerSecond, EAttributeType.Status, "")]
-        [InlineData(EAttribute.HealthRegenPerSecond, EAttributeType.Status, "")]
+        [InlineData(EAttribute.MaxHealth, EAttributeType.Secondary, "HP")]
+        [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "CDR")]
+        [InlineData(EAttribute.DamageTakenPerSecond, EAttributeType.Status, "DOT")]
+        [InlineData(EAttribute.HealthRegenPerSecond, EAttributeType.Status, "REG")]
         public void Constructor_AssignsTypeAndCode(EAttribute id, EAttributeType expectedType, string expectedCode)
         {
             var attribute = new Attribute(id);
