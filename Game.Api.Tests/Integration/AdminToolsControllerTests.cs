@@ -146,6 +146,53 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditEnemies_EditUnknownEnemy_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent enemy is a not-found rejection (not a 500 from the
+            // 0-row update), and the whole batch is rejected up front — so the valid Add alongside it is
+            // not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Enemy",
+                        IsBoss = false,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        IsBoss = false,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetEnemies(), e => e.Name == "Ghost Enemy");
+        }
+
+        [Fact]
         public async Task AddEditZones_AddZone_Succeeds()
         {
             using var authClient = await SetupAuthenticatedClientAsync();
@@ -761,6 +808,57 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditSkills_EditUnknownSkill_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent skill is a not-found rejection (not a 500 from the
+            // 0-row update), and the whole batch is rejected up front — so the valid Add alongside it is
+            // not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Skill",
+                        BaseDamage = 10m,
+                        CooldownMs = 1000,
+                        Description = "Should never be saved",
+                        IconPath = "skills/ghost.png",
+                        DamageMultipliers = Array.Empty<object>(),
+                        Effects = Array.Empty<object>()
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        BaseDamage = 1m,
+                        CooldownMs = 1000,
+                        Description = "x",
+                        IconPath = "skills/phantom.png",
+                        DamageMultipliers = Array.Empty<object>(),
+                        Effects = Array.Empty<object>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditSkills", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Skill not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetSkills(), s => s.Name == "Ghost Skill");
+        }
+
+        [Fact]
         public async Task AddEditChallenges_AddChallenge_Succeeds()
         {
             using var authClient = await SetupAuthenticatedClientAsync();
@@ -837,6 +935,57 @@ namespace Game.Api.Tests.Integration
 
             var created = Assert.Single(GetChallenges(), c => c.Name == "Pyromancer");
             Assert.Equal(skill.Id, created.RewardSkillId);
+        }
+
+        [Fact]
+        public async Task AddEditChallenges_EditUnknownChallenge_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent challenge is a not-found rejection (not a 500 from
+            // the 0-row update), and the whole batch is rejected up front — so the valid Add alongside it
+            // is not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Challenge",
+                        Description = "Should never be saved",
+                        ChallengeTypeId = (int)EChallengeType.EnemiesKilled,
+                        TargetEntityId = (int?)null,
+                        ProgressGoal = 5m,
+                        RewardItemId = (int?)null,
+                        RewardItemModId = (int?)null
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        Description = "x",
+                        ChallengeTypeId = (int)EChallengeType.EnemiesKilled,
+                        TargetEntityId = (int?)null,
+                        ProgressGoal = 1m,
+                        RewardItemId = (int?)null,
+                        RewardItemModId = (int?)null
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditChallenges", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Challenge not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetChallenges(), c => c.Name == "Ghost Challenge");
         }
 
         // The reference-data HTTP GET endpoints were removed (#64); reads now go over the socket, which
@@ -1961,6 +2110,53 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Contains("unlock challenge", result.ErrorMessage ?? "", StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(GetZones(), z => z.Name == "Phantom Gate");
+        }
+
+        [Fact]
+        public async Task AddEditZones_EditUnknownZone_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An identity-level edit of a non-existent zone is a not-found rejection (not a 500 from the
+            // 0-row update), and the whole batch is rejected up front — so the valid Add alongside it is
+            // not persisted.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Ghost Zone",
+                        Description = "Should never be saved",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5
+                    },
+                    ChangeType = 0 // Add
+                },
+                new
+                {
+                    Item = new
+                    {
+                        Id = 999999,
+                        Name = "Phantom",
+                        Description = "x",
+                        Order = 0,
+                        LevelMin = 1,
+                        LevelMax = 5
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Zone not found.", result.ErrorMessage);
+            Assert.DoesNotContain(GetZones(), z => z.Name == "Ghost Zone");
         }
 
         [Fact]
