@@ -1,4 +1,5 @@
 using Game.Abstractions.Contracts.Admin;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
@@ -11,12 +12,24 @@ namespace Game.DataAccess.Repositories.Admin
     /// The contract's <c>StatisticType</c>/<c>EntityType</c> are read-only projections of the type
     /// and are ignored here — the type id is the only persisted classification.
     /// </summary>
-    internal class AdminChallenges(IEntityStore entityStore) : IAdminChallenges
+    internal class AdminChallenges(IChallenges challenges, IEntityStore entityStore) : IAdminChallenges
     {
+        private readonly IChallenges _challenges = challenges;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public void SaveChallenges(IReadOnlyList<Change<Contracts.Challenge>> changes)
+        public bool SaveChallenges(IReadOnlyList<Change<Contracts.Challenge>> changes)
         {
+            // An edit must target an existing challenge; a missing id is a not-found rejection (matching the
+            // relationship setters), not an EF 0-row update that throws. Challenges are zero-based-id
+            // reference data, so a valid id is an in-range index. Validate the whole batch up front so the
+            // commit filter doesn't persist the rest of the batch alongside an invalid edit.
+            var challengeCount = _challenges.All().Count;
+            if (changes.Any(c => c.ChangeType == EChangeType.Edit
+                && (c.Item.Id < 0 || c.Item.Id >= challengeCount)))
+            {
+                return false;
+            }
+
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Challenge
                 {
@@ -42,6 +55,8 @@ namespace Game.DataAccess.Repositories.Admin
                     RewardSkillId = item.RewardSkillId,
                     RetiredAt = item.RetiredAt,
                 }));
+
+            return true;
         }
     }
 }

@@ -26,14 +26,20 @@ namespace Game.DataAccess.Repositories.Admin
         public string? SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
             // A zone's dedicated boss must reference an existing enemy flagged IsBoss, and its unlock gate
-            // must reference an existing challenge. Validate the whole change set up front so an invalid
-            // reference rejects the batch rather than partially applying.
+            // must reference an existing challenge. An edit must also target an existing zone — a missing id
+            // is a not-found rejection, not an EF 0-row update that throws. Validate the whole change set up
+            // front so an invalid reference rejects the batch rather than partially applying.
             var challengeCount = _challenges.All().Count;
             foreach (var change in changes)
             {
                 if (change.ChangeType == EChangeType.Delete)
                 {
                     continue;
+                }
+
+                if (change.ChangeType == EChangeType.Edit && _zones.LookupZone(change.Item.Id) is null)
+                {
+                    return "Zone not found.";
                 }
 
                 if (change.Item.BossEnemyId is int bossEnemyId

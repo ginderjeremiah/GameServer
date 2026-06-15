@@ -11,8 +11,9 @@ namespace Game.Abstractions.DataAccess.Admin
     /// </summary>
     public interface IAdminEnemies
     {
-        /// <summary>Applies an identity-level Add/Edit/Delete change set to the enemy catalogue.</summary>
-        void SaveEnemies(IReadOnlyList<Change<Enemy>> changes);
+        /// <summary>Applies an identity-level Add/Edit/Delete change set to the enemy catalogue.
+        /// Returns <c>false</c> (applying nothing) if an edit targets an enemy that does not exist.</summary>
+        bool SaveEnemies(IReadOnlyList<Change<Enemy>> changes);
 
         /// <summary>Replaces an enemy's attribute distributions. Returns <c>false</c> if the enemy does not exist.</summary>
         bool SetAttributeDistributions(SetEnemyAttributeDistributions data);

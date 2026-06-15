@@ -23,8 +23,9 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditSkills([FromBody] List<Change<Skill>> changes)
         {
-            _adminSkills.SaveSkills(changes);
-            return ApiResponse.Success();
+            return _adminSkills.SaveSkills(changes)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Skill not found.");
         }
 
         [HttpPost]

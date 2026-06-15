@@ -25,8 +25,9 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditEnemies([FromBody] List<Change<Enemy>> changes)
         {
-            _adminEnemies.SaveEnemies(changes);
-            return ApiResponse.Success();
+            return _adminEnemies.SaveEnemies(changes)
+                ? ApiResponse.Success()
+                : ApiResponse.Error("Enemy not found.");
         }
 
         [HttpPost]

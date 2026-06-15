@@ -16,8 +16,16 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly IEnemyEntityCache _enemies = enemies;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public void SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
+        public bool SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
         {
+            // An edit must target an existing enemy; a missing id is a not-found rejection (matching the
+            // relationship setters), not an EF 0-row update that throws. Validate the whole batch up front
+            // so the commit filter doesn't persist the rest of the batch alongside an invalid edit.
+            if (changes.Any(c => c.ChangeType == EChangeType.Edit && _enemies.GetEnemy(c.Item.Id) is null))
+            {
+                return false;
+            }
+
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Enemy
                 {
@@ -31,6 +39,8 @@ namespace Game.DataAccess.Repositories.Admin
                     IsBoss = item.IsBoss,
                     RetiredAt = item.RetiredAt,
                 }));
+
+            return true;
         }
 
         public bool SetAttributeDistributions(SetEnemyAttributeDistributions data)

@@ -10,7 +10,8 @@ namespace Game.Abstractions.DataAccess.Admin
     /// </summary>
     public interface IAdminChallenges
     {
-        /// <summary>Applies an identity-level Add/Edit/Delete change set to the challenge catalogue.</summary>
-        void SaveChallenges(IReadOnlyList<Change<Challenge>> changes);
+        /// <summary>Applies an identity-level Add/Edit/Delete change set to the challenge catalogue.
+        /// Returns <c>false</c> (applying nothing) if an edit targets a challenge that does not exist.</summary>
+        bool SaveChallenges(IReadOnlyList<Change<Challenge>> changes);
     }
 }
