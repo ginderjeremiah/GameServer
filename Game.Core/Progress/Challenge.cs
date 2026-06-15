@@ -23,13 +23,13 @@ namespace Game.Core.Progress
         {
             if (Type.StatisticType is not null)
             {
-                var value = playerProgress.GetStatisticValue(Type.StatisticType.Id, TargetEntityId);
-                playerChallenge.UpdateProgress(value);
+                var hasData = playerProgress.TryGetStatisticValue(Type.StatisticType.Id, TargetEntityId, out var value);
+                playerChallenge.UpdateProgress(value, hasData);
             }
             else if (Type.Id is EChallengeType.LevelReached)
             {
-                var value = playerProgress.Player.Level;
-                playerChallenge.UpdateProgress(value);
+                // The player's level is always present, so the progress value is always real data.
+                playerChallenge.UpdateProgress(playerProgress.Player.Level, hasData: true);
             }
         }
     }
