@@ -58,7 +58,7 @@ namespace Game.Core.Tests.Battle
 
             Assert.False(result.Victory);
             Assert.False(result.PlayerDied);
-            Assert.Equal(40 * 10000, result.TotalMs);
+            Assert.Equal(GameConstants.DefaultMaxBattleMs, result.TotalMs);
         }
 
         [Fact]
