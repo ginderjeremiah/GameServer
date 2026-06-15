@@ -96,6 +96,10 @@ describe('ActiveEffectChips', () => {
 		expect(effectRow.textContent).toContain('+5');
 		expect(effectRow.textContent).toContain('Buff');
 
+		// Moving over the chip keeps it open (the controller repositions the panel).
+		await fireEvent.mouseMove(container.querySelector('.effect-chip') as HTMLElement);
+		expect(container.querySelector('.tt-title-name')).not.toBeNull();
+
 		await fireEvent.mouseLeave(container.querySelector('.effect-chip') as HTMLElement);
 		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
