@@ -9,7 +9,13 @@
 					<span class="nm">{entry ? section.labelOf(entry) : `#${id}`}</span>
 					<span class="dm">{entry ? section.metaOf(entry) : ''}</span>
 					{#if entry?.retired}<span class="retired-tag">retired</span>{/if}
-					<button type="button" class="x" title="Remove" aria-label="Remove" onclick={() => remove(id)}>
+					<button
+						type="button"
+						class="x"
+						title="Remove"
+						aria-label={`Remove ${entry ? section.labelOf(entry) : `#${id}`}`}
+						onclick={() => remove(id)}
+					>
 						<WorkbenchIcon kind="x" size={11} />
 					</button>
 				</div>

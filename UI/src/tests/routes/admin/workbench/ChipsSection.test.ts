@@ -133,12 +133,20 @@ describe('ChipsSection', () => {
 		expect(store.items[0].skillPool).toEqual([2]);
 	});
 
-	it('renders the remove control as a real, labelled button (not a clickable span)', () => {
+	it('names the chip in the remove control so each button is distinguishable to a screen reader', () => {
 		const { store, record, baseline } = setup([1]);
 		const { container } = renderChips(store, record, baseline);
 		const remove = container.querySelector('.skill-chip .x') as HTMLElement;
 		expect(remove.tagName).toBe('BUTTON');
-		expect(remove.getAttribute('aria-label')).toBe('Remove');
+		expect(remove.getAttribute('aria-label')).toBe('Remove Cleave');
+	});
+
+	it('falls back to the raw id in the remove label when the chip is unresolved', () => {
+		// Id 99 has no catalogue entry, so the label uses the same `#id` fallback as the chip name.
+		const { store, record, baseline } = setup([99]);
+		const { container } = renderChips(store, record, baseline);
+		const remove = container.querySelector('.skill-chip .x') as HTMLElement;
+		expect(remove.getAttribute('aria-label')).toBe('Remove #99');
 	});
 
 	it('excludes a retired catalogue entry from the add select but keeps an assigned one as a chip', () => {
