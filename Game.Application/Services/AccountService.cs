@@ -105,6 +105,18 @@ namespace Game.Application.Services
         }
 
         /// <summary>
+        /// Resolves which player an authenticated user's session binds to, re-deriving the same selection
+        /// the login flow makes (the user's first player). Returns <see langword="null"/> when the user has
+        /// no player. Used to rehydrate a session whose volatile cache entry was evicted while the access
+        /// token is still valid, so the request is served instead of being reported as not-logged-in.
+        /// </summary>
+        public async Task<int?> ResolveSelectedPlayerId(int userId)
+        {
+            var playerIds = await _users.GetPlayerIds(userId);
+            return playerIds.Count > 0 ? playerIds[0] : null;
+        }
+
+        /// <summary>
         /// Validates and rotates a refresh token: consuming it (single use) and, when valid, issuing a
         /// brand-new token pair carrying the same user and roles. Returns <see langword="null"/> when the
         /// supplied token is missing, expired, or already consumed.

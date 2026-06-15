@@ -71,6 +71,14 @@ namespace Game.DataAccess.Repositories
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<IReadOnlyList<int>> GetPlayerIds(int userId)
+        {
+            return await _context.Users
+                .Where(u => u.Id == userId && u.ArchivedAt == null)
+                .SelectMany(u => u.Players.Select(p => p.Id))
+                .ToListAsync();
+        }
+
         public async Task<bool> CheckIfUsernameExists(string username)
         {
             return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
