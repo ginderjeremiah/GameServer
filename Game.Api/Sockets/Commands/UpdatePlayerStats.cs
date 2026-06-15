@@ -30,7 +30,7 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<List<BattlerAttribute>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = context.Session.Player;
-            var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>());
+            var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>(), cancellationToken);
 
             var allocations = player.StatPoints.StatAllocations
                 .Select(allocation => BattlerAttribute.From(allocation.Attribute, allocation.Amount))

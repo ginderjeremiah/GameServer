@@ -80,7 +80,7 @@ namespace Game.Application.Tests.Services.Performance
                 Settle();
 
                 var endMs = await TimeAsync(() => op.BattleService.EndBattleVictory(op.Player, op.State, DateTime.UtcNow));
-                var commitMs = await TimeAsync(op.UnitOfWork.CommitAsync);
+                var commitMs = await TimeAsync(() => op.UnitOfWork.CommitAsync());
 
                 endStats.Add(endMs);
                 commitStats.Add(commitMs);

@@ -30,34 +30,34 @@ namespace Game.DataAccess.Repositories
 
         private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
 
-        public async Task<PlayerProgress> Load(Player player)
+        public async Task<PlayerProgress> Load(Player player, CancellationToken cancellationToken = default)
         {
-            var cached = await GetCachedProgress(player.Id);
+            var cached = await GetCachedProgress(player.Id, cancellationToken);
             return new PlayerProgress(
                 player,
                 cached.Statistics.Select(ToCoreStatistic),
                 cached.Challenges.Select(ToCoreChallenge));
         }
 
-        public async Task<List<CoreStat>> GetStatistics(int playerId)
+        public async Task<List<CoreStat>> GetStatistics(int playerId, CancellationToken cancellationToken = default)
         {
-            var cached = await GetCachedProgress(playerId);
+            var cached = await GetCachedProgress(playerId, cancellationToken);
             return cached.Statistics.Select(ToCoreStatistic).ToList();
         }
 
-        public async Task<List<CoreChallenge>> GetChallenges(int playerId)
+        public async Task<List<CoreChallenge>> GetChallenges(int playerId, CancellationToken cancellationToken = default)
         {
-            var cached = await GetCachedProgress(playerId);
+            var cached = await GetCachedProgress(playerId, cancellationToken);
             return cached.Challenges.Select(ToCoreChallenge).ToList();
         }
 
-        public async Task<HashSet<int>> GetCompletedChallengeIds(int playerId)
+        public async Task<HashSet<int>> GetCompletedChallengeIds(int playerId, CancellationToken cancellationToken = default)
         {
-            var cached = await GetCachedProgress(playerId);
+            var cached = await GetCachedProgress(playerId, cancellationToken);
             return [.. cached.Challenges.Where(c => c.Completed).Select(c => c.ChallengeId)];
         }
 
-        public async Task Save(PlayerProgress progress)
+        public async Task Save(PlayerProgress progress, CancellationToken cancellationToken = default)
         {
             // Nothing mutated since load -> the cache already holds the current snapshot (and reads slide its
             // TTL), so there is nothing to persist and no reason to rewrite the cache.
@@ -85,16 +85,16 @@ namespace Game.DataAccess.Repositories
                     Challenges = changed.Challenges,
                 }.Serialize(),
             };
-            await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope);
+            await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope, cancellationToken);
         }
 
-        private async Task<CachedPlayerProgress> GetCachedProgress(int playerId)
+        private async Task<CachedPlayerProgress> GetCachedProgress(int playerId, CancellationToken cancellationToken)
         {
             var key = ProgressKey(playerId);
-            var cached = await _cache.Get<CachedPlayerProgress>(key);
+            var cached = await _cache.Get<CachedPlayerProgress>(key, cancellationToken);
             if (cached is null)
             {
-                cached = await LoadFromDb(playerId);
+                cached = await LoadFromDb(playerId, cancellationToken);
                 _cache.SetAndForget(key, cached, ProgressCacheTtl);
             }
             else
@@ -106,7 +106,7 @@ namespace Game.DataAccess.Repositories
             return cached;
         }
 
-        private async Task<CachedPlayerProgress> LoadFromDb(int playerId)
+        private async Task<CachedPlayerProgress> LoadFromDb(int playerId, CancellationToken cancellationToken)
         {
             var statistics = await _context.PlayerStatistics
                 .AsNoTracking()
@@ -117,7 +117,7 @@ namespace Game.DataAccess.Repositories
                     EntityId = ps.EntityId,
                     Value = ps.Value,
                 })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             var challenges = await _context.PlayerChallenges
                 .AsNoTracking()
@@ -129,7 +129,7 @@ namespace Game.DataAccess.Repositories
                     Completed = pc.Completed,
                     CompletedAt = pc.CompletedAt,
                 })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return new CachedPlayerProgress { Statistics = statistics, Challenges = challenges };
         }

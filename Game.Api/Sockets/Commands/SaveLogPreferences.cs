@@ -32,7 +32,8 @@ namespace Game.Api.Sockets.Commands
             var player = context.Session.Player;
             await _playerService.SaveLogPreferences(
                 player,
-                Parameters.Select(p => new CoreLogPreference { LogType = p.Id, Enabled = p.Enabled }));
+                Parameters.Select(p => new CoreLogPreference { LogType = p.Id, Enabled = p.Enabled }),
+                cancellationToken);
 
             return Success();
         }

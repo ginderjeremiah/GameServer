@@ -1,4 +1,4 @@
-﻿using Game.Abstractions.Infrastructure;
+using Game.Abstractions.Infrastructure;
 using Game.Core;
 using StackExchange.Redis;
 
@@ -14,62 +14,68 @@ namespace Game.Infrastructure.Cache.Redis
             Multiplexer = multiplexer;
         }
 
-        public async Task<string?> Get(string key)
+        // StackExchange.Redis exposes no CancellationToken on its database operations, so the token is honoured
+        // only partially: WaitAsync makes the *await* unwind promptly when the budget is cancelled (releasing the
+        // per-socket command lock without waiting out the dependency's own 5s timeout — #558), while the
+        // underlying command keeps running to completion in the background. WaitAsync(CancellationToken.None) is a
+        // zero-overhead no-op (it returns the same task), so the default-token callers pay nothing.
+
+        public async Task<string?> Get(string key, CancellationToken cancellationToken = default)
         {
-            return await Redis.StringGetAsync(key);
+            return await Redis.StringGetAsync(key).WaitAsync(cancellationToken);
         }
 
-        public async Task<T?> Get<T>(string key)
+        public async Task<T?> Get<T>(string key, CancellationToken cancellationToken = default)
         {
-            var val = await Get(key);
+            var val = await Get(key, cancellationToken);
             return val.Deserialize<T>();
         }
 
-        public async Task<string?> GetDelete(string key)
+        public async Task<string?> GetDelete(string key, CancellationToken cancellationToken = default)
         {
-            return await Redis.StringGetDeleteAsync(key);
+            return await Redis.StringGetDeleteAsync(key).WaitAsync(cancellationToken);
         }
 
-        public async Task<T?> GetDelete<T>(string key)
+        public async Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default)
         {
-            var val = await GetDelete(key);
+            var val = await GetDelete(key, cancellationToken);
             return val.Deserialize<T>();
         }
 
-        public async Task<string?> GetSet(string key, string? value)
+        public async Task<string?> GetSet(string key, string? value, CancellationToken cancellationToken = default)
         {
-            return await Redis.StringGetSetAsync(key, value);
+            return await Redis.StringGetSetAsync(key, value).WaitAsync(cancellationToken);
         }
 
-        public async Task<T?> GetSet<T>(string key, T value)
+        public async Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default)
         {
-            var val = await GetSet(key, value?.Serialize());
+            var val = await GetSet(key, value?.Serialize(), cancellationToken);
             return val.Deserialize<T>();
         }
 
-        public async Task Set(string key, string? value)
+        public async Task Set(string key, string? value, CancellationToken cancellationToken = default)
         {
-            await StringSetAsync(key, value);
+            await StringSetAsync(key, value, cancellationToken: cancellationToken);
         }
 
-        public async Task Set<T>(string key, T value)
+        public async Task Set<T>(string key, T value, CancellationToken cancellationToken = default)
         {
-            await Set(key, value?.Serialize());
+            await Set(key, value?.Serialize(), cancellationToken);
         }
 
-        public async Task Set(string key, string? value, TimeSpan expiry)
+        public async Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            await StringSetAsync(key, value, expiry: expiry);
+            await StringSetAsync(key, value, expiry: expiry, cancellationToken: cancellationToken);
         }
 
-        public async Task Set<T>(string key, T value, TimeSpan expiry)
+        public async Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            await Set(key, value?.Serialize(), expiry);
+            await Set(key, value?.Serialize(), expiry, cancellationToken);
         }
 
-        public async Task Expire(string key, TimeSpan expiry)
+        public async Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            await Redis.KeyExpireAsync(key, expiry);
+            await Redis.KeyExpireAsync(key, expiry).WaitAsync(cancellationToken);
         }
 
         public void ExpireAndForget(string key, TimeSpan expiry)
@@ -97,19 +103,19 @@ namespace Game.Infrastructure.Cache.Redis
             SetAndForget(key, value?.Serialize(), expiry);
         }
 
-        public async Task SetNotExists(string key, string value)
+        public async Task SetNotExists(string key, string value, CancellationToken cancellationToken = default)
         {
-            await StringSetAsync(key, value, when: When.NotExists);
+            await StringSetAsync(key, value, when: When.NotExists, cancellationToken: cancellationToken);
         }
 
-        public async Task CompareAndDelete(string key, string deleteIfValue)
+        public async Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)
         {
-            await Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]);
+            await Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]).WaitAsync(cancellationToken);
         }
 
-        public async Task Delete(string key)
+        public async Task Delete(string key, CancellationToken cancellationToken = default)
         {
-            await Redis.KeyDeleteAsync(key);
+            await Redis.KeyDeleteAsync(key).WaitAsync(cancellationToken);
         }
 
         public void DeleteAndForget(string key)
@@ -122,9 +128,9 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.StringSet(key, value, expiry: expiry, flags: flags, when: when);
         }
 
-        private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always)
+        private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
         {
-            await Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when);
+            await Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when).WaitAsync(cancellationToken);
         }
     }
 }

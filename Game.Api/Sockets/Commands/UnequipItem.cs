@@ -28,7 +28,7 @@ namespace Game.Api.Sockets.Commands
         {
             var player = context.Session.Player;
             var success = await _playerService.UnequipItem(
-                player, (EEquipmentSlot)Parameters.EquipmentSlotId);
+                player, (EEquipmentSlot)Parameters.EquipmentSlotId, cancellationToken);
 
             return success ? Success() : Error("Failed to unequip item.");
         }

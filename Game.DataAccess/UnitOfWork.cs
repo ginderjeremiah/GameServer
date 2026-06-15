@@ -5,9 +5,9 @@ namespace Game.DataAccess
 {
     internal class UnitOfWork(GameContext context) : IUnitOfWork
     {
-        public Task CommitAsync()
+        public Task CommitAsync(CancellationToken cancellationToken = default)
         {
-            return context.SaveChangesAsync();
+            return context.SaveChangesAsync(cancellationToken);
         }
     }
 }

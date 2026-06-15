@@ -30,7 +30,7 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
-            var success = await _battleService.EndBattleLoss(player, state);
+            var success = await _battleService.EndBattleLoss(player, state, cancellationToken);
 
             if (success)
             {

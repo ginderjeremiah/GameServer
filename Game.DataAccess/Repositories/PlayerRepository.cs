@@ -56,13 +56,13 @@ namespace Game.DataAccess.Repositories
             _skills = skills;
         }
 
-        public async Task<Player?> GetPlayer(int playerId)
+        public async Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
         {
             var playerKey = $"{PlayerPrefix}_{playerId}";
-            var player = await _cache.Get<Player>(playerKey);
+            var player = await _cache.Get<Player>(playerKey, cancellationToken);
             if (player is null)
             {
-                player = await GetPlayerFromDb(playerId);
+                player = await GetPlayerFromDb(playerId, cancellationToken);
                 if (player is not null)
                 {
                     _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
@@ -77,20 +77,20 @@ namespace Game.DataAccess.Repositories
             return player;
         }
 
-        public async Task SavePlayer(Player player)
+        public async Task SavePlayer(Player player, CancellationToken cancellationToken = default)
         {
             // Dispatching the player's events buffers each one into the scoped PlayerUpdateBatch (via
             // PlayerPersistencePublisher) rather than publishing it individually; flushing the whole batch
             // here as a single multi-value LPUSH collapses a multi-event save into one queue round-trip (#559).
-            await _dispatcher.DispatchAsync(player);
-            await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain());
+            await _dispatcher.DispatchAsync(player, cancellationToken);
+            await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain(), cancellationToken);
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
             _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
         }
 
-        private async Task<Player?> GetPlayerFromDb(int playerId)
+        private async Task<Player?> GetPlayerFromDb(int playerId, CancellationToken cancellationToken)
         {
             // Only the player-specific relational data is fetched here; the reference-data portion
             // (item/skill/mod definitions and their attributes) is resolved from the in-memory cached
@@ -104,7 +104,7 @@ namespace Game.DataAccess.Repositories
                 .Include(p => p.AppliedMods)
                 .Include(p => p.LogPreferences)
                 .AsSplitQuery()
-                .FirstOrDefaultAsync(p => p.Id == playerId);
+                .FirstOrDefaultAsync(p => p.Id == playerId, cancellationToken);
 
             return entity is null ? null : PlayerMapper.ToCore(entity, _items, _itemMods, _skills);
         }

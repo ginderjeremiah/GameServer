@@ -27,7 +27,7 @@ namespace Game.Api.Sockets.Commands
         {
             var player = context.Session.Player;
             var success = await _playerService.RemoveMod(
-                player, Parameters.ItemId, Parameters.ItemModSlotId);
+                player, Parameters.ItemId, Parameters.ItemModSlotId, cancellationToken);
 
             return success ? Success() : Error("Failed to remove modifier.");
         }

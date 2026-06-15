@@ -95,7 +95,7 @@ namespace Game.Api.Tests.Unit
 
         private sealed class NoOpUnitOfWork : IUnitOfWork
         {
-            public Task CommitAsync() => Task.CompletedTask;
+            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

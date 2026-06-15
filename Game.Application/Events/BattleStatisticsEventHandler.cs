@@ -18,7 +18,7 @@ namespace Game.Application.Events
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
-            var progress = await _progressRepo.Load(domainEvent.Player);
+            var progress = await _progressRepo.Load(domainEvent.Player, cancellationToken);
 
             progress.RecordBattleCompleted(
                 domainEvent.Enemy, domainEvent.Victory, domainEvent.PlayerDied, domainEvent.TotalMs,
@@ -39,7 +39,7 @@ namespace Game.Application.Events
                 }
             }
 
-            await _progressRepo.Save(progress);
+            await _progressRepo.Save(progress, cancellationToken);
         }
     }
 }

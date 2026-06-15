@@ -27,7 +27,7 @@ namespace Game.Api.Sockets.Commands
         {
             var player = context.Session.Player;
             var success = await _playerService.ApplyMod(
-                player, Parameters.ItemId, Parameters.ItemModId, Parameters.ItemModSlotId);
+                player, Parameters.ItemId, Parameters.ItemModId, Parameters.ItemModSlotId, cancellationToken);
 
             return success ? Success() : Error("Failed to apply modifier.");
         }

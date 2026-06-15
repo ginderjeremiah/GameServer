@@ -28,7 +28,7 @@ namespace Game.Api.Sockets.Commands
         {
             var player = context.Session.Player;
             var success = await _playerService.EquipItem(
-                player, Parameters.ItemId, (EEquipmentSlot)Parameters.EquipmentSlotId);
+                player, Parameters.ItemId, (EEquipmentSlot)Parameters.EquipmentSlotId, cancellationToken);
 
             return success ? Success() : Error("Failed to equip item.");
         }
