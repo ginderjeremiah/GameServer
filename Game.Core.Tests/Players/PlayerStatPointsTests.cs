@@ -166,20 +166,20 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TryUpdateAttributes_DuplicateUpdatesForSameAttribute_AppliesOnlyTheFirst()
+        public void TryUpdateAttributes_DuplicateAttribute_RejectsWithNoMutation()
         {
-            // Indexing keeps the first update per attribute (matching the prior FirstOrDefault), so a
-            // second update for the same attribute is ignored rather than summed.
+            // A duplicate update for the same attribute is ambiguous, so the whole payload is rejected
+            // with no mutation rather than silently keeping only the first update (#698).
             var stats = MakeStats(gained: 10, used: 0);
 
             var result = stats.TryUpdateAttributes([
-                new Update(EAttribute.Strength, 2),
                 new Update(EAttribute.Strength, 5),
+                new Update(EAttribute.Strength, -3),
             ]);
 
-            Assert.True(result);
-            Assert.Equal(2, stats.StatPointsUsed);
-            Assert.Equal(2, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
         }
 
         private static PlayerStatPoints MakeStats(int gained, int used)

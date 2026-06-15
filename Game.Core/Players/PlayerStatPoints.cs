@@ -37,11 +37,14 @@ namespace Game.Core.Players
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             var allocationsByAttribute = StatAllocations.ToDictionary(allocation => allocation.Attribute);
-            // Match each update to the player's existing allocation row, keeping the first update per
-            // attribute (matching the prior FirstOrDefault). An update targeting an attribute the player
-            // has no allocation row for is rejected outright (#488): only the core attributes are seeded
-            // as rows, so allocating into an unknown (or derived) attribute is an invalid request, not a
-            // silent no-op that still reports success.
+            // Match each update to the player's existing allocation row. Two payloads are rejected
+            // outright (no mutation, all-or-nothing anti-cheat contract):
+            //  - An update targeting an attribute the player has no allocation row for (#488): only the
+            //    core attributes are seeded as rows, so allocating into an unknown (or derived) attribute
+            //    is an invalid request, not a silent no-op that still reports success.
+            //  - A duplicate update for the same attribute (#698): an ambiguous payload can't be resolved
+            //    to a single intended amount, so the whole request is invalid rather than a silent
+            //    partial apply (keeping only the first update) that still reports success.
             var matchedUpdates = new Dictionary<EAttribute, (StatAllocation Allocation, IAttributeUpdate Update)>();
             foreach (var update in changedAttributes)
             {
@@ -50,7 +53,10 @@ namespace Game.Core.Players
                     return false;
                 }
 
-                matchedUpdates.TryAdd(update.Attribute, (allocation, update));
+                if (!matchedUpdates.TryAdd(update.Attribute, (allocation, update)))
+                {
+                    return false;
+                }
             }
 
             var changedPoints = matchedUpdates.Values.Sum(match => match.Update.Amount);
