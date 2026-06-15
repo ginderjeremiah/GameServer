@@ -53,7 +53,10 @@
 			{#if metrics.contributions.length}
 				{#each metrics.contributions as contribution (contribution.attributeId)}
 					<div class="scale" style:--ac={attributeColor(contribution.attributeId)}>
-						<span class="achip">{attributeCode(contribution.attributeId, staticData.attributes)}</span>
+						<span class="achip">
+							<AttributeIcon id={contribution.attributeId} size={12} />
+							{attributeCode(contribution.attributeId, staticData.attributes)}
+						</span>
 						<div class="bar"><i style:width="{Math.round((contribution.value / maxContribution) * 100)}%"></i></div>
 						<span class="contrib"
 							>{attributeName(contribution.attributeId, staticData.attributes)} ×{contribution.multiplier} = +{fmt(
@@ -114,6 +117,7 @@ import {
 	formatNum
 } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
@@ -369,7 +373,11 @@ const rawNote = $derived.by(() => {
 }
 
 .achip {
-	width: 46px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	min-width: 46px;
 	padding: 2px 8px;
 	border: 1px solid color-mix(in srgb, var(--ac) 38%, transparent);
 	border-radius: 3px;

@@ -1,7 +1,7 @@
 <div class="trow">
+	<AttributeIcon {id} size={40} />
 	<div class="attr">
 		<div class="head">
-			<span class="bullet" style="--c: {color}"></span>
 			<span class="code" style="color: {color}">{code}</span>
 			<span class="name">{name}</span>
 		</div>
@@ -41,6 +41,7 @@
 <script lang="ts">
 import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import Stepper from './Stepper.svelte';
 import {
 	CORE_ATTRIBUTES,
@@ -79,7 +80,7 @@ const deltaWidth = $derived((Math.abs(value - saved) / view.hexMax) * 100);
 	flex: 1;
 	min-height: 0;
 	display: grid;
-	grid-template-columns: 1.7fr 1.3fr 0.8fr auto;
+	grid-template-columns: 40px 1.7fr 1.3fr 0.8fr auto;
 	gap: 14px;
 	align-items: center;
 	padding: 0 16px;
@@ -94,15 +95,6 @@ const deltaWidth = $derived((Math.abs(value - saved) / view.hexMax) * 100);
 	display: flex;
 	align-items: center;
 	gap: 8px;
-}
-
-.bullet {
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	flex-shrink: 0;
-	background: var(--c);
-	box-shadow: 0 0 6px color-mix(in srgb, var(--c) 60%, transparent);
 }
 
 .code {

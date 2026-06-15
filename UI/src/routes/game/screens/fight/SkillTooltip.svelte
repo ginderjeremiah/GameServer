@@ -53,6 +53,7 @@ const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) :
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(
 	(skill ? skillContributions(skill, skill.owner.attributes) : []).map((contribution) => ({
+		attributeId: contribution.attributeId,
 		name: attributeName(contribution.attributeId, staticData.attributes),
 		multiplier: contribution.multiplier,
 		value: contribution.value

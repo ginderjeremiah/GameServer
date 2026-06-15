@@ -3,6 +3,7 @@ import { EAttribute, type IAttribute } from '$lib/api';
 import {
 	attributeCode,
 	attributeEnumName,
+	attributeIcon,
 	attributeIsHarmful,
 	attributeName
 } from '../../lib/common/attribute-display';
@@ -92,5 +93,41 @@ describe('attributeIsHarmful', () => {
 	it('defaults to false when attributes are absent or the id is unknown', () => {
 		expect(attributeIsHarmful(EAttribute.DamageTakenPerSecond)).toBe(false);
 		expect(attributeIsHarmful(EAttribute.Luck, mockAttributes)).toBe(false);
+	});
+});
+
+describe('attributeIcon', () => {
+	it('resolves to the static-img path under /img, named after the display name', () => {
+		expect(attributeIcon(EAttribute.Strength)).toBe('/img/Strength.png');
+		expect(attributeIcon(EAttribute.MaxHealth)).toBe('/img/Max Health.png');
+		expect(attributeIcon(EAttribute.CooldownRecovery)).toBe('/img/Cooldown Recovery.png');
+		expect(attributeIcon(EAttribute.DamageTakenPerSecond)).toBe('/img/Damage Taken Per Second.png');
+	});
+
+	it('maps every currently-visible attribute to a non-empty path', () => {
+		const visible = [
+			EAttribute.Strength,
+			EAttribute.Endurance,
+			EAttribute.Intellect,
+			EAttribute.Agility,
+			EAttribute.Dexterity,
+			EAttribute.Luck,
+			EAttribute.MaxHealth,
+			EAttribute.Defense,
+			EAttribute.CooldownRecovery,
+			EAttribute.DamageTakenPerSecond,
+			EAttribute.HealthRegenPerSecond
+		];
+		for (const id of visible) {
+			expect(attributeIcon(id)).toMatch(/^\/img\/.+\.png$/);
+		}
+	});
+
+	it('returns "" for attributes without art yet and for unknown ids', () => {
+		// The unimplemented crit/dodge/block set and the obsolete DropBonus have no art; an
+		// out-of-range id resolves the same way so the AttributeIcon component renders nothing.
+		expect(attributeIcon(EAttribute.DropBonus)).toBe('');
+		expect(attributeIcon(EAttribute.CriticalChance)).toBe('');
+		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });

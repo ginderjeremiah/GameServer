@@ -9,7 +9,10 @@
 	onclick={() => onSelect(meta.id)}
 >
 	<span class="info">
-		<span class="name">{attributeName(meta.id, staticData.attributes)}</span>
+		<span class="name-row">
+			<AttributeIcon id={meta.id} size={15} />
+			<span class="name">{attributeName(meta.id, staticData.attributes)}</span>
+		</span>
 		<StackBar {computed} height={6} radius={1} />
 	</span>
 	<span class="total">{fmtNum(computed.total, meta.dec)}</span>
@@ -19,6 +22,7 @@
 import type { ComputedAttribute } from '$lib/battle';
 import { attributeName } from '$lib/common';
 import { staticData } from '$stores';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import StackBar from './StackBar.svelte';
 import { fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';
 
@@ -62,12 +66,20 @@ let { meta, computed, active, onSelect }: Props = $props();
 	min-width: 0;
 }
 
+.name-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 4px;
+	min-width: 0;
+}
+
 .name {
-	display: block;
 	font-size: 12.5px;
 	color: var(--text-secondary);
-	margin-bottom: 4px;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 
 	.active & {
 		color: var(--text-primary);
