@@ -43,7 +43,17 @@ namespace Game.Core.Enemies
         /// </summary>
         public void SelectBattleSkills()
         {
-            _battleSkills = [.. AvailableSkills.OrderBy(_ => Random.Shared.Next()).Take(MaxBattleSkills)];
+            // Partial Fisher–Yates: draw an unbiased, uniformly-distributed sample (and ordering) of the
+            // available skills, rather than the biased OrderBy(random) sort it replaces.
+            var pool = AvailableSkills.ToArray();
+            var take = Math.Min(MaxBattleSkills, pool.Length);
+            for (var i = 0; i < take; i++)
+            {
+                var swap = Random.Shared.Next(i, pool.Length);
+                (pool[i], pool[swap]) = (pool[swap], pool[i]);
+            }
+
+            _battleSkills = [.. pool[..take]];
         }
 
         /// <summary>
