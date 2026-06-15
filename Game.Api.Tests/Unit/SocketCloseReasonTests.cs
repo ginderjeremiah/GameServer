@@ -1,4 +1,5 @@
 using Game.Api;
+using System.Net.WebSockets;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -49,6 +50,59 @@ namespace Game.Api.Tests.Unit
             var undefined = (ESocketCloseReason)int.MaxValue;
 
             Assert.Throws<ArgumentOutOfRangeException>(() => undefined.GetDescription());
+        }
+
+        [Theory]
+        [InlineData(ESocketCloseReason.Finished)]
+        [InlineData(ESocketCloseReason.SocketReplaced)]
+        [InlineData(ESocketCloseReason.ServerShuttingDown)]
+        public void GetCloseStatus_GracefulReason_IsNormalClosure(ESocketCloseReason reason)
+        {
+            // A finished connection, an intentional takeover, and a planned shutdown are all clean closures —
+            // they must not be reported as errors by status code.
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, reason.GetCloseStatus());
+        }
+
+        [Fact]
+        public void GetCloseStatus_MessageTooBig_IsMessageTooBig()
+        {
+            Assert.Equal(WebSocketCloseStatus.MessageTooBig, ESocketCloseReason.MessageTooBig.GetCloseStatus());
+        }
+
+        [Fact]
+        public void GetCloseStatus_Inactivity_IsPolicyViolation()
+        {
+            Assert.Equal(WebSocketCloseStatus.PolicyViolation, ESocketCloseReason.Inactivity.GetCloseStatus());
+        }
+
+        [Theory]
+        [InlineData(ESocketCloseReason.Inactivity)]
+        [InlineData(ESocketCloseReason.MessageTooBig)]
+        public void GetCloseStatus_NonGracefulReason_IsNotNormalClosure(ESocketCloseReason reason)
+        {
+            // The motivating bug: error/abnormal closures previously reported NormalClosure, so a client
+            // inspecting the status code couldn't tell them apart from a clean finish.
+            Assert.NotEqual(WebSocketCloseStatus.NormalClosure, reason.GetCloseStatus());
+        }
+
+        [Theory]
+        [InlineData(ESocketCloseReason.Finished)]
+        [InlineData(ESocketCloseReason.Inactivity)]
+        [InlineData(ESocketCloseReason.SocketReplaced)]
+        [InlineData(ESocketCloseReason.MessageTooBig)]
+        [InlineData(ESocketCloseReason.ServerShuttingDown)]
+        public void GetCloseStatus_AnyDefinedReason_ReturnsAStatus(ESocketCloseReason reason)
+        {
+            // Every defined reason must map to a status; an unhandled one would throw rather than fall through.
+            Assert.True(Enum.IsDefined(reason.GetCloseStatus()));
+        }
+
+        [Fact]
+        public void GetCloseStatus_UndefinedReason_Throws()
+        {
+            var undefined = (ESocketCloseReason)int.MaxValue;
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => undefined.GetCloseStatus());
         }
     }
 }
