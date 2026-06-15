@@ -17,7 +17,7 @@
 
 	<!-- Shared attribute tooltip for the rail rows (and any future attribute surface on this screen),
 	     published via context so the rows don't have to thread hover handlers up to this owner. -->
-	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">

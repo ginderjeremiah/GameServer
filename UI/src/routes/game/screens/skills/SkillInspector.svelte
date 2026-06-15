@@ -112,7 +112,7 @@
 	{/if}
 
 	<!-- One shared tooltip for the scaling chips, anchored to whichever chip is hovered. -->
-	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">

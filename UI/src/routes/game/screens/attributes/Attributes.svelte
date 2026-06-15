@@ -58,7 +58,7 @@
 
 	<!-- Shared attribute tooltip for the steppers' icon/name, published via context so the rows
 	     (guided or theory mode) don't have to thread hover handlers up to this owner. -->
-	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">

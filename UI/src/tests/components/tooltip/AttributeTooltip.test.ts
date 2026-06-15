@@ -59,35 +59,39 @@ describe('AttributeTooltip', () => {
 		);
 	});
 
-	it('shows the effect direction/magnitude/duration in the chip context (a buff)', () => {
+	it('shows the effect magnitude/direction and a depleting countdown pill in the chip context (a buff)', () => {
 		staticData.attributes = [STRENGTH];
 		const { container, getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Strength,
-				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000 }
+				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000, remainingMs: 1000 }
 			}
 		});
 
+		// Raising a beneficial attribute is a buff; the magnitude is signed and tinted by direction.
 		const effect = getByTestId('attr-tip-effect');
-		// Raising a beneficial attribute is a buff; the magnitude is signed and the duration in seconds.
 		expect(effect.textContent).toContain('+5');
 		expect(effect.textContent).toContain('Buff');
-		expect(effect.textContent).toContain('1s');
 		expect(container.querySelector('.at-effect-mag')?.getAttribute('style')).toContain('var(--effect-buff)');
+		// A full (remaining == duration) countdown pill shows the remaining time.
+		expect((container.querySelector('.tt-duration-text') as HTMLElement).textContent?.trim()).toBe('1.0s');
+		expect((container.querySelector('.tt-duration-fill') as HTMLElement).style.width).toBe('100%');
 	});
 
-	it('classifies a lowered beneficial attribute as a debuff', () => {
+	it('classifies a lowered beneficial attribute as a debuff and depletes the pill', () => {
 		staticData.attributes = [DEFENSE];
 		const { getByTestId, container } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Defense,
-				effect: { modifierType: EModifierType.Additive, amount: -5, durationMs: 2000 }
+				effect: { modifierType: EModifierType.Additive, amount: -5, durationMs: 2000, remainingMs: 1000 }
 			}
 		});
 		const effect = getByTestId('attr-tip-effect');
 		expect(effect.textContent).toContain('-5');
 		expect(effect.textContent).toContain('Debuff');
 		expect(container.querySelector('.at-effect-mag')?.getAttribute('style')).toContain('var(--effect-debuff)');
+		// Half elapsed → the pill is half depleted.
+		expect((container.querySelector('.tt-duration-fill') as HTMLElement).style.width).toBe('50%');
 	});
 
 	it('treats raising a harmful attribute as a debuff for the chip it lands on', () => {
@@ -95,11 +99,24 @@ describe('AttributeTooltip', () => {
 		const { getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.DamageTakenPerSecond,
-				effect: { modifierType: EModifierType.Additive, amount: 3, durationMs: 5000 }
+				effect: { modifierType: EModifierType.Additive, amount: 3, durationMs: 5000, remainingMs: 5000 }
 			}
 		});
 		// DamageTakenPerSecond is harmful, so a positive amount is a debuff despite raising the value.
 		expect(getByTestId('attr-tip-effect').textContent).toContain('Debuff');
+	});
+
+	it('omits the countdown pill when no remaining time is supplied', () => {
+		staticData.attributes = [STRENGTH];
+		const { container, getByTestId } = render(AttributeTooltip, {
+			props: {
+				attributeId: EAttribute.Strength,
+				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000 }
+			}
+		});
+		// The effect summary still renders, but with no live timer there is no pill.
+		expect(getByTestId('attr-tip-effect').textContent).toContain('+5');
+		expect(container.querySelector('.tt-duration-pill')).toBeNull();
 	});
 
 	it('degrades gracefully when the reference data is unavailable', () => {

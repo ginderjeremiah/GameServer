@@ -12,6 +12,15 @@
 					<AttributeIcon id={attributeId} size={30} />
 				{/if}
 			{/snippet}
+			{#snippet trailing()}
+				{#if effectDetail?.pill}
+					<DurationPill
+						progress={effectDetail.pill.progress}
+						text={effectDetail.pill.text}
+						color={effectDetail.color}
+					/>
+				{/if}
+			{/snippet}
 		</TooltipTitle>
 	{/snippet}
 
@@ -26,7 +35,6 @@
 			<div class="at-effect" data-testid="attr-tip-effect">
 				<span class="at-effect-mag" style:color={effectDetail.color}>{effectDetail.magnitude}</span>
 				<span class="at-effect-dir" style:color={effectDetail.color}>{effectDetail.label}</span>
-				<span class="at-effect-dur">{effectDetail.duration}</span>
 			</div>
 		</TooltipSection>
 	{/if}
@@ -41,7 +49,6 @@ import {
 	attributeTypeName,
 	effectDirection,
 	effectDirectionColor,
-	formatEffectDuration,
 	formatEffectMagnitude
 } from '$lib/common';
 import { staticData } from '$stores';
@@ -49,6 +56,7 @@ import AttributeIcon from '$components/AttributeIcon.svelte';
 import TooltipShell from './TooltipShell.svelte';
 import TooltipSection from './TooltipSection.svelte';
 import TooltipTitle from './TooltipTitle.svelte';
+import DurationPill from './DurationPill.svelte';
 import type { AttributeEffectContext } from './attribute-tooltip.svelte';
 
 export const getBaseNode = () => container;
@@ -73,7 +81,8 @@ const description = $derived(attribute?.description ?? '');
 const accent = $derived(attributeId != null ? attributeColor(attributeId) : 'var(--text-secondary)');
 
 // The buff/debuff framing of the chip's effect, reusing the shared skill-effect helpers so the
-// wording/direction match the chips and the skill tooltip's "On hit" lines.
+// wording/direction match the chips and the skill tooltip's "On hit" lines. When the caller supplies
+// a live `remainingMs` (the combat chips do) it also drives a depleting countdown pill.
 const effectDetail = $derived.by(() => {
 	if (!effect || attributeId == null) {
 		return undefined;
@@ -83,11 +92,19 @@ const effectDetail = $derived.by(() => {
 		effect.modifierType,
 		effect.amount
 	);
+	const remainingMs = effect.remainingMs;
+	let pill: { progress: number; text: string } | undefined;
+	if (remainingMs != null && effect.durationMs > 0) {
+		pill = {
+			progress: Math.max(0, Math.min(100, (remainingMs / effect.durationMs) * 100)),
+			text: `${(remainingMs / 1000).toFixed(1)}s`
+		};
+	}
 	return {
 		label: direction === 'buff' ? 'Buff' : 'Debuff',
 		color: effectDirectionColor(direction),
 		magnitude: formatEffectMagnitude(effect.modifierType, effect.amount),
-		duration: formatEffectDuration(effect.durationMs)
+		pill
 	};
 });
 </script>
@@ -117,12 +134,5 @@ const effectDetail = $derived.by(() => {
 	font-size: 8.5px;
 	letter-spacing: 1.4px;
 	text-transform: uppercase;
-}
-
-.at-effect-dur {
-	margin-left: auto;
-	font-family: var(--mono);
-	font-size: 9.5px;
-	color: var(--text-muted);
 }
 </style>

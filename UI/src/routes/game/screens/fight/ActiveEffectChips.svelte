@@ -14,7 +14,7 @@
 				style:--chip-accent={color}
 				onmouseenter={(ev) => showChipTooltip(effect, ev)}
 				onmousemove={(ev) => tip.controller.move(ev)}
-				onmouseleave={() => tip.controller.hide()}
+				onmouseleave={hideChipTooltip}
 			>
 				<AttributeIcon id={effect.attribute} size={13} />
 				<span class="chip-mag">{formatEffectMagnitude(effect.modifierType, effect.amount)}</span>
@@ -29,8 +29,10 @@
 {/if}
 
 <!-- One tooltip instance per chip row, anchored to whichever chip is hovered. Always mounted (it
-     stays hidden until a chip is hovered) so its registration survives chips coming and going. -->
-<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={tip.effect} />
+     stays hidden until a chip is hovered) so its registration survives chips coming and going. The
+     effect context is the live `ActiveEffectView` (resolved by source id), so the tooltip's countdown
+     pill keeps depleting and the panel closes itself if the hovered effect expires under the cursor. -->
+<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} effect={shownEffectContext} />
 
 <script lang="ts">
 import {
@@ -57,15 +59,43 @@ const { battler, reversed = false }: Props = $props();
 let tooltip = $state<TooltipComponent>();
 const tip = createAttributeTooltip(() => tooltip);
 
+// The source id of the chip the tooltip is currently anchored to (if any). Tracked so the live
+// effect can be re-resolved each tick and so an expiring chip can close the tooltip itself — a chip
+// removed under the cursor never fires `mouseleave`, which otherwise left the panel stuck open.
+let shownSourceId = $state<number>();
+const shownEffect = $derived(
+	shownSourceId != null ? battler.activeEffects.find((e) => e.sourceId === shownSourceId) : undefined
+);
+// Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes.
+const shownEffectContext = $derived(
+	shownEffect
+		? {
+				modifierType: shownEffect.modifierType,
+				amount: shownEffect.amount,
+				durationMs: shownEffect.durationMs,
+				remainingMs: shownEffect.renderRemainingMs
+			}
+		: undefined
+);
+
+// Close the tooltip when the chip it's anchored to expires under the cursor (no `mouseleave` fires).
+$effect(() => {
+	if (shownSourceId != null && !shownEffect) {
+		hideChipTooltip();
+	}
+});
+
 const remainingSeconds = (effect: ActiveEffectView) => (effect.renderRemainingMs / 1000).toFixed(2);
 const remainingPercent = (effect: ActiveEffectView) =>
 	effect.durationMs > 0 ? Math.max(0, Math.min(100, (effect.renderRemainingMs / effect.durationMs) * 100)) : 0;
-const showChipTooltip = (effect: ActiveEffectView, ev: MouseEvent) =>
-	tip.controller.show(effect.attribute, ev, {
-		modifierType: effect.modifierType,
-		amount: effect.amount,
-		durationMs: effect.durationMs
-	});
+const showChipTooltip = (effect: ActiveEffectView, ev: MouseEvent) => {
+	shownSourceId = effect.sourceId;
+	tip.controller.show(effect.attribute, ev);
+};
+const hideChipTooltip = () => {
+	shownSourceId = undefined;
+	tip.controller.hide();
+};
 </script>
 
 <style lang="scss">
