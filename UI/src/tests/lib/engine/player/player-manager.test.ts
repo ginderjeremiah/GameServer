@@ -167,15 +167,6 @@ describe('PlayerManager', () => {
 			expect(logMessage).toHaveBeenCalledWith(ELogType.ItemFound, 'New skill unlocked!');
 		});
 
-		it('reassigns the array so reactive consumers re-derive', () => {
-			manager.initialize(makePlayerData({ unlockedSkills: [] }));
-			const before = manager.unlockedSkills;
-
-			manager.addUnlockedSkill(5);
-
-			expect(manager.unlockedSkills).not.toBe(before);
-		});
-
 		it('is idempotent — an already-unlocked skill is not duplicated', () => {
 			manager.initialize(makePlayerData({ unlockedSkills: [{ skillId: 5, selected: false }] }));
 

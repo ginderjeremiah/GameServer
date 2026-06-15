@@ -66,14 +66,13 @@ export class PlayerManager implements IPlayerData {
 	/**
 	 * Called when the player unlocks a new skill from a challenge reward. The skill is added to the
 	 * unlocked set unselected — earning a skill does not equip it (the loadout is chosen separately),
-	 * mirroring the backend `Player.UnlockSkill`. The array is reassigned so reactive consumers (the
-	 * skills screen) re-derive.
+	 * mirroring the backend `Player.UnlockSkill`.
 	 */
 	public addUnlockedSkill(skillId: number) {
 		if (this.unlockedSkills.some((skill) => skill.skillId === skillId)) {
 			return;
 		}
-		this.unlockedSkills = [...this.unlockedSkills, { skillId, selected: false }];
+		this.unlockedSkills.push({ skillId, selected: false });
 		logMessage(ELogType.ItemFound, 'New skill unlocked!');
 	}
 

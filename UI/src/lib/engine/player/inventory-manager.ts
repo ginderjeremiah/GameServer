@@ -325,7 +325,6 @@ export class InventoryManager {
 	/** Republishes the reactive item snapshot so consumers re-derive after a mutation. */
 	private publish() {
 		this.items = [...this.unlockedItems.values()];
-		this.equippedSlots = [...this.equippedSlots];
 	}
 }
 

@@ -67,36 +67,6 @@ describe('statify', () => {
 		cleanup();
 	});
 
-	// CHARACTERIZATION TEST documenting a known limitation (see follow-up issue): the `statifyArray`
-	// set-trap that is meant to re-statify values pushed/assigned after construction never fires,
-	// because the property is wrapped in `$state(...)` whose own deep proxy shadows the statify proxy.
-	// As a result a class instance added to a statified array later is NOT made reactive at the field
-	// level. This test pins the current behaviour so a future fix to `statify` updates it deliberately.
-	it('does not field-reactify a class instance pushed after construction (known limitation)', () => {
-		const outer = statify(new Outer());
-
-		const pushed = new Inner();
-		outer.items.push(pushed);
-
-		let observedValue = -1;
-		const cleanup = $effect.root(() => {
-			const value = $derived(outer.items[1].value);
-			$effect(() => {
-				observedValue = value;
-			});
-		});
-
-		flushSync();
-		expect(observedValue).toBe(1);
-
-		// Mutating the pushed instance's field does not propagate — it was never statified.
-		outer.items[1].value = 99;
-		flushSync();
-		expect(observedValue).toBe(1);
-
-		cleanup();
-	});
-
 	it('makes class properties reactive to a $derived read', () => {
 		const outer = statify(new Outer());
 

@@ -427,16 +427,12 @@ export class SkillsView {
 	}
 
 	/** Mirror the loadout onto the player manager so battles and other screens read
-	 *  the new equipped set/order without a reload (reassigned so the reactive proxy
-	 *  observes the change). */
+	 *  the new equipped set/order without a reload. */
 	private applyToPlayer(orderedIds: number[]): void {
-		playerManager.unlockedSkills = playerManager.unlockedSkills.map((s) => {
-			const order = orderedIds.indexOf(s.skillId);
-			return {
-				...s,
-				selected: order >= 0,
-				order: order >= 0 ? order : 0
-			};
-		});
+		for (const unlockedSkill of playerManager.unlockedSkills) {
+			const order = orderedIds.indexOf(unlockedSkill.skillId);
+			unlockedSkill.selected = order >= 0;
+			unlockedSkill.order = order >= 0 ? order : 0;
+		}
 	}
 }
