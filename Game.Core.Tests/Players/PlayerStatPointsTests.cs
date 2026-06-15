@@ -166,10 +166,11 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TryUpdateAttributes_DuplicateUpdatesForSameAttribute_AppliesOnlyTheFirst()
+        public void TryUpdateAttributes_DuplicateUpdatesForSameAttribute_RejectsWithoutMutating()
         {
-            // Indexing keeps the first update per attribute (matching the prior FirstOrDefault), so a
-            // second update for the same attribute is ignored rather than summed.
+            // A payload containing more than one update for the same attribute is ambiguous and is
+            // rejected outright (#698) rather than silently keeping the first and discarding the rest,
+            // which would partially apply the payload while still reporting success.
             var stats = MakeStats(gained: 10, used: 0);
 
             var result = stats.TryUpdateAttributes([
@@ -177,9 +178,46 @@ namespace Game.Core.Tests.Players
                 new Update(EAttribute.Strength, 5),
             ]);
 
-            Assert.True(result);
-            Assert.Equal(2, stats.StatPointsUsed);
-            Assert.Equal(2, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_DuplicateSummingToValidTotal_StillRejects()
+        {
+            // The { Str: +5, Str: -3 } payload from #698: even though the net spend (+2) and each step
+            // would be individually affordable, the duplicate attribute id makes the payload invalid and
+            // it must be rejected with no mutation rather than partially applied.
+            var stats = MakeStats(gained: 10, used: 0);
+
+            var result = stats.TryUpdateAttributes([
+                new Update(EAttribute.Strength, 5),
+                new Update(EAttribute.Strength, -3),
+            ]);
+
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_DuplicateAmongOtherwiseValidUpdates_RejectsEntireSet()
+        {
+            // A duplicate appearing alongside an otherwise valid distinct update rejects the whole set,
+            // leaving every allocation and the point pool untouched.
+            var stats = MakeStats(gained: 10, used: 0);
+
+            var result = stats.TryUpdateAttributes([
+                new Update(EAttribute.Endurance, 3),
+                new Update(EAttribute.Strength, 2),
+                new Update(EAttribute.Strength, 1),
+            ]);
+
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Endurance).Amount);
         }
 
         private static PlayerStatPoints MakeStats(int gained, int used)
