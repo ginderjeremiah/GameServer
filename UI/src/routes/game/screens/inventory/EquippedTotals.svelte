@@ -6,7 +6,7 @@
 			<div class="line"></div>
 		</div>
 
-		<StatList attrs={view.equippedTotals} emptyText="No gear equipped yet." />
+		<TooltipStatsGrid entries={view.equippedTotals} emptyText="No gear equipped yet." format />
 
 		<div class="slots-filled">
 			<span class="mono-label">Slots filled</span>
@@ -19,7 +19,7 @@
 </div>
 
 <script lang="ts">
-import StatList from './StatList.svelte';
+import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import { EQUIP_SLOTS, type InventoryView } from './inventory-view.svelte';
 
 const { view }: { view: InventoryView } = $props();
