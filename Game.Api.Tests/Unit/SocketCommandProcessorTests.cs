@@ -166,10 +166,10 @@ namespace Game.Api.Tests.Unit
 
             public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Publish(string channel, string message) => Task.CompletedTask;
-            public Task Publish(string channel, string queueName, string queueData) => Task.CompletedTask;
-            public Task Publish<T>(string channel, string queueName, T queueData) => Task.CompletedTask;
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData) => Task.CompletedTask;
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
             public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
@@ -178,27 +178,27 @@ namespace Game.Api.Tests.Unit
         // RegisterSocket only touches GetSet + Expire on the presence key; everything else is unused here.
         private sealed class NoOpCacheService : ICacheService
         {
-            public Task<string?> GetSet(string key, string value) => Task.FromResult<string?>(null);
-            public Task Expire(string key, TimeSpan expiry) => Task.CompletedTask;
+            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-            public Task<string?> Get(string key) => throw new NotSupportedException();
-            public Task<T?> Get<T>(string key) => throw new NotSupportedException();
-            public Task<string?> GetDelete(string key) => throw new NotSupportedException();
-            public Task<T?> GetDelete<T>(string key) => throw new NotSupportedException();
-            public Task<T?> GetSet<T>(string key, T value) => throw new NotSupportedException();
-            public Task Set(string key, string value) => throw new NotSupportedException();
-            public Task Set<T>(string key, T value) => throw new NotSupportedException();
-            public Task Set(string key, string value, TimeSpan expiry) => throw new NotSupportedException();
-            public Task Set<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget(string key, string value) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value) => throw new NotSupportedException();
             public void SetAndForget(string key, string value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
-            public Task SetNotExists(string key, string value) => throw new NotSupportedException();
-            public Task Delete(string key) => throw new NotSupportedException();
+            public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
-            public Task CompareAndDelete(string key, string deleteIfValue) => throw new NotSupportedException();
+            public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime
@@ -218,7 +218,7 @@ namespace Game.Api.Tests.Unit
 
         private sealed class NoOpUnitOfWork : IUnitOfWork
         {
-            public Task CommitAsync() => Task.CompletedTask;
+            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

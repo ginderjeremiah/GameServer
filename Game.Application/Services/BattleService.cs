@@ -28,11 +28,11 @@ namespace Game.Application.Services
         private readonly ISkills _skills = skills;
         private readonly BattleFactory _battleFactory = battleFactory;
 
-        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null)
+        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, CancellationToken cancellationToken = default)
         {
             if (state.HasActiveBattle)
             {
-                await AbandonBattle(player, state);
+                await AbandonBattle(player, state, cancellationToken);
             }
 
             // A real zone change is gated on the target being unlocked (anti-cheat). A legitimate client
@@ -42,11 +42,11 @@ namespace Game.Application.Services
             if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
             {
                 var targetZone = _zones.GetDomainZone(newZoneId.Value);
-                if (await IsZoneUnlocked(player.Id, targetZone))
+                if (await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
                 {
                     player.ChangeZone(newZoneId.Value);
                     zoneId = newZoneId.Value;
-                    await _playerRepo.SavePlayer(player);
+                    await _playerRepo.SavePlayer(player, cancellationToken);
                 }
             }
 
@@ -78,7 +78,7 @@ namespace Game.Application.Services
         /// <see cref="StartBattle"/> there is no cooldown gate — the boss challenge is always available — and
         /// challenging does not change the player's current zone.
         /// </summary>
-        public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId)
+        public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId, CancellationToken cancellationToken = default)
         {
             var zone = _zones.GetDomainZone(zoneId);
 
@@ -92,14 +92,14 @@ namespace Game.Application.Services
 
             // Anti-cheat: a locked zone's boss cannot be challenged. A legitimate client can never be in a
             // locked zone to begin with, so this only blocks tampered requests.
-            if (!await IsZoneUnlocked(player.Id, zone))
+            if (!await IsZoneUnlocked(player.Id, zone, cancellationToken))
             {
                 return null;
             }
 
             if (state.HasActiveBattle)
             {
-                await AbandonBattle(player, state);
+                await AbandonBattle(player, state, cancellationToken);
             }
 
             var now = DateTime.UtcNow;
@@ -123,7 +123,7 @@ namespace Game.Application.Services
             };
         }
 
-        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp)
+        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp, CancellationToken cancellationToken = default)
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
@@ -148,7 +148,7 @@ namespace Game.Application.Services
             state.SetCooldown(claimedTimestamp.AddSeconds(5));
             state.ClearBattle();
 
-            await _playerRepo.SavePlayer(player);
+            await _playerRepo.SavePlayer(player, cancellationToken);
 
             return new DefeatResult
             {
@@ -160,7 +160,7 @@ namespace Game.Application.Services
             };
         }
 
-        public async Task<bool> EndBattleLoss(Player player, PlayerState state)
+        public async Task<bool> EndBattleLoss(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
@@ -177,12 +177,12 @@ namespace Game.Application.Services
             state.SetCooldown(DateTime.UtcNow.AddSeconds(5));
             state.ClearBattle();
 
-            await _playerRepo.SavePlayer(player);
+            await _playerRepo.SavePlayer(player, cancellationToken);
 
             return true;
         }
 
-        private async Task AbandonBattle(Player player, PlayerState state)
+        private async Task AbandonBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
 
@@ -208,7 +208,7 @@ namespace Game.Application.Services
 
             state.ClearBattle();
 
-            await _playerRepo.SavePlayer(player);
+            await _playerRepo.SavePlayer(player, cancellationToken);
         }
 
         // Books a victory: grants the earned exp and records the win (kills, zone clears, and the
@@ -236,14 +236,14 @@ namespace Game.Application.Services
         // Whether a zone is unlocked for the player. An ungated zone is always open and pays no read cost;
         // a gated zone costs one indexed completion lookup, incurred only on a real zone transition or a
         // boss challenge (not per idle tick). The unlock rule itself lives on the domain Zone.
-        private async Task<bool> IsZoneUnlocked(int playerId, CoreZone zone)
+        private async Task<bool> IsZoneUnlocked(int playerId, CoreZone zone, CancellationToken cancellationToken = default)
         {
             if (zone.UnlockChallengeId is null)
             {
                 return true;
             }
 
-            var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(playerId);
+            var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(playerId, cancellationToken);
             return zone.IsUnlocked(completedChallengeIds);
         }
 

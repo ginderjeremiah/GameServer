@@ -9,7 +9,7 @@ namespace Game.Abstractions.DataAccess
     /// </summary>
     public interface IPlayerRepository
     {
-        Task<Player?> GetPlayer(int playerId);
-        Task SavePlayer(Player player);
+        Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default);
+        Task SavePlayer(Player player, CancellationToken cancellationToken = default);
     }
 }

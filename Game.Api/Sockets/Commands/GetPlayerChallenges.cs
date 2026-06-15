@@ -25,7 +25,7 @@ namespace Game.Api.Sockets.Commands
 
         public override async Task<ApiSocketResponse<IEnumerable<PlayerChallenge>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            var progress = await _playerProgress.GetChallenges(context.Session.SelectedPlayerId);
+            var progress = await _playerProgress.GetChallenges(context.Session.SelectedPlayerId, cancellationToken);
             return Success(progress.To().Model<PlayerChallenge>());
         }
     }

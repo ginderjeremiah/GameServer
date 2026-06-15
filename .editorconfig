@@ -13,6 +13,14 @@ dotnet_diagnostic.IDE0290.severity = none
 # IDE0305: Simplify collection initialization
 dotnet_diagnostic.IDE0305.severity = none
 
+# xUnit1051: Use TestContext.Current.CancellationToken on calls that accept a CancellationToken.
+# Disabled (only ever fires in the test projects): once the data tier exposes optional cancellation
+# tokens (#558) this rule fires at every existing test data-access call site, and threading
+# TestContext.Current.CancellationToken through all of them adds churn without proportionate value for
+# this integration-heavy suite (which manages its own lifecycle). The production cancellation plumbing
+# is exercised directly by DataAccessCancellationTests.
+dotnet_diagnostic.xUnit1051.severity = none
+
 # Apply Windows-style CRLF line endings specifically to batch files
 [*.bat]
 end_of_line = crlf

@@ -15,7 +15,8 @@ namespace Game.Api.Filters
             var executedContext = await next();
             if (executedContext.Exception is null || executedContext.ExceptionHandled)
             {
-                await unitOfWork.CommitAsync();
+                // Forward the request's abort token so a client disconnect cancels the commit cooperatively.
+                await unitOfWork.CommitAsync(context.HttpContext.RequestAborted);
             }
         }
     }

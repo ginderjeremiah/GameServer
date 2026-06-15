@@ -25,7 +25,7 @@ namespace Game.Api.Sockets.Commands
 
         public override async Task<ApiSocketResponse<IEnumerable<PlayerStatistic>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            var stats = await _playerProgress.GetStatistics(context.Session.SelectedPlayerId);
+            var stats = await _playerProgress.GetStatistics(context.Session.SelectedPlayerId, cancellationToken);
             return Success(stats.To().Model<PlayerStatistic>());
         }
     }

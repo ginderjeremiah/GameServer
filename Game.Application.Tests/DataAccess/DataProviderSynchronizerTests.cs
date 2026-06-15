@@ -1041,10 +1041,10 @@ namespace Game.Application.Tests.DataAccess
         /// </summary>
         private sealed class ThrowingPubSubService : IPubSubService
         {
-            public Task Publish(string channel, string message) => Task.CompletedTask;
-            public Task Publish(string channel, string queueName, string queueData) => Task.CompletedTask;
-            public Task Publish<T>(string channel, string queueName, T queueData) => Task.CompletedTask;
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData) => Task.CompletedTask;
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
             public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");

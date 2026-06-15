@@ -28,9 +28,13 @@ namespace Game.Infrastructure.PubSub.Redis
             _logger = loggerFactory.CreateLogger<RedisPubSubService>();
         }
 
-        public async Task Publish(string channel, string message)
+        // StackExchange.Redis exposes no CancellationToken on its operations, so the durable queue write is
+        // wrapped in WaitAsync (the same partial-honouring as RedisService): a cancelled per-command budget
+        // unwinds the await promptly rather than waiting out the dependency's own timeout (#558), while the
+        // underlying command settles in the background. The wake publish stays fire-and-forget, so it needs none.
+        public async Task Publish(string channel, string message, CancellationToken cancellationToken = default)
         {
-            await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget);
+            await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget).WaitAsync(cancellationToken);
         }
 
         public IPubSubQueue GetQueue(string queueName)
@@ -38,23 +42,23 @@ namespace Game.Infrastructure.PubSub.Redis
             return new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
         }
 
-        public async Task Publish(string channel, string queueName, string queueData)
+        public async Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default)
         {
             var queue = GetQueue(queueName);
             // The queue write is the durable part and stays awaited. The channel publish is only a wake
             // signal for the queue consumer, and Redis pub/sub is already at-most-once (awaiting it confirms
             // the command was sent, not that any subscriber received it), so it is fire-and-forget: the data
             // is safely enqueued regardless, and the consumer drains the whole queue on its next wake (#552).
-            await queue.AddToQueueAsync(queueData);
+            await queue.AddToQueueAsync(queueData).WaitAsync(cancellationToken);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
         }
 
-        public async Task Publish<T>(string channel, string queueName, T queueData)
+        public async Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default)
         {
-            await Publish(channel, queueName, queueData.Serialize());
+            await Publish(channel, queueName, queueData.Serialize(), cancellationToken);
         }
 
-        public async Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData)
+        public async Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
         {
             var values = queueData.Select(data => data.Serialize()).ToArray();
             if (values.Length == 0)
@@ -66,7 +70,7 @@ namespace Game.Infrastructure.PubSub.Redis
             // for the same reason as the per-event Publish above — the data is already enqueued and the consumer
             // drains the whole queue on its next wake (#559).
             var queue = GetQueue(queueName);
-            await queue.AddRangeToQueueAsync(values);
+            await queue.AddRangeToQueueAsync(values).WaitAsync(cancellationToken);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
         }
 
