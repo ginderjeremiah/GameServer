@@ -42,19 +42,62 @@ namespace Game.Api.Services
             var socketContext = new SocketContext(socket, playerId, sessionService, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId));
             var presenceKey = CurrentSocketKey(playerId);
-            var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId);
-            await _cache.Expire(presenceKey, SocketPresenceTtl);
-            if (oldSocketId is not null)
+            // Claim the presence key with its TTL atomically so a fault here can never leave the key without an
+            // expiry — a TTL-less key would defeat the heartbeat design and report a permanent ghost session.
+            var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId, SocketPresenceTtl);
+            try
             {
-                await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
+                if (oldSocketId is not null)
+                {
+                    await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
+                }
+
+                await RegisterSocketCommandListener(socketHandler);
+                // Register before starting the loops so the registry tracks the socket — and threads its
+                // shutdown tokens into Listen — for a graceful drain on host shutdown (#526).
+                _socketRegistry.Register(socketHandler);
+            }
+            catch
+            {
+                // A step after the presence-key write failed, so the key now points at a socket whose drain
+                // loops never started — a "registered but dead" presence that would block the player and never
+                // drain. Undo the partial registration before propagating.
+                await RollbackRegistration(socketContext);
+                throw;
             }
 
-            await RegisterSocketCommandListener(socketHandler);
-            // Register before starting the loops so the registry tracks the socket — and threads its
-            // shutdown tokens into Listen — for a graceful drain on host shutdown (#526).
-            _socketRegistry.Register(socketHandler);
             _logger.LogDebug("Initiated socket for player: ({Id}), with Id: {SocketId}", playerId, socketContext.SocketId);
             return socketContext;
+        }
+
+        /// <summary>
+        /// Undoes a partially-completed <see cref="RegisterSocket"/> after the presence key was written but a
+        /// later step threw: drop our presence claim (only if it is still ours) and tear down any subscription
+        /// and registry tracking. Each step is best-effort and guarded so a cleanup fault can't mask the
+        /// original registration exception that is about to propagate.
+        /// </summary>
+        private async Task RollbackRegistration(SocketContext context)
+        {
+            _socketRegistry.Unregister(context.SocketId);
+            try
+            {
+                await UnRegisterSocketCommandListener(context.SocketId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to unsubscribe socket {SocketId} while rolling back a failed registration.", context.SocketId);
+            }
+
+            try
+            {
+                // Compare-and-delete so we only release the key while it is still ours — a newer connection may
+                // have taken it over between our write and this rollback, and that key must be left intact.
+                await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to release the presence key for socket {SocketId} while rolling back a failed registration.", context.SocketId);
+            }
         }
 
         /// <summary>
@@ -120,9 +163,29 @@ namespace Game.Api.Services
         {
             return async (queue) =>
             {
-                var nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
-                while (nextCommandInfo is not null)
+                while (true)
                 {
+                    SocketCommandInfo? nextCommandInfo;
+                    try
+                    {
+                        nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
+                    }
+                    catch (Exception ex)
+                    {
+                        // A fault dequeuing the next message (a malformed payload or a Redis blip) must not
+                        // escape the processor and kill the drain loop — that would silently drop every later
+                        // server push for this socket (#691). A malformed payload is already popped by
+                        // GetNextAsync before deserialization throws, so skipping it advances the queue; a
+                        // transient blip is retried on the next pass.
+                        _logger.LogError(ex, "An error occurred while dequeuing a socket command on socket: {Id}, playerId: {PlayerId}.", socket.Id, socket.PlayerId);
+                        continue;
+                    }
+
+                    if (nextCommandInfo is null)
+                    {
+                        break;
+                    }
+
                     try
                     {
                         _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
@@ -146,8 +209,6 @@ namespace Game.Api.Services
                         // "Challenge-completion notifications (server push)".
                         _logger.LogError(ex, "An error occurred while executing a socket command: {CommandInfo}", nextCommandInfo);
                     }
-
-                    nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
                 }
             };
         }
