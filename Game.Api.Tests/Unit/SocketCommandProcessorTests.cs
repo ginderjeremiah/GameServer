@@ -65,6 +65,26 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Processor_DequeueFaultThenValidCommand_QueueKeepsDrainingAndProcessorDoesNotThrow()
+        {
+            var commands = new CapturingCommandFactory(throwOn: _ => null);
+            var processor = BuildProcessor(commands);
+
+            // The first dequeue faults (a malformed payload / Redis blip), which previously escaped the loop
+            // outside the try and killed the drain — silently dropping every later push (#691). It must be
+            // logged and skipped so the following command still runs.
+            var queue = new FakeQueue(
+                FakeQueueStep.Throw(new InvalidOperationException("dequeue boom")),
+                FakeQueueStep.Yield(new SocketCommandInfo("WillSucceed") { Id = "ok-1" }));
+
+            await processor(queue);
+
+            // The valid command after the dequeue fault still ran, proving the loop survived.
+            Assert.Equal(["ok-1"], commands.ExecutedCommandIds);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("dequeuing"));
+        }
+
+        [Fact]
         public async Task Processor_EmptyQueue_CompletesWithoutDispatchingOrThrowing()
         {
             var commands = new CapturingCommandFactory(throwOn: _ => null);
@@ -73,6 +93,36 @@ namespace Game.Api.Tests.Unit
             await processor(new FakeQueue());
 
             Assert.Empty(commands.ExecutedCommandIds);
+        }
+
+        [Fact]
+        public async Task RegisterSocket_SubscribeFailsAfterPresenceWrite_RollsBackPresenceClaim()
+        {
+            // The presence key write succeeds (GetSet returns null — no prior owner), then Subscribe throws.
+            // Without rollback the key would point at a socket whose drain loops never started — a "registered
+            // but dead" presence that blocks the player forever (#691). Rollback must compare-and-delete it.
+            var cache = new RecordingCacheService();
+            var pubSub = new ThrowingSubscribePubSubService(new InvalidOperationException("subscribe boom"));
+            var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
+            var registry = new SocketConnectionRegistry(new NoOpHostLifetime(), NullLogger<SocketConnectionRegistry>.Instance);
+            var manager = new SocketManagerService(
+                pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            session.CreateSession(userId: 1, playerId: 42);
+
+            // The Subscribe failure propagates out of RegisterSocket...
+            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session));
+
+            // ...and the partial registration was rolled back: the presence key was released via a
+            // compare-and-delete keyed on the exact socket id that was claimed (so a newer owner's key would be
+            // left intact), on the player's presence key.
+            var claim = Assert.Single(cache.GetSetWithExpiries);
+            var release = Assert.Single(cache.CompareAndDeletes);
+            Assert.Equal(claim.Key, release.Key);
+            Assert.Equal(claim.Value, release.DeleteIfValue);
+            Assert.Contains("42", release.Key);
         }
 
         private Func<IPubSubQueue, Task> BuildProcessor(CapturingCommandFactory commandFactory)
@@ -130,15 +180,36 @@ namespace Game.Api.Tests.Unit
             }
         }
 
-        private sealed class FakeQueue(params SocketCommandInfo[] commands) : IPubSubQueue
+        /// <summary>A scripted step for <see cref="FakeQueue"/>: either yield a command or throw on dequeue.
+        /// An implicit conversion from <see cref="SocketCommandInfo"/> keeps the plain command cases terse.</summary>
+        private sealed class FakeQueueStep
         {
-            private readonly Queue<SocketCommandInfo> _commands = new(commands);
+            public SocketCommandInfo? Command { get; private init; }
+            public Exception? Error { get; private init; }
+
+            public static FakeQueueStep Yield(SocketCommandInfo command) => new() { Command = command };
+            public static FakeQueueStep Throw(Exception error) => new() { Error = error };
+
+            public static implicit operator FakeQueueStep(SocketCommandInfo command) => Yield(command);
+        }
+
+        private sealed class FakeQueue(params FakeQueueStep[] steps) : IPubSubQueue
+        {
+            private readonly Queue<FakeQueueStep> _steps = new(steps);
 
             public Task<T?> GetNextAsync<T>()
             {
-                if (_commands.TryDequeue(out var next) && next is T typed)
+                if (_steps.TryDequeue(out var next))
                 {
-                    return Task.FromResult<T?>(typed);
+                    if (next.Error is not null)
+                    {
+                        throw next.Error;
+                    }
+
+                    if (next.Command is T typed)
+                    {
+                        return Task.FromResult<T?>(typed);
+                    }
                 }
 
                 return Task.FromResult<T?>(default);
@@ -175,12 +246,13 @@ namespace Game.Api.Tests.Unit
             public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
 
-        // RegisterSocket only touches GetSet + Expire on the presence key; everything else is unused here.
+        // RegisterSocket only claims the presence key via the atomic GetSet-with-expiry; everything else is unused here.
         private sealed class NoOpCacheService : ICacheService
         {
-            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
-            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
+            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -199,6 +271,62 @@ namespace Game.Api.Tests.Unit
             public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path.</summary>
+        private sealed class ThrowingSubscribePubSubService(Exception toThrow) : IPubSubService
+        {
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw toThrow;
+
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task UnSubscribe(string channel) => Task.CompletedTask;
+            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+        }
+
+        /// <summary>Records the presence-key writes and releases so a rollback test can assert the exact
+        /// claimed socket id is the one compare-and-deleted.</summary>
+        private sealed class RecordingCacheService : ICacheService
+        {
+            public List<(string Key, string? Value)> GetSetWithExpiries { get; } = [];
+            public List<(string Key, string DeleteIfValue)> CompareAndDeletes { get; } = [];
+
+            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
+            {
+                GetSetWithExpiries.Add((key, value));
+                return Task.FromResult<string?>(null);
+            }
+
+            public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)
+            {
+                CompareAndDeletes.Add((key, deleteIfValue));
+                return Task.CompletedTask;
+            }
+
+            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
+            public void SetAndForget(string key, string value) => throw new NotSupportedException();
+            public void SetAndForget<T>(string key, T value) => throw new NotSupportedException();
+            public void SetAndForget(string key, string value, TimeSpan expiry) => throw new NotSupportedException();
+            public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
+            public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void DeleteAndForget(string key) => throw new NotSupportedException();
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime

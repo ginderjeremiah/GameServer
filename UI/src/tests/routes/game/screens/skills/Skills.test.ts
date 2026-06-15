@@ -193,6 +193,30 @@ describe('Skills screen', () => {
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2, 0]);
 	});
 
+	it('keeps a filled card bound to its skill across a reorder (keyed by skill, not slot index)', async () => {
+		const { container } = render(Skills);
+		// Tag the first card's DOM node so we can recognise it after the reorder.
+		const movedCard = container.querySelectorAll<HTMLElement>('.eqcard')[0];
+		expect(movedCard.getAttribute('aria-label')).toContain('Alpha');
+		movedCard.dataset.identityProbe = 'alpha';
+
+		// Move Alpha (slot 1) to the end → loadout [Bravo, Charlie, Alpha].
+		await fireEvent.dragStart(movedCard);
+		const cards = container.querySelectorAll<HTMLElement>('.eqcard');
+		await fireEvent.dragOver(cards[2]);
+		await fireEvent.drop(cards[2]);
+		await fireEvent.dragEnd(cards[2]);
+		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2, 0]);
+
+		// Stable keying: the same DOM node follows Alpha to slot 3, rather than the
+		// slot-1 node being reused for Bravo (which index keying would do).
+		const probed = container.querySelector<HTMLElement>('[data-identity-probe="alpha"]');
+		expect(probed).toBe(movedCard);
+		expect(probed?.getAttribute('aria-label')).toContain('Alpha');
+		const reordered = Array.from(container.querySelectorAll<HTMLElement>('.eqcard'));
+		expect(reordered.indexOf(movedCard)).toBe(2);
+	});
+
 	it('resolves a pending swap from a band card via the keyboard', async () => {
 		const { container } = render(Skills);
 		await fireEvent.click(rowByName(container, 'Delta')!);

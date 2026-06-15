@@ -6,9 +6,14 @@ namespace Game.Infrastructure.Redis
 {
     internal static class RedisMultiplexerFactory
     {
-        private static ConnectionMultiplexer? _cacheInstance;
-        private static ConnectionMultiplexer? _pubsubInstance;
-        private static readonly object _cacheLock = new();
+        // Multiplexers are keyed by the *original* connection string under a single lock. Keying by the raw
+        // string (rather than comparing against ConnectionMultiplexer.Configuration, which StackExchange.Redis
+        // normalizes/rewrites) makes reuse reliable: the cache and pub/sub services share one multiplexer
+        // whenever their connection strings match, and two getters racing on first startup resolve to the same
+        // instance instead of each opening their own (#696). The whole get-or-add runs under the lock, so a
+        // partially-constructed multiplexer is never published to another thread.
+        private static readonly Dictionary<string, ConnectionMultiplexer> _multiplexers = new();
+        private static readonly object _lock = new();
 
         // Minimum size to grow the thread pool to before connecting (see ConnectMultiplexer).
         private const int MinThreadPoolThreads = 32;
@@ -19,33 +24,8 @@ namespace Game.Infrastructure.Redis
             {
                 throw new InvalidOperationException($"{nameof(config.CacheConnectionString)} cannot be null.");
             }
-            else if (_cacheInstance is null)
-            {
-                lock (_cacheLock)
-                {
-                    if (_pubsubInstance is not null && _pubsubInstance.Configuration == config.CacheConnectionString)
-                    {
-                        _cacheInstance = _pubsubInstance;
-                    }
-                    else
-                    {
-                        _cacheInstance ??= ConnectMultiplexer(config.CacheConnectionString);
-                    }
-                }
-            }
 
-            return _cacheInstance;
-        }
-
-        internal static void ResetForTesting()
-        {
-            lock (_cacheLock)
-            {
-                _cacheInstance?.Dispose();
-                _cacheInstance = null;
-                _pubsubInstance?.Dispose();
-                _pubsubInstance = null;
-            }
+            return GetOrConnect(config.CacheConnectionString);
         }
 
         public static ConnectionMultiplexer GetMultiplexer(IPubSubOptions config)
@@ -55,22 +35,48 @@ namespace Game.Infrastructure.Redis
                 throw new InvalidOperationException($"{nameof(config.PubSubConnectionString)} cannot be null.");
             }
 
-            if (_pubsubInstance is null)
-            {
-                lock (_cacheLock)
-                {
-                    if (_cacheInstance is not null && _cacheInstance.Configuration == config.PubSubConnectionString)
-                    {
-                        _pubsubInstance = _cacheInstance;
-                    }
-                    else
-                    {
-                        _pubsubInstance ??= ConnectMultiplexer(config.PubSubConnectionString);
-                    }
-                }
-            }
+            return GetOrConnect(config.PubSubConnectionString);
+        }
 
-            return _pubsubInstance;
+        private static ConnectionMultiplexer GetOrConnect(string connectionString)
+        {
+            return GetOrAdd(_multiplexers, _lock, connectionString, ConnectMultiplexer);
+        }
+
+        /// <summary>
+        /// Locked get-or-add: returns the value cached for <paramref name="key"/>, or invokes
+        /// <paramref name="factory"/> under <paramref name="syncRoot"/> to create and cache one on first request.
+        /// Running the whole lookup-and-create inside the lock is what makes the cache safe to read from multiple
+        /// threads without a partially-constructed value escaping, and what collapses a first-startup race onto a
+        /// single created instance. Generic over the value type so the keyed-reuse semantics are unit-testable
+        /// without a live connection (#696); production keys <see cref="ConnectionMultiplexer"/> by connection
+        /// string.
+        /// </summary>
+        internal static T GetOrAdd<T>(Dictionary<string, T> cache, object syncRoot, string key, Func<string, T> factory)
+        {
+            lock (syncRoot)
+            {
+                if (!cache.TryGetValue(key, out var value))
+                {
+                    value = factory(key);
+                    cache[key] = value;
+                }
+
+                return value;
+            }
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (_lock)
+            {
+                foreach (var multiplexer in _multiplexers.Values)
+                {
+                    multiplexer.Dispose();
+                }
+
+                _multiplexers.Clear();
+            }
         }
 
         /// <summary>

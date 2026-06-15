@@ -13,8 +13,9 @@ namespace Game.Api.Tests.Integration
 {
     /// <summary>
     /// Integration tests for the Tags reference reads — the only remaining HTTP-exclusive reference
-    /// endpoints (consumed by the Workbench). They are read live from the database (no in-memory cache),
-    /// so seeding a tag and reading it back exercises the controller and the IAsyncEnumerable projection.
+    /// endpoints (consumed by the admin Workbench). They are read live from the database (no in-memory
+    /// cache), so seeding a tag and reading it back exercises the controller and the IAsyncEnumerable
+    /// projection. The endpoints are admin-only (#690), so the authenticated reader is granted the Admin role.
     /// </summary>
     [Collection("Integration")]
     public class TagsControllerTests : ApiIntegrationTestBase
@@ -31,6 +32,7 @@ namespace Game.Api.Tests.Integration
                 var context = scope.ServiceProvider.GetRequiredService<GameContext>();
                 var user = await TestDataSeeder.CreateUserAsync(context, Username, Password);
                 await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
                 await TestDataSeeder.CreateTagAsync(context, tagName, ETagCategory.Accessory);
             }
 
@@ -78,6 +80,29 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Tags", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Theory]
+        [InlineData("/api/Tags")]
+        [InlineData("/api/Tags/TagCategories")]
+        public async Task TagsEndpoints_NonAdmin_Returns403(string url)
+        {
+            int userId, playerId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context, "nonadmintags", "nonadminpass");
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+                playerId = player.Id;
+            }
+
+            // Non-admin token: the endpoints are gated by AdminRoleAuthorizationFilter (#690).
+            using var client = CreateAuthenticatedClient(userId, playerId);
+
+            var response = await client.GetAsync(url, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
     }
 }

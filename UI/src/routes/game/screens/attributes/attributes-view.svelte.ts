@@ -312,26 +312,17 @@ export class AttributesView {
 
 		const netSpent = sum(this.draft) - sum(this.committed);
 		this.saving = true;
-		let result: IBattlerAttribute[] | undefined;
-		try {
-			const response = await apiSocket.sendSocketCommand('UpdatePlayerStats', updates);
-			if (!response.error) {
-				result = response.data;
-			}
-		} catch {
-			result = undefined;
-		} finally {
-			this.saving = false;
-		}
+		const response = await apiSocket.sendSocketCommand('UpdatePlayerStats', updates);
+		this.saving = false;
 
-		if (!result) {
+		if (response.error || !response.data) {
 			toastError('Your attribute changes could not be saved. Please try again.');
 			return;
 		}
 
 		// Persist to the player manager so battles and other screens use the new
 		// allocation, then re-seed the baseline to clear the dirty state.
-		playerManager.attributes = result;
+		playerManager.attributes = response.data;
 		playerManager.statPointsUsed += netSpent;
 		this.syncFromPlayer();
 		this.flashSaved();

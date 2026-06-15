@@ -11,7 +11,7 @@
 </div>
 
 <div class="band" style:--cap={view.cap}>
-	{#each slots as id, index (index)}
+	{#each slots as id, index (id ?? `empty-${index}`)}
 		{@const metrics = id != null ? view.metric(id) : undefined}
 		{#if id != null && metrics}
 			<div

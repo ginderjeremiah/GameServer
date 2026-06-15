@@ -115,6 +115,46 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task Save_PublishFails_LeavesCacheUnadvanced()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            // A first successful save establishes a known snapshot in the cache (one kill).
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId));
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+                await repo.Save(progress);
+            }
+
+            // A second save whose publish fails (a pre-cancelled budget makes the enqueue throw) must leave the
+            // cache holding the pre-failure snapshot — publishing happens before the cache is advanced, so the
+            // un-enqueued second kill never reaches the cache.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId)); // cache hit -> one kill
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0); // would advance to two
+
+                using var cts = new CancellationTokenSource();
+                await cts.CancelAsync();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repo.Save(progress, cts.Token));
+            }
+
+            // The cache still serves the snapshot from before the failed save (one kill, not two).
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var stats = await repo.GetStatistics(playerId);
+                var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+                Assert.Equal(1m, kills.Value);
+            }
+        }
+
+        [Fact]
         public async Task Load_CacheMiss_ReloadsStatisticsAndChallengeProgressFromDatabase()
         {
             var playerId = await SeedPlayerAsync();

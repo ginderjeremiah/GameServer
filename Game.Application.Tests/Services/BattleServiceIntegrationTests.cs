@@ -236,6 +236,92 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleVictory_ClaimedSlightlyAheadOfServer_WithinSkewTolerance_ReturnsDefeatResult()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // Backdate the battle start so the simulation's TotalMs has already elapsed (the "too early"
+            // side is satisfied), isolating the future-side skew check.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // A benign client clock that leads the server by less than the skew tolerance must NOT void
+            // the win — the prior zero-tolerance future check would have dropped this legitimate victory.
+            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(50);
+            var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
+
+            Assert.NotNull(result);
+            Assert.True(result.ExpReward >= 0);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task EndBattleVictory_ClaimedFarAheadOfServer_BeyondSkewTolerance_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // Backdate so the "too early" side is satisfied, isolating the future-side skew check.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // A claim far beyond the skew tolerance into the future is anti-cheat and must still be rejected,
+            // and the active battle must remain so the client can re-claim with a corrected timestamp.
+            var claimedTimestamp = DateTime.UtcNow.AddSeconds(2);
+            var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
+
+            Assert.Null(result);
+            Assert.True(state.HasActiveBattle);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_Success_PersistsPlayerToCache()
         {
             using var scope = CreateScope();

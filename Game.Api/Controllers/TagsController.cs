@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
+using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,7 @@ namespace Game.Api.Controllers
 {
     [Route("/api/[controller]/[action]")]
     [ApiController]
+    [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
     public class TagsController(ITags tags, ITagCategories tagCategories) : ControllerBase
     {
         private readonly ITags _tags = tags;

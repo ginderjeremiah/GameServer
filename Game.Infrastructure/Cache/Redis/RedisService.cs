@@ -53,6 +53,17 @@ namespace Game.Infrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
+        public async Task<string?> GetSet(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            // Read-old-then-write in one Lua script (atomic, mirroring CompareAndDelete) so the value and its
+            // TTL land together — a separate StringGetSet + KeyExpire would leave the key without an expiry if
+            // the process faulted between the two calls.
+            var result = await Redis.ScriptEvaluateAsync(
+                "local old = redis.call('get', KEYS[1]); redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]); return old",
+                [key], [(RedisValue)value, (RedisValue)(long)expiry.TotalMilliseconds]).WaitAsync(cancellationToken);
+            return (string?)result;
+        }
+
         public async Task Set(string key, string? value, CancellationToken cancellationToken = default)
         {
             await StringSetAsync(key, value, cancellationToken: cancellationToken);
