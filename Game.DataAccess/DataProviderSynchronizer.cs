@@ -43,6 +43,15 @@ namespace Game.DataAccess
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await InitSubscriber();
+
+            // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
+            // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
+            // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
+            // for the next publish to trigger a drain, stranding it at the tail when no further save follows.
+            // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
+            // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
+            // (the pop-based read is idempotent, so a concurrent first wake can never double-apply) (#560).
+            await ProcessQueue(_pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
