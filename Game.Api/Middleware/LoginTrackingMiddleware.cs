@@ -47,7 +47,7 @@ namespace Game.Api.Middleware
         /// Resolves the originating client IP, preferring the first <c>X-Forwarded-For</c> entry when the
         /// request arrives through a reverse proxy, and falling back to the transport remote address.
         /// </summary>
-        private static string ResolveIpAddress(HttpContext context)
+        internal static string ResolveIpAddress(HttpContext context)
         {
             var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
             if (!string.IsNullOrWhiteSpace(forwardedFor))
