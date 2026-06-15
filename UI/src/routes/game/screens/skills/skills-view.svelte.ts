@@ -418,12 +418,8 @@ export class SkillsView {
 		const previous = this.equipped;
 		this.equipped = next;
 		this.applyToPlayer(next);
-		try {
-			const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
-			if (response.error) {
-				throw new Error(response.error);
-			}
-		} catch {
+		const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
+		if (response.error) {
 			this.equipped = previous;
 			this.applyToPlayer(previous);
 			toastError('Your loadout could not be saved. Please try again.');
