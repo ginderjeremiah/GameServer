@@ -20,9 +20,9 @@ namespace Game.Api.Services
 
         /// <summary>
         /// True when the request carries a valid authenticated user. Derived from the validated access
-        /// token (recorded by <see cref="LoadPlayerState"/>), not from a session-cache hit — the session
-        /// cache is a volatile presentation convenience, so its absence must never be mistaken for "not
-        /// logged in" (see docs/backend.md → Authentication).
+        /// token (recorded by <see cref="SetAuthenticatedUser"/>), not from a session-cache hit — the
+        /// session cache is a volatile presentation convenience, so its absence must never be mistaken for
+        /// "not logged in" (see docs/backend.md → Authentication).
         /// </summary>
         public bool Authenticated => UserId > 0;
 
@@ -34,16 +34,24 @@ namespace Game.Api.Services
         public bool HasPlayerSession => PlayerState.PlayerId > 0;
 
         /// <summary>
-        /// Records the authenticated user (from the validated token) and loads their in-flight player state
-        /// from the session store. The user id is the sole authority for whether the caller is
-        /// authenticated, so it is recorded regardless of a cache hit; a miss leaves
-        /// <see cref="HasPlayerSession"/> false for the caller to rehydrate. Called by
-        /// SessionLoaderMiddleware on every authenticated request.
+        /// Records the authenticated user from the validated access token. The user id is the sole
+        /// authority for <see cref="Authenticated"/>, so it is recorded on every authenticated request (by
+        /// <c>SessionLoaderMiddleware</c>) independently of whether any player state is ever loaded.
         /// </summary>
-        public async Task LoadPlayerState(int userId, CancellationToken cancellationToken = default)
+        public void SetAuthenticatedUser(int userId)
         {
             UserId = userId;
-            var sessionData = await _sessionStore.GetSession(userId, cancellationToken);
+        }
+
+        /// <summary>
+        /// Loads the authenticated user's in-flight player state from the session store. A cache miss leaves
+        /// <see cref="HasPlayerSession"/> false so the caller can rehydrate it (see
+        /// <see cref="SessionInitializer"/>). Only invoked where a consumer actually needs player state (the
+        /// socket handshake and the Status/ActiveSession auth endpoints), never on every HTTP request.
+        /// </summary>
+        public async Task LoadPlayerState(CancellationToken cancellationToken = default)
+        {
+            var sessionData = await _sessionStore.GetSession(UserId, cancellationToken);
             if (sessionData is not null)
             {
                 PlayerState = sessionData;

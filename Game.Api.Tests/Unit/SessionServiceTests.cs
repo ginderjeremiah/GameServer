@@ -16,30 +16,44 @@ namespace Game.Api.Tests.Unit
     public class SessionServiceTests
     {
         [Fact]
-        public async Task LoadPlayerState_CacheHit_AuthenticatesAndLoadsPlayerSession()
+        public void SetAuthenticatedUser_AuthenticatesWithoutLoadingPlayerSession()
         {
-            var store = new FakeSessionStore { Session = new PlayerState { PlayerId = 7 } };
-            var session = new SessionService(store);
+            // Recording the user id is the cheap, per-request work: it authenticates the caller without
+            // touching the session cache, so a request that never reads player state pays no cache read.
+            var session = new SessionService(new FakeSessionStore());
 
-            await session.LoadPlayerState(5);
+            session.SetAuthenticatedUser(5);
 
             Assert.True(session.Authenticated);
             Assert.Equal(5, session.UserId);
+            Assert.False(session.HasPlayerSession);
+            Assert.Equal(0, session.SelectedPlayerId);
+        }
+
+        [Fact]
+        public async Task LoadPlayerState_CacheHit_LoadsPlayerSession()
+        {
+            var store = new FakeSessionStore { Session = new PlayerState { PlayerId = 7 } };
+            var session = new SessionService(store);
+            session.SetAuthenticatedUser(5);
+
+            await session.LoadPlayerState();
+
             Assert.True(session.HasPlayerSession);
             Assert.Equal(7, session.SelectedPlayerId);
         }
 
         [Fact]
-        public async Task LoadPlayerState_CacheMiss_AuthenticatesButHasNoPlayerSession()
+        public async Task LoadPlayerState_CacheMiss_LeavesNoPlayerSession()
         {
-            // The token is the sole authority for "authenticated", so an evicted/absent session must still
-            // report the user as logged in — it simply has no player session yet for the caller to rehydrate.
+            // An evicted/absent session leaves the user authenticated but with no player session yet, for the
+            // caller to rehydrate; the token (recorded separately) remains the sole authority for login.
             var session = new SessionService(new FakeSessionStore());
+            session.SetAuthenticatedUser(5);
 
-            await session.LoadPlayerState(5);
+            await session.LoadPlayerState();
 
             Assert.True(session.Authenticated);
-            Assert.Equal(5, session.UserId);
             Assert.False(session.HasPlayerSession);
             Assert.Equal(0, session.SelectedPlayerId);
         }
@@ -51,19 +65,20 @@ namespace Game.Api.Tests.Unit
             // unwinds the cache read cooperatively rather than running it to completion.
             var store = new FakeSessionStore();
             var session = new SessionService(store);
+            session.SetAuthenticatedUser(5);
             using var cts = new CancellationTokenSource();
 
-            await session.LoadPlayerState(5, cts.Token);
+            await session.LoadPlayerState(cts.Token);
 
             Assert.Equal(cts.Token, store.LastGetSessionToken);
         }
 
         [Fact]
-        public async Task RehydrateSession_EstablishesAndPersistsSession()
+        public void RehydrateSession_EstablishesAndPersistsSession()
         {
             var store = new FakeSessionStore();
             var session = new SessionService(store);
-            await session.LoadPlayerState(5);
+            session.SetAuthenticatedUser(5);
 
             session.RehydrateSession(7);
 

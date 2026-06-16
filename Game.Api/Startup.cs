@@ -92,6 +92,7 @@ namespace Game.Api
                 .AddDomainEventDispatcher()
                 .AddApplication()
                 .AddScoped<SessionService>()
+                .AddScoped<SessionInitializer>()
                 .AddSingleton<IAccessTokenService, JwtTokenService>()
                 .AddSingleton<SocketConnectionRegistry>()
                 .AddTransient<SocketManagerService>()

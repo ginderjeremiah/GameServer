@@ -13,12 +13,14 @@ namespace Game.Api.Controllers
     [ApiController]
     public class LoginController(
         SessionService sessionService,
+        SessionInitializer sessionInitializer,
         AccountService accountService,
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
         PlayerService playerService) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
+        private readonly SessionInitializer _sessionInitializer = sessionInitializer;
         private readonly AccountService _accountService = accountService;
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
         private readonly SocketManagerService _socketManager = socketManager;
@@ -87,6 +89,10 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in");
             }
 
+            // Load (or rehydrate) the session so the selected player id resolves; the HTTP pipeline no
+            // longer reads the session cache per request.
+            await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
+
             // A still-valid token whose player can't be loaded (deleted/archived between requests) is a
             // graceful error, not a 500 — mirroring the structured ApiResponse.Error its sibling endpoints use.
             var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId);
@@ -110,6 +116,10 @@ namespace Game.Api.Controllers
             {
                 return ApiResponse.Error("Not logged in");
             }
+
+            // Load (or rehydrate) the session so the selected player id resolves for the presence check;
+            // the HTTP pipeline no longer reads the session cache per request.
+            await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
 
             var active = await _socketManager.HasActiveSocket(_sessionService.SelectedPlayerId);
             return ApiResponse.Success(new ActiveSessionResult { Active = active });

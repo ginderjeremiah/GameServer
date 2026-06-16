@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Core;
@@ -262,6 +263,29 @@ namespace Game.Api.Tests.Integration
             Assert.False(result.Data.Active);
 
             await AssertSessionRehydratedAsync(user.Id, player.Id);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task NonSessionEndpoint_ValidTokenWithNoSessionCache_DoesNotEstablishSession()
+        {
+            // The redundant per-request session read is gone (#755): an authenticated endpoint that never
+            // reads player state (here DeviceInfo) must not load or rehydrate the session cache, even for a
+            // user who has a resolvable player. Only the socket handshake and Status/ActiveSession do.
+            var (client, user, _) = await SeedUserWithTokenButNoSessionAsync("nosessionread");
+            client.DefaultRequestHeaders.TryAddWithoutValidation(ClientHints.DeviceFingerprintHeader, "fp-nosession");
+
+            var response = await client.PostAsJsonAsync("/api/Login/DeviceInfo",
+                new { DeviceMemory = 8.0, HardwareConcurrency = 4 }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Give any (erroneous) fire-and-forget rehydration write a window to land, then confirm the
+            // session was never established — the cache stays empty for this user.
+            await Task.Delay(250, CancellationToken);
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            Assert.Null(await sessionStore.GetSession(user.Id));
             client.Dispose();
         }
 
