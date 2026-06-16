@@ -259,7 +259,7 @@ namespace Game.Core.Tests.Battle
                 Level = level,
                 Exp = 0,
                 CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints(allocations ?? []) { StatPointsGained = 0, StatPointsUsed = 0 },
+                StatPoints = new PlayerStatPoints { StatAllocations = allocations ?? [], StatPointsGained = 0, StatPointsUsed = 0 },
                 Inventory = new Inventory(),
                 SelectedSkills = selectedSkills ?? [],
                 Skills = selectedSkills ?? [],

@@ -18,16 +18,7 @@ namespace Game.Core.Players
         public required int StatPointsUsed { get; set; }
 
         /// <inheritdoc cref="StatAllocation"/>
-        public List<StatAllocation> StatAllocations { get; set; }
-
-        /// <summary>
-        /// Creates a new instance of <see cref="PlayerStatPoints"/>.
-        /// </summary>
-        /// <param name="statAllocations"></param>
-        public PlayerStatPoints(List<StatAllocation> statAllocations)
-        {
-            StatAllocations = statAllocations;
-        }
+        public required List<StatAllocation> StatAllocations { get; set; }
 
         /// <summary>
         /// Attempts to apply the given <paramref name="changedAttributes"/> to the player's stat allocations.

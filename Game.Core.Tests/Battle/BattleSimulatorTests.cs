@@ -141,8 +141,8 @@ namespace Game.Core.Tests.Battle
                 Level = 1,
                 Exp = 0,
                 CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints(allocations)
-                { StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
+                StatPoints = new PlayerStatPoints
+                { StatAllocations = allocations, StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
                 Inventory = new Inventory(),
                 SelectedSkills = defaultSkills,
                 Skills = defaultSkills,

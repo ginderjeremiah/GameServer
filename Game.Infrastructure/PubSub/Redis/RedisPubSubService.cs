@@ -29,9 +29,10 @@ namespace Game.Infrastructure.PubSub.Redis
         }
 
         // StackExchange.Redis exposes no CancellationToken on its operations, so the durable queue write is
-        // wrapped in WaitAsync (the same partial-honouring as RedisService): a cancelled per-command budget
+        // wrapped in ObserveWrite (the same partial-honouring as RedisService): a cancelled per-command budget
         // unwinds the await promptly rather than waiting out the dependency's own timeout (#558), while the
-        // underlying command settles in the background. The wake publish stays fire-and-forget, so it needs none.
+        // underlying command settles in the background — and a post-cancellation fault on the abandoned write is
+        // logged rather than lost. The wake publish stays fire-and-forget, so it needs none.
         public async Task Publish(string channel, string message, CancellationToken cancellationToken = default)
         {
             await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget).WaitAsync(cancellationToken);
@@ -49,7 +50,7 @@ namespace Game.Infrastructure.PubSub.Redis
             // signal for the queue consumer, and Redis pub/sub is already at-most-once (awaiting it confirms
             // the command was sent, not that any subscriber received it), so it is fire-and-forget: the data
             // is safely enqueued regardless, and the consumer drains the whole queue on its next wake (#552).
-            await queue.AddToQueueAsync(queueData).WaitAsync(cancellationToken);
+            await ObserveWrite(queue.AddToQueueAsync(queueData), cancellationToken);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
         }
 
@@ -70,8 +71,29 @@ namespace Game.Infrastructure.PubSub.Redis
             // for the same reason as the per-event Publish above — the data is already enqueued and the consumer
             // drains the whole queue on its next wake (#559).
             var queue = GetQueue(queueName);
-            await queue.AddRangeToQueueAsync(values).WaitAsync(cancellationToken);
+            await ObserveWrite(queue.AddRangeToQueueAsync(values), cancellationToken);
             await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
+        }
+
+        // Mirrors RedisService.ObserveWrite for the durable queue writes: the underlying command keeps running
+        // after a cancelled await (StackExchange.Redis can't cancel it), so a post-cancellation fault — a
+        // silently-dropped enqueue, i.e. a lost player update — is surfaced via a fault-logging continuation
+        // rather than going unobserved. ExecuteSynchronously + OnlyOnFaulted keeps it light and silent on success.
+        private async Task ObserveWrite(Task command, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await command.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _ = command.ContinueWith(
+                    faulted => _logger.LogError(faulted.Exception, "A Redis queue write faulted after its command budget was cancelled; the enqueued data may have been lost."),
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                throw;
+            }
         }
 
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)

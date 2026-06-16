@@ -188,9 +188,9 @@ namespace Game.Core.Tests.Battle
                 Level = 1,
                 Exp = 0,
                 CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints(
-                    allocations.Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount }).ToList())
+                StatPoints = new PlayerStatPoints
                 {
+                    StatAllocations = allocations.Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount }).ToList(),
                     StatPointsGained = statPointsGained,
                     StatPointsUsed = (int)allocations.Sum(a => a.Amount),
                 },

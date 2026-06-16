@@ -86,7 +86,7 @@ namespace Game.Core.Tests.Progress
             Level = level,
             Exp = 0,
             CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
+            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],

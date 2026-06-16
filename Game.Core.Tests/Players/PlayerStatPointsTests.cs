@@ -135,7 +135,7 @@ namespace Game.Core.Tests.Players
             {
                 new() { Attribute = EAttribute.Strength, Amount = 0 },
             };
-            var stats = new PlayerStatPoints(allocations) { StatPointsGained = 10, StatPointsUsed = 0 };
+            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 0 };
 
             var result = stats.TryUpdateAttributes([new Update(EAttribute.Luck, 3)]);
 
@@ -153,7 +153,7 @@ namespace Game.Core.Tests.Players
             {
                 new() { Attribute = EAttribute.Strength, Amount = 0 },
             };
-            var stats = new PlayerStatPoints(allocations) { StatPointsGained = 10, StatPointsUsed = 0 };
+            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 0 };
 
             var result = stats.TryUpdateAttributes([
                 new Update(EAttribute.Strength, 2),
@@ -193,8 +193,9 @@ namespace Game.Core.Tests.Players
                 new() { Attribute = EAttribute.Dexterity, Amount = 0 },
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
-            return new PlayerStatPoints(allocations)
+            return new PlayerStatPoints
             {
+                StatAllocations = allocations,
                 StatPointsGained = gained,
                 StatPointsUsed = used,
             };

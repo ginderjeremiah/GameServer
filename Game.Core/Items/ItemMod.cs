@@ -25,7 +25,7 @@ namespace Game.Core.Items
         public required string Description { get; init; }
 
         /// <inheritdoc cref="EItemModType" />
-        public EItemModType Type { get; init; }
+        public required EItemModType Type { get; init; }
 
         /// <inheritdoc cref="ERarity" />
         public required ERarity Rarity { get; init; }

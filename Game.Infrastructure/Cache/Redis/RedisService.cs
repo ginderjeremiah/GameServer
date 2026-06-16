@@ -1,5 +1,6 @@
 using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Game.Infrastructure.Cache.Redis
@@ -7,11 +8,13 @@ namespace Game.Infrastructure.Cache.Redis
     internal class RedisService : ICacheService
     {
         private ConnectionMultiplexer Multiplexer { get; }
+        private readonly ILogger<RedisService> _logger;
         public IDatabase Redis => Multiplexer.GetDatabase();
 
-        public RedisService(ConnectionMultiplexer multiplexer)
+        public RedisService(ConnectionMultiplexer multiplexer, ILogger<RedisService> logger)
         {
             Multiplexer = multiplexer;
+            _logger = logger;
         }
 
         // StackExchange.Redis exposes no CancellationToken on its database operations, so the token is honoured
@@ -19,6 +22,10 @@ namespace Game.Infrastructure.Cache.Redis
         // per-socket command lock without waiting out the dependency's own 5s timeout — #558), while the
         // underlying command keeps running to completion in the background. WaitAsync(CancellationToken.None) is a
         // zero-overhead no-op (it returns the same task), so the default-token callers pay nothing.
+        //
+        // For write operations the abandoned command's eventual fault would otherwise go unobserved — a silently
+        // failed write with no signal — so they route through ObserveWrite, which attaches a fault-logging
+        // continuation when (and only when) the await is cancelled.
 
         public async Task<string?> Get(string key, CancellationToken cancellationToken = default)
         {
@@ -58,9 +65,9 @@ namespace Game.Infrastructure.Cache.Redis
             // Read-old-then-write in one Lua script (atomic, mirroring CompareAndDelete) so the value and its
             // TTL land together — a separate StringGetSet + KeyExpire would leave the key without an expiry if
             // the process faulted between the two calls.
-            var result = await Redis.ScriptEvaluateAsync(
+            var result = await ObserveWrite(Redis.ScriptEvaluateAsync(
                 "local old = redis.call('get', KEYS[1]); redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]); return old",
-                [key], [(RedisValue)value, (RedisValue)(long)expiry.TotalMilliseconds]).WaitAsync(cancellationToken);
+                [key], [(RedisValue)value, (RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
             return (string?)result;
         }
 
@@ -86,7 +93,7 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            await Redis.KeyExpireAsync(key, expiry).WaitAsync(cancellationToken);
+            await ObserveWrite(Redis.KeyExpireAsync(key, expiry), cancellationToken);
         }
 
         public void ExpireAndForget(string key, TimeSpan expiry)
@@ -121,12 +128,12 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)
         {
-            await Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]).WaitAsync(cancellationToken);
+            await ObserveWrite(Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]), cancellationToken);
         }
 
         public async Task Delete(string key, CancellationToken cancellationToken = default)
         {
-            await Redis.KeyDeleteAsync(key).WaitAsync(cancellationToken);
+            await ObserveWrite(Redis.KeyDeleteAsync(key), cancellationToken);
         }
 
         public void DeleteAndForget(string key)
@@ -141,7 +148,29 @@ namespace Game.Infrastructure.Cache.Redis
 
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
         {
-            await Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when).WaitAsync(cancellationToken);
+            await ObserveWrite(Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when), cancellationToken);
+        }
+
+        // Awaits a write command under the cancellation budget. On a non-cancelled await a fault surfaces here
+        // directly; on cancellation the await unwinds but the underlying command keeps running (StackExchange.Redis
+        // can't cancel it), so a fault-logging continuation is attached to the abandoned task before rethrowing —
+        // the write may have silently failed, and the next save self-heals the value but would otherwise leave no
+        // signal. ExecuteSynchronously + OnlyOnFaulted keeps it allocation-light and silent on success.
+        private async Task<T> ObserveWrite<T>(Task<T> command, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await command.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _ = command.ContinueWith(
+                    faulted => _logger.LogError(faulted.Exception, "A Redis write faulted after its command budget was cancelled; the write may not have been applied."),
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                throw;
+            }
         }
     }
 }

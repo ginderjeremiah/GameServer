@@ -1,5 +1,6 @@
 using Game.Abstractions.Infrastructure;
 using Game.Infrastructure.Cache;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Game.Infrastructure.Tests
@@ -24,7 +25,7 @@ namespace Game.Infrastructure.Tests
             };
 
             var ex = Assert.Throws<InvalidOperationException>(
-                () => CacheServiceFactory.GetCacheService(options));
+                () => CacheServiceFactory.GetCacheService(options, NullLoggerFactory.Instance));
             Assert.Contains("CacheSystem", ex.Message);
         }
     }

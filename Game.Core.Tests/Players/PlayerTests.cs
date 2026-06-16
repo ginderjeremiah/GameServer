@@ -675,7 +675,7 @@ namespace Game.Core.Tests.Players
             Level = level,
             Exp = exp,
             CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
+            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],
