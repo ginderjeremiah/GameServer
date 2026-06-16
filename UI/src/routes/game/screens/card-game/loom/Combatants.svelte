@@ -4,17 +4,12 @@
 			<span class="name"><span class="glyph"></span>The Warden</span>
 			<span class="hpnum">{game.enemyHP} / {game.enemyMax}</span>
 		</div>
-		<div
-			class="bar enemy"
-			role="progressbar"
-			aria-label="The Warden health"
-			aria-valuenow={Math.round(game.enemyHP)}
-			aria-valuemin={0}
-			aria-valuemax={game.enemyMax}
-			aria-valuetext="{game.enemyHP} / {game.enemyMax}"
-		>
-			<i style:width="{(game.enemyHP / game.enemyMax) * 100}%"></i>
-		</div>
+		<Bar
+			value={game.enemyHP}
+			max={game.enemyMax}
+			ariaLabel="The Warden health"
+			valueText="{game.enemyHP} / {game.enemyMax}"
+		/>
 	</div>
 
 	<div class="combatant you">
@@ -22,31 +17,18 @@
 			<span class="name"><span class="glyph"></span>You</span>
 			<span class="hpnum">{game.playerHP} / {game.playerMax}</span>
 		</div>
-		<div
-			class="bar player"
-			role="progressbar"
-			aria-label="Your health"
-			aria-valuenow={Math.round(game.playerHP)}
-			aria-valuemin={0}
-			aria-valuemax={game.playerMax}
-			aria-valuetext="{game.playerHP} / {game.playerMax}"
-		>
-			<i style:width="{(game.playerHP / game.playerMax) * 100}%"></i>
-		</div>
+		<Bar
+			value={game.playerHP}
+			max={game.playerMax}
+			ariaLabel="Your health"
+			valueText="{game.playerHP} / {game.playerMax}"
+		/>
 	</div>
 
 	<div class="drawcluster">
 		<span class="mono">deck</span><b>{game.deck.length}</b>
-		<div
-			class="drawbar"
-			title="next draw"
-			role="progressbar"
-			aria-label="Next draw progress"
-			aria-valuenow={Math.round(drawPerc)}
-			aria-valuemin={0}
-			aria-valuemax={100}
-		>
-			<i style:width="{drawPerc}%"></i>
+		<div class="drawbar" title="next draw">
+			<Bar value={drawPerc} ariaLabel="Next draw progress" />
 		</div>
 		<span class="mono">used</span><b>{game.discard.length}</b>
 	</div>
@@ -54,13 +36,15 @@
 
 <script lang="ts">
 import type { LoomGame } from '$lib/card-game';
+import { Bar } from '$components';
 
 interface Props {
 	game: LoomGame;
 }
 const { game }: Props = $props();
 
-const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 100));
+// Percentage toward the next draw; Bar clamps the overshoot to 100%.
+const drawPerc = $derived((game.drawAcc / game.drawIntervalSec) * 100);
 </script>
 
 <style lang="scss">
@@ -78,6 +62,10 @@ const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 
 	gap: 5px;
 	min-width: 210px;
 	flex: 1;
+
+	// Shared HP-bar track geometry; the fill treatment differs per side below.
+	--bar-height: 9px;
+	--bar-track-shadow: inset 0 1px 2px color-mix(in srgb, var(--black) 40%, transparent);
 
 	.row {
 		display: flex;
@@ -108,6 +96,9 @@ const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 
 }
 
 .combatant.enemy {
+	--bar-fill: linear-gradient(90deg, color-mix(in srgb, var(--enemy-accent) 70%, black), var(--enemy-accent));
+	--bar-fill-shadow: 0 0 10px color-mix(in srgb, var(--enemy-accent) 50%, transparent);
+
 	.name {
 		color: var(--log-enemy);
 	}
@@ -118,6 +109,9 @@ const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 
 }
 
 .combatant.you {
+	--bar-fill: linear-gradient(90deg, var(--health-remaining-dark), var(--health-remaining-color));
+	--bar-fill-shadow: 0 0 10px color-mix(in srgb, var(--health-remaining-color) 45%, transparent);
+
 	.name {
 		color: var(--health-remaining-color);
 	}
@@ -125,31 +119,6 @@ const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 
 		background: var(--health-remaining-color);
 		box-shadow: 0 0 8px var(--health-remaining-color);
 	}
-}
-
-.bar {
-	height: 9px;
-	border-radius: 30px;
-	background: color-mix(in srgb, var(--white) 6%, transparent);
-	overflow: hidden;
-	box-shadow: inset 0 1px 2px color-mix(in srgb, var(--black) 40%, transparent);
-
-	> i {
-		display: block;
-		height: 100%;
-		border-radius: 30px;
-		transition: width 0.14s linear;
-	}
-}
-
-.bar.enemy > i {
-	background: linear-gradient(90deg, color-mix(in srgb, var(--enemy-accent) 70%, black), var(--enemy-accent));
-	box-shadow: 0 0 10px color-mix(in srgb, var(--enemy-accent) 50%, transparent);
-}
-
-.bar.player > i {
-	background: linear-gradient(90deg, var(--health-remaining-dark), var(--health-remaining-color));
-	box-shadow: 0 0 10px color-mix(in srgb, var(--health-remaining-color) 45%, transparent);
 }
 
 .drawcluster {
@@ -174,16 +143,10 @@ const drawPerc = $derived(Math.min(100, (game.drawAcc / game.drawIntervalSec) * 
 
 .drawbar {
 	width: 54px;
-	height: 7px;
-	border-radius: 30px;
-	background: color-mix(in srgb, var(--white) 6%, transparent);
-	overflow: hidden;
-
-	> i {
-		display: block;
-		height: 100%;
-		background: var(--gold);
-		box-shadow: 0 0 8px color-mix(in srgb, var(--gold) 50%, transparent);
-	}
+	--bar-height: 7px;
+	--bar-fill: var(--gold);
+	--bar-fill-shadow: 0 0 8px color-mix(in srgb, var(--gold) 50%, transparent);
+	// The meter retracks every frame, so it fills instantly rather than easing.
+	--bar-transition: none;
 }
 </style>

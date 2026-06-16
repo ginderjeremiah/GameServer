@@ -1,18 +1,14 @@
-<div
-	class="bar-track"
-	style:height="{height}px"
-	style:border-radius="{height / 2}px"
-	role="progressbar"
-	aria-valuenow={Math.round(clamped)}
-	aria-valuemin={0}
-	aria-valuemax={100}
+<!-- Challenge progress bar: the shared Bar primitive accented by challenge type (or success once
+     done), with a position cursor overlaid at the fill edge while in progress. -->
+<Bar
+	value={percent}
+	--bar-height={barHeight}
+	--bar-radius={barRadius}
+	--bar-track-bg="color-mix(in srgb, var(--white) 7%, transparent)"
+	--bar-fill={fill}
+	--bar-fill-shadow={fillShadow}
+	--bar-transition="width 320ms ease"
 >
-	<div
-		class="bar-fill"
-		style:width="{clamped}%"
-		style:background="linear-gradient(90deg, {tintColor(col, 0.85)}, {tintColor(col, 0.45)})"
-		style:box-shadow="0 0 8px {tintColor(col, 0.5)}"
-	></div>
 	{#if !done && clamped > 3 && clamped < 99}
 		<div
 			class="bar-cursor"
@@ -21,10 +17,11 @@
 			style:box-shadow="0 0 6px {col}"
 		></div>
 	{/if}
-</div>
+</Bar>
 
 <script lang="ts">
 import { tintColor } from '$lib/common';
+import { Bar } from '$components';
 
 interface Props {
 	percent: number;
@@ -37,21 +34,13 @@ const { percent, accent, done = false, height = 5 }: Props = $props();
 
 const clamped = $derived(Math.max(0, Math.min(100, percent)));
 const col = $derived(done ? 'var(--success)' : accent);
+const fill = $derived(`linear-gradient(90deg, ${tintColor(col, 0.85)}, ${tintColor(col, 0.45)})`);
+const fillShadow = $derived(`0 0 8px ${tintColor(col, 0.5)}`);
+const barHeight = $derived(`${height}px`);
+const barRadius = $derived(`${height / 2}px`);
 </script>
 
 <style lang="scss">
-.bar-track {
-	position: relative;
-	overflow: hidden;
-	background: color-mix(in srgb, var(--white) 7%, transparent);
-}
-
-.bar-fill {
-	position: absolute;
-	inset: 0;
-	transition: width 320ms ease;
-}
-
 .bar-cursor {
 	position: absolute;
 	top: -1px;

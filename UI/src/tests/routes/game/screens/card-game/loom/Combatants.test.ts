@@ -14,17 +14,15 @@ describe('Combatants', () => {
 		game.playerMax = 80;
 		const { container } = render(Combatants, { props: { game } });
 
-		const enemy = container.querySelector('.bar.enemy') as HTMLElement;
+		const enemy = container.querySelector('[aria-label="The Warden health"]') as HTMLElement;
 		expect(enemy.getAttribute('role')).toBe('progressbar');
-		expect(enemy.getAttribute('aria-label')).toBe('The Warden health');
 		expect(enemy.getAttribute('aria-valuenow')).toBe('90');
 		expect(enemy.getAttribute('aria-valuemin')).toBe('0');
 		expect(enemy.getAttribute('aria-valuemax')).toBe('120');
 		expect(enemy.getAttribute('aria-valuetext')).toBe('90.4 / 120');
 
-		const player = container.querySelector('.bar.player') as HTMLElement;
+		const player = container.querySelector('[aria-label="Your health"]') as HTMLElement;
 		expect(player.getAttribute('role')).toBe('progressbar');
-		expect(player.getAttribute('aria-label')).toBe('Your health');
 		expect(player.getAttribute('aria-valuenow')).toBe('41');
 		expect(player.getAttribute('aria-valuemax')).toBe('80');
 		expect(player.getAttribute('aria-valuetext')).toBe('40.6 / 80');
@@ -36,9 +34,8 @@ describe('Combatants', () => {
 		game.drawAcc = game.drawIntervalSec / 2;
 		const { container } = render(Combatants, { props: { game } });
 
-		const draw = container.querySelector('.drawbar') as HTMLElement;
+		const draw = container.querySelector('[aria-label="Next draw progress"]') as HTMLElement;
 		expect(draw.getAttribute('role')).toBe('progressbar');
-		expect(draw.getAttribute('aria-label')).toBe('Next draw progress');
 		expect(draw.getAttribute('aria-valuenow')).toBe('50');
 		expect(draw.getAttribute('aria-valuemin')).toBe('0');
 		expect(draw.getAttribute('aria-valuemax')).toBe('100');
@@ -49,8 +46,8 @@ describe('Combatants', () => {
 		game.drawAcc = game.drawIntervalSec * 2;
 		const { container } = render(Combatants, { props: { game } });
 
-		const draw = container.querySelector('.drawbar') as HTMLElement;
+		const draw = container.querySelector('[aria-label="Next draw progress"]') as HTMLElement;
 		expect(draw.getAttribute('aria-valuenow')).toBe('100');
-		expect((draw.querySelector('i') as HTMLElement).getAttribute('style')).toContain('width: 100%');
+		expect((draw.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 100%');
 	});
 });

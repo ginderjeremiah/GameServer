@@ -1,3 +1,4 @@
+export { default as Bar } from './Bar.svelte';
 export { default as ChallengeTooltip } from './tooltip/ChallengeTooltip.svelte';
 export { default as DiamondMark } from './DiamondMark.svelte';
 export { default as HpBar } from './HpBar.svelte';
