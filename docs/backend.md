@@ -145,6 +145,10 @@ At most one active account may hold a given username, enforced by a **partial un
 
 The browser CORS policy's allowed origins are **configuration-bound, not hardcoded** — they are deployment-specific. The list supports multiple origins and is validated at startup (must be non-empty), so a misconfigured environment fails fast rather than silently rejecting every browser request. The local dev origin ships in the Development config.
 
+## Unhandled exception handling
+
+A centralized exception-handling middleware is the **single place** unhandled exceptions are logged and turned into a response. It converts any exception escaping the downstream pipeline into the project's consistent `ApiResponse` error envelope with a 500 status, so clients get the same `{ errorMessage }` shape they get for business failures rather than the host's default response. Internal details (the exception message) are surfaced **only in Development**; other environments get a generic message so nothing leaks. A client-disconnect cancellation is not treated as a server error, and an already-started response (e.g. an upgraded WebSocket) is left to unwind rather than corrupted. It runs **inside `RequestLoggingMiddleware`** so the 500 is set before the "Request Ended" event logs the status; `RequestLoggingMiddleware` therefore stays focused on structured start/end events and never logs the exception itself.
+
 ## Access Roles and Admin Authorization
 
 Authenticated users are gated out of admin tooling unless they hold the `Admin` role. **Roles live in the signed auth token, not the session store** — the token is the source of truth for what a request is authorized to do, which keeps the check self-contained and avoids a second lookup; the trade-off is that a role change only takes effect on the user's next login. The admin authorization filter reads the role straight off the cryptographically validated principal, **never** off the gameplay session cache: that cache is a presentation concern decoupled from the token's validity, so keying off it would wrongly reject a valid admin whose session key happens to be absent (evicted, never established, or aged out).
