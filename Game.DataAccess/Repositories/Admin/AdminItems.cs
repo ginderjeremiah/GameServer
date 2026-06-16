@@ -27,7 +27,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Item");
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Item
                 {
                     Name = item.Name,
@@ -48,8 +48,6 @@ namespace Game.DataAccess.Repositories.Admin
                     IconPath = item.IconPath,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)
@@ -77,7 +75,7 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveModSlots(IReadOnlyList<Change<Contracts.ItemModSlot>> changes)
         {
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.ItemModSlot
                 {
                     ItemId = item.ItemId,
@@ -93,8 +91,6 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     Id = item.Id,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public async Task<AdminSaveResult> SetTags(SetTagsData data)

@@ -137,15 +137,15 @@ namespace Game.Api.Tests.Integration
                 }
             };
 
-            // The reference admin repo rejects a top-level delete by throwing, which the centralized
-            // exception handler converts into a consistent 500 envelope (with the generic message, since
-            // the test host is not the Development environment). Nothing is committed, so the record stays.
+            // The reference admin repo rejects a top-level delete as a graceful business error (validated
+            // input, not a server fault), which surfaces as a 400 with an actionable message instead of an
+            // opaque 500. Nothing is committed, so the record stays.
             var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
 
-            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
-            Assert.Equal("Internal Server Error", result.ErrorMessage);
+            Assert.Equal("Delete is not supported for Enemy: reference records are retired, not deleted.", result.ErrorMessage);
             Assert.Contains(GetEnemies(), e => e.Id == enemy.Id);
         }
 

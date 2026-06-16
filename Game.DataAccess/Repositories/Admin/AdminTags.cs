@@ -14,7 +14,10 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveTags(IReadOnlyList<Change<Contracts.Tag>> changes)
         {
-            ChangeSetProcessor.Apply(changes,
+            // Tags carry their own identity and have no owner to miss, and they support a real delete, so a
+            // tag write never rejects — the processor returns the unified success result every admin write
+            // reports through.
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Tag
                 {
                     Name = item.Name,
@@ -27,10 +30,6 @@ namespace Game.DataAccess.Repositories.Admin
                     TagCategoryId = item.TagCategoryId,
                 }),
                 delete: item => _entityStore.DeleteByKey<Entities.Tag>(item.Id));
-
-            // Tags carry their own identity and have no owner to miss, so a tag write never rejects — it
-            // succeeds to share the unified result contract every admin write reports through.
-            return AdminSaveResult.Success;
         }
     }
 }
