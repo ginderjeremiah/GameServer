@@ -19,8 +19,8 @@ namespace Game.Application.Tests.DataAccess
         }
 
         private static void Reconcile(
-            IEnumerable<ExistingChild> existing,
-            IEnumerable<DesiredChild> desired,
+            IReadOnlyCollection<ExistingChild> existing,
+            IReadOnlyCollection<DesiredChild> desired,
             Recorder recorder,
             bool withUpdate = true)
         {

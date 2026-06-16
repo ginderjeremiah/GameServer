@@ -24,9 +24,12 @@ namespace Game.DataAccess.Repositories.Admin
     /// </remarks>
     internal static class ChildCollectionReconciler
     {
+        // The collections are typed IReadOnlyCollection rather than IEnumerable because each is enumerated
+        // twice (once to build its key set, once to diff), so a deferred/lazy source would re-run — and could
+        // yield a different sequence the second time. Requiring a materialized collection rules that out.
         public static void Reconcile<TExisting, TDesired, TKey>(
-            IEnumerable<TExisting> existing,
-            IEnumerable<TDesired> desired,
+            IReadOnlyCollection<TExisting> existing,
+            IReadOnlyCollection<TDesired> desired,
             Func<TExisting, TKey> existingKey,
             Func<TDesired, TKey> desiredKey,
             Action<TExisting> delete,

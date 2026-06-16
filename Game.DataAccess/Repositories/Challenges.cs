@@ -13,6 +13,11 @@ namespace Game.DataAccess.Repositories
             return holder.Current;
         }
 
+        public bool ValidateChallengeId(int challengeId)
+        {
+            return challengeId >= 0 && challengeId < holder.Current.Count;
+        }
+
         public Challenge GetChallenge(int challengeId)
         {
             return holder.Current.GetById(challengeId, "challenge");

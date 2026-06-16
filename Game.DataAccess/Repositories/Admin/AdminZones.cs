@@ -29,7 +29,6 @@ namespace Game.DataAccess.Repositories.Admin
             // must reference an existing challenge. An edit must also target an existing zone — a missing id
             // is a not-found rejection, not an EF 0-row update that throws. Validate the whole change set up
             // front so an invalid reference rejects the batch rather than partially applying.
-            var challengeCount = _challenges.All().Count;
             foreach (var change in changes)
             {
                 if (change.ChangeType == EChangeType.Delete)
@@ -48,9 +47,10 @@ namespace Game.DataAccess.Repositories.Admin
                     return "Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.";
                 }
 
-                // Challenges are zero-based-id reference data, so a valid id is an in-range index.
+                // Challenges are zero-based-id reference data, so a valid id is an in-range index (an O(1)
+                // check, like the enemy/zone validators above).
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
-                    && (unlockChallengeId < 0 || unlockChallengeId >= challengeCount))
+                    && !_challenges.ValidateChallengeId(unlockChallengeId))
                 {
                     return "Unlock challenge is invalid. A zone's unlock challenge must reference an existing challenge.";
                 }

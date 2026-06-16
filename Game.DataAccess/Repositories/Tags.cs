@@ -25,7 +25,7 @@ namespace Game.DataAccess.Repositories
             return _context.Tags.Select(ToContract).AsAsyncEnumerable();
         }
 
-        public IAsyncEnumerable<int> GetExistingTagIds(IEnumerable<int> tagIds)
+        public IAsyncEnumerable<int> GetExistingTagIds(IReadOnlyCollection<int> tagIds)
         {
             return _context.Tags.Where(t => tagIds.Contains(t.Id)).Select(t => t.Id).AsAsyncEnumerable();
         }
