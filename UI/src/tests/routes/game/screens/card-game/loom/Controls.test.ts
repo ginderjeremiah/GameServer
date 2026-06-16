@@ -20,9 +20,8 @@ describe('Controls', () => {
 		view.game.reflex = 60.7;
 		const { container } = render(Controls, { props: { view } });
 
-		const meter = container.querySelector('.reflexmeter') as HTMLElement;
+		const meter = container.querySelector('[aria-label="Agility reserve"]') as HTMLElement;
 		expect(meter.getAttribute('role')).toBe('progressbar');
-		expect(meter.getAttribute('aria-label')).toBe('Agility reserve');
 		expect(meter.getAttribute('aria-valuenow')).toBe('61');
 		expect(meter.getAttribute('aria-valuemin')).toBe('0');
 		expect(meter.getAttribute('aria-valuemax')).toBe('100');

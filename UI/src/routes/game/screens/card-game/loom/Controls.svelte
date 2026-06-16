@@ -7,16 +7,8 @@
 	>
 		⏳ REFLEX
 	</button>
-	<div
-		class="reflexmeter"
-		title="Agility reserve"
-		role="progressbar"
-		aria-label="Agility reserve"
-		aria-valuenow={Math.round(view.game.reflex)}
-		aria-valuemin={0}
-		aria-valuemax={100}
-	>
-		<i style:width="{view.game.reflex}%"></i>
+	<div class="reflexmeter" title="Agility reserve">
+		<Bar value={view.game.reflex} ariaLabel="Agility reserve" />
 	</div>
 
 	<button class="btn reset" onclick={() => view.reset()}>↺ RESET</button>
@@ -24,6 +16,7 @@
 
 <script lang="ts">
 import type { CardGameView } from '../card-game-view.svelte';
+import { Bar } from '$components';
 
 interface Props {
 	view: CardGameView;
@@ -79,17 +72,9 @@ const { view }: Props = $props();
 
 .reflexmeter {
 	width: 80px;
-	height: 7px;
-	border-radius: 30px;
-	background: color-mix(in srgb, var(--white) 6%, transparent);
-	overflow: hidden;
-
-	> i {
-		display: block;
-		height: 100%;
-		background: var(--accent);
-		box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
-		transition: width 0.1s linear;
-	}
+	--bar-height: 7px;
+	--bar-fill: var(--accent);
+	--bar-fill-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+	--bar-transition: width 0.1s linear;
 }
 </style>
