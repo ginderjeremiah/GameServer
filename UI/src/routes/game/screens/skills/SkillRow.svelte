@@ -4,9 +4,11 @@
 	class:sel={view.selectedId === metrics.skill.id}
 	class:lock={!metrics.unlocked}
 	onclick={() => view.select(metrics.skill.id)}
-	onmouseenter={gated ? (e) => onGateEnter?.(metrics, e) : undefined}
+	onmouseenter={gated ? (e) => onGateShow?.(metrics, e) : undefined}
 	onmousemove={gated ? onGateMove : undefined}
 	onmouseleave={gated ? onGateLeave : undefined}
+	onfocus={gated ? onGateFocus : undefined}
+	onblur={gated ? onGateLeave : undefined}
 >
 	<SkillIcon skill={metrics.skill} locked={!metrics.unlocked} size={30} />
 	<span class="body">
@@ -24,22 +26,31 @@
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
+import type { TooltipAnchor } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
 	metrics: SkillMetrics;
 	view: SkillsView;
-	/** Hover callbacks that surface a gated skill's gating challenge. Fired only when the row is
-	 *  gated (locked + rewarded by a challenge); unlocked rows never invoke them. */
-	onGateEnter?: (metrics: SkillMetrics, ev: MouseEvent) => void;
+	/** Callbacks that surface a gated skill's gating challenge, reachable by both mouse hover and
+	 *  keyboard focus. Fired only when the row is gated (locked + rewarded by a challenge); unlocked
+	 *  rows never invoke them. The anchor is a pointer event (cursor) or the row element (focus). */
+	onGateShow?: (metrics: SkillMetrics, anchor: TooltipAnchor) => void;
 	onGateMove?: (ev: MouseEvent) => void;
 	onGateLeave?: () => void;
 };
 
-const { metrics, view, onGateEnter, onGateMove, onGateLeave }: Props = $props();
+const { metrics, view, onGateShow, onGateMove, onGateLeave }: Props = $props();
 
 const fmt = (n: number) => formatNum(Math.round(n));
+
+// Anchor the gate tooltip off the focused row's box (focus has no cursor position).
+const onGateFocus = (ev: FocusEvent) => {
+	if (ev.currentTarget instanceof HTMLElement) {
+		onGateShow?.(metrics, ev.currentTarget);
+	}
+};
 
 // A locked skill that is some challenge's reward is gated behind that challenge — hovering it
 // surfaces the gate. Unlocked skills (and locked ones with no challenge source) show no tooltip.

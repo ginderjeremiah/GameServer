@@ -60,7 +60,14 @@ const {
 });
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData, toastError, playerChallenges, registerTooltipComponent }));
+vi.mock('$stores', () => ({
+	staticData,
+	toastError,
+	playerChallenges,
+	registerTooltipComponent,
+	// The gate tooltip content under test is driven by `challengeId`; position is irrelevant here.
+	anchorPosition: () => ({ x: 0, y: 0 })
+}));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
@@ -431,6 +438,34 @@ describe('Skills screen', () => {
 
 		// Leaving the row clears the gate so it no longer renders.
 		await fireEvent.mouseLeave(echo);
+		expect(screen.queryByText('Slay Ten')).toBeNull();
+	});
+
+	it('surfaces the gating challenge tooltip on keyboard focus of a locked, challenge-gated skill', async () => {
+		staticData.challenges = [
+			{
+				id: 0,
+				name: 'Slay Ten',
+				description: 'Defeat 10 enemies',
+				challengeTypeId: 0,
+				progressGoal: 10,
+				rewardSkillId: 4
+			}
+		] as unknown as IChallenge[];
+		const { container } = render(Skills);
+
+		// Reveal locked skills so Echo (gated) appears in the rail.
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
+		const echo = rowByName(container, 'Echo')!;
+
+		// The gated row is a focusable button; focusing it (keyboard path) surfaces the gate.
+		await fireEvent.focus(echo);
+		expect(screen.getByText('Slay Ten')).toBeTruthy();
+		expect(screen.getByText('Defeat 10 enemies')).toBeTruthy();
+
+		// Blurring the row clears the gate so it no longer renders.
+		await fireEvent.blur(echo);
 		expect(screen.queryByText('Slay Ten')).toBeNull();
 	});
 

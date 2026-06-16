@@ -9,9 +9,12 @@
 		<button
 			class="zone-btn"
 			class:locked={leftLocked}
-			disabled={leftDisabled}
+			disabled={leftAbsent}
+			aria-disabled={leftLocked || undefined}
 			aria-label={leftLocked ? 'Previous zone locked' : 'Previous zone'}
 			onclick={handleClickLeft}
+			onfocus={(e) => focusLock(leftLocked, prevZone?.unlockChallengeId, e)}
+			onblur={hideLock}
 		>
 			{#if leftLocked}<LockGlyph />{:else}&#8249;{/if}
 		</button>
@@ -30,9 +33,12 @@
 		<button
 			class="zone-btn"
 			class:locked={rightLocked}
-			disabled={rightDisabled}
+			disabled={rightAbsent}
+			aria-disabled={rightLocked || undefined}
 			aria-label={rightLocked ? 'Next zone locked' : 'Next zone'}
 			onclick={handleClickRight}
+			onfocus={(e) => focusLock(rightLocked, nextZone?.unlockChallengeId, e)}
+			onblur={hideLock}
 		>
 			{#if rightLocked}<LockGlyph />{:else}&#8250;{/if}
 		</button>
@@ -43,7 +49,14 @@
 
 <script lang="ts">
 import type { IZone } from '$lib/api';
-import { staticData, playerChallenges, registerTooltipComponent, type TooltipComponent } from '$stores';
+import {
+	anchorPosition,
+	staticData,
+	playerChallenges,
+	registerTooltipComponent,
+	type TooltipAnchor,
+	type TooltipComponent
+} from '$stores';
 import { playerManager } from '$lib/engine';
 import { isZoneUnlocked, zonesByOrder } from '$lib/common';
 import { ChallengeTooltip } from '$components';
@@ -51,20 +64,28 @@ import LockGlyph from './LockGlyph.svelte';
 
 // A locked zone is always gated on a challenge (an ungated zone is never locked), so the lock
 // affordance shows that gating challenge — what it requires and what completing it unlocks —
-// rather than a static hint that wrongly assumed every gate was the zone's boss.
+// rather than a static hint that wrongly assumed every gate was the zone's boss. The explanation is
+// reachable by both mouse hover and keyboard focus (the locked arrow stays focusable via
+// `aria-disabled` rather than `disabled`).
 let tooltip = $state<TooltipComponent>();
 let challengeId = $state<number | undefined>();
 const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
-const showLock = (locked: boolean, gateChallengeId: number | undefined, ev: MouseEvent) => {
+// Anchor the lock tooltip at the cursor (mouse) or off the focused arrow's box (focus).
+const showLock = (locked: boolean, gateChallengeId: number | undefined, anchor: TooltipAnchor) => {
 	if (!locked) {
 		return;
 	}
 	challengeId = gateChallengeId;
-	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+	setTooltipPosition(anchorPosition(anchor));
 	showTooltip();
 };
-const moveLock = (ev: MouseEvent) => setTooltipPosition({ x: ev.clientX, y: ev.clientY });
+const moveLock = (ev: MouseEvent) => setTooltipPosition(anchorPosition(ev));
+const focusLock = (locked: boolean, gateChallengeId: number | undefined, ev: FocusEvent) => {
+	if (ev.currentTarget instanceof HTMLElement) {
+		showLock(locked, gateChallengeId, ev.currentTarget);
+	}
+};
 const hideLock = () => {
 	hideTooltip();
 	challengeId = undefined;
@@ -85,8 +106,10 @@ const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
 // simply being at the first/last zone (no neighbour at all).
 const leftLocked = $derived(prevZone != null && !isZoneUnlocked(prevZone, completed));
 const rightLocked = $derived(nextZone != null && !isZoneUnlocked(nextZone, completed));
-const leftDisabled = $derived(prevZone == null || leftLocked);
-const rightDisabled = $derived(nextZone == null || rightLocked);
+// An arrow is hard-`disabled` (unfocusable) only when there is no neighbour to explain at all;
+// a locked-but-existing neighbour stays focusable with `aria-disabled` so its gate is reachable.
+const leftAbsent = $derived(prevZone == null);
+const rightAbsent = $derived(nextZone == null);
 
 const goToZone = (zone: IZone | undefined) => {
 	if (zone != null && isZoneUnlocked(zone, completed)) {
@@ -128,8 +151,13 @@ const handleClickRight = () => goToZone(nextZone);
 	font-size: 12px;
 	transition: background 140ms;
 
-	&:hover:not(:disabled) {
+	&:hover:not(:disabled):not(.locked) {
 		background: var(--border-subtle);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 
 	&:disabled {
@@ -138,12 +166,13 @@ const handleClickRight = () => goToZone(nextZone);
 	}
 
 	// A locked neighbour (gating challenge not yet completed) reads more clearly than a plain
-	// end-of-list disabled arrow, so the lock glyph stays legible. Disabling the button suppresses
-	// its own pointer events, so the wrapping span receives the hover that drives the lock tooltip.
-	&.locked:disabled {
+	// end-of-list disabled arrow, so the lock glyph stays legible. It stays focusable (not
+	// `disabled`, but `aria-disabled`) so the gate tooltip is keyboard-reachable; activation is a
+	// no-op because `goToZone` only navigates to an unlocked zone.
+	&.locked {
 		opacity: 0.6;
 		color: color-mix(in srgb, var(--text-primary) 65%, transparent);
-		pointer-events: none;
+		cursor: not-allowed;
 	}
 }
 
