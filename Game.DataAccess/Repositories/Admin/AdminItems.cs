@@ -60,38 +60,17 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            ChangeSetProcessor.Apply(data.Changes,
-                add: attribute => _entityStore.Insert(new Entities.ItemAttribute
+            // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Item
+            // back-reference would drag the whole graph into the change tracker).
+            AttributeChangeSetProcessor.Apply(data.Changes, item.ItemAttributes,
+                existingKey: att => att.AttributeId,
+                toEntity: attribute => new Entities.ItemAttribute
                 {
                     ItemId = item.Id,
                     AttributeId = (int)attribute.AttributeId,
                     Amount = attribute.Amount,
-                }),
-                // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
-                // Item back-reference would drag the whole graph into the change tracker).
-                edit: attribute =>
-                {
-                    if (item.ItemAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
-                    {
-                        _entityStore.Update(new Entities.ItemAttribute
-                        {
-                            ItemId = item.Id,
-                            AttributeId = (int)attribute.AttributeId,
-                            Amount = attribute.Amount,
-                        });
-                    }
                 },
-                delete: attribute =>
-                {
-                    if (item.ItemAttributes.Any(att => (int)attribute.AttributeId == att.AttributeId))
-                    {
-                        _entityStore.Delete(new Entities.ItemAttribute
-                        {
-                            ItemId = item.Id,
-                            AttributeId = (int)attribute.AttributeId,
-                        });
-                    }
-                });
+                _entityStore);
 
             return true;
         }
@@ -123,27 +102,11 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            // Reconcile this item's join rows directly: read only its current tag ids and the desired ids
-            // that actually exist, then add/remove a single navigation-free join row per difference — never
-            // loading a tag's full item membership.
-            var currentTagIds = await _tags.GetTagIdsForItem(data.Id).ToHashSetAsync();
-            var desiredTagIds = await _tags.GetExistingTagIds(data.TagIds).ToHashSetAsync();
-
-            foreach (var tagId in currentTagIds)
-            {
-                if (!desiredTagIds.Contains(tagId))
-                {
-                    _entityStore.Delete(new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
-                }
-            }
-
-            foreach (var tagId in desiredTagIds)
-            {
-                if (!currentTagIds.Contains(tagId))
-                {
-                    _entityStore.Insert(new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
-                }
-            }
+            await TagAssignmentReconciler.ReconcileAsync(
+                _tags.GetTagIdsForItem(data.Id),
+                _tags.GetExistingTagIds(data.TagIds),
+                _entityStore,
+                tagId => new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
 
             return true;
         }

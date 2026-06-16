@@ -57,38 +57,17 @@ namespace Game.DataAccess.Repositories.Admin
                 return false;
             }
 
-            ChangeSetProcessor.Apply(data.Changes,
-                add: attribute => _entityStore.Insert(new Entities.SkillDamageMultiplier
+            // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Skill
+            // back-reference would drag the whole graph into the change tracker).
+            AttributeChangeSetProcessor.Apply(data.Changes, skill.SkillDamageMultipliers,
+                existingKey: att => att.AttributeId,
+                toEntity: attribute => new Entities.SkillDamageMultiplier
                 {
                     SkillId = skill.Id,
                     AttributeId = (int)attribute.AttributeId,
                     Multiplier = attribute.Amount,
-                }),
-                // Operate on a fresh, navigation-free entity (not the cached one, whose loaded
-                // Skill back-reference would drag the whole graph into the change tracker).
-                edit: attribute =>
-                {
-                    if (skill.SkillDamageMultipliers.Any(att => (int)attribute.AttributeId == att.AttributeId))
-                    {
-                        _entityStore.Update(new Entities.SkillDamageMultiplier
-                        {
-                            SkillId = skill.Id,
-                            AttributeId = (int)attribute.AttributeId,
-                            Multiplier = attribute.Amount,
-                        });
-                    }
                 },
-                delete: attribute =>
-                {
-                    if (skill.SkillDamageMultipliers.Any(att => (int)attribute.AttributeId == att.AttributeId))
-                    {
-                        _entityStore.Delete(new Entities.SkillDamageMultiplier
-                        {
-                            SkillId = skill.Id,
-                            AttributeId = (int)attribute.AttributeId,
-                        });
-                    }
-                });
+                _entityStore);
 
             return true;
         }
