@@ -232,9 +232,20 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
         // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
-        private static DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state)
+        private DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state)
         {
-            var rewards = new DefeatRewards(player, enemy);
+            // Measure the player's power for the reward from the same frozen snapshot the battle was simulated
+            // against, not the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps)
+            // can shift live power between battle start and the victory claim — which would both diverge from
+            // the fought battle and let a client deflate its power right before claiming to inflate the payout.
+            // RecordVictory only runs after TryResolveActiveBattle has confirmed an active snapshot, so a null
+            // here is a broken invariant rather than a reachable state.
+            if (state.Snapshot is not { } snapshot)
+            {
+                throw new InvalidOperationException("Cannot record a victory without an active battle snapshot.");
+            }
+
+            var rewards = new DefeatRewards(snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod), enemy);
 
             player.GrantExp(rewards.ExpReward);
             player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
