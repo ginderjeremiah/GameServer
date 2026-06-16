@@ -1,4 +1,6 @@
-﻿namespace Game.Api.Models.Common
+﻿using Game.Abstractions.DataAccess.Admin;
+
+namespace Game.Api.Models.Common
 {
     public class ApiResponse<T> : IApiResponse where T : IModel
     {
@@ -45,6 +47,16 @@
     public class ApiResponse : IApiResponse
     {
         public string? ErrorMessage { get; set; }
+
+        // Maps the admin data tier's unified write result to the API response once, so every admin
+        // endpoint can hand its result back directly instead of re-deriving the success/error mapping.
+        public static implicit operator ApiResponse(AdminSaveResult result)
+        {
+            return new ApiResponse
+            {
+                ErrorMessage = result.ErrorMessage
+            };
+        }
 
         public static ApiResponse Success()
         {

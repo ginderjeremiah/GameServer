@@ -23,18 +23,13 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditZones([FromBody] List<Change<Zone>> changes)
         {
-            var error = _adminZones.SaveZones(changes);
-            return error is null
-                ? ApiResponse.Success()
-                : ApiResponse.Error(error);
+            return _adminZones.SaveZones(changes);
         }
 
         [HttpPost]
         public ApiResponse SetZoneEnemies([FromBody] SetZoneEnemiesData zoneEnemiesData)
         {
-            return _adminZones.SetEnemies(zoneEnemiesData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Zone not found.");
+            return _adminZones.SetEnemies(zoneEnemiesData);
         }
     }
 }

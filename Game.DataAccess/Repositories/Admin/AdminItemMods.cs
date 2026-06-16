@@ -16,14 +16,14 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)
+        public AdminSaveResult SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)
         {
             // An edit must target an existing item mod; a missing id is a not-found rejection (matching the
             // relationship setters), not a silent success. Validate the whole batch up front so the
             // commit filter doesn't persist the rest of the batch alongside an invalid edit.
             if (changes.Any(c => c.ChangeType == EChangeType.Edit && _itemMods.LookupItemMod(c.Item.Id) is null))
             {
-                return false;
+                return AdminSaveResult.NotFound("Item mod");
             }
 
             ChangeSetProcessor.Apply(changes,
@@ -46,15 +46,15 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetAttributes(AddEditAttributesData data)
+        public AdminSaveResult SetAttributes(AddEditAttributesData data)
         {
             var itemMod = _itemMods.LookupItemMod(data.Id);
             if (itemMod is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Item mod");
             }
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded ItemMod
@@ -69,14 +69,14 @@ namespace Game.DataAccess.Repositories.Admin
                 },
                 _entityStore);
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public async Task<bool> SetTags(SetTagsData data)
+        public async Task<AdminSaveResult> SetTags(SetTagsData data)
         {
             if (_itemMods.LookupItemMod(data.Id) is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Item mod");
             }
 
             await TagAssignmentReconciler.ReconcileAsync(
@@ -85,7 +85,7 @@ namespace Game.DataAccess.Repositories.Admin
                 _entityStore,
                 tagId => new Entities.ItemModTag { ItemModId = data.Id, TagId = tagId });
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

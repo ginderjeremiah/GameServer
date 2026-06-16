@@ -16,14 +16,14 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly ISkillEntityCache _skills = skills;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveSkills(IReadOnlyList<Change<Contracts.Skill>> changes)
+        public AdminSaveResult SaveSkills(IReadOnlyList<Change<Contracts.Skill>> changes)
         {
             // An edit must target an existing skill; a missing id is a not-found rejection (matching the
             // relationship setters), not an EF 0-row update that throws. Validate the whole batch up front
             // so the commit filter doesn't persist the rest of the batch alongside an invalid edit.
             if (changes.Any(c => c.ChangeType == EChangeType.Edit && _skills.LookupSkill(c.Item.Id) is null))
             {
-                return false;
+                return AdminSaveResult.NotFound("Skill");
             }
 
             ChangeSetProcessor.Apply(changes,
@@ -46,15 +46,15 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetMultipliers(AddEditAttributesData data)
+        public AdminSaveResult SetMultipliers(AddEditAttributesData data)
         {
             var skill = _skills.LookupSkill(data.Id);
             if (skill is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Skill");
             }
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Skill
@@ -69,15 +69,15 @@ namespace Game.DataAccess.Repositories.Admin
                 },
                 _entityStore);
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetEffects(SetSkillEffectsData data)
+        public AdminSaveResult SetEffects(SetSkillEffectsData data)
         {
             var skill = _skills.LookupSkill(data.Id);
             if (skill is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Skill");
             }
 
             ChangeSetProcessor.Apply(data.Changes,
@@ -119,7 +119,7 @@ namespace Game.DataAccess.Repositories.Admin
                     }
                 });
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

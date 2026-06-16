@@ -17,7 +17,7 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly IChallenges _challenges = challenges;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveChallenges(IReadOnlyList<Change<Contracts.Challenge>> changes)
+        public AdminSaveResult SaveChallenges(IReadOnlyList<Change<Contracts.Challenge>> changes)
         {
             // An edit must target an existing challenge; a missing id is a not-found rejection (matching the
             // relationship setters), not an EF 0-row update that throws. Challenges are zero-based-id
@@ -27,7 +27,7 @@ namespace Game.DataAccess.Repositories.Admin
             if (changes.Any(c => c.ChangeType == EChangeType.Edit
                 && (c.Item.Id < 0 || c.Item.Id >= challengeCount)))
             {
-                return false;
+                return AdminSaveResult.NotFound("Challenge");
             }
 
             ChangeSetProcessor.Apply(changes,
@@ -56,7 +56,7 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

@@ -23,8 +23,7 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
         {
-            _adminTags.SaveTags(changes);
-            return ApiResponse.Success();
+            return _adminTags.SaveTags(changes);
         }
     }
 }

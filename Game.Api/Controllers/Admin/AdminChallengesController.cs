@@ -24,9 +24,7 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditChallenges([FromBody] List<Change<Challenge>> changes)
         {
-            return _adminChallenges.SaveChallenges(changes)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Challenge not found.");
+            return _adminChallenges.SaveChallenges(changes);
         }
     }
 }

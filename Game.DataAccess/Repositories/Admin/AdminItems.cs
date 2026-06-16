@@ -17,14 +17,14 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
+        public AdminSaveResult SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
         {
             // An edit must target an existing item; a missing id is a not-found rejection (matching the
             // relationship setters), not a silent success. Validate the whole batch up front so the
             // commit filter doesn't persist the rest of the batch alongside an invalid edit.
             if (changes.Any(c => c.ChangeType == EChangeType.Edit && _items.LookupItem(c.Item.Id) is null))
             {
-                return false;
+                return AdminSaveResult.NotFound("Item");
             }
 
             ChangeSetProcessor.Apply(changes,
@@ -49,15 +49,15 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetAttributes(AddEditAttributesData data)
+        public AdminSaveResult SetAttributes(AddEditAttributesData data)
         {
             var item = _items.LookupItem(data.Id);
             if (item is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Item");
             }
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Item
@@ -72,10 +72,10 @@ namespace Game.DataAccess.Repositories.Admin
                 },
                 _entityStore);
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public void SaveModSlots(IReadOnlyList<Change<Contracts.ItemModSlot>> changes)
+        public AdminSaveResult SaveModSlots(IReadOnlyList<Change<Contracts.ItemModSlot>> changes)
         {
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.ItemModSlot
@@ -93,13 +93,15 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     Id = item.Id,
                 }));
+
+            return AdminSaveResult.Success;
         }
 
-        public async Task<bool> SetTags(SetTagsData data)
+        public async Task<AdminSaveResult> SetTags(SetTagsData data)
         {
             if (_items.LookupItem(data.Id) is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Item");
             }
 
             await TagAssignmentReconciler.ReconcileAsync(
@@ -108,7 +110,7 @@ namespace Game.DataAccess.Repositories.Admin
                 _entityStore,
                 tagId => new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

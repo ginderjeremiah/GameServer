@@ -59,7 +59,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminZones>();
-                Assert.True(admin.SetEnemies(data));
+                Assert.True(admin.SetEnemies(data).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
@@ -78,14 +78,15 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SetEnemies_UnknownZone_ReturnsFalse()
+        public void SetEnemies_UnknownZone_ReturnsNotFound()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
 
             var result = admin.SetEnemies(new SetZoneEnemiesData { ZoneId = 99999, ZoneEnemies = [] });
 
-            Assert.False(result);
+            Assert.False(result.Succeeded);
+            Assert.Equal("Zone not found.", result.ErrorMessage);
         }
     }
 }
