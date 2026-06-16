@@ -26,7 +26,13 @@ const { mockPlayerManager, staticData, playerChallenges, registerTooltipComponen
 }));
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
-vi.mock('$stores', () => ({ staticData, playerChallenges, registerTooltipComponent }));
+vi.mock('$stores', () => ({
+	staticData,
+	playerChallenges,
+	registerTooltipComponent,
+	// The tooltip content under test is driven by `challengeId`; position is irrelevant here.
+	anchorPosition: () => ({ x: 0, y: 0 })
+}));
 
 import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
 
@@ -112,7 +118,10 @@ describe('ZoneNav', () => {
 		render(ZoneNav);
 		const [, right] = screen.getAllByRole('button') as HTMLButtonElement[];
 
-		expect(right.disabled).toBe(true);
+		// A locked arrow stays focusable (not hard-`disabled`) so its gate is keyboard-reachable,
+		// signalling its non-navigability with `aria-disabled` instead.
+		expect(right.disabled).toBe(false);
+		expect(right.getAttribute('aria-disabled')).toBe('true');
 		expect(right.getAttribute('aria-label')).toBe('Next zone locked');
 		// A locked arrow shows the padlock glyph rather than the chevron.
 		expect(right.querySelector('svg')).not.toBeNull();
@@ -132,6 +141,7 @@ describe('ZoneNav', () => {
 		const [, right] = screen.getAllByRole('button') as HTMLButtonElement[];
 
 		expect(right.disabled).toBe(false);
+		expect(right.getAttribute('aria-disabled')).toBeNull();
 		expect(right.querySelector('svg')).toBeNull();
 
 		await fireEvent.click(right);
@@ -147,7 +157,8 @@ describe('ZoneNav', () => {
 		render(ZoneNav);
 		const [left] = screen.getAllByRole('button') as HTMLButtonElement[];
 
-		expect(left.disabled).toBe(true);
+		expect(left.disabled).toBe(false);
+		expect(left.getAttribute('aria-disabled')).toBe('true');
 		expect(left.getAttribute('aria-label')).toBe('Previous zone locked');
 		expect(left.querySelector('svg')).not.toBeNull();
 	});
@@ -174,6 +185,40 @@ describe('ZoneNav', () => {
 
 		// Leaving clears the tooltip's challenge so it no longer renders the gate.
 		await fireEvent.mouseLeave(wraps[1]);
+		expect(screen.queryByText('Cull the Swarm')).toBeNull();
+	});
+
+	it('surfaces the gating challenge on keyboard focus of a locked arrow and clears on blur', async () => {
+		staticData.zones = [zone(10, 1, 'Alpha'), zone(20, 2, 'Beta', 5)];
+		staticData.challenges = [];
+		staticData.challenges[5] = challenge(5, 'Cull the Swarm', 'Defeat 10 enemies');
+		mockPlayerManager.currentZone = 10;
+		playerChallenges.isChallengeCompleted.mockReturnValue(false);
+
+		render(ZoneNav);
+		const [, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		// Focusing the locked arrow (keyboard path, no cursor) surfaces the gate.
+		await fireEvent.focus(right);
+		expect(screen.getByText('Cull the Swarm')).toBeTruthy();
+		expect(screen.getByText('Defeat 10 enemies')).toBeTruthy();
+		expect(screen.getByText('Beta')).toBeTruthy();
+
+		// Blurring clears the gate so it no longer renders.
+		await fireEvent.blur(right);
+		expect(screen.queryByText('Cull the Swarm')).toBeNull();
+	});
+
+	it('does not surface a tooltip when focusing an unlocked (navigable) arrow', async () => {
+		staticData.zones = [zone(10, 1, 'Alpha'), zone(20, 2, 'Beta')];
+		staticData.challenges = [];
+		staticData.challenges[5] = challenge(5, 'Cull the Swarm', 'Defeat 10 enemies');
+		mockPlayerManager.currentZone = 10;
+
+		render(ZoneNav);
+		const [, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		await fireEvent.focus(right);
 		expect(screen.queryByText('Cull the Swarm')).toBeNull();
 	});
 
