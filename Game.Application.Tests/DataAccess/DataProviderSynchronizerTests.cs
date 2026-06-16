@@ -94,8 +94,10 @@ namespace Game.Application.Tests.DataAccess
 
             // Each event is attempted MaxAttempts times: the non-final attempts log a "retrying" warning and the
             // final attempt logs an error before dead-lettering, and the first failure did not stop the second.
-            Assert.Equal((TestRetryPolicy.MaxAttempts - 1) * 2, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.Equal((TestRetryPolicy.MaxAttempts - 1) * 2, logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.Contains("retrying")));
             Assert.Equal(2, logger.Entries.Count(e => e.Level == LogLevel.Error));
+            // The now-growing dead-letter queue is surfaced once the drain settles so the backlog isn't invisible.
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("dead-letter queue"));
             Assert.Null(await queue.GetNextAsync());
 
             // Both events that exhausted their retries are preserved on the dead-letter queue rather than dropped.
@@ -166,7 +168,7 @@ namespace Game.Application.Tests.DataAccess
             await synchronizer.ProcessQueue(queue);
 
             // A poison inner payload is surfaced as a warning (not retried, so no error) and dead-lettered verbatim.
-            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.Contains("Dead-lettering")));
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
         }
@@ -193,7 +195,7 @@ namespace Game.Application.Tests.DataAccess
 
             // An unknown type is a poison message — no retry can fix it — so it is dead-lettered
             // immediately with a warning and without escalating to an error.
-            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning));
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.Contains("Dead-lettering")));
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Equal([message], await DrainDeadLetterQueue(pubsub));
         }
@@ -760,6 +762,58 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StartAsync_ReclaimsInFlightItemOrphanedByCrashedRun_AndApplies()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 21,
+                Exp: 9876,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100);
+
+            var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
+
+            // Model a run that crashed mid-apply: it reserved the event (moving it off the main queue onto the
+            // processing list) but died before acknowledging it, so the destructive-pop behaviour would have lost
+            // it entirely. Reserve-without-acknowledge leaves it stranded on the processing list (#769).
+            await queue.AddToQueueAsync(Serialize(validEvent));
+            var reserved = await queue.ReserveNextAsync();
+            Assert.NotNull(reserved);
+            Assert.Null(await queue.GetNextAsync());
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            // Subscribe is suppressed so the test exercises only the startup reclaim + drain (and leaves no
+            // lingering subscription); GetQueue and the dead-letter writes still route to real Redis.
+            var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // Startup reclaims the orphaned in-flight item back onto the queue and the startup drain applies it.
+            await synchronizer.StartAsync(CancellationToken.None);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(realPubSub));
+
+            // The reclaimed event was applied and nothing is left waiting or in flight.
+            Assert.Null(await queue.GetNextAsync());
+            Assert.Equal(0, await queue.ReclaimProcessingAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(21, persisted.Level);
+            Assert.Equal(9876, persisted.Exp);
+        }
+
+        [Fact]
         public async Task ProcessQueue_ProgressUpdatedEvent_UpsertsStatisticsAndChallengesIdempotently()
         {
             using var scope = CreateScope();
@@ -919,19 +973,69 @@ namespace Game.Application.Tests.DataAccess
         /// </summary>
         private sealed class InMemoryPubSubQueue : IPubSubQueue
         {
-            private readonly Queue<string?> _items;
+            // Models the Redis reliable-queue semantics: items wait on _items (head = First), a reserve moves the
+            // head onto _processing, and an acknowledge removes it; a reclaim restores the processing list to the
+            // queue head in order. GetNext destructively pops the queue head (used to assert the queue is drained).
+            private readonly LinkedList<string?> _items;
+            private readonly LinkedList<string?> _processing = new();
 
             public InMemoryPubSubQueue(params string?[] items)
             {
-                _items = new Queue<string?>(items);
+                _items = new LinkedList<string?>(items);
             }
 
-            public string? GetNext() => _items.Count > 0 ? _items.Dequeue() : null;
+            public string? GetNext()
+            {
+                if (_items.First is null)
+                {
+                    return null;
+                }
+
+                var value = _items.First.Value;
+                _items.RemoveFirst();
+                return value;
+            }
+
             public Task<string?> GetNextAsync() => Task.FromResult(GetNext());
-            public void AddToQueue(string value) => _items.Enqueue(value);
+
+            public Task<string?> ReserveNextAsync()
+            {
+                if (_items.First is null)
+                {
+                    return Task.FromResult<string?>(null);
+                }
+
+                var value = _items.First.Value;
+                _items.RemoveFirst();
+                _processing.AddLast(value);
+                return Task.FromResult(value);
+            }
+
+            public Task AcknowledgeAsync(string value)
+            {
+                _processing.Remove(value);
+                return Task.CompletedTask;
+            }
+
+            public Task<long> ReclaimProcessingAsync()
+            {
+                long reclaimed = 0;
+                while (_processing.Last is not null)
+                {
+                    _items.AddFirst(_processing.Last.Value);
+                    _processing.RemoveLast();
+                    reclaimed++;
+                }
+
+                return Task.FromResult(reclaimed);
+            }
+
+            public Task<long> GetLengthAsync() => Task.FromResult((long)_items.Count);
+
+            public void AddToQueue(string value) => _items.AddLast(value);
             public Task AddToQueueAsync(string value)
             {
-                _items.Enqueue(value);
+                _items.AddLast(value);
                 return Task.CompletedTask;
             }
 
@@ -939,7 +1043,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 foreach (var value in values)
                 {
-                    _items.Enqueue(value);
+                    _items.AddLast(value);
                 }
                 return Task.CompletedTask;
             }
@@ -952,28 +1056,30 @@ namespace Game.Application.Tests.DataAccess
         }
 
         /// <summary>
-        /// An <see cref="IPubSubQueue"/> whose <see cref="GetNextAsync"/> delays each pop (to widen the overlap
-        /// window) and records the peak number of pops in flight at once. A serialized drainer keeps that peak at
-        /// 1; two concurrent drains would push it to 2, so it deterministically catches the #578 regression.
+        /// An <see cref="IPubSubQueue"/> whose <see cref="ReserveNextAsync"/> delays each reserve (to widen the
+        /// overlap window) and records the peak number of reserves in flight at once. A serialized drainer keeps
+        /// that peak at 1; two concurrent drains would push it to 2, so it deterministically catches the #578
+        /// regression. Reserved items are parked on a processing list and removed on acknowledge.
         /// </summary>
         private sealed class ConcurrencyTrackingQueue : IPubSubQueue
         {
             private readonly object _gate = new();
             private readonly Queue<string?> _items;
-            private readonly TimeSpan _popDelay;
-            private int _activePops;
+            private readonly List<string?> _processing = [];
+            private readonly TimeSpan _reserveDelay;
+            private int _activeReserves;
 
             public int MaxObservedConcurrency { get; private set; }
 
-            public ConcurrencyTrackingQueue(TimeSpan popDelay, params string?[] items)
+            public ConcurrencyTrackingQueue(TimeSpan reserveDelay, params string?[] items)
             {
-                _popDelay = popDelay;
+                _reserveDelay = reserveDelay;
                 _items = new Queue<string?>(items);
             }
 
-            public async Task<string?> GetNextAsync()
+            public async Task<string?> ReserveNextAsync()
             {
-                var active = Interlocked.Increment(ref _activePops);
+                var active = Interlocked.Increment(ref _activeReserves);
                 lock (_gate)
                 {
                     MaxObservedConcurrency = Math.Max(MaxObservedConcurrency, active);
@@ -981,18 +1087,52 @@ namespace Game.Application.Tests.DataAccess
 
                 try
                 {
-                    await Task.Delay(_popDelay);
+                    await Task.Delay(_reserveDelay);
                     lock (_gate)
                     {
-                        return _items.Count > 0 ? _items.Dequeue() : null;
+                        if (_items.Count == 0)
+                        {
+                            return null;
+                        }
+
+                        var value = _items.Dequeue();
+                        _processing.Add(value);
+                        return value;
                     }
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref _activePops);
+                    Interlocked.Decrement(ref _activeReserves);
                 }
             }
 
+            public Task AcknowledgeAsync(string value)
+            {
+                lock (_gate)
+                {
+                    _processing.Remove(value);
+                }
+                return Task.CompletedTask;
+            }
+
+            public Task<long> GetLengthAsync()
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_items.Count);
+                }
+            }
+
+            // The drained-queue assertion uses GetNextAsync to confirm nothing is left waiting.
+            public Task<string?> GetNextAsync()
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult(_items.Count > 0 ? _items.Dequeue() : null);
+                }
+            }
+
+            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value) => throw new NotSupportedException();

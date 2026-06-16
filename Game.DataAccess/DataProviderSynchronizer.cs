@@ -32,6 +32,11 @@ namespace Game.DataAccess
         // never stranded — it is coalesced into one follow-up pass rather than dropped.
         private int _drainRequested;
 
+        // Last dead-letter depth surfaced to the log. Nothing drains the dead-letter queue automatically, so its
+        // depth effectively only grows; logging only when it grows past this value keeps a standing poison count
+        // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
+        private long _lastReportedDeadLetterDepth;
+
         public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy)
         {
             _services = services;
@@ -44,14 +49,27 @@ namespace Game.DataAccess
         {
             await InitSubscriber();
 
+            var queue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
+
+            // Recover any items a previous run reserved but never acknowledged — it crashed (deploy, scale-down,
+            // kill) mid-apply — before draining, so an event in flight when that run died is re-applied rather
+            // than lost (#769). The reclaim is safe to run while other instances drain because the handlers are
+            // idempotent, so at worst a still-live item is applied twice; cross-instance same-player ordering is
+            // already only best-effort, so the reclaim introduces no new reordering hazard.
+            var reclaimed = await queue.ReclaimProcessingAsync();
+            if (reclaimed > 0)
+            {
+                _logger.LogInformation("Reclaimed {Count} in-flight player update(s) orphaned by a previous run on queue '{Queue}'.", reclaimed, Constants.PUBSUB_PLAYER_QUEUE);
+            }
+
             // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
             // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
             // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
             // for the next publish to trigger a drain, stranding it at the tail when no further save follows.
             // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
             // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
-            // (the pop-based read is idempotent, so a concurrent first wake can never double-apply) (#560).
-            await ProcessQueue(_pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE));
+            // (the reserve/acknowledge read is idempotent, so a concurrent first wake can never double-apply) (#560).
+            await ProcessQueue(queue);
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -97,12 +115,36 @@ namespace Game.DataAccess
         {
             var deadLetterQueue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
 
-            var next = await queue.GetNextAsync();
+            // Reserve each item (move it to the processing list) instead of destructively popping it, and only
+            // acknowledge (remove it) once ProcessMessage has durably applied or dead-lettered it. A crash
+            // anywhere in between leaves the item on the processing list to be reclaimed on next startup rather
+            // than lost (#769). At-least-once is safe because the handlers are idempotent.
+            var next = await queue.ReserveNextAsync();
             while (next is not null)
             {
                 await ProcessMessage(next, deadLetterQueue);
-                next = await queue.GetNextAsync();
+                await queue.AcknowledgeAsync(next);
+                next = await queue.ReserveNextAsync();
             }
+
+            await SurfaceDeadLetterDepth(deadLetterQueue);
+        }
+
+        /// <summary>
+        /// Surfaces the dead-letter queue's depth so accumulating poison messages don't pile up invisibly (#769).
+        /// Nothing drains the dead-letter queue automatically, so a warning is logged only when its depth grows
+        /// past the last reported value — keeping a standing count from spamming the log on every drain while
+        /// still flagging fresh growth (and a standing backlog on the first drain after startup).
+        /// </summary>
+        private async Task SurfaceDeadLetterDepth(IPubSubQueue deadLetterQueue)
+        {
+            var depth = await deadLetterQueue.GetLengthAsync();
+            if (depth > _lastReportedDeadLetterDepth)
+            {
+                _logger.LogWarning("Player update dead-letter queue '{Queue}' now holds {Count} message(s) awaiting inspection.", Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE, depth);
+            }
+
+            _lastReportedDeadLetterDepth = depth;
         }
 
         /// <summary>

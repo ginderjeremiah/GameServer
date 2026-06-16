@@ -82,6 +82,52 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(await queue.GetNextAsync());
         }
 
+        [Fact]
+        public async Task ReserveNextAsync_ParksItemOffTheQueueUntilAcknowledged()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["a", "b"]);
+            Assert.Equal(2, await queue.GetLengthAsync());
+
+            // Reserving takes the head off the queue (so a concurrent drainer can't re-read it) but keeps it
+            // recoverable on the processing list rather than destroying it.
+            Assert.Equal("a", await queue.ReserveNextAsync());
+            Assert.Equal(1, await queue.GetLengthAsync());
+
+            // Acknowledging removes the reserved item for good; nothing remains to reclaim.
+            await queue.AcknowledgeAsync("a");
+            Assert.Equal(0, await queue.ReclaimProcessingAsync());
+
+            Assert.Equal("b", await queue.ReserveNextAsync());
+            await queue.AcknowledgeAsync("b");
+            Assert.Null(await queue.ReserveNextAsync());
+            Assert.Equal(0, await queue.GetLengthAsync());
+        }
+
+        [Fact]
+        public async Task ReclaimProcessingAsync_RestoresUnacknowledgedItemsToHead_PreservingOrder()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["a", "b", "c"]);
+
+            // Reserve two items without acknowledging them — modelling a run that crashed with work in flight.
+            Assert.Equal("a", await queue.ReserveNextAsync());
+            Assert.Equal("b", await queue.ReserveNextAsync());
+
+            // Reclaim moves both orphaned items back ahead of the still-queued "c", in their original order.
+            Assert.Equal(2, await queue.ReclaimProcessingAsync());
+            Assert.Equal("a", await queue.GetNextAsync());
+            Assert.Equal("b", await queue.GetNextAsync());
+            Assert.Equal("c", await queue.GetNextAsync());
+            Assert.Null(await queue.GetNextAsync());
+        }
+
         private sealed record SamplePayload(int Id, string Name);
     }
 }
