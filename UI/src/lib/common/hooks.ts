@@ -21,11 +21,14 @@ export const createHook = <T extends unknown[] = []>() => {
 		promiseResolvers = [];
 
 		// Iterate by index without allocating a snapshot (this is one of the hottest
-		// game-loop paths). A subscriber that unhooks mid-dispatch only tombstones
-		// itself (`removed`) instead of splicing, so no sibling is shifted past the
-		// cursor and skipped; the tombstones are compacted out once after dispatch.
+		// game-loop paths). Removals and additions during dispatch are both deferred so
+		// the index walk isn't disturbed: an unhook only tombstones (`removed`) instead
+		// of splicing, and the snapshotted `count` excludes any subscriber a callback
+		// appends mid-dispatch — keeping it from firing on an event that predates it.
+		// Tombstones are compacted out once after dispatch; appends survive it.
 		dispatching = true;
-		for (let i = 0; i < trackers.length; i++) {
+		const count = trackers.length;
+		for (let i = 0; i < count; i++) {
 			const tracker = trackers[i];
 			if (!tracker.removed) {
 				tracker.callback(...data, tracker.unhook);
