@@ -14,9 +14,14 @@ namespace Game.Application.Tests.DataAccess
         public List<object> Deleted { get; } = [];
         public List<object> Tracked { get; } = [];
 
+        // Key-only deletes, each recorded as the entity type plus the supplied key values, in call order.
+        public List<(Type EntityType, object[] KeyValues)> DeletedByKey { get; } = [];
+
         public void Insert<TEntity>(TEntity entity) where TEntity : class => Inserted.Add(entity);
         public void Update<TEntity>(TEntity entity) where TEntity : class => Updated.Add(entity);
         public void Delete<TEntity>(TEntity entity) where TEntity : class => Deleted.Add(entity);
+        public void DeleteByKey<TEntity>(params object[] keyValues) where TEntity : class =>
+            DeletedByKey.Add((typeof(TEntity), keyValues));
         public void Track<TEntity>(TEntity entity) where TEntity : class => Tracked.Add(entity);
     }
 }

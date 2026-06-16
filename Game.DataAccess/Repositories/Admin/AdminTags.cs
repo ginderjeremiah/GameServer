@@ -26,11 +26,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Name = item.Name,
                     TagCategoryId = item.TagCategoryId,
                 }),
-                delete: item => _entityStore.Delete(new Entities.Tag
-                {
-                    Id = item.Id,
-                    Name = "",
-                }));
+                delete: item => _entityStore.DeleteByKey<Entities.Tag>(item.Id));
 
             // Tags carry their own identity and have no owner to miss, so a tag write never rejects — it
             // succeeds to share the unified result contract every admin write reports through.
