@@ -26,7 +26,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Skill");
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Skill
                 {
                     Name = item.Name,
@@ -45,8 +45,6 @@ namespace Game.DataAccess.Repositories.Admin
                     IconPath = item.IconPath,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetMultipliers(AddEditAttributesData data)
@@ -80,7 +78,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Skill");
             }
 
-            ChangeSetProcessor.Apply(data.Changes,
+            return ChangeSetProcessor.Apply(data.Changes,
                 add: effect => _entityStore.Insert(new Entities.SkillEffect
                 {
                     SkillId = skill.Id,
@@ -118,8 +116,6 @@ namespace Game.DataAccess.Repositories.Admin
                         });
                     }
                 });
-
-            return AdminSaveResult.Success;
         }
     }
 }

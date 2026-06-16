@@ -99,25 +99,42 @@ namespace Game.Application.Tests.DataAccess
                 Change(EChangeType.Edit, "e"),
             };
 
-            ChangeSetProcessor.Apply(changes,
+            var result = ChangeSetProcessor.Apply(changes,
                 add: item => added.Add(item.Tag),
                 edit: item => edited.Add(item.Tag));
 
+            Assert.True(result.Succeeded);
             Assert.Equal(["a"], added);
             Assert.Equal(["e"], edited);
         }
 
         [Fact]
-        public void Apply_DeleteChange_WithNoDeleteHandler_Throws()
+        public void Apply_DeleteChange_WithNoDeleteHandler_ReturnsBusinessFailureAndAppliesNothing()
         {
-            // A top-level Delete against a retire-only reference set must fail loud rather than open
-            // an id gap that silently mis-resolves index-based lookups.
-            var changes = new[] { Change(EChangeType.Delete, "d") };
+            // A top-level Delete against a retire-only reference set is a client input error, not a server
+            // fault: it is rejected as a graceful business failure (which the API surfaces as a 400) rather
+            // than thrown, because opening an id gap would silently mis-resolve index-based lookups. The
+            // sibling Add/Edit in the same batch must not be applied — the rejection keeps it atomic.
+            var added = new List<string>();
+            var edited = new List<string>();
 
-            Assert.Throws<InvalidOperationException>(() =>
-                ChangeSetProcessor.Apply(changes,
-                    add: _ => { },
-                    edit: _ => { }));
+            var changes = new[]
+            {
+                Change(EChangeType.Add, "a"),
+                Change(EChangeType.Edit, "e"),
+                Change(EChangeType.Delete, "d"),
+            };
+
+            var result = ChangeSetProcessor.Apply(changes,
+                add: item => added.Add(item.Tag),
+                edit: item => edited.Add(item.Tag));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Delete is not supported for TestModel: reference records are retired, not deleted.",
+                result.ErrorMessage);
+            Assert.Empty(added);
+            Assert.Empty(edited);
         }
 
         [Fact]

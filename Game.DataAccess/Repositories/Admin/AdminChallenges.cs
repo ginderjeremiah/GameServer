@@ -30,7 +30,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Challenge");
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Challenge
                 {
                     Name = item.Name,
@@ -55,8 +55,6 @@ namespace Game.DataAccess.Repositories.Admin
                     RewardSkillId = item.RewardSkillId,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
     }
 }

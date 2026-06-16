@@ -26,7 +26,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Item mod");
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.ItemMod
                 {
                     Name = item.Name,
@@ -45,8 +45,6 @@ namespace Game.DataAccess.Repositories.Admin
                     RarityId = (int)item.RarityId,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)

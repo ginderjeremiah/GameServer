@@ -56,7 +56,7 @@ namespace Game.DataAccess.Repositories.Admin
                 }
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Zone
                 {
                     Name = item.Name,
@@ -81,8 +81,6 @@ namespace Game.DataAccess.Repositories.Admin
                     UnlockChallengeId = item.UnlockChallengeId,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetEnemies(SetZoneEnemiesData data)

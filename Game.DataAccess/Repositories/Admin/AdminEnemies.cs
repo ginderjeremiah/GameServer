@@ -26,7 +26,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Enemy");
             }
 
-            ChangeSetProcessor.Apply(changes,
+            return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Enemy
                 {
                     Name = item.Name,
@@ -39,8 +39,6 @@ namespace Game.DataAccess.Repositories.Admin
                     IsBoss = item.IsBoss,
                     RetiredAt = item.RetiredAt,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data)
