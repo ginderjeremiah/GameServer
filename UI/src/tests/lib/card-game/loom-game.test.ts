@@ -119,6 +119,37 @@ describe('LoomGame — resolution', () => {
 	});
 });
 
+describe('LoomGame — enemy channel', () => {
+	/* The enemy's heavy Channel (windup 8, dmg 28 under zeroRng) winds up from
+	   tick 18 and resolves at tick 26 — far harder-hitting than a regular strike
+	   (dmg 8). Nothing else resolves in the [25,27) window, so the HP delta there
+	   isolates the channel. */
+
+	it('applies its full damage when it resolves unblocked', () => {
+		const game = new LoomGame(zeroRng);
+		const channel = () => game.ents.find((e) => e.type === 'enemychannel');
+		advanceTo(game, 25); // past the strikes at 9/16/23, still inside the channel wind-up
+		expect(channel()?.resolved).toBe(false);
+		const before = game.playerHP;
+		advanceTo(game, 27); // cross the channel resolve at tick 26
+		expect(channel()?.resolved).toBe(true);
+		expect(before - game.playerHP).toBe(28); // the channel's full hit, nothing else resolves in [25,27)
+	});
+
+	it('is negated when a block span covers its resolve', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'dodge' }];
+		game.castSlot(0, 24); // [24,27) covers the channel resolve at 26, but not the strike at 23
+		advanceTo(game, 25);
+		const before = game.playerHP;
+		advanceTo(game, 27);
+		const channel = game.ents.find((e) => e.type === 'enemychannel');
+		expect(channel?.resolved).toBe(true);
+		expect(game.playerHP).toBe(before); // channel fully blocked — no damage
+		expect(game.flashes.map((f) => f.kind)).toContain('block');
+	});
+});
+
 describe('LoomGame — resolution flashes', () => {
 	/* The engine emits presentation-free semantic flash kinds; the Board maps
 	   each to a board position + themeable colour. These pin the kind each
