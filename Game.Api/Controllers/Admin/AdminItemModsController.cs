@@ -23,25 +23,19 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditItemMods([FromBody] List<Change<ItemMod>> changes)
         {
-            return _adminItemMods.SaveItemMods(changes)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Item mod not found.");
+            return _adminItemMods.SaveItemMods(changes);
         }
 
         [HttpPost]
         public ApiResponse AddEditItemModAttributes([FromBody] AddEditAttributesData changeData)
         {
-            return _adminItemMods.SetAttributes(changeData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Item mod not found.");
+            return _adminItemMods.SetAttributes(changeData);
         }
 
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {
-            return await _adminItemMods.SetTags(setTagsData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Item mod not found.");
+            return await _adminItemMods.SetTags(setTagsData);
         }
     }
 }

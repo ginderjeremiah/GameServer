@@ -23,25 +23,19 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditSkills([FromBody] List<Change<Skill>> changes)
         {
-            return _adminSkills.SaveSkills(changes)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Skill not found.");
+            return _adminSkills.SaveSkills(changes);
         }
 
         [HttpPost]
         public ApiResponse SetSkillMultipliers([FromBody] AddEditAttributesData changeData)
         {
-            return _adminSkills.SetMultipliers(changeData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Skill not found.");
+            return _adminSkills.SetMultipliers(changeData);
         }
 
         [HttpPost]
         public ApiResponse SetSkillEffects([FromBody] SetSkillEffectsData changeData)
         {
-            return _adminSkills.SetEffects(changeData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Skill not found.");
+            return _adminSkills.SetEffects(changeData);
         }
     }
 }

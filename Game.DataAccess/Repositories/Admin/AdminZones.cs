@@ -23,7 +23,7 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly IChallenges _challenges = challenges;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public string? SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
+        public AdminSaveResult SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
             // A zone's dedicated boss must reference an existing enemy flagged IsBoss, and its unlock gate
             // must reference an existing challenge. An edit must also target an existing zone — a missing id
@@ -38,13 +38,13 @@ namespace Game.DataAccess.Repositories.Admin
 
                 if (change.ChangeType == EChangeType.Edit && _zones.LookupZone(change.Item.Id) is null)
                 {
-                    return "Zone not found.";
+                    return AdminSaveResult.NotFound("Zone");
                 }
 
                 if (change.Item.BossEnemyId is int bossEnemyId
                     && _enemies.GetEnemy(bossEnemyId) is not { IsBoss: true })
                 {
-                    return "Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.";
+                    return AdminSaveResult.Failure("Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.");
                 }
 
                 // Challenges are zero-based-id reference data, so a valid id is an in-range index (an O(1)
@@ -52,7 +52,7 @@ namespace Game.DataAccess.Repositories.Admin
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
                     && !_challenges.ValidateChallengeId(unlockChallengeId))
                 {
-                    return "Unlock challenge is invalid. A zone's unlock challenge must reference an existing challenge.";
+                    return AdminSaveResult.Failure("Unlock challenge is invalid. A zone's unlock challenge must reference an existing challenge.");
                 }
             }
 
@@ -82,15 +82,15 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return null;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetEnemies(SetZoneEnemiesData data)
+        public AdminSaveResult SetEnemies(SetZoneEnemiesData data)
         {
             var zone = _zones.LookupZone(data.ZoneId);
             if (zone is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Zone");
             }
 
             ChildCollectionReconciler.Reconcile(
@@ -116,7 +116,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Weight = ze.Weight,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

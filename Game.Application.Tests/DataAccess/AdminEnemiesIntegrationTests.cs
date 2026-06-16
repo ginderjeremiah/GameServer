@@ -53,7 +53,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
-                Assert.True(admin.SetAttributeDistributions(data));
+                Assert.True(admin.SetAttributeDistributions(data).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
@@ -103,7 +103,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
-                Assert.True(admin.SetSkills(data));
+                Assert.True(admin.SetSkills(data).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
@@ -155,7 +155,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
-                Assert.True(admin.SetSpawns(data));
+                Assert.True(admin.SetSpawns(data).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
@@ -174,7 +174,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SetAttributeDistributions_UnknownEnemy_ReturnsFalse()
+        public void SetAttributeDistributions_UnknownEnemy_ReturnsNotFound()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
@@ -185,29 +185,32 @@ namespace Game.Application.Tests.DataAccess
                 AttributeDistributions = [],
             });
 
-            Assert.False(result);
+            Assert.False(result.Succeeded);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
         }
 
         [Fact]
-        public void SetSkills_UnknownEnemy_ReturnsFalse()
+        public void SetSkills_UnknownEnemy_ReturnsNotFound()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
 
             var result = admin.SetSkills(new SetEnemySkillsData { EnemyId = 99999, SkillIds = [] });
 
-            Assert.False(result);
+            Assert.False(result.Succeeded);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
         }
 
         [Fact]
-        public void SetSpawns_UnknownEnemy_ReturnsFalse()
+        public void SetSpawns_UnknownEnemy_ReturnsNotFound()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
 
             var result = admin.SetSpawns(new SetEnemySpawnsData { EnemyId = 99999, Spawns = [] });
 
-            Assert.False(result);
+            Assert.False(result.Succeeded);
+            Assert.Equal("Enemy not found.", result.ErrorMessage);
         }
     }
 }

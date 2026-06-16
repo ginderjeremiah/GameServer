@@ -10,16 +10,16 @@ namespace Game.Abstractions.DataAccess.Admin
     public interface IAdminItems
     {
         /// <summary>Applies an identity-level Add/Edit/Delete change set to the item catalogue.
-        /// Returns <c>false</c> (applying nothing) if an edit targets an item that does not exist.</summary>
-        bool SaveItems(IReadOnlyList<Change<Item>> changes);
+        /// Fails (applying nothing) if an edit targets an item that does not exist.</summary>
+        AdminSaveResult SaveItems(IReadOnlyList<Change<Item>> changes);
 
-        /// <summary>Applies a change set to an item's attributes. Returns <c>false</c> if the item does not exist.</summary>
-        bool SetAttributes(AddEditAttributesData data);
+        /// <summary>Applies a change set to an item's attributes. Fails if the item does not exist.</summary>
+        AdminSaveResult SetAttributes(AddEditAttributesData data);
 
         /// <summary>Applies an Add/Edit/Delete change set to an item's mod slots.</summary>
-        void SaveModSlots(IReadOnlyList<Change<ItemModSlot>> changes);
+        AdminSaveResult SaveModSlots(IReadOnlyList<Change<ItemModSlot>> changes);
 
-        /// <summary>Replaces an item's tag associations. Returns <c>false</c> if the item does not exist.</summary>
-        Task<bool> SetTags(SetTagsData data);
+        /// <summary>Replaces an item's tag associations. Fails if the item does not exist.</summary>
+        Task<AdminSaveResult> SetTags(SetTagsData data);
     }
 }

@@ -16,14 +16,14 @@ namespace Game.DataAccess.Repositories.Admin
         private readonly IEnemyEntityCache _enemies = enemies;
         private readonly IEntityStore _entityStore = entityStore;
 
-        public bool SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
+        public AdminSaveResult SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
         {
             // An edit must target an existing enemy; a missing id is a not-found rejection (matching the
             // relationship setters), not an EF 0-row update that throws. Validate the whole batch up front
             // so the commit filter doesn't persist the rest of the batch alongside an invalid edit.
             if (changes.Any(c => c.ChangeType == EChangeType.Edit && _enemies.GetEnemy(c.Item.Id) is null))
             {
-                return false;
+                return AdminSaveResult.NotFound("Enemy");
             }
 
             ChangeSetProcessor.Apply(changes,
@@ -40,15 +40,15 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetAttributeDistributions(SetEnemyAttributeDistributions data)
+        public AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data)
         {
             var enemy = _enemies.GetEnemy(data.EnemyId);
             if (enemy is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Enemy");
             }
 
             ChildCollectionReconciler.Reconcile(
@@ -76,15 +76,15 @@ namespace Game.DataAccess.Repositories.Admin
                     AmountPerLevel = ad.AmountPerLevel,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetSkills(SetEnemySkillsData data)
+        public AdminSaveResult SetSkills(SetEnemySkillsData data)
         {
             var enemy = _enemies.GetEnemy(data.EnemyId);
             if (enemy is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Enemy");
             }
 
             // An EnemySkill is a pure join row (no payload beyond its key), so a skill present on both
@@ -105,15 +105,15 @@ namespace Game.DataAccess.Repositories.Admin
                     SkillId = id,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
 
-        public bool SetSpawns(SetEnemySpawnsData data)
+        public AdminSaveResult SetSpawns(SetEnemySpawnsData data)
         {
             var enemy = _enemies.GetEnemy(data.EnemyId);
             if (enemy is null)
             {
-                return false;
+                return AdminSaveResult.NotFound("Enemy");
             }
 
             ChildCollectionReconciler.Reconcile(
@@ -139,7 +139,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Weight = s.Weight,
                 }));
 
-            return true;
+            return AdminSaveResult.Success;
         }
     }
 }

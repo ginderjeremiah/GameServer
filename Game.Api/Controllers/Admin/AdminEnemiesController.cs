@@ -25,33 +25,25 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public ApiResponse AddEditEnemies([FromBody] List<Change<Enemy>> changes)
         {
-            return _adminEnemies.SaveEnemies(changes)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SaveEnemies(changes);
         }
 
         [HttpPost]
         public ApiResponse SetEnemyAttributeDistributions([FromBody] SetEnemyAttributeDistributions distributionsData)
         {
-            return _adminEnemies.SetAttributeDistributions(distributionsData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetAttributeDistributions(distributionsData);
         }
 
         [HttpPost]
         public ApiResponse SetEnemySkills([FromBody] SetEnemySkillsData enemySkillsData)
         {
-            return _adminEnemies.SetSkills(enemySkillsData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetSkills(enemySkillsData);
         }
 
         [HttpPost]
         public ApiResponse SetEnemySpawns([FromBody] SetEnemySpawnsData spawnsData)
         {
-            return _adminEnemies.SetSpawns(spawnsData)
-                ? ApiResponse.Success()
-                : ApiResponse.Error("Enemy not found.");
+            return _adminEnemies.SetSpawns(spawnsData);
         }
     }
 }

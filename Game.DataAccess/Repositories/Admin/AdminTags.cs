@@ -12,7 +12,7 @@ namespace Game.DataAccess.Repositories.Admin
     {
         private readonly IEntityStore _entityStore = entityStore;
 
-        public void SaveTags(IReadOnlyList<Change<Contracts.Tag>> changes)
+        public AdminSaveResult SaveTags(IReadOnlyList<Change<Contracts.Tag>> changes)
         {
             ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Tag
@@ -31,6 +31,10 @@ namespace Game.DataAccess.Repositories.Admin
                     Id = item.Id,
                     Name = "",
                 }));
+
+            // Tags carry their own identity and have no owner to miss, so a tag write never rejects — it
+            // succeeds to share the unified result contract every admin write reports through.
+            return AdminSaveResult.Success;
         }
     }
 }

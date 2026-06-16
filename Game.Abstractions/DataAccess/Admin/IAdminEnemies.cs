@@ -12,16 +12,16 @@ namespace Game.Abstractions.DataAccess.Admin
     public interface IAdminEnemies
     {
         /// <summary>Applies an identity-level Add/Edit/Delete change set to the enemy catalogue.
-        /// Returns <c>false</c> (applying nothing) if an edit targets an enemy that does not exist.</summary>
-        bool SaveEnemies(IReadOnlyList<Change<Enemy>> changes);
+        /// Fails (applying nothing) if an edit targets an enemy that does not exist.</summary>
+        AdminSaveResult SaveEnemies(IReadOnlyList<Change<Enemy>> changes);
 
-        /// <summary>Replaces an enemy's attribute distributions. Returns <c>false</c> if the enemy does not exist.</summary>
-        bool SetAttributeDistributions(SetEnemyAttributeDistributions data);
+        /// <summary>Replaces an enemy's attribute distributions. Fails if the enemy does not exist.</summary>
+        AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data);
 
-        /// <summary>Replaces an enemy's skill pool. Returns <c>false</c> if the enemy does not exist.</summary>
-        bool SetSkills(SetEnemySkillsData data);
+        /// <summary>Replaces an enemy's skill pool. Fails if the enemy does not exist.</summary>
+        AdminSaveResult SetSkills(SetEnemySkillsData data);
 
-        /// <summary>Replaces an enemy's zone spawns. Returns <c>false</c> if the enemy does not exist.</summary>
-        bool SetSpawns(SetEnemySpawnsData data);
+        /// <summary>Replaces an enemy's zone spawns. Fails if the enemy does not exist.</summary>
+        AdminSaveResult SetSpawns(SetEnemySpawnsData data);
     }
 }
