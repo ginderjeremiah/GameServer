@@ -137,11 +137,15 @@ namespace Game.Api.Tests.Integration
                 }
             };
 
-            // The change set is rejected before anything is committed (the test host rethrows the
-            // action's exception), so the record is left untouched.
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken));
+            // The reference admin repo rejects a top-level delete by throwing, which the centralized
+            // exception handler converts into a consistent 500 envelope (with the generic message, since
+            // the test host is not the Development environment). Nothing is committed, so the record stays.
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
 
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Internal Server Error", result.ErrorMessage);
             Assert.Contains(GetEnemies(), e => e.Id == enemy.Id);
         }
 

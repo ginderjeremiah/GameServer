@@ -170,6 +170,9 @@ namespace Game.Api
             app.UseAuthentication();
             app.UseSessionLoader();
             app.UseRequestLogging();
+            // Runs inside request logging so an unhandled exception is converted to a 500 (with the
+            // consistent error envelope) before the request-ended event logs the response status.
+            app.UseExceptionHandling();
             app.UseLoginTracking();
             app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
             app.UseSocketInterceptor();
