@@ -5,7 +5,7 @@ namespace Game.Abstractions.DataAccess
     // Sessions are keyed by the user/account id (not PlayerState.PlayerId, which is a distinct value).
     public interface ISessionStore
     {
-        public Task<PlayerState?> GetSession(int userId);
+        public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default);
         public void Update(PlayerState sessionData, int userId);
         public void Clear(int userId);
     }

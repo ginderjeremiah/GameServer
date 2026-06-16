@@ -40,10 +40,10 @@ namespace Game.Api.Services
         /// <see cref="HasPlayerSession"/> false for the caller to rehydrate. Called by
         /// SessionLoaderMiddleware on every authenticated request.
         /// </summary>
-        public async Task LoadPlayerState(int userId)
+        public async Task LoadPlayerState(int userId, CancellationToken cancellationToken = default)
         {
             UserId = userId;
-            var sessionData = await _sessionStore.GetSession(userId);
+            var sessionData = await _sessionStore.GetSession(userId, cancellationToken);
             if (sessionData is not null)
             {
                 PlayerState = sessionData;

@@ -32,7 +32,8 @@ namespace Game.Api.Middleware
                         hints.UserAgent,
                         hints.SecChUa,
                         hints.SecChUaMobile,
-                        hints.SecChUaPlatform);
+                        hints.SecChUaPlatform,
+                        context.RequestAborted);
                 }
                 catch (Exception ex)
                 {

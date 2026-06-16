@@ -32,10 +32,10 @@ namespace Game.DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<PlayerState?> GetSession(int userId)
+        public async Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
         {
             var sessionKey = SessionKey(userId);
-            var session = await _cache.Get<PlayerState>(sessionKey);
+            var session = await _cache.Get<PlayerState>(sessionKey, cancellationToken);
             if (session is not null)
             {
                 // Sliding expiration: a read refreshes the idle TTL so an active session never ages out.

@@ -45,6 +45,20 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task LoadPlayerState_ForwardsCancellationTokenToStore()
+        {
+            // The token (HttpContext.RequestAborted) must reach the session store so a cancelled request
+            // unwinds the cache read cooperatively rather than running it to completion.
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+            using var cts = new CancellationTokenSource();
+
+            await session.LoadPlayerState(5, cts.Token);
+
+            Assert.Equal(cts.Token, store.LastGetSessionToken);
+        }
+
+        [Fact]
         public async Task RehydrateSession_EstablishesAndPersistsSession()
         {
             var store = new FakeSessionStore();
@@ -110,8 +124,14 @@ namespace Game.Api.Tests.Unit
         {
             public PlayerState? Session { get; set; }
             public List<(PlayerState State, int UserId)> Updates { get; } = [];
+            public CancellationToken LastGetSessionToken { get; private set; }
 
-            public Task<PlayerState?> GetSession(int userId) => Task.FromResult(Session);
+            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
+            {
+                LastGetSessionToken = cancellationToken;
+                return Task.FromResult(Session);
+            }
+
             public void Update(PlayerState sessionData, int userId) => Updates.Add((sessionData, userId));
             public void Clear(int userId) { }
         }
