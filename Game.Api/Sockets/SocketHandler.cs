@@ -105,9 +105,57 @@ namespace Game.Api.Sockets
             await Completion;
         }
 
+        /// <summary>
+        /// Executes a command from the client read loop. The client awaits this command's response by id, so
+        /// a genuine fault is surfaced to it as an <c>"Internal Server Error"</c> response it can react to.
+        /// </summary>
         public async Task ExecuteCommand(SocketCommandInfo commandInfo)
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
+            var (outcome, fault) = await RunCommandUnderLock(commandInfo);
+            if (outcome is SocketCommandOutcome.Faulted)
+            {
+                _logger.LogError(fault, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
+                await _context.SendData(new ApiSocketResponse
+                {
+                    Id = commandInfo.Id,
+                    Name = commandInfo.Name,
+                    Error = "Internal Server Error"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Executes a server-initiated (pub/sub) command and reports the outcome so the
+        /// <see cref="Services.SocketManagerService"/> processor can escalate a fault (dead-letter + a typed
+        /// client re-sync notice) rather than silently dropping it. Unlike <see cref="ExecuteCommand"/> it
+        /// does <b>not</b> send an <c>"Internal Server Error"</c> response on a fault: a server push carries no
+        /// awaiting client request, so the processor owns the surfacing instead.
+        /// </summary>
+        internal async Task<SocketCommandOutcome> ExecuteServerCommand(SocketCommandInfo commandInfo)
+        {
+            _logger.LogTrace("Executing server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
+            var (outcome, fault) = await RunCommandUnderLock(commandInfo);
+            if (outcome is SocketCommandOutcome.Faulted)
+            {
+                // Logged here (with the exception) so the failure is captured once; the processor logs only
+                // the escalation it then performs.
+                _logger.LogError(fault, "A server-initiated socket command failed: {CommandInfo} on socket: {Id}", commandInfo, Id);
+            }
+
+            return outcome;
+        }
+
+        /// <summary>
+        /// Runs a command under the per-socket command lock and per-command timeout, classifying the result
+        /// into a <see cref="SocketCommandOutcome"/> so the two callers can apply their own fault policy. It
+        /// owns the single send for the success and timeout paths (so an abandoned command's late response is
+        /// suppressed) but sends nothing on a fault — the caller decides how to surface that. A cancellation
+        /// that is not the per-command timeout is treated as a lifetime/teardown unwind, not a command defect
+        /// (#671).
+        /// </summary>
+        private async Task<(SocketCommandOutcome Outcome, Exception? Fault)> RunCommandUnderLock(SocketCommandInfo commandInfo)
+        {
             await _commandLock.WaitAsync();
 
             // Cancels at the budget, both signalling cancellation-aware commands to unwind cooperatively and
@@ -143,20 +191,26 @@ namespace Game.Api.Sockets
                     });
                     ReleaseCommandLockWhenSettled(commandTask, cts, commandInfo);
                     lockHandedOff = true;
-                    return;
+                    return (SocketCommandOutcome.TimedOut, null);
                 }
 
                 await _context.SendData(response);
+                return (SocketCommandOutcome.Succeeded, null);
+            }
+            catch (OperationCanceledException ex)
+            {
+                // A cancellation that is NOT the per-command timeout (handled above with the
+                // cts.IsCancellationRequested guard) is a lifetime/teardown cancellation, not a command
+                // defect: log it as a teardown rather than surfacing a misleading "Internal Server Error",
+                // and send no response since the socket is unwinding (#671).
+                _logger.LogDebug(ex, "Socket command cancelled during teardown: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                return (SocketCommandOutcome.TornDown, ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
-                await _context.SendData(new ApiSocketResponse
-                {
-                    Id = commandInfo.Id,
-                    Name = commandInfo.Name,
-                    Error = "Internal Server Error"
-                });
+                // A genuine command fault. The caller owns surfacing it (a client error response, or the
+                // server-push escalation), so no response is sent here.
+                return (SocketCommandOutcome.Faulted, ex);
             }
             finally
             {

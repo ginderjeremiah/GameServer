@@ -15,19 +15,13 @@ using Xunit;
 namespace Game.Api.Tests.Unit
 {
     /// <summary>
-    /// Verifies the server-initiated (pub/sub) command processor's drain contract (#656):
+    /// Verifies the server-initiated (pub/sub) command processor's drain-and-escalate contract (#656, #671):
     /// <see cref="SocketManagerService.GetSocketCommandProcessor"/> isolates a faulting command and keeps
-    /// draining the queue so a later command still runs, and never lets an exception escape its loop.
-    /// A <see cref="FakeWebSocket"/> and an in-memory queue stand in for the transport and the Redis
-    /// backplane, so these run as plain unit tests with hand-built dependencies — see <c>docs/backend.md</c>
-    /// → "Challenge-completion notifications (server push)".
-    ///
-    /// Note the actual failure handler is <see cref="SocketHandler.ExecuteCommand"/>, whose own catch absorbs
-    /// every command-execution fault (turning it into an "Internal Server Error" response — which goes nowhere
-    /// for a server push). The processor's own cancellation/fault catch is a backstop for the narrow residual
-    /// that escapes ExecuteCommand; since no lifetime token is plumbed into command execution today, asserting
-    /// that backstop's log levels through the full path would be testing currently-unreachable code, so these
-    /// tests assert the reachable contract — the queue keeps draining and the processor never throws.
+    /// draining the queue so a later command still runs, and a genuine fault is no longer silently dropped —
+    /// the poisoned payload is dead-lettered and the client is sent a <see cref="ServerCommandFailed"/> notice.
+    /// A <see cref="FakeWebSocket"/> and an in-memory queue stand in for the transport and the Redis backplane,
+    /// so these run as plain unit tests with hand-built dependencies — see <c>docs/backend.md</c> →
+    /// "Challenge-completion notifications (server push)".
     /// </summary>
     public sealed class SocketCommandProcessorTests : IDisposable
     {
@@ -44,10 +38,10 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public async Task Processor_CommandFaultThenValidCommand_QueueKeepsDrainingAndProcessorDoesNotThrow()
+        public async Task Processor_CommandFaultThenValidCommand_QueueKeepsDrainingAndEscalatesTheFault()
         {
             var commands = new CapturingCommandFactory(throwOn: name => name == "WillFault" ? new InvalidOperationException("boom") : null);
-            var processor = BuildProcessor(commands);
+            var (processor, pubSub) = BuildProcessor(commands);
 
             var queue = new FakeQueue(
                 new SocketCommandInfo("WillFault") { Id = "fault-1" },
@@ -56,19 +50,43 @@ namespace Game.Api.Tests.Unit
             // The processor must not propagate the fault out of its drain loop.
             await processor(queue);
 
-            // Both commands ran in order — the first command's fault did not abort the drain.
-            Assert.Equal(["fault-1", "ok-1"], commands.ExecutedCommandIds);
-            // The fault is logged (by ExecuteCommand's own handler) rather than silently dropped, while the
-            // following command still produces its own (successful) response.
+            // Both real commands ran in order — the fault did not abort the drain — and the failed push was
+            // surfaced to the client with a ServerCommandFailed notice dispatched between them.
+            Assert.Equal(["WillFault", "ServerCommandFailed", "WillSucceed"], commands.ExecutedCommandNames);
+            // The faulted payload is dead-lettered (not silently dropped) and logged, while the following
+            // command still produces its own (successful) response.
+            Assert.Contains(pubSub.DeadLetterQueue.Added, m => m.Contains("fault-1"));
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("fault-1"));
             Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("ok-1"));
+        }
+
+        [Fact]
+        public async Task Processor_ServerCommandFaults_DeadLettersPayloadAndNotifiesTheClient()
+        {
+            var commands = new CapturingCommandFactory(throwOn: name => name == "Poison" ? new InvalidOperationException("boom") : null);
+            var (processor, pubSub) = BuildProcessor(commands);
+
+            var queue = new FakeQueue(new SocketCommandInfo("Poison") { Id = "poison-1", Parameters = "bad" });
+
+            await processor(queue);
+
+            // The faulted payload is preserved on the dead-letter queue rather than silently dropped, carrying
+            // enough to inspect/replay it (its name and id).
+            var deadLettered = Assert.Single(pubSub.DeadLetterQueue.Added);
+            Assert.Contains("Poison", deadLettered);
+            Assert.Contains("poison-1", deadLettered);
+
+            // The client is told a server push failed via a ServerCommandFailed notice (surface-to-client),
+            // and the escalation is recorded at warning.
+            Assert.Contains("ServerCommandFailed", commands.ExecutedCommandNames);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Dead-lettered"));
         }
 
         [Fact]
         public async Task Processor_DequeueFaultThenValidCommand_QueueKeepsDrainingAndProcessorDoesNotThrow()
         {
             var commands = new CapturingCommandFactory(throwOn: _ => null);
-            var processor = BuildProcessor(commands);
+            var (processor, _) = BuildProcessor(commands);
 
             // The first dequeue faults (a malformed payload / Redis blip), which previously escaped the loop
             // outside the try and killed the drain — silently dropping every later push (#691). It must be
@@ -88,7 +106,7 @@ namespace Game.Api.Tests.Unit
         public async Task Processor_EmptyQueue_CompletesWithoutDispatchingOrThrowing()
         {
             var commands = new CapturingCommandFactory(throwOn: _ => null);
-            var processor = BuildProcessor(commands);
+            var (processor, _) = BuildProcessor(commands);
 
             await processor(new FakeQueue());
 
@@ -125,7 +143,7 @@ namespace Game.Api.Tests.Unit
             Assert.Contains("42", release.Key);
         }
 
-        private Func<IPubSubQueue, Task> BuildProcessor(CapturingCommandFactory commandFactory)
+        private (Func<IPubSubQueue, Task> Processor, CapturingPubSubService PubSub) BuildProcessor(CapturingCommandFactory commandFactory)
         {
             var capturingPubSub = new CapturingPubSubService();
             var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
@@ -141,8 +159,9 @@ namespace Game.Api.Tests.Unit
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
             manager.RegisterSocket(socket, session).GetAwaiter().GetResult();
 
-            return capturingPubSub.CapturedProcessor
+            var processor = capturingPubSub.CapturedProcessor
                 ?? throw new InvalidOperationException("Processor was not registered.");
+            return (processor, capturingPubSub);
         }
 
         public void Dispose()
@@ -157,10 +176,12 @@ namespace Game.Api.Tests.Unit
         private sealed class CapturingCommandFactory(Func<string, Exception?> throwOn) : SocketCommandFactory
         {
             public List<string> ExecutedCommandIds { get; } = [];
+            public List<string> ExecutedCommandNames { get; } = [];
 
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
             {
                 ExecutedCommandIds.Add(commandInfo.Id ?? "<null>");
+                ExecutedCommandNames.Add(commandInfo.Name);
                 return new StubCommand(commandInfo, throwOn(commandInfo.Name));
             }
         }
@@ -229,6 +250,9 @@ namespace Game.Api.Tests.Unit
         {
             public Func<IPubSubQueue, Task>? CapturedProcessor { get; private set; }
 
+            // The dead-letter queue the escalation writes a faulted server command to (the only GetQueue use).
+            public RecordingQueue DeadLetterQueue { get; } = new();
+
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
             {
                 CapturedProcessor = queue => action((queue, channel));
@@ -243,7 +267,29 @@ namespace Game.Api.Tests.Unit
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+            public IPubSubQueue GetQueue(string queueName) => DeadLetterQueue;
+        }
+
+        /// <summary>An in-memory queue that records the values written to it, so a test can assert a faulted
+        /// server command's payload was dead-lettered rather than dropped.</summary>
+        private sealed class RecordingQueue : IPubSubQueue
+        {
+            public List<string> Added { get; } = [];
+
+            public Task AddToQueueAsync(string value)
+            {
+                Added.Add(value);
+                return Task.CompletedTask;
+            }
+
+            public string? GetNext() => throw new NotSupportedException();
+            public T? GetNext<T>() => throw new NotSupportedException();
+            public Task<string?> GetNextAsync() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public void AddToQueue(string value) => throw new NotSupportedException();
+            public void AddToQueue<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
         }
 
         // RegisterSocket only claims the presence key via the atomic GetSet-with-expiry; everything else is unused here.
