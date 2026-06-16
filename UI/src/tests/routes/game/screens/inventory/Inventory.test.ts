@@ -22,6 +22,7 @@ vi.mock('$lib/engine', () => ({
 
 vi.mock('$stores', () => ({
 	staticData: { itemMods: [] },
+	anchorPosition: vi.fn(() => ({ x: 0, y: 0 })),
 	registerTooltipComponent: vi.fn(() => ({
 		setTooltipPosition: vi.fn(),
 		showTooltip: vi.fn(),
