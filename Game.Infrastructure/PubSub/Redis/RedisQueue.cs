@@ -12,6 +12,11 @@ namespace Game.Infrastructure.PubSub.Redis
 
         public string QueueName { get; }
 
+        // Side list holding items reserved for processing but not yet acknowledged. The key is shared (not
+        // per-instance) so any instance's startup reclaim recovers items a crashed run left in flight;
+        // re-processing a reclaimed item is safe because the write-behind handlers are idempotent.
+        private string ProcessingQueueName => $"{QueueName}:processing";
+
         public RedisQueue(IDatabase redis, string queueName, ILogger<RedisQueue> logger)
         {
             _redis = redis;
@@ -50,6 +55,49 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             var val = await GetNextAsync();
             return val.Deserialize<T>();
+        }
+
+        public async Task<string?> ReserveNextAsync()
+        {
+            // LMOVE head->tail: atomically pop this queue's head and park it on the processing list, so the item
+            // is never out of Redis between the read and a durable apply. Returns null when the queue is empty.
+            var value = await _redis.ListMoveAsync(QueueName, ProcessingQueueName, ListSide.Left, ListSide.Right);
+            if (value.HasValue)
+            {
+                _logger.LogTrace("Reserved value from RedisQueue: {QueueName}, value: {Value}", QueueName, value);
+            }
+
+            return value;
+        }
+
+        public Task AcknowledgeAsync(string value)
+        {
+            // Remove a single matching occurrence from the processing list (LREM count 1). A reserved item is
+            // unique in flight, and a no-op (count 0) is fine when another run already reclaimed it.
+            return _redis.ListRemoveAsync(ProcessingQueueName, value, 1);
+        }
+
+        public async Task<long> ReclaimProcessingAsync()
+        {
+            // Move each orphaned item from the processing list back onto this queue's head, tail-first, so their
+            // original head-to-tail order is preserved (the oldest ends up at the head, ahead of newer items).
+            long reclaimed = 0;
+            while ((await _redis.ListMoveAsync(ProcessingQueueName, QueueName, ListSide.Right, ListSide.Left)).HasValue)
+            {
+                reclaimed++;
+            }
+
+            if (reclaimed > 0)
+            {
+                _logger.LogTrace("Reclaimed {Count} orphaned value(s) into RedisQueue: {QueueName}", reclaimed, QueueName);
+            }
+
+            return reclaimed;
+        }
+
+        public Task<long> GetLengthAsync()
+        {
+            return _redis.ListLengthAsync(QueueName);
         }
 
         public void AddToQueue(string value)

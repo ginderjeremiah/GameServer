@@ -237,6 +237,10 @@ namespace Game.Api.Tests.Unit
             }
 
             public Task<string?> GetNextAsync() => throw new NotSupportedException();
+            public Task<string?> ReserveNextAsync() => throw new NotSupportedException();
+            public Task AcknowledgeAsync(string value) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
+            public Task<long> GetLengthAsync() => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
@@ -286,6 +290,10 @@ namespace Game.Api.Tests.Unit
             public T? GetNext<T>() => throw new NotSupportedException();
             public Task<string?> GetNextAsync() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public Task<string?> ReserveNextAsync() => throw new NotSupportedException();
+            public Task AcknowledgeAsync(string value) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
+            public Task<long> GetLengthAsync() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
