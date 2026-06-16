@@ -29,20 +29,31 @@ vi.mock('$stores', async () => {
 	};
 });
 
-const { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted } = vi.hoisted(() => {
-	const unlistenSocketReplaced = vi.fn();
-	const unlistenChallengeCompleted = vi.fn();
-	const listenCommand = vi.fn().mockImplementation((command: string) => {
-		if (command === 'SocketReplaced') {
-			return unlistenSocketReplaced;
-		}
-		if (command === 'ChallengeCompleted') {
-			return unlistenChallengeCompleted;
-		}
+const { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted, unlistenServerCommandFailed } =
+	vi.hoisted(() => {
+		const unlistenSocketReplaced = vi.fn();
+		const unlistenChallengeCompleted = vi.fn();
+		const unlistenServerCommandFailed = vi.fn();
+		const listenCommand = vi.fn().mockImplementation((command: string) => {
+			if (command === 'SocketReplaced') {
+				return unlistenSocketReplaced;
+			}
+			if (command === 'ChallengeCompleted') {
+				return unlistenChallengeCompleted;
+			}
+			if (command === 'ServerCommandFailed') {
+				return unlistenServerCommandFailed;
+			}
+		});
+		const disconnect = vi.fn();
+		return {
+			listenCommand,
+			disconnect,
+			unlistenSocketReplaced,
+			unlistenChallengeCompleted,
+			unlistenServerCommandFailed
+		};
 	});
-	const disconnect = vi.fn();
-	return { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted };
-});
 // Partial mock: keep $lib/api's real exports (other modules in the graph, e.g. $lib/common, rely on
 // them) but swap apiSocket for a stub whose listenCommand/disconnect we can assert against.
 vi.mock('$lib/api', async (importOriginal) => ({
@@ -90,6 +101,7 @@ import {
 	startGame,
 	handleSocketReplaced,
 	handleChallengeCompleted,
+	handleServerCommandFailed,
 	SESSION_REPLACED_TITLE,
 	SESSION_REPLACED_BODY,
 	logicEngine,
@@ -165,6 +177,7 @@ describe('startGame', () => {
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
 		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
 		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
+		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed);
 	});
 
 	it('does nothing when the static data is not loaded', () => {
@@ -186,12 +199,13 @@ describe('startGame', () => {
 		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
 	});
 
-	it('stopGame unregisters SocketReplaced and ChallengeCompleted listeners', () => {
+	it('stopGame unregisters SocketReplaced, ChallengeCompleted and ServerCommandFailed listeners', () => {
 		startGame();
 		void handleSocketReplaced();
 
 		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
+		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
 	});
 
 	it('stopGame disconnects the socket so the keepalive ping cannot reconnect after takeover', () => {
@@ -250,5 +264,23 @@ describe('handleChallengeCompleted', () => {
 
 		expect(playerChallengesStub.markCompleted).not.toHaveBeenCalled();
 		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
+	});
+});
+
+/** Builds a ServerCommandFailed notice naming the server-pushed command that failed. */
+const serverCommandFailedResponse = (commandName: string): IApiSocketResponse<'ServerCommandFailed'> =>
+	({ id: '', name: 'ServerCommandFailed', data: { commandName } }) as IApiSocketResponse<'ServerCommandFailed'>;
+
+describe('handleServerCommandFailed', () => {
+	it('force-reloads challenge progress when a ChallengeCompleted push was dead-lettered', () => {
+		handleServerCommandFailed(serverCommandFailedResponse('ChallengeCompleted'));
+
+		expect(playerChallengesStub.load).toHaveBeenCalledWith(true);
+	});
+
+	it('does not reload challenges for an unrelated failed command', () => {
+		handleServerCommandFailed(serverCommandFailedResponse('SocketReplaced'));
+
+		expect(playerChallengesStub.load).not.toHaveBeenCalled();
 	});
 });

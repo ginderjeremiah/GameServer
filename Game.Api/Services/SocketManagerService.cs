@@ -1,6 +1,7 @@
 ﻿using Game.Abstractions.Infrastructure;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
+using Game.Core;
 using System.Net.WebSockets;
 
 namespace Game.Api.Services
@@ -186,31 +187,49 @@ namespace Game.Api.Services
                         break;
                     }
 
-                    try
+                    _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
+
+                    // ExecuteServerCommand contains every fault and reports the outcome (it never throws), so a
+                    // genuine fault no longer silently drops the push: escalate it (dead-letter + client
+                    // re-sync notice) while the queue keeps draining. A teardown cancellation and a timeout are
+                    // not command defects and need no escalation.
+                    var outcome = await socket.ExecuteServerCommand(nextCommandInfo);
+                    if (outcome is SocketCommandOutcome.Faulted)
                     {
-                        _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
-                        await socket.ExecuteCommand(nextCommandInfo);
-                    }
-                    catch (OperationCanceledException ex)
-                    {
-                        // A cancellation reaching here is the socket tearing down (a lifetime cancel escaping
-                        // ExecuteCommand), not a command defect — log as informational and keep draining rather
-                        // than raising a misleading error for a normal cancel. This is a defensive backstop:
-                        // ExecuteCommand already absorbs both a command's own fault and its per-command timeout,
-                        // and no lifetime token is plumbed into it today, so in practice this branch is unhit.
-                        _logger.LogDebug(ex, "Socket command processing was cancelled: {CommandInfo}", nextCommandInfo);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Backstop for a genuine fault that escapes ExecuteCommand: log and keep draining the
-                        // queue. ExecuteCommand handles command faults itself (error response to the client), so
-                        // server-initiated (pub/sub) command failures have no client surfacing or dead-lettering
-                        // here today; escalation is tracked as follow-up. See docs/backend.md →
-                        // "Challenge-completion notifications (server push)".
-                        _logger.LogError(ex, "An error occurred while executing a socket command: {CommandInfo}", nextCommandInfo);
+                        await EscalateFailedServerCommand(socket, nextCommandInfo);
                     }
                 }
             };
+        }
+
+        /// <summary>
+        /// Escalates a persistently-failing server-initiated command: dead-letters the poisoned payload so it
+        /// is preserved for inspection/replay rather than silently dropped, then pushes a
+        /// <see cref="ServerCommandFailed"/> notice to the affected socket so the client re-syncs the
+        /// authoritative state the failed push would have updated instead of silently diverging (#671).
+        /// </summary>
+        private async Task EscalateFailedServerCommand(SocketHandler socket, SocketCommandInfo commandInfo)
+        {
+            try
+            {
+                var deadLetterQueue = _pubSub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE);
+                await deadLetterQueue.AddToQueueAsync(commandInfo.Serialize());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to dead-letter a faulted server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, socket.Id);
+            }
+
+            // The notice is itself a server command, so don't surface a failed notice with another notice —
+            // that would risk an escalation loop. The dead-letter above already preserves it.
+            if (commandInfo.Name != nameof(ServerCommandFailed))
+            {
+                // Dispatched directly (not re-queued over pub/sub) since the failing socket is right here;
+                // ExecuteServerCommand runs it under the same command lock and owns the send to the client.
+                await socket.ExecuteServerCommand(new ServerCommandFailedInfo(commandInfo.Name));
+            }
+
+            _logger.LogWarning("Dead-lettered a failing server-initiated command and notified the client: {CommandInfo} on socket: {Id}", commandInfo, socket.Id);
         }
 
         private async Task<string?> CurrentSocketId(int playerId)

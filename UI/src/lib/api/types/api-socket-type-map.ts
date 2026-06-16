@@ -24,6 +24,7 @@ import type {
 	IPlayerStatistic,
 	IReferenceDataVersion,
 	IRemoveModRequest,
+	IServerCommandFailedModel,
 	ISetItemFavoriteRequest,
 	ISkill,
 	IStatisticType,
@@ -52,6 +53,7 @@ export type ApiSocketResponseTypes = {
 	'NewEnemy': INewEnemyModel;
 	'RemoveMod': undefined;
 	'SaveLogPreferences': undefined;
+	'ServerCommandFailed': IServerCommandFailedModel;
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;

@@ -24,6 +24,7 @@ export const SESSION_REPLACED_BODY =
 
 let socketReplacedUnhook: Action | undefined;
 let challengeCompletedUnhook: Action | undefined;
+let serverCommandFailedUnhook: Action | undefined;
 
 export const startGame = () => {
 	if (staticData.loaded) {
@@ -39,6 +40,22 @@ export const startGame = () => {
 		startBattleEngine();
 		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
+		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed);
+	}
+};
+
+/**
+ * Reacts to a ServerCommandFailed notice: the server dead-lettered a server-pushed command that threw and
+ * is telling us to re-sync rather than silently diverge from the authoritative state. The only push that
+ * leaves divergent client state is ChallengeCompleted (its completion gates zone navigation), so a failed
+ * one force-reloads the authoritative challenge progress; any reward it carried still surfaces on the next
+ * natural load of the inventory/skills stores.
+ */
+export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCommandFailed'>) => {
+	const failedCommand = response.data?.commandName;
+	console.warn(`A server-pushed command failed on the server and was dead-lettered: ${failedCommand ?? 'unknown'}.`);
+	if (failedCommand === 'ChallengeCompleted') {
+		void playerChallenges.load(true);
 	}
 };
 
@@ -93,6 +110,7 @@ const stopGame = () => {
 	resetLogs();
 	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();
+	serverCommandFailedUnhook?.();
 	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
 	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
 	// just took over.
