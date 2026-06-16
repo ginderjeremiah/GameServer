@@ -66,7 +66,7 @@ import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityTint, tintColor } from '$lib/common';
 import RarityTag from '$components/RarityTag.svelte';
 import CategoryGlyph from './CategoryGlyph.svelte';
-import OverlayButton from './OverlayButton.svelte';
+import OverlayButton from '$components/OverlayButton.svelte';
 import { type EquipSlotDef } from './inventory-view.svelte';
 
 interface Props {

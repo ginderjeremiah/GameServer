@@ -39,7 +39,7 @@ const { label, draggable = false, onActivate, onDoubleClick, onDragStart, onDrag
 	border-radius: inherit;
 	background: transparent;
 	appearance: none;
-	// Inherit the card's cursor (grab on the grid, pointer on an equip slot).
+	// Inherit the card's cursor (grab on a drag-source card, pointer on a static one).
 	cursor: inherit;
 
 	// Drawn inset so the ring stays visible inside the card's `overflow: hidden` clip.

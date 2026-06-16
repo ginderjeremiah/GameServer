@@ -14,24 +14,28 @@
 	{#each slots as id, index (id ?? `empty-${index}`)}
 		{@const metrics = id != null ? view.metric(id) : undefined}
 		{#if id != null && metrics}
+			<!-- Accessible card: a presentational container whose primary action is a full-bleed
+			     OverlayButton (inspect the skill, or resolve a pending swap into this slot), with the
+			     remove button as a higher-z-index sibling and the drag handle on the overlay — native
+			     keyboard activation, no nested interactive elements. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="eqcard"
 				class:swap-target={swapping}
 				class:dragging={view.dragIndex === index}
 				class:dragover={dragOverIndex === index}
-				draggable={!swapping}
-				role="button"
-				tabindex="0"
-				aria-label={swapping
-					? `Replace slot ${index + 1} with ${swapName}`
-					: `${metrics.skill.name}, loadout slot ${index + 1}`}
-				onclick={() => swapping && view.swapInto(index)}
-				onkeydown={(e) => onCardKeydown(e, index, id)}
-				ondragstart={(e) => onDragStart(e, index)}
 				ondragover={(e) => onDragOver(e, index)}
 				ondrop={(e) => onDrop(e, index)}
-				ondragend={onDragEnd}
 			>
+				<OverlayButton
+					label={swapping
+						? `Replace slot ${index + 1} with ${swapName}`
+						: `${metrics.skill.name}, loadout slot ${index + 1}`}
+					draggable={!swapping}
+					onActivate={() => (swapping ? view.swapInto(index) : view.select(id))}
+					onDragStart={(e) => onDragStart(e, index)}
+					{onDragEnd}
+				/>
 				<span class="num">{index + 1}</span>
 				{#if swapping}
 					<span class="rep">↪ replace</span>
@@ -41,10 +45,10 @@
 						class="rm"
 						title="Remove from loadout"
 						aria-label="Remove {metrics.skill.name} from loadout"
-						onclick={(e) => remove(e, id)}>✕</button
+						onclick={() => view.toggle(id)}>✕</button
 					>
 				{/if}
-				<button type="button" class="en" onclick={(e) => pick(e, id)}>{metrics.skill.name}</button>
+				<span class="en">{metrics.skill.name}</span>
 				<div class="es">
 					<div class="stat"><span class="v accent">{fmt(view.effective(id))}</span><span class="k">dmg</span></div>
 					<div class="stat"><span class="v">{metrics.cooldown.toFixed(1)}s</span><span class="k">cd</span></div>
@@ -68,6 +72,7 @@
 <script lang="ts">
 import { formatNum } from '$lib/common';
 import AttributeChip from '$components/AttributeChip.svelte';
+import OverlayButton from '$components/OverlayButton.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -86,16 +91,6 @@ const slots = $derived(Array.from({ length: view.cap }, (_, i) => view.equipped[
 
 const fmt = (n: number) => formatNum(Math.round(n));
 
-const remove = (e: MouseEvent, id: number) => {
-	e.stopPropagation();
-	view.toggle(id);
-};
-
-const pick = (e: MouseEvent, id: number) => {
-	e.stopPropagation();
-	view.select(id);
-};
-
 /** Selecting an empty slot surfaces the first available skill to equip. */
 const focusAvailable = () => {
 	const first = view.availableRail[0];
@@ -104,24 +99,7 @@ const focusAvailable = () => {
 	}
 };
 
-/** Enter/Space resolves a pending swap into this slot, or inspects the skill otherwise. */
-const onCardKeydown = (e: KeyboardEvent, index: number, id: number) => {
-	if (e.key !== 'Enter' && e.key !== ' ') {
-		return;
-	}
-	e.preventDefault();
-	if (swapping) {
-		view.swapInto(index);
-	} else {
-		view.select(id);
-	}
-};
-
 const onDragStart = (e: DragEvent, index: number) => {
-	if (swapping) {
-		e.preventDefault();
-		return;
-	}
 	view.dragIndex = index;
 	if (e.dataTransfer) {
 		e.dataTransfer.effectAllowed = 'move';
@@ -210,10 +188,8 @@ const onDragEnd = () => {
 	background: color-mix(in srgb, var(--white) 3.5%, transparent);
 	text-align: left;
 	color: var(--text-primary);
-
-	&[draggable='true'] {
-		cursor: grab;
-	}
+	// Filled cards are drag sources; the full-bleed overlay inherits this grab cursor.
+	cursor: grab;
 
 	&.dragging {
 		opacity: 0.4;
@@ -275,6 +251,8 @@ const onDragEnd = () => {
 		position: absolute;
 		top: 5px;
 		right: 6px;
+		// Above the full-bleed overlay button so it stays clickable.
+		z-index: 2;
 		width: 16px;
 		height: 16px;
 		border: none;
@@ -293,15 +271,10 @@ const onDragEnd = () => {
 
 	.en {
 		margin-top: 9px;
-		padding: 0;
-		border: none;
-		background: transparent;
 		color: inherit;
 		font-size: 13.5px;
 		font-weight: 500;
 		line-height: 1.1;
-		text-align: left;
-		cursor: pointer;
 	}
 
 	.es {
@@ -313,6 +286,9 @@ const onDragEnd = () => {
 	.chips {
 		display: flex;
 		gap: 5px;
+		// Above the overlay so each chip keeps its own hover (the shared attribute tooltip).
+		position: relative;
+		z-index: 2;
 	}
 }
 
