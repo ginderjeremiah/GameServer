@@ -193,4 +193,55 @@ describe('createHook', () => {
 
 		expect(cb).not.toHaveBeenCalled();
 	});
+
+	it('subscriber added during dispatch is deferred to the next notify', () => {
+		const hook = createHook<[number]>();
+		const added = vi.fn();
+
+		// A subscriber that registers another subscriber while handling the event.
+		// The new subscriber must not receive the in-progress notification (it
+		// subscribed after the event fired) but must receive subsequent ones.
+		hook.onNotified((value) => {
+			if (value === 1) {
+				hook.onNotified(added);
+			}
+		});
+
+		hook.notify(1);
+		expect(added).not.toHaveBeenCalled();
+
+		hook.notify(2);
+		expect(added).toHaveBeenCalledTimes(1);
+		expect(added).toHaveBeenCalledWith(2, expect.any(Function));
+	});
+
+	it('compaction after a deferred add keeps the new subscriber and drops the tombstoned one', () => {
+		const hook = createHook<[number]>();
+		const cbA = vi.fn();
+		const cbB = vi.fn();
+		const cbC = vi.fn();
+
+		// One callback both tombstones itself and appends a new subscriber in the
+		// same dispatch — the post-dispatch compaction must splice the tombstone yet
+		// preserve the appended subscriber so it fires on the following notify.
+		hook.onNotified((value, unhook) => {
+			cbA(value);
+			if (value === 1) {
+				unhook();
+				hook.onNotified(cbC);
+			}
+		});
+		hook.onNotified(cbB);
+
+		hook.notify(1);
+		expect(cbA).toHaveBeenCalledTimes(1);
+		expect(cbB).toHaveBeenCalledTimes(1);
+		expect(cbC).not.toHaveBeenCalled();
+
+		hook.notify(2);
+		expect(cbA).toHaveBeenCalledTimes(1);
+		expect(cbB).toHaveBeenCalledTimes(2);
+		expect(cbC).toHaveBeenCalledTimes(1);
+		expect(cbC).toHaveBeenCalledWith(2, expect.any(Function));
+	});
 });
