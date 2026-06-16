@@ -42,7 +42,7 @@ namespace Game.Core.Tests.Battle
             new Dictionary<string, ParityScenario>
             {
                 // Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-                //   Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09
+                //   Player: MaxHealth=900, Def=42, CDR=1.09 → cdMult=1.09
                 //     charge/tick = 40*1.09 = 43.6, fires every 28 ticks (28*43.6=1220.8≥1200)
                 //     damage = 10 + 50*1.5 = 85, after def = 85-17 = 68
                 //   Enemy:  MaxHealth=400, Def=17, CDR=0; damage = 5-42 = 0 (clamped)
@@ -147,7 +147,7 @@ namespace Game.Core.Tests.Battle
                 // one source changes the kill count; the item's Agility and the prefix's Dexterity
                 // additionally feed CooldownRecovery, so the whole merge is exercised end to end.
                 //   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
-                //   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=10 → cdMult=1.10.
+                //   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=1.10 → cdMult=1.10.
                 //   Player skill: 10 + 45*1.5 = 77.5 raw, after enemy def 17 → 60.5, fires every 28 ticks
                 //     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
                 //   Enemy: MaxHealth=400, Def=17; attack 5-32 clamps to 0, so the player never dies.
@@ -196,8 +196,8 @@ namespace Game.Core.Tests.Battle
 
                 // A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after
                 // the first hit applies it — proving CDR buffs change fire ticks.
-                //   Player: Str=20, base CDR=0 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
-                //     Effect: Self +100 CooldownRecovery (additive) → cdMult=2 once applied, effectively permanent.
+                //   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
+                //     Effect: Self +1.0 CooldownRecovery (additive) → cdMult=2 once applied (base 1 + 1), effectively permanent.
                 //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 20−2 = 18.
                 //   Hit 1 fires at 400 (cdMult=1) and applies the buff; thereafter charge/tick = 80, so the
                 //   skill fires every 200ms: hits at 400,600,800,1000,1200,1400 → enemy dies on hit 6 at 1400.
@@ -208,7 +208,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0,
-                                effects: [MakeEffect(101, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 100, Permanent)]),
+                                effects: [MakeEffect(101, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 1.0, Permanent)]),
                         ]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 0,
@@ -267,7 +267,7 @@ namespace Game.Core.Tests.Battle
                 // Same-tick CDR ordering: slot 0's self CooldownRecovery buff (applied after it fires) speeds
                 // up slot 1's charge accrual ON THE SAME TICK, because each slot reads the cooldown multiplier
                 // live in loadout order — so an earlier slot's effect influences a later slot firing that tick.
-                //   Player: base CDR=0 (cdMult=1). slot0 = pure buffer (0 damage, cooldown 40, Self +100 CDR
+                //   Player: base CDR=1 (cdMult=1). slot0 = pure buffer (0 damage, cooldown 40, Self +1.0 CDR
                 //     permanent → cdMult=2 once applied); slot1 = baseDamage 27, cooldown 400, no multiplier.
                 //   Enemy:  Str=5 → MaxHealth=75, Def=2, no skills. Each slot1 hit deals 27−2 = 25.
                 //   The buff lifts slot1's accrual to 80/tick from the first tick, so slot1 fires every 200ms at
@@ -279,7 +279,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(104, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 100, Permanent)]),
+                                effects: [MakeEffect(104, ESkillEffectTarget.Self, EAttribute.CooldownRecovery, EModifierType.Additive, 1.0, Permanent)]),
                             MakeSkill(2, baseDamage: 27, cooldownMs: 400),
                         ]),
                     Enemy: () => MakeEnemy(
@@ -431,9 +431,9 @@ namespace Game.Core.Tests.Battle
 
         /// <summary>
         /// Demonstrates what happens if the player's derived stats are double-counted
-        /// (the bug the frontend used to have). CooldownRecovery doubles from 9→18,
-        /// cdMultiplier goes from 1.09→1.18, skills fire every 26 ticks instead of 28,
-        /// so the same matchup as the <c>cooldownRecovery</c> scenario ends sooner.
+        /// (the bug the frontend used to have). CooldownRecovery doubles from 1.09→2.18
+        /// (the base-1 multiplier counted twice), so skills fire every 14 ticks instead of 28,
+        /// ending the same matchup as the <c>cooldownRecovery</c> scenario much sooner.
         /// Kept separate from the matrix because it builds the player from already-final
         /// attribute values rather than raw allocations.
         /// </summary>
@@ -452,9 +452,9 @@ namespace Game.Core.Tests.Battle
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
-            // With doubled CDR (18 instead of 9), cdMult=1.18,
-            // charge/tick = 47.2, fires every 26 ticks → 6240ms
-            Assert.Equal(6240, result.TotalMs);
+            // With doubled CDR (2.18 instead of 1.09), cdMult=2.18,
+            // charge/tick = 87.2, fires every 14 ticks → 3360ms
+            Assert.Equal(3360, result.TotalMs);
             Assert.True(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
         }
 
@@ -476,7 +476,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(20, player.GetAttributeValue(EAttribute.Dexterity));
             Assert.Equal(675, player.GetAttributeValue(EAttribute.MaxHealth));
             Assert.Equal(32, player.GetAttributeValue(EAttribute.Defense));
-            Assert.Equal(10, player.GetAttributeValue(EAttribute.CooldownRecovery));
+            Assert.Equal(1.10, player.GetAttributeValue(EAttribute.CooldownRecovery), 10);
             Assert.Equal(1.10, player.GetCooldownMultiplier(), 10);
         }
 
@@ -628,7 +628,7 @@ namespace Game.Core.Tests.Battle
             // First, compute the correct final values (as the API would send them).
             double maxHealth = 50 + 20 * endurance + 5 * strength;
             double defense = 2 + endurance + 0.5 * agility;
-            double cooldownRecovery = 0.4 * agility + 0.1 * dexterity;
+            double cooldownRecovery = 1 + 0.004 * agility + 0.001 * dexterity;
 
             // These allocations include both raw stats AND derived values,
             // mimicking what PlayerData.FromPlayer sends to the frontend.

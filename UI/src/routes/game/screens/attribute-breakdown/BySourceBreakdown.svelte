@@ -9,7 +9,7 @@
 				<span class="swatch" style:background={sourceColor(group.source)}></span>
 				<span class="src-name">{sourceLabel(group.source)}</span>
 				<span class="rule"></span>
-				<span class="src-total">{fmtSigned(group.total, 1)}</span>
+				<span class="src-total">{fmtSigned(group.total, 1, pct)}</span>
 			</div>
 			{#each group.lines as line, i (i)}
 				<div class="line">
@@ -25,7 +25,7 @@
 							{modifierLabel(line)}
 						{/if}
 					</span>
-					<span class="line-amount" class:negative={line.applied < 0}>{fmtSigned(line.applied)}</span>
+					<span class="line-amount" class:negative={line.applied < 0}>{fmtSigned(line.applied, undefined, pct)}</span>
 				</div>
 			{/each}
 		</div>
@@ -41,9 +41,11 @@ import { fmtNum, fmtSigned, modifierLabel, type LabeledModifier } from './attrib
 
 interface Props {
 	groups: SourceGroup<LabeledModifier>[];
+	/** Whether the selected attribute renders as a percentage (scaled ×100 with a `%` suffix). */
+	pct: boolean;
 }
 
-let { groups }: Props = $props();
+let { groups, pct }: Props = $props();
 </script>
 
 <style lang="scss">

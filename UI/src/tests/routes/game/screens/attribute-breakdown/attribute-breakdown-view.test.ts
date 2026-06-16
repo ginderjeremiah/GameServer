@@ -58,7 +58,7 @@ const refAttributes: IAttribute[] = [
 	makeAttribute(EAttribute.CooldownRecovery, 'Cooldown Recovery', {
 		attributeType: EAttributeType.Secondary,
 		displayOrder: 8,
-		decimals: 2,
+		decimals: 0,
 		isPercentage: true
 	}),
 	makeAttribute(EAttribute.DamageTakenPerSecond, 'Damage Taken Per Second', {
@@ -203,8 +203,10 @@ describe('AttributeBreakdownView', () => {
 			EAttribute.Defense,
 			EAttribute.CooldownRecovery
 		]);
-		// CooldownRecovery carries its reference-data precision (2 decimals).
-		expect(secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta.dec).toBe(2);
+		// CooldownRecovery carries its reference-data precision (0 decimals) and percentage flag.
+		const cdrMeta = secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta;
+		expect(cdrMeta?.dec).toBe(0);
+		expect(cdrMeta?.pct).toBe(true);
 	});
 
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
@@ -261,6 +263,13 @@ describe('formatting + labels', () => {
 		expect(fmtSigned(12)).toBe('+12');
 		expect(fmtSigned(-3)).toBe('−3');
 		expect(fmtSigned(0.5)).toBe('+0.5'); // small fractional shown to 1 dp
+	});
+
+	it('renders a percentage attribute scaled ×100 with a % suffix', () => {
+		// CooldownRecovery stores a decimal fraction (1.09) and renders as a percentage (109%).
+		expect(fmtNum(1.09, 0, true)).toBe('109%');
+		expect(fmtSigned(1.0, undefined, true)).toBe('+100%'); // the base contribution
+		expect(fmtSigned(0.08, undefined, true)).toBe('+8%'); // Agility's +0.004·20 share
 	});
 
 	it('falls back to a normalised enum name when reference data is absent', () => {

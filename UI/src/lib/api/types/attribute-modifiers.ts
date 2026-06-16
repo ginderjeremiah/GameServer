@@ -4,8 +4,9 @@
 import { EAttribute, EAttributeModifierSource, EModifierType } from './enums.ts';
 
 export const STATIC_ATTRIBUTE_MODIFIERS = [
-	{ attribute: EAttribute.CooldownRecovery, amount: 0.4, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
-	{ attribute: EAttribute.CooldownRecovery, amount: 0.1, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Dexterity },
+	{ attribute: EAttribute.CooldownRecovery, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
+	{ attribute: EAttribute.CooldownRecovery, amount: 0.004, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
+	{ attribute: EAttribute.CooldownRecovery, amount: 0.001, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Dexterity },
 	{ attribute: EAttribute.Defense, amount: 2, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.Defense, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
 	{ attribute: EAttribute.Defense, amount: 0.5, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },

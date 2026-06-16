@@ -16,7 +16,7 @@
 		</span>
 		<StackBar {computed} height={6} radius={1} />
 	</span>
-	<span class="total">{fmtNum(computed.total, meta.dec)}</span>
+	<span class="total">{fmtNum(computed.total, meta.dec, meta.pct)}</span>
 </button>
 
 <script lang="ts">

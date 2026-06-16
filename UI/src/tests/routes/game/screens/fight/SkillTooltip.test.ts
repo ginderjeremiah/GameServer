@@ -21,7 +21,15 @@ let owner: Battler;
 let opponent: Battler;
 
 beforeEach(() => {
-	owner = makeBattler({ name: 'Aelara', attributes: [{ attributeId: EAttribute.Strength, amount: 20 }] });
+	// These raw fixtures skip the derived pass, so CooldownRecovery is supplied explicitly: 1 is the
+	// base-1 multiplier every real battler carries (cdMultiplier reads the attribute directly now).
+	owner = makeBattler({
+		name: 'Aelara',
+		attributes: [
+			{ attributeId: EAttribute.Strength, amount: 20 },
+			{ attributeId: EAttribute.CooldownRecovery, amount: 1 }
+		]
+	});
 	opponent = makeBattler({ name: 'Dire Wolf', attributes: [{ attributeId: EAttribute.Defense, amount: 5 }] });
 	mockBattleEngine.getOpponent.mockReturnValue(opponent);
 	staticData.attributes = [];
@@ -88,12 +96,12 @@ describe('SkillTooltip', () => {
 	});
 
 	it('derives cooldown and DPS, shortening the cooldown for a faster battler', () => {
-		// cdMultiplier is a live read of CooldownRecovery: 1 + 100/100 = 2 (fixtures skip the
-		// derived pass, so CooldownRecovery is taken verbatim from the supplied attributes).
+		// cdMultiplier is the CooldownRecovery attribute read directly — a base-1 multiplier, so 2 = double
+		// speed (fixtures skip the derived pass, so CooldownRecovery is taken verbatim from the supplied attributes).
 		const fast = makeBattler({
 			attributes: [
 				{ attributeId: EAttribute.Strength, amount: 20 },
-				{ attributeId: EAttribute.CooldownRecovery, amount: 100 }
+				{ attributeId: EAttribute.CooldownRecovery, amount: 2 }
 			]
 		});
 		const skill = makeSkill(fast, {

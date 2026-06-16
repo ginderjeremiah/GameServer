@@ -1,5 +1,5 @@
 import { EAttribute, EAttributeType, type IAttribute } from '$lib/api';
-import { normalizeText } from './functions';
+import { formatNum, normalizeText } from './functions';
 
 /*
  * Frontend display helpers for attributes. The accent hues are declared as `--attr-*` custom
@@ -86,3 +86,26 @@ export const attributeIsHarmful = (id: EAttribute, attributes?: IAttribute[]): b
  *  out-of-range type (e.g. reference data not yet loaded) degrades to an empty label. */
 export const attributeTypeName = (type: EAttributeType | undefined): string =>
 	type != null ? (EAttributeType[type] ?? '') : '';
+
+/** Renders an attribute value in its display form, honoring the reference set's `isPercentage`/
+ *  `decimals`. A percentage attribute stores a decimal fraction (e.g. CooldownRecovery `1.09`) and
+ *  renders scaled ×100 with a `%` suffix to its `decimals` precision (`109%`); other attributes render
+ *  the plain number. The reference set is passed in (not read from `$stores`), mirroring the other
+ *  param-based `$lib/common` helpers. */
+export const formatAttributeValue = (value: number, id: EAttribute, attributes?: IAttribute[]): string => {
+	const attribute = attributes?.find((a) => a.id === id);
+	if (attribute?.isPercentage) {
+		return `${(value * 100).toFixed(attribute.decimals)}%`;
+	}
+	return formatNum(value);
+};
+
+/** Renders a signed attribute delta (e.g. a per-point yield or a build-to-build change), honoring the
+ *  reference set's `isPercentage` the same way as {@link formatAttributeValue}. Uses adaptive precision
+ *  (trailing zeroes dropped) rather than the attribute's `decimals` so a small percentage contribution
+ *  — e.g. CooldownRecovery's `+0.004` per Agility point → `+0.4%` — is not rounded away. */
+export const formatAttributeDelta = (value: number, id: EAttribute, attributes?: IAttribute[]): string => {
+	const isPercentage = attributes?.find((a) => a.id === id)?.isPercentage ?? false;
+	const scaled = isPercentage ? value * 100 : value;
+	return `${scaled < 0 ? '−' : '+'}${formatNum(Math.abs(scaled))}${isPercentage ? '%' : ''}`;
+};

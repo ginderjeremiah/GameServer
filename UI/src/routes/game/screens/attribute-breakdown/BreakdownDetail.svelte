@@ -13,7 +13,7 @@
 				<p class="desc">{description}</p>
 			{/if}
 		</div>
-		<div class="value">{fmtNum(computed.total, view.selectedMeta.dec)}</div>
+		<div class="value">{fmtNum(computed.total, view.selectedMeta.dec, view.selectedMeta.pct)}</div>
 	</div>
 
 	<div class="bar"><StackBar {computed} height={18} /></div>
@@ -25,8 +25,8 @@
 		</p>
 	{:else}
 		<div class="columns">
-			<BySourceBreakdown {groups} />
-			<ApplyOrderTrace {computed} dec={view.selectedMeta.dec} />
+			<BySourceBreakdown {groups} pct={view.selectedMeta.pct} />
+			<ApplyOrderTrace {computed} dec={view.selectedMeta.dec} pct={view.selectedMeta.pct} />
 		</div>
 	{/if}
 </div>

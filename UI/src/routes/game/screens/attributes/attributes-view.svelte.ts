@@ -32,7 +32,10 @@ export type AttributeMode = 'guided' | 'theory';
 const MODE_STORAGE_KEY = 'ttf.attr.mode';
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
-const round2 = (n: number): number => Math.round(n * 100) / 100;
+/** Rounds a per-point yield to clean floating-point noise while preserving the small increments a
+ *  base-1 multiplier attribute contributes (e.g. CooldownRecovery's +0.004 per Agility point), which a
+ *  coarser 2-decimal round would collapse to zero and drop from the surfaced yields. */
+const roundYield = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 /** The six core attributes that accept stat-point allocation (EAttribute 0..5), in display order.
  *  This is the **allocation domain** (the frontend mirror of the backend `Attribute.CoreAttributes`
@@ -57,17 +60,16 @@ export const DERIVED_GROUPS: DerivedGroup[] = ['Survivability', 'Offense', 'Util
 export interface DerivedStatDef {
 	id: EAttribute;
 	group: DerivedGroup;
-	/** Optional unit suffix appended after the value (e.g. `%`). */
-	unit: string;
 }
 
 /** Derived stats the game actually computes today (see `BattleAttributes`). Kept
  *  deliberately minimal — adding a real formula there plus an entry here is all
- *  it takes to surface a new stat, and the panel scales by scrolling. */
+ *  it takes to surface a new stat, and the panel scales by scrolling. Value formatting
+ *  (including the `%` for percentage attributes) comes from the shared `formatAttributeValue`. */
 export const DERIVED_STATS: DerivedStatDef[] = [
-	{ id: EAttribute.MaxHealth, group: 'Survivability', unit: '' },
-	{ id: EAttribute.Defense, group: 'Survivability', unit: '' },
-	{ id: EAttribute.CooldownRecovery, group: 'Utility', unit: '' }
+	{ id: EAttribute.MaxHealth, group: 'Survivability' },
+	{ id: EAttribute.Defense, group: 'Survivability' },
+	{ id: EAttribute.CooldownRecovery, group: 'Utility' }
 ];
 
 /** Marginal yield of a single point in a core attribute on one derived stat. */
@@ -100,7 +102,7 @@ export function perPointYields(coreIndex: number, coreValues: number[]): PerPoin
 	const after = deriveStats(bumped);
 	const yields: PerPointYield[] = [];
 	for (const def of DERIVED_STATS) {
-		const delta = round2(after[def.id] - before[def.id]);
+		const delta = roundYield(after[def.id] - before[def.id]);
 		if (delta !== 0) {
 			yields.push({ id: def.id, delta });
 		}
@@ -151,11 +153,6 @@ const DERIVED_SHORT: Partial<Record<EAttribute, string>> = {
 
 export function derivedShortLabel(id: EAttribute): string {
 	return DERIVED_SHORT[id] ?? attributeName(id, staticData.attributes);
-}
-
-/** The unit suffix configured for a surfaced derived stat (empty if none). */
-export function derivedUnit(id: EAttribute): string {
-	return DERIVED_STATS.find((d) => d.id === id)?.unit ?? '';
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────

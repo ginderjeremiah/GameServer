@@ -14,7 +14,7 @@
 			{:else}
 				{#each yields as y (y.id)}
 					<span class="yield">
-						<span class="amt" style="color: {color}">+{formatNum(y.delta)}{derivedUnit(y.id)}</span>
+						<span class="amt" style="color: {color}">{formatAttributeDelta(y.delta, y.id, staticData.attributes)}</span>
 						{derivedShortLabel(y.id)}
 					</span>
 				{/each}
@@ -41,19 +41,13 @@
 </div>
 
 <script lang="ts">
-import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
+import { formatAttributeDelta, attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { attributeHover } from '$components/tooltip/attribute-hover';
 import Stepper from './Stepper.svelte';
-import {
-	CORE_ATTRIBUTES,
-	derivedShortLabel,
-	derivedUnit,
-	perPointYields,
-	type AttributesView
-} from './attributes-view.svelte';
+import { CORE_ATTRIBUTES, derivedShortLabel, perPointYields, type AttributesView } from './attributes-view.svelte';
 
 interface Props {
 	i: number;
