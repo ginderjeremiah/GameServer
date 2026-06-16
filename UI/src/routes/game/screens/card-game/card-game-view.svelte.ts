@@ -49,6 +49,21 @@ export class CardGameView {
 		return this.boardWidth * NOW_FRACTION;
 	}
 
+	/* ── tick ↔ pixel projection ───────────────────────────────────────────
+	   The single source for the scrolling timeline's tick→pixel mapping; the
+	   Board, the placement preview, and the pointer math all project through
+	   this pair so the board and preview can never desync. */
+
+	/** Board-local x (px) of a timeline `tick` at the current scroll position. */
+	tickToX(tick: number): number {
+		return this.nowX + (tick - this.game.playTick) * PX_PER_TICK;
+	}
+
+	/** Inverse of {@link tickToX}: the (fractional) tick at a board-local x. */
+	xToTick(boardX: number): number {
+		return (boardX - this.nowX) / PX_PER_TICK + this.game.playTick;
+	}
+
 	/** Where a card would land if cast right now — an active drag aim, else the
 	 *  hover hint at the lane tail. Null when nothing is hovered/dragged. */
 	get preview(): PlacementPreview | null {
@@ -57,7 +72,7 @@ export class CardGameView {
 		}
 		const d = this.drag;
 		if (d?.started) {
-			const desired = Math.round((d.pointerX - this.boardLeft - this.nowX) / PX_PER_TICK + this.game.playTick);
+			const desired = this.tickAtClientX(d.pointerX);
 			const p = this.game.aimPlacement(d.key, desired);
 			return { key: d.key, kind: p.kind, start: p.start, dur: p.dur, hint: false };
 		}
@@ -110,9 +125,10 @@ export class CardGameView {
 		this.hoverKey = null;
 	}
 
-	/** Convert a client x-coordinate to a board tick (for the aimed cast). */
+	/** Convert a client x-coordinate to a board tick (for the aimed cast),
+	 *  snapped to the nearest tick. */
 	tickAtClientX(clientX: number): number {
-		return Math.round((clientX - this.boardLeft - this.nowX) / PX_PER_TICK + this.game.playTick);
+		return Math.round(this.xToTick(clientX - this.boardLeft));
 	}
 
 	/* ── hover hint ────────────────────────────────────────────────────── */

@@ -118,18 +118,18 @@ const hasTip = $derived(
 
 .ent.attack {
 	top: 118px;
-	border-color: color-mix(in srgb, var(--log-enemy) 88%, transparent);
+	border-color: color-mix(in srgb, var(--log-player) 88%, transparent);
 	background: linear-gradient(
 		180deg,
-		color-mix(in srgb, var(--log-enemy) 46%, var(--surface)),
-		color-mix(in srgb, var(--log-enemy) 30%, var(--surface))
+		color-mix(in srgb, var(--log-player) 46%, var(--surface)),
+		color-mix(in srgb, var(--log-player) 30%, var(--surface))
 	);
-	color: color-mix(in srgb, var(--log-enemy) 12%, var(--white));
+	color: color-mix(in srgb, var(--log-player) 12%, var(--white));
 	box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 45%, transparent);
 
 	.tip {
-		background: color-mix(in srgb, var(--log-enemy) 60%, var(--white));
-		box-shadow: 0 0 8px color-mix(in srgb, var(--log-enemy) 70%, transparent);
+		background: color-mix(in srgb, var(--log-player) 60%, var(--white));
+		box-shadow: 0 0 8px color-mix(in srgb, var(--log-player) 70%, transparent);
 	}
 }
 

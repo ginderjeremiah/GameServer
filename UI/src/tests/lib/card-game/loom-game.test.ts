@@ -119,6 +119,63 @@ describe('LoomGame — resolution', () => {
 	});
 });
 
+describe('LoomGame — resolution flashes', () => {
+	/* The engine emits presentation-free semantic flash kinds; the Board maps
+	   each to a board position + themeable colour. These pin the kind each
+	   resolution path emits. */
+	const kinds = (game: LoomGame) => game.flashes.map((f) => f.kind);
+
+	it('emits an "enemyHit" flash when an enemy strike lands unblocked', () => {
+		const game = new LoomGame(zeroRng);
+		advanceTo(game, 10); // first enemy strike resolves unblocked at tick 9
+		expect(kinds(game)).toContain('enemyHit');
+	});
+
+	it('emits a "block" flash (and no others on that hit) when a strike is blocked', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'guard' }];
+		game.castSlot(0, 7); // [7,14) covers the enemy resolve at 9
+		advanceTo(game, 10);
+		expect(kinds(game)).toContain('block');
+		expect(kinds(game)).not.toContain('enemyHit');
+	});
+
+	it('emits "crit" and "strike" flashes when a strike doubles on a crit tick', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'slash' }];
+		game.castSlot(0, 8); // [8,11], resolves on the crit mark at tick 11
+		advanceTo(game, 12);
+		expect(kinds(game)).toEqual(expect.arrayContaining(['crit', 'strike']));
+	});
+
+	it('emits a "guarded" flash when a strike resolves inside the boss guard', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'slash' }];
+		game.castSlot(0, 14); // [14,17], resolves at 17 inside enemy guard [16,20)
+		advanceTo(game, 18);
+		expect(kinds(game)).toEqual(expect.arrayContaining(['guarded', 'strike']));
+	});
+
+	it('emits a "channel" flash when a player Channel resolves', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'channel' }];
+		game.castSlot(0); // quick-cast [0,9]; resolves at 9 before any enemy hit can interrupt it
+		advanceTo(game, 10);
+		expect(kinds(game)).toContain('channel');
+		expect(game.enemyHP).toBe(74); // 120 - 46
+	});
+
+	it('emits an "interrupt" flash and cancels the Channel when an unblocked hit lands mid-wind-up', () => {
+		const game = new LoomGame(zeroRng);
+		game.hand = [{ id: 1, key: 'channel' }];
+		game.castSlot(0, 3); // [3,12], still winding up when the enemy strike resolves at 9
+		advanceTo(game, 10);
+		expect(kinds(game)).toContain('interrupt');
+		const channel = game.ents.find((e) => e.type === 'channel');
+		expect(channel?.cancelled).toBe(true);
+	});
+});
+
 describe('LoomGame — deck economy', () => {
 	it('draws over time to refill the hand toward the cap', () => {
 		const game = new LoomGame(zeroRng); // hand 4, deck 10, drawInterval 1.95s
