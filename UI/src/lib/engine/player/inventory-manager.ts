@@ -43,9 +43,10 @@ export class InventoryManager {
 	public equippedSlots: (Item | undefined)[] = new Array(6).fill(undefined);
 
 	/**
-	 * Reactive published view of `unlockedItems`. The manager is the single owner of the item
-	 * objects and the only place they are mutated; this snapshot is republished (`publish`) on every
-	 * change so reactive consumers (the inventory screen) re-derive without keeping their own copies.
+	 * Reactive published view of `unlockedItems`. The manager is the single owner of the item objects
+	 * and the only place they are mutated. `statify` makes each item's fields (and this array) reactive
+	 * in place, so the array is rebuilt (`publish`) only when the item *set* changes; in-place field
+	 * edits (equip, favorite, mods) propagate to consumers on their own without a rebuild.
 	 */
 	public items: Item[] = [];
 
@@ -116,7 +117,6 @@ export class InventoryManager {
 				...affected.map((it) => snapshotFields(it, 'equipped', 'equipmentSlotId'))
 			);
 			this.applyEquip(item, slotId);
-			this.publish();
 
 			const response = await apiSocket.sendSocketCommand('EquipItem', {
 				itemId,
@@ -124,7 +124,6 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
-				this.publish();
 				return false;
 			}
 
@@ -148,7 +147,6 @@ export class InventoryManager {
 			const slots = [...this.equippedSlots];
 			slots[slotId] = undefined;
 			this.equippedSlots = slots;
-			this.publish();
 
 			const response = await apiSocket.sendSocketCommand('UnequipItem', {
 				itemId: item.itemId,
@@ -156,7 +154,6 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
-				this.publish();
 				return false;
 			}
 
@@ -176,7 +173,6 @@ export class InventoryManager {
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = [...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId), mod];
 			this.refreshItemAttributes(item);
-			this.publish();
 
 			const response = await apiSocket.sendSocketCommand('ApplyMod', {
 				itemId,
@@ -185,7 +181,6 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
-				this.publish();
 				return false;
 			}
 
@@ -204,7 +199,6 @@ export class InventoryManager {
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
 			this.refreshItemAttributes(item);
-			this.publish();
 
 			const response = await apiSocket.sendSocketCommand('RemoveMod', {
 				itemId,
@@ -212,7 +206,6 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
-				this.publish();
 				return false;
 			}
 
@@ -234,7 +227,6 @@ export class InventoryManager {
 		}
 
 		item.favorite = favorite;
-		this.publish();
 		const response = await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
 		if (response.error) {
 			logMessage(ELogType.Debug, 'There was an error setting the item favorite: ' + response.error);
@@ -322,7 +314,11 @@ export class InventoryManager {
 		item.totalAttributes = new BattleAttributes(allAttributes, false);
 	}
 
-	/** Republishes the reactive item snapshot so consumers re-derive after a mutation. */
+	/**
+	 * Rebuilds the published `items` array from `unlockedItems`. Only needed when the item *set* changes
+	 * (initialize, addUnlockedItem): `statify` keeps in-place field edits reactive on their own, so pure
+	 * field mutations (equip, favorite, mods) propagate without a rebuild.
+	 */
 	private publish() {
 		this.items = [...this.unlockedItems.values()];
 	}
