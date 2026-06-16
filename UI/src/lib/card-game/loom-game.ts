@@ -57,13 +57,16 @@ export interface CritMark {
 	used: boolean;
 }
 
+/** Semantic kind of a resolution flash. The Board maps each to a board
+ *  position and themeable colour, so the engine stays free of pixels and CSS. */
+export type FlashKind = 'block' | 'enemyHit' | 'interrupt' | 'crit' | 'guarded' | 'strike' | 'channel';
+
 export interface FlashFx {
 	id: number;
-	/** Vertical position within the board (px); flashes always sit on the NOW line. */
-	y: number;
+	/** What resolved; the Board resolves this to a board y-position and colour. */
+	kind: FlashKind;
+	/** Display text for the flash (a damage number or an outcome label). */
 	text: string;
-	/** Themeable CSS colour token. */
-	color: string;
 	/** Remaining lifetime in seconds. */
 	ttl: number;
 }
@@ -76,24 +79,6 @@ export interface HandCard {
 }
 
 export type Outcome = 'win' | 'lose' | null;
-
-/** Lane-relative board y-positions (px) where resolution flashes appear. */
-const FLASH_Y = {
-	topImpact: 36,
-	crit: 116,
-	guarded: 92,
-	bottomImpact: 160
-} as const;
-
-const FLASH_COLOR = {
-	block: 'var(--health-remaining-color)',
-	enemyHit: 'var(--enemy-accent)',
-	interrupt: 'var(--rarity-epic)',
-	crit: 'var(--gold)',
-	guarded: 'var(--log-enemy)',
-	strike: 'var(--log-enemy)',
-	channel: 'var(--rarity-epic)'
-} as const;
 
 export class LoomGame {
 	/* ── timeline ──────────────────────────────────────────────────────── */
@@ -408,17 +393,17 @@ export class LoomGame {
 	private resolveEnemyHit(e: Entity, resolve: number): void {
 		e.resolved = true;
 		if (spanActiveAt(this.blockLane, resolve)) {
-			this.flash(FLASH_Y.topImpact, 'BLOCK', FLASH_COLOR.block);
+			this.flash('block', 'BLOCK');
 			return;
 		}
 		this.playerHP = Math.max(0, this.playerHP - (e.dmg ?? 0));
-		this.flash(FLASH_Y.topImpact, `-${e.dmg}`, FLASH_COLOR.enemyHit);
+		this.flash('enemyHit', `-${e.dmg}`);
 		// An unblocked hit interrupts a player Channel mid-wind-up.
 		for (const ch of this.ents) {
 			if (ch.type === 'channel' && !ch.resolved && resolve >= ch.start && resolve < ch.end) {
 				ch.resolved = true;
 				ch.cancelled = true;
-				this.flash(FLASH_Y.bottomImpact, 'interrupted', FLASH_COLOR.interrupt);
+				this.flash('interrupt', 'interrupted');
 			}
 		}
 	}
@@ -431,17 +416,13 @@ export class LoomGame {
 			if (mark) {
 				mark.used = true;
 			}
-			this.flash(FLASH_Y.crit, 'CRIT ×2', FLASH_COLOR.crit);
+			this.flash('crit', 'CRIT ×2');
 		}
 		if (outcome.guarded) {
-			this.flash(FLASH_Y.guarded, 'GUARDED', FLASH_COLOR.guarded);
+			this.flash('guarded', 'GUARDED');
 		}
 		this.enemyHP = Math.max(0, this.enemyHP - outcome.dmg);
-		this.flash(
-			FLASH_Y.bottomImpact,
-			`-${outcome.dmg}`,
-			e.type === 'channel' ? FLASH_COLOR.channel : FLASH_COLOR.strike
-		);
+		this.flash(e.type === 'channel' ? 'channel' : 'strike', `-${outcome.dmg}`);
 	}
 
 	/* ── reflex ────────────────────────────────────────────────────────── */
@@ -455,8 +436,8 @@ export class LoomGame {
 	}
 
 	/* ── housekeeping ──────────────────────────────────────────────────── */
-	private flash(y: number, text: string, color: string): void {
-		this.flashes.push({ id: this.nextFlashId++, y, text, color, ttl: 0.6 });
+	private flash(kind: FlashKind, text: string): void {
+		this.flashes.push({ id: this.nextFlashId++, kind, text, ttl: 0.6 });
 	}
 
 	private decayFlashes(dt: number): void {

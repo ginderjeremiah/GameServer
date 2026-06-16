@@ -1,11 +1,11 @@
 <div class="board" bind:this={boardEl} bind:clientWidth={view.boardWidth}>
-	<div class="gridlayer" style:background-position-x="{view.nowX + (0.5 - game.playTick) * PXT}px"></div>
+	<div class="gridlayer" style:background-position-x="{view.tickToX(0.5)}px"></div>
 
 	<span class="lane-label" style="top:4px">
 		<b style="color:var(--log-enemy)">enemy strikes</b> <b style="color:var(--health-remaining-color)">· your blocks</b>
 	</span>
 	<span class="lane-label" style="top:96px">
-		<b style="color:var(--log-enemy)">your strikes</b> <b style="color:var(--log-enemy)">· enemy guard</b>
+		<b style="color:var(--log-player)">your strikes</b> <b style="color:var(--log-enemy)">· enemy guard</b>
 	</span>
 	<div class="lanediv" style="top:92px"></div>
 
@@ -28,9 +28,7 @@
 			class="preview {preview.kind === 'block' ? 'block' : 'attack'}"
 			class:pvhint={preview.hint}
 			style:width="{preview.dur * PXT}px"
-			style:transform="translateX({view.nowX +
-				(preview.start - game.playTick) * PXT -
-				(preview.kind === 'block' ? PXT / 2 : 0)}px)"
+			style:transform="translateX({view.tickToX(preview.start - (preview.kind === 'block' ? 0.5 : 0))}px)"
 		>
 			{CARDS[preview.key].label}
 		</div>
@@ -38,7 +36,14 @@
 
 	<!-- resolution flashes -->
 	{#each game.flashes as f (f.id)}
-		<div class="flash" style:left="{view.nowX}px" style:top="{f.y}px" style:color={f.color}>{f.text}</div>
+		<div
+			class="flash"
+			style:left="{view.nowX}px"
+			style:top="{FLASH_LAYOUT[f.kind].y}px"
+			style:color={FLASH_LAYOUT[f.kind].color}
+		>
+			{f.text}
+		</div>
 	{/each}
 
 	{#if game.over && game.outcome}
@@ -48,7 +53,7 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { CARDS, PX_PER_TICK, type CritMark, type Entity, type EntityType } from '$lib/card-game';
+import { CARDS, PX_PER_TICK, type CritMark, type Entity, type EntityType, type FlashKind } from '$lib/card-game';
 import type { CardGameView } from '../card-game-view.svelte';
 import BoardEntity from './BoardEntity.svelte';
 import OutcomeBanner from './OutcomeBanner.svelte';
@@ -60,13 +65,29 @@ const { view }: Props = $props();
 const game = $derived(view.game);
 const PXT = PX_PER_TICK;
 
+/* Board placement (y px) + themeable colour for each semantic flash kind — the
+   loom engine emits the kind; the presentation (pixels + CSS tokens) lives here.
+   Player strikes use the player combat-log hue (--log-player); the enemy's guard
+   keeps the enemy hue (--log-enemy); player blocks stay the board's block green. */
+const FLASH_LAYOUT: Record<FlashKind, { y: number; color: string }> = {
+	enemyHit: { y: 36, color: 'var(--enemy-accent)' },
+	block: { y: 36, color: 'var(--health-remaining-color)' },
+	guarded: { y: 92, color: 'var(--log-enemy)' },
+	crit: { y: 116, color: 'var(--gold)' },
+	strike: { y: 160, color: 'var(--log-player)' },
+	channel: { y: 160, color: 'var(--rarity-epic)' },
+	interrupt: { y: 160, color: 'var(--rarity-epic)' }
+};
+
 let boardEl: HTMLDivElement;
 
 const isCover = (type: EntityType) => type === 'block' || type === 'enemyblock';
 
-const entX = (e: Entity) => view.nowX + (e.start - game.playTick) * PXT - (isCover(e.type) ? PXT / 2 : 0);
+// Cover spans (blocks/guards) and crit columns sit half a tick earlier so they
+// visually centre on the cell their half-open coverage rule occupies.
+const entX = (e: Entity) => view.tickToX(e.start - (isCover(e.type) ? 0.5 : 0));
 const entW = (e: Entity) => Math.max((e.end - e.start) * PXT, 30);
-const critX = (c: CritMark) => view.nowX + (c.tick - game.playTick) * PXT - PXT / 2;
+const critX = (c: CritMark) => view.tickToX(c.tick - 0.5);
 
 // A derived local so `{#if preview}` narrows it to non-null inside the block.
 const preview = $derived(view.preview);
@@ -253,7 +274,7 @@ onMount(() => {
 
 .preview.attack {
 	top: 118px;
-	border-color: color-mix(in srgb, var(--log-enemy) 60%, transparent);
+	border-color: color-mix(in srgb, var(--log-player) 60%, transparent);
 }
 
 /* ── flashes ───────────────────────────────────────────────────────────── */

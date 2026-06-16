@@ -100,3 +100,23 @@ describe('Board — pointer drag wiring', () => {
 		expect(view.game.hand).toHaveLength(1);
 	});
 });
+
+describe('Board — flash rendering', () => {
+	it('maps a semantic flash kind to its board y-position and themeable colour', () => {
+		const view = new CardGameView();
+		view.game.flashes = [
+			{ id: 1, kind: 'strike', text: '-16', ttl: 0.6 },
+			{ id: 2, kind: 'enemyHit', text: '-8', ttl: 0.6 }
+		];
+		const { container } = render(Board, { props: { view } });
+		const flashes = Array.from(container.querySelectorAll('.flash')) as HTMLElement[];
+
+		const strike = flashes.find((f) => f.textContent?.includes('-16'));
+		expect(strike?.style.top).toBe('160px'); // player-strike row
+		expect(strike?.style.color).toBe('var(--log-player)'); // player combat-log hue
+
+		const enemyHit = flashes.find((f) => f.textContent?.includes('-8'));
+		expect(enemyHit?.style.top).toBe('36px'); // enemy-impact row
+		expect(enemyHit?.style.color).toBe('var(--enemy-accent)');
+	});
+});

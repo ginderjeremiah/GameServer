@@ -27,6 +27,36 @@ describe('CardGameView — board geometry', () => {
 	});
 });
 
+describe('CardGameView — tick ↔ pixel projection', () => {
+	beforeEach(() => {
+		view.boardWidth = 200; // nowX = 60
+	});
+
+	it('projects a tick to its board-local x at the current scroll position', () => {
+		expect(view.tickToX(0)).toBeCloseTo(60, 5); // playTick 0 → NOW line
+		expect(view.tickToX(5)).toBeCloseTo(60 + 5 * PX_PER_TICK, 5);
+		view.game.playTick = 3; // scroll forward: tick 3 now sits on the NOW line
+		expect(view.tickToX(3)).toBeCloseTo(60, 5);
+	});
+
+	it('xToTick is the exact inverse of tickToX (round-trips at any scroll)', () => {
+		for (const playTick of [0, 3.5, 42]) {
+			view.game.playTick = playTick;
+			for (const tick of [-2, 0, 1.5, 7, 100]) {
+				expect(view.xToTick(view.tickToX(tick))).toBeCloseTo(tick, 5);
+			}
+		}
+	});
+
+	it('tickAtClientX is xToTick (offset by the board left edge) snapped to the nearest tick', () => {
+		view.boardLeft = 20;
+		view.game.playTick = 3;
+		const clientX = 20 + 60 + 5 * PX_PER_TICK; // boardLeft + nowX + 5 ticks of pixels
+		expect(view.tickAtClientX(clientX)).toBe(Math.round(view.xToTick(clientX - 20)));
+		expect(view.tickAtClientX(clientX)).toBe(8); // 5 + playTick 3
+	});
+});
+
 describe('CardGameView — pointer→tick conversion', () => {
 	beforeEach(() => {
 		view.boardWidth = 200; // nowX = 60

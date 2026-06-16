@@ -55,8 +55,8 @@ const ITEMS = [
 	);
 }
 .sw.at {
-	border-color: color-mix(in srgb, var(--log-enemy) 60%, transparent);
-	background: color-mix(in srgb, var(--log-enemy) 14%, transparent);
+	border-color: color-mix(in srgb, var(--log-player) 60%, transparent);
+	background: color-mix(in srgb, var(--log-player) 14%, transparent);
 }
 .sw.ch {
 	border-color: var(--rarity-epic);
