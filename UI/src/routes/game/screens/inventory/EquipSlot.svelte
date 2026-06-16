@@ -54,11 +54,7 @@
 	<div class="row-info">
 		{#if item}
 			<div class="item-name">{item.name}</div>
-			<div class="rarity-tag">
-				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
-				></span>
-				<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
-			</div>
+			<RarityTag rarityId={item.rarityId} style="margin-top: 3px" />
 		{:else}
 			<div class="empty-label">Empty</div>
 		{/if}
@@ -67,7 +63,8 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { itemCategoryColor, rarityColor, rarityLabel, rarityTint, tintColor } from '$lib/common';
+import { itemCategoryColor, rarityTint, tintColor } from '$lib/common';
+import RarityTag from '$components/RarityTag.svelte';
 import CategoryGlyph from './CategoryGlyph.svelte';
 import OverlayButton from './OverlayButton.svelte';
 import { type EquipSlotDef } from './inventory-view.svelte';
@@ -92,7 +89,6 @@ let over = $state(false);
 let hover = $state(false);
 
 const filled = $derived(!!item);
-const rc = $derived(item ? rarityColor(item.rarityId) : 'var(--accent)');
 const canAccept = $derived(!!dragItem && dragItem.itemCategoryId === slot.category);
 
 const tileBorder = $derived(
@@ -214,27 +210,6 @@ const handleDrop = (e: DragEvent) => {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.rarity-tag {
-	margin-top: 3px;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-
-.rarity-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	flex-shrink: 0;
-}
-
-.rarity-label {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
 }
 
 .empty-label {

@@ -49,18 +49,6 @@ const { view }: { view: InventoryView } = $props();
 	flex-shrink: 0;
 }
 
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-
-	&.accent {
-		color: var(--accent-light);
-	}
-}
-
 .line {
 	flex: 1;
 	height: 1px;

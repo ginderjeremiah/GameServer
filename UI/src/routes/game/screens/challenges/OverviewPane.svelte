@@ -107,22 +107,6 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 	gap: 14px;
 }
 
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-
-	&.sm {
-		font-size: 8.5px;
-	}
-
-	&.done {
-		color: var(--success);
-	}
-}
-
 .summary-card {
 	flex: 1;
 	background: var(--panel);

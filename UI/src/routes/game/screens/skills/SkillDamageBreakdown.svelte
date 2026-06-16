@@ -3,16 +3,7 @@
 	{#if metrics.contributions.length}
 		{#each metrics.contributions as contribution (contribution.attributeId)}
 			<div class="scale" style:--ac={attributeColor(contribution.attributeId)}>
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<span
-					class="achip"
-					onmouseenter={(e) => tip.controller.show(contribution.attributeId, e)}
-					onmousemove={(e) => tip.controller.move(e)}
-					onmouseleave={() => tip.controller.hide()}
-				>
-					<AttributeIcon id={contribution.attributeId} size={12} />
-					{attributeCode(contribution.attributeId, staticData.attributes)}
-				</span>
+				<AttributeChip attributeId={contribution.attributeId} wide />
 				<div class="bar"><i style:width="{Math.round((contribution.value / maxContribution) * 100)}%"></i></div>
 				<span class="contrib"
 					>{attributeName(contribution.attributeId, staticData.attributes)} ×{contribution.multiplier} = +{fmt(
@@ -32,15 +23,10 @@
 	</div>
 </div>
 
-<!-- One shared tooltip for the scaling chips, anchored to whichever chip is hovered. -->
-<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
-
 <script lang="ts">
-import { attributeCode, attributeColor, attributeName, formatNum } from '$lib/common';
-import { staticData, type TooltipComponent } from '$stores';
-import AttributeIcon from '$components/AttributeIcon.svelte';
-import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
-import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
+import { attributeColor, attributeName, formatNum } from '$lib/common';
+import { staticData } from '$stores';
+import AttributeChip from '$components/AttributeChip.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -49,9 +35,6 @@ type Props = {
 };
 
 const { view, metrics }: Props = $props();
-
-let tooltip = $state<TooltipComponent>();
-const tip = createAttributeTooltip(() => tooltip);
 
 const fmt = (n: number) => formatNum(Math.round(n));
 
@@ -82,24 +65,6 @@ const maxContribution = $derived(Math.max(metrics.skill.baseDamage, ...metrics.c
 	align-items: center;
 	gap: 11px;
 	margin-top: 8px;
-}
-
-.achip {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 4px;
-	min-width: 46px;
-	padding: 2px 8px;
-	border: 1px solid color-mix(in srgb, var(--ac) 38%, transparent);
-	border-radius: 3px;
-	background: color-mix(in srgb, var(--ac) 12%, transparent);
-	color: var(--ac);
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 0.5px;
-	text-align: center;
-	white-space: nowrap;
 }
 
 .bar {

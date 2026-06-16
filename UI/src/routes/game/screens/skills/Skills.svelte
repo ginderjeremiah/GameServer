@@ -25,10 +25,17 @@
 	<EquippedBand {view} />
 
 	<SortFilterModal {view} />
+
+	<!-- Shared attribute tooltip for the scaling chips in the damage breakdown and the equipped
+	     loadout band, published via context so both surfaces hover the one panel. -->
+	<AttributeTooltip bind:this={tooltip} attributeId={tip.attributeId} />
 </div>
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
+import { type TooltipComponent } from '$stores';
+import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
+import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { SkillsView } from './skills-view.svelte';
 import CompareBar from './CompareBar.svelte';
 import SkillRail from './SkillRail.svelte';
@@ -39,6 +46,10 @@ import SortFilterModal from './SortFilterModal.svelte';
 const view = new SkillsView();
 
 const fmt = (n: number) => formatNum(Math.round(n));
+
+let tooltip = $state<TooltipComponent>();
+const tip = createAttributeTooltip(() => tooltip);
+setAttributeTooltip(tip.controller);
 </script>
 
 <style lang="scss">

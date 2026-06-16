@@ -122,14 +122,6 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 	margin-left: auto;
 }
 
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
 .sort-toggle {
 	display: flex;
 	border: 1px solid var(--border-subtle);
