@@ -50,4 +50,25 @@ describe('Mulberry32 parity with backend', () => {
 			}
 		});
 	}
+
+	// Long-run guard: drawn well past ~4.9M, the point where a JS double accumulating the seed
+	// (initialSeed + N*0x6D2B79F5) exceeds 2^53 and starts losing low bits. Without the `>>> 0`
+	// truncation in mulberry32.ts the stream silently diverges from the C# `uint` port here; the
+	// six-draw vectors above are too short to catch it. MUST mirror the backend's `Parity_LongRun`.
+	const LONG_RUN_DRAWS = 6_000_000;
+	const LONG_RUN_SEED = 0xdeadbeef;
+	const LONG_RUN_TAIL = [2279814222, 2629024272, 2977756834, 4201168860, 3781448676, 52134473];
+
+	it('matches the backend long-run tail past the float-precision divergence point', () => {
+		const rng = new Mulberry32(LONG_RUN_SEED);
+		const tailStart = LONG_RUN_DRAWS - LONG_RUN_TAIL.length;
+
+		for (let i = 0; i < tailStart; i++) {
+			rng.next();
+		}
+
+		for (const numerator of LONG_RUN_TAIL) {
+			expect(rng.next()).toBe(numerator / UINT32_RANGE);
+		}
+	});
 });

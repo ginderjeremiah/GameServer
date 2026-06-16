@@ -1,6 +1,4 @@
-﻿using Game.Core.Attributes.Modifiers;
-
-namespace Game.Core.Skills
+﻿namespace Game.Core.Skills
 {
     /// <summary>
     /// Represents a skill definition — immutable template data, not runtime battle state. Shared, cached
@@ -20,7 +18,7 @@ namespace Game.Core.Skills
 
         public required int CooldownMs { get; init; }
 
-        public required IReadOnlyList<AttributeModifier> DamageMultipliers { get; init; }
+        public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 
         public required IReadOnlyList<SkillEffect> Effects { get; init; }
     }
