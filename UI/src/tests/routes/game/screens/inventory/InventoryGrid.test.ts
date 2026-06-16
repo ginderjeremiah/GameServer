@@ -164,7 +164,7 @@ describe('InventoryGrid — drag interactions', () => {
 		const items = [makeGridItem(1)];
 		const view = makeView(items);
 		const { container } = render(InventoryGrid, { props: { view } });
-		await fireEvent.dragStart(container.querySelector('.grid-slot')!, {
+		await fireEvent.dragStart(container.querySelector('.overlay-button')!, {
 			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
 		});
 		expect(hideTooltip).toHaveBeenCalled();
@@ -174,7 +174,7 @@ describe('InventoryGrid — drag interactions', () => {
 		const items = [makeGridItem(7)];
 		const view = makeView(items);
 		const { container } = render(InventoryGrid, { props: { view } });
-		await fireEvent.dragStart(container.querySelector('.grid-slot')!, {
+		await fireEvent.dragStart(container.querySelector('.overlay-button')!, {
 			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
 		});
 		expect(view.dragItemId).toBe(7);
@@ -184,7 +184,7 @@ describe('InventoryGrid — drag interactions', () => {
 		const items = [makeGridItem(7)];
 		const view = makeView(items, { dragItemId: 7 });
 		const { container } = render(InventoryGrid, { props: { view } });
-		await fireEvent.dragEnd(container.querySelector('.grid-slot')!);
+		await fireEvent.dragEnd(container.querySelector('.overlay-button')!);
 		expect(view.dragItemId).toBeNull();
 	});
 });

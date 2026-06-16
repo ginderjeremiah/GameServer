@@ -98,6 +98,12 @@ Blocking confirmation dialogs are the toast system's counterpart, from the same 
 
 **Non-blocking overlays compose `Popover` (`components/Popover.svelte`), not a hand-rolled backdrop.** It is the `ModalHost` counterpart for overlays that aren't a blocking confirm — driven by a plain `open` boolean + `onClose` rather than the promise queue — and owns the same chrome: backdrop/Escape dismissal, a focus trap, focus capture+restore, and a body scroll lock, with the content passed as a snippet. The layer is absolutely positioned, so it overlays its nearest positioned ancestor (mount it inside a `position: relative` container) rather than the whole viewport.
 
+## Accessibility
+
+Interactive controls are real elements, not `role="button"` divs — convert clickable `div`/`span`s to `<button>` (the app is mid-conversion; some `role="button"` tiles remain, e.g. `skills/EquippedBand.svelte`).
+
+**Accessible card pattern.** When a tile must host its own nested actions (favorite/unequip) and/or be a drag source, it can't itself be a `<button>` — nesting interactive elements is invalid HTML. Instead it uses a presentational container with a full-bleed primary-action `<button>` (`inventory/OverlayButton.svelte`) stretched beneath the secondary action buttons, which sit at a higher `z-index` so they stay clickable. The overlay carries the drag handle and gets native keyboard activation — modifier state rides the synthesized click, so a ⌘/Ctrl-activate can branch (e.g. select vs. equip) without a manual `keydown`. A card with no primary action (an empty equip slot) renders no overlay, so it stays out of the tab order while remaining a drop target. Hover-only affordances on the presentational container (tooltips, drop highlighting) carry a `<!-- svelte-ignore a11y_no_static_element_interactions -->`.
+
 ## Styling
 
 Most styling lives in each component's scoped scss; global styles and theming live in `UI/src/styles`. **All colours are CSS variables, used by semantic intent — never hard-coded.** Core colours are declared in `+layout.svelte` (pulled from `_colors.scss`); the palette is intentionally limited for consistency and contrast. The frontend is built for future custom themes that override those variables, so any colour must be a variable (added to `+layout.svelte`) and used according to its semantic meaning, even when two roles happen to share a hue.

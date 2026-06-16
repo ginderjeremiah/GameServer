@@ -1,14 +1,15 @@
 <div class="equip-row">
 	<div class="row-label">{slot.label}</div>
 
+	<!-- The tile is a presentational drop target; only a filled slot carries an interactive
+	     (focusable) select button, so empty slots stay out of the tab order. -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="equip-tile"
 		class:filled
 		class:over
 		class:selected
 		class:can-accept={canAccept}
-		role="button"
-		tabindex="0"
 		style:border-color={tileBorder}
 		style:background={over
 			? tintColor('var(--accent)', 0.14)
@@ -18,13 +19,6 @@
 		ondragover={handleDragOver}
 		ondragleave={() => (over = false)}
 		ondrop={handleDrop}
-		onclick={() => item && onSelect?.(item)}
-		onkeydown={(e) => {
-			if (item && (e.key === 'Enter' || e.key === ' ')) {
-				e.preventDefault();
-				onSelect?.(item);
-			}
-		}}
 		onmouseenter={(e) => {
 			hover = true;
 			if (item) {
@@ -39,16 +33,14 @@
 	>
 		{#if item}
 			{#if item.iconPath}
-				<img class="item-icon" src={item.iconPath} alt={item.name} />
+				<img class="item-icon" src={item.iconPath} alt="" />
 			{:else}
 				<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={40} />
 			{/if}
+			<OverlayButton label={item.name} onActivate={() => onSelect?.(item)} />
 			{#if hover}
-				<button
-					class="unequip"
-					title="Unequip"
-					aria-label="Unequip {item.name}"
-					onclick={stopPropagation(() => onUnequip?.(slot.id))}>×</button
+				<button class="unequip" title="Unequip" aria-label="Unequip {item.name}" onclick={() => onUnequip?.(slot.id)}
+					>×</button
 				>
 			{/if}
 			{#if item.appliedMods.length}
@@ -76,8 +68,8 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityLabel, rarityTint, tintColor } from '$lib/common';
-import { stopPropagation } from '$lib/common/event-wrappers';
 import CategoryGlyph from './CategoryGlyph.svelte';
+import OverlayButton from './OverlayButton.svelte';
 import { type EquipSlotDef } from './inventory-view.svelte';
 
 interface Props {
@@ -185,6 +177,8 @@ const handleDrop = (e: DragEvent) => {
 	position: absolute;
 	top: 2px;
 	right: 2px;
+	// Above the full-bleed select button so it stays clickable.
+	z-index: 2;
 	width: 16px;
 	height: 16px;
 	border-radius: 2px;

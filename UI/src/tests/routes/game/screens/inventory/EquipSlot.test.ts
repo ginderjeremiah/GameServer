@@ -51,6 +51,14 @@ describe('EquipSlot — empty state', () => {
 		const { container } = render(EquipSlot, { props: { slot: helmSlot } });
 		expect(container.querySelector('.equip-tile')!.classList.contains('filled')).toBe(false);
 	});
+
+	it('is not focusable when empty — no overlay button, and no role/tabindex on the tile', () => {
+		const { container } = render(EquipSlot, { props: { slot: helmSlot } });
+		expect(container.querySelector('.overlay-button')).toBeNull();
+		const tile = container.querySelector('.equip-tile')!;
+		expect(tile.getAttribute('role')).toBeNull();
+		expect(tile.getAttribute('tabindex')).toBeNull();
+	});
 });
 
 describe('EquipSlot — filled state', () => {
@@ -77,11 +85,11 @@ describe('EquipSlot — filled state', () => {
 });
 
 describe('EquipSlot — interactions', () => {
-	it('calls onSelect with the item when the filled tile is clicked', async () => {
+	it('calls onSelect with the item when the filled tile is activated', async () => {
 		const onSelect = vi.fn();
 		const item = makeItem();
 		const { container } = render(EquipSlot, { props: { slot: helmSlot, item, onSelect } });
-		await fireEvent.click(container.querySelector('.equip-tile')!);
+		await fireEvent.click(container.querySelector('.overlay-button')!);
 		expect(onSelect).toHaveBeenCalledWith(item);
 	});
 
@@ -90,6 +98,13 @@ describe('EquipSlot — interactions', () => {
 		const { container } = render(EquipSlot, { props: { slot: helmSlot, onSelect } });
 		await fireEvent.click(container.querySelector('.equip-tile')!);
 		expect(onSelect).not.toHaveBeenCalled();
+	});
+
+	it('exposes the filled tile select action as a real <button> labelled with the item name', () => {
+		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem({ name: 'Iron Helm' }) } });
+		const overlay = container.querySelector('.overlay-button');
+		expect(overlay?.tagName).toBe('BUTTON');
+		expect(overlay!.getAttribute('aria-label')).toBe('Iron Helm');
 	});
 
 	it('shows the unequip button on mouse enter', async () => {
