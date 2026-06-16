@@ -76,31 +76,35 @@ describe('GridSlot — rendering', () => {
 	});
 });
 
-describe('GridSlot — click interactions', () => {
-	it('calls onSelect with the item on a plain click', async () => {
+// The primary action is a real <button> overlay, so pointer and keyboard share one activation
+// path: pressing Enter/Space on the focused button dispatches a click carrying the same modifier
+// state as a mouse click. jsdom doesn't synthesize that click from a keydown, so these fire the
+// click directly — the faithful representation of both a mouse click and a keyboard activation.
+describe('GridSlot — activation (pointer + keyboard share one path)', () => {
+	it('selects on a plain activate (click / Enter / Space)', async () => {
 		const onSelect = vi.fn();
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item, onSelect } });
-		await fireEvent.click(container.querySelector('.grid-slot')!);
+		await fireEvent.click(container.querySelector('.overlay-button')!);
 		expect(onSelect).toHaveBeenCalledWith(item);
 	});
 
-	it('calls onToggleEquip instead of onSelect on a ctrl+click', async () => {
+	it('equips (not selects) on a Ctrl-modified activate — Ctrl-click or Ctrl+Enter', async () => {
 		const onSelect = vi.fn();
 		const onToggleEquip = vi.fn();
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
-		await fireEvent.click(container.querySelector('.grid-slot')!, { ctrlKey: true });
+		await fireEvent.click(container.querySelector('.overlay-button')!, { ctrlKey: true });
 		expect(onToggleEquip).toHaveBeenCalledWith(item);
 		expect(onSelect).not.toHaveBeenCalled();
 	});
 
-	it('calls onToggleEquip instead of onSelect on a meta+click', async () => {
+	it('equips (not selects) on a Meta-modified activate — ⌘-click or ⌘+Space', async () => {
 		const onSelect = vi.fn();
 		const onToggleEquip = vi.fn();
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
-		await fireEvent.click(container.querySelector('.grid-slot')!, { metaKey: true });
+		await fireEvent.click(container.querySelector('.overlay-button')!, { metaKey: true });
 		expect(onToggleEquip).toHaveBeenCalledWith(item);
 		expect(onSelect).not.toHaveBeenCalled();
 	});
@@ -109,11 +113,11 @@ describe('GridSlot — click interactions', () => {
 		const onToggleEquip = vi.fn();
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item, onToggleEquip } });
-		await fireEvent.dblClick(container.querySelector('.grid-slot')!);
+		await fireEvent.dblClick(container.querySelector('.overlay-button')!);
 		expect(onToggleEquip).toHaveBeenCalledWith(item);
 	});
 
-	it('calls onToggleFav when the fav-star button is clicked and does not bubble to onSelect', async () => {
+	it('favoriting via the fav-star button does not also select', async () => {
 		const onToggleFav = vi.fn();
 		const onSelect = vi.fn();
 		const item = makeItem();
@@ -124,49 +128,22 @@ describe('GridSlot — click interactions', () => {
 	});
 });
 
-describe('GridSlot — keyboard interactions', () => {
-	it('calls onSelect on Enter key', async () => {
-		const onSelect = vi.fn();
-		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onSelect } });
-		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: 'Enter' });
-		expect(onSelect).toHaveBeenCalledWith(item);
+describe('GridSlot — accessibility semantics', () => {
+	it('exposes the primary action as a real <button>, not a tile with role/tabindex', () => {
+		const { container } = render(GridSlot, { props: { item: makeItem() } });
+		const overlay = container.querySelector('.overlay-button');
+		expect(overlay?.tagName).toBe('BUTTON');
+
+		// The card container is presentational — it must not carry button semantics or focus.
+		const tile = container.querySelector('.grid-slot')!;
+		expect(tile.getAttribute('role')).toBeNull();
+		expect(tile.getAttribute('tabindex')).toBeNull();
 	});
 
-	it('calls onSelect on Space key', async () => {
-		const onSelect = vi.fn();
-		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onSelect } });
-		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: ' ' });
-		expect(onSelect).toHaveBeenCalledWith(item);
-	});
-
-	it('does not call onSelect for other keys', async () => {
-		const onSelect = vi.fn();
-		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onSelect } });
-		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: 'ArrowRight' });
-		expect(onSelect).not.toHaveBeenCalled();
-	});
-
-	it('equips (not selects) on Ctrl+Enter — the keyboard equivalent of ⌘/Ctrl-click', async () => {
-		const onSelect = vi.fn();
-		const onToggleEquip = vi.fn();
-		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
-		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: 'Enter', ctrlKey: true });
-		expect(onToggleEquip).toHaveBeenCalledWith(item);
-		expect(onSelect).not.toHaveBeenCalled();
-	});
-
-	it('equips (not selects) on Meta+Space', async () => {
-		const onSelect = vi.fn();
-		const onToggleEquip = vi.fn();
-		const item = makeItem();
-		const { container } = render(GridSlot, { props: { item, onSelect, onToggleEquip } });
-		await fireEvent.keyDown(container.querySelector('.grid-slot')!, { key: ' ', metaKey: true });
-		expect(onToggleEquip).toHaveBeenCalledWith(item);
-		expect(onSelect).not.toHaveBeenCalled();
+	it('labels the primary action and the fav-star button for assistive tech', () => {
+		const { container } = render(GridSlot, { props: { item: makeItem({ name: 'Iron Sword' }) } });
+		expect(container.querySelector('.overlay-button')!.getAttribute('aria-label')).toBe('Iron Sword');
+		expect(container.querySelector('.fav-star')!.getAttribute('aria-label')).toBe('Favorite');
 	});
 });
 
@@ -212,7 +189,7 @@ describe('GridSlot — drag interactions', () => {
 		const item = makeItem({ itemId: 42 });
 		const { container } = render(GridSlot, { props: { item } });
 		const dt = { setData: vi.fn(), effectAllowed: '' };
-		await fireEvent.dragStart(container.querySelector('.grid-slot')!, { dataTransfer: dt });
+		await fireEvent.dragStart(container.querySelector('.overlay-button')!, { dataTransfer: dt });
 		expect(dt.setData).toHaveBeenCalledWith('text/plain', '42');
 	});
 
@@ -220,7 +197,7 @@ describe('GridSlot — drag interactions', () => {
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item } });
 		const dt = { setData: vi.fn(), effectAllowed: '' };
-		await fireEvent.dragStart(container.querySelector('.grid-slot')!, { dataTransfer: dt });
+		await fireEvent.dragStart(container.querySelector('.overlay-button')!, { dataTransfer: dt });
 		expect(dt.effectAllowed).toBe('move');
 	});
 
@@ -228,7 +205,7 @@ describe('GridSlot — drag interactions', () => {
 		const onDragStart = vi.fn();
 		const item = makeItem();
 		const { container } = render(GridSlot, { props: { item, onDragStart } });
-		await fireEvent.dragStart(container.querySelector('.grid-slot')!, {
+		await fireEvent.dragStart(container.querySelector('.overlay-button')!, {
 			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
 		});
 		expect(onDragStart).toHaveBeenCalledWith(item);
@@ -237,7 +214,12 @@ describe('GridSlot — drag interactions', () => {
 	it('calls onDragEnd on drag end', async () => {
 		const onDragEnd = vi.fn();
 		const { container } = render(GridSlot, { props: { item: makeItem(), onDragEnd } });
-		await fireEvent.dragEnd(container.querySelector('.grid-slot')!);
+		await fireEvent.dragEnd(container.querySelector('.overlay-button')!);
 		expect(onDragEnd).toHaveBeenCalled();
+	});
+
+	it('makes the primary action the drag handle (draggable)', () => {
+		const { container } = render(GridSlot, { props: { item: makeItem() } });
+		expect(container.querySelector('.overlay-button')!.getAttribute('draggable')).toBe('true');
 	});
 });

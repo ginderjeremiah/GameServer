@@ -1,20 +1,13 @@
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="grid-slot"
 	class:selected
-	role="button"
-	tabindex="0"
-	draggable="true"
 	style:width="{size}px"
 	style:height="{size}px"
 	style:background={bg}
 	style:border-color={borderColor}
 	style:box-shadow={boxShadow}
 	style:transform={hover ? 'translateY(-1px)' : 'none'}
-	ondragstart={handleDragStart}
-	ondragend={() => onDragEnd?.()}
-	onclick={handleClick}
-	ondblclick={() => onToggleEquip?.(item)}
-	onkeydown={handleKeydown}
 	onmouseenter={(e) => {
 		hover = true;
 		onHoverEnter?.(item, e);
@@ -26,7 +19,7 @@
 	}}
 >
 	{#if item.iconPath}
-		<img class="item-icon" src={item.iconPath} alt={item.name} />
+		<img class="item-icon" src={item.iconPath} alt="" />
 	{:else}
 		<CategoryGlyph
 			cat={item.itemCategoryId}
@@ -35,13 +28,24 @@
 		/>
 	{/if}
 
+	<!-- Full-bleed primary action: plain activate selects, modifier/double activate equips.
+	     A real <button> gives native keyboard activation (modifier state rides the click). -->
+	<OverlayButton
+		label={item.name}
+		draggable
+		onActivate={handleActivate}
+		onDoubleClick={() => onToggleEquip?.(item)}
+		onDragStart={handleDragStart}
+		onDragEnd={() => onDragEnd?.()}
+	/>
+
 	<button
 		class="fav-star"
 		class:on={item.favorite}
 		class:show={hover}
 		title={item.favorite ? 'Unfavorite' : 'Favorite'}
 		aria-label={item.favorite ? 'Unfavorite' : 'Favorite'}
-		onclick={stopPropagation(() => onToggleFav?.(item))}
+		onclick={() => onToggleFav?.(item)}
 	>
 		<FavoriteStar
 			filled={item.favorite}
@@ -65,9 +69,9 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
-import { stopPropagation } from '$lib/common/event-wrappers';
 import CategoryGlyph from './CategoryGlyph.svelte';
 import FavoriteStar from './FavoriteStar.svelte';
+import OverlayButton from './OverlayButton.svelte';
 
 interface Props {
 	item: Item;
@@ -124,24 +128,13 @@ const boxShadow = $derived(
 			: glowShadow
 );
 
-const handleClick = (e: MouseEvent) => {
+// A modifier-held activate (⌘/Ctrl-click, or ⌘/Ctrl + keyboard activation, since the modifier
+// state rides the native button's click) equips; a plain activate selects.
+const handleActivate = (e: MouseEvent) => {
 	if (e.metaKey || e.ctrlKey) {
 		onToggleEquip?.(item);
 	} else {
 		onSelect?.(item);
-	}
-};
-
-const handleKeydown = (e: KeyboardEvent) => {
-	if (e.key === 'Enter' || e.key === ' ') {
-		e.preventDefault();
-		// Mirror the pointer affordances: a modifier+activate equips (like ⌘/Ctrl-click and
-		// double-click), a plain activate selects — so the equip path has a keyboard equivalent.
-		if (e.metaKey || e.ctrlKey) {
-			onToggleEquip?.(item);
-		} else {
-			onSelect?.(item);
-		}
 	}
 };
 
