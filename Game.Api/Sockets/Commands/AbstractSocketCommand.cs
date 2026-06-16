@@ -8,16 +8,10 @@ namespace Game.Api.Sockets.Commands
         public string? Id { get; set; }
         public abstract string Name { get; set; }
 
-        public virtual Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
-        {
-            var result = Execute(context);
-            return Task.FromResult(result);
-        }
-
-        public virtual ApiSocketResponse Execute(SocketContext context)
-        {
-            throw new NotImplementedException();
-        }
+        // The single execution entry point. Abstract (rather than a virtual with a sync companion that
+        // throws) so the compiler forces every command to implement exactly this one method — there is no
+        // wrong-override-at-runtime path. A synchronous handler returns Task.FromResult(...).
+        public abstract Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken);
 
         public virtual void SetParameters(string? parameters) { }
 
@@ -64,26 +58,14 @@ namespace Game.Api.Sockets.Commands
 
     public abstract class AbstractSocketCommandWithResponseData<T> : AbstractSocketCommand
     {
+        // Seals the base entry point onto the typed handler so commands implement only HandleExecuteAsync,
+        // whose ApiSocketResponse<T> return is what the codegen reads to type the client response.
         public sealed override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             return await HandleExecuteAsync(context, cancellationToken);
         }
 
-        public sealed override ApiSocketResponse Execute(SocketContext context)
-        {
-            return base.Execute(context);
-        }
-
-        public virtual Task<ApiSocketResponse<T>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
-        {
-            var result = HandleExecute(context);
-            return Task.FromResult(result);
-        }
-
-        public virtual ApiSocketResponse<T> HandleExecute(SocketContext context)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Task<ApiSocketResponse<T>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken);
     }
 
     public class SocketCommandInfo
