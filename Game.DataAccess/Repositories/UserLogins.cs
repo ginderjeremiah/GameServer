@@ -21,11 +21,12 @@ namespace Game.DataAccess.Repositories
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
-            string? secChUaPlatform)
+            string? secChUaPlatform,
+            CancellationToken cancellationToken = default)
         {
             ipAddress = Truncate(ipAddress, UserLogin.MaxIpAddressLength) ?? string.Empty;
 
-            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform);
+            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
 
             // A brand-new device cannot have an existing login, so skip the lookup and rely on the
             // navigation to propagate the generated DeviceId onto the new login when saved.
@@ -42,7 +43,7 @@ namespace Game.DataAccess.Repositories
             }
 
             var login = await _context.UserLogins.FirstOrDefaultAsync(l =>
-                l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id);
+                l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id, cancellationToken);
 
             if (login is null)
             {
@@ -67,9 +68,10 @@ namespace Game.DataAccess.Repositories
             string? secChUaMobile,
             string? secChUaPlatform,
             double? deviceMemory,
-            int? hardwareConcurrency)
+            int? hardwareConcurrency,
+            CancellationToken cancellationToken = default)
         {
-            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform);
+            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
 
             device.DeviceMemory = deviceMemory;
             device.HardwareConcurrency = hardwareConcurrency;
@@ -84,14 +86,15 @@ namespace Game.DataAccess.Repositories
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
-            string? secChUaPlatform)
+            string? secChUaPlatform,
+            CancellationToken cancellationToken)
         {
             deviceFingerprintHash = Truncate(deviceFingerprintHash, Device.MaxFingerprintLength) ?? string.Empty;
 
-            var device = await _context.Devices.FirstOrDefaultAsync(d => d.DeviceFingerprintHash == deviceFingerprintHash);
+            var device = await _context.Devices.FirstOrDefaultAsync(d => d.DeviceFingerprintHash == deviceFingerprintHash, cancellationToken);
             if (device is null)
             {
-                var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform);
+                var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
                 device = new Device
                 {
                     DeviceFingerprintHash = deviceFingerprintHash,
@@ -112,14 +115,15 @@ namespace Game.DataAccess.Repositories
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
-            string? secChUaPlatform)
+            string? secChUaPlatform,
+            CancellationToken cancellationToken)
         {
             userAgent = Truncate(userAgent, BrowserInfo.MaxUserAgentLength) ?? string.Empty;
             secChUa = Truncate(secChUa, BrowserInfo.MaxClientHintLength);
             secChUaMobile = Truncate(secChUaMobile, BrowserInfo.MaxClientHintLength);
             secChUaPlatform = Truncate(secChUaPlatform, BrowserInfo.MaxClientHintLength);
 
-            var browserInfo = await _context.BrowserInfos.FirstOrDefaultAsync(b => b.UserAgent == userAgent);
+            var browserInfo = await _context.BrowserInfos.FirstOrDefaultAsync(b => b.UserAgent == userAgent, cancellationToken);
             if (browserInfo is null)
             {
                 browserInfo = new BrowserInfo

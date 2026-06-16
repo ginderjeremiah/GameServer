@@ -26,7 +26,7 @@ namespace Game.Api.Middleware
             if (principal.Identity?.IsAuthenticated == true
                 && int.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var userId))
             {
-                await sessionService.LoadPlayerState(userId);
+                await sessionService.LoadPlayerState(userId, context.RequestAborted);
 
                 // A valid token whose session cache entry is gone (Redis flush, TTL lapse, or a session
                 // never established on this instance) is authenticated-but-uncached, not anonymous. Rebuild

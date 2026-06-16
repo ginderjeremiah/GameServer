@@ -137,7 +137,8 @@ namespace Game.Api.Controllers
                 hints.SecChUaMobile,
                 hints.SecChUaPlatform,
                 request.DeviceMemory,
-                request.HardwareConcurrency);
+                request.HardwareConcurrency,
+                HttpContext.RequestAborted);
 
             return ApiResponse.Success();
         }

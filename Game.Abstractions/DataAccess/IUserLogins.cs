@@ -21,7 +21,8 @@ namespace Game.Abstractions.DataAccess
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
-            string? secChUaPlatform);
+            string? secChUaPlatform,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Enriches (creating when new) the <c>Device</c> for the given fingerprint with the capabilities the
@@ -35,6 +36,7 @@ namespace Game.Abstractions.DataAccess
             string? secChUaMobile,
             string? secChUaPlatform,
             double? deviceMemory,
-            int? hardwareConcurrency);
+            int? hardwareConcurrency,
+            CancellationToken cancellationToken = default);
     }
 }

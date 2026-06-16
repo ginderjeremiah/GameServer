@@ -20,11 +20,12 @@ namespace Game.Application.Services
             string userAgent,
             string? secChUa,
             string? secChUaMobile,
-            string? secChUaPlatform)
+            string? secChUaPlatform,
+            CancellationToken cancellationToken = default)
         {
             await _userLogins.RecordConnection(
-                userId, ipAddress, deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform);
-            await _unitOfWork.CommitAsync();
+                userId, ipAddress, deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
         }
 
         public async Task SaveDeviceInfo(
@@ -34,12 +35,13 @@ namespace Game.Application.Services
             string? secChUaMobile,
             string? secChUaPlatform,
             double? deviceMemory,
-            int? hardwareConcurrency)
+            int? hardwareConcurrency,
+            CancellationToken cancellationToken = default)
         {
             await _userLogins.SaveDeviceInfo(
                 deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform,
-                deviceMemory, hardwareConcurrency);
-            await _unitOfWork.CommitAsync();
+                deviceMemory, hardwareConcurrency, cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
         }
     }
 }

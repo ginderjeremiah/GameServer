@@ -88,7 +88,7 @@ namespace Game.Api.Tests.Unit
 
         private sealed class NoOpSessionStore : ISessionStore
         {
-            public Task<PlayerState?> GetSession(int userId) => Task.FromResult<PlayerState?>(null);
+            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
             public void Clear(int userId) { }
         }

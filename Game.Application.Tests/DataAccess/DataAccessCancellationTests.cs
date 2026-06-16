@@ -77,6 +77,42 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetSession_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
+        {
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+
+            // The session read runs on every authenticated request; the token now reaches the wrapped cache
+            // read, so a cancelled budget unwinds it cooperatively (#708).
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => sessionStore.GetSession(1, AlreadyCancelled()));
+        }
+
+        [Fact]
+        public async Task RecordConnection_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
+        {
+            using var scope = CreateScope();
+            var userLogins = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+
+            // The connection-recording device lookup is the first awaited EF read; Npgsql honours the token
+            // natively, so a pre-cancelled budget unwinds the tracking write rather than running it (#708).
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => userLogins.RecordConnection(
+                    1, "127.0.0.1", "fp-cancel", "ua", null, null, null, AlreadyCancelled()));
+        }
+
+        [Fact]
+        public async Task SaveDeviceInfo_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
+        {
+            using var scope = CreateScope();
+            var userLogins = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => userLogins.SaveDeviceInfo(
+                    "fp-cancel", "ua", null, null, null, 8, 4, AlreadyCancelled()));
+        }
+
+        [Fact]
         public async Task CommitAsync_WithPendingChanges_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
         {
             using var scope = CreateScope();
