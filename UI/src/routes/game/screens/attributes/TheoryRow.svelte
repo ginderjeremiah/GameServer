@@ -1,17 +1,9 @@
 <div class="trow">
-	<span
-		class="attr-hit"
-		role="img"
-		aria-label={name}
-		onmouseenter={showTip}
-		onmousemove={moveTip}
-		onmouseleave={hideTip}
-	>
+	<span class="attr-hit" role="img" aria-label={name} use:attributeHover={{ controller: attrTip, id }}>
 		<AttributeIcon {id} size={40} />
 	</span>
 	<div class="attr">
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="head" onmouseenter={showTip} onmousemove={moveTip} onmouseleave={hideTip}>
+		<div class="head" use:attributeHover={{ controller: attrTip, id }}>
 			<span class="code" style="color: {color}">{code}</span>
 			<span class="name">{name}</span>
 		</div>
@@ -53,6 +45,7 @@ import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/co
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
+import { attributeHover } from '$components/tooltip/attribute-hover';
 import Stepper from './Stepper.svelte';
 import {
 	CORE_ATTRIBUTES,
@@ -76,9 +69,6 @@ const name = $derived(attributeName(id, staticData.attributes));
 
 // Hover explainer for the attribute, driven through the screen-level controller.
 const attrTip = getAttributeTooltip();
-const showTip = (e: MouseEvent) => attrTip?.show(id, e);
-const moveTip = (e: MouseEvent) => attrTip?.move(e);
-const hideTip = () => attrTip?.hide();
 
 const value = $derived(view.values[i]);
 const saved = $derived(view.savedValues[i]);

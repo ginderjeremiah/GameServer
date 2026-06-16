@@ -1,0 +1,52 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { EAttribute } from '$lib/api';
+
+const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+
+// The chip resolves the screen-level controller via context; the action/controller wiring is
+// covered elsewhere, so here we stub it to assert the chip drives it on hover.
+vi.mock('$components/tooltip/attribute-tooltip.svelte', () => ({
+	getAttributeTooltip: () => controller
+}));
+
+vi.mock('$stores', () => ({
+	staticData: { attributes: [{ id: EAttribute.Strength, code: 'STR', name: 'Strength' }] }
+}));
+
+import AttributeChip from '$components/AttributeChip.svelte';
+
+afterEach(() => {
+	cleanup();
+	vi.clearAllMocks();
+});
+
+describe('AttributeChip', () => {
+	it('renders the attribute code, icon, and colour tint', () => {
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		const chip = container.querySelector('.achip') as HTMLElement;
+		expect(chip.textContent).toContain('STR');
+		expect(chip.querySelector('img.attr-icon')).toBeTruthy();
+		expect(chip.style.getPropertyValue('--ac')).toBe('var(--attr-strength)');
+	});
+
+	it('applies the wide modifier only when requested', () => {
+		const plain = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		expect(plain.container.querySelector('.achip')?.classList.contains('wide')).toBe(false);
+		cleanup();
+		const wide = render(AttributeChip, { props: { attributeId: EAttribute.Strength, wide: true } });
+		expect(wide.container.querySelector('.achip')?.classList.contains('wide')).toBe(true);
+	});
+
+	it('drives the shared attribute tooltip across hover (enter/move/leave)', async () => {
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		const chip = container.querySelector('.achip') as HTMLElement;
+		await fireEvent.mouseEnter(chip);
+		expect(controller.show).toHaveBeenCalledWith(EAttribute.Strength, expect.anything());
+		await fireEvent.mouseMove(chip);
+		expect(controller.move).toHaveBeenCalled();
+		await fireEvent.mouseLeave(chip);
+		expect(controller.hide).toHaveBeenCalled();
+	});
+});

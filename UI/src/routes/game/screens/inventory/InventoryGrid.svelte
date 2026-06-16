@@ -142,14 +142,6 @@ const handleHoverLeave = () => {
 	justify-content: space-between;
 }
 
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
 .pager {
 	display: flex;
 	align-items: center;

@@ -6,11 +6,7 @@
 		labelColor={accent}
 	>
 		{#snippet trailing()}
-			<span class="rarity-tag">
-				<span class="rarity-dot" style:background={rc} style:box-shadow="0 0 6px {rarityTint(item.rarityId, 0.65)}"
-				></span>
-				<span class="rarity-label" style:color={rc}>{rarityLabel(item.rarityId)}</span>
-			</span>
+			<RarityTag rarityId={item.rarityId} style="margin-left: auto" />
 			<button class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
 		{/snippet}
 	</TooltipTitle>
@@ -47,14 +43,14 @@ import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipDescription from '$components/tooltip/TooltipDescription.svelte';
+import RarityTag from '$components/RarityTag.svelte';
 import { type Item } from '$lib/battle';
-import { itemCategoryColor, itemCategoryName, rarityColor, rarityLabel, rarityTint } from '$lib/common';
+import { itemCategoryColor, itemCategoryName } from '$lib/common';
 import { type InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
 
 const accent = $derived(itemCategoryColor(item.itemCategoryId));
-const rc = $derived(rarityColor(item.rarityId));
 const equipped = $derived(item.equipmentSlotId != null);
 
 // Merged item + applied-mod attributes, from the item's own source-of-truth
@@ -68,26 +64,6 @@ const attributeMap = $derived(item.totalAttributes?.getAttributeMap());
 // primitive; the drawer keeps only its category-coloured left-accent stripe.
 .drawer-header {
 	border-left: 3px solid;
-}
-
-.rarity-tag {
-	margin-left: auto;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-
-.rarity-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-}
-
-.rarity-label {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
 }
 
 .close {

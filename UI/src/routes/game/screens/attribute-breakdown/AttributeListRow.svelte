@@ -7,11 +7,7 @@
 	data-testid="attr-row-{meta.id}"
 	aria-pressed={active}
 	onclick={() => onSelect(meta.id)}
-	onmouseenter={(e) => attrTip?.show(meta.id, e)}
-	onmousemove={(e) => attrTip?.move(e)}
-	onmouseleave={() => attrTip?.hide()}
-	onfocus={(e) => attrTip?.show(meta.id, e.currentTarget)}
-	onblur={() => attrTip?.hide()}
+	use:attributeHover={{ controller: attrTip, id: meta.id }}
 >
 	<span class="info">
 		<span class="name-row">
@@ -29,6 +25,7 @@ import { attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
+import { attributeHover } from '$components/tooltip/attribute-hover';
 import StackBar from './StackBar.svelte';
 import { fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';
 

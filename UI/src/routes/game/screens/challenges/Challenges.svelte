@@ -153,22 +153,6 @@ onMount(async () => {
 	line-height: 1;
 }
 
-.mono-label {
-	font-family: var(--mono);
-	font-size: 9.5px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-
-	&.accent {
-		color: var(--accent-light);
-	}
-
-	&.sm {
-		font-size: 8.5px;
-	}
-}
-
 .chal-summary {
 	text-align: right;
 }

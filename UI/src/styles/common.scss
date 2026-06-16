@@ -96,6 +96,29 @@ h1 {
 	align-content: center;
 }
 
+// Monospaced uppercase eyebrow/label used across screens (section rules, footers, stat
+// captions). Promoted from ~10 byte-identical scoped copies. `.sm` is the compact variant;
+// `.accent`/`.done` recolour it for the highlighted/completed states that use it.
+.mono-label {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+
+	&.sm {
+		font-size: 8.5px;
+	}
+
+	&.accent {
+		color: var(--accent-light);
+	}
+
+	&.done {
+		color: var(--success);
+	}
+}
+
 input::placeholder {
 	color: var(--text-tertiary);
 }
