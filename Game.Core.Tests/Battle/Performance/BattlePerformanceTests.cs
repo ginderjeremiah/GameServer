@@ -408,15 +408,13 @@ namespace Game.Core.Tests.Battle.Performance
 
         private static Skill BuildSkill(int id, int multiplierCount, int effectsPerSkill, EffectMode effectMode)
         {
-            var multipliers = new List<AttributeModifier>(multiplierCount);
+            var multipliers = new List<DamageMultiplier>(multiplierCount);
             for (var i = 0; i < multiplierCount; i++)
             {
-                multipliers.Add(new AttributeModifier
+                multipliers.Add(new DamageMultiplier
                 {
                     Attribute = Strength,
                     Amount = 0.5,
-                    Type = EModifierType.Multiplicative,
-                    Source = EAttributeModifierSource.Derived,
                 });
             }
 

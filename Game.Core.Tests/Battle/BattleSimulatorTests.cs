@@ -122,12 +122,10 @@ namespace Game.Core.Tests.Battle
                     CooldownMs = 1000,
                     BaseDamage = 10,
                     DamageMultipliers = [
-                        new AttributeModifier
+                        new DamageMultiplier
                         {
                             Attribute = EAttribute.Strength,
                             Amount = 1.0,
-                            Type = EModifierType.Multiplicative,
-                            Source = EAttributeModifierSource.Derived,
                         }
                     ],
                     Effects = [],

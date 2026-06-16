@@ -18,6 +18,11 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
+                // Gear is additive-only by contract: ItemAttribute carries no modifier type, the
+                // BattlerAttribute wire contract can't express one, and the frontend mirror applies
+                // gear additively — so this is the only representable type, not an arbitrary default.
+                // Adding multiplicative gear means threading a modifier type across all three first
+                // (see backend-battle.md "Gear modifiers are additive-only").
                 Attributes = entity.ItemAttributes
                     .Select(ia => new AttributeModifier
                     {
@@ -46,6 +51,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 Type = (EItemModType)entity.ItemModTypeId,
                 Rarity = (ERarity)entity.RarityId,
+                // Additive-only by contract — see the note on item attributes above.
                 Attributes = entity.ItemModAttributes
                     .Select(ima => new AttributeModifier
                     {

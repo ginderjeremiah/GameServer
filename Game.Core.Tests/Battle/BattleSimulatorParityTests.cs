@@ -494,12 +494,10 @@ namespace Game.Core.Tests.Battle
                     ? []
                     :
                     [
-                        new AttributeModifier
+                        new DamageMultiplier
                         {
                             Attribute = mult.Value,
                             Amount = multAmount,
-                            Type = EModifierType.Multiplicative,
-                            Source = EAttributeModifierSource.Derived,
                         }
                     ],
                 Effects = effects ?? [],

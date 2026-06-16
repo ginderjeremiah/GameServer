@@ -78,9 +78,9 @@ namespace Game.Core.Tests.Battle
             // The active battler (attacker) has 10 Strength.
             // Multiplier: Strength × 2.0 bonus.
             // Expected: BaseDamage(5) + 10 * 2.0 = 25.
-            var multipliers = new List<AttributeModifier>
+            var multipliers = new List<DamageMultiplier>
             {
-                new() { Attribute = EAttribute.Strength, Amount = 2.0, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item }
+                new() { Attribute = EAttribute.Strength, Amount = 2.0 }
             };
             var skill = MakeSkill(cooldownMs: 1000, baseDamage: 5, multipliers: multipliers);
             var battleSkill = new BattleSkill(skill);
@@ -102,11 +102,11 @@ namespace Game.Core.Tests.Battle
             // must stay allocation-free (the prior LINQ `.Sum(lambda)` boxed a list enumerator and
             // captured a closure on every call — #286). Measure managed allocations on this thread
             // across a batch of calls and assert none, locking the optimization in against regression.
-            var multipliers = new List<AttributeModifier>
+            var multipliers = new List<DamageMultiplier>
             {
-                new() { Attribute = EAttribute.Strength,  Amount = 2.0, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
-                new() { Attribute = EAttribute.Endurance, Amount = 1.5, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
-                new() { Attribute = EAttribute.Agility,   Amount = 0.5, Type = EModifierType.Additive, Source = EAttributeModifierSource.Item },
+                new() { Attribute = EAttribute.Strength,  Amount = 2.0 },
+                new() { Attribute = EAttribute.Endurance, Amount = 1.5 },
+                new() { Attribute = EAttribute.Agility,   Amount = 0.5 },
             };
             var skill = MakeSkill(cooldownMs: 1000, baseDamage: 5, multipliers: multipliers);
             var battleSkill = new BattleSkill(skill);
@@ -134,7 +134,7 @@ namespace Game.Core.Tests.Battle
 
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        private static Skill MakeSkill(int cooldownMs, double baseDamage, List<AttributeModifier>? multipliers = null) => new()
+        private static Skill MakeSkill(int cooldownMs, double baseDamage, List<DamageMultiplier>? multipliers = null) => new()
         {
             Id = 1,
             Name = "Test Skill",

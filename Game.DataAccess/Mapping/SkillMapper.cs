@@ -1,6 +1,5 @@
 using Game.Core;
 using Game.Core.Attributes;
-using Game.Core.Attributes.Modifiers;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
@@ -56,12 +55,10 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 DamageMultipliers = entity.SkillDamageMultipliers
-                    .Select(sdm => new AttributeModifier
+                    .Select(sdm => new DamageMultiplier
                     {
                         Attribute = (EAttribute)sdm.AttributeId,
                         Amount = (double)sdm.Multiplier,
-                        Type = EModifierType.Multiplicative,
-                        Source = EAttributeModifierSource.Derived,
                     }).ToList(),
                 Effects = entity.SkillEffects
                     .Select(se => new CoreSkillEffect

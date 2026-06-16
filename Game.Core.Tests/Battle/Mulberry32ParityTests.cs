@@ -62,5 +62,39 @@ namespace Game.Core.Tests.Battle
                 Assert.Equal(numerator / Uint32Range, rng.Next());
             }
         }
+
+        /// <summary>
+        /// Number of draws taken before sampling the long-run tail. Chosen well past ~4.9M, the point
+        /// where a JS double accumulating the seed (<c>initialSeed + N*0x6D2B79F5</c>) exceeds 2^53 and
+        /// begins losing low bits — the latent divergence the frontend port guards against by truncating
+        /// the seed to a uint32 each step. The fixed-length <see cref="Vectors"/> table can't catch it.
+        /// </summary>
+        private const int LongRunDraws = 6_000_000;
+
+        private const uint LongRunSeed = 0xDEADBEEFu;
+
+        /// <summary>
+        /// The exact numerators of the final six draws of the <see cref="LongRunDraws"/>-long stream for
+        /// <see cref="LongRunSeed"/>. MUST be mirrored in the frontend suite's long-run case.
+        /// </summary>
+        private static readonly uint[] LongRunTailNumerators =
+            [2279814222, 2629024272, 2977756834, 4201168860, 3781448676, 52134473];
+
+        [Fact]
+        public void Parity_LongRun_MatchesExpectedTail()
+        {
+            var rng = new Mulberry32(LongRunSeed);
+            var tailStart = LongRunDraws - LongRunTailNumerators.Length;
+
+            for (var i = 0; i < tailStart; i++)
+            {
+                rng.Next();
+            }
+
+            foreach (var numerator in LongRunTailNumerators)
+            {
+                Assert.Equal(numerator / Uint32Range, rng.Next());
+            }
+        }
     }
 }

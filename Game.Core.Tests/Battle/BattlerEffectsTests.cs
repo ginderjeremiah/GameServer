@@ -163,7 +163,7 @@ namespace Game.Core.Tests.Battle
                 BaseDamage = 0,
                 DamageMultipliers =
                 [
-                    new AttributeModifier { Attribute = Strength, Amount = 1.0, Type = Multiplicative, Source = EAttributeModifierSource.Derived },
+                    new DamageMultiplier { Attribute = Strength, Amount = 1.0 },
                 ],
                 Effects = [Effect(1, Strength, Additive, 10, target: ESkillEffectTarget.Self)],
             });
