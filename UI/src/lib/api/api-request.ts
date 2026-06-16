@@ -7,7 +7,6 @@ import {
 } from './types/api-type-map';
 import { ApiResponse } from './api-response';
 import { keys } from '../common/functions';
-import { getAccessToken } from './token-store';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 import { ensureDeviceFingerprint, getDeviceFingerprint } from './device-fingerprint';
 
@@ -94,13 +93,16 @@ export class ApiRequest<U extends ApiEndpoint> {
 		payload?: any,
 		isRetry = false
 	): Promise<ApiResponse<ApiResponseTypes[U]>> {
+		let accessToken: string | null = null;
 		if (this.requiresAuth) {
-			await ensureValidAccessToken();
+			// Refresh pre-emptively if needed and carry the resulting token straight through to send(),
+			// rather than re-reading the token store there.
+			accessToken = await ensureValidAccessToken();
 			// Compute the device fingerprint (once, then cached) so it can be attached below.
 			await ensureDeviceFingerprint();
 		}
 
-		const response = await this.send(method, url, payload);
+		const response = await this.send(method, url, payload, accessToken);
 
 		if (response.status === 401 && this.requiresAuth && !isRetry) {
 			const refreshed = await refreshTokens();
@@ -118,7 +120,8 @@ export class ApiRequest<U extends ApiEndpoint> {
 		method: 'GET' | 'POST',
 		url: string,
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the typed overloads above guarantee the payload matches the endpoint; this is the shared implementation.
-		payload?: any
+		payload?: any,
+		accessToken: string | null = null
 	): Promise<ApiResponse<ApiResponseTypes[U]>> {
 		const headers: Record<string, string> = {};
 		if (method === 'POST') {
@@ -126,7 +129,6 @@ export class ApiRequest<U extends ApiEndpoint> {
 		}
 
 		if (this.requiresAuth) {
-			const accessToken = getAccessToken();
 			if (accessToken) {
 				headers['Authorization'] = `Bearer ${accessToken}`;
 			}

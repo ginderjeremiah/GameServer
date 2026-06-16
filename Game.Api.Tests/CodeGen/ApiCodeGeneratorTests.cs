@@ -45,8 +45,6 @@ namespace Game.Api.Tests.CodeGen
         [InlineData(nameof(GameConstants.MaxSelectedSkills))]
         [InlineData(nameof(GameConstants.ExpPerLevel))]
         [InlineData(nameof(GameConstants.StatPointsPerLevel))]
-        [InlineData(nameof(GameConstants.MaxExpRewardMultiplier))]
-        [InlineData(nameof(GameConstants.MaxExpPerGrant))]
         public void GetClientMirroredConstantFields_IncludesGameConstants(string fieldName)
         {
             var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
@@ -54,6 +52,19 @@ namespace Game.Api.Tests.CodeGen
                 .ToList();
 
             Assert.Contains(fieldName, fieldNames);
+        }
+
+        [Theory]
+        [InlineData(nameof(ServerGameConstants.MaxExpRewardMultiplier))] // server-authoritative reward clamp
+        [InlineData(nameof(ServerGameConstants.MaxExpPerGrant))]         // server-only anti-cheat backstop
+        public void GetClientMirroredConstantFields_ExcludesServerOnlyConstants(string fieldName)
+        {
+            // ServerGameConstants carries no [ClientMirrored], so its values must never reach the client.
+            var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
+                .Select(field => field.Name)
+                .ToList();
+
+            Assert.DoesNotContain(fieldName, fieldNames);
         }
 
         [Fact]

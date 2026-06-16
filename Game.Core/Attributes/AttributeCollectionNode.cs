@@ -5,7 +5,13 @@ namespace Game.Core.Attributes
 {
     internal class AttributeCollectionNode
     {
-        public SortedLinkedList<AttributeModifier> Modifiers { get; } = new(new AttributeModifierNullUnsafeTypeComparer());
+        // Orders modifiers by type. Built from a non-nullable Comparison delegate so the comparer needs
+        // no null-forgiving operator on this mid-battle add/remove hot path, and shared as a single static
+        // instance rather than allocated per node.
+        private static readonly IComparer<AttributeModifier> TypeComparer =
+            Comparer<AttributeModifier>.Create(static (x, y) => x.Type - y.Type);
+
+        public SortedLinkedList<AttributeModifier> Modifiers { get; } = new(TypeComparer);
         public double? CachedValue { get; private set; }
         public HashSet<AttributeCollectionNode> DerivedNodes { get; } = [];
 
