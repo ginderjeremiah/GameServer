@@ -23,7 +23,7 @@ This is the feature the seeded battle RNG (`Mulberry32` + `BattleSeed`) has been
 
 Settled with the project owner during the spike:
 
-1. **Decimal storage convention for percentage attributes — `0.05` means 5%, used as-is in calculations.** No `×100` / `÷100` transform in the battle math. A `CriticalChance` of `0.05` is compared directly against a `[0,1)` RNG draw; a `CriticalDamage` of `0.5` means `×(1 + 0.5)` = a 1.5× hit. This settles the storage convention #528 deferred ("5 vs 0.05 — settled when crit/dodge are implemented"). `BlockReduction` is a **flat** value (like Defense), not a percentage.
+1. **Decimal storage convention for percentage attributes — `0.05` means 5%, used as-is in calculations.** No `×100` / `÷100` transform in the battle math. A `CriticalChance` of `0.05` is compared directly against a `[0,1)` RNG draw; a `CriticalDamage` of `1.5` is the crit multiplier **read directly** (a 1.5× hit) — the same base-multiplier convention as the CooldownRecovery rebase below, not a `1 + value` bonus. This settles the storage convention #528 deferred ("5 vs 0.05 — settled when crit/dodge are implemented"). `BlockReduction` is a **flat** value (like Defense), not a percentage.
 2. **Rebase `CooldownRecovery` to a base-`1` multiplier.** Every battler gets a static `1.0` base and bonuses are decimals (`0.05` = +5%), so the cooldown multiplier is the attribute **read directly** (drop the `1 + CDR/100` transform). This makes multiplicative modifiers behave intuitively — a `2×` CooldownRecovery buff genuinely doubles charge speed (halves the effective cooldown) instead of nudging `1.09 → 1.18`. It is bundled here because crit/dodge/block establish the same decimal convention. The derived coefficients are rescaled so existing behaviour is preserved exactly (see below).
 3. **Crit applies pre-Defense; block is a flat reduction alongside Defense; dodge fully negates.** A crit multiplies the **raw** skill damage before the defender's Defense subtraction; a block adds `BlockReduction` as a second flat reduction in the same clamp as Defense; a dodge zeroes the hit. (See [Runtime semantics](#runtime-semantics-parity-critical).)
 4. **Values come from core-attribute derivations *and* gear/effects.** New `StaticAttributeModifiers` rows derive crit/dodge/block from the core attributes (the enum descriptions already hint the mapping: DEX/LUK → crit, AGI → dodge, END → block), so the feature is live from raw allocations; items/item-mods/skill-effects can also grant them (they already carry arbitrary `EAttribute` modifiers). The derivation coefficients are a **conservative strawman to tune** (see [Derivation](#derivation-strawman--tunable)).
@@ -32,12 +32,12 @@ Settled with the project owner during the spike:
 
 ## The attribute convention & CooldownRecovery rebase
 
-Percentage attributes are stored as **decimal fractions** and consumed without transformation:
+Percentage- and multiplier-style attributes are stored so they can be consumed without transformation:
 
 | Attribute | Stored | Used in battle as |
 | --- | --- | --- |
 | `CriticalChance` / `DodgeChance` / `BlockChance` | `0.05` = 5% | probability, compared `rng.Next() < chance` |
-| `CriticalDamage` | `0.5` = +50% | damage multiplier `× (1 + value)` |
+| `CriticalDamage` | `1.5` (base `1.5`) | crit damage multiplier, **read directly** (like `CooldownRecovery`) |
 | `BlockReduction` | flat (e.g. `20`) | flat damage reduction, like Defense |
 | `CooldownRecovery` | `1.09` (base `1` + `0.09` bonus) | cooldown multiplier, **read directly** |
 
@@ -46,7 +46,7 @@ Percentage attributes are stored as **decimal fractions** and consumed without t
 - `StaticAttributeModifiers`: add a `BaseValue` of `1.0` for `CooldownRecovery`, and rescale the derived coefficients by `÷100` → `+0.004·Agility + 0.001·Dexterity`. AGI 20, DEX 10 → `1 + 0.08 + 0.01 = 1.09` — **identical** to today.
 - `Battler.GetCooldownMultiplier()` (BE) and `cooldownMultiplier()` (FE, `battle-formulas.ts`) become `return attributes[CooldownRecovery]` (drop `1 + x/100`). Audit every consumer of that formula (the shared display surfaces — skills page, skill tooltips — go through the same function, so they follow automatically).
 - The non-buff CDR parity scenarios keep their expected `totalMs` (the value is unchanged); only the CDR-*buff* scenarios re-author their effect amounts (a "double speed" buff becomes `+1.0` additive or a `×2` multiplicative on the base `1`).
-- Display: `CooldownRecovery` is now a multiplier centred at `1` — the Attribute display metadata (`IsPercentage`/`Decimals`) needs a small revisit so it renders sensibly (e.g. `1.09×` or `+9%`), folded into the foundation work.
+- Display: `CooldownRecovery` (base `1`) — and, once crit lands, `CriticalDamage` (base `1.5`) — are multiplier-style attributes, so the Attribute display metadata (`IsPercentage`/`Decimals`) needs a small revisit to render them sensibly (e.g. `1.09×` / `1.5×` rather than `109%` / `150%`). The CDR revisit is in the foundation work; `CriticalDamage`'s follows with the crit display.
 
 ## Runtime semantics (parity-critical)
 
@@ -63,7 +63,7 @@ Draws are **unconditional**: a skill that deals zero damage (a pure buff) still 
 
 ### Crit / dodge / block math
 
-- **Crit (player attacking):** roll `c = rng.Next()`. `isCrit = c < CriticalChance`. The raw skill damage is multiplied by `(1 + CriticalDamage)` on a crit, **then** the enemy's `Defense` is subtracted (clamped ≥ 0). Crit therefore lands before mitigation, so high crit damage punches through Defense.
+- **Crit (player attacking):** roll `c = rng.Next()`. `isCrit = c < CriticalChance`. The raw skill damage is multiplied by `CriticalDamage` (read directly, base `1.5`) on a crit, **then** the enemy's `Defense` is subtracted (clamped ≥ 0). Crit therefore lands before mitigation, so high crit damage punches through Defense.
 - **Dodge (enemy attacking the player):** roll `d = rng.Next()`. `isDodge = d < DodgeChance`. On a dodge the hit deals **0** (fully avoided; Defense/block irrelevant).
 - **Block (enemy attacking the player):** roll `b = rng.Next()` (always, even if dodged). `isBlock = b < BlockChance`. On a non-dodged block the player's `TakeDamage` subtracts `Defense + BlockReduction` in one clamp (`max(raw − Defense − BlockReduction, 0)`); a dodged hit ignores the block result.
 
@@ -81,12 +81,12 @@ New `StaticAttributeModifiers` rows feed crit/dodge/block from the core attribut
 | Attribute | Strawman derivation | Example (DEX/LUK/AGI/END = 20) |
 | --- | --- | --- |
 | `CriticalChance` | `0.002·Dexterity + 0.001·Luck` | DEX 20 → 0.04 (4%) |
-| `CriticalDamage` | base `0.5` + `0.0025·Luck` | LUK 20 → 0.55 (+55%) |
-| `DodgeChance` | `0.0015·Agility` | AGI 20 → 0.03 (3%) |
+| `CriticalDamage` | base `1.5` + `0.0025·Luck` | LUK 20 → 1.55 (×1.55) |
+| `DodgeChance` | `0.001·Agility` | AGI 20 → 0.02 (2%) |
 | `BlockChance` | `0.002·Endurance` | END 20 → 0.04 (4%) |
 | `BlockReduction` | base `2` + `0.5·Endurance` | END 20 → 12 flat |
 
-`CriticalDamage` carries a **base** so a crit is worth something even before gear (a derived `CriticalChance` with no crit-damage source would crit for +0%). Gear/item-mods/skill-effects layer on top of these through the normal modifier path. Because the frontend `STATIC_ATTRIBUTE_MODIFIERS` table is **codegen'd** from `StaticAttributeModifiers.All`, the rows mirror to the client automatically.
+`CriticalDamage` carries a **base multiplier** of `1.5` so a crit is worth something even before gear — with no crit-damage source a crit would otherwise do `×1` (nothing). Like `CooldownRecovery` it is read directly, so a `×2` multiplicative modifier doubles the crit multiplier intuitively. Gear/item-mods/skill-effects layer on top of these through the normal modifier path. Because the frontend `STATIC_ATTRIBUTE_MODIFIERS` table is **codegen'd** from `StaticAttributeModifiers.All`, the rows mirror to the client automatically.
 
 ## Changes by area
 
@@ -108,14 +108,14 @@ The RNG draw order is the riskiest surface this spike adds: both simulators must
 
 ## Implementation issues
 
-Tracked as sub-issues of #178 _(filled in on creation)_:
+Tracked as sub-issues of #178:
 
-1. **Foundation — decimal percentage convention + CooldownRecovery rebase** *(foundation)* — area **A**.
-2. **Battle runtime — seeded RNG draw order + player crit/dodge/block** *(depends on 1)* — area **B**. The parity-critical core.
-3. **Sourcing — derive crit/dodge/block from core attributes + gear authoring** *(depends on 2)* — area **C**.
-4. **UI — crit/dodge/block combat log + display** *(depends on 2)* — area **D**.
+1. **[#797](https://github.com/ginderjeremiah/GameServer/issues/797) — Foundation: decimal percentage convention + CooldownRecovery rebase** *(foundation)* — area **A**.
+2. **[#798](https://github.com/ginderjeremiah/GameServer/issues/798) — Battle runtime: seeded RNG draw order + player crit/dodge/block** *(depends on #797)* — area **B**. The parity-critical core.
+3. **[#799](https://github.com/ginderjeremiah/GameServer/issues/799) — Sourcing: derive crit/dodge/block from core attributes + gear authoring** *(depends on #798)* — area **C**.
+4. **[#800](https://github.com/ginderjeremiah/GameServer/issues/800) — UI: crit/dodge/block combat log + display** *(depends on #798)* — area **D**.
 
-**1** is the foundation; **2** is the core mechanic; **3** and **4** follow **2** and can run in parallel.
+**#797** is the foundation; **#798** is the core mechanic; **#799** and **#800** follow **#798** and can run in parallel. Deferred follow-ups are tracked standalone in **[#801](https://github.com/ginderjeremiah/GameServer/issues/801)** (not a sub-issue, so closing the spike doesn't depend on them).
 
 ## Documentation to update on landing
 
@@ -124,6 +124,8 @@ Tracked as sub-issues of #178 _(filled in on creation)_:
 - `docs/backend.md` / `docs/frontend.md` — battle-parity sections: the seeded RNG stream as a new parity surface, if a cross-cutting mention is warranted.
 
 ## Out of scope / deferred
+
+The first five are tracked standalone in **[#801](https://github.com/ginderjeremiah/GameServer/issues/801)** (split into their own issues when picked up); proc chance is #336's.
 
 - **Enemy crit/dodge/block.** Player-only by decision; the gating leaves a clean seam (enemy crit adds a draw on enemy attacks; enemy dodge/block adds draws on player attacks — a stream change, safe since no mid-battle RNG state is persisted across versions).
 - **Statistics & challenges** (crit/dodge/block counts, challenge hooks) — a tracked follow-up.
