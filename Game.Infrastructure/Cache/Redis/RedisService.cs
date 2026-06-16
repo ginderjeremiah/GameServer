@@ -24,8 +24,10 @@ namespace Game.Infrastructure.Cache.Redis
         // zero-overhead no-op (it returns the same task), so the default-token callers pay nothing.
         //
         // For write operations the abandoned command's eventual fault would otherwise go unobserved — a silently
-        // failed write with no signal — so they route through ObserveWrite, which attaches a fault-logging
-        // continuation when (and only when) the await is cancelled.
+        // failed write with no signal — so every mutating call (including the read-modify-write GetSet/GetDelete)
+        // routes through ObserveWrite, which attaches a fault-logging continuation when (and only when) the await
+        // is cancelled. Pure reads (Get) are exempt: a post-cancellation fault there loses only an unobserved
+        // read, not a write.
 
         public async Task<string?> Get(string key, CancellationToken cancellationToken = default)
         {
@@ -40,7 +42,8 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task<string?> GetDelete(string key, CancellationToken cancellationToken = default)
         {
-            return await Redis.StringGetDeleteAsync(key).WaitAsync(cancellationToken);
+            // Read-and-delete is a write (it removes the key), so it routes through ObserveWrite too.
+            return await ObserveWrite(Redis.StringGetDeleteAsync(key), cancellationToken);
         }
 
         public async Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default)
@@ -51,7 +54,8 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task<string?> GetSet(string key, string? value, CancellationToken cancellationToken = default)
         {
-            return await Redis.StringGetSetAsync(key, value).WaitAsync(cancellationToken);
+            // Read-and-set is a write (it stores the new value), so it routes through ObserveWrite too.
+            return await ObserveWrite(Redis.StringGetSetAsync(key, value), cancellationToken);
         }
 
         public async Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default)
