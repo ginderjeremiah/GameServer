@@ -392,19 +392,21 @@ export class LoomGame {
 			if (e.resolved || e.resolve == null) {
 				continue;
 			}
-			if (e.resolve > a && e.resolve <= b) {
+			// `resolve` is narrowed to a number by the null check above; pass it through so the
+			// handlers don't need to re-assert it.
+			const resolve = e.resolve;
+			if (resolve > a && resolve <= b) {
 				if (e.type === 'enemyhit' || e.type === 'enemychannel') {
-					this.resolveEnemyHit(e);
+					this.resolveEnemyHit(e, resolve);
 				} else {
-					this.resolvePlayerStrike(e);
+					this.resolvePlayerStrike(e, resolve);
 				}
 			}
 		}
 	}
 
-	private resolveEnemyHit(e: Entity): void {
+	private resolveEnemyHit(e: Entity, resolve: number): void {
 		e.resolved = true;
-		const resolve = e.resolve as number;
 		if (spanActiveAt(this.blockLane, resolve)) {
 			this.flash(FLASH_Y.topImpact, 'BLOCK', FLASH_COLOR.block);
 			return;
@@ -421,12 +423,8 @@ export class LoomGame {
 		}
 	}
 
-	private resolvePlayerStrike(e: Entity): void {
-		if (e.cancelled) {
-			return;
-		}
+	private resolvePlayerStrike(e: Entity, resolve: number): void {
 		e.resolved = true;
-		const resolve = e.resolve as number;
 		const outcome = resolveStrike(e.dmg ?? 0, resolve, this.crits, this.enemyGuardLane);
 		if (outcome.crit) {
 			const mark = this.crits.find((c) => !c.used && Math.round(c.tick) === Math.round(resolve));

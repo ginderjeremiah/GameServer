@@ -18,6 +18,7 @@
 
 import { EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
 import { staticData } from '$stores';
+import { statCategoryLabel } from './statistics-display';
 
 export type StatUnit = 'count' | 'damage' | 'time';
 export type StatAgg = 'sum' | 'max' | 'min';
@@ -133,12 +134,13 @@ export function buildStatEntities(): Record<StatEntityKind, StatEntity[]> {
 	};
 }
 
-export const STAT_CATEGORIES: { key: StatCategory; label: string }[] = [
-	{ key: 'combat', label: 'Combat' },
-	{ key: 'survival', label: 'Survival' },
-	{ key: 'exploration', label: 'Exploration' },
-	{ key: 'time', label: 'Time' }
-];
+/** The four stat categories in display order; labels come from the single source in
+ *  `statistics-display` so the tab labels and the category accents can't drift apart. */
+const STAT_CATEGORY_KEYS: StatCategory[] = ['combat', 'survival', 'exploration', 'time'];
+export const STAT_CATEGORIES: { key: StatCategory; label: string }[] = STAT_CATEGORY_KEYS.map((key) => ({
+	key,
+	label: statCategoryLabel(key)
+}));
 
 export const ENTITY_KINDS: StatEntityKind[] = ['enemy', 'zone', 'skill'];
 

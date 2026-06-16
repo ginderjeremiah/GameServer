@@ -149,35 +149,33 @@ export function slotLabel(slot: number | undefined): string {
 	return slot != null ? (SLOT_LABELS[slot] ?? '') : '';
 }
 
-/** The primary label for one contribution line: the source attribute for a
- *  derived line, a fixed phrase for base/stat-point lines, or the item/mod name
- *  for gear. */
-export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
+/** Shared shape of a contribution-line label: both the full and the short variants resolve a derived
+ *  line to its source attribute and any gear line to the item/mod name, differing only in the fixed
+ *  phrasing used for the base-value and stat-point sources (`base`/`statPoints`). */
+function contributionLabel(line: AppliedModifier<LabeledModifier>, base: string, statPoints: string): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
 			return attributeName(line.derivedSource, staticData.attributes);
 		case EAttributeModifierSource.PlayerStatPoints:
-			return 'Allocated stat points';
+			return statPoints;
 		case EAttributeModifierSource.BaseValue:
-			return 'Engine base value';
+			return base;
 		default:
 			return line.label ?? '';
 	}
 }
 
+/** The primary label for one contribution line: the source attribute for a
+ *  derived line, a fixed phrase for base/stat-point lines, or the item/mod name
+ *  for gear. */
+export function modifierLabel(line: AppliedModifier<LabeledModifier>): string {
+	return contributionLabel(line, 'Engine base value', 'Allocated stat points');
+}
+
 /** A shortened label for the dense apply-order trace (e.g. `Base`, `Stat
  *  points`, or the derived source attribute / item name). */
 export function traceLabel(line: AppliedModifier<LabeledModifier>): string {
-	switch (line.source) {
-		case EAttributeModifierSource.Derived:
-			return attributeName(line.derivedSource, staticData.attributes);
-		case EAttributeModifierSource.PlayerStatPoints:
-			return 'Stat points';
-		case EAttributeModifierSource.BaseValue:
-			return 'Base';
-		default:
-			return line.label ?? '';
-	}
+	return contributionLabel(line, 'Base', 'Stat points');
 }
 
 /* ── modifier assembly (mirrors Player.GetAllModifiers + static modifiers) ──── */

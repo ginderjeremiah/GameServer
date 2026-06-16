@@ -1,15 +1,12 @@
 import { ApiRequest } from './api-request';
 import type { IDeviceInfoRequest } from './types';
+import type { NavigatorWithCapabilities } from './navigator';
 
 /**
  * Reports the device capabilities that aren't carried on a regular request (and aren't part of the
  * fingerprint header): `deviceMemory` and `hardwareConcurrency`. Sent once after login to enrich the
  * device record — the device itself is identified by the fingerprint header the request layer attaches.
  */
-
-interface NavigatorWithCapabilities extends Navigator {
-	deviceMemory?: number;
-}
 
 /** Reads the JS-only device capabilities from the navigator. */
 export const collectDeviceInfo = (): IDeviceInfoRequest => {

@@ -105,11 +105,10 @@ export interface SettingsCatDef {
 	label: string;
 	glyph: SettingsGlyphKind;
 	built: boolean;
-	blurb?: string;
 }
 
 export const SETTINGS_CATS: SettingsCatDef[] = [
-	{ key: 'logging', label: 'Logging', glyph: 'logging', built: true, blurb: 'Combat Log' },
+	{ key: 'logging', label: 'Logging', glyph: 'logging', built: true },
 	{ key: 'display', label: 'Display', glyph: 'display', built: false },
 	{ key: 'audio', label: 'Audio', glyph: 'audio', built: false },
 	{ key: 'gameplay', label: 'Gameplay', glyph: 'gameplay', built: false },
@@ -143,7 +142,7 @@ export class OptionsView {
 	}
 
 	/** Log types whose draft value differs from the persisted baseline. */
-	readonly dirtyIds = $derived(LOG_TYPES.filter((lt) => this.draft[lt.id] !== this.baseline[lt.id]).map((lt) => lt.id));
+	readonly dirtyIds = $derived(LOG_TYPES.filter((lt) => this.isDirtyId(lt.id)).map((lt) => lt.id));
 	readonly dirtyCount = $derived(this.dirtyIds.length);
 	readonly isDirty = $derived(this.dirtyCount > 0);
 	readonly enabledCount = $derived(LOG_TYPES.filter((lt) => this.draft[lt.id]).length);
@@ -152,6 +151,8 @@ export class OptionsView {
 		return !!this.draft[id];
 	}
 
+	/** Whether a log type's draft value differs from the persisted baseline — the single
+	 *  dirty predicate the dirty set and the changed-preferences diff both build on. */
 	isDirtyId(id: ELogType): boolean {
 		return this.draft[id] !== this.baseline[id];
 	}
@@ -183,7 +184,7 @@ export class OptionsView {
 	 *  Computed from plain state (not the `$derived` getters) so it is safe to
 	 *  read from non-reactive call sites like {@link save}. */
 	get changedPreferences(): ILogPreference[] {
-		return LOG_TYPES.filter((lt) => this.draft[lt.id] !== this.baseline[lt.id]).map((lt) => ({
+		return LOG_TYPES.filter((lt) => this.isDirtyId(lt.id)).map((lt) => ({
 			id: lt.id,
 			enabled: this.draft[lt.id]
 		}));

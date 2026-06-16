@@ -77,7 +77,7 @@ const skillReward = (revealed: boolean): ResolvedReward =>
 		revealed,
 		rarity: ERarity.Common,
 		accent: 'var(--accent-light)',
-		glow: '0',
+		glow: null,
 		name: 'Firebolt',
 		sub: 'Skill',
 		skill: previewSkill()

@@ -21,13 +21,17 @@ interface Props {
 
 let { view }: Props = $props();
 
-const kindTabs: Tab[] = ENTITY_KINDS.map((k) => ({
-	key: k,
-	label: statKindPlural(k),
-	color: statKindColor(k),
-	count: view.data.entityList(k).length,
-	glyphKind: k
-}));
+// `$derived` (not a plain const) so the per-kind counts track live `staticData`
+// changes, mirroring `ByStatisticView`'s tabs.
+const kindTabs = $derived<Tab[]>(
+	ENTITY_KINDS.map((k) => ({
+		key: k,
+		label: statKindPlural(k),
+		color: statKindColor(k),
+		count: view.data.entityList(k).length,
+		glyphKind: k
+	}))
+);
 </script>
 
 <style lang="scss">

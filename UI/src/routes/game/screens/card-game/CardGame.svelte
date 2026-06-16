@@ -27,6 +27,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { CardGameView } from './card-game-view.svelte';
+import { runLoomLoop, bindLoomInput } from './loom-input';
 import Combatants from './loom/Combatants.svelte';
 import SandboxStrip from './loom/SandboxStrip.svelte';
 import Board from './loom/Board.svelte';
@@ -37,60 +38,11 @@ import Legend from './loom/Legend.svelte';
 const view = new CardGameView();
 
 onMount(() => {
-	// Real-time render/sim loop — the present advances on its own.
-	let last: number | null = null;
-	let raf = 0;
-	const loop = (ts: number) => {
-		if (last === null) {
-			last = ts;
-		}
-		const dt = (ts - last) / 1000;
-		last = ts;
-		view.game.advance(dt);
-		raf = requestAnimationFrame(loop);
-	};
-	raf = requestAnimationFrame(loop);
-
-	// Hotkeys: 1–7 quick-cast a hand slot, hold Space for Reflex slow-time.
-	// Yields to focused sandbox sliders so they keep working.
-	const onKeyDown = (e: KeyboardEvent) => {
-		const ae = document.activeElement;
-		if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
-			return;
-		}
-		if (e.code === 'Space') {
-			e.preventDefault();
-			if (!e.repeat) {
-				view.setReflex(true);
-			}
-			return;
-		}
-		if (view.game.over) {
-			return;
-		}
-		if (e.key >= '1' && e.key <= '7') {
-			view.castSlot(+e.key - 1);
-		}
-	};
-	const onKeyUp = (e: KeyboardEvent) => {
-		if (e.code === 'Space') {
-			view.setReflex(false);
-		}
-	};
-	// Releasing or cancelling the pointer anywhere ends a held Reflex (the button is press-and-hold).
-	const endReflex = () => view.setReflex(false);
-
-	window.addEventListener('keydown', onKeyDown);
-	window.addEventListener('keyup', onKeyUp);
-	window.addEventListener('pointerup', endReflex);
-	window.addEventListener('pointercancel', endReflex);
-
+	const stopLoop = runLoomLoop(view);
+	const unbindInput = bindLoomInput(view);
 	return () => {
-		cancelAnimationFrame(raf);
-		window.removeEventListener('keydown', onKeyDown);
-		window.removeEventListener('keyup', onKeyUp);
-		window.removeEventListener('pointerup', endReflex);
-		window.removeEventListener('pointercancel', endReflex);
+		stopLoop();
+		unbindInput();
 	};
 });
 </script>

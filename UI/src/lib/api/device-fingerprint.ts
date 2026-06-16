@@ -5,22 +5,13 @@
  * sessions; it is cached in memory and local storage to avoid recomputing.
  */
 
-const STORAGE_KEY = 'gameserver.device-fingerprint';
+import { safeLocalStorage } from '$lib/common/local-storage';
+import type { NavigatorWithCapabilities } from './navigator';
 
-interface NavigatorWithCapabilities extends Navigator {
-	deviceMemory?: number;
-}
+const STORAGE_KEY = 'gameserver.device-fingerprint';
 
 let cached: string | undefined;
 let pending: Promise<string | undefined> | null = null;
-
-const storage = (): Storage | null => {
-	try {
-		return typeof localStorage !== 'undefined' ? localStorage : null;
-	} catch {
-		return null;
-	}
-};
 
 /**
  * The stable client-side signals that make up the fingerprint. Kept deterministic (no
@@ -76,7 +67,7 @@ export const getDeviceFingerprint = (): string | undefined => {
 		return cached;
 	}
 
-	const stored = storage()?.getItem(STORAGE_KEY) ?? undefined;
+	const stored = safeLocalStorage()?.getItem(STORAGE_KEY) ?? undefined;
 	if (stored) {
 		cached = stored;
 	}
@@ -103,7 +94,7 @@ export const ensureDeviceFingerprint = async (): Promise<string | undefined> => 
 		if (hash) {
 			cached = hash;
 			try {
-				storage()?.setItem(STORAGE_KEY, hash);
+				safeLocalStorage()?.setItem(STORAGE_KEY, hash);
 			} catch {
 				// Local storage unavailable (private mode) — the in-memory cache still serves the session.
 			}
