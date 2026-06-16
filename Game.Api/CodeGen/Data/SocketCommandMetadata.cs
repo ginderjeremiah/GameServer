@@ -19,8 +19,12 @@ namespace Game.Api.CodeGen.Data
             // member, and the generic argument is read with a guarded index.
             if (socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommandWithResponseData<>)) is not null)
             {
-                var method = socketCommand.GetMethod(nameof(AbstractSocketCommandWithResponseData<>.HandleExecute));
-                if (method is not null && method.ReturnParameter.GetNullabilityInfo().GenericTypeArguments is [var responseArg, ..])
+                // HandleExecuteAsync returns Task<ApiSocketResponse<T>>; peel the Task and the response
+                // envelope to reach T (the data type the generated client surfaces).
+                var method = socketCommand.GetMethod(nameof(AbstractSocketCommandWithResponseData<>.HandleExecuteAsync));
+                if (method is not null
+                    && method.ReturnParameter.GetNullabilityInfo().GenericTypeArguments is [var responseEnvelope]
+                    && responseEnvelope.GenericTypeArguments is [var responseArg, ..])
                 {
                     ResponseDescriptor = new CodeGenTypeDescriptor(responseArg);
                 }

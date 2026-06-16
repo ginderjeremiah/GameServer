@@ -87,9 +87,9 @@ namespace Game.Api.Tests.CodeGen
     {
         public override string Name { get; set; } = "TestWithResponse";
 
-        public override ApiSocketResponse<SimpleModel> HandleExecute(SocketContext context)
+        public override Task<ApiSocketResponse<SimpleModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success(new SimpleModel());
+            return Task.FromResult(Success(new SimpleModel()));
         }
     }
 
@@ -97,9 +97,9 @@ namespace Game.Api.Tests.CodeGen
     {
         public override string Name { get; set; } = "TestWithParams";
 
-        public override ApiSocketResponse Execute(SocketContext context)
+        public override Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success();
+            return Task.FromResult(Success());
         }
     }
 
@@ -107,9 +107,9 @@ namespace Game.Api.Tests.CodeGen
     {
         public override string Name { get; set; } = "TestFull";
 
-        public override ApiSocketResponse<SimpleModel> HandleExecute(SocketContext context)
+        public override Task<ApiSocketResponse<SimpleModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success(new SimpleModel());
+            return Task.FromResult(Success(new SimpleModel()));
         }
     }
 
@@ -117,9 +117,9 @@ namespace Game.Api.Tests.CodeGen
     {
         public override string Name { get; set; } = "TestBasic";
 
-        public override ApiSocketResponse Execute(SocketContext context)
+        public override Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success();
+            return Task.FromResult(Success());
         }
     }
 
@@ -131,7 +131,7 @@ namespace Game.Api.Tests.CodeGen
     }
 
     // A basic command (no params/response generic base) that nonetheless declares members named
-    // "Parameters" and "HandleExecute". Resolving by raw member name would mis-extract these; gating on
+    // "Parameters" and "HandleExecuteAsync". Resolving by raw member name would mis-extract these; gating on
     // the typed generic base means neither descriptor is set.
     public class TestSocketCommandWithDecoyMembers : AbstractSocketCommand
     {
@@ -139,14 +139,14 @@ namespace Game.Api.Tests.CodeGen
 
         public string Parameters { get; set; } = "";
 
-        public int HandleExecute(SocketContext context)
+        public int HandleExecuteAsync(SocketContext context)
         {
             return 0;
         }
 
-        public override ApiSocketResponse Execute(SocketContext context)
+        public override Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success();
+            return Task.FromResult(Success());
         }
     }
 }

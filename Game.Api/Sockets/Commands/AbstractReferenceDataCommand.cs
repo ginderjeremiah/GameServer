@@ -11,14 +11,14 @@ namespace Game.Api.Sockets.Commands
     /// <typeparam name="TModel">The API model type returned in the collection.</typeparam>
     public abstract class AbstractReferenceDataCommand<TModel> : AbstractSocketCommandWithResponseData<IEnumerable<TModel>>, IReferenceDataCommand
     {
-        public override ApiSocketResponse<IEnumerable<TModel>> HandleExecute(SocketContext context)
+        public override Task<ApiSocketResponse<IEnumerable<TModel>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Success(GetReferenceData());
+            return Task.FromResult(Success(GetReferenceData()));
         }
 
         /// <summary>
         /// Hashes this set's current data so the frontend can detect a stale cache. Computed from
-        /// the same models <see cref="HandleExecute"/> returns, so the version tracks exactly what
+        /// the same models <see cref="HandleExecuteAsync"/> returns, so the version tracks exactly what
         /// a client would download.
         /// </summary>
         public string ComputeVersion()

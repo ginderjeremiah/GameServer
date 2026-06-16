@@ -23,7 +23,7 @@ namespace Game.Api.Sockets.Commands
             _referenceDataCommands = referenceDataCommands;
         }
 
-        public override ApiSocketResponse<IEnumerable<ReferenceDataVersion>> HandleExecute(SocketContext context)
+        public override Task<ApiSocketResponse<IEnumerable<ReferenceDataVersion>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var versions = _referenceDataCommands
                 .Select(command => new ReferenceDataVersion
@@ -34,7 +34,7 @@ namespace Game.Api.Sockets.Commands
                 .OrderBy(version => version.Command, StringComparer.Ordinal)
                 .ToList();
 
-            return Success<IEnumerable<ReferenceDataVersion>>(versions);
+            return Task.FromResult(Success<IEnumerable<ReferenceDataVersion>>(versions));
         }
     }
 }

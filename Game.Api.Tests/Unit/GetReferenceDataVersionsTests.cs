@@ -15,7 +15,7 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void HandleExecute_ReturnsOneVersionPerReferenceDataCommand()
+        public async Task HandleExecuteAsync_ReturnsOneVersionPerReferenceDataCommand()
         {
             var command = new GetReferenceDataVersions(
             [
@@ -24,7 +24,7 @@ namespace Game.Api.Tests.Unit
             ]);
 
             // The command ignores the socket context entirely.
-            var response = command.HandleExecute(null!);
+            var response = await command.HandleExecuteAsync(null!, CancellationToken.None);
 
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
@@ -34,7 +34,7 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void HandleExecute_OrdersVersionsByCommandName()
+        public async Task HandleExecuteAsync_OrdersVersionsByCommandName()
         {
             var command = new GetReferenceDataVersions(
             [
@@ -43,7 +43,7 @@ namespace Game.Api.Tests.Unit
                 new StubReferenceDataCommand { Name = "GetItems", Version = "i" }
             ]);
 
-            var response = command.HandleExecute(null!);
+            var response = await command.HandleExecuteAsync(null!, CancellationToken.None);
 
             Assert.Equal(
                 ["GetAttributes", "GetItems", "GetZones"],
@@ -51,11 +51,11 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void HandleExecute_ReturnsEmptyWhenNoReferenceDataCommands()
+        public async Task HandleExecuteAsync_ReturnsEmptyWhenNoReferenceDataCommands()
         {
             var command = new GetReferenceDataVersions([]);
 
-            var response = command.HandleExecute(null!);
+            var response = await command.HandleExecuteAsync(null!, CancellationToken.None);
 
             Assert.Null(response.Error);
             Assert.Empty(response.Data);

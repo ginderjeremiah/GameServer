@@ -10,6 +10,12 @@ namespace Game.Api.Sockets
     public class SocketContext
     {
         private const short MAX_MESSAGE_SIZE = 1024 * 4;
+
+        // Caps a single inbound message at MAX_FRAMES_PER_MESSAGE * MAX_MESSAGE_SIZE (~4 MB). Every received
+        // frame counts toward it — including empty ones — so a peer streaming zero-length frames is bounded
+        // rather than spinning the read loop until cancellation.
+        private const int MAX_FRAMES_PER_MESSAGE = 1024;
+
         private readonly byte[] _buffer = new byte[MAX_MESSAGE_SIZE];
 
         private readonly TaskCompletionSource<ESocketCloseReason> _socketClosedSource = new();
@@ -46,29 +52,35 @@ namespace Game.Api.Sockets
 
             _logger.LogDebug("Sending data to playerId ({PlayerId}) from socket ({Id}): {Data}", PlayerId, SocketId, data);
             var dataBytes = Encoding.UTF8.GetBytes(data);
-            await _sendLock.WaitAsync(cancellationToken);
+
+            try
+            {
+                await _sendLock.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled while waiting for the send lock — no frame was started, so there is nothing to
+                // unwind. Report the send as not delivered rather than letting the cancellation escape.
+                return false;
+            }
+
             try
             {
                 for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
                 {
-                    if (dataBytes.Length - i <= MAX_MESSAGE_SIZE)
-                    {
-                        await _socket.SendAsync(
-                            buffer: new ArraySegment<byte>(dataBytes, i, dataBytes.Length - i),
-                            messageType: WebSocketMessageType.Text,
-                            endOfMessage: true,
-                            cancellationToken
-                        );
-                    }
-                    else
-                    {
-                        await _socket.SendAsync(
-                            buffer: new ArraySegment<byte>(dataBytes, i, MAX_MESSAGE_SIZE),
-                            messageType: WebSocketMessageType.Text,
-                            endOfMessage: false,
-                            cancellationToken
-                        );
-                    }
+                    var isFinalChunk = dataBytes.Length - i <= MAX_MESSAGE_SIZE;
+                    var chunkSize = isFinalChunk ? dataBytes.Length - i : MAX_MESSAGE_SIZE;
+
+                    // Send each chunk with CancellationToken.None: once a multi-chunk frame has begun it must
+                    // be written to completion under the lock. Cancelling mid-frame would release the lock on a
+                    // half-sent frame and let the next writer interleave into it, corrupting the stream.
+                    // Cancellation is honoured before the frame starts (the lock wait above), not during it.
+                    await _socket.SendAsync(
+                        buffer: new ArraySegment<byte>(dataBytes, i, chunkSize),
+                        messageType: WebSocketMessageType.Text,
+                        endOfMessage: isFinalChunk,
+                        CancellationToken.None
+                    );
                 }
             }
             catch (Exception ex)
@@ -93,19 +105,29 @@ namespace Game.Api.Sockets
         {
             var message = new StringBuilder();
             WebSocketReceiveResult result;
-            var buffersRead = 0;
+            var framesRead = 0;
             do
             {
                 result = await _socket.ReceiveAsync(new ArraySegment<byte>(_buffer), cancellationToken);
+
+                // A Close frame ends the message stream; stop reading and let the read loop run the closing
+                // handshake off the CloseReceived state. It carries no data, so don't append or count it.
+                if (result.MessageType is WebSocketMessageType.Close)
+                {
+                    break;
+                }
+
+                framesRead++;
                 if (result.Count > 0)
                 {
                     message.Append(Encoding.UTF8.GetString(_buffer, 0, result.Count));
-                    buffersRead++;
                 }
             }
-            while (!result.EndOfMessage && buffersRead < 1024);
+            while (!result.EndOfMessage && framesRead < MAX_FRAMES_PER_MESSAGE);
 
-            if (buffersRead >= 1024)
+            // Only a message that hit the frame cap without completing is over-size; a message that ends
+            // exactly on the cap is whole and accepted.
+            if (framesRead >= MAX_FRAMES_PER_MESSAGE && !result.EndOfMessage)
             {
                 await Close(ESocketCloseReason.MessageTooBig);
                 throw new WebSocketException("Socket message exceeded maximum allowed size.");

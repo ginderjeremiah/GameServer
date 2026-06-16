@@ -5,6 +5,7 @@ using Game.Api.Sockets;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net.WebSockets;
+using System.Text;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -104,10 +105,194 @@ namespace Game.Api.Tests.Unit
             await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
         }
 
+        [Fact]
+        public async Task SendData_MidFrameCancellation_CompletesTheFrameRatherThanLeavingItHalfSent()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            // A payload larger than one frame, so it is sent as multiple chunks under the send lock.
+            var payload = new string('x', SocketContextTests.MaxFrameSize + 1000);
+            using var cts = new CancellationTokenSource();
+            // Cancel the moment the first (non-final) chunk has gone out — mid-frame.
+            socket.AfterSendChunk = isFinal =>
+            {
+                if (!isFinal)
+                {
+                    cts.Cancel();
+                }
+            };
+
+            var sent = await context.SendData(payload, cts.Token).WaitAsync(WaitTimeout, cancellationToken);
+
+            // The frame is written to completion despite the mid-frame cancellation, so the next writer can't
+            // interleave into a half-sent frame.
+            Assert.True(sent);
+            Assert.True(socket.SentFrameEndFlags is [false, true]);
+            Assert.Equal(payload, Assert.Single(socket.SentMessages));
+        }
+
+        [Fact]
+        public async Task SendData_CancelledBeforeAcquiringSendLock_ReturnsFalseAndSendsNothing()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // The cancellation is handled locally (returns false), not allowed to escape as an exception.
+            var sent = await context.SendData("hello", cts.Token).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.False(sent);
+            Assert.Empty(socket.SentMessages);
+        }
+
+        [Fact]
+        public async Task ReadMessage_ReassemblesMultiFrameTextMessage()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            socket.QueueData("hel", endOfMessage: false);
+            socket.QueueData("lo", endOfMessage: true);
+
+            var message = await context.ReadMessage(cancellationToken).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.Equal("hello", message);
+        }
+
+        [Fact]
+        public async Task ReadMessage_CloseFrame_StopsReadingAndReturnsEmpty()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            socket.QueueClose();
+
+            // The Close frame is honoured (the read returns promptly instead of looping), leaving the socket in
+            // CloseReceived for the read loop to complete the handshake.
+            var message = await context.ReadMessage(cancellationToken).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.Equal("", message);
+            Assert.Equal(WebSocketState.CloseReceived, socket.State);
+        }
+
+        [Fact]
+        public async Task ReadMessage_ZeroLengthFrameFlood_IsBoundedAndClosesAsMessageTooBig()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            // A malformed peer streaming endless zero-length continuation frames must not spin forever: every
+            // frame counts toward the cap, so the read trips the size limit and closes.
+            socket.StreamZeroLengthFramesForever();
+
+            await Assert.ThrowsAsync<WebSocketException>(
+                () => context.ReadMessage(cancellationToken).WaitAsync(WaitTimeout, cancellationToken));
+
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.MessageTooBig, socket.CloseStatusUsed);
+        }
+
         private static SocketContext CreateContext(WebSocket socket)
         {
             var session = new SessionService(new NoOpSessionStore());
             return new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
+        }
+
+        /// <summary>The frame chunk size <see cref="SocketContext"/> splits outbound sends at (4 KB).</summary>
+        private const int MaxFrameSize = 1024 * 4;
+
+        /// <summary>
+        /// A <see cref="WebSocket"/> stand-in that scripts receives (data / close / a zero-length flood) and
+        /// records outbound frame chunks, so the read-message and send-atomicity contracts can be exercised
+        /// deterministically.
+        /// </summary>
+        private sealed class ScriptedWebSocket : WebSocket
+        {
+            private readonly Queue<ReceiveStep> _receives = new();
+            private bool _floodZeroLengthFrames;
+            private readonly List<byte> _pendingSend = [];
+            private readonly List<string> _sentMessages = [];
+            private WebSocketState _state = WebSocketState.Open;
+
+            /// <summary>The endOfMessage flag of each sent chunk, in order.</summary>
+            public List<bool> SentFrameEndFlags { get; } = [];
+            public IReadOnlyList<string> SentMessages => _sentMessages;
+            public bool CloseAsyncCalled { get; private set; }
+            public WebSocketCloseStatus? CloseStatusUsed { get; private set; }
+
+            /// <summary>Invoked after each chunk is sent, with its endOfMessage flag.</summary>
+            public Action<bool>? AfterSendChunk { get; set; }
+
+            public void QueueData(string text, bool endOfMessage)
+                => _receives.Enqueue(new ReceiveStep(Encoding.UTF8.GetBytes(text), WebSocketMessageType.Text, endOfMessage));
+
+            public void QueueClose()
+                => _receives.Enqueue(new ReceiveStep([], WebSocketMessageType.Close, EndOfMessage: true));
+
+            public void StreamZeroLengthFramesForever() => _floodZeroLengthFrames = true;
+
+            public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (_receives.Count == 0 && _floodZeroLengthFrames)
+                {
+                    return Task.FromResult(new WebSocketReceiveResult(0, WebSocketMessageType.Text, endOfMessage: false));
+                }
+
+                var step = _receives.Dequeue();
+                if (step.Payload.Length > 0)
+                {
+                    Array.Copy(step.Payload, 0, buffer.Array!, buffer.Offset, step.Payload.Length);
+                }
+
+                if (step.Type is WebSocketMessageType.Close)
+                {
+                    _state = WebSocketState.CloseReceived;
+                }
+
+                return Task.FromResult(new WebSocketReceiveResult(step.Payload.Length, step.Type, step.EndOfMessage));
+            }
+
+            public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+            {
+                await Task.Yield();
+                _pendingSend.AddRange(buffer.ToArray());
+                SentFrameEndFlags.Add(endOfMessage);
+                if (endOfMessage)
+                {
+                    _sentMessages.Add(Encoding.UTF8.GetString(_pendingSend.ToArray()));
+                    _pendingSend.Clear();
+                }
+
+                AfterSendChunk?.Invoke(endOfMessage);
+            }
+
+            public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+            {
+                CloseAsyncCalled = true;
+                CloseStatusUsed = closeStatus;
+                _state = WebSocketState.Closed;
+                return Task.CompletedTask;
+            }
+
+            public override WebSocketState State => _state;
+            public override WebSocketCloseStatus? CloseStatus => null;
+            public override string? CloseStatusDescription => null;
+            public override string? SubProtocol => null;
+            public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
+            public override void Abort() { }
+            public override void Dispose() { }
+
+            private sealed record ReceiveStep(byte[] Payload, WebSocketMessageType Type, bool EndOfMessage);
         }
 
         /// <summary>
