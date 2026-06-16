@@ -10,7 +10,7 @@ namespace Game.Api.Middleware
         /// <summary>
         /// The application request pipeline hook.
         /// </summary>
-        public async Task InvokeAsync(HttpContext context, SessionService sessionService, SocketManagerService socketManager, IServiceScopeFactory scopeFactory)
+        public async Task InvokeAsync(HttpContext context, SessionService sessionService, SessionInitializer sessionInitializer, SocketManagerService socketManager, IServiceScopeFactory scopeFactory)
         {
             if (context.Request.Path != "/socket")
             {
@@ -24,7 +24,7 @@ namespace Game.Api.Middleware
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
             }
-            else if (!await TryLoadPlayer(sessionService, scopeFactory))
+            else if (!await TryLoadPlayer(sessionService, sessionInitializer, scopeFactory, context.RequestAborted))
             {
                 // An authenticated session whose player can't be loaded can't play, so fail before
                 // upgrading the socket rather than erroring on the first command.
@@ -40,13 +40,17 @@ namespace Game.Api.Middleware
         }
 
         /// <summary>
-        /// Loads the player aggregate up front into the session so socket commands read it synchronously for
-        /// the connection's lifetime (the connection never re-reads the cache per command). The load runs in a
-        /// disposable scope so its <c>GameContext</c> is not held open for the whole connection. Returns false
-        /// when the authenticated player has no loadable aggregate.
+        /// Establishes the player session for the connection: first loads (or rehydrates) the in-flight
+        /// player state — the HTTP pipeline no longer does this per request, so the socket handshake is where
+        /// it happens — then loads the player aggregate up front so socket commands read it synchronously for
+        /// the connection's lifetime (the connection never re-reads the cache per command). The aggregate load
+        /// runs in a disposable scope so its <c>GameContext</c> is not held open for the whole connection.
+        /// Returns false when the authenticated player has no loadable aggregate.
         /// </summary>
-        private static async Task<bool> TryLoadPlayer(SessionService sessionService, IServiceScopeFactory scopeFactory)
+        private static async Task<bool> TryLoadPlayer(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
         {
+            await sessionInitializer.EnsureSessionLoaded(cancellationToken);
+
             using var scope = scopeFactory.CreateScope();
             var player = await scope.ServiceProvider.GetRequiredService<PlayerService>()
                 .LoadPlayer(sessionService.SelectedPlayerId);

@@ -116,7 +116,8 @@ namespace Game.Api.Tests.Integration
         {
             using var scope = CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
-            await sessionService.LoadPlayerState(userId);
+            sessionService.SetAuthenticatedUser(userId);
+            await sessionService.LoadPlayerState();
             modifyState(sessionService.PlayerState);
             sessionService.SavePlayerState();
         }
