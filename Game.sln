@@ -34,6 +34,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0F1D473D-E66D-4155-926F-3CC32BDC1F7A}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		global.json = global.json
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Infrastructure.Tests", "Game.Infrastructure.Tests\Game.Infrastructure.Tests.csproj", "{91602D3C-BE00-461B-AE2D-B38B22F6207B}"
