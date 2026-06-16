@@ -1,6 +1,5 @@
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Enemies;
-using Game.Core.Players;
 
 namespace Game.Core.Battle
 {
@@ -11,27 +10,45 @@ namespace Game.Core.Battle
     {
         public int ExpReward { get; set; }
 
-        public DefeatRewards(Player player, Enemy enemy)
+        /// <summary>
+        /// Computes the rewards for defeating <paramref name="enemy"/>. The player's power is measured from
+        /// <paramref name="playerModifiers"/> — the modifier set reconstructed from the battle snapshot
+        /// (<see cref="BattleSnapshot.GetModifiers"/>) — rather than the live player aggregate, so the reward
+        /// is consistent with the snapshot the battle was actually simulated against.
+        /// </summary>
+        public DefeatRewards(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
         {
-            ExpReward = GetExpReward(player, enemy);
+            ExpReward = GetExpReward(playerModifiers, enemy);
         }
 
-        private static int GetExpReward(Player player, Enemy enemy)
+        private static int GetExpReward(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
         {
             var enemyAttTotal = SumCoreAttributes(enemy.GetAttributeModifiers());
-            var playerAttTotal = SumCoreAttributes(player.GetAllModifiers());
+            var playerAttTotal = SumCoreAttributes(playerModifiers);
             if (playerAttTotal <= 0)
             {
-                return (int)Math.Floor(enemyAttTotal);
+                return ToIntReward(enemyAttTotal);
             }
 
             var attRatio = enemyAttTotal / playerAttTotal;
             // Within a ±20% band the multiplier is 1; outside it the reward scales quadratically with the
             // ratio, clamped at MaxExpRewardMultiplier so an enemy far above the player can't mint an
-            // unbounded payout. The cap also keeps the final reward well inside int range.
+            // unbounded payout.
             var expMulti = attRatio is < 0.8 or > 1.2 ? Math.Pow(attRatio, 2) : 1.0;
             expMulti = Math.Min(expMulti, GameConstants.MaxExpRewardMultiplier);
-            return (int)Math.Floor(enemyAttTotal * expMulti);
+            return ToIntReward(enemyAttTotal * expMulti);
+        }
+
+        /// <summary>
+        /// Floors <paramref name="reward"/> and clamps it into <see cref="int"/> range. The
+        /// <see cref="GameConstants.MaxExpRewardMultiplier"/> cap bounds the multiplier but not
+        /// <c>enemyAttTotal</c> itself (a sum over core attributes scaled by author-controlled enemy level
+        /// and per-level slopes), so a large authored enemy can push the product past <see cref="int.MaxValue"/>.
+        /// Clamping before the cast avoids the unchecked overflow that would wrap to a negative reward.
+        /// </summary>
+        private static int ToIntReward(double reward)
+        {
+            return (int)Math.Floor(Math.Min(reward, int.MaxValue));
         }
 
         /// <summary>

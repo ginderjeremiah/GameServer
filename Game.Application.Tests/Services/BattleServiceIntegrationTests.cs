@@ -202,6 +202,60 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleVictory_RewardMeasuresPowerFromSnapshot_NotLiveAggregate()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A one-shot player skill makes the victory certain regardless of stats; the enemy's hit is negligible.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            // Fixed enemy power of 100 (Strength 50 + Endurance 50, no per-level scaling) matches the seeded
+            // player's power (Strength 50 + Endurance 50), so the difficulty ratio is exactly 1 → reward = 100.
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // After the snapshot is frozen, deflate the LIVE player's power (a valid mid-battle stat
+            // reallocation). The bug keyed the reward off this live aggregate: ratio 100/2 caps the
+            // multiplier at MaxExpRewardMultiplier (4), inflating the payout to 400. The fix measures power
+            // from the snapshot, so the reward stays the snapshot-era 100.
+            foreach (var allocation in player.StatPoints.StatAllocations)
+            {
+                allocation.Amount = 1;
+            }
+
+            // Backdate the battle start so the simulated victory's elapsed time has already passed, making
+            // DateTime.UtcNow a valid claimed timestamp.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+
+            Assert.NotNull(result);
+            Assert.Equal(100, result.ExpReward);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_TimestampTooEarly_ReturnsNull()
         {
             using var scope = CreateScope();

@@ -19,7 +19,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 10), (Endurance, 5)]);
             var enemy = MakeEnemy(strength: 10, endurance: 5);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // enemy total = 15, player core total = 15; ratio 1.0 ∈ [0.8, 1.2] → exp = floor(15 * 1) = 15
             Assert.Equal(15, rewards.ExpReward);
@@ -31,7 +31,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 11), (Endurance, 5)]);
             var enemy = MakeEnemy(strength: 10, endurance: 5);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 15/16 ≈ 0.9375 ∈ [0.8, 1.2] → multiplier 1.0 → exp = floor(15) = 15
             Assert.Equal(15, rewards.ExpReward);
@@ -43,7 +43,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 60), (Endurance, 40)]);
             var enemy = MakeEnemy(strength: 5, endurance: 5);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 10/100 = 0.1 < 0.8 → multiplier 0.1^2 = 0.01 → exp = floor(10 * 0.01) = 0
             Assert.Equal(0, rewards.ExpReward);
@@ -55,7 +55,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 50)]);
             var enemy = MakeEnemy(strength: 50, endurance: 25);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 75/50 = 1.5 > 1.2 → multiplier 1.5^2 = 2.25 (below the cap) → exp = floor(75 * 2.25) = 168
             Assert.Equal(168, rewards.ExpReward);
@@ -67,7 +67,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 10)]);
             var enemy = MakeEnemy(strength: 50, endurance: 50);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 100/10 = 10 → uncapped multiplier would be 100; clamped to MaxExpRewardMultiplier (4)
             // → exp = floor(100 * 4) = 400 instead of the unbounded floor(100 * 100) = 10000.
@@ -81,7 +81,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 25)]);
             var enemy = MakeEnemy(strength: 30, endurance: 20);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 50/25 = 2.0 → multiplier 2^2 = 4.0, exactly MaxExpRewardMultiplier (the saturation
             // boundary) → exp = floor(50 * 4) = 200.
@@ -94,7 +94,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: [(Strength, 100)]);
             var enemy = MakeEnemy(strength: 10);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 10/100 = 0.1 ≪ 0.8 → multiplier 0.1^2 = 0.01 (the cap only bounds the upper tail) →
             // exp = floor(10 * 0.01) = 0.
@@ -107,7 +107,7 @@ namespace Game.Core.Tests.Battle
             var player = MakePlayer(allocations: []);
             var enemy = MakeEnemy(strength: 10, endurance: 5);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // No player attribute investment → guard returns floor(enemy total) = floor(15) = 15
             Assert.Equal(15, rewards.ExpReward);
@@ -123,7 +123,7 @@ namespace Game.Core.Tests.Battle
                 statPointsGained: 0);
             var enemy = MakeEnemy(strength: 15);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // ratio = 15/30 = 0.5 < 0.8 → multiplier 0.25 → exp = floor(15 * 0.25) = 3.
             // The old formula divided by StatPointsGained (0) and returned the full floor(15) = 15.
@@ -139,8 +139,8 @@ namespace Game.Core.Tests.Battle
             var lowGained = MakePlayer(allocations: [(Strength, 15), (Endurance, 15)], statPointsGained: 0);
             var highGained = MakePlayer(allocations: [(Strength, 15), (Endurance, 15)], statPointsGained: 999);
 
-            var lowReward = new DefeatRewards(lowGained, enemy);
-            var highReward = new DefeatRewards(highGained, enemy);
+            var lowReward = new DefeatRewards(lowGained.GetAllModifiers(), enemy);
+            var highReward = new DefeatRewards(highGained.GetAllModifiers(), enemy);
 
             // ratio = 30/30 = 1.0 → exp = floor(30) = 30 for both
             Assert.Equal(30, lowReward.ExpReward);
@@ -154,7 +154,7 @@ namespace Game.Core.Tests.Battle
             EquipAccessory(player, [Modifier(Strength, 5, EModifierType.Additive)]);
             var enemy = MakeEnemy(strength: 15);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // Player core total = 10 (allocation) + 5 (gear) = 15; ratio 1.0 → exp = floor(15) = 15
             Assert.Equal(15, rewards.ExpReward);
@@ -171,12 +171,40 @@ namespace Game.Core.Tests.Battle
             ]);
             var enemy = MakeEnemy(strength: 15);
 
-            var rewards = new DefeatRewards(player, enemy);
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
 
             // Only the additive core Strength (15) counts; ratio 15/15 = 1.0 → exp = floor(15) = 15.
             // Were the derived/multiplicative modifiers summed, the denominator would balloon and the
             // reward would collapse.
             Assert.Equal(15, rewards.ExpReward);
+        }
+
+        [Fact]
+        public void ExpReward_EnemyTotalAboveIntRange_ClampsToIntMaxValueInsteadOfWrapping()
+        {
+            // No player investment hits the playerAttTotal <= 0 path, which returns the floored enemy total.
+            // A huge authored enemy power (author-controlled level × per-level slope) can exceed int.MaxValue;
+            // the unclamped (int) cast would wrap to a negative value that GrantExp floors to 0, silently
+            // zeroing a legitimate reward. The reward must clamp to int.MaxValue instead.
+            var player = MakePlayer(allocations: []);
+            var enemy = MakeEnemy(strength: 3_000_000_000); // above int.MaxValue (≈ 2.147e9)
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            Assert.Equal(int.MaxValue, rewards.ExpReward);
+        }
+
+        [Fact]
+        public void ExpReward_MultipliedProductAboveIntRange_ClampsToIntMaxValue()
+        {
+            // ratio = 1e9 / 1 ≫ 1.2 → multiplier clamps to MaxExpRewardMultiplier (4); the product
+            // 1e9 × 4 = 4e9 still exceeds int.MaxValue, so the cap alone does not keep the cast in range.
+            var player = MakePlayer(allocations: [(Strength, 1)]);
+            var enemy = MakeEnemy(strength: 1_000_000_000);
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            Assert.Equal(int.MaxValue, rewards.ExpReward);
         }
 
         private static Player MakePlayer(

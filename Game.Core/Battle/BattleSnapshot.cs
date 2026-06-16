@@ -1,4 +1,5 @@
 using Game.Core.Attributes;
+using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Skills;
@@ -87,15 +88,25 @@ namespace Game.Core.Battle
         /// </summary>
         public Battler ToBattler(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
         {
-            var modifiers = StatAllocations.Select(allocation => allocation.ToModifier())
-                .Concat(EquippedItems.SelectMany(equipped =>
-                    resolveItem(equipped.ItemId)
-                        .GetAttributeModifiers(equipped.AppliedModIds.Select(resolveMod))));
-
-            var attributes = new AttributeCollection(modifiers);
+            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod));
             var skills = SkillIds.Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
+        }
+
+        /// <summary>
+        /// Composes the player's battle attribute modifiers from this snapshot — the captured stat
+        /// allocations plus each equipped item's attributes and those of its applied mods — resolving the
+        /// captured ids against the in-memory catalogs. Shared by <see cref="ToBattler"/> (the simulation)
+        /// and the exp-reward power measurement (<see cref="DefeatRewards"/>), so both read the player's
+        /// power from the same frozen snapshot rather than the live aggregate.
+        /// </summary>
+        public IEnumerable<AttributeModifier> GetModifiers(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod)
+        {
+            return StatAllocations.Select(allocation => allocation.ToModifier())
+                .Concat(EquippedItems.SelectMany(equipped =>
+                    resolveItem(equipped.ItemId)
+                        .GetAttributeModifiers(equipped.AppliedModIds.Select(resolveMod))));
         }
     }
 
