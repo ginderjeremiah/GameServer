@@ -27,7 +27,7 @@ namespace Game.Core.Tests.Players
                 new() { Attribute = EAttribute.Strength, Amount = 4 },
                 new() { Attribute = EAttribute.Agility, Amount = 6 },
             };
-            var statPoints = new PlayerStatPoints(allocations) { StatPointsGained = 10, StatPointsUsed = 10 };
+            var statPoints = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 10 };
 
             var fromAllocations = allocations.Select(a => a.ToModifier()).ToList();
             var fromStatPoints = statPoints.ToAttributeModifiers().ToList();

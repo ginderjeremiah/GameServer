@@ -39,9 +39,11 @@ namespace Game.DataAccess.Repositories.Caching
                 .ToListAsync(cancellationToken);
 
             // Map each enemy's available-skill loadout once here so the gameplay reads clone a pre-built
-            // template rather than re-mapping the skill graph per encounter (#584). Skills are loaded directly
-            // rather than read from the skill cache: holders reload independently and this one reloads before
-            // the skill holder, so a cross-cache read could observe a stale skill snapshot mid-reload-sweep.
+            // template rather than re-mapping the skill graph per encounter (#584). Skills are queried directly
+            // from this snapshot's own context rather than read from the skill cache so the build stays
+            // self-contained and order-independent: holders reload concurrently and independently (no holder
+            // depends on another's reload order), so reading the shared skill cache mid-sweep could observe a
+            // stale — or not-yet-loaded — skill snapshot.
             var skills = await context.Skills
                 .AsNoTracking()
                 .Include(s => s.SkillDamageMultipliers)

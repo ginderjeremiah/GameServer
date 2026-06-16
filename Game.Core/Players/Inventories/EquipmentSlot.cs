@@ -13,14 +13,14 @@ namespace Game.Core.Players.Inventories
         public EEquipmentSlot Value { get; set; }
 
         /// <summary>
-        /// The name of the equipment slot.
+        /// The name of the equipment slot, derived from <see cref="Value"/>.
         /// </summary>
-        public string Name { get; set; }
+        public string Name => Value.ToString().Capitalize().SpaceWords();
 
         /// <summary>
-        /// The item category that is allowed to be equipped.
+        /// The item category that is allowed to be equipped, derived from <see cref="Value"/>.
         /// </summary>
-        public EItemCategory ItemCategory { get; set; }
+        public EItemCategory ItemCategory => GetItemCategory(Value);
 
         /// <summary>
         /// The item ID of the equipped item, or null when the slot is empty.
@@ -39,8 +39,6 @@ namespace Game.Core.Players.Inventories
         public EquipmentSlot(EEquipmentSlot value)
         {
             Value = value;
-            Name = value.ToString().Capitalize().SpaceWords();
-            ItemCategory = GetItemCategory(value);
         }
 
         /// <summary>

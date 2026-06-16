@@ -471,11 +471,13 @@ namespace Game.DataAccess
             // Batched like HandleAttributeAllocationsChanged: load the touched rows, set/insert, save once.
             if (evt.Statistics.Count > 0)
             {
-                // Constrain the load to the touched (type, entity) space, not every row of the touched
-                // types: a long-lived account accrues one row per enemy/skill, so filtering on typeIds alone
-                // would load hundreds to upsert the ~10-20 this battle changed (aggregate-DB-load concern,
-                // #548). The exact-key match still happens in memory below; this only bounds the fetch.
-                // entityIds includes null for the global rows — EF turns Contains over a List<int?> into
+                // Bound the load by the touched type id set AND the touched entity id set — their
+                // cross-product, which is a superset of the exact (type, entity) pairs changed. Filtering on
+                // typeIds alone would, for a long-lived account with one row per enemy/skill, load hundreds to
+                // upsert the ~10-20 this battle changed (aggregate-DB-load concern, #548). A value-tuple IN
+                // over the exact pairs isn't cleanly EF-translatable, so this cross-product bound is the
+                // pragmatic narrowing; the exact-key match still happens in memory below. entityIds includes
+                // null for the global rows — EF turns Contains over a List<int?> into
                 // "EntityId IN (...) OR EntityId IS NULL".
                 var typeIds = evt.Statistics.Select(s => s.StatisticTypeId).Distinct().ToList();
                 var entityIds = evt.Statistics.Select(s => s.EntityId).Distinct().ToList();

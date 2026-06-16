@@ -60,9 +60,14 @@ namespace Game.Api.Controllers
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {
             var status = await _accountService.CreateAccount(creds.Username, creds.Password);
-            return status == CreateAccountStatus.UsernameTaken
-                ? ApiResponse.Error("There is already an account with this username.")
-                : ApiResponse.Success();
+            // Exhaustive map (mirrors the login/role mappings) so a newly-added failure status is a build-time
+            // gap to fill rather than a silent success reported to the client.
+            return status switch
+            {
+                CreateAccountStatus.Success => ApiResponse.Success(),
+                CreateAccountStatus.UsernameTaken => ApiResponse.Error("There is already an account with this username."),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
         }
 
         [AllowAnonymous]
@@ -82,8 +87,14 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in");
             }
 
-            var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId)
-                ?? throw new InvalidOperationException("Player data not loaded.");
+            // A still-valid token whose player can't be loaded (deleted/archived between requests) is a
+            // graceful error, not a 500 — mirroring the structured ApiResponse.Error its sibling endpoints use.
+            var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId);
+            if (player is null)
+            {
+                return ApiResponse.Error("Player data not found");
+            }
+
             return ApiResponse.Success(PlayerData.FromPlayer(player));
         }
 

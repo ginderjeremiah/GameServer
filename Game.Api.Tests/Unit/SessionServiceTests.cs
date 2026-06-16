@@ -97,7 +97,7 @@ namespace Game.Api.Tests.Unit
             Level = 1,
             Exp = 0,
             CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints([]) { StatPointsGained = 0, StatPointsUsed = 0 },
+            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
             Inventory = new Inventory(),
             SelectedSkills = [],
             Skills = [],

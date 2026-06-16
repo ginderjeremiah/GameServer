@@ -16,7 +16,9 @@ namespace Game.DataAccess.Repositories
         IAsyncEnumerable<int> GetTagIdsForItemMod(int itemModId);
 
         /// <summary>The subset of the given ids that correspond to existing tags, so a join row is never
-        /// inserted for an unknown tag (which would violate the foreign key).</summary>
-        IAsyncEnumerable<int> GetExistingTagIds(IEnumerable<int> tagIds);
+        /// inserted for an unknown tag (which would violate the foreign key). Takes a materialized collection
+        /// (not a deferred <see cref="IEnumerable{T}"/>) so the ids captured in the translated query can't be a
+        /// re-evaluated/side-effecting source.</summary>
+        IAsyncEnumerable<int> GetExistingTagIds(IReadOnlyCollection<int> tagIds);
     }
 }

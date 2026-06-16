@@ -49,12 +49,12 @@ namespace Game.Api.Filters
                     logger.LogWarning(ex, "Failed to broadcast the reference-data change; other instances may serve stale reference data until the next notification.");
                 }
 
-                foreach (var cache in caches)
-                {
-                    // Not tied to the request's cancellation token: the write has committed, so the cache
-                    // must reflect it even if the client has disconnected.
-                    await cache.ReloadAsync();
-                }
+                // Reload all holders concurrently rather than back-to-back: each rebuilds its snapshot on its
+                // own DI-scoped context and swaps it atomically, and no holder depends on another's reload
+                // order, so a serial pass only adds latency and could leave some sets fresh and some stale if
+                // one query failed mid-list. Not tied to the request's cancellation token: the write has
+                // committed, so the caches must reflect it even if the client has disconnected.
+                await Task.WhenAll(caches.Select(cache => cache.ReloadAsync()));
             }
         }
     }

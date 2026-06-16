@@ -62,5 +62,23 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains("challenge", ex.Message);
             Assert.Throws<ArgumentOutOfRangeException>(() => challenges.GetChallenge(-1));
         }
+
+        [Fact]
+        public void ValidateChallengeId_AcceptsInRangeRejectsOutOfRange()
+        {
+            using var scope = CreateScope();
+            var challenges = scope.ServiceProvider.GetRequiredService<IChallenges>();
+            var count = challenges.All().Count;
+
+            // The O(1) range check the admin zone validator relies on: an id is valid iff it indexes the
+            // zero-based snapshot.
+            Assert.False(challenges.ValidateChallengeId(-1));
+            Assert.False(challenges.ValidateChallengeId(count));
+            if (count > 0)
+            {
+                Assert.True(challenges.ValidateChallengeId(0));
+                Assert.True(challenges.ValidateChallengeId(count - 1));
+            }
+        }
     }
 }

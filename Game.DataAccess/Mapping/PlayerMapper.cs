@@ -156,8 +156,9 @@ namespace Game.DataAccess.Mapping
                 Level = entity.Level,
                 Exp = entity.Exp,
                 CurrentZoneId = entity.CurrentZoneId,
-                StatPoints = new PlayerStatPoints(statAllocations)
+                StatPoints = new PlayerStatPoints
                 {
+                    StatAllocations = statAllocations,
                     StatPointsGained = entity.StatPointsGained,
                     StatPointsUsed = entity.StatPointsUsed,
                 },

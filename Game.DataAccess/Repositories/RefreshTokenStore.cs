@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -57,15 +58,8 @@ namespace Game.DataAccess.Repositories
 
         private static string GenerateToken()
         {
-            return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-        }
-
-        private static string Base64UrlEncode(byte[] bytes)
-        {
-            return Convert.ToBase64String(bytes)
-                .TrimEnd('=')
-                .Replace('+', '-')
-                .Replace('/', '_');
+            // Base64Url emits the URL-safe alphabet without padding, so no manual trim/replace is needed.
+            return Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
         }
     }
 }

@@ -71,5 +71,31 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(TimeSpan.Zero, policy.DelayAfterAttempt(1));
             Assert.Equal(TimeSpan.Zero, policy.DelayAfterAttempt(5));
         }
+
+        [Fact]
+        public void MaxDelay_DefaultsToOneMinute()
+        {
+            Assert.Equal(TimeSpan.FromMinutes(1), PlayerUpdateRetryPolicy.Default.MaxDelay);
+        }
+
+        [Fact]
+        public void DelayAfterAttempt_SaturatesAtMaxDelay_ForLargeAttempt()
+        {
+            // 200ms * 2^39 is days — far past MaxDelay — so the doubling must saturate at the cap rather
+            // than schedule an absurd wait.
+            var policy = new PlayerUpdateRetryPolicy(40, TimeSpan.FromMilliseconds(200));
+
+            Assert.Equal(policy.MaxDelay, policy.DelayAfterAttempt(40));
+        }
+
+        [Fact]
+        public void DelayAfterAttempt_PathologicalAttempt_ClampsWithoutOverflowing()
+        {
+            // A high enough exponent overflows the raw TimeSpan multiply (which throws); the clamp must
+            // saturate at MaxDelay instead of letting it overflow.
+            var policy = new PlayerUpdateRetryPolicy(3, TimeSpan.FromMilliseconds(200));
+
+            Assert.Equal(policy.MaxDelay, policy.DelayAfterAttempt(1000));
+        }
     }
 }
