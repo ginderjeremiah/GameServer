@@ -55,7 +55,7 @@ namespace Game.Core.Players
         /// </summary>
         public void GrantExp(int amount)
         {
-            Exp += Math.Clamp(amount, 0, GameConstants.MaxExpPerGrant);
+            Exp += Math.Clamp(amount, 0, ServerGameConstants.MaxExpPerGrant);
             // Guard the threshold against a non-positive level so a pre-initialized Level of 0 can't make
             // the threshold 0 and spin the loop.
             while (Exp >= Math.Max(1, Level) * GameConstants.ExpPerLevel)

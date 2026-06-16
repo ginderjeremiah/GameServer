@@ -35,13 +35,13 @@ namespace Game.Core.Battle
             // ratio, clamped at MaxExpRewardMultiplier so an enemy far above the player can't mint an
             // unbounded payout.
             var expMulti = attRatio is < 0.8 or > 1.2 ? Math.Pow(attRatio, 2) : 1.0;
-            expMulti = Math.Min(expMulti, GameConstants.MaxExpRewardMultiplier);
+            expMulti = Math.Min(expMulti, ServerGameConstants.MaxExpRewardMultiplier);
             return ToIntReward(enemyAttTotal * expMulti);
         }
 
         /// <summary>
         /// Floors <paramref name="reward"/> and clamps it into <see cref="int"/> range. The
-        /// <see cref="GameConstants.MaxExpRewardMultiplier"/> cap bounds the multiplier but not
+        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/> cap bounds the multiplier but not
         /// <c>enemyAttTotal</c> itself (a sum over core attributes scaled by author-controlled enemy level
         /// and per-level slopes), so a large authored enemy can push the product past <see cref="int.MaxValue"/>.
         /// Clamping before the cast avoids the unchecked overflow that would wrap to a negative reward.

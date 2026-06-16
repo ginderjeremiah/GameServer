@@ -71,7 +71,7 @@ namespace Game.Core.Tests.Battle
 
             // ratio = 100/10 = 10 → uncapped multiplier would be 100; clamped to MaxExpRewardMultiplier (4)
             // → exp = floor(100 * 4) = 400 instead of the unbounded floor(100 * 100) = 10000.
-            Assert.Equal(4.0, GameConstants.MaxExpRewardMultiplier);
+            Assert.Equal(4.0, ServerGameConstants.MaxExpRewardMultiplier);
             Assert.Equal(400, rewards.ExpReward);
         }
 

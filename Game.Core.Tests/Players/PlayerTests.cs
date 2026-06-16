@@ -132,7 +132,7 @@ namespace Game.Core.Tests.Players
             player.GrantExp(int.MaxValue);
 
             var clamped = MakePlayer(level: 1, exp: 0);
-            clamped.GrantExp(GameConstants.MaxExpPerGrant);
+            clamped.GrantExp(ServerGameConstants.MaxExpPerGrant);
 
             Assert.Equal(clamped.Level, player.Level);
             Assert.Equal(clamped.Exp, player.Exp);
@@ -147,7 +147,7 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer(level: 1, exp: 0);
 
-            player.GrantExp(GameConstants.MaxExpPerGrant);
+            player.GrantExp(ServerGameConstants.MaxExpPerGrant);
 
             // The per-level cost grows linearly (Level * ExpPerLevel), so a clamped grant can only ever
             // produce a small, finite number of levels — proving the loop is bounded rather than the
