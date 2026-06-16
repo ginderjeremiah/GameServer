@@ -32,7 +32,6 @@ import {
 	perPointYields,
 	feedsFor,
 	derivedShortLabel,
-	derivedUnit,
 	radarValueAtPointer
 } from '$routes/game/screens/attributes/attributes-view.svelte';
 
@@ -68,7 +67,7 @@ describe('deriveStats', () => {
 		const d = deriveStats([0, 0, 0, 0, 0, 0]);
 		expect(d[EAttribute.MaxHealth]).toBe(50);
 		expect(d[EAttribute.Defense]).toBe(2);
-		expect(d[EAttribute.CooldownRecovery]).toBe(0);
+		expect(d[EAttribute.CooldownRecovery]).toBe(1);
 	});
 
 	it('computes MaxHealth = 50 + 20*END + 5*STR', () => {
@@ -102,15 +101,15 @@ describe('perPointYields', () => {
 		]);
 	});
 
-	it('AGI yields +0.5 Defense and +0.4 Cooldown Recovery per point', () => {
+	it('AGI yields +0.5 Defense and +0.004 Cooldown Recovery per point', () => {
 		expect(perPointYields(idx.agi, base)).toEqual([
 			{ id: EAttribute.Defense, delta: 0.5 },
-			{ id: EAttribute.CooldownRecovery, delta: 0.4 }
+			{ id: EAttribute.CooldownRecovery, delta: 0.004 }
 		]);
 	});
 
-	it('DEX yields +0.1 Cooldown Recovery per point', () => {
-		expect(perPointYields(idx.dex, base)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.1 }]);
+	it('DEX yields +0.001 Cooldown Recovery per point (a small multiplier increment, not rounded away)', () => {
+		expect(perPointYields(idx.dex, base)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.001 }]);
 	});
 
 	it('INT and LUK have no surfaced derived yield yet', () => {
@@ -165,10 +164,9 @@ describe('radarValueAtPointer', () => {
 });
 
 describe('label helpers', () => {
-	it('provides compact labels and units for derived stats', () => {
+	it('provides compact labels for derived stats', () => {
 		expect(derivedShortLabel(EAttribute.MaxHealth)).toBe('HP');
 		expect(derivedShortLabel(EAttribute.CooldownRecovery)).toBe('CDR');
-		expect(derivedUnit(EAttribute.MaxHealth)).toBe('');
 	});
 
 	it('falls back to a normalised enum name when reference data is absent', () => {

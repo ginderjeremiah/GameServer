@@ -22,9 +22,13 @@ namespace Game.Core.Attributes.Modifiers
         /// </summary>
         public static IReadOnlyList<AttributeModifier> All { get; } =
         [
-            // CooldownRecovery = 0.4·Agility + 0.1·Dexterity
-            new() { Attribute = CooldownRecovery, Amount = 0.4, Source = Derived, DerivedSource = Agility, Type = Additive },
-            new() { Attribute = CooldownRecovery, Amount = 0.1, Source = Derived, DerivedSource = Dexterity, Type = Additive },
+            // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity. The attribute is the cooldown
+            // multiplier read directly (a base-1 multiplier, so a ×2 modifier genuinely doubles charge speed),
+            // hence the base 1 and the derived coefficients scaled ÷100 from the legacy 1 + CDR/100 form
+            // (AGI 20, DEX 10 → 1.09, identical to before the rebase).
+            new() { Attribute = CooldownRecovery, Amount = 1.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = CooldownRecovery, Amount = 0.004, Source = Derived, DerivedSource = Agility, Type = Additive },
+            new() { Attribute = CooldownRecovery, Amount = 0.001, Source = Derived, DerivedSource = Dexterity, Type = Additive },
 
             // Defense = 2 (base) + 1·Endurance + 0.5·Agility
             new() { Attribute = Defense, Amount = 2.0, Source = BaseValue, Type = Additive },

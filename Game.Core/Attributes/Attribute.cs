@@ -51,8 +51,9 @@ namespace Game.Core.Attributes
         public int DisplayOrder { get; }
 
         /// <summary>
-        /// The number of decimal places the value should be displayed with (e.g.
-        /// <see cref="EAttribute.CooldownRecovery"/> = 2, most = 0).
+        /// The number of decimal places the value should be displayed with in its natural display form
+        /// (the percentage value for <see cref="IsPercentage"/> attributes). All attributes render as
+        /// whole numbers today, but a fractional attribute would raise it.
         /// </summary>
         public int Decimals { get; }
 
@@ -120,7 +121,7 @@ namespace Game.Core.Attributes
                 Luck => new(EAttributeType.Primary, IsPercentage: false, IsHarmful: false, "LUK", 5, 0),
                 MaxHealth => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "HP", 6, 0),
                 Defense => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "DEF", 7, 0),
-                CooldownRecovery => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDR", 8, 2),
+                CooldownRecovery => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDR", 8, 0),
                 CriticalChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
                 CriticalDamage => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT DMG", 10, 0),
                 DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD", 11, 0),

@@ -260,14 +260,15 @@ describe('SkillsView — initial state', () => {
 	});
 
 	it('resolves metrics through the shared battle formulas and the derived attribute composition', () => {
-		// Strength feeds Alpha's 1× multiplier directly; Agility derives CooldownRecovery (0.4/pt).
+		// Strength feeds Alpha's 1× multiplier directly; Agility derives CooldownRecovery (0.004/pt).
 		mockPlayerManager.attributes = [
 			{ attributeId: EAttribute.Strength, amount: 20 },
 			{ attributeId: EAttribute.Agility, amount: 10 }
 		];
 		const fresh = new SkillsView();
 		expect(fresh.rawDamage(0)).toBe(32); // 12 base + 20·1
-		expect(fresh.cooldown(0)).toBeCloseTo(1 / 1.04, 10); // 1s / (1 + 4 CDR / 100)
+		// CooldownRecovery = base 1 + 0.004·10 = 1.04, read directly as the cooldown multiplier.
+		expect(fresh.cooldown(0)).toBeCloseTo(1 / 1.04, 10);
 		expect(fresh.metric(0)?.contributions).toEqual([{ attributeId: EAttribute.Strength, multiplier: 1, value: 20 }]);
 	});
 });

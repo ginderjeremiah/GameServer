@@ -65,16 +65,16 @@ describe('BattleAttributes', () => {
 			expect(ba.getValue(EAttribute.Defense)).toBe(2 + 30 + 0.5 * 20);
 		});
 
-		it('calculates CooldownRecovery = 0.4*Agi + 0.1*Dex', () => {
+		it('calculates CooldownRecovery = 1 (base) + 0.004*Agi + 0.001*Dex', () => {
 			const ba = new BattleAttributes(makeAttrs([EAttribute.Agility, 20], [EAttribute.Dexterity, 10]));
-			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(0.4 * 20 + 0.1 * 10);
+			expect(ba.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1 + 0.004 * 20 + 0.001 * 10, 10);
 		});
 
-		it('handles zero base stats (MaxHealth still has base 50)', () => {
+		it('handles zero base stats (MaxHealth base 50, CooldownRecovery base 1)', () => {
 			const ba = new BattleAttributes([]);
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50);
 			expect(ba.getValue(EAttribute.Defense)).toBe(2);
-			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(0);
+			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(1);
 		});
 	});
 

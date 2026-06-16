@@ -18,6 +18,15 @@ Attributes are somewhat of a work-in-progress feature, but the general idea is t
 
 The attribute system is the substrate for timed skill effects (see [Skills](#skills)): applying an effect adds a real attribute modifier to the target mid-battle and expiry removes it, so derived attributes cascade naturally (a temporary Strength buff also raises MaxHealth, exactly like a permanent one). Damage-over-time and heal-over-time are realized the same way, through two **per-second** attributes — `DamageTakenPerSecond` and `HealthRegenPerSecond` — that an end-of-tick simulator phase consumes (a poison is then pure data: a debuff that adds `DamageTakenPerSecond` to the opponent for a duration). See [Skill Effects](#skill-effects) for the DoT/HoT runtime rules.
 
+## Attribute value conventions
+
+Percentage- and multiplier-style attributes are stored so they are consumed **without transformation** in the battle math:
+
+- **Percentage attributes** are stored as decimal fractions (`0.05` = 5%) and used as-is — a chance is compared directly against a `[0,1)` RNG draw — and rendered scaled ×100 (`0.05` → `5%`).
+- **Multiplier attributes** carry a base ≥ 1 and are read directly as the multiplier. `CooldownRecovery` is a base-`1` cooldown multiplier: a static `1.0` base plus `0.004·Agility + 0.001·Dexterity` (a typical AGI 20 / DEX 10 build sits at `1.09` ≈ +9% charge speed). Reading the attribute directly means a multiplicative modifier scales intuitively — a `×2` `CooldownRecovery` buff genuinely doubles charge speed rather than nudging the old `1 + CDR/100` value. Like the percentage attributes, it renders scaled ×100 (`1.09` → `109%`).
+
+This convention is the foundation the (still-unimplemented) player crit/dodge/block attributes build on — see the [spike](./spikes/178-player-crit-dodge-block.md).
+
 ## Experience Rewards
 
 The XP a victory awards scales with how well the enemy is matched to the player's power, so fighting something around (or above) your level pays off and grinding trivial enemies does not. The reward (`DefeatRewards`, computed server-side and sent to the client) is the enemy's attribute power times a difficulty multiplier derived from the ratio of the enemy's power to the player's: within a ±20% band the multiplier is `1`, and outside it the reward scales quadratically with the ratio (over-level enemies pay out more, under-level enemies far less).

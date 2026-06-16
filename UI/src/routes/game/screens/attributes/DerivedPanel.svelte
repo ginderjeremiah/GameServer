@@ -24,10 +24,12 @@
 						</div>
 						{#if isChanged}
 							<span class="stat-delta" class:up={to > from}>
-								{to > from ? '+' : ''}{formatNum(round1(to - from))}
+								{formatAttributeDelta(to - from, d.id, staticData.attributes)}
 							</span>
 						{/if}
-						<span class="stat-val" class:changed={isChanged}>{formatNum(to)}{derivedUnit(d.id)}</span>
+						<span class="stat-val" class:changed={isChanged}
+							>{formatAttributeValue(to, d.id, staticData.attributes)}</span
+						>
 					</div>
 				{/each}
 			</div>
@@ -36,14 +38,13 @@
 </div>
 
 <script lang="ts">
-import { formatNum, attributeColor, attributeCode, attributeName } from '$lib/common';
+import { formatAttributeValue, formatAttributeDelta, attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import {
 	DERIVED_GROUPS,
 	DERIVED_STATS,
 	CORE_ATTRIBUTES,
-	derivedUnit,
 	feedsFor,
 	type AttributesView,
 	type DerivedGroup
@@ -63,8 +64,6 @@ const visibleGroups = DERIVED_GROUPS.filter((g) => statsIn(g).length > 0);
  *  so the "fed by" line never goes stale. */
 const contributorsFor = (derivedId: EAttribute): EAttribute[] =>
 	CORE_ATTRIBUTES.filter((_, i) => feedsFor(i).includes(derivedId));
-
-const round1 = (n: number): number => Math.round(n * 10) / 10;
 </script>
 
 <style lang="scss">
