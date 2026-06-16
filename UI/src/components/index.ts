@@ -5,6 +5,7 @@ export { default as HpBar } from './HpBar.svelte';
 export { default as Loading } from './Loading.svelte';
 export { default as Modal } from './Modal.svelte';
 export { default as ModalHost } from './ModalHost.svelte';
+export { default as OverlayButton } from './OverlayButton.svelte';
 export { default as Popover } from './Popover.svelte';
 export { default as StatusGlyph } from './StatusGlyph.svelte';
 export { default as Toast } from './Toast.svelte';

@@ -173,8 +173,8 @@ describe('Skills screen', () => {
 		const cta = container.querySelector<HTMLButtonElement>('.d-cta .btn')!;
 		expect(cta.textContent).toContain('Swap');
 		await fireEvent.click(cta);
-		// Cards become swap targets; click the first to replace it.
-		const target = container.querySelector<HTMLElement>('.eqcard.swap-target')!;
+		// Cards become swap targets; activate the first card's overlay button to replace it.
+		const target = container.querySelector<HTMLElement>('.eqcard.swap-target .overlay-button')!;
 		await fireEvent.click(target);
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [3, 1, 2]);
 	});
@@ -193,10 +193,12 @@ describe('Skills screen', () => {
 	it('reorders the loadout via drag and drop', async () => {
 		const { container } = render(Skills);
 		const cards = container.querySelectorAll<HTMLElement>('.eqcard');
-		await fireEvent.dragStart(cards[0]);
+		// The overlay button is the drag handle; the card is the drop target.
+		const handle = cards[0].querySelector<HTMLElement>('.overlay-button')!;
+		await fireEvent.dragStart(handle);
 		await fireEvent.dragOver(cards[2]);
 		await fireEvent.drop(cards[2]);
-		await fireEvent.dragEnd(cards[2]);
+		await fireEvent.dragEnd(handle);
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2, 0]);
 	});
 
@@ -204,22 +206,24 @@ describe('Skills screen', () => {
 		const { container } = render(Skills);
 		// Tag the first card's DOM node so we can recognise it after the reorder.
 		const movedCard = container.querySelectorAll<HTMLElement>('.eqcard')[0];
-		expect(movedCard.getAttribute('aria-label')).toContain('Alpha');
+		expect(movedCard.querySelector('.overlay-button')!.getAttribute('aria-label')).toContain('Alpha');
 		movedCard.dataset.identityProbe = 'alpha';
 
-		// Move Alpha (slot 1) to the end → loadout [Bravo, Charlie, Alpha].
-		await fireEvent.dragStart(movedCard);
+		// Move Alpha (slot 1) to the end → loadout [Bravo, Charlie, Alpha]. The overlay button
+		// is the drag handle; the card is the drop target.
+		const handle = movedCard.querySelector<HTMLElement>('.overlay-button')!;
+		await fireEvent.dragStart(handle);
 		const cards = container.querySelectorAll<HTMLElement>('.eqcard');
 		await fireEvent.dragOver(cards[2]);
 		await fireEvent.drop(cards[2]);
-		await fireEvent.dragEnd(cards[2]);
+		await fireEvent.dragEnd(handle);
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2, 0]);
 
 		// Stable keying: the same DOM node follows Alpha to slot 3, rather than the
 		// slot-1 node being reused for Bravo (which index keying would do).
 		const probed = container.querySelector<HTMLElement>('[data-identity-probe="alpha"]');
 		expect(probed).toBe(movedCard);
-		expect(probed?.getAttribute('aria-label')).toContain('Alpha');
+		expect(probed?.querySelector('.overlay-button')!.getAttribute('aria-label')).toContain('Alpha');
 		const reordered = Array.from(container.querySelectorAll<HTMLElement>('.eqcard'));
 		expect(reordered.indexOf(movedCard)).toBe(2);
 	});
@@ -228,8 +232,12 @@ describe('Skills screen', () => {
 		const { container } = render(Skills);
 		await fireEvent.click(rowByName(container, 'Delta')!);
 		await fireEvent.click(container.querySelector<HTMLButtonElement>('.d-cta .btn')!); // start swap
-		const target = container.querySelector<HTMLElement>('.eqcard.swap-target')!;
-		await fireEvent.keyDown(target, { key: 'Enter' });
+		// The swap target is a real <button>, so keyboard Enter/Space activation comes for free —
+		// it dispatches the same click. jsdom doesn't synthesize that click from a keydown, so fire
+		// it directly as the faithful representation of a keyboard activation.
+		const target = container.querySelector<HTMLButtonElement>('.eqcard.swap-target .overlay-button')!;
+		expect(target.tagName).toBe('BUTTON');
+		await fireEvent.click(target);
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [3, 1, 2]);
 	});
 

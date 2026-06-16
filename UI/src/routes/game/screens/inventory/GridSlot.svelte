@@ -71,7 +71,7 @@ import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
 import CategoryGlyph from './CategoryGlyph.svelte';
 import FavoriteStar from './FavoriteStar.svelte';
-import OverlayButton from './OverlayButton.svelte';
+import OverlayButton from '$components/OverlayButton.svelte';
 
 interface Props {
 	item: Item;
