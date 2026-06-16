@@ -189,7 +189,12 @@ namespace Game.Api
         private static void ConfigureAuth(WebApplicationBuilder builder)
         {
             var jwtSection = builder.Configuration.GetSection("Jwt");
-            builder.Services.AddOptions<JwtOptions>().Bind(jwtSection);
+            builder.Services.AddOptions<JwtOptions>()
+                .Bind(jwtSection)
+                // HMAC-SHA256 needs a key of at least its 256-bit output, so fail fast at startup (mirroring
+                // the pepper/CORS validation below) rather than only when the first token is issued.
+                .Validate(options => Encoding.UTF8.GetByteCount(options.SigningKey) >= 32, "Jwt:SigningKey must be at least 32 bytes for HMAC-SHA256")
+                .ValidateOnStart();
 
             var signingKey = jwtSection["SigningKey"] ?? throw new InvalidOperationException("Jwt:SigningKey not set");
             var issuer = jwtSection["Issuer"] ?? Constants.SERVER_PRINCIPAL;

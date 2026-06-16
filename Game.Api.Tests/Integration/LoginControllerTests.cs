@@ -195,6 +195,29 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Status_AuthenticatedButPlayerNotLoadable_ReturnsGracefulError()
+        {
+            // A still-valid token whose player can't be loaded (archived/deleted between requests; here a user
+            // with no player at all) must return a structured error, not a 500 — mirroring how Login surfaces a
+            // missing player. Rehydration finds no player, so the session's selected id stays unresolved and the
+            // player load comes back null.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "playerlessstatus", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.Null(result?.Data);
+            Assert.NotNull(result?.ErrorMessage);
+            client.Dispose();
+        }
+
+        [Fact]
         public async Task ActiveSession_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/Login/ActiveSession", CancellationToken);
