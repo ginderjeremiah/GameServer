@@ -35,34 +35,21 @@
 	<div class="loadout-footer">
 		<button class="loadout-button" title="Saved loadouts — coming soon" disabled>+ Save loadout</button>
 	</div>
-
-	<ItemTooltip bind:this={tooltip} item={tooltipItem} />
 </div>
 
 <script lang="ts">
-import ItemTooltip from './ItemTooltip.svelte';
 import EquipSlot from './EquipSlot.svelte';
-import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import type { Item } from '$lib/battle';
 import { EQUIP_GROUPS, EQUIP_SLOTS, type InventoryView } from './inventory-view.svelte';
+import { getItemTooltip } from './item-tooltip.svelte';
 
 const { view }: { view: InventoryView } = $props();
 
-let tooltip = $state<TooltipComponent>();
-let tooltipItem = $state<Item>();
+const tooltip = getItemTooltip();
 
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
-
-const handleHoverEnter = (item: Item, ev: MouseEvent) => {
-	tooltipItem = item;
-	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-	showTooltip();
-};
-const handleHoverMove = (ev: MouseEvent) => setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-const handleHoverLeave = () => {
-	tooltipItem = undefined;
-	hideTooltip();
-};
+const handleHoverEnter = (item: Item, ev: MouseEvent) => tooltip?.show(item, ev);
+const handleHoverMove = (ev: MouseEvent) => tooltip?.move(ev);
+const handleHoverLeave = () => tooltip?.hide();
 
 const handleDrop = (slotId: number) => {
 	const dragged = view.dragItem;

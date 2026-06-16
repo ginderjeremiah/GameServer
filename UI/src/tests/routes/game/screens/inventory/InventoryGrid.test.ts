@@ -4,10 +4,11 @@ import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EItemCategory, ERarity } from '$lib/api';
 import { BattleAttributes, type Item } from '$lib/battle';
 
-const { setTooltipPosition, showTooltip, hideTooltip } = vi.hoisted(() => ({
-	setTooltipPosition: vi.fn(),
-	showTooltip: vi.fn(),
-	hideTooltip: vi.fn()
+// The grid consumes the screen-level item-tooltip controller via context; here we stub that context
+// hook to assert the grid drives the shared controller (and honours its suppression rule).
+const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+vi.mock('$routes/game/screens/inventory/item-tooltip.svelte', () => ({
+	getItemTooltip: () => controller
 }));
 
 vi.mock('$lib/engine', () => ({
@@ -27,8 +28,7 @@ vi.mock('$lib/engine', () => ({
 }));
 
 vi.mock('$stores', () => ({
-	staticData: { itemMods: [] },
-	registerTooltipComponent: vi.fn(() => ({ setTooltipPosition, showTooltip, hideTooltip }))
+	staticData: { itemMods: [] }
 }));
 
 import InventoryGrid from '$routes/game/screens/inventory/InventoryGrid.svelte';
@@ -68,7 +68,10 @@ const makeView = (items: Item[] = [], overrides: Partial<InventoryView> = {}): I
 		...overrides
 	}) as unknown as InventoryView;
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.clearAllMocks();
+});
 
 describe('InventoryGrid', () => {
 	it('shows the empty message when there are no visible items', () => {
@@ -133,41 +136,37 @@ describe('InventoryGrid', () => {
 });
 
 describe('InventoryGrid — tooltip suppression', () => {
-	it('shows the tooltip on hover when nothing is selected or dragged', async () => {
-		showTooltip.mockClear();
+	it('shows the shared tooltip on hover when nothing is selected or dragged', async () => {
 		const items = [makeGridItem(1)];
 		const { container } = render(InventoryGrid, { props: { view: makeView(items) } });
 		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
-		expect(showTooltip).toHaveBeenCalled();
+		expect(controller.show).toHaveBeenCalledWith(items[0], expect.anything());
 	});
 
 	it('suppresses the tooltip when an item is selected', async () => {
-		showTooltip.mockClear();
 		const items = [makeGridItem(1)];
 		const { container } = render(InventoryGrid, { props: { view: makeView(items, { selectedId: 1 }) } });
 		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
-		expect(showTooltip).not.toHaveBeenCalled();
+		expect(controller.show).not.toHaveBeenCalled();
 	});
 
 	it('suppresses the tooltip when an item is being dragged', async () => {
-		showTooltip.mockClear();
 		const items = [makeGridItem(1)];
 		const { container } = render(InventoryGrid, { props: { view: makeView(items, { dragItemId: 1 }) } });
 		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
-		expect(showTooltip).not.toHaveBeenCalled();
+		expect(controller.show).not.toHaveBeenCalled();
 	});
 });
 
 describe('InventoryGrid — drag interactions', () => {
 	it('hides the tooltip when a drag starts', async () => {
-		hideTooltip.mockClear();
 		const items = [makeGridItem(1)];
 		const view = makeView(items);
 		const { container } = render(InventoryGrid, { props: { view } });
 		await fireEvent.dragStart(container.querySelector('.overlay-button')!, {
 			dataTransfer: { setData: vi.fn(), effectAllowed: '' }
 		});
-		expect(hideTooltip).toHaveBeenCalled();
+		expect(controller.hide).toHaveBeenCalled();
 	});
 
 	it('sets view.dragItemId on drag start', async () => {

@@ -33,16 +33,27 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- One shared item tooltip for the whole screen, published via context so the equipped rail and
+	     the item grid drive this single panel instead of each mounting their own. -->
+	<ItemTooltip item={tip.item} bind:this={tooltip} />
 </div>
 
 <script lang="ts">
+import { type TooltipComponent } from '$stores';
 import EquippedRail from './EquippedRail.svelte';
 import InventoryGrid from './InventoryGrid.svelte';
 import EquippedTotals from './EquippedTotals.svelte';
 import ItemDrawer from './ItemDrawer.svelte';
+import ItemTooltip from './ItemTooltip.svelte';
 import { InventoryView } from './inventory-view.svelte';
+import { createItemTooltip, setItemTooltip } from './item-tooltip.svelte';
 
 const view = new InventoryView();
+
+let tooltip = $state<TooltipComponent>();
+const tip = createItemTooltip(() => tooltip);
+setItemTooltip(tip.controller);
 </script>
 
 <style lang="scss">

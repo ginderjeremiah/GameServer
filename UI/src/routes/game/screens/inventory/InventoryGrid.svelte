@@ -46,17 +46,14 @@
 			</div>
 		{/if}
 	</div>
-
-	<ItemTooltip bind:this={tooltip} item={tooltipItem} />
 </div>
 
 <script lang="ts">
 import GridSlot from './GridSlot.svelte';
 import InventoryToolbar from './InventoryToolbar.svelte';
-import ItemTooltip from './ItemTooltip.svelte';
-import { registerTooltipComponent, type TooltipComponent } from '$stores';
 import type { Item } from '$lib/battle';
 import type { InventoryView } from './inventory-view.svelte';
+import { getItemTooltip } from './item-tooltip.svelte';
 
 const { view }: { view: InventoryView } = $props();
 
@@ -74,24 +71,18 @@ $effect(() => {
 	view.page = 0;
 });
 
-let tooltip = $state<TooltipComponent>();
-let tooltipItem = $state<Item>();
+const tooltip = getItemTooltip();
 
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
-
+// Suppress the tooltip while an item is selected or being dragged — a rule the grid owns since the
+// rail has no such constraint.
 const handleHoverEnter = (item: Item, ev: MouseEvent) => {
 	if (view.selectedId != null || view.dragItemId != null) {
 		return;
 	}
-	tooltipItem = item;
-	setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-	showTooltip();
+	tooltip?.show(item, ev);
 };
-const handleHoverMove = (ev: MouseEvent) => setTooltipPosition({ x: ev.clientX, y: ev.clientY });
-const handleHoverLeave = () => {
-	tooltipItem = undefined;
-	hideTooltip();
-};
+const handleHoverMove = (ev: MouseEvent) => tooltip?.move(ev);
+const handleHoverLeave = () => tooltip?.hide();
 </script>
 
 <style lang="scss">

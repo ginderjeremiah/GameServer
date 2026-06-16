@@ -3,10 +3,11 @@ import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EItemCategory, ERarity } from '$lib/api';
 import type { Item } from '$lib/battle';
 
-const { setTooltipPosition, showTooltip, hideTooltip } = vi.hoisted(() => ({
-	setTooltipPosition: vi.fn(),
-	showTooltip: vi.fn(),
-	hideTooltip: vi.fn()
+// The rail consumes the screen-level item-tooltip controller via context; here we stub that context
+// hook to assert the rail drives the shared controller on hover.
+const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+vi.mock('$routes/game/screens/inventory/item-tooltip.svelte', () => ({
+	getItemTooltip: () => controller
 }));
 
 vi.mock('$lib/engine', () => ({
@@ -26,14 +27,16 @@ vi.mock('$lib/engine', () => ({
 }));
 
 vi.mock('$stores', () => ({
-	staticData: { itemMods: [] },
-	registerTooltipComponent: vi.fn(() => ({ setTooltipPosition, showTooltip, hideTooltip }))
+	staticData: { itemMods: [] }
 }));
 
 import EquippedRail from '$routes/game/screens/inventory/EquippedRail.svelte';
 import type { InventoryView } from '$routes/game/screens/inventory/inventory-view.svelte';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.clearAllMocks();
+});
 
 const makeItem = (overrides: Partial<Item> = {}): Item =>
 	({
@@ -146,34 +149,31 @@ describe('EquippedRail — drop handling', () => {
 });
 
 describe('EquippedRail — tooltip handling', () => {
-	it('shows the tooltip on hover enter when a slot is filled', async () => {
-		showTooltip.mockClear();
+	it('shows the shared tooltip on hover enter when a slot is filled', async () => {
 		const item = makeItem();
 		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
 		const { container } = render(EquippedRail, { props: { view } });
 		const tiles = container.querySelectorAll('.equip-tile');
 		await fireEvent.mouseEnter(tiles[4]);
-		expect(showTooltip).toHaveBeenCalled();
+		expect(controller.show).toHaveBeenCalledWith(item, expect.anything());
 	});
 
-	it('hides the tooltip on hover leave', async () => {
-		hideTooltip.mockClear();
+	it('hides the shared tooltip on hover leave', async () => {
 		const item = makeItem();
 		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
 		const { container } = render(EquippedRail, { props: { view } });
 		const tiles = container.querySelectorAll('.equip-tile');
 		await fireEvent.mouseEnter(tiles[4]);
 		await fireEvent.mouseLeave(tiles[4]);
-		expect(hideTooltip).toHaveBeenCalled();
+		expect(controller.hide).toHaveBeenCalled();
 	});
 
-	it('updates the tooltip position on hover move', async () => {
-		setTooltipPosition.mockClear();
+	it('repositions the shared tooltip on hover move', async () => {
 		const item = makeItem();
 		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
 		const { container } = render(EquippedRail, { props: { view } });
 		const tiles = container.querySelectorAll('.equip-tile');
 		await fireEvent.mouseMove(tiles[4]);
-		expect(setTooltipPosition).toHaveBeenCalled();
+		expect(controller.move).toHaveBeenCalled();
 	});
 });
