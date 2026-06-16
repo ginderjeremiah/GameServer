@@ -35,8 +35,9 @@ export interface ResolvedReward {
 	rarity: ERarity;
 	/** Themeable accent: the rarity hue for items/mods, the neutral skill accent for skills. */
 	accent: string;
-	/** Themeable rarity glow intensity (`var(--rarity-*-glow)`); `0` for the (rarity-less) skill. */
-	glow: string;
+	/** Themeable rarity glow intensity token (`var(--rarity-*-glow)`), or `null` for the rarity-less
+	 *  skill (which gets only the flat base glow, no tier scaling). */
+	glow: string | null;
 	name: string;
 	/** Teaser sub-line, e.g. `Rare · Helm`, or `Skill`. */
 	sub: string;
@@ -92,8 +93,15 @@ export interface TypeGroup {
 }
 
 /* ─── Reference lookups ──────────────────────────────────────────────── */
-/** Goal-comparison direction is intrinsic to the type; sourced from reference data. */
-function comparisonFor(typeId: EChallengeType): EChallengeGoalComparison {
+/** Goal-comparison direction is intrinsic to the type; sourced from reference data. Bulk callers pass a
+ *  precomputed `byType` lookup so a rebuild doesn't re-scan the challenge-type list once per challenge. */
+function comparisonFor(
+	typeId: EChallengeType,
+	byType?: ReadonlyMap<EChallengeType, EChallengeGoalComparison>
+): EChallengeGoalComparison {
+	if (byType) {
+		return byType.get(typeId) ?? EChallengeGoalComparison.AtLeast;
+	}
 	return staticData.challengeTypes?.find((t) => t.id === typeId)?.goalComparison ?? EChallengeGoalComparison.AtLeast;
 }
 
@@ -145,7 +153,7 @@ export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward
 		rarity: base.rarity,
 		accent: base.accent,
 		// Skills carry no rarity tier, so they get no glow; items/mods glow by tier.
-		glow: base.kind === 'skill' ? '0' : rarityGlow(base.rarity),
+		glow: base.kind === 'skill' ? null : rarityGlow(base.rarity),
 		name: base.name,
 		sub: base.sub
 	};
@@ -178,10 +186,14 @@ export function progressInfo(ch: IChallenge, comparison: EChallengeGoalCompariso
 }
 
 /* ─── View-model assembly ────────────────────────────────────────────── */
-export function buildChallengeVM(ch: IChallenge, player?: IPlayerChallenge): ChallengeVM {
+export function buildChallengeVM(
+	ch: IChallenge,
+	player?: IPlayerChallenge,
+	comparisonByType?: ReadonlyMap<EChallengeType, EChallengeGoalComparison>
+): ChallengeVM {
 	const completed = player?.completed ?? false;
 	const progress = player?.progress ?? 0;
-	const comparison = comparisonFor(ch.challengeTypeId);
+	const comparison = comparisonFor(ch.challengeTypeId, comparisonByType);
 	const prog = progressInfo(ch, comparison, progress);
 	const state: ChallengeState = completed ? 'done' : prog.percent > 0 ? 'active' : 'locked';
 	return {
@@ -279,9 +291,16 @@ export class ChallengesView {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	readonly #progressById = $derived(new Map(this.playerChallenges.map((pc) => [pc.challengeId, pc])));
 
-	readonly all = $derived.by<ChallengeVM[]>(() =>
-		(staticData.challenges ?? []).filter(Boolean).map((ch) => buildChallengeVM(ch, this.#progressById.get(ch.id)))
-	);
+	readonly all = $derived.by<ChallengeVM[]>(() => {
+		// Build the type→comparison lookup once per rebuild instead of scanning the list per challenge.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup map, not held state
+		const comparisonByType = new Map(
+			(staticData.challengeTypes ?? []).map((t): [EChallengeType, EChallengeGoalComparison] => [t.id, t.goalComparison])
+		);
+		return (staticData.challenges ?? [])
+			.filter(Boolean)
+			.map((ch) => buildChallengeVM(ch, this.#progressById.get(ch.id), comparisonByType));
+	});
 
 	readonly groups = $derived.by(() => groupByType(this.all));
 	readonly summary = $derived.by(() => overallSummary(this.all));

@@ -208,12 +208,10 @@ export class ApiSocket {
 		try {
 			const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
 			const hook = this.getOrCreateHook(data.name);
-			if (hook) {
-				try {
-					hook.notify(data);
-				} catch (ex) {
-					console.error('An error occurred while executing a socket listener callback', ex);
-				}
+			try {
+				hook.notify(data);
+			} catch (ex) {
+				console.error('An error occurred while executing a socket listener callback', ex);
 			}
 
 			if (data.id) {

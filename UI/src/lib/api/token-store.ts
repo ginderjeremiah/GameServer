@@ -4,6 +4,8 @@
  * truth for the current credentials — the request and socket layers read the access token from here
  * to authenticate, and the auth layer reads/rotates the refresh token.
  */
+import { safeLocalStorage } from '$lib/common/local-storage';
+
 export interface StoredTokens {
 	accessToken: string;
 	refreshToken: string;
@@ -11,21 +13,9 @@ export interface StoredTokens {
 
 const STORAGE_KEY = 'gameserver.auth-tokens';
 
-/**
- * Returns local storage when it is available (it is absent during SSR), or null otherwise. Access is
- * wrapped in a try/catch because reading `localStorage` throws in some privacy modes.
- */
-const storage = (): Storage | null => {
-	try {
-		return typeof localStorage !== 'undefined' ? localStorage : null;
-	} catch {
-		return null;
-	}
-};
-
 /** The currently stored token pair, or null when the user is not logged in. */
 export const getTokens = (): StoredTokens | null => {
-	const raw = storage()?.getItem(STORAGE_KEY);
+	const raw = safeLocalStorage()?.getItem(STORAGE_KEY);
 	if (!raw) {
 		return null;
 	}
@@ -44,12 +34,12 @@ export const getTokens = (): StoredTokens | null => {
 
 /** Persists a freshly issued token pair, replacing any previous one. */
 export const setTokens = (tokens: StoredTokens): void => {
-	storage()?.setItem(STORAGE_KEY, JSON.stringify(tokens));
+	safeLocalStorage()?.setItem(STORAGE_KEY, JSON.stringify(tokens));
 };
 
 /** Removes the stored token pair (logout, or after an unrecoverable auth failure). */
 export const clearTokens = (): void => {
-	storage()?.removeItem(STORAGE_KEY);
+	safeLocalStorage()?.removeItem(STORAGE_KEY);
 };
 
 export const getAccessToken = (): string | null => getTokens()?.accessToken ?? null;

@@ -64,8 +64,10 @@ interface Props {
 const { reward, size, glow = true, animate = false }: Props = $props();
 
 const accent = $derived(reward.accent);
-// Blur radius/alpha scale with the rarity tier's glow intensity (themeable var).
-const revealGlow = $derived(`0 0 calc(4px + ${reward.glow} * 16px) ${tintColor(accent, 0.55)}`);
+// Blur radius scales with the rarity tier's glow intensity (themeable var); a rarity-less skill
+// (`glow == null`) gets only the flat base radius.
+const glowExtent = $derived(reward.glow ? `calc(4px + ${reward.glow} * 16px)` : '4px');
+const revealGlow = $derived(`0 0 ${glowExtent} ${tintColor(accent, 0.55)}`);
 </script>
 
 <style lang="scss">

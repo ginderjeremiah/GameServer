@@ -1,4 +1,5 @@
 export * from './functions';
+export * from './local-storage';
 export * from './rarity';
 export * from './challenge-type';
 export * from './tag-color';

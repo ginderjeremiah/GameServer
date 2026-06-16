@@ -432,7 +432,9 @@ export class SkillsView {
 		for (const unlockedSkill of playerManager.unlockedSkills) {
 			const order = orderedIds.indexOf(unlockedSkill.skillId);
 			unlockedSkill.selected = order >= 0;
-			unlockedSkill.order = order >= 0 ? order : 0;
+			// An unequipped skill has no loadout slot, so clear its order rather than
+			// pinning it to 0 (which would conflate "unequipped" with "first slot").
+			unlockedSkill.order = order >= 0 ? order : undefined;
 		}
 	}
 }
