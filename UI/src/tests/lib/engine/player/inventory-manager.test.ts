@@ -234,7 +234,7 @@ describe('InventoryManager', () => {
 	});
 
 	describe('items (reactive published list)', () => {
-		it('mirrors unlockedItemList and republishes a new array reference on mutation', async () => {
+		it('mirrors unlockedItemList and reflects an in-place field edit without rebuilding the array', async () => {
 			mockItems[1] = makeItem(1);
 			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
 			manager.initialize();
@@ -244,16 +244,21 @@ describe('InventoryManager', () => {
 
 			const before = manager.items;
 			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
-			// A mutation publishes a fresh array reference so reactive consumers re-derive.
-			expect(manager.items).not.toBe(before);
+			// A pure field edit mutates the item in place — statify keeps it reactive, so the array is not
+			// rebuilt and the same reference now reflects the change.
+			expect(manager.items).toBe(before);
+			expect(manager.items.find((i) => i.itemId === 1)?.equipped).toBe(true);
 		});
 
-		it('publishes a newly unlocked item into the list', () => {
+		it('rebuilds a fresh array when the item set grows (addUnlockedItem)', () => {
 			mockItems[3] = makeItem(3);
 			manager.initialize();
+			const before = manager.items;
 
 			manager.addUnlockedItem(makeInventoryItem({ itemId: 3 }));
 
+			// A set change has no statified field to signal it, so publish rebuilds a fresh array reference.
+			expect(manager.items).not.toBe(before);
 			expect(manager.items.map((i) => i.itemId)).toEqual([3]);
 		});
 	});
