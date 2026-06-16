@@ -1,6 +1,6 @@
 // Ratchet helper: aggregates the latest Vitest coverage-summary.json by source area
-// and prints the integer floors (Math.floor of the exact %) to paste into vite.config.ts's
-// `coverage.thresholds`. Run after `npm run test:unit:coverage`:
+// and prints the integer floors (Math.floor of the exact %) to paste into coverage.config.ts's
+// `coverageThresholds`. Run after `npm run test:unit:coverage`:
 //   node scripts/coverage-floors.mjs
 // Re-run when coverage rises to ratchet the floors upward.
 import { readFileSync } from 'node:fs';
