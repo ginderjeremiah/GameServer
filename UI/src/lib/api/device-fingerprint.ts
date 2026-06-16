@@ -14,8 +14,42 @@ let cached: string | undefined;
 let pending: Promise<string | undefined> | null = null;
 
 /**
- * The stable client-side signals that make up the fingerprint. Kept deterministic (no
- * timestamps/randomness) so the same device produces the same hash across sessions.
+ * A coarse, update-stable platform descriptor (e.g. `Windows`, `macOS`, `Android`). Prefers the
+ * standardized UA Client Hints `platform`; otherwise derives the OS family from the `userAgent`,
+ * excluding the version numbers — so a browser auto-update no longer rotates the fingerprint.
+ */
+const platformToken = (nav: NavigatorWithCapabilities): string => {
+	const hinted = nav.userAgentData?.platform;
+	if (hinted) {
+		return hinted;
+	}
+
+	const userAgent = nav.userAgent ?? '';
+	// Ordered: families whose UA token nests another (Android/ChromeOS UAs contain `Linux`, iOS UAs
+	// contain `Mac OS X`) must be tested first so the most specific match wins.
+	const families: ReadonlyArray<[RegExp, string]> = [
+		[/Android/i, 'Android'],
+		[/iPhone|iPad|iPod/i, 'iOS'],
+		[/CrOS/i, 'ChromeOS'],
+		[/Windows/i, 'Windows'],
+		[/Mac OS X|Macintosh/i, 'macOS'],
+		[/Linux/i, 'Linux']
+	];
+
+	for (const [pattern, family] of families) {
+		if (pattern.test(userAgent)) {
+			return family;
+		}
+	}
+
+	return '';
+};
+
+/**
+ * The stable client-side signals that make up the fingerprint. Every signal is chosen to stay
+ * invariant for one physical device across sessions: no timestamps/randomness, a coarse platform
+ * token rather than the auto-updating `userAgent`, and the DST-stable IANA time-zone string rather
+ * than the numeric offset.
  */
 const fingerprintSignals = (): string => {
 	const nav = navigator as NavigatorWithCapabilities;
@@ -28,7 +62,7 @@ const fingerprintSignals = (): string => {
 	})();
 
 	return [
-		nav.userAgent,
+		platformToken(nav),
 		nav.language,
 		(nav.languages ?? []).join(','),
 		nav.hardwareConcurrency ?? '',
@@ -36,8 +70,7 @@ const fingerprintSignals = (): string => {
 		screen.width,
 		screen.height,
 		screen.colorDepth,
-		timeZone,
-		new Date().getTimezoneOffset()
+		timeZone
 	].join('|');
 };
 
