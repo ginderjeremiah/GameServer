@@ -3,6 +3,8 @@ using Game.Abstractions.DataAccess.Admin;
 using Game.Application;
 using Game.Core.Events;
 using Game.Core.Players.Events;
+using Game.DataAccess.PlayerUpdates;
+using Game.DataAccess.PlayerUpdates.Handlers;
 using Game.DataAccess.Repositories;
 using Game.DataAccess.Repositories.Admin;
 using Game.DataAccess.Repositories.Caching;
@@ -107,7 +109,46 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IAdminChallenges, AdminChallenges>()
                 .AddScoped<IAdminTags, AdminTags>()
                 // Admin Ops: guarded inspection/replay of the player write-behind dead-letter queue (#794).
-                .AddScoped<IPlayerUpdateDeadLetters, PlayerUpdateDeadLetters>();
+                .AddScoped<IPlayerUpdateDeadLetters, PlayerUpdateDeadLetters>()
+                // Per-event persistence handlers the DataProviderSynchronizer applies on the consume side.
+                .AddPlayerUpdateHandlers();
+        }
+
+        /// <summary>
+        /// Registers the discrete per-event persistence handlers that <see cref="DataProviderSynchronizer"/>
+        /// applies to the database when draining the player update queue, together with their dispatch
+        /// mapping. Adding a persisted event is a new <see cref="IPlayerUpdateHandler{TEvent}"/> plus one line
+        /// here — the consume-side mirror of the publish-side <see cref="RegisterPlayerPersistenceHandlers"/> —
+        /// rather than an edit to a central switch. <see cref="ProgressUpdatedEvent"/> is published directly by
+        /// the progress repo (not a domain event), so it appears here but not on the publish side.
+        /// </summary>
+        private static IServiceCollection AddPlayerUpdateHandlers(this IServiceCollection services)
+        {
+            return services
+                .AddPlayerUpdateHandler<PlayerCoreUpdatedEvent, PlayerCoreUpdatedHandler>()
+                .AddPlayerUpdateHandler<AttributeAllocationsChangedEvent, AttributeAllocationsChangedHandler>()
+                .AddPlayerUpdateHandler<ItemUnlockedEvent, ItemUnlockedHandler>()
+                .AddPlayerUpdateHandler<ItemEquippedEvent, ItemEquippedHandler>()
+                .AddPlayerUpdateHandler<ItemUnequippedEvent, ItemUnequippedHandler>()
+                .AddPlayerUpdateHandler<ModUnlockedEvent, ModUnlockedHandler>()
+                .AddPlayerUpdateHandler<ModAppliedEvent, ModAppliedHandler>()
+                .AddPlayerUpdateHandler<ModRemovedEvent, ModRemovedHandler>()
+                .AddPlayerUpdateHandler<SkillUnlockedEvent, SkillUnlockedHandler>()
+                .AddPlayerUpdateHandler<SelectedSkillsChangedEvent, SelectedSkillsChangedHandler>()
+                .AddPlayerUpdateHandler<ItemFavoriteChangedEvent, ItemFavoriteChangedHandler>()
+                .AddPlayerUpdateHandler<LogPreferenceChangedEvent, LogPreferenceChangedHandler>()
+                .AddPlayerUpdateHandler<ProgressUpdatedEvent, ProgressUpdatedHandler>();
+        }
+
+        /// <summary>
+        /// Registers a single write-behind persistence handler: the scoped DI binding the dispatcher resolves
+        /// per drain, and the type-name → deserialize-and-invoke mapping keyed by the event's type name.
+        /// </summary>
+        private static IServiceCollection AddPlayerUpdateHandler<TEvent, THandler>(this IServiceCollection services)
+            where THandler : class, IPlayerUpdateHandler<TEvent>
+        {
+            PlayerUpdateEventDispatcher.Register<TEvent>();
+            return services.AddScoped<IPlayerUpdateHandler<TEvent>, THandler>();
         }
 
         /// <summary>
