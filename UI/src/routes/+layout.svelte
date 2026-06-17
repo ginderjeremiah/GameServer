@@ -35,9 +35,9 @@ onMount(() => {
 });
 
 // Surface otherwise-silent WebSocket failures to the player. Registered during
-// layout init (the root layout lives for the whole app session), so the hook's
-// onDestroy cleanup is valid and a single subscription covers every screen.
-onSocketError((message) => toastError(message));
+// layout init (the root layout lives for the whole app session), so we opt into
+// the hook's onDestroy cleanup; a single subscription covers every screen.
+onSocketError((message) => toastError(message), true);
 
 // Boot gate. On a fresh page load (refresh or deep link) the in-memory game state is gone, so we
 // attempt to restore the session and decide where to land — keeping a fully-restored session on the

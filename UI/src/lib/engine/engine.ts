@@ -41,6 +41,13 @@ export const startGame = () => {
 		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
 		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed);
+		// startGame runs during the game page's component init, so unhook these server-pushed-command
+		// listeners on teardown (listenCommand no longer auto-wires onDestroy) — mirroring the engines above.
+		onDestroy(() => {
+			socketReplacedUnhook?.();
+			challengeCompletedUnhook?.();
+			serverCommandFailedUnhook?.();
+		});
 	}
 };
 

@@ -46,7 +46,18 @@ export const createHook = <T extends unknown[] = []>() => {
 		}
 	};
 
-	const onNotified = (callback: Action<[...T, Action]>, cleanupOnDestroy: boolean = true) => {
+	/**
+	 * Subscribes `callback` to this hook and returns an unsubscribe function. The hook is a generic
+	 * pub/sub primitive with no framework coupling: by default it wires NO Svelte lifecycle cleanup,
+	 * so a module-level, async, or `setTimeout` caller can subscribe safely and is responsible for
+	 * calling the returned unsubscribe itself.
+	 *
+	 * @param cleanupOnDestroy Opt in to auto-unsubscribe via Svelte's `onDestroy`. ONLY pass `true`
+	 *   from within component initialization (a `.svelte` `<script>` top level or a function reached
+	 *   synchronously from it) — `onDestroy` throws/no-ops outside that window. Callers outside a
+	 *   component context must leave this off and manage teardown via the returned unsubscribe.
+	 */
+	const onNotified = (callback: Action<[...T, Action]>, cleanupOnDestroy: boolean = false) => {
 		const unhook = () => {
 			if (tracker.removed) {
 				return;
