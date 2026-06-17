@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+@keyframes fx-punchy{0%{opacity:0;transform:translate(-50%,6px) scale(.42)}16%{opacity:1;transform:translate(-50%,-8px) scale(1.4)}30%{transform:translate(-50%,-12px) scale(1)}82%{opacity:1}100%{opacity:0;transform:translate(-50%,-76px) scale(1)}}
+@keyframes ready-pulse{0%,100%{box-shadow:inset 0 0 8px rgba(161,194,247,.3),0 0 6px rgba(161,194,247,.35)}50%{box-shadow:inset 0 0 10px rgba(161,194,247,.5),0 0 14px rgba(161,194,247,.85)}}
+@keyframes ready-pulse-enemy{0%,100%{box-shadow:inset 0 0 8px rgba(224,135,120,.3),0 0 6px rgba(224,135,120,.35)}50%{box-shadow:inset 0 0 10px rgba(224,135,120,.5),0 0 14px rgba(224,135,120,.85)}}
+@keyframes xp-shimmer{0%{transform:translateX(-160%)}55%{transform:translateX(420%)}100%{transform:translateX(420%)}}
+@keyframes levelup-flash{0%,100%{box-shadow:0 0 0 0 transparent}30%{box-shadow:0 0 16px 3px var(--gold)}}
+</style>
+</helmet>
+
+<div style="--page:#0f1014;--accent:#a1c2f7;--accent-light:#c0d8ff;--enemy-accent:#e08778;--gold:#e8c878;--text-primary:#f0f0f0;--text-secondary:rgba(240,240,240,.78);--text-muted:rgba(240,240,240,.4);--white:#fff;--border-subtle:rgba(255,255,255,.08);--border-light:rgba(255,255,255,.14);--border-medium:rgba(255,255,255,.18);--warning:#f0d28a;--success:#bde0b4;--block-color:#7fc28b;--text-secondary:rgba(240,240,240,.78);--health-missing-color:rgba(224,138,120,.18);--health-remaining-color:#7fc28b;--health-remaining-dark:#5da66a;--health-disappearing-color:rgba(224,138,120,.55);--mono:'Geist Mono',ui-monospace,monospace;--sans:Geist,system-ui,sans-serif;min-height:100vh;width:100%;box-sizing:border-box;background:radial-gradient(120% 90% at 50% 0%,#16171d 0%,#0f1014 55%,#0b0c0f 100%);font-family:var(--sans);color:var(--text-primary);display:flex;flex-direction:column;overflow:hidden;">
+
+  <!-- zone nav -->
+  <div style="padding:22px 32px 0;display:flex;justify-content:center;">
+    <div style="display:inline-flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);border:1px solid var(--border-light);border-radius:3px;padding:6px 10px 6px 6px;">
+      <div style="width:24px;height:24px;background:rgba(255,255,255,.03);border:1px solid var(--border-medium);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:rgba(240,240,240,.85);">‹</div>
+      <div style="display:flex;align-items:baseline;gap:10px;min-width:200px;justify-content:center;">
+        <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(192,216,255,.85);">Zone · 03</span>
+        <span style="font-size:16px;letter-spacing:.1px;">Ashfall Reach</span>
+      </div>
+      <div style="width:24px;height:24px;background:rgba(255,255,255,.03);border:1px solid var(--border-medium);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:rgba(240,240,240,.85);">›</div>
+    </div>
+  </div>
+
+  <!-- combatants -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:40px;padding:20px 36px 60px;min-height:0;">
+
+    <!-- PLAYER CARD -->
+    <div style="position:relative;background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-left:3px solid var(--accent);border-radius:3px;padding:16px 18px;width:300px;box-shadow:0 0 0 1px rgba(0,0,0,.4),-4px 0 18px rgba(161,194,247,.1);">
+      <div id="fl-player" style="position:absolute;inset:-12px 0 0 0;pointer-events:none;overflow:visible;z-index:6;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <div style="width:4px;height:18px;background:var(--accent);box-shadow:0 0 8px rgba(161,194,247,.5);"></div>
+          <span style="font-size:18px;font-weight:500;letter-spacing:-.1px;">Aelara</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+          <span style="font-family:var(--mono);font-size:9.5px;color:var(--accent-light);letter-spacing:.8px;">LV {{ level }}</span>
+          <div style="position:relative;width:104px;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;">
+            <div id="hero-xpbar" style="position:absolute;inset:0;width: {{ xpPct }};background:#e8c878;border-radius:2px;transition:width .35s ease-out;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:24px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 2.8s ease-in-out infinite;"></div></div>
+          </div>
+        </div>
+      </div>
+      <div style="position:relative;height:20px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-bottom:14px;">
+        <div style="position:absolute;inset:0;width: {{ pHpPct }};background:var(--health-disappearing-color);transition:width 1s ease-out;"></div>
+        <div style="position:absolute;inset:0;width: {{ pHpPct }};background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));transition:width .12s ease-out;"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7);letter-spacing:.3px;">{{ pHpText }}</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(161,194,247,.5);border-radius:2px;overflow:hidden;animation:ready-pulse 1.3s ease-in-out infinite;"><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(161,194,247,.18),transparent 65%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-light);">Strike</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 150deg,transparent 150deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Guard</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 250deg,transparent 250deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Rally</span></div>
+      </div>
+    </div>
+
+    <!-- center: timer above VS -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:18px;flex-shrink:0;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 124px; margin-bottom: 12px">
+        <sc-if value="{{ notTimedOut }}" hint-placeholder-val="{{ true }}">
+          <div style="font-family:var(--mono);font-weight:500;font-size:28px;letter-spacing:1.5px;line-height:1;color:var(--text-primary);">{{ timerText }}</div>
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);">/ 2:00 limit</div>
+        </sc-if>
+        <sc-if value="{{ timedOut }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:var(--mono);font-weight:600;font-size:20px;letter-spacing:2.5px;line-height:1;color:var(--enemy-accent);">TIMEOUT</div>
+          <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);">draw</div>
+        </sc-if>
+        <div style="width:120px;height:2px;background:rgba(255,255,255,.09);border-radius:1px;overflow:hidden;margin-top:3px;">
+          <div style="height:100%;width: {{ timePct }};background: {{ timerFillColor }};transition:width .12s linear,background .4s;"></div>
+        </div>
+      </div>
+      <div style="width:56px;height:56px;position:relative;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;inset:0;border:1px solid var(--border-medium);transform:rotate(45deg);background:rgba(20,21,27,.6);"></div>
+        <div style="position:absolute;inset:14px;background:rgba(255,255,255,.04);transform:rotate(45deg);box-shadow:inset 0 0 12px rgba(255,255,255,.08);"></div>
+        <span style="position:relative;font-family:var(--mono);font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:rgba(240,240,240,.85);">vs</span>
+      </div>
+    </div>
+
+    <!-- ENEMY CARD -->
+    <div style="position:relative;background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-right:3px solid var(--enemy-accent);border-radius:3px;padding:16px 18px;width:300px;box-shadow:0 0 0 1px rgba(0,0,0,.4),4px 0 18px rgba(224,135,120,.1);">
+      <div id="fl-enemy" style="position:absolute;inset:-12px 0 0 0;pointer-events:none;overflow:visible;z-index:6;"></div>
+      <div style="display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:baseline;margin-bottom:14px;">
+        <div style="display:flex;flex-direction:row-reverse;align-items:center;gap:9px;">
+          <div style="width:4px;height:18px;background:var(--enemy-accent);box-shadow:0 0 8px rgba(224,135,120,.5);"></div>
+          <span style="font-size:18px;font-weight:500;letter-spacing:-.1px;">Cinder Wraith</span>
+        </div>
+        <span style="font-family:var(--mono);font-size:10.5px;color:rgba(240,240,240,.6);letter-spacing:.6px;">LV · 9</span>
+      </div>
+      <div style="position:relative;height:20px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-bottom:14px;">
+        <div style="position:absolute;inset:0;width: {{ eHpPct }};background:var(--health-disappearing-color);transition:width 1s ease-out;"></div>
+        <div style="position:absolute;inset:0;width: {{ eHpPct }};background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));transition:width .12s ease-out;"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7);letter-spacing:.3px;">{{ eHpText }}</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 90deg,transparent 90deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Gnash</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(224,135,120,.5);border-radius:2px;overflow:hidden;animation:ready-pulse-enemy 1.3s ease-in-out infinite;"><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(224,135,120,.18),transparent 65%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--enemy-accent);">Howl</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 210deg,transparent 210deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Rend</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;timeScale&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;min&quot;:1,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = {
+    level: 7,
+    xpInLevel: 280,
+    pMax: 1180, pHp: 1180,
+    eMax: 940, eHp: 940,
+    timeMs: 0,
+    timedOut: false,
+  };
+
+  _ts() { return this.props.timeScale ?? 4; }
+
+  componentDidMount() {
+    this._dead = false;
+    this._clock = setInterval(() => this._tick(), 100);
+    this._scheduleAttack();
+  }
+
+  componentWillUnmount() {
+    this._dead = true;
+    clearInterval(this._clock);
+    clearTimeout(this._atk);
+    clearTimeout(this._rst);
+  }
+
+  _tick() {
+    if (this._dead || this.state.timedOut) return;
+    const t = this.state.timeMs + 100 * this._ts();
+    if (t >= 120000) {
+      this.setState({ timeMs: 120000, timedOut: true });
+      this._rst = setTimeout(() => {
+        if (this._dead) return;
+        this.setState({ timeMs: 0, timedOut: false, pHp: this.state.pMax, eHp: this.state.eMax });
+      }, 1700);
+      return;
+    }
+    this.setState({ timeMs: t });
+  }
+
+  _scheduleAttack() {
+    const delay = 520 + Math.random() * 460;
+    this._atk = setTimeout(() => {
+      this._resolve();
+      this._scheduleAttack();
+    }, delay);
+  }
+
+  _resolve() {
+    if (this._dead || this.state.timedOut) return;
+    const playerAtt = Math.random() < 0.6;
+    const r = Math.random();
+    if (playerAtt) {
+      if (r < 0.10) { this._float('fl-enemy', { label: 'DODGE', color: 'var(--text-secondary)' }); return; }
+      if (r < 0.20) { const a = Math.round(20 + Math.random() * 30); this._float('fl-enemy', { amount: a, label: 'BLOCK', color: 'var(--block-color)' }); this._dmg('e', a); return; }
+      const crit = Math.random() < 0.20;
+      const dmg = Math.round((80 + Math.random() * 90) * (crit ? 2.1 : 1));
+      this._float('fl-enemy', { amount: dmg, label: crit ? 'CRIT' : '', color: crit ? 'var(--gold)' : 'var(--accent)', crit });
+      this._dmg('e', dmg);
+    } else {
+      if (r < 0.12) { this._float('fl-player', { label: 'DODGE', color: 'var(--text-secondary)' }); return; }
+      if (r < 0.22) { const a = Math.round(15 + Math.random() * 25); this._float('fl-player', { amount: a, label: 'BLOCK', color: 'var(--block-color)' }); this._dmg('p', a); return; }
+      const crit = Math.random() < 0.14;
+      const dmg = Math.round((55 + Math.random() * 65) * (crit ? 1.9 : 1));
+      this._float('fl-player', { amount: dmg, label: crit ? 'CRIT' : '', color: 'var(--enemy-accent)', crit });
+      this._dmg('p', dmg);
+    }
+  }
+
+  _dmg(who, amount) {
+    if (who === 'e') {
+      const hp = this.state.eHp - amount;
+      if (hp <= 0) { this._kill(); return; }
+      this.setState({ eHp: hp });
+    } else {
+      const hp = this.state.pHp - amount;
+      if (hp < this.state.pMax * 0.14) {
+        this._float('fl-player', { amount: Math.round(this.state.pMax * 0.4), label: '', color: 'var(--success)', heal: true });
+        this.setState({ pHp: Math.min(this.state.pMax, hp + this.state.pMax * 0.45) });
+      } else {
+        this.setState({ pHp: hp });
+      }
+    }
+  }
+
+  _kill() {
+    const gain = 30 + Math.round(Math.random() * 30);
+    let xp = this.state.xpInLevel + gain;
+    let level = this.state.level;
+    let leveled = false;
+    let need = level * 100;
+    while (xp >= need) { xp -= need; level++; leveled = true; need = level * 100; }
+    this.setState({ eHp: this.state.eMax, xpInLevel: xp, level });
+    if (leveled) {
+      this._float('fl-player', { label: 'LEVEL UP', color: 'var(--gold)', crit: true });
+      const bar = document.getElementById('hero-xpbar');
+      if (bar) { bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = 'levelup-flash 900ms ease-out'; }
+    }
+  }
+
+  _float(layerId, o) {
+    const layer = document.getElementById(layerId);
+    if (!layer) return;
+    const dur = 1500;
+    const x = 24 + Math.random() * 52;
+    const labelOnly = o.amount == null;
+    const size = o.crit ? 30 : labelOnly ? 20 : 21;
+    const amtTxt = o.amount != null ? (o.heal ? '+' + o.amount : '' + o.amount) : '';
+    const ico = '<span style="display:inline-block;width:.62em;height:.62em;border:1px solid currentColor;border-radius:2px;opacity:.5;margin-right:.26em;vertical-align:.02em;"></span>';
+    const amt = amtTxt ? '<span>' + amtTxt + '</span>' : '';
+    const lbl = o.label ? '<span style="font-size:.6em;letter-spacing:.13em;margin-left:.32em;font-weight:600;opacity:.95;">' + o.label + '</span>' : '';
+    const el = document.createElement('div');
+    el.innerHTML = ico + amt + lbl;
+    const glow = o.crit ? ',0 0 10px ' + o.color : '';
+    el.style.cssText = 'position:absolute;left:' + x + '%;top:54%;color:' + o.color + ';font-family:var(--mono);font-weight:700;font-size:' + size + 'px;white-space:nowrap;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.85)' + glow + ';animation:fx-punchy ' + dur + 'ms cubic-bezier(.18,.7,.28,1) forwards;';
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), dur + 80);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const pPct = Math.max(0, (s.pHp / s.pMax) * 100);
+    const ePct = Math.max(0, (s.eHp / s.eMax) * 100);
+    const need = s.level * 100;
+    const xpPct = Math.min(100, (s.xpInLevel / need) * 100);
+    const fmt = (n) => Math.round(n).toLocaleString();
+    const totalS = Math.floor(s.timeMs / 1000);
+    const mm = Math.floor(totalS / 60);
+    const ss = totalS % 60;
+    const warn = s.timeMs >= 100000;
+    return {
+      level: s.level,
+      pHpPct: pPct + '%',
+      eHpPct: ePct + '%',
+      pHpText: fmt(s.pHp) + ' / ' + fmt(s.pMax),
+      eHpText: fmt(s.eHp) + ' / ' + fmt(s.eMax),
+      xpPct: xpPct + '%',
+      timerText: mm + ':' + String(ss).padStart(2, '0'),
+      timePct: (s.timeMs / 120000) * 100 + '%',
+      timerFillColor: warn ? 'var(--warning)' : 'var(--accent)',
+      timedOut: s.timedOut,
+      notTimedOut: !s.timedOut,
+    };
+  }
+}
+</script>
+</body>
+</html>

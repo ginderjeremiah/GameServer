@@ -103,7 +103,7 @@ vi.mock('$lib/engine/battle/enemy-manager', () => ({
 	})
 }));
 
-import { BattleEngine, BattleStage } from '$lib/engine/battle/battle-engine';
+import { BattleEngine, BattleStage, onCombatFloat, type CombatFloatEvent } from '$lib/engine/battle/battle-engine';
 import { logMessage } from '$lib/engine/log';
 
 describe('BattleEngine', () => {
@@ -552,6 +552,75 @@ describe('BattleEngine', () => {
 					expect.stringContaining("You blocked Goblin's Slash"),
 					'player-block'
 				);
+			});
+		});
+
+		// The floating-number layer consumes these events; they mirror the same flags as the combat-log
+		// outcomes, spawning over whichever side was struck or defended.
+		describe('combat float events', () => {
+			const defaultAttributes = mockPlayerManager.attributes;
+			let events: CombatFloatEvent[];
+			let unhook: () => void;
+
+			beforeEach(() => {
+				events = [];
+				unhook = onCombatFloat((event) => events.push(event));
+			});
+			afterEach(() => {
+				unhook();
+				mockPlayerManager.attributes = defaultAttributes;
+			});
+
+			const forcePlayerChance = (attributeId: EAttribute) => {
+				mockPlayerManager.attributes = [{ attributeId, amount: 1 }];
+			};
+			const tankyEnemy = {
+				id: 1,
+				level: 1,
+				seed: 0,
+				selectedSkills: [0],
+				attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }]
+			};
+
+			it("emits an enemy-targeted hit carrying the skill's damage on a player hit", () => {
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500);
+
+				const hit = events.find((event) => event.target === 'enemy');
+				expect(hit).toMatchObject({ target: 'enemy', kind: 'hit' });
+				expect(hit?.amount).toBeGreaterThan(0);
+			});
+
+			it('emits an enemy-targeted crit when the player crits', () => {
+				forcePlayerChance(EAttribute.CriticalChance);
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(events).toContainEqual(expect.objectContaining({ target: 'enemy', kind: 'crit' }));
+			});
+
+			it('emits a player-targeted dodge with no amount when the player dodges', () => {
+				forcePlayerChance(EAttribute.DodgeChance);
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(events).toContainEqual({ target: 'player', kind: 'dodge' });
+			});
+
+			it('emits a player-targeted block when the player blocks', () => {
+				forcePlayerChance(EAttribute.BlockChance);
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(events).toContainEqual(expect.objectContaining({ target: 'player', kind: 'block' }));
 			});
 		});
 	});

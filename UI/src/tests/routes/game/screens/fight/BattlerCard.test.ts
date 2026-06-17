@@ -3,13 +3,16 @@ import { render, cleanup } from '@testing-library/svelte';
 import { EAttribute, type IAttribute } from '$lib/api';
 
 // The card renders a Skills -> SkillTooltip subtree, which imports the battle engine and the
-// reference-data store at module load; both are mocked even though no hover happens here.
-const { mockBattleEngine, staticData } = vi.hoisted(() => ({
+// reference-data store at module load; both are mocked even though no hover happens here. The player
+// card also reads the player manager (level/XP for the header bar) and the combat-float hook.
+const { mockBattleEngine, mockPlayerManager, onCombatFloat, staticData } = vi.hoisted(() => ({
 	mockBattleEngine: { getOpponent: vi.fn() },
+	mockPlayerManager: { level: 7, exp: 280, nextLevelThreshold: 700 },
+	onCombatFloat: vi.fn(() => () => {}),
 	staticData: { attributes: [] as IAttribute[] }
 }));
 
-vi.mock('$lib/engine', () => ({ battleEngine: mockBattleEngine }));
+vi.mock('$lib/engine', () => ({ battleEngine: mockBattleEngine, playerManager: mockPlayerManager, onCombatFloat }));
 vi.mock('$stores', () => ({ staticData }));
 
 import BattlerCard from '$routes/game/screens/fight/BattlerCard.svelte';
@@ -18,18 +21,19 @@ import { makeBattler, makeSkill } from './fight-fixtures';
 afterEach(cleanup);
 
 describe('BattlerCard', () => {
-	it('renders the battler name, level and current/max health', () => {
+	it('renders the player name, account level and current/max health', () => {
 		const battler = makeBattler({
 			name: 'Aelara',
-			level: 12,
 			attributes: [{ attributeId: EAttribute.MaxHealth, amount: 100 }],
 			currentHealth: 80
 		});
+		// The player card shows the player's account level (from the player manager), not the battler's.
+		mockPlayerManager.level = 5;
 		const { getByTestId } = render(BattlerCard, { props: { battler, side: 'player' } });
 
 		const card = getByTestId('player-card');
 		expect(card.querySelector('.battler-name')?.textContent).toBe('Aelara');
-		expect(card.querySelector('.battler-level')?.textContent).toContain('12');
+		expect(card.querySelector('.player-level')?.textContent).toContain('5');
 		expect(card.querySelector('.hp-text')?.textContent).toContain('80 / 100');
 	});
 
@@ -99,5 +103,30 @@ describe('BattlerCard', () => {
 		const { getByAltText, getByText } = render(BattlerCard, { props: { battler, side: 'player' } });
 		expect(getByAltText('Slash')).toBeTruthy();
 		expect(getByText('Slash')).toBeTruthy();
+	});
+
+	it("shows the player's level and XP progress bar in the header", () => {
+		mockPlayerManager.level = 7;
+		mockPlayerManager.exp = 280;
+		mockPlayerManager.nextLevelThreshold = 700;
+		const { getByTestId } = render(BattlerCard, { props: { battler: makeBattler(), side: 'player' } });
+
+		const card = getByTestId('player-card');
+		expect(card.querySelector('.player-level')?.textContent).toContain('7');
+
+		const xpBar = getByTestId('player-xp-bar');
+		expect(xpBar.getAttribute('role')).toBe('progressbar');
+		expect(xpBar.getAttribute('aria-valuenow')).toBe('280');
+		expect(xpBar.getAttribute('aria-valuemax')).toBe('700');
+		// 280 / 700 = 40%.
+		expect((xpBar.querySelector('.xp-fill') as HTMLElement).getAttribute('style')).toContain('width: 40%');
+	});
+
+	it('shows a plain level on the enemy card with no XP bar', () => {
+		const { getByTestId, queryByTestId } = render(BattlerCard, {
+			props: { battler: makeBattler({ name: 'Dire Wolf', level: 9 }), side: 'enemy' }
+		});
+		expect(getByTestId('enemy-card').querySelector('.battler-level')?.textContent).toContain('9');
+		expect(queryByTestId('player-xp-bar')).toBeNull();
 	});
 });

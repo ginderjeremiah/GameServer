@@ -18,11 +18,14 @@
 	<div class="combatants">
 		<BattlerCard battler={battleEngine.player} side="player" />
 
-		<!-- VS badge -->
-		<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
-			<div class="vs-diamond"></div>
-			<div class="vs-diamond-inner"></div>
-			<span class="vs-text">vs</span>
+		<!-- Center column: the battle timer rides above the VS badge, clear of the zone-nav/boss band. -->
+		<div class="center-column">
+			<BattleTimer elapsedMs={battleEngine.timeElapsed} maxMs={DEFAULT_MAX_BATTLE_MS} />
+			<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
+				<div class="vs-diamond"></div>
+				<div class="vs-diamond-inner"></div>
+				<span class="vs-text">vs</span>
+			</div>
 		</div>
 
 		{#if boss.engaged}
@@ -45,12 +48,14 @@
 <script lang="ts">
 import ZoneNav from './ZoneNav.svelte';
 import BattlerCard from './BattlerCard.svelte';
+import BattleTimer from './BattleTimer.svelte';
 import BossAffordanceSlot from './boss/BossAffordanceSlot.svelte';
 import BossBattlerCard from './boss/BossBattlerCard.svelte';
 import BossAtmosphere from './boss/BossAtmosphere.svelte';
 import ZoneClearedOverlay from './boss/ZoneClearedOverlay.svelte';
 import { BossView } from './boss/boss-view.svelte';
 import { battleEngine } from '$lib/engine';
+import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 const boss = new BossView();
 </script>
@@ -96,6 +101,14 @@ const boss = new BossView();
 	gap: 40px;
 	padding: 20px 36px 96px;
 	min-height: 0;
+}
+
+.center-column {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 30px;
+	flex-shrink: 0;
 }
 
 .vs-badge {

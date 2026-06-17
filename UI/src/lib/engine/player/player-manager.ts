@@ -78,8 +78,10 @@ export class PlayerManager implements IPlayerData {
 
 	/** Exp required to advance the current level (`Level * EXP_PER_LEVEL`, mirroring the backend).
 	 *  The level is clamped to ≥ 1 so the pre-`initialize` `level = 0` default can't produce a
-	 *  zero threshold that would let `grantExp` over-level. A real level (≥ 1) is unaffected. */
-	private get nextLevelThreshold(): number {
+	 *  zero threshold that would let `grantExp` over-level. A real level (≥ 1) is unaffected.
+	 *  Public so the fight-screen XP bar derives its fill from the same threshold the level-up
+	 *  logic uses, rather than re-deriving `level * EXP_PER_LEVEL` in the view. */
+	public get nextLevelThreshold(): number {
 		return Math.max(1, this.level) * EXP_PER_LEVEL;
 	}
 

@@ -30,7 +30,7 @@ Each screen folder contains the HTML entry-point prototype(s), the JSX component
 | [login](./game/login/)             | Login / account-creation form                              | `chat.md`                                               |
 | [loading](./game/loading/)         | Loading screen                                             | `chat.md`                                               |
 | [game-screen](./game/game-screen/) | Main game layout (collapsible sidebar nav)                 | `chat.md`                                               |
-| [fight](./game/fight/)             | Fight screen layout                                        | `chat-original.md` (initial), `chat.md` (boss redesign) |
+| [fight](./game/fight/)             | Fight screen layout, combat-feedback enhancements          | `chat-original.md` (initial), `chat.md` (boss redesign), `chat-enhancements.md` (XP bar, floating numbers, battle timer) |
 | [inventory](./game/inventory/)     | Inventory screen (drag-drop, item mods)                    | `chat.md`                                               |
 | [challenge](./game/challenge/)     | Challenge screen v1/v2/v3 + redesign                       | `chat.md` (original), `chat-redesign.md`                |
 | [attributes](./game/attributes/)   | Attribute page, breakdown, build, stats-attributes sidebar | — (see stats/chat.md)                                   |
