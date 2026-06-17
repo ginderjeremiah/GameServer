@@ -1,7 +1,7 @@
 import { ELogType } from '$lib/api';
 import type { LogMessage } from '$lib/engine/log';
 
-export type GlyphKind = 'hit' | 'crit' | 'enemy' | 'loot' | 'system' | 'kill' | 'effect';
+export type GlyphKind = 'hit' | 'crit' | 'dodge' | 'block' | 'enemy' | 'loot' | 'system' | 'kill' | 'effect';
 
 export interface LogKind {
 	/** Accent color for the chip, message, and left bar. */
@@ -40,12 +40,23 @@ const EFFECT = logColors.effect;
  *
  * The log model only stores a flat `message` + `logType`, so player-vs-enemy
  * actions (both `ELogType.Damage`) are disambiguated by the message prefix the
- * battle engine produces ("You used …" / "You've been defeated!").
+ * battle engine produces ("You used …" / "You've been defeated!"). The player-only
+ * crit/dodge/block outcomes (#178) ride the same `ELogType.Damage` channel and are
+ * told apart by the distinctive phrasing `damageLogMessage` produces.
  */
 export function logKind(log: LogMessage): LogKind {
 	const fromPlayer = log.message.startsWith('You');
 	switch (log.logType) {
 		case ELogType.Damage:
+			if (log.message.startsWith('You landed a critical hit')) {
+				return { color: PLAYER, glyph: 'crit', label: 'Crit' };
+			}
+			if (log.message.startsWith('You dodged')) {
+				return { color: ENEMY, glyph: 'dodge', label: 'Dodge' };
+			}
+			if (log.message.startsWith('You blocked')) {
+				return { color: ENEMY, glyph: 'block', label: 'Block' };
+			}
 			return fromPlayer
 				? { color: PLAYER, glyph: 'hit', label: 'Hit' }
 				: { color: ENEMY, glyph: 'enemy', label: 'Hurt' };

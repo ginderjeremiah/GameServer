@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EAttribute, ELogType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
 
@@ -471,6 +471,61 @@ describe('BattleEngine', () => {
 			const effectCalls = vi.mocked(logMessage).mock.calls.filter(([type]) => type === ELogType.SkillEffect);
 			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'You took 6 damage over time.']);
 			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'Goblin recovered 5 health.']);
+		});
+
+		// The player-only crit/dodge/block outcomes (#178) surface through the combat log. Forcing a
+		// chance of 1 makes every [0,1) RNG draw succeed, so the outcome is deterministic without a seed.
+		describe('crit / dodge / block lines (#178)', () => {
+			const defaultAttributes = mockPlayerManager.attributes;
+			afterEach(() => {
+				mockPlayerManager.attributes = defaultAttributes;
+			});
+
+			const forcePlayerChance = (attributeId: EAttribute) => {
+				mockPlayerManager.attributes = [{ attributeId, amount: 1 }];
+			};
+			// A tanky enemy survives the player's opening hit and fires back, giving the player something
+			// to dodge/block.
+			const tankyEnemy = {
+				id: 1,
+				level: 1,
+				seed: 0,
+				selectedSkills: [0],
+				attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }]
+			};
+
+			it('logs a critical-hit line when the player crits', () => {
+				forcePlayerChance(EAttribute.CriticalChance);
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500); // the player's 500ms skill fires and crits
+
+				expect(logMessage).toHaveBeenCalledWith(
+					ELogType.Damage,
+					expect.stringContaining('You landed a critical hit with Slash')
+				);
+			});
+
+			it('logs a dodge line when the player dodges an incoming enemy hit', () => {
+				forcePlayerChance(EAttribute.DodgeChance);
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, "You dodged Goblin's Slash!");
+			});
+
+			it('logs a block line when the player blocks an incoming enemy hit', () => {
+				forcePlayerChance(EAttribute.BlockChance);
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining("You blocked Goblin's Slash"));
+			});
 		});
 	});
 
