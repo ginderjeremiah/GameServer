@@ -3,6 +3,7 @@
 
 import type {
 	EChangeType,
+	EDeadLetterReason,
 	IAttributeDistribution,
 	IBattlerAttribute,
 	IEnemySpawn,
@@ -18,6 +19,29 @@ export interface IAddEditAttributesData {
 export interface IChange<T> {
 	item: T;
 	changeType: EChangeType;
+}
+
+export interface IDeadLetterEntry {
+	index: number;
+	eventType?: string;
+	playerId?: number;
+	reason: EDeadLetterReason;
+	rawPayload: string;
+}
+
+export interface IDeadLetterInspection {
+	totalCount: number;
+	entries: IDeadLetterEntry[];
+}
+
+export interface IDeadLetterReplayResult {
+	replayedCount: number;
+	remainingCount: number;
+}
+
+export interface IReplayDeadLettersData {
+	all: boolean;
+	payloads?: string[];
 }
 
 export interface ISetEnemyAttributeDistributions {

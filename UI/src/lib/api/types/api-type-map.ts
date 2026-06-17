@@ -8,6 +8,8 @@ import type {
 	IAuthTokens,
 	IChallenge,
 	IChange,
+	IDeadLetterInspection,
+	IDeadLetterReplayResult,
 	IDeviceInfoRequest,
 	IEnemy,
 	IItem,
@@ -17,6 +19,7 @@ import type {
 	ILoginResult,
 	IPlayerData,
 	IRefreshRequest,
+	IReplayDeadLettersData,
 	IRole,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
@@ -45,8 +48,10 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditZones': undefined;
 	'AdminTools/ArchiveUser': undefined;
 	'AdminTools/BanUser': undefined;
+	'AdminTools/GetPlayerUpdateDeadLetters': IDeadLetterInspection;
 	'AdminTools/GetRoles': IRole[];
 	'AdminTools/GetUsers': IAdminUserSearchResults;
+	'AdminTools/ReplayPlayerUpdateDeadLetters': IDeadLetterReplayResult;
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
@@ -80,7 +85,9 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditZones': IChange<IZone>[];
 	'AdminTools/ArchiveUser': IUserActionData;
 	'AdminTools/BanUser': IUserActionData;
+	'AdminTools/GetPlayerUpdateDeadLetters': { max?: number } | undefined;
 	'AdminTools/GetUsers': { search?: string, roleId?: number, archived?: boolean, page?: number, pageSize?: number } | undefined;
+	'AdminTools/ReplayPlayerUpdateDeadLetters': IReplayDeadLettersData;
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;

@@ -60,6 +60,12 @@ export enum EChangeType {
 	Delete = 2,
 }
 
+export enum EDeadLetterReason {
+	Malformed = 0,
+	UnknownEventType = 1,
+	Replayable = 2,
+}
+
 export enum EEntityType {
 	None = 0,
 	Enemy = 1,

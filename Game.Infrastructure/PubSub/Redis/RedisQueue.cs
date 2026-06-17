@@ -100,6 +100,26 @@ namespace Game.Infrastructure.PubSub.Redis
             return _redis.ListLengthAsync(QueueName);
         }
 
+        public async Task<IReadOnlyList<string>> PeekAsync(long count)
+        {
+            if (count <= 0)
+            {
+                return [];
+            }
+
+            // LRANGE 0..count-1 reads the oldest items at the head without removing them, so inspecting the
+            // queue never risks the at-most-once loss a destructive pop would — the reason the dead-letter
+            // queue is read this way rather than popped.
+            var values = await _redis.ListRangeAsync(QueueName, 0, count - 1);
+            return Array.ConvertAll(values, value => value.ToString());
+        }
+
+        public async Task<bool> RemoveAsync(string value)
+        {
+            // LREM count 1 removes a single matching occurrence; returns false (a no-op) when none remain.
+            return await _redis.ListRemoveAsync(QueueName, value, 1) > 0;
+        }
+
         public void AddToQueue(string value)
         {
             _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);

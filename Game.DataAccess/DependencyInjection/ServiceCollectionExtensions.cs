@@ -105,7 +105,9 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IAdminSkills, AdminSkills>()
                 .AddScoped<IAdminZones, AdminZones>()
                 .AddScoped<IAdminChallenges, AdminChallenges>()
-                .AddScoped<IAdminTags, AdminTags>();
+                .AddScoped<IAdminTags, AdminTags>()
+                // Admin Ops: guarded inspection/replay of the player write-behind dead-letter queue (#794).
+                .AddScoped<IPlayerUpdateDeadLetters, PlayerUpdateDeadLetters>();
         }
 
         /// <summary>
