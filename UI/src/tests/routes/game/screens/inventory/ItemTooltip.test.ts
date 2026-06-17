@@ -108,4 +108,54 @@ describe('ItemTooltip', () => {
 		expect(container.querySelector('.tt-body')).toBeNull();
 		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
+
+	describe('masked', () => {
+		it('accents the panel border by the item rarity', () => {
+			const { container } = render(ItemTooltip, { props: { item: makeItem(), masked: true } });
+			expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
+				'var(--rarity-epic)'
+			);
+		});
+
+		it('masks the name and shows the SEALED badge', () => {
+			const { container } = render(ItemTooltip, { props: { item: makeItem(), masked: true } });
+			expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('?????????');
+			expect((container.querySelector('.sealed-badge') as HTMLElement).textContent?.trim()).toBe('Sealed');
+			expect(container.textContent).not.toContain('Flaming Sword');
+		});
+
+		it('teases the correct number of masked stat rows without revealing values', () => {
+			const { container } = render(ItemTooltip, { props: { item: makeItem(), masked: true } });
+			// Two non-zero stats (Strength, Agility) → two masked rows of "???".
+			expect(container.querySelectorAll('.tt-qmark')).toHaveLength(2);
+			expect(container.querySelector('.tt-stats-grid')).toBeNull();
+			expect(container.textContent).not.toContain('Strength');
+		});
+
+		it('shows one sealed-slot row per mod slot with a redacted 0/N count', () => {
+			const { container } = render(ItemTooltip, { props: { item: makeItem(), masked: true } });
+			expect(container.querySelectorAll('.sealed-slot')).toHaveLength(2);
+			expect(container.querySelector('.tt-mod-tile')).toBeNull();
+			expect(container.textContent).toContain('Mods · 0/2');
+		});
+
+		it('always shows a masked description teaser', () => {
+			const { container } = render(ItemTooltip, { props: { item: makeItem(), masked: true } });
+			expect(container.textContent).toContain('Description');
+			expect(container.querySelector('.tt-masked-desc')).not.toBeNull();
+			expect(container.querySelector('.tt-description')).toBeNull();
+		});
+
+		it('omits the stats and mods sections for a statless, slotless item', () => {
+			const item = {
+				...makeItem(),
+				modSlots: [],
+				appliedMods: [],
+				totalAttributes: new BattleAttributes([], false)
+			} as unknown as Item;
+			const { container } = render(ItemTooltip, { props: { item, masked: true } });
+			expect(container.querySelector('.tt-qmark')).toBeNull();
+			expect(container.querySelector('.sealed-slot')).toBeNull();
+		});
+	});
 });

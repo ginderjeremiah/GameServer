@@ -1,47 +1,78 @@
 <!-- A lightweight, reference-data-only preview of a skill reward, composed over the shared tooltip
 	chrome. Unlike the battle `SkillTooltip` it needs no `Battler`/owner context (there is no live
-	fight when inspecting a challenge reward), so it reads the authored `ISkill` directly. -->
-<TooltipShell accent="var(--accent)" glow>
+	fight when inspecting a challenge reward), so it reads the authored `ISkill` directly. The same
+	component serves the sealed teaser (`masked`): redacted rows that keep their counts truthful. -->
+<TooltipShell accent={masked ? ACCENT : 'var(--accent)'} glow={!masked}>
 	{#snippet header()}
-		<TooltipTitle label="Skill" name={skill.name} diamondColor="var(--accent)" labelColor="var(--accent)" />
+		<TooltipTitle
+			label="Skill"
+			name={skill.name}
+			diamondColor="var(--accent)"
+			labelColor="var(--accent)"
+			{masked}
+			sealedAccent={ACCENT}
+		/>
 	{/snippet}
 
-	<TooltipSection label="Damage">
-		<div class="srt-line">
-			<span class="srt-key">Base damage</span>
-			<span class="srt-val">{formatNum(skill.baseDamage)}</span>
-		</div>
-		{#each scaling as entry (entry.attributeId)}
+	{#if masked}
+		{#if skill.damageMultipliers.length}
+			<TooltipSection label="Scaling">
+				<TooltipStatsGrid
+					masked
+					maskedRows={skill.damageMultipliers.length}
+					accent={ACCENT}
+					barWidths={SCALING_BAR_WIDTHS}
+				/>
+			</TooltipSection>
+		{/if}
+
+		{#if skill.effects.length}
+			<TooltipSection label="On hit">
+				<TooltipStatsGrid masked maskedRows={skill.effects.length} accent={ACCENT} barWidths={EFFECT_BAR_WIDTHS} />
+			</TooltipSection>
+		{/if}
+
+		<TooltipSection label="Description" last>
+			<TooltipDescription masked accent={ACCENT} lineWidths={DESC_LINE_WIDTHS} />
+		</TooltipSection>
+	{:else}
+		<TooltipSection label="Damage">
 			<div class="srt-line">
-				<span class="srt-key" style:color={attributeColor(entry.attributeId)}>{entry.name}</span>
-				<span class="srt-val">×{formatNum(entry.multiplier)}</span>
+				<span class="srt-key">Base damage</span>
+				<span class="srt-val">{formatNum(skill.baseDamage)}</span>
 			</div>
-		{/each}
-	</TooltipSection>
-
-	<TooltipSection label="Cooldown" last={effectLines.length === 0 && !skill.description}>
-		<div class="srt-line">
-			<span class="srt-key">Cooldown</span>
-			<span class="srt-val">{cooldownSeconds}s</span>
-		</div>
-	</TooltipSection>
-
-	{#if effectLines.length}
-		<TooltipSection label="On hit" last={!skill.description}>
-			{#each effectLines as effect (effect.id)}
-				<div class="srt-effect">
-					<span class="srt-mag" style:color={effectDirectionColor(effect.direction)}>{effect.magnitude}</span>
-					<span class="srt-attr">{effect.attributeName}</span>
-					<span class="srt-meta">{effect.targetLabel} · {effect.duration}</span>
+			{#each scaling as entry (entry.attributeId)}
+				<div class="srt-line">
+					<span class="srt-key" style:color={attributeColor(entry.attributeId)}>{entry.name}</span>
+					<span class="srt-val">×{formatNum(entry.multiplier)}</span>
 				</div>
 			{/each}
 		</TooltipSection>
-	{/if}
 
-	{#if skill.description}
-		<TooltipSection label="Description" last>
-			<div class="srt-description">{skill.description}</div>
+		<TooltipSection label="Cooldown" last={effectLines.length === 0 && !skill.description}>
+			<div class="srt-line">
+				<span class="srt-key">Cooldown</span>
+				<span class="srt-val">{cooldownSeconds}s</span>
+			</div>
 		</TooltipSection>
+
+		{#if effectLines.length}
+			<TooltipSection label="On hit" last={!skill.description}>
+				{#each effectLines as effect (effect.id)}
+					<div class="srt-effect">
+						<span class="srt-mag" style:color={effectDirectionColor(effect.direction)}>{effect.magnitude}</span>
+						<span class="srt-attr">{effect.attributeName}</span>
+						<span class="srt-meta">{effect.targetLabel} · {effect.duration}</span>
+					</div>
+				{/each}
+			</TooltipSection>
+		{/if}
+
+		{#if skill.description}
+			<TooltipSection label="Description" last>
+				<TooltipDescription text={skill.description} />
+			</TooltipSection>
+		{/if}
 	{/if}
 </TooltipShell>
 
@@ -58,13 +89,20 @@ import {
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
+import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
+import TooltipDescription from '$components/tooltip/TooltipDescription.svelte';
 
 interface Props {
 	skill: ISkill;
+	/** Render a sealed teaser (masked name, redacted scaling/effects/description) instead of the real skill. */
+	masked?: boolean;
 }
 
-const { skill }: Props = $props();
+const { skill, masked = false }: Props = $props();
+
+// Skills have no rarity tier, so the teaser uses the neutral skill accent throughout.
+const ACCENT = 'var(--accent-light)';
 
 const scaling = $derived(
 	skill.damageMultipliers.map((m) => ({
@@ -86,6 +124,10 @@ const effectLines = $derived(
 		)
 	}))
 );
+
+const SCALING_BAR_WIDTHS = [82, 64, 92];
+const EFFECT_BAR_WIDTHS = [70, 88, 58];
+const DESC_LINE_WIDTHS = [236, 180];
 </script>
 
 <style lang="scss">
@@ -140,12 +182,5 @@ const effectLines = $derived(
 	letter-spacing: 0.4px;
 	color: var(--text-muted);
 	white-space: nowrap;
-}
-
-.srt-description {
-	font-size: 11.5px;
-	font-style: italic;
-	color: color-mix(in srgb, var(--text-primary) 60%, transparent);
-	line-height: 1.55;
 }
 </style>

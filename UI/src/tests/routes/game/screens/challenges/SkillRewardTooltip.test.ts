@@ -75,4 +75,47 @@ describe('SkillRewardTooltip', () => {
 		const { container } = render(SkillRewardTooltip, { props: { skill: makeSkill({ description: '' }) } });
 		expect(container.textContent).not.toContain('Description');
 	});
+
+	describe('masked', () => {
+		it('accents the panel with the neutral skill hue and masks the name', () => {
+			const { container } = render(SkillRewardTooltip, { props: { skill: makeSkill(), masked: true } });
+			expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
+				'var(--accent-light)'
+			);
+			expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('?????????');
+			expect((container.querySelector('.tt-category-label') as HTMLElement).textContent).toBe('Skill');
+			expect(container.textContent).not.toContain('Firebolt');
+		});
+
+		it('teases one masked row per scaling attribute and per effect', () => {
+			const skill = makeSkill({
+				damageMultipliers: [
+					{ attributeId: EAttribute.Intellect, multiplier: 1.5 },
+					{ attributeId: EAttribute.Strength, multiplier: 0.5 }
+				],
+				effects: [
+					{
+						id: 1,
+						target: ESkillEffectTarget.Self,
+						attributeId: EAttribute.Strength,
+						modifierTypeId: EModifierType.Additive,
+						amount: 5,
+						durationMs: 5000
+					}
+				]
+			});
+			const { container } = render(SkillRewardTooltip, { props: { skill, masked: true } });
+			// Two damage multipliers + one effect → three masked rows.
+			expect(container.querySelectorAll('.tt-qmark')).toHaveLength(3);
+		});
+
+		it('always shows a masked description teaser, even without scaling or effects', () => {
+			const { container } = render(SkillRewardTooltip, {
+				props: { skill: makeSkill({ damageMultipliers: [], effects: [], description: '' }), masked: true }
+			});
+			expect(container.querySelector('.tt-qmark')).toBeNull();
+			expect(container.textContent).toContain('Description');
+			expect(container.querySelector('.tt-masked-desc')).not.toBeNull();
+		});
+	});
 });

@@ -64,4 +64,40 @@ describe('ModTooltip', () => {
 		rerender({ mod: makeMod({ description: '' }) });
 		expect(container.querySelector('.tt-description')).toBeNull();
 	});
+
+	describe('masked', () => {
+		it('accents the panel border by the mod rarity', () => {
+			const { container } = render(ModTooltip, { props: { mod: makeMod(), masked: true } });
+			expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
+				'var(--rarity-legendary)'
+			);
+		});
+
+		it('masks the name and shows the SEALED badge while keeping the type label visible', () => {
+			const { container } = render(ModTooltip, { props: { mod: makeMod(), masked: true } });
+			expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('?????????');
+			expect((container.querySelector('.tt-category-label') as HTMLElement).textContent).toBe('Prefix');
+			expect((container.querySelector('.sealed-badge') as HTMLElement).textContent?.trim()).toBe('Sealed');
+			expect(container.textContent).not.toContain('Flaming');
+		});
+
+		it('teases one masked effect row per attribute without revealing values', () => {
+			const { container } = render(ModTooltip, { props: { mod: makeMod(), masked: true } });
+			expect(container.querySelectorAll('.tt-qmark')).toHaveLength(3);
+			expect(container.querySelector('.tt-stats-grid')).toBeNull();
+			expect(container.textContent).not.toContain('Strength');
+		});
+
+		it('always shows a masked description teaser', () => {
+			const { container } = render(ModTooltip, { props: { mod: makeMod({ description: '' }), masked: true } });
+			expect(container.textContent).toContain('Description');
+			expect(container.querySelector('.tt-masked-desc')).not.toBeNull();
+			expect(container.querySelector('.tt-description')).toBeNull();
+		});
+
+		it('omits the effects section for a mod with no attributes', () => {
+			const { container } = render(ModTooltip, { props: { mod: makeMod({ attributes: [] }), masked: true } });
+			expect(container.querySelector('.tt-qmark')).toBeNull();
+		});
+	});
 });

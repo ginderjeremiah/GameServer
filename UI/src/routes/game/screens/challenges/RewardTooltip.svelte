@@ -1,20 +1,12 @@
 <div class="reward-tooltip" bind:this={container} style={reward ? '' : 'display: none;'}>
 	{#if reward}
-		{#if reward.revealed}
-			<!-- Revealed rewards open the exact tooltip you'd see inspecting the thing in your bag. -->
-			{#if reward.kind === 'item' && reward.item}
-				<ItemTooltip item={reward.item} />
-			{:else if reward.kind === 'skill' && reward.skill}
-				<SkillRewardTooltip skill={reward.skill} />
-			{:else if reward.mod}
-				<ModTooltip mod={reward.mod} />
-			{/if}
-		{:else if reward.kind === 'item' && reward.item}
-			<SealedItemTooltip item={reward.item} />
+		<!-- One tooltip per reward kind; the `masked` flag redacts an unrevealed reward in place. -->
+		{#if reward.kind === 'item' && reward.item}
+			<ItemTooltip item={reward.item} masked={!reward.revealed} />
 		{:else if reward.kind === 'skill' && reward.skill}
-			<SealedSkillTooltip skill={reward.skill} />
+			<SkillRewardTooltip skill={reward.skill} masked={!reward.revealed} />
 		{:else if reward.mod}
-			<SealedModTooltip mod={reward.mod} />
+			<ModTooltip mod={reward.mod} masked={!reward.revealed} />
 		{/if}
 	{/if}
 </div>
@@ -22,9 +14,6 @@
 <script lang="ts">
 import ItemTooltip from '../inventory/ItemTooltip.svelte';
 import ModTooltip from './ModTooltip.svelte';
-import SealedItemTooltip from './SealedItemTooltip.svelte';
-import SealedModTooltip from './SealedModTooltip.svelte';
-import SealedSkillTooltip from './SealedSkillTooltip.svelte';
 import SkillRewardTooltip from './SkillRewardTooltip.svelte';
 import type { ResolvedReward } from './challenges-view.svelte';
 
