@@ -1,7 +1,7 @@
 import { EItemCategory } from '$lib/api';
 import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager } from '$lib/engine';
 import { BattleAttributes, type AttributeEntry, type Item, type ItemMod } from '$lib/battle';
-import { staticData } from '$stores';
+import { staticData, toastError } from '$stores';
 
 /* ─── Static config ─────────────────────────────────────────────────────
    Equipment slots are declared here (extensible): adding a second weapon
@@ -118,19 +118,25 @@ export class InventoryView {
 		this.selectedId = itemId;
 	}
 
-	equip(itemId: number, slotId: EEquipmentSlot) {
-		inventoryManager.equipItem(itemId, slotId);
+	// Inventory mutations apply optimistically and roll back on a persist error; await the manager's
+	// boolean and surface a toast on failure so the silent revert is reported, not swallowed.
+	async equip(itemId: number, slotId: EEquipmentSlot) {
+		if (!(await inventoryManager.equipItem(itemId, slotId))) {
+			toastError('Your equipment change could not be saved. Please try again.');
+		}
 	}
 
-	unequip(slotId: EEquipmentSlot) {
-		inventoryManager.unequipItem(slotId);
+	async unequip(slotId: EEquipmentSlot) {
+		if (!(await inventoryManager.unequipItem(slotId))) {
+			toastError('Your equipment change could not be saved. Please try again.');
+		}
 	}
 
-	toggleEquip(item: Item) {
+	async toggleEquip(item: Item) {
 		if (item.equipmentSlotId != null) {
-			this.unequip(item.equipmentSlotId);
+			await this.unequip(item.equipmentSlotId);
 		} else {
-			this.equip(item.itemId, getEquipmentSlotForCategory(item.itemCategoryId));
+			await this.equip(item.itemId, getEquipmentSlotForCategory(item.itemCategoryId));
 		}
 	}
 
@@ -151,11 +157,15 @@ export class InventoryView {
 			.map((m) => ({ ...m, itemModSlotId: -1 }));
 	}
 
-	applyMod(itemId: number, slotId: number, modId: number) {
-		inventoryManager.applyMod(itemId, modId, slotId);
+	async applyMod(itemId: number, slotId: number, modId: number) {
+		if (!(await inventoryManager.applyMod(itemId, modId, slotId))) {
+			toastError('Your modifier change could not be saved. Please try again.');
+		}
 	}
 
-	removeMod(itemId: number, slotId: number) {
-		inventoryManager.removeMod(itemId, slotId);
+	async removeMod(itemId: number, slotId: number) {
+		if (!(await inventoryManager.removeMod(itemId, slotId))) {
+			toastError('Your modifier change could not be saved. Please try again.');
+		}
 	}
 }
