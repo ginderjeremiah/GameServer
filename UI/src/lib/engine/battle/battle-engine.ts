@@ -137,18 +137,14 @@ export class BattleEngine {
 
 	private logicalUpdate(timeDelta: number) {
 		if (this.stage === Active) {
-			for (const { skill, damage, byPlayer } of battleStep(
+			for (const { skill, damage, byPlayer, crit, dodged, blocked } of battleStep(
 				this.player,
 				this.enemy,
 				timeDelta,
 				this.rng,
 				this.stepLog
 			)) {
-				if (byPlayer) {
-					logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(damage)} damage!`);
-				} else {
-					logMessage(ELogType.Damage, `${this.enemy.name} used ${skill.name} and dealt ${formatNum(damage)} damage!`);
-				}
+				logMessage(ELogType.Damage, this.damageLogMessage(skill.name, damage, byPlayer, crit, dodged, blocked));
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
@@ -162,6 +158,33 @@ export class BattleEngine {
 			}
 		}
 		this.timeElapsed += timeDelta;
+	}
+
+	/** Builds the combat-log line for one skill activation, surfacing the player-only crit/dodge/block
+	 *  outcomes (#178). The crit/dodge/block flags are only ever set on the player's side of the
+	 *  exchange (crit on the player's own hit; dodge/block on an incoming enemy hit — a dodged hit is
+	 *  never also blocked), so the player-perspective phrasing is unambiguous. The "You"/enemy-name
+	 *  prefixes are what `logKind` keys the glyph off (see `log-kind.ts`). */
+	private damageLogMessage(
+		skillName: string,
+		damage: number,
+		byPlayer: boolean,
+		crit: boolean,
+		dodged: boolean,
+		blocked: boolean
+	): string {
+		if (byPlayer) {
+			return crit
+				? `You landed a critical hit with ${skillName} for ${formatNum(damage)} damage!`
+				: `You used ${skillName} and dealt ${formatNum(damage)} damage!`;
+		}
+		if (dodged) {
+			return `You dodged ${this.enemy.name}'s ${skillName}!`;
+		}
+		if (blocked) {
+			return `You blocked ${this.enemy.name}'s ${skillName}, taking only ${formatNum(damage)} damage!`;
+		}
+		return `${this.enemy.name} used ${skillName} and dealt ${formatNum(damage)} damage!`;
 	}
 
 	/** Logs a line for each effect freshly applied this tick (refreshes are skipped — the chip countdown

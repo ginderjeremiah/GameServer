@@ -23,6 +23,27 @@ describe('logKind', () => {
 			expect(result.glyph).toBe('enemy');
 			expect(result.label).toBe('Hurt');
 		});
+
+		it('returns the crit treatment for a player critical-hit line', () => {
+			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit with Slash for 84 damage!'));
+			expect(result.color).toBe(logColors.player);
+			expect(result.glyph).toBe('crit');
+			expect(result.label).toBe('Crit');
+		});
+
+		it('returns the dodge treatment for a dodged incoming hit', () => {
+			const result = logKind(makeLog(ELogType.Damage, "You dodged Goblin's Slash!"));
+			expect(result.color).toBe(logColors.enemy);
+			expect(result.glyph).toBe('dodge');
+			expect(result.label).toBe('Dodge');
+		});
+
+		it('returns the block treatment for a blocked incoming hit', () => {
+			const result = logKind(makeLog(ELogType.Damage, "You blocked Goblin's Slash, taking only 12 damage!"));
+			expect(result.color).toBe(logColors.enemy);
+			expect(result.glyph).toBe('block');
+			expect(result.label).toBe('Block');
+		});
 	});
 
 	describe('ELogType.EnemyDefeated', () => {
