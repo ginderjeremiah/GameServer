@@ -35,7 +35,13 @@ namespace Game.Core.Progress
             _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
         }
 
-        public void RecordBattleCompleted(
+        /// <summary>
+        /// Records the outcome of a completed battle and returns the (statistic type, entity) keys it
+        /// touched. On a freshly loaded aggregate (one is built per battle) those keys are exactly this
+        /// battle's mutated statistics, so the caller can scope challenge evaluation to the challenges that
+        /// track them (see <see cref="ChallengeIndex.RelevantTo"/>) instead of re-scanning the whole catalog.
+        /// </summary>
+        public IReadOnlyCollection<(EStatisticType Type, int? EntityId)> RecordBattleCompleted(
             Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats, bool isBossBattle, int zoneId)
         {
             Increment(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
@@ -105,13 +111,17 @@ namespace Game.Core.Progress
                 Increment(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(skillStats.TotalDamage, 3));
                 SetMax(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
             }
+
+            // The mutated rows are exactly the statistics this battle touched (the aggregate was freshly
+            // loaded), so they double as the relevance scope for challenge evaluation.
+            return [.. _dirtyStatistics];
         }
 
-        public List<CompletedChallenge> EvaluateChallenges(IReadOnlyList<Challenge> allChallenges)
+        public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges)
         {
             var completed = new List<CompletedChallenge>();
 
-            foreach (var challenge in allChallenges)
+            foreach (var challenge in challenges)
             {
                 if (_challenges.TryGetValue(challenge.Id, out var playerChallenge) && playerChallenge.Completed)
                 {

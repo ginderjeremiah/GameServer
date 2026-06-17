@@ -8,19 +8,24 @@ namespace Game.DataAccess.Repositories
     {
         public IReadOnlyList<Challenge> All()
         {
-            // holder.Current is already an immutable snapshot, so return it directly rather than copying it
-            // on every battle's challenge evaluation (the hottest caller). Callers treat it as read-only.
-            return holder.Current;
+            // The snapshot's list is already immutable, so return it directly rather than copying it on
+            // every battle's challenge evaluation (the hottest caller). Callers treat it as read-only.
+            return holder.Current.Challenges;
         }
 
         public bool ValidateChallengeId(int challengeId)
         {
-            return challengeId >= 0 && challengeId < holder.Current.Count;
+            return challengeId >= 0 && challengeId < holder.Current.Challenges.Count;
         }
 
         public Challenge GetChallenge(int challengeId)
         {
-            return holder.Current.GetById(challengeId, "challenge");
+            return holder.Current.Challenges.GetById(challengeId, "challenge");
+        }
+
+        public ChallengeIndex Index()
+        {
+            return holder.Current.Index;
         }
     }
 }

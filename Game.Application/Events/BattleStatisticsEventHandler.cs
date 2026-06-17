@@ -20,11 +20,14 @@ namespace Game.Application.Events
         {
             var progress = await _progressRepo.Load(domainEvent.Player, cancellationToken);
 
-            progress.RecordBattleCompleted(
+            var touchedStatistics = progress.RecordBattleCompleted(
                 domainEvent.Enemy, domainEvent.Victory, domainEvent.PlayerDied, domainEvent.TotalMs,
                 domainEvent.Stats, domainEvent.IsBossBattle, domainEvent.ZoneId);
 
-            var completed = progress.EvaluateChallenges(_challengeRepo.All());
+            // Evaluate only the challenges whose tracked statistic this battle actually moved (plus the
+            // statistic-independent ones), rather than re-scanning the whole authored catalog each battle.
+            var relevantChallenges = _challengeRepo.Index().RelevantTo(touchedStatistics);
+            var completed = progress.EvaluateChallenges(relevantChallenges);
 
             if (completed.Count > 0)
             {

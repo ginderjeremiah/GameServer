@@ -124,6 +124,42 @@ namespace Game.Application.Tests.Events
             Assert.DoesNotContain(player.Skills, s => s.Id == setup.RewardSkillId);
         }
 
+        [Fact]
+        public async Task CompletingStatisticIndependentChallenge_CompletesThroughTheRelevanceIndex()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            // The seeder's default player level (5) meets the LevelReached goal below.
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.LevelReached, progressGoal: 5m);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var handler = new BattleStatisticsEventHandler(
+                scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
+                scope.ServiceProvider.GetRequiredService<IChallenges>(),
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>());
+
+            // A LevelReached challenge tracks no recorded statistic, so it is only reached via the index's
+            // statistic-independent set — which any completed battle evaluates, even this empty-stats victory.
+            var battleEvent = new BattleCompletedEvent(
+                loadedPlayer, loadedEnemy, Victory: true, PlayerDied: false, TotalMs: 5000,
+                Stats: new BattleStats(), IsBossBattle: false, ZoneId: loadedPlayer.CurrentZoneId);
+            await handler.HandleAsync(battleEvent, CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(player.Id));
+        }
+
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each
         /// reward kind, plus an <see cref="EChallengeType.EnemiesKilled"/> challenge whose goal of 1 a single
