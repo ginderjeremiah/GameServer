@@ -187,10 +187,13 @@ namespace Game.Application.Tests.Mapping
 
             public bool ValidateItemModId(int itemModId) => true;
 
-            // ToCore never reads the full contract lists, only the per-id resolvers above.
+            // ToCore never reads the full contract lists or the version key, only the per-id resolvers above.
             List<Item> IItems.All() => throw new NotSupportedException();
             List<ItemMod> IItemMods.All() => throw new NotSupportedException();
             List<Skill> ISkills.AllSkills() => throw new NotSupportedException();
+            object IItems.VersionKey => throw new NotSupportedException();
+            object IItemMods.VersionKey => throw new NotSupportedException();
+            object ISkills.VersionKey => throw new NotSupportedException();
         }
     }
 }

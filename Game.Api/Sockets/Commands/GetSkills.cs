@@ -22,5 +22,7 @@ namespace Game.Api.Sockets.Commands
         {
             return _skills.AllSkills();
         }
+
+        protected override object VersionKey => _skills.VersionKey;
     }
 }

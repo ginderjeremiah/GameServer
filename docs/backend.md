@@ -107,7 +107,9 @@ A stopping instance drains its live sockets cleanly rather than leaving them to 
 
 ## Reference-data caching and versioning
 
-The frontend caches each reference-data set in the browser and re-downloads only the sets that changed (see `frontend.md`). The `GetReferenceDataVersions` socket command supports this by returning a **content hash per set** in one round-trip. The hash is computed on demand by hashing the same serialized models the client actually receives (SHA-256 over the camelCase JSON), so the version changes if and only if the client-visible data changes — there is no separate version counter to maintain or invalidate. The versioned set is exactly the set of reference-data socket commands (discovered by assembly scan), so a newly-added one is versioned automatically.
+The frontend caches each reference-data set in the browser and re-downloads only the sets that changed (see `frontend.md`). The `GetReferenceDataVersions` socket command supports this by returning a **content hash per set** in one round-trip. The hash is computed by hashing the same serialized models the client actually receives (SHA-256 over the camelCase JSON), so the version changes if and only if the client-visible data changes — there is no separate version counter to maintain or invalidate. The versioned set is exactly the set of reference-data socket commands (discovered by assembly scan), so a newly-added one is versioned automatically.
+
+`GetReferenceDataVersions` is the **first** command the loading screen issues on every connect, so the hash is **memoized per set, keyed on the immutable cache snapshot it was computed from** — the serialize-and-hash runs once per cache swap rather than once per connect. Keying on the snapshot instance makes invalidation automatic: a build-then-swap publishes a new snapshot object (a memo miss), so an admin write can never serve a stale hash. Intrinsic (enum-derived) sets have no holder to swap, so they key on a process-stable sentinel and hash once for the process lifetime.
 
 ## Battle (setup, runtime & skill effects)
 

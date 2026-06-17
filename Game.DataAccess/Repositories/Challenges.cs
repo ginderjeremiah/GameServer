@@ -6,6 +6,9 @@ namespace Game.DataAccess.Repositories
 {
     internal class Challenges(ChallengesCacheHolder holder) : IChallenges
     {
+        // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
+        public object VersionKey => holder.Current;
+
         public IReadOnlyList<Challenge> All()
         {
             // The snapshot's list is already immutable, so return it directly rather than copying it on

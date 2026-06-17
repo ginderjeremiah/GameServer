@@ -14,5 +14,8 @@ namespace Game.Api.Sockets.Commands
         {
             return Core.Attributes.Attribute.GetAllAttributes().To().Model<Attribute>();
         }
+
+        // Intrinsic (enum-derived) set: fixed for the process lifetime, so the version is memoized once.
+        protected override object VersionKey => IntrinsicVersionKey<GetAttributes>.Instance;
     }
 }

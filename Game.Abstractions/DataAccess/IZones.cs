@@ -14,5 +14,8 @@ namespace Game.Abstractions.DataAccess
         public CoreZone GetDomainZone(int zoneId);
 
         public bool ValidateZoneId(int zoneId);
+
+        /// <inheritdoc cref="IItems.VersionKey"/>
+        public object VersionKey { get; }
     }
 }

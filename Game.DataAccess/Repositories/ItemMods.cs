@@ -11,6 +11,9 @@ namespace Game.DataAccess.Repositories
     {
         private IReadOnlyList<ItemMod> Entities => holder.Current.Entities;
 
+        // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
+        public object VersionKey => holder.Current;
+
         public List<Contracts.ItemMod> All()
         {
             return [.. Entities.Select(ItemMapper.ModToContract)];

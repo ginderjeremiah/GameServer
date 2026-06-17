@@ -7,5 +7,8 @@ namespace Game.Abstractions.DataAccess
     {
         public List<Contracts.Skill> AllSkills();
         public CoreSkill GetSkill(int skillId);
+
+        /// <inheritdoc cref="IItems.VersionKey"/>
+        public object VersionKey { get; }
     }
 }

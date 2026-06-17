@@ -19,13 +19,24 @@ namespace Game.Api.Sockets.Commands
         /// <summary>
         /// Hashes this set's current data so the frontend can detect a stale cache. Computed from
         /// the same models <see cref="HandleExecuteAsync"/> returns, so the version tracks exactly what
-        /// a client would download.
+        /// a client would download. The hash is memoized against <see cref="VersionKey"/> so it is computed
+        /// once per cache swap rather than re-serialized on every connect (this is the first command the
+        /// loading screen issues, for every player).
         /// </summary>
         public string ComputeVersion()
         {
-            return ReferenceDataVersioning.ComputeVersion(GetReferenceData());
+            return ReferenceDataVersioning.GetOrComputeVersion(VersionKey, GetReferenceData);
         }
 
         protected abstract IEnumerable<TModel> GetReferenceData();
+
+        /// <summary>
+        /// The immutable instance the memoized version is keyed on; its reference identity must change exactly
+        /// when this set's client-visible data changes. For a database-backed set this is the cache holder's
+        /// current snapshot (a build-then-swap publishes a new instance), so a swap invalidates the cached
+        /// version automatically. For an intrinsic (enum-derived) set the data is fixed for the process
+        /// lifetime, so a stable per-set sentinel is the natural key — see <see cref="IntrinsicVersionKey"/>.
+        /// </summary>
+        protected abstract object VersionKey { get; }
     }
 }

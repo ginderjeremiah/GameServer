@@ -14,5 +14,8 @@ namespace Game.Api.Sockets.Commands
         {
             return Core.Progress.StatisticType.GetAll().To().Model<StatisticType>();
         }
+
+        // Intrinsic (enum-derived) set: fixed for the process lifetime, so the version is memoized once.
+        protected override object VersionKey => IntrinsicVersionKey<GetStatisticTypes>.Instance;
     }
 }

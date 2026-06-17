@@ -10,6 +10,9 @@ namespace Game.DataAccess.Repositories
     {
         private IReadOnlyList<Zone> Entities => holder.Current;
 
+        // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
+        public object VersionKey => holder.Current;
+
         public List<Contracts.Zone> All()
         {
             return [.. Entities.Select(ZoneMapper.ToContract)];

@@ -25,6 +25,8 @@ namespace Game.Api.Sockets.Commands
             return _challenges.All().Select(ToContract);
         }
 
+        protected override object VersionKey => _challenges.VersionKey;
+
         // The domain challenge carries the rich ChallengeType; the read contract flattens it to the
         // type id plus the statistic/entity dimensions the type derives. Kept here because the
         // gameplay domain (IChallenges.All) intentionally serves the domain model — see backend.md.

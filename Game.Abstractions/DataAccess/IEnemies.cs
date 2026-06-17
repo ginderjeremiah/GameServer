@@ -13,5 +13,8 @@ namespace Game.Abstractions.DataAccess
 
         /// <inheritdoc cref="GetDomainEnemy"/>
         public CoreEnemy GetRandomDomainEnemy(int zoneId, int level);
+
+        /// <inheritdoc cref="IItems.VersionKey"/>
+        public object VersionKey { get; }
     }
 }
