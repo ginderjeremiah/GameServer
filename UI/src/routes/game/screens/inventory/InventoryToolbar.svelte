@@ -83,6 +83,11 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 		background: color-mix(in srgb, var(--white) 6%, transparent);
 	}
 
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
 	&.active {
 		background: color-mix(in srgb, var(--accent) 16%, transparent);
 		color: var(--text-primary);
@@ -134,6 +139,13 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 
 	&:not(:first-child) {
 		border-left: 1px solid var(--border-subtle);
+	}
+
+	// Inset the ring: the .sort-toggle wrapper clips overflow, so a positive
+	// offset would be cut off and the focus indicator would vanish.
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
 	}
 
 	&.active {

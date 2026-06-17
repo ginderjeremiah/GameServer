@@ -80,6 +80,11 @@ const gated = $derived(!metrics.unlocked && metrics.source != null);
 		background: color-mix(in srgb, var(--white) 4%, transparent);
 	}
 
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
 	&.sel {
 		background: color-mix(in srgb, var(--accent) 12%, transparent);
 		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
