@@ -93,6 +93,8 @@ describe('EnemyManager boss mode', () => {
 		h.statistics.markZoneCleared.mockClear();
 		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
 		h.staticData.zones = undefined;
+		// Reset the current zone (a mid-claim zone-change test mutates it).
+		h.playerManager.currentZone = 3;
 		// Restore the enemy reference record (a missing-id test clears it).
 		h.staticData.enemies = [{ id: 0, name: 'Catacomb Lich', isBoss: true }];
 		h.playerChallenges.isChallengeCompleted.mockReset();
@@ -109,6 +111,21 @@ describe('EnemyManager boss mode', () => {
 	});
 
 	const fireStage = async (stage: number) => h.holder.stageCb?.(stage);
+
+	// Drain the microtask queue (a macrotask boundary) so an in-flight victory handler settles up to its
+	// next awaited point — used to park it on a gated claim/reload before interleaving a transition.
+	const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+	// A DefeatEnemy (claimVictory) response gated on a manual release, so a stop / retreat / zone-change
+	// can be interleaved while the victory claim is still in flight.
+	const gateDefeat = () => {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy' ? gate.then(() => defeatResponse) : Promise.resolve(newEnemyResponse)
+		);
+		return release;
+	};
 
 	const zone = (id: number, order: number, unlockChallengeId?: number): IZone => ({
 		id,
@@ -230,6 +247,96 @@ describe('EnemyManager boss mode', () => {
 
 		expect(h.playerChallenges.load).not.toHaveBeenCalled();
 		expect(unlock.value).toBe(false);
+	});
+
+	it('abandons the boss victory when stop() lands during the victory claim', async () => {
+		await manager.challengeBoss();
+		const releaseDefeat = gateDefeat();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // park the handler on the awaited claim
+
+		manager.stop();
+		releaseDefeat();
+		await handled;
+
+		// The resolution bailed right after the claim: no zone clear, no overlay, no re-challenge.
+		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
+		expect(manager.bossOutcome).toBeUndefined();
+		expect(manager.bossUnlockedNextZone).toBe(false);
+		expect(manager.mode).toBe('idle');
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+	});
+
+	it('abandons the boss victory when a retreat lands during the victory claim', async () => {
+		await manager.challengeBoss();
+		const releaseDefeat = gateDefeat();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush();
+
+		const retreated = manager.retreatFromBoss();
+		releaseDefeat();
+		await Promise.all([handled, retreated]);
+
+		// The retreat won: idle loop with a fresh normal enemy, and the victory resolution bailed.
+		expect(manager.mode).toBe('idle');
+		expect(manager.bossOutcome).toBeUndefined();
+		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
+	it("clears and unlocks the boss's own zone even if currentZone changes during the victory claim", async () => {
+		// Cleared zone 3; zone 4 (next by order) is gated behind challenge 7 and flips open on the refetch.
+		h.staticData.zones = [zone(3, 0), zone(4, 1, 7)];
+		let gateComplete = false;
+		h.playerChallenges.isChallengeCompleted.mockImplementation((id: number) => id === 7 && gateComplete);
+		h.playerChallenges.load.mockImplementation(() => {
+			gateComplete = true;
+			return Promise.resolve();
+		});
+		const unlock = captureUnlockAtOverlay();
+
+		await manager.challengeBoss();
+		const releaseDefeat = gateDefeat();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush();
+
+		// Navigate to a different zone while the claim is still resolving.
+		h.playerManager.currentZone = 4;
+		releaseDefeat();
+		await handled;
+
+		// The clear and unlock target zone 3 (the boss that was fought), not the zone navigated to.
+		expect(h.statistics.markZoneCleared).toHaveBeenCalledWith(3);
+		expect(h.statistics.markZoneCleared).not.toHaveBeenCalledWith(4);
+		expect(unlock.value).toBe(true);
+	});
+
+	it('abandons the unlock and overlay when a retreat lands during the challenge reload', async () => {
+		// Zone 4 is gated behind challenge 7 (incomplete), so the victory triggers the challenge reload.
+		h.staticData.zones = [zone(3, 0), zone(4, 1, 7)];
+		h.playerChallenges.isChallengeCompleted.mockReturnValue(false);
+		let releaseLoad!: () => void;
+		const loadGate = new Promise<void>((resolve) => (releaseLoad = resolve));
+		h.playerChallenges.load.mockImplementation(() => loadGate);
+
+		await manager.challengeBoss();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // the claim settles; the handler parks on the gated challenge reload
+
+		const retreated = manager.retreatFromBoss();
+		releaseLoad();
+		await Promise.all([handled, retreated]);
+
+		// The zone was still marked cleared (the boss died), but the retreat abandoned the unlock + overlay.
+		expect(h.statistics.markZoneCleared).toHaveBeenCalledWith(3);
+		expect(manager.bossUnlockedNextZone).toBe(false);
+		expect(manager.bossOutcome).toBeUndefined();
+		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
 	it('on a boss loss: records it, turns auto-fight off, and returns to the idle loop honoring the cooldown', async () => {
