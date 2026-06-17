@@ -5,108 +5,134 @@ using Xunit;
 namespace Game.Core.Tests.Attributes
 {
     /// <summary>
-    /// Parity guard for the shared derived-stat formulas. These cases mirror,
-    /// with identical inputs and identical expected values, the
-    /// "derived stat computation" block of the frontend suite
-    /// <c>UI/src/tests/lib/battle/battle-attributes.test.ts</c>.
-    /// The formula constants live in two hand-maintained places —
-    /// <see cref="StaticAttributeModifiers"/> on the backend and
-    /// <c>STATIC_ATTRIBUTE_MODIFIERS</c> on the frontend — and the battle
-    /// simulation on both sides depends on them agreeing, so these assertions
-    /// exist to make any silent drift between the two fail a build.
+    /// Parity guard for the shared derived-stat formulas. Every scenario here MUST be mirrored —
+    /// with identical inputs (the same name and core-attribute allocations) — in the frontend suite
+    /// <c>UI/src/tests/lib/battle/battle-attributes.test.ts</c>, just as the battle-simulation and
+    /// progression parity suites share a single named scenario table row-for-row.
+    /// <para>
+    /// The expected derived value is NOT a re-hardcoded literal: it is computed from the single source
+    /// of truth — <see cref="StaticAttributeModifiers.All"/> on the backend, the codegen-generated
+    /// <c>STATIC_ATTRIBUTE_MODIFIERS</c> on the frontend — by <see cref="ExpectedValue"/>. So a coefficient
+    /// retune flows into both the production <see cref="AttributeCollection"/> path and the expectation,
+    /// and the test pins that the two agree rather than a second hand-maintained copy of the numbers that
+    /// could rot out of step.
+    /// </para>
     /// </summary>
     public class BattleAttributesParityTests
     {
-        [Fact]
-        public void MaxHealth_Is50Plus20EndurancePlus5Strength()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Strength, 10),
-                (EAttribute.Endurance, 20));
+        /// <summary>
+        /// A single derived-stat scenario: the core-attribute allocations that feed the collection
+        /// and the derived attributes whose composed value is asserted against the single-sourced table.
+        /// </summary>
+        public sealed record DerivedStatScenario(
+            (EAttribute Attribute, double Amount)[] Allocations,
+            EAttribute[] DerivedAttributes);
 
-            Assert.Equal(50 + 20 * 20 + 5 * 10, collection[EAttribute.MaxHealth]);
+        /// <summary>
+        /// The shared scenario table, keyed by name so xUnit can drive a <see cref="TheoryAttribute"/>
+        /// over the names; the test resolves the full scenario by name. Mirrored row-for-row by the
+        /// frontend suite's <c>scenarios</c> table.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, DerivedStatScenario> Scenarios =
+            new Dictionary<string, DerivedStatScenario>
+            {
+                // MaxHealth = 50 (base) + 20·Endurance + 5·Strength
+                ["maxHealth"] = new DerivedStatScenario(
+                    [(EAttribute.Strength, 10), (EAttribute.Endurance, 20)],
+                    [EAttribute.MaxHealth]),
+
+                // Defense = 2 (base) + 1·Endurance + 0.5·Agility
+                ["defense"] = new DerivedStatScenario(
+                    [(EAttribute.Endurance, 30), (EAttribute.Agility, 20)],
+                    [EAttribute.Defense]),
+
+                // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity
+                ["cooldownRecovery"] = new DerivedStatScenario(
+                    [(EAttribute.Agility, 20), (EAttribute.Dexterity, 10)],
+                    [EAttribute.CooldownRecovery]),
+
+                // CriticalChance = 0.002·Dexterity + 0.001·Luck (no base)
+                ["criticalChance"] = new DerivedStatScenario(
+                    [(EAttribute.Dexterity, 20), (EAttribute.Luck, 10)],
+                    [EAttribute.CriticalChance]),
+
+                // CriticalDamage = 1.5 (base) + 0.0025·Luck
+                ["criticalDamage"] = new DerivedStatScenario(
+                    [(EAttribute.Luck, 20)],
+                    [EAttribute.CriticalDamage]),
+
+                // DodgeChance = 0.001·Agility (no base)
+                ["dodgeChance"] = new DerivedStatScenario(
+                    [(EAttribute.Agility, 20)],
+                    [EAttribute.DodgeChance]),
+
+                // BlockChance = 0.002·Endurance (no base)
+                ["blockChance"] = new DerivedStatScenario(
+                    [(EAttribute.Endurance, 20)],
+                    [EAttribute.BlockChance]),
+
+                // BlockReduction = 2 (base) + 0.5·Endurance
+                ["blockReduction"] = new DerivedStatScenario(
+                    [(EAttribute.Endurance, 20)],
+                    [EAttribute.BlockReduction]),
+
+                // With no allocations every derived stat collapses to just its base: the two with a base
+                // carry it (CriticalDamage 1.5, BlockReduction 2), the three pure-derived chances are 0.
+                ["zeroBaseStats"] = new DerivedStatScenario(
+                    [],
+                    [
+                        EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery,
+                        EAttribute.CriticalDamage, EAttribute.BlockReduction,
+                        EAttribute.CriticalChance, EAttribute.DodgeChance, EAttribute.BlockChance,
+                    ]),
+            };
+
+        public static IEnumerable<object[]> ScenarioNames =>
+            Scenarios.Keys.Select(name => new object[] { name });
+
+        [Theory]
+        [MemberData(nameof(ScenarioNames))]
+        public void Parity_Scenario_ComposesDerivedStatsFromSingleSourcedCoefficients(string scenarioName)
+        {
+            var scenario = Scenarios[scenarioName];
+            var collection = MakeCollection(scenario.Allocations);
+
+            foreach (var attribute in scenario.DerivedAttributes)
+            {
+                var expected = ExpectedValue(attribute, scenario.Allocations);
+                // Compared to 10 decimals: the static coefficients are fractional, so the additions
+                // accumulate the usual binary-float error the frontend's toBeCloseTo also tolerates.
+                Assert.Equal(expected, collection[attribute], 10);
+            }
         }
 
-        [Fact]
-        public void Defense_Is2PlusEndurancePlusHalfAgility()
+        /// <summary>
+        /// Composes the expected value of <paramref name="attribute"/> directly from
+        /// <see cref="StaticAttributeModifiers.All"/> (the single source of truth) under the given
+        /// core-attribute <paramref name="allocations"/>. Every static modifier is additive: a base value
+        /// contributes its raw amount, a derived modifier contributes <c>amount × allocation[source]</c>
+        /// (an allocated core attribute carries no further modifiers, so its final value is its raw amount).
+        /// This is the same reduction <see cref="AttributeCollection"/> performs, so it can't diverge from
+        /// the production path on a coefficient change.
+        /// </summary>
+        private static double ExpectedValue(EAttribute attribute, (EAttribute Attribute, double Amount)[] allocations)
         {
-            var collection = MakeCollection(
-                (EAttribute.Endurance, 30),
-                (EAttribute.Agility, 20));
+            var allocated = allocations.ToDictionary(a => a.Attribute, a => a.Amount);
+            var expected = 0.0;
+            foreach (var modifier in StaticAttributeModifiers.All)
+            {
+                if (modifier.Attribute != attribute)
+                {
+                    continue;
+                }
 
-            Assert.Equal(2 + 30 + 0.5 * 20, collection[EAttribute.Defense]);
-        }
+                Assert.Equal(EModifierType.Additive, modifier.Type);
+                expected += modifier.Source is EAttributeModifierSource.Derived
+                    ? modifier.Amount * allocated.GetValueOrDefault(modifier.DerivedSource)
+                    : modifier.Amount;
+            }
 
-        [Fact]
-        public void CooldownRecovery_IsOnePlusFourThousandthsAgilityPlusOneThousandthDexterity()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Agility, 20),
-                (EAttribute.Dexterity, 10));
-
-            Assert.Equal(1 + 0.004 * 20 + 0.001 * 10, collection[EAttribute.CooldownRecovery], 10);
-        }
-
-        [Fact]
-        public void CriticalChance_IsTwoThousandthsDexterityPlusOneThousandthLuck()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Dexterity, 20),
-                (EAttribute.Luck, 10));
-
-            Assert.Equal(0.002 * 20 + 0.001 * 10, collection[EAttribute.CriticalChance], 10);
-        }
-
-        [Fact]
-        public void CriticalDamage_IsBaseOneAndHalfPlusQuarterPercentLuck()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Luck, 20));
-
-            Assert.Equal(1.5 + 0.0025 * 20, collection[EAttribute.CriticalDamage], 10);
-        }
-
-        [Fact]
-        public void DodgeChance_IsOneThousandthAgility()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Agility, 20));
-
-            Assert.Equal(0.001 * 20, collection[EAttribute.DodgeChance], 10);
-        }
-
-        [Fact]
-        public void BlockChance_IsTwoThousandthsEndurance()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Endurance, 20));
-
-            Assert.Equal(0.002 * 20, collection[EAttribute.BlockChance], 10);
-        }
-
-        [Fact]
-        public void BlockReduction_IsTwoPlusHalfEndurance()
-        {
-            var collection = MakeCollection(
-                (EAttribute.Endurance, 20));
-
-            Assert.Equal(2 + 0.5 * 20, collection[EAttribute.BlockReduction]);
-        }
-
-        [Fact]
-        public void ZeroBaseStats_StillHaveDerivedBaseValues()
-        {
-            var collection = MakeCollection();
-
-            Assert.Equal(50, collection[EAttribute.MaxHealth]);
-            Assert.Equal(2, collection[EAttribute.Defense]);
-            Assert.Equal(1, collection[EAttribute.CooldownRecovery]);
-            // CriticalDamage and BlockReduction carry a base; the three chances have none, so they are 0.
-            Assert.Equal(1.5, collection[EAttribute.CriticalDamage]);
-            Assert.Equal(2, collection[EAttribute.BlockReduction]);
-            Assert.Equal(0, collection[EAttribute.CriticalChance]);
-            Assert.Equal(0, collection[EAttribute.DodgeChance]);
-            Assert.Equal(0, collection[EAttribute.BlockChance]);
+            return expected;
         }
 
         private static AttributeCollection MakeCollection(params (EAttribute Attribute, double Amount)[] allocations)

@@ -103,7 +103,7 @@ namespace Game.Core.Tests.Enemies
         [Fact]
         public void SelectAllBattleSkills_KeepsEveryAvailableSkillInAuthoredOrder()
         {
-            // The dedicated-boss loadout is the full authored set — neither capped at MaxBattleSkills (4)
+            // The dedicated-boss loadout is the full authored set — neither capped at MaxSelectedSkills (4)
             // nor shuffled — so a 6-skill boss brings all 6 in order.
             var enemy = MakeEnemy(Skills(6));
 

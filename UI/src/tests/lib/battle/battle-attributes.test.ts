@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EAttribute, type IAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
-import { EModifierType, EAttributeModifierSource, type AttributeModifier } from '$lib/battle/attribute-modifier';
+import {
+	STATIC_ATTRIBUTE_MODIFIERS,
+	EModifierType,
+	EAttributeModifierSource,
+	type AttributeModifier
+} from '$lib/battle/attribute-modifier';
 
 // The projection resolves names through `attributeName(id, staticData.attributes)`, so mock the
 // store to drive that reference set. Empty by default → names fall back to the normalised enum.
@@ -54,57 +59,125 @@ describe('BattleAttributes', () => {
 		});
 	});
 
-	describe('derived stat computation', () => {
-		it('calculates MaxHealth = 50 + 20*End + 5*Str', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10], [EAttribute.Endurance, 20]));
-			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50 + 20 * 20 + 5 * 10);
-		});
+	// Parity guard for the shared derived-stat formulas. Every scenario here MUST be mirrored — with
+	// identical inputs (the same name and core-attribute allocations) — in the backend suite
+	// Game.Core.Tests/Attributes/BattleAttributesParityTests.cs, just as the battle-simulation parity
+	// suite shares its scenario table row-for-row. The expected value is NOT a re-hardcoded literal: it
+	// is composed from the single source of truth — STATIC_ATTRIBUTE_MODIFIERS (generated from the
+	// backend's StaticAttributeModifiers.All) — by expectedValue, so a coefficient retune flows into both
+	// the production BattleAttributes path and the expectation rather than a second copy that could rot.
+	describe('derived stat computation (parity)', () => {
+		type Allocation = [EAttribute, number];
+		interface DerivedStatScenario {
+			allocations: Allocation[];
+			derivedAttributes: EAttribute[];
+		}
 
-		it('calculates Defense = 2 + End + 0.5*Agi', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 30], [EAttribute.Agility, 20]));
-			expect(ba.getValue(EAttribute.Defense)).toBe(2 + 30 + 0.5 * 20);
-		});
+		const scenarios: Record<string, DerivedStatScenario> = {
+			// MaxHealth = 50 (base) + 20*Endurance + 5*Strength
+			maxHealth: {
+				allocations: [
+					[EAttribute.Strength, 10],
+					[EAttribute.Endurance, 20]
+				],
+				derivedAttributes: [EAttribute.MaxHealth]
+			},
 
-		it('calculates CooldownRecovery = 1 (base) + 0.004*Agi + 0.001*Dex', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Agility, 20], [EAttribute.Dexterity, 10]));
-			expect(ba.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1 + 0.004 * 20 + 0.001 * 10, 10);
-		});
+			// Defense = 2 (base) + 1*Endurance + 0.5*Agility
+			defense: {
+				allocations: [
+					[EAttribute.Endurance, 30],
+					[EAttribute.Agility, 20]
+				],
+				derivedAttributes: [EAttribute.Defense]
+			},
 
-		it('calculates CriticalChance = 0.002*Dex + 0.001*Luck', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Dexterity, 20], [EAttribute.Luck, 10]));
-			expect(ba.getValue(EAttribute.CriticalChance)).toBeCloseTo(0.002 * 20 + 0.001 * 10, 10);
-		});
+			// CooldownRecovery = 1 (base) + 0.004*Agility + 0.001*Dexterity
+			cooldownRecovery: {
+				allocations: [
+					[EAttribute.Agility, 20],
+					[EAttribute.Dexterity, 10]
+				],
+				derivedAttributes: [EAttribute.CooldownRecovery]
+			},
 
-		it('calculates CriticalDamage = 1.5 (base) + 0.0025*Luck', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Luck, 20]));
-			expect(ba.getValue(EAttribute.CriticalDamage)).toBeCloseTo(1.5 + 0.0025 * 20, 10);
-		});
+			// CriticalChance = 0.002*Dexterity + 0.001*Luck (no base)
+			criticalChance: {
+				allocations: [
+					[EAttribute.Dexterity, 20],
+					[EAttribute.Luck, 10]
+				],
+				derivedAttributes: [EAttribute.CriticalChance]
+			},
 
-		it('calculates DodgeChance = 0.001*Agi', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Agility, 20]));
-			expect(ba.getValue(EAttribute.DodgeChance)).toBeCloseTo(0.001 * 20, 10);
-		});
+			// CriticalDamage = 1.5 (base) + 0.0025*Luck
+			criticalDamage: {
+				allocations: [[EAttribute.Luck, 20]],
+				derivedAttributes: [EAttribute.CriticalDamage]
+			},
 
-		it('calculates BlockChance = 0.002*End', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 20]));
-			expect(ba.getValue(EAttribute.BlockChance)).toBeCloseTo(0.002 * 20, 10);
-		});
+			// DodgeChance = 0.001*Agility (no base)
+			dodgeChance: {
+				allocations: [[EAttribute.Agility, 20]],
+				derivedAttributes: [EAttribute.DodgeChance]
+			},
 
-		it('calculates BlockReduction = 2 (base) + 0.5*End', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 20]));
-			expect(ba.getValue(EAttribute.BlockReduction)).toBe(2 + 0.5 * 20);
-		});
+			// BlockChance = 0.002*Endurance (no base)
+			blockChance: {
+				allocations: [[EAttribute.Endurance, 20]],
+				derivedAttributes: [EAttribute.BlockChance]
+			},
 
-		it('handles zero base stats (CriticalDamage base 1.5, BlockReduction base 2, chances 0)', () => {
-			const ba = new BattleAttributes([]);
-			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50);
-			expect(ba.getValue(EAttribute.Defense)).toBe(2);
-			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(1);
-			expect(ba.getValue(EAttribute.CriticalDamage)).toBe(1.5);
-			expect(ba.getValue(EAttribute.BlockReduction)).toBe(2);
-			expect(ba.getValue(EAttribute.CriticalChance)).toBe(0);
-			expect(ba.getValue(EAttribute.DodgeChance)).toBe(0);
-			expect(ba.getValue(EAttribute.BlockChance)).toBe(0);
+			// BlockReduction = 2 (base) + 0.5*Endurance
+			blockReduction: {
+				allocations: [[EAttribute.Endurance, 20]],
+				derivedAttributes: [EAttribute.BlockReduction]
+			},
+
+			// With no allocations every derived stat collapses to just its base: the two with a base carry
+			// it (CriticalDamage 1.5, BlockReduction 2), the three pure-derived chances are 0.
+			zeroBaseStats: {
+				allocations: [],
+				derivedAttributes: [
+					EAttribute.MaxHealth,
+					EAttribute.Defense,
+					EAttribute.CooldownRecovery,
+					EAttribute.CriticalDamage,
+					EAttribute.BlockReduction,
+					EAttribute.CriticalChance,
+					EAttribute.DodgeChance,
+					EAttribute.BlockChance
+				]
+			}
+		};
+
+		// Composes the expected value of `attribute` directly from STATIC_ATTRIBUTE_MODIFIERS (the single
+		// source of truth) under the given allocations — the same reduction BattleAttributes performs.
+		// Every static modifier is additive: a base value contributes its raw amount, a derived modifier
+		// contributes amount * allocation[derivedSource] (an allocated core attribute carries no further
+		// modifiers, so its final value is its raw amount).
+		const expectedValue = (attribute: EAttribute, allocations: Allocation[]): number => {
+			const allocated = new Map(allocations);
+			return STATIC_ATTRIBUTE_MODIFIERS.filter((modifier) => modifier.attribute === attribute).reduce(
+				(sum, modifier) => {
+					expect(modifier.type).toBe(EModifierType.Additive);
+					return modifier.source === EAttributeModifierSource.Derived
+						? sum + modifier.amount * (allocated.get(modifier.derivedSource) ?? 0)
+						: sum + modifier.amount;
+				},
+				0
+			);
+		};
+
+		it.each(Object.keys(scenarios))('composes %s derived stats from the single-sourced coefficients', (name) => {
+			const { allocations, derivedAttributes } = scenarios[name];
+			const ba = new BattleAttributes(makeAttrs(...allocations));
+
+			for (const attribute of derivedAttributes) {
+				// toBeCloseTo to 10 decimals: the fractional coefficients accumulate the usual binary-float
+				// error, matching the backend's `Assert.Equal(expected, actual, 10)` tolerance.
+				expect(ba.getValue(attribute)).toBeCloseTo(expectedValue(attribute, allocations), 10);
+			}
 		});
 	});
 

@@ -9,9 +9,6 @@ namespace Game.Core.Enemies
     /// </summary>
     public class Enemy
     {
-        /// <summary>The maximum number of skills an enemy brings into a battle.</summary>
-        private const int MaxBattleSkills = 4;
-
         private List<Skill>? _battleSkills;
 
         public required int Id { get; init; }
@@ -35,18 +32,19 @@ namespace Game.Core.Enemies
         }
 
         /// <summary>
-        /// Randomly selects this enemy's loadout for a new encounter: up to <see cref="MaxBattleSkills"/>
-        /// skills drawn from its available skills. The chosen loadout is the source of truth — it is
-        /// snapshotted and sent to the client — so the selection deliberately uses ambient randomness
-        /// rather than the battle seed, keeping that seed reserved as the battle simulation's RNG source
-        /// (identical on client and server).
+        /// Randomly selects this enemy's loadout for a new encounter: up to
+        /// <see cref="GameConstants.MaxSelectedSkills"/> skills drawn from its available skills (the same
+        /// cap the player's loadout uses, for player/enemy symmetry). The chosen loadout is the source of
+        /// truth — it is snapshotted and sent to the client — so the selection deliberately uses ambient
+        /// randomness rather than the battle seed, keeping that seed reserved as the battle simulation's
+        /// RNG source (identical on client and server).
         /// </summary>
         public void SelectBattleSkills()
         {
             // Partial Fisher–Yates: draw an unbiased, uniformly-distributed sample (and ordering) of the
             // available skills, rather than the biased OrderBy(random) sort it replaces.
             var pool = AvailableSkills.ToArray();
-            var take = Math.Min(MaxBattleSkills, pool.Length);
+            var take = Math.Min(GameConstants.MaxSelectedSkills, pool.Length);
             for (var i = 0; i < take; i++)
             {
                 var swap = Random.Shared.Next(i, pool.Length);
@@ -59,7 +57,7 @@ namespace Game.Core.Enemies
         /// <summary>
         /// Selects this enemy's <em>full</em> authored loadout — every available skill, in authored order —
         /// for a deterministic encounter (the dedicated-boss challenge). Unlike <see cref="SelectBattleSkills"/>
-        /// this neither caps the count at <see cref="MaxBattleSkills"/> nor shuffles, so the loadout is fixed.
+        /// this neither caps the count at <see cref="GameConstants.MaxSelectedSkills"/> nor shuffles, so the loadout is fixed.
         /// The chosen loadout is the source of truth — it is snapshotted and sent to the client — so both
         /// sides simulate the boss with the identical skill set.
         /// </summary>
