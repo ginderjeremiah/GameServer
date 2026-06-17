@@ -153,10 +153,15 @@ export class ApiSocket {
 		return await request.getResponse();
 	}
 
+	/**
+	 * Subscribes to a server-pushed command and returns an unsubscribe function. Mirrors the underlying
+	 * hook's lifecycle contract: `cleanupOnDestroy` defaults off, so only pass `true` from within Svelte
+	 * component init; callers outside it must call the returned unsubscribe themselves.
+	 */
 	public listenCommand<T extends ApiSocketCommand>(
 		commandName: T,
 		action: Action<[IApiSocketResponse<T>]>,
-		cleanupOnDestroy: boolean = true
+		cleanupOnDestroy: boolean = false
 	) {
 		const hook = this.getOrCreateHook(commandName);
 		return hook.onNotified((data: IApiSocketResponse<T>) => action(data), cleanupOnDestroy);

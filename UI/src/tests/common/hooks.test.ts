@@ -80,19 +80,29 @@ describe('createHook', () => {
 		expect(cb).not.toHaveBeenCalled();
 	});
 
-	it('registers onDestroy cleanup by default', () => {
+	it('does not wire onDestroy by default (safe outside component init)', () => {
+		const hook = createHook<[number]>();
+		const cb = vi.fn();
+
+		// Default subscribe must not touch the framework lifecycle, so a module-level / async
+		// caller can subscribe without onDestroy throwing — and still gets a working unsubscribe.
+		const unhook = hook.onNotified(cb);
+		expect(onDestroy).not.toHaveBeenCalled();
+
+		hook.notify(1);
+		expect(cb).toHaveBeenCalledTimes(1);
+
+		unhook();
+		hook.notify(2);
+		expect(cb).toHaveBeenCalledTimes(1);
+	});
+
+	it('wires onDestroy cleanup when opted in (component context)', () => {
 		const hook = createHook<[]>();
-		hook.onNotified(vi.fn());
+		hook.onNotified(vi.fn(), true);
 
 		expect(onDestroy).toHaveBeenCalledTimes(1);
 		expect(onDestroy).toHaveBeenCalledWith(expect.any(Function));
-	});
-
-	it('skips onDestroy when cleanupOnDestroy is false', () => {
-		const hook = createHook<[]>();
-		hook.onNotified(vi.fn(), false);
-
-		expect(onDestroy).not.toHaveBeenCalled();
 	});
 
 	it('nextNotification resolves on next notify', async () => {

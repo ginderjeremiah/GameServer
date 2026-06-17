@@ -70,7 +70,8 @@ let { screens, active, onNavigate, pinned = $bindable(false) }: Props = $props()
 
 let ping = $state(0);
 
-onPingMeasured((p) => (ping = p));
+// Subscribed during component init, so opt into the hook's onDestroy cleanup.
+onPingMeasured((p) => (ping = p), true);
 
 const groups = [
 	{ key: 'combat', label: 'Combat' },
