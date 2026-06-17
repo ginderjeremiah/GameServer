@@ -6,6 +6,7 @@ import type { IAttribute, IEnemy, IZone } from '$lib/api';
 // (player manager + reference data) and the boss affordance (engine boss mode + the per-zone
 // cleared statistic); all data sources are mocked.
 const {
+	BattleStage,
 	mockBattleEngine,
 	mockPlayerManager,
 	mockEnemyManager,
@@ -15,10 +16,17 @@ const {
 	playerChallenges,
 	registerTooltipComponent
 } = vi.hoisted(() => ({
+	// Mirrors the real BattleStage enum (the mock replaces the whole module, so the stage the center
+	// column branches on must be provided here).
+	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5 } as const,
 	mockBattleEngine: {
 		player: undefined as unknown,
 		enemy: undefined as unknown,
 		timeElapsed: 0,
+		// 0 == BattleStage.Idle; the else-branch (battle timer) renders for any non-Loading stage.
+		stage: 0,
+		loadingTime: 0,
+		loadingTotal: 0,
 		getOpponent: vi.fn()
 	},
 	mockPlayerManager: { currentZone: 0, level: 7, exp: 280, nextLevelThreshold: 700 },
@@ -46,7 +54,8 @@ vi.mock('$lib/engine', () => ({
 	battleEngine: mockBattleEngine,
 	playerManager: mockPlayerManager,
 	enemyManager: mockEnemyManager,
-	onCombatFloat
+	onCombatFloat,
+	BattleStage
 }));
 vi.mock('$stores', () => ({ staticData, statistics, playerChallenges, registerTooltipComponent }));
 
@@ -69,6 +78,9 @@ beforeEach(() => {
 	mockBattleEngine.player = makeBattler({ name: 'Aelara' });
 	mockBattleEngine.enemy = makeBattler({ name: 'Dire Wolf' });
 	mockBattleEngine.timeElapsed = 0;
+	mockBattleEngine.stage = BattleStage.Idle;
+	mockBattleEngine.loadingTime = 0;
+	mockBattleEngine.loadingTotal = 0;
 	mockPlayerManager.currentZone = 0;
 	mockEnemyManager.mode = 'idle';
 	mockEnemyManager.autoFight = false;
@@ -96,6 +108,18 @@ describe('Fight', () => {
 		const timer = screen.getByTestId('battle-timer');
 		expect(timer.textContent).toContain('0:48');
 		expect(timer.textContent).toContain('/ 2:00 limit');
+	});
+
+	it('swaps the battle timer for the enemy-cooldown countdown while loading', () => {
+		mockBattleEngine.stage = BattleStage.Loading;
+		mockBattleEngine.loadingTime = 3000;
+		mockBattleEngine.loadingTotal = 5000;
+		render(Fight);
+		// The clock yields the center slot to the next-enemy countdown.
+		expect(screen.queryByTestId('battle-timer')).toBeNull();
+		const cooldown = screen.getByTestId('enemy-cooldown');
+		expect(cooldown.textContent).toContain('3s');
+		expect(cooldown.textContent).toContain('next enemy');
 	});
 
 	it('wires each battler to its own card', () => {

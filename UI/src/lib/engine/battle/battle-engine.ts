@@ -47,6 +47,9 @@ export class BattleEngine {
 	public enemy: Battler = new Battler();
 	public timeElapsed = 0;
 	public loadingTime = 0;
+	/** The full enemy-cooldown duration the current countdown started from, so the UI can render the
+	 *  remaining {@link loadingTime} as a fraction. Only meaningful while {@link stage} is Loading. */
+	public loadingTotal = 0;
 	public running = false;
 
 	/** The seeded battle RNG, re-created from each enemy's seed in {@link reset} so the live battle draws the
@@ -138,6 +141,7 @@ export class BattleEngine {
 		// Cancel any countdown still in flight so re-invoking can't leak the previous render hook.
 		this.finishLoading?.();
 		this.loadingTime = loadingTime;
+		this.loadingTotal = loadingTime;
 		this.setBattleStage(Loading);
 		const { promise, resolve } = Promise.withResolvers<void>();
 		const unhook = onRenderUpdate((delta) => {
