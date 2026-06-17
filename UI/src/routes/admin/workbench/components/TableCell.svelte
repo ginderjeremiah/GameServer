@@ -27,7 +27,7 @@
 {:else}
 	<td style:width="{col.width ?? 150}px">
 		<div class="share">
-			<div class="share-bar"><span style:width="{pct}%"></span></div>
+			<div class="share-bar"><Bar presentational value={pct} /></div>
 			<span class="share-pct">{pct}%</span>
 		</div>
 	</td>
@@ -35,6 +35,7 @@
 
 <script lang="ts">
 import type { ColumnConfig } from '../entities/types';
+import Bar from '$components/Bar.svelte';
 import NumInput from './NumInput.svelte';
 import SelectCaret from './SelectCaret.svelte';
 
@@ -75,8 +76,15 @@ const pct = $derived.by(() => {
 	align-items: center;
 	gap: 9px;
 
+	// Sizing wrapper for the presentational share fill; the Bar primitive supplies the visuals.
 	.share-bar {
 		flex: 1;
+		--bar-height: 4px;
+		--bar-radius: 2px;
+		--bar-track-bg: color-mix(in srgb, var(--accent) 20%, transparent);
+		--bar-fill: var(--accent);
+		--bar-fill-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+		--bar-transition: none;
 	}
 }
 </style>

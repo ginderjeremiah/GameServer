@@ -55,6 +55,24 @@ describe('Bar', () => {
 		expect((container.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 0%');
 	});
 
+	it('renders role="presentation" and omits progressbar ARIA when presentational', () => {
+		const { container } = render(Bar, {
+			props: { value: 50, max: 100, ariaLabel: 'Share', valueText: '50%', presentational: true }
+		});
+		const bar = container.querySelector('.bar-track') as HTMLElement;
+		expect(bar.getAttribute('role')).toBe('presentation');
+		expect(bar.hasAttribute('aria-valuenow')).toBe(false);
+		expect(bar.hasAttribute('aria-valuemin')).toBe(false);
+		expect(bar.hasAttribute('aria-valuemax')).toBe(false);
+		expect(bar.hasAttribute('aria-label')).toBe(false);
+		expect(bar.hasAttribute('aria-valuetext')).toBe(false);
+	});
+
+	it('still sizes the fill to the value when presentational', () => {
+		const { container } = render(Bar, { props: { value: 3, max: 4, presentational: true } });
+		expect((container.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 75%');
+	});
+
 	it('applies a test id and renders overlay children inside the track', () => {
 		const overlay = createRawSnippet(() => ({ render: () => '<div data-testid="cursor"></div>' }));
 		const { getByTestId } = render(Bar, { props: { value: 40, testId: 'meter', children: overlay } });

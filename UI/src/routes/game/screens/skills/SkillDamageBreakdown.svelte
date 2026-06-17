@@ -4,7 +4,7 @@
 		{#each metrics.contributions as contribution (contribution.attributeId)}
 			<div class="scale" style:--ac={attributeColor(contribution.attributeId)}>
 				<AttributeChip attributeId={contribution.attributeId} wide />
-				<div class="bar"><i style:width="{Math.round((contribution.value / maxContribution) * 100)}%"></i></div>
+				<div class="bar"><Bar presentational value={contribution.value} max={maxContribution} /></div>
 				<span class="contrib"
 					>{attributeName(contribution.attributeId, staticData.attributes)} ×{contribution.multiplier} = +{fmt(
 						contribution.value
@@ -26,6 +26,7 @@
 <script lang="ts">
 import { attributeColor, attributeName, formatNum } from '$lib/common';
 import { staticData } from '$stores';
+import Bar from '$components/Bar.svelte';
 import AttributeChip from '$components/AttributeChip.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
@@ -69,17 +70,12 @@ const maxContribution = $derived(Math.max(metrics.skill.baseDamage, ...metrics.c
 
 .bar {
 	flex: 1;
-	height: 6px;
-	border-radius: 4px;
-	background: color-mix(in srgb, var(--white) 7%, transparent);
-	overflow: hidden;
-
-	i {
-		display: block;
-		height: 100%;
-		border-radius: 4px;
-		background: var(--ac);
-	}
+	// The contribution fill (Bar primitive) inherits its accent from --ac set on .scale.
+	--bar-height: 6px;
+	--bar-radius: 4px;
+	--bar-track-bg: color-mix(in srgb, var(--white) 7%, transparent);
+	--bar-fill: var(--ac);
+	--bar-transition: none;
 }
 
 .contrib {
