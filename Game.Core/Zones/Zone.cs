@@ -9,9 +9,47 @@ namespace Game.Core.Zones
     /// </summary>
     public class Zone
     {
+        private readonly int _levelMin;
+        private readonly int _levelMax;
+        private readonly int _bossLevel;
+
         public required int Id { get; init; }
-        public required int LevelMin { get; init; }
-        public required int LevelMax { get; init; }
+
+        /// <summary>The inclusive lower bound of the random idle encounter-level range. Must be at least 1
+        /// and no greater than <see cref="LevelMax"/>.</summary>
+        public required int LevelMin
+        {
+            get => _levelMin;
+            init
+            {
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(LevelMin), value,
+                        $"{nameof(LevelMin)} must be at least 1.");
+                }
+
+                _levelMin = value;
+                ValidateLevelRange();
+            }
+        }
+
+        /// <summary>The inclusive upper bound of the random idle encounter-level range. Must be at least 1
+        /// and no less than <see cref="LevelMin"/>.</summary>
+        public required int LevelMax
+        {
+            get => _levelMax;
+            init
+            {
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(LevelMax), value,
+                        $"{nameof(LevelMax)} must be at least 1.");
+                }
+
+                _levelMax = value;
+                ValidateLevelRange();
+            }
+        }
 
         /// <summary>The id of this zone's single dedicated boss, fought via the "Challenge Boss" action,
         /// or <c>null</c> when no boss has been authored.</summary>
@@ -19,8 +57,21 @@ namespace Game.Core.Zones
 
         /// <summary>The fixed level the dedicated boss is fought at, independent of the
         /// <see cref="LevelMin"/>/<see cref="LevelMax"/> idle range. Only meaningful when
-        /// <see cref="BossEnemyId"/> is set.</summary>
-        public required int BossLevel { get; init; }
+        /// <see cref="BossEnemyId"/> is set. Must be at least 1.</summary>
+        public required int BossLevel
+        {
+            get => _bossLevel;
+            init
+            {
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(BossLevel), value,
+                        $"{nameof(BossLevel)} must be at least 1.");
+                }
+
+                _bossLevel = value;
+            }
+        }
 
         /// <summary>The id of the challenge that gates entry to this zone, or <c>null</c> when the zone is
         /// always open (e.g. the starting zone). The zone unlocks once the player completes that challenge
@@ -48,6 +99,24 @@ namespace Game.Core.Zones
         public int RollEncounterLevel()
         {
             return Random.Shared.Next(LevelMin, LevelMax + 1);
+        }
+
+        /// <summary>
+        /// Enforces the <see cref="LevelMin"/> &lt;= <see cref="LevelMax"/> invariant. Called from both
+        /// bounds' <c>init</c> accessors so a mis-authored range is rejected at construction (with the
+        /// offending values named) rather than throwing mid-battle in <see cref="RollEncounterLevel"/>.
+        /// The check runs only once both bounds are assigned: a not-yet-set bound has its backing field at
+        /// the default <c>0</c>, which a valid level (always &gt;= 1) never is, so the first accessor is a
+        /// no-op and the second performs the comparison regardless of initializer order.
+        /// </summary>
+        private void ValidateLevelRange()
+        {
+            if (_levelMin > 0 && _levelMax > 0 && _levelMin > _levelMax)
+            {
+                throw new ArgumentException(
+                    $"{nameof(LevelMin)} ({_levelMin}) cannot be greater than {nameof(LevelMax)} ({_levelMax}).",
+                    nameof(LevelMin));
+            }
         }
     }
 }
