@@ -97,6 +97,65 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Strength
+			},
+			// CriticalChance = 0.002·DEX + 0.001·LUK
+			{
+				attribute: EAttribute.CriticalChance,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Dexterity
+			},
+			{
+				attribute: EAttribute.CriticalChance,
+				amount: 0.001,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Luck
+			},
+			// CriticalDamage = base 1.5 + 0.0025·LUK
+			{
+				attribute: EAttribute.CriticalDamage,
+				amount: 1.5,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.CriticalDamage,
+				amount: 0.0025,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Luck
+			},
+			// DodgeChance = 0.001·AGI
+			{
+				attribute: EAttribute.DodgeChance,
+				amount: 0.001,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Agility
+			},
+			// BlockChance = 0.002·END
+			{
+				attribute: EAttribute.BlockChance,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Endurance
+			},
+			// BlockReduction = base 2 + 0.5·END
+			{
+				attribute: EAttribute.BlockReduction,
+				amount: 2.0,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.BlockReduction,
+				amount: 0.5,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Endurance
 			}
 		]);
 	});

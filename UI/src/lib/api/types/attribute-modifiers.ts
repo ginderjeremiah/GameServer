@@ -13,4 +13,12 @@ export const STATIC_ATTRIBUTE_MODIFIERS = [
 	{ attribute: EAttribute.MaxHealth, amount: 50, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.MaxHealth, amount: 20, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
 	{ attribute: EAttribute.MaxHealth, amount: 5, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Strength },
+	{ attribute: EAttribute.CriticalChance, amount: 0.002, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Dexterity },
+	{ attribute: EAttribute.CriticalChance, amount: 0.001, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Luck },
+	{ attribute: EAttribute.CriticalDamage, amount: 1.5, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
+	{ attribute: EAttribute.CriticalDamage, amount: 0.0025, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Luck },
+	{ attribute: EAttribute.DodgeChance, amount: 0.001, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
+	{ attribute: EAttribute.BlockChance, amount: 0.002, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
+	{ attribute: EAttribute.BlockReduction, amount: 2, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
+	{ attribute: EAttribute.BlockReduction, amount: 0.5, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
 ] as const;

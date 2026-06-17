@@ -170,10 +170,11 @@ describe('battleStep', () => {
 	// so the outcome is deterministic regardless of the seed; the draw-order test pins the per-fire counts.
 	describe('crit / dodge / block (player-only, seeded)', () => {
 		it('multiplies a player crit by CriticalDamage before defense', () => {
+			// CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, read directly as the multiplier.
 			const player = makeBattler(
 				[
 					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 2 }
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
 				[makeSkill(20, 40)]
 			);
@@ -210,10 +211,11 @@ describe('battleStep', () => {
 		});
 
 		it('subtracts defense and BlockReduction on a blocked hit', () => {
+			// BlockReduction is the base 2 (sourced by #799) + 8 = 10.
 			const player = makeBattler(
 				[
 					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 10 }
+					{ id: EAttribute.BlockReduction, amount: 8 }
 				],
 				[]
 			);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+	EAttribute,
 	EChallengeGoalComparison,
 	EEntityType,
 	EItemCategory,
@@ -75,6 +76,18 @@ describe('enum-backed select options', () => {
 		const opts = reference.attributeOptions();
 		expect(opts.find((o) => o.value === 0)?.text).toBe('Strength');
 		expect(opts.find((o) => o.value === 6)?.text).toBe('Max Health');
+	});
+
+	it('exposes the crit/dodge/block attributes for gear/item-mod authoring', () => {
+		// Now that crit/dodge/block are sourced (#799) rather than unused, the item/item-mod attribute
+		// pickers — which read this same enum-backed option set — must offer them.
+		const opts = reference.attributeOptions();
+		const byValue = (value: EAttribute) => opts.find((o) => o.value === value)?.text;
+		expect(byValue(EAttribute.CriticalChance)).toBe('Critical Chance');
+		expect(byValue(EAttribute.CriticalDamage)).toBe('Critical Damage');
+		expect(byValue(EAttribute.DodgeChance)).toBe('Dodge Chance');
+		expect(byValue(EAttribute.BlockChance)).toBe('Block Chance');
+		expect(byValue(EAttribute.BlockReduction)).toBe('Block Reduction');
 	});
 
 	it('builds item-category, rarity and mod-type options', () => {

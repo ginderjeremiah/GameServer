@@ -70,11 +70,41 @@ describe('BattleAttributes', () => {
 			expect(ba.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1 + 0.004 * 20 + 0.001 * 10, 10);
 		});
 
-		it('handles zero base stats (MaxHealth base 50, CooldownRecovery base 1)', () => {
+		it('calculates CriticalChance = 0.002*Dex + 0.001*Luck', () => {
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Dexterity, 20], [EAttribute.Luck, 10]));
+			expect(ba.getValue(EAttribute.CriticalChance)).toBeCloseTo(0.002 * 20 + 0.001 * 10, 10);
+		});
+
+		it('calculates CriticalDamage = 1.5 (base) + 0.0025*Luck', () => {
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Luck, 20]));
+			expect(ba.getValue(EAttribute.CriticalDamage)).toBeCloseTo(1.5 + 0.0025 * 20, 10);
+		});
+
+		it('calculates DodgeChance = 0.001*Agi', () => {
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Agility, 20]));
+			expect(ba.getValue(EAttribute.DodgeChance)).toBeCloseTo(0.001 * 20, 10);
+		});
+
+		it('calculates BlockChance = 0.002*End', () => {
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 20]));
+			expect(ba.getValue(EAttribute.BlockChance)).toBeCloseTo(0.002 * 20, 10);
+		});
+
+		it('calculates BlockReduction = 2 (base) + 0.5*End', () => {
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Endurance, 20]));
+			expect(ba.getValue(EAttribute.BlockReduction)).toBe(2 + 0.5 * 20);
+		});
+
+		it('handles zero base stats (CriticalDamage base 1.5, BlockReduction base 2, chances 0)', () => {
 			const ba = new BattleAttributes([]);
 			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50);
 			expect(ba.getValue(EAttribute.Defense)).toBe(2);
 			expect(ba.getValue(EAttribute.CooldownRecovery)).toBe(1);
+			expect(ba.getValue(EAttribute.CriticalDamage)).toBe(1.5);
+			expect(ba.getValue(EAttribute.BlockReduction)).toBe(2);
+			expect(ba.getValue(EAttribute.CriticalChance)).toBe(0);
+			expect(ba.getValue(EAttribute.DodgeChance)).toBe(0);
+			expect(ba.getValue(EAttribute.BlockChance)).toBe(0);
 		});
 	});
 
