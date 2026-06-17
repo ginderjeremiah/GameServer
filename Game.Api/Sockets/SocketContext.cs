@@ -9,7 +9,7 @@ namespace Game.Api.Sockets
 {
     public class SocketContext
     {
-        private const short MAX_MESSAGE_SIZE = 1024 * 4;
+        internal const short MAX_MESSAGE_SIZE = 1024 * 4;
 
         // Caps a single inbound message at MAX_FRAMES_PER_MESSAGE * MAX_MESSAGE_SIZE (~4 MB). Every received
         // frame counts toward it — including empty ones — so a peer streaming zero-length frames is bounded
