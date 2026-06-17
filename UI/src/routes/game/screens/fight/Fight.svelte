@@ -18,9 +18,15 @@
 	<div class="combatants">
 		<BattlerCard battler={battleEngine.player} side="player" />
 
-		<!-- Center column: the battle timer rides above the VS badge, clear of the zone-nav/boss band. -->
+		<!-- Center column: the battle status readout rides above the VS badge, clear of the zone-nav/boss
+		     band. Between enemies (the Loading cooldown) it swaps the battle clock for the next-enemy
+		     countdown; otherwise it shows the elapsed-vs-limit battle timer. -->
 		<div class="center-column">
-			<BattleTimer elapsedMs={battleEngine.timeElapsed} maxMs={DEFAULT_MAX_BATTLE_MS} />
+			{#if battleEngine.stage === BattleStage.Loading}
+				<EnemyCooldown remainingMs={battleEngine.loadingTime} totalMs={battleEngine.loadingTotal} />
+			{:else}
+				<BattleTimer elapsedMs={battleEngine.timeElapsed} maxMs={DEFAULT_MAX_BATTLE_MS} />
+			{/if}
 			<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
 				<div class="vs-diamond"></div>
 				<div class="vs-diamond-inner"></div>
@@ -49,12 +55,13 @@
 import ZoneNav from './ZoneNav.svelte';
 import BattlerCard from './BattlerCard.svelte';
 import BattleTimer from './BattleTimer.svelte';
+import EnemyCooldown from './EnemyCooldown.svelte';
 import BossAffordanceSlot from './boss/BossAffordanceSlot.svelte';
 import BossBattlerCard from './boss/BossBattlerCard.svelte';
 import BossAtmosphere from './boss/BossAtmosphere.svelte';
 import ZoneClearedOverlay from './boss/ZoneClearedOverlay.svelte';
 import { BossView } from './boss/boss-view.svelte';
-import { battleEngine } from '$lib/engine';
+import { battleEngine, BattleStage } from '$lib/engine';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 const boss = new BossView();

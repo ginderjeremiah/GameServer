@@ -271,6 +271,8 @@ describe('BattleEngine', () => {
 
 			expect(engine.stage).toBe(BattleStage.Loading);
 			expect(engine.loadingTime).toBe(100);
+			// loadingTotal captures the full duration so the cooldown UI can render the remaining fraction.
+			expect(engine.loadingTotal).toBe(100);
 		});
 
 		it('counts the loading time down each render frame and resolves + unhooks at zero', async () => {
