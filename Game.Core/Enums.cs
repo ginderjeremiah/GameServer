@@ -353,6 +353,32 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// How a statistic's recorded value is aggregated across the battles that report it. A derived domain
+    /// fact of the statistic type (see <see cref="Progress.StatisticType"/>), so it is the single source of
+    /// truth for both the recording mutator and a challenge's <see cref="EChallengeGoalComparison"/>.
+    /// </summary>
+    public enum EAggregationKind
+    {
+        /// <summary>
+        /// Each report is added to a running total (e.g. kills, damage dealt). Higher is better, so a
+        /// backing challenge completes once the value is at least the goal.
+        /// </summary>
+        Sum = 1,
+
+        /// <summary>
+        /// Only the largest reported value is kept (e.g. highest single attack). Higher is better, so a
+        /// backing challenge completes once the value is at least the goal.
+        /// </summary>
+        Max = 2,
+
+        /// <summary>
+        /// Only the smallest reported value is kept (e.g. fastest victory). Lower is better, so a backing
+        /// challenge completes once the value is at or below the goal.
+        /// </summary>
+        Min = 3,
+    }
+
+    /// <summary>
     /// Represents a type of player statistic that is tracked over time.
     /// </summary>
     public enum EStatisticType

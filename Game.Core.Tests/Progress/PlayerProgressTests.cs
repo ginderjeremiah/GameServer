@@ -332,6 +332,44 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_MutatorMatchesStatisticAggregationKind()
+        {
+            // The mutator is now derived from StatisticType.AggregationKind, not chosen by hand per call.
+            // Recording two values across two battles must agree with that direction for each kind:
+            // Sum accumulates, Max keeps the larger, Min keeps the smaller.
+            var sumProgress = MakeProgress();
+            var maxProgress = MakeProgress();
+            var minProgress = MakeProgress();
+
+            // Sum: DamageDealt (40 then 60 → 100).
+            sumProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { PlayerDamageDealt = 40.0 }, isBossBattle: false, zoneId: 0);
+            sumProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { PlayerDamageDealt = 60.0 }, isBossBattle: false, zoneId: 0);
+
+            // Max: HighestSingleAttackDamage (30 then 20 → 30).
+            maxProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { HighestPlayerAttack = 30.0 }, isBossBattle: false, zoneId: 0);
+            maxProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { HighestPlayerAttack = 20.0 }, isBossBattle: false, zoneId: 0);
+
+            // Min: FastestVictory (7s then 5s → 5s).
+            minProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 7000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+            minProgress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 5000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(EAggregationKind.Sum, StatisticType.GetAggregationKind(EStatisticType.DamageDealt));
+            Assert.Equal(100m, sumProgress.GetStatisticValue(EStatisticType.DamageDealt, null));
+
+            Assert.Equal(EAggregationKind.Max, StatisticType.GetAggregationKind(EStatisticType.HighestSingleAttackDamage));
+            Assert.Equal(30m, maxProgress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
+
+            Assert.Equal(EAggregationKind.Min, StatisticType.GetAggregationKind(EStatisticType.FastestVictory));
+            Assert.Equal(5m, minProgress.GetStatisticValue(EStatisticType.FastestVictory, null));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_FirstVictoryWithZeroDuration_RecordsZeroFastestVictory()
         {
             var progress = MakeProgress();

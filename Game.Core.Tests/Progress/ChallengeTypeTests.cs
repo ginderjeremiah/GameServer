@@ -1,3 +1,4 @@
+using Game.Core;
 using Game.Core.Progress;
 using Xunit;
 
@@ -52,6 +53,39 @@ namespace Game.Core.Tests.Progress
             var challengeType = new ChallengeType(type);
 
             Assert.Equal(EChallengeGoalComparison.AtLeast, challengeType.GoalComparison);
+        }
+
+        [Fact]
+        public void GoalComparison_IsDerivedFromBackingStatisticAggregation()
+        {
+            // The single domain fact ("this statistic is minimized") must drive both the recording mutator
+            // and the challenge comparison. This pins the invariant the issue (#839) exists to enforce:
+            // a min-aggregated backing statistic yields AtMost; anything else (including a challenge with no
+            // backing statistic) yields AtLeast — so the two encodings can never silently disagree.
+            foreach (var challengeType in ChallengeType.GetAll())
+            {
+                var isMinAggregated = challengeType.StatisticType?.AggregationKind == EAggregationKind.Min;
+                var expected = isMinAggregated
+                    ? EChallengeGoalComparison.AtMost
+                    : EChallengeGoalComparison.AtLeast;
+
+                Assert.Equal(expected, challengeType.GoalComparison);
+            }
+        }
+
+        [Fact]
+        public void EveryMinAggregatedStatisticChallengeUsesAtMost()
+        {
+            // Stated directionally as the issue asks: every challenge backed by a minimized statistic must
+            // compare AtMost, and every AtMost challenge must be backed by a minimized statistic — there is
+            // no other source of an AtMost comparison.
+            foreach (var challengeType in ChallengeType.GetAll())
+            {
+                var isMinAggregated = challengeType.StatisticType?.AggregationKind == EAggregationKind.Min;
+                var isAtMost = challengeType.GoalComparison == EChallengeGoalComparison.AtMost;
+
+                Assert.Equal(isMinAggregated, isAtMost);
+            }
         }
 
         [Fact]

@@ -11,25 +11,26 @@
         {
             Id = id;
             Name = id.ToString().SpaceWords();
-            GoalComparison = GetGoalComparison(id);
 
             var statisticType = GetStatisticType(id);
             if (statisticType.HasValue)
             {
                 StatisticType = new StatisticType(statisticType.Value);
             }
+
+            GoalComparison = GetGoalComparison(StatisticType);
         }
 
         public static IEnumerable<ChallengeType> GetAll() => Enum.GetValues<EChallengeType>().Select(id => new ChallengeType(id));
 
-        private static EChallengeGoalComparison GetGoalComparison(EChallengeType id)
+        private static EChallengeGoalComparison GetGoalComparison(StatisticType? statisticType)
         {
-            return id switch
-            {
-                // Time trials track the fastest victory time, where a lower value is better.
-                EChallengeType.TimeTrial => EChallengeGoalComparison.AtMost,
-                _ => EChallengeGoalComparison.AtLeast,
-            };
+            // The comparison direction follows the backing statistic's aggregation: a minimized statistic
+            // (lower is better, e.g. FastestVictory) completes "at or below" the goal, everything else "at
+            // least". A challenge with no backing statistic (e.g. LevelReached) accumulates, so AtLeast.
+            return statisticType?.AggregationKind == EAggregationKind.Min
+                ? EChallengeGoalComparison.AtMost
+                : EChallengeGoalComparison.AtLeast;
         }
 
         private static EStatisticType? GetStatisticType(EChallengeType id)
