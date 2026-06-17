@@ -634,6 +634,26 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_ReturnsTheTouchedStatisticKeys()
+        {
+            var progress = MakeProgress();
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(id: 3), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats { PlayerDamageDealt = 10.0 }, isBossBattle: false, zoneId: 0);
+
+            // The returned keys are exactly the rows the battle touched — the relevance scope a caller hands
+            // to ChallengeIndex.RelevantTo — so the global kill counter and its per-enemy twin are present...
+            Assert.Contains((EStatisticType.EnemiesKilled, (int?)null), touched);
+            Assert.Contains((EStatisticType.EnemiesKilled, (int?)3), touched);
+            // ...and a stat this winning battle never touched (BattlesLost) is absent.
+            Assert.DoesNotContain((EStatisticType.BattlesLost, (int?)null), touched);
+            // The returned set mirrors the dirty (persist) set on a freshly loaded aggregate.
+            Assert.Equal(
+                progress.DirtyStatistics.Select(s => (s.Type, s.EntityId)).ToHashSet(),
+                touched.ToHashSet());
+        }
+
+        [Fact]
         public void EvaluateChallenges_MarksNewAndChangedChallengesDirty_ButNotSkippedCompletedOnes()
         {
             var progressed = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5);
