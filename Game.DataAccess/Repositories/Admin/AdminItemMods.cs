@@ -70,7 +70,7 @@ namespace Game.DataAccess.Repositories.Admin
             return AdminSaveResult.Success;
         }
 
-        public async Task<AdminSaveResult> SetTags(SetTagsData data)
+        public async Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default)
         {
             if (_itemMods.LookupItemMod(data.Id) is null)
             {
@@ -81,7 +81,8 @@ namespace Game.DataAccess.Repositories.Admin
                 _tags.GetTagIdsForItemMod(data.Id),
                 _tags.GetExistingTagIds(data.TagIds),
                 _entityStore,
-                tagId => new Entities.ItemModTag { ItemModId = data.Id, TagId = tagId });
+                tagId => new Entities.ItemModTag { ItemModId = data.Id, TagId = tagId },
+                cancellationToken);
 
             return AdminSaveResult.Success;
         }

@@ -93,7 +93,7 @@ namespace Game.DataAccess.Repositories.Admin
                 }));
         }
 
-        public async Task<AdminSaveResult> SetTags(SetTagsData data)
+        public async Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default)
         {
             if (_items.LookupItem(data.Id) is null)
             {
@@ -104,7 +104,8 @@ namespace Game.DataAccess.Repositories.Admin
                 _tags.GetTagIdsForItem(data.Id),
                 _tags.GetExistingTagIds(data.TagIds),
                 _entityStore,
-                tagId => new Entities.ItemTag { ItemId = data.Id, TagId = tagId });
+                tagId => new Entities.ItemTag { ItemId = data.Id, TagId = tagId },
+                cancellationToken);
 
             return AdminSaveResult.Success;
         }

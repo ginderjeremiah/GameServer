@@ -20,6 +20,6 @@ namespace Game.Abstractions.DataAccess.Admin
         AdminSaveResult SaveModSlots(IReadOnlyList<Change<ItemModSlot>> changes);
 
         /// <summary>Replaces an item's tag associations. Fails if the item does not exist.</summary>
-        Task<AdminSaveResult> SetTags(SetTagsData data);
+        Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default);
     }
 }
