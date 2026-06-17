@@ -65,4 +65,52 @@ describe('TooltipStatsGrid', () => {
 		});
 		expect(valuesOf(container)).toEqual(['+1.3', '-0.5', '+4']);
 	});
+
+	describe('masked', () => {
+		it('renders one mask bar and one ??? per entry without leaking the values, so the count reads true', () => {
+			const { container } = render(TooltipStatsGrid, {
+				props: {
+					masked: true,
+					accent: 'var(--rarity-rare)',
+					barWidths: [70, 88, 58],
+					entries: [
+						{ name: 'Strength', value: 5 },
+						{ name: 'Agility', value: 2 },
+						{ name: 'Defense', value: 3 }
+					]
+				}
+			});
+			expect(container.querySelectorAll('.mask-bar')).toHaveLength(3);
+			const qmarks = container.querySelectorAll('.tt-qmark');
+			expect(qmarks).toHaveLength(3);
+			qmarks.forEach((q) => expect(q.textContent).toBe('???'));
+			// No real names/values are rendered in the teaser.
+			expect(container.querySelector('.tt-stats-grid')).toBeNull();
+			expect(container.textContent).not.toContain('Strength');
+		});
+
+		it('uses maskedRows for the count when given, ignoring entries', () => {
+			const { container } = render(TooltipStatsGrid, {
+				props: { masked: true, maskedRows: 2, accent: 'var(--accent)', barWidths: [70] }
+			});
+			expect(container.querySelectorAll('.mask-bar')).toHaveLength(2);
+			expect(container.querySelectorAll('.tt-qmark')).toHaveLength(2);
+		});
+
+		it('cycles the bar widths across the masked rows', () => {
+			const { container } = render(TooltipStatsGrid, {
+				props: { masked: true, maskedRows: 4, accent: 'var(--accent)', barWidths: [10, 20] }
+			});
+			const widths = [...container.querySelectorAll<HTMLElement>('.mask-bar')].map((b) => b.style.width);
+			expect(widths).toEqual(['10px', '20px', '10px', '20px']);
+		});
+
+		it('renders nothing when there are no rows to mask', () => {
+			const { container } = render(TooltipStatsGrid, {
+				props: { masked: true, maskedRows: 0, accent: 'var(--accent)', barWidths: [70] }
+			});
+			expect(container.querySelectorAll('.mask-bar')).toHaveLength(0);
+			expect(container.querySelectorAll('.tt-qmark')).toHaveLength(0);
+		});
+	});
 });

@@ -1,6 +1,15 @@
 <div class="tt-mods-list">
 	{#each slots as slot (slot.slotId)}
-		{#if slot.mod}
+		{#if masked}
+			<!-- Sealed teaser: one redacted row per slot, so the *count* still reads true. -->
+			<div class="sealed-slot" style:border-left="2px solid {tintColor(accent, 0.5)}">
+				<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+					<rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+					<path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" />
+				</svg>
+				<span class="sealed-slot-label">Sealed slot</span>
+			</div>
+		{:else if slot.mod}
 			<div class="tt-mod-tile" style:border-left-color={rarityColor(slot.mod.rarityId)}>
 				<div class="tt-mod-header">
 					<span class="tt-mod-name" style:color={rarityColor(slot.mod.rarityId)}>{slot.mod.name}</span>
@@ -19,7 +28,7 @@
 
 <script lang="ts">
 import type { ItemMod } from '$lib/battle';
-import { modTypeColor, modTypeLabel, rarityColor } from '$lib/common';
+import { modTypeColor, modTypeLabel, rarityColor, tintColor } from '$lib/common';
 
 interface ModSlotView {
 	slotId: number;
@@ -31,9 +40,13 @@ interface ModSlotView {
 
 interface Props {
 	slots: ModSlotView[];
+	/** Render every slot as a sealed teaser row instead of its real mod/empty state. */
+	masked?: boolean;
+	/** Accent hue tinting the sealed-slot rows. Only used when `masked`. */
+	accent?: string;
 }
 
-const { slots }: Props = $props();
+const { slots, masked = false, accent = 'var(--accent)' }: Props = $props();
 </script>
 
 <style lang="scss">
@@ -88,5 +101,19 @@ const { slots }: Props = $props();
 	font-size: 11.5px;
 	color: color-mix(in srgb, var(--text-primary) 65%, transparent);
 	line-height: 1.5;
+}
+
+.sealed-slot {
+	padding: 6px 10px;
+	border: 1px dashed var(--border-light);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sealed-slot-label {
+	font-size: 11.5px;
+	color: color-mix(in srgb, var(--text-primary) 45%, transparent);
+	font-style: italic;
 }
 </style>
