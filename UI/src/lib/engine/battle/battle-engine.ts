@@ -2,7 +2,7 @@ import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData } from '$stores';
 import { ELogType, IEnemyInstance } from '$lib/api';
-import { logMessage } from '../log';
+import { logMessage, type LogOutcome } from '../log';
 import { formatNum, createHook, Action, effectLogMessage, attributeIsHarmful, attributeName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
@@ -144,7 +144,8 @@ export class BattleEngine {
 				this.rng,
 				this.stepLog
 			)) {
-				logMessage(ELogType.Damage, this.damageLogMessage(skill.name, damage, byPlayer, crit, dodged, blocked));
+				const outcome = damageLogOutcome(byPlayer, crit, dodged, blocked);
+				logMessage(ELogType.Damage, this.damageLogMessage(skill.name, damage, outcome), outcome);
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
@@ -161,30 +162,22 @@ export class BattleEngine {
 	}
 
 	/** Builds the combat-log line for one skill activation, surfacing the player-only crit/dodge/block
-	 *  outcomes (#178). The crit/dodge/block flags are only ever set on the player's side of the
-	 *  exchange (crit on the player's own hit; dodge/block on an incoming enemy hit — a dodged hit is
-	 *  never also blocked), so the player-perspective phrasing is unambiguous. The "You"/enemy-name
-	 *  prefixes are what `logKind` keys the glyph off (see `log-kind.ts`). */
-	private damageLogMessage(
-		skillName: string,
-		damage: number,
-		byPlayer: boolean,
-		crit: boolean,
-		dodged: boolean,
-		blocked: boolean
-	): string {
-		if (byPlayer) {
-			return crit
-				? `You landed a critical hit with ${skillName} for ${formatNum(damage)} damage!`
-				: `You used ${skillName} and dealt ${formatNum(damage)} damage!`;
+	 *  outcomes (#178). The message prose and the structured `outcome` are derived from the same
+	 *  {@link damageLogOutcome} decision, so a reworded line can no longer drift from the glyph
+	 *  `logKind` picks for it (the glyph now keys off `outcome`, not this text — see `log-kind.ts`). */
+	private damageLogMessage(skillName: string, damage: number, outcome: LogOutcome): string {
+		switch (outcome) {
+			case 'player-crit':
+				return `You landed a critical hit with ${skillName} for ${formatNum(damage)} damage!`;
+			case 'player-hit':
+				return `You used ${skillName} and dealt ${formatNum(damage)} damage!`;
+			case 'player-dodge':
+				return `You dodged ${this.enemy.name}'s ${skillName}!`;
+			case 'player-block':
+				return `You blocked ${this.enemy.name}'s ${skillName}, taking only ${formatNum(damage)} damage!`;
+			case 'enemy-hit':
+				return `${this.enemy.name} used ${skillName} and dealt ${formatNum(damage)} damage!`;
 		}
-		if (dodged) {
-			return `You dodged ${this.enemy.name}'s ${skillName}!`;
-		}
-		if (blocked) {
-			return `You blocked ${this.enemy.name}'s ${skillName}, taking only ${formatNum(damage)} damage!`;
-		}
-		return `${this.enemy.name} used ${skillName} and dealt ${formatNum(damage)} damage!`;
 	}
 
 	/** Logs a line for each effect freshly applied this tick (refreshes are skipped — the chip countdown
@@ -251,4 +244,21 @@ export class BattleEngine {
 		this.stage = stage;
 		notifyBattleStageChanged(stage);
 	}
+}
+
+/** Resolves the structured {@link LogOutcome} for one damage exchange from the battle-step flags.
+ *  The crit/dodge/block flags are only ever set on the player's side (crit on the player's own hit;
+ *  dodge/block on an incoming enemy hit — a dodged hit is never also blocked), so the mapping is
+ *  unambiguous. Drives both the log prose and the glyph, keeping them in lockstep. */
+function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, blocked: boolean): LogOutcome {
+	if (byPlayer) {
+		return crit ? 'player-crit' : 'player-hit';
+	}
+	if (dodged) {
+		return 'player-dodge';
+	}
+	if (blocked) {
+		return 'player-block';
+	}
+	return 'enemy-hit';
 }
