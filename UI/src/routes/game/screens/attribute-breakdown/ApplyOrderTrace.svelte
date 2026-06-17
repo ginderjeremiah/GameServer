@@ -8,15 +8,15 @@
 			<span class="swatch-slot"></span>
 			<span class="label">Start</span>
 			<span class="op"></span>
-			<span class="value">{fmtNum(0, dec)}</span>
+			<span class="value">{fmtNum(0, dec, pct)}</span>
 		</div>
 
 		{#each adds as line, i (i)}
 			<div class="line">
 				<span class="swatch-slot"><span class="swatch" style:background={sourceColor(line.source)}></span></span>
 				<span class="label">{traceLabel(line)}</span>
-				<span class="op">{fmtSigned(line.applied)}</span>
-				<span class="value">{fmtNum(line.running, dec)}</span>
+				<span class="op">{fmtSigned(line.applied, undefined, pct)}</span>
+				<span class="value">{fmtNum(line.running, dec, pct)}</span>
 			</div>
 		{/each}
 
@@ -26,14 +26,14 @@
 				<span class="swatch-slot"></span>
 				<span class="label">Additive subtotal</span>
 				<span class="op"></span>
-				<span class="value">{fmtNum(computed.additiveSubtotal, dec)}</span>
+				<span class="value">{fmtNum(computed.additiveSubtotal, dec, pct)}</span>
 			</div>
 			{#each mults as line, i (i)}
 				<div class="line">
 					<span class="swatch-slot"><span class="swatch" style:background={sourceColor(line.source)}></span></span>
 					<span class="label">{traceLabel(line)} (mult)</span>
 					<span class="op">×{line.factor}</span>
-					<span class="value">{fmtNum(line.running, dec)}</span>
+					<span class="value">{fmtNum(line.running, dec, pct)}</span>
 				</div>
 			{/each}
 		{/if}
@@ -43,7 +43,7 @@
 			<span class="swatch-slot"></span>
 			<span class="label">Final</span>
 			<span class="op"></span>
-			<span class="value">{fmtNum(computed.total, dec)}</span>
+			<span class="value">{fmtNum(computed.total, dec, pct)}</span>
 		</div>
 	</div>
 </div>
@@ -56,9 +56,11 @@ import type { ComputedAttribute } from '$lib/battle';
 interface Props {
 	computed: ComputedAttribute<LabeledModifier>;
 	dec: number;
+	/** Whether the selected attribute renders as a percentage (scaled ×100 with a `%` suffix). */
+	pct: boolean;
 }
 
-let { computed, dec }: Props = $props();
+let { computed, dec, pct }: Props = $props();
 
 const adds = $derived(computed.lines.filter((l) => !l.multiplied));
 const mults = $derived(computed.lines.filter((l) => l.multiplied));

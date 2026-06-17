@@ -127,17 +127,15 @@ describe('battle-formulas', () => {
 	});
 
 	describe('cooldownMultiplier', () => {
-		it('is 1 with no CooldownRecovery', () => {
-			expect(cooldownMultiplier(makeAttributes())).toBe(1);
+		// CooldownRecovery is a base-1 multiplier read directly, so the attribute value IS the multiplier
+		// (these raw attributes skip the static base; a real battler's base 1.0 is exercised in battler.test).
+		it('reads the CooldownRecovery attribute directly as the multiplier', () => {
+			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 1.09]]))).toBeCloseTo(1.09, 10);
+			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 2]]))).toBe(2);
 		});
 
-		it('adds 1% per point of CooldownRecovery', () => {
-			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 9]]))).toBeCloseTo(1.09, 10);
-			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 100]]))).toBe(2);
-		});
-
-		it('slows cooldowns below 1 for a negative CooldownRecovery', () => {
-			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, -50]]))).toBeCloseTo(0.5, 10);
+		it('slows cooldowns for a CooldownRecovery below 1', () => {
+			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 0.5]]))).toBeCloseTo(0.5, 10);
 		});
 	});
 });

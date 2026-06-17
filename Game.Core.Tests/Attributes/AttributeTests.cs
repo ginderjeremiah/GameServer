@@ -104,7 +104,7 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Theory]
-        [InlineData(EAttribute.CooldownRecovery, true, 2)]
+        [InlineData(EAttribute.CooldownRecovery, true, 0)]
         [InlineData(EAttribute.CriticalChance, true, 0)]
         [InlineData(EAttribute.DodgeChance, true, 0)]
         [InlineData(EAttribute.BlockChance, true, 0)]

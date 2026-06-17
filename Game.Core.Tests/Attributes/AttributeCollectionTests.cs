@@ -84,8 +84,8 @@ namespace Game.Core.Tests.Attributes
 
             var collection = new AttributeCollection(modifiers);
 
-            // CooldownRecovery = Agility(10)*0.4 + Dexterity(20)*0.1 = 4 + 2 = 6
-            Assert.Equal(6, collection[EAttribute.CooldownRecovery]);
+            // CooldownRecovery = 1 (base) + Agility(10)*0.004 + Dexterity(20)*0.001 = 1 + 0.04 + 0.02 = 1.06
+            Assert.Equal(1.06, collection[EAttribute.CooldownRecovery], 10);
         }
 
         [Fact]

@@ -38,13 +38,13 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
-        public void CooldownRecovery_IsFourTenthsAgilityPlusOneTenthDexterity()
+        public void CooldownRecovery_IsOnePlusFourThousandthsAgilityPlusOneThousandthDexterity()
         {
             var collection = MakeCollection(
                 (EAttribute.Agility, 20),
                 (EAttribute.Dexterity, 10));
 
-            Assert.Equal(0.4 * 20 + 0.1 * 10, collection[EAttribute.CooldownRecovery]);
+            Assert.Equal(1 + 0.004 * 20 + 0.001 * 10, collection[EAttribute.CooldownRecovery], 10);
         }
 
         [Fact]
@@ -54,7 +54,7 @@ namespace Game.Core.Tests.Attributes
 
             Assert.Equal(50, collection[EAttribute.MaxHealth]);
             Assert.Equal(2, collection[EAttribute.Defense]);
-            Assert.Equal(0, collection[EAttribute.CooldownRecovery]);
+            Assert.Equal(1, collection[EAttribute.CooldownRecovery]);
         }
 
         private static AttributeCollection MakeCollection(params (EAttribute Attribute, double Amount)[] allocations)

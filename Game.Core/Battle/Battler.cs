@@ -59,7 +59,9 @@ namespace Game.Core.Battle
 
         public double GetCooldownMultiplier()
         {
-            return 1 + (_attributes[CooldownRecovery] / 100);
+            // CooldownRecovery is a base-1 multiplier read directly (1.0 = normal charge speed); see
+            // StaticAttributeModifiers for the base/derived formula.
+            return _attributes[CooldownRecovery];
         }
 
         public double GetAttributeValue(EAttribute attribute)

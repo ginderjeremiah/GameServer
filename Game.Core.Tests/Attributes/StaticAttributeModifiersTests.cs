@@ -17,9 +17,10 @@ namespace Game.Core.Tests.Attributes
         {
             var expected = new (EAttribute Attribute, double Amount, EModifierType Type, EAttributeModifierSource Source, EAttribute? DerivedSource)[]
             {
-                // CooldownRecovery = 0.4·Agility + 0.1·Dexterity
-                (EAttribute.CooldownRecovery, 0.4, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
-                (EAttribute.CooldownRecovery, 0.1, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
+                // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity
+                (EAttribute.CooldownRecovery, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.CooldownRecovery, 0.004, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
+                (EAttribute.CooldownRecovery, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
                 // Defense = 2 (base) + 1·Endurance + 0.5·Agility
                 (EAttribute.Defense, 2.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.Defense, 1.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),

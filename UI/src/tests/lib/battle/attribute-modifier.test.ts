@@ -35,17 +35,23 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 		// Each entry corresponds 1:1 to a property in the C# StaticAttributeModifiers,
 		// kept in the order AttributeCollection.AddStaticModifiers adds them.
 		expect(STATIC_ATTRIBUTE_MODIFIERS).toEqual([
-			// CooldownRecovery = 0.4·AGI + 0.1·DEX
+			// CooldownRecovery = base 1 + 0.004·AGI + 0.001·DEX
 			{
 				attribute: EAttribute.CooldownRecovery,
-				amount: 0.4,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.CooldownRecovery,
+				amount: 0.004,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Agility
 			},
 			{
 				attribute: EAttribute.CooldownRecovery,
-				amount: 0.1,
+				amount: 0.001,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Dexterity

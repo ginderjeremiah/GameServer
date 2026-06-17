@@ -45,10 +45,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void GetCooldownMultiplier_CalculatedFromCooldownRecovery()
         {
-            // CooldownRecovery = Agility(20)*0.4 + Dexterity(10)*0.1 = 8 + 1 = 9.
+            // CooldownRecovery = 1 (base) + 0.004·Agility(20) + 0.001·Dexterity(10) = 1.09, read directly
+            // as the cooldown multiplier (no 1 + x/100 transform).
             var battler = MakeBattler((EAttribute.Agility, 20), (EAttribute.Dexterity, 10));
 
-            var expected = 1 + (0.4 * 20 + 0.1 * 10) / 100;
+            var expected = 1 + 0.004 * 20 + 0.001 * 10;
             Assert.Equal(expected, battler.GetCooldownMultiplier(), 10);
         }
 

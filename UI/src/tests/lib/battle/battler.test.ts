@@ -67,7 +67,7 @@ describe('Battler', () => {
 			expect(battler.currentHealth).toBe(expectedMaxHealth);
 		});
 
-		it('calculates cdMultiplier from CooldownRecovery', () => {
+		it('calculates cdMultiplier from CooldownRecovery (a base-1 multiplier read directly)', () => {
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
@@ -77,17 +77,20 @@ describe('Battler', () => {
 				})
 			);
 
-			const cdRecovery = 0.4 * 20 + 0.1 * 10;
-			expect(battler.cdMultiplier).toBeCloseTo(1 + cdRecovery / 100, 10);
+			// CooldownRecovery = base 1 + 0.004·AGI + 0.001·DEX, read directly as the multiplier.
+			const cdRecovery = 1 + 0.004 * 20 + 0.001 * 10;
+			expect(battler.cdMultiplier).toBeCloseTo(cdRecovery, 10);
 		});
 
 		it('reads cdMultiplier live, reflecting a mid-battle CooldownRecovery change', () => {
 			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			// No allocations, so CooldownRecovery is just the static base 1.0 → multiplier 1.0.
 			expect(battler.cdMultiplier).toBe(1);
 
+			// A +1.0 buff lands on the base 1.0, doubling the multiplier to 2.0.
 			battler.attributes.addModifier({
 				attribute: EAttribute.CooldownRecovery,
-				amount: 100,
+				amount: 1,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.PlayerStatPoints
 			});

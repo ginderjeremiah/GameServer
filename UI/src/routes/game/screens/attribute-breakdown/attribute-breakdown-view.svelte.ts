@@ -53,6 +53,8 @@ export interface BreakdownAttrMeta {
 	type: EAttributeType;
 	/** Decimal places to render the value with. */
 	dec: number;
+	/** Whether the value renders as a percentage (scaled ×100 with a `%` suffix). */
+	pct: boolean;
 }
 
 /** The display-taxonomy groups, in render order. Status normally stays empty here — its per-second
@@ -76,7 +78,8 @@ export function attributeMeta(id: EAttribute, attributes: IAttribute[] | undefin
 	return {
 		id,
 		type: attribute?.attributeType ?? EAttributeType.Secondary,
-		dec: attribute?.decimals ?? 0
+		dec: attribute?.decimals ?? 0,
+		pct: attribute?.isPercentage ?? false
 	};
 }
 
@@ -126,18 +129,23 @@ export function buildGroups(
 
 /* ── number formatting ────────────────────────────────────────────────────── */
 
-export function fmtNum(n: number, dec = 0): string {
+/** Formats a value to `dec` places. When `pct` is set the value is a decimal fraction rendered as a
+ *  percentage — scaled ×100 with a `%` suffix (e.g. CooldownRecovery `1.09` → `109%`). */
+export function fmtNum(n: number, dec = 0, pct = false): string {
+	const value = pct ? n * 100 : n;
 	const factor = 10 ** dec;
-	const rounded = dec > 0 ? Math.round(n * factor) / factor : Math.round(n);
-	return rounded.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+	const rounded = dec > 0 ? Math.round(value * factor) / factor : Math.round(value);
+	return rounded.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + (pct ? '%' : '');
 }
 
-/** Signed value with a typographic minus, e.g. `+12` / `−3`. When `dec` is
- *  omitted a fractional value under 10 is shown to one decimal so small derived
- *  contributions (e.g. `+0.5`) don't collapse to `+1`/`+0`. */
-export function fmtSigned(n: number, dec?: number): string {
-	const places = dec ?? (Math.abs(n) < 10 && !Number.isInteger(n) ? 1 : 0);
-	return (n < 0 ? '−' : '+') + fmtNum(Math.abs(n), places);
+/** Signed value with a typographic minus, e.g. `+12` / `−3` (or `+8%` for a percentage attribute).
+ *  When `dec` is omitted a fractional value under 10 is shown to one decimal so small contributions
+ *  (e.g. `+0.5`) don't collapse to `+1`/`+0`; the threshold is judged on the rendered (percentage-
+ *  scaled, when `pct`) magnitude. */
+export function fmtSigned(n: number, dec?: number, pct = false): string {
+	const scaled = pct ? n * 100 : n;
+	const places = dec ?? (Math.abs(scaled) < 10 && !Number.isInteger(scaled) ? 1 : 0);
+	return (scaled < 0 ? '−' : '+') + fmtNum(Math.abs(n), places, pct);
 }
 
 /* ── contribution-line labels ─────────────────────────────────────────────── */

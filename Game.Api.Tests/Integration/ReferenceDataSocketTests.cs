@@ -151,7 +151,7 @@ namespace Game.Api.Tests.Integration
 
             var cooldownRecovery = Assert.Single(response.Data, a => a.Id == EAttribute.CooldownRecovery);
             Assert.True(cooldownRecovery.IsPercentage);
-            Assert.Equal(2, cooldownRecovery.Decimals);
+            Assert.Equal(0, cooldownRecovery.Decimals);
 
             var damageTaken = Assert.Single(response.Data, a => a.Id == EAttribute.DamageTakenPerSecond);
             Assert.Equal(EAttributeType.Status, damageTaken.AttributeType);

@@ -58,7 +58,7 @@ interface ParityScenario {
 
 const scenarios: ParityScenario[] = [
 	// Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-	//   Player: MaxHealth=900, Def=42, CDR=9 → cdMult=1.09; damage 85, after def 68.
+	//   Player: MaxHealth=900, Def=42, CDR=1.09 → cdMult=1.09; damage 85, after def 68.
 	//   Enemy:  MaxHealth=400, Def=17; damage 5-42 clamped to 0.
 	//   6 hits at ticks 28,56,84,112,140,168 → 6720ms.
 	{
@@ -197,7 +197,7 @@ const scenarios: ParityScenario[] = [
 	// one source changes the kill count; the item's Agility and the prefix's Dexterity
 	// additionally feed CooldownRecovery, so the whole merge is exercised end to end.
 	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
-	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=10 → cdMult=1.10.
+	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=1.10 → cdMult=1.10.
 	//   Player skill: 10 + 45*1.5 = 77.5 raw, after enemy def 17 → 60.5, fires every 28 ticks
 	//     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
 	//   Enemy: MaxHealth=400, Def=17; attack 5-32 clamps to 0, so the player never dies.
@@ -269,8 +269,8 @@ const scenarios: ParityScenario[] = [
 
 	// A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after the first
 	// hit applies it. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
-	//   Player: Str=20, base CDR=0 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
-	//     Effect: Self +100 CooldownRecovery → cdMult=2 once applied, permanent.
+	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
+	//     Effect: Self +1.0 CooldownRecovery → cdMult=2 once applied (base 1 + 1), permanent.
 	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 18.
 	//   Hit 1 at 400 applies the buff; thereafter the skill fires every 200ms → hit 6 at 1400.
 	{
@@ -289,7 +289,7 @@ const scenarios: ParityScenario[] = [
 								ESkillEffectTarget.Self,
 								EAttribute.CooldownRecovery,
 								EModifierType.Additive,
-								100,
+								1,
 								PERMANENT
 							)
 						]
@@ -360,7 +360,7 @@ const scenarios: ParityScenario[] = [
 	// Same-tick CDR ordering: slot 0's self CooldownRecovery buff speeds up slot 1's accrual on the same
 	// tick, because each slot reads the cooldown multiplier live in loadout order. Mirrors the backend
 	// `cdrBuffSpeedsLaterSlotSameTick` scenario.
-	//   Player: base CDR=0. slot0 = pure buffer (0 dmg, cooldown 40, Self +100 CDR permanent → cdMult=2),
+	//   Player: base CDR=1. slot0 = pure buffer (0 dmg, cooldown 40, Self +1.0 CDR permanent → cdMult=2),
 	//     slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
 	//   The boosted accrual makes slot1 fire at 200,400,600 → enemy dies on the 3rd hit at 600.
 	{
@@ -379,7 +379,7 @@ const scenarios: ParityScenario[] = [
 								ESkillEffectTarget.Self,
 								EAttribute.CooldownRecovery,
 								EModifierType.Additive,
-								100,
+								1,
 								PERMANENT
 							)
 						]
@@ -640,7 +640,7 @@ describe('Battle simulation parity with backend', () => {
 
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(900);
 		expect(player.attributes.getValue(EAttribute.Defense)).toBe(42);
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(9);
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.09, 10);
 		expect(player.cdMultiplier).toBeCloseTo(1.09, 10);
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
@@ -664,7 +664,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.Dexterity)).toBe(20);
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(675);
 		expect(player.attributes.getValue(EAttribute.Defense)).toBe(32);
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(10);
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.1, 10);
 		expect(player.cdMultiplier).toBeCloseTo(1.1, 10);
 	});
 
@@ -680,7 +680,7 @@ describe('Battle simulation parity with backend', () => {
 			// The FINAL values including derived stats, re-fed into the derived pipeline:
 			{ id: EAttribute.MaxHealth, amount: 900 }, // 50 + 20*30 + 5*50
 			{ id: EAttribute.Defense, amount: 42 }, // 2 + 30 + 0.5*20
-			{ id: EAttribute.CooldownRecovery, amount: 9 } // 0.4*20 + 0.1*10
+			{ id: EAttribute.CooldownRecovery, amount: 1.09 } // 1 + 0.004*20 + 0.001*10
 		];
 		const player = makeBattler(playerFinalAttrs, [
 			makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])
@@ -690,11 +690,11 @@ describe('Battle simulation parity with backend', () => {
 		// Derived stats are now DOUBLED.
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800);
 		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84);
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBe(18);
-		expect(player.cdMultiplier).toBeCloseTo(1.18, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(2.18, 10);
+		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
 
 		const result = new BattleSimulator(player, enemy).simulate();
-		expect(result.totalMs).toBe(6240);
+		expect(result.totalMs).toBe(3360);
 		expect(result.totalMs).toBeLessThan(6720);
 	});
 });
