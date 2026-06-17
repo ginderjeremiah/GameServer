@@ -128,6 +128,58 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(await queue.GetNextAsync());
         }
 
+        [Fact]
+        public async Task PeekAsync_ReturnsHeadItemsOldestFirst_WithoutRemovingThem()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["a", "b", "c"]);
+
+            // A non-destructive read returns the oldest items first and leaves them in place.
+            Assert.Equal(["a", "b"], await queue.PeekAsync(2));
+            Assert.Equal(3, await queue.GetLengthAsync());
+
+            // A count beyond the queue length returns everything still present (nothing was consumed).
+            Assert.Equal(["a", "b", "c"], await queue.PeekAsync(10));
+            Assert.Equal(3, await queue.GetLengthAsync());
+        }
+
+        [Fact]
+        public async Task PeekAsync_NonPositiveCount_ReturnsEmptyWithoutTouchingTheQueue()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddToQueueAsync("a");
+
+            Assert.Empty(await queue.PeekAsync(0));
+            Assert.Empty(await queue.PeekAsync(-5));
+            Assert.Equal(1, await queue.GetLengthAsync());
+        }
+
+        [Fact]
+        public async Task RemoveAsync_RemovesASingleOccurrence_AndReportsWhetherOneWasRemoved()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            // Two copies of "dup" plus a "keep" — removing once must leave one "dup" behind.
+            await queue.AddRangeToQueueAsync(["dup", "keep", "dup"]);
+
+            Assert.True(await queue.RemoveAsync("dup"));
+            Assert.Equal(["keep", "dup"], await queue.PeekAsync(10));
+
+            // Removing a value that is no longer (or never was) present is a no-op.
+            Assert.True(await queue.RemoveAsync("dup"));
+            Assert.False(await queue.RemoveAsync("dup"));
+            Assert.False(await queue.RemoveAsync("missing"));
+            Assert.Equal(["keep"], await queue.PeekAsync(10));
+        }
+
         private sealed record SamplePayload(int Id, string Name);
     }
 }

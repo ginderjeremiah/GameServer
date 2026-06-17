@@ -1032,6 +1032,26 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> GetLengthAsync() => Task.FromResult((long)_items.Count);
 
+            public Task<IReadOnlyList<string>> PeekAsync(long count)
+            {
+                IReadOnlyList<string> head = count <= 0
+                    ? []
+                    : _items.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
+                return Task.FromResult(head);
+            }
+
+            public Task<bool> RemoveAsync(string value)
+            {
+                var node = _items.Find(value);
+                if (node is null)
+                {
+                    return Task.FromResult(false);
+                }
+
+                _items.Remove(node);
+                return Task.FromResult(true);
+            }
+
             public void AddToQueue(string value) => _items.AddLast(value);
             public Task AddToQueueAsync(string value)
             {
@@ -1133,6 +1153,8 @@ namespace Game.Application.Tests.DataAccess
             }
 
             public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value) => throw new NotSupportedException();

@@ -33,6 +33,20 @@
         /// <summary>The current number of items waiting on this queue (e.g. to surface dead-letter-queue depth).</summary>
         public Task<long> GetLengthAsync();
 
+        /// <summary>
+        /// Returns up to <paramref name="count"/> items from the head of the queue (oldest first) WITHOUT
+        /// removing them — a non-destructive read. Lets a dead-letter queue be inspected without the
+        /// at-most-once exposure a destructive pop would reintroduce. A non-positive count returns an empty list.
+        /// </summary>
+        public Task<IReadOnlyList<string>> PeekAsync(long count);
+
+        /// <summary>
+        /// Removes a single occurrence of <paramref name="value"/> from this queue, returning true when one
+        /// was removed. Used to acknowledge a dead-letter entry off the queue once it has been re-enqueued
+        /// for replay; a no-op (false) when no matching entry remains.
+        /// </summary>
+        public Task<bool> RemoveAsync(string value);
+
         public void AddToQueue(string value);
         public void AddToQueue<T>(T value);
         public Task AddToQueueAsync(string value);
