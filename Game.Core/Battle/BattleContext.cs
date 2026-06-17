@@ -101,13 +101,18 @@ namespace Game.Core.Battle
         /// Enemies never crit/dodge/block: the gating reads the rolls only on the player's side, leaving a clean
         /// seam for later enemy parity.
         /// </summary>
-        public void DamageTarget(double rawDamage)
+        /// <returns>
+        /// The actual damage applied after crit, Defense, and block — the same value booked into the battle
+        /// stats — so the caller can record a reconciling per-skill total instead of the raw pre-mitigation hit.
+        /// </returns>
+        public double DamageTarget(double rawDamage)
         {
+            double actualDamage;
             if (_isPlayerActive)
             {
                 var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
                 var damage = isCrit ? rawDamage * _activeBattler.GetAttributeValue(CriticalDamage) : rawDamage;
-                var actualDamage = _targetBattler.TakeDamage(damage);
+                actualDamage = _targetBattler.TakeDamage(damage);
 
                 Stats.PlayerDamageDealt += actualDamage;
                 if (actualDamage > Stats.HighestPlayerAttack)
@@ -122,7 +127,6 @@ namespace Game.Core.Battle
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
                 var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
 
-                double actualDamage;
                 if (isDodge)
                 {
                     actualDamage = 0;
@@ -138,6 +142,8 @@ namespace Game.Core.Battle
 
                 Stats.PlayerDamageTaken += actualDamage;
             }
+
+            return actualDamage;
         }
 
         public void RecordSkillUse(int skillId, double damage)
