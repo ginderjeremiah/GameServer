@@ -2,7 +2,7 @@
 	<div class="gridlayer" style:background-position-x="{view.tickToX(0.5)}px"></div>
 
 	<span class="lane-label" style="top:4px">
-		<b style="color:var(--log-enemy)">enemy strikes</b> <b style="color:var(--health-remaining-color)">· your blocks</b>
+		<b style="color:var(--log-enemy)">enemy strikes</b> <b style="color:var(--block-color)">· your blocks</b>
 	</span>
 	<span class="lane-label" style="top:96px">
 		<b style="color:var(--log-player)">your strikes</b> <b style="color:var(--log-enemy)">· enemy guard</b>
@@ -71,7 +71,7 @@ const PXT = PX_PER_TICK;
    keeps the enemy hue (--log-enemy); player blocks stay the board's block green. */
 const FLASH_LAYOUT: Record<FlashKind, { y: number; color: string }> = {
 	enemyHit: { y: 36, color: 'var(--enemy-accent)' },
-	block: { y: 36, color: 'var(--health-remaining-color)' },
+	block: { y: 36, color: 'var(--block-color)' },
 	guarded: { y: 92, color: 'var(--log-enemy)' },
 	crit: { y: 116, color: 'var(--gold)' },
 	strike: { y: 160, color: 'var(--log-player)' },
@@ -267,9 +267,9 @@ onMount(() => {
 	height: 76px;
 	align-items: flex-start;
 	padding-top: 3px;
-	border-color: color-mix(in srgb, var(--health-remaining-color) 70%, transparent);
-	background: color-mix(in srgb, var(--health-remaining-color) 10%, transparent);
-	color: color-mix(in srgb, var(--health-remaining-color) 35%, var(--white));
+	border-color: color-mix(in srgb, var(--block-color) 70%, transparent);
+	background: color-mix(in srgb, var(--block-color) 10%, transparent);
+	color: color-mix(in srgb, var(--block-color) 35%, var(--white));
 }
 
 .preview.attack {
