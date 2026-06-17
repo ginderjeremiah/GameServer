@@ -406,10 +406,118 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 3000,
                     MaxMs: 3000),
+
+                // ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
+                // Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a
+                // chance ≥ 1 always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still
+                // taken in lockstep on both sides, so these pin the player-only crit/dodge/block math and draw
+                // order while staying hand-computable.
+
+                // A forced crit (CriticalChance 1) multiplies the raw damage by CriticalDamage BEFORE Defense:
+                // 20 raw × 2 = 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs
+                // hit 6 / 2400ms at the un-critted 18/hit).
+                ["forcedCrit"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
+                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // A forced dodge (DodgeChance 1) negates every incoming hit: the enemy's 1000-damage skill would
+                // one-shot the 100-HP player at tick 10, but each hit deals 0, so the player survives and grinds
+                // the enemy down (18/hit) for the win on hit 6 at tick 60 → 2400ms.
+                ["forcedDodge"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
+                        extra: [(EAttribute.DodgeChance, 1.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 1000, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
+
+                // A forced block (BlockChance 1) flatly reduces each incoming hit by Defense + BlockReduction:
+                // 25 − 2 − 20 = 3/hit instead of 23/hit. At 23/hit the enemy (firing every 5 ticks) kills the
+                // 100-HP player on its 5th hit at tick 25; at 3/hit the player survives to kill the 200-HP enemy
+                // (48/hit every 10 ticks) on hit 5 at tick 50 → 2000ms. Block flips the loss into a win.
+                ["forcedBlock"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 50, cooldownMs: 400)],
+                        extra: [(EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 20.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 30, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 25, cooldownMs: 200)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two
+                // enemy skills (two dodge+block draw pairs) fire on the same ticks, so a mis-ordered or
+                // mis-counted draw stream would diverge between the two simulators. The player crits both hits
+                // (10×2−2=18, 15×2−2=28 → 46/tick) and blocks both enemy hits (12−2−10=0, 14−2−10=2 → 2/tick).
+                // The 100-HP enemy dies on the player's tick-30 volley → 1200ms; the player ends at 96 HP.
+                ["drawOrderMultiSkill"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 10, cooldownMs: 400),
+                            MakeSkill(2, baseDamage: 15, cooldownMs: 400),
+                        ],
+                        extra:
+                        [
+                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0),
+                            (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 10.0),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(3, baseDamage: 12, cooldownMs: 400),
+                            MakeSkill(4, baseDamage: 14, cooldownMs: 400),
+                        ]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // Enemies never crit/dodge/block — even with every chance forced to 1, the gating reads the rolls
+                // only on the player's side. The enemy's forced crit is ignored (it deals 18, not 38, so the
+                // player survives to win) and its forced dodge/block is ignored (the player's 18-damage hits land
+                // in full and kill it, rather than being zeroed by a 50 BlockReduction). Win on hit 6 → 2400ms.
+                ["enemyForcedChanceIgnored"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 20, cooldownMs: 400)],
+                        extra:
+                        [
+                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0),
+                            (EAttribute.DodgeChance, 1.0), (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 50.0),
+                        ]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
         private const int Permanent = 1_000_000;
+
+        /// <summary>
+        /// The shared battle-RNG seed both simulators construct their <see cref="Mulberry32"/> from. Its value
+        /// is immaterial to the current scenarios (their crit/dodge/block chances are forced to 1/0, so the
+        /// outcome never depends on a draw) but both suites must seed identically — the frontend mirror passes
+        /// the same constant — so the threaded seed is exercised and a future real-probability scenario stays
+        /// in lockstep.
+        /// </summary>
+        private const uint ParitySeed = 0x9E3779B9;
 
         public static IEnumerable<object[]> ScenarioNames =>
             Scenarios.Keys.Select(name => new object[] { name });
@@ -420,7 +528,7 @@ namespace Game.Core.Tests.Battle
         {
             var scenario = Scenarios[scenarioName];
 
-            var sim = new BattleSimulator(scenario.Player(), scenario.Enemy());
+            var sim = new BattleSimulator(scenario.Player(), scenario.Enemy(), ParitySeed);
             var result = sim.Simulate(scenario.MaxMs);
 
             Assert.Equal(scenario.ExpectedVictory, result.Victory);
@@ -517,14 +625,16 @@ namespace Game.Core.Tests.Battle
 
         private static Battler MakeBattler(
             double strength, double endurance, double agility = 0, double dexterity = 0,
-            List<Skill>? skills = null)
+            List<Skill>? skills = null,
+            (EAttribute Attribute, double Amount)[]? extra = null)
         {
-            return new Battler(MakePlayer(strength, endurance, agility, dexterity, skills));
+            return new Battler(MakePlayer(strength, endurance, agility, dexterity, skills, extra));
         }
 
         private static Player MakePlayer(
             double strength, double endurance, double agility = 0, double dexterity = 0,
-            List<Skill>? skills = null)
+            List<Skill>? skills = null,
+            (EAttribute Attribute, double Amount)[]? extra = null)
         {
             var allocations = new List<StatAllocation>
             {
@@ -535,6 +645,16 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Dexterity, Amount = dexterity },
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
+
+            // Extra non-core attributes (e.g. forced crit/dodge/block chances) ride in as additive allocations,
+            // since the static derivations that will eventually feed them are a later sourcing concern (#799).
+            if (extra is not null)
+            {
+                foreach (var (attribute, amount) in extra)
+                {
+                    allocations.Add(new StatAllocation { Attribute = attribute, Amount = amount });
+                }
+            }
 
             var totalUsed = (int)(strength + endurance + agility + dexterity);
             var defaultSkills = skills ?? [];
@@ -666,9 +786,31 @@ namespace Game.Core.Tests.Battle
 
         private static Battler MakeEnemy(
             double strength, double endurance,
-            List<Skill>? skills = null)
+            List<Skill>? skills = null,
+            (EAttribute Attribute, double Amount)[]? extra = null)
         {
             var defaultSkills = skills ?? [];
+
+            var distributions = new List<AttributeDistribution>
+            {
+                new() { AttributeId = EAttribute.Strength, BaseAmount = (decimal)strength, AmountPerLevel = 0 },
+                new() { AttributeId = EAttribute.Endurance, BaseAmount = (decimal)endurance, AmountPerLevel = 0 },
+            };
+
+            // Forced crit/dodge/block chances used by the "enemies never crit/dodge/block" scenario — they must
+            // be present on the enemy yet never consulted, proving the rolls are gated on the player alone.
+            if (extra is not null)
+            {
+                foreach (var (attribute, amount) in extra)
+                {
+                    distributions.Add(new AttributeDistribution
+                    {
+                        AttributeId = attribute,
+                        BaseAmount = (decimal)amount,
+                        AmountPerLevel = 0,
+                    });
+                }
+            }
 
             var enemy = new Enemy
             {
@@ -676,21 +818,7 @@ namespace Game.Core.Tests.Battle
                 Name = "Test Enemy",
                 IsBoss = false,
                 Level = 1,
-                AttributeDistributions =
-                [
-                    new AttributeDistribution
-                    {
-                        AttributeId = EAttribute.Strength,
-                        BaseAmount = (decimal)strength,
-                        AmountPerLevel = 0,
-                    },
-                    new AttributeDistribution
-                    {
-                        AttributeId = EAttribute.Endurance,
-                        BaseAmount = (decimal)endurance,
-                        AmountPerLevel = 0,
-                    },
-                ],
+                AttributeDistributions = distributions,
                 AvailableSkills = defaultSkills,
             };
             enemy.SetBattleSkills(defaultSkills.Select(s => s.Id).ToList());

@@ -69,9 +69,14 @@ namespace Game.Core.Battle
             return _attributes[attribute];
         }
 
-        public double TakeDamage(double rawDamage)
+        /// <summary>
+        /// Applies <paramref name="rawDamage"/> after subtracting flat <see cref="Defense"/> and the optional
+        /// <paramref name="blockReduction"/> (a second flat reduction in the same clamp, supplied by the
+        /// caller only when an incoming hit is blocked), never below zero. Returns the damage actually dealt.
+        /// </summary>
+        public double TakeDamage(double rawDamage, double blockReduction = 0)
         {
-            var damage = rawDamage - _attributes[Defense];
+            var damage = rawDamage - _attributes[Defense] - blockReduction;
             damage = damage > 0 ? damage : 0;
             CurrentHealth -= damage;
             return damage;

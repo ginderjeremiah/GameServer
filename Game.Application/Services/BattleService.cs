@@ -297,11 +297,13 @@ namespace Game.Application.Services
             enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
-            result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, maxMs);
+            // The seed is set alongside the snapshot at battle start (and cleared together), so a non-null
+            // snapshot here guarantees a non-null seed — the ?? 0 mirrors the defensive fallbacks above.
+            result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, state.BattleSeed ?? 0, maxMs);
             return true;
         }
 
-        private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, int? maxMs = null)
+        private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, uint seed, int? maxMs = null)
         {
             enemy.SetBattleSkills(enemySkillIds);
 
@@ -311,7 +313,9 @@ namespace Game.Application.Services
                 enemy.BattleSkills,
                 enemy.Level);
 
-            var simulator = new BattleSimulator(playerBattler, enemyBattler);
+            // The same seed shipped to the client at battle start, so the server's anti-cheat replay draws
+            // the crit/dodge/block rolls from the identical RNG stream the client simulated.
+            var simulator = new BattleSimulator(playerBattler, enemyBattler, seed);
             return simulator.Simulate(maxMs);
         }
     }

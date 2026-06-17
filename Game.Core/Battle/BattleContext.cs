@@ -1,4 +1,5 @@
 using Game.Core.Skills;
+using static Game.Core.EAttribute;
 
 namespace Game.Core.Battle
 {
@@ -6,6 +7,7 @@ namespace Game.Core.Battle
     {
         private readonly Battler _playerBattler;
         private readonly Battler _enemyBattler;
+        private readonly Mulberry32 _rng;
         private Battler _activeBattler;
         private Battler _targetBattler;
         private bool _isPlayerActive;
@@ -13,10 +15,11 @@ namespace Game.Core.Battle
         public int TimeDelta { get; set; }
         public BattleStats Stats { get; } = new();
 
-        public BattleContext(Battler playerBattler, Battler enemyBattler, int timeDelta)
+        public BattleContext(Battler playerBattler, Battler enemyBattler, int timeDelta, Mulberry32 rng)
         {
             _playerBattler = playerBattler;
             _enemyBattler = enemyBattler;
+            _rng = rng;
             _activeBattler = playerBattler;
             _targetBattler = enemyBattler;
             _isPlayerActive = true;
@@ -81,12 +84,31 @@ namespace Game.Core.Battle
             Stats.PlayerDamageHealed += _playerBattler.ApplyHealOverTime(TimeDelta);
         }
 
-        public void DamageTarget(double damage)
+        /// <summary>
+        /// Deals one skill hit's <paramref name="rawDamage"/> to the current target, drawing the per-fire
+        /// seeded RNG and applying the player-only crit/dodge/block rolls (gated on the acting battler). The
+        /// draw order is a pure function of the skill-fire sequence — never of a roll outcome — so the per-tick
+        /// draw count stays <c>playerFires×1 + enemyFires×2</c>:
+        /// <list type="bullet">
+        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). On a crit
+        /// the raw damage is multiplied by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
+        /// Defense is subtracted, so high crit damage punches through Defense.</item>
+        /// <item>When the <b>enemy</b> attacks the player, two draws are taken unconditionally — dodge then
+        /// block, <b>both</b> always drawn (even when the hit is dodged). A dodge zeroes the hit; a non-dodged
+        /// block applies <see cref="EAttribute.BlockReduction"/> as a second flat reduction alongside
+        /// Defense.</item>
+        /// </list>
+        /// Enemies never crit/dodge/block: the gating reads the rolls only on the player's side, leaving a clean
+        /// seam for later enemy parity.
+        /// </summary>
+        public void DamageTarget(double rawDamage)
         {
-            var actualDamage = _targetBattler.TakeDamage(damage);
-
             if (_isPlayerActive)
             {
+                var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
+                var damage = isCrit ? rawDamage * _activeBattler.GetAttributeValue(CriticalDamage) : rawDamage;
+                var actualDamage = _targetBattler.TakeDamage(damage);
+
                 Stats.PlayerDamageDealt += actualDamage;
                 if (actualDamage > Stats.HighestPlayerAttack)
                 {
@@ -95,6 +117,25 @@ namespace Game.Core.Battle
             }
             else
             {
+                // Both draws are always taken (dodge then block), even on a dodge, so the stream never
+                // branches on a roll result.
+                var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
+                var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
+
+                double actualDamage;
+                if (isDodge)
+                {
+                    actualDamage = 0;
+                }
+                else if (isBlock)
+                {
+                    actualDamage = _targetBattler.TakeDamage(rawDamage, _targetBattler.GetAttributeValue(BlockReduction));
+                }
+                else
+                {
+                    actualDamage = _targetBattler.TakeDamage(rawDamage);
+                }
+
                 Stats.PlayerDamageTaken += actualDamage;
             }
         }

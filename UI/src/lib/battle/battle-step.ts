@@ -1,17 +1,24 @@
 import type { Battler } from './battler';
 import type { Skill } from './skill';
-import type { ISkillEffect } from '$lib/api';
+import type { Mulberry32 } from '$lib/engine/mulberry32';
+import { EAttribute, type ISkillEffect } from '$lib/api';
 
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
  * final damage it dealt after the defender's defense clamp, and whether the
- * player (true) or the enemy (false) was the attacker. The live BattleEngine
- * turns these into combat-log messages; the headless BattleSimulator ignores them.
+ * player (true) or the enemy (false) was the attacker. The crit/dodged/blocked
+ * flags carry the player-only roll outcomes for the combat log: `crit` on a player
+ * attack, `dodged`/`blocked` on an incoming enemy attack (a dodged hit is never
+ * also blocked). The live BattleEngine turns these into combat-log messages; the
+ * headless BattleSimulator ignores them.
  */
 export interface SkillActivation {
 	skill: Skill;
 	damage: number;
 	byPlayer: boolean;
+	crit: boolean;
+	dodged: boolean;
+	blocked: boolean;
 }
 
 /** A skill effect that was newly applied during a tick, with the side it landed on. */
@@ -51,7 +58,13 @@ export interface BattleStepLog {
  * {@link Battler.takeDamage} cannot let the live game diverge from the backend
  * replay while a copied test stays green.
  */
-export function battleStep(player: Battler, enemy: Battler, timeDelta: number, log?: BattleStepLog): SkillActivation[] {
+export function battleStep(
+	player: Battler,
+	enemy: Battler,
+	timeDelta: number,
+	rng: Mulberry32,
+	log?: BattleStepLog
+): SkillActivation[] {
 	const activations: SkillActivation[] = [];
 
 	// Reset the (reused) observation sink for this tick; absent for the headless simulator.
@@ -73,17 +86,32 @@ export function battleStep(player: Battler, enemy: Battler, timeDelta: number, l
 
 	// Resolve each loadout slot fully in order — accrue, fire, damage, then apply effects — before the
 	// next slot accrues, so an earlier slot's effect (e.g. a self CooldownRecovery buff) influences a
-	// later slot on the same tick, exactly as the backend's per-slot BattleSkill.Update does.
+	// later slot on the same tick, exactly as the backend's per-slot BattleSkill.Update does. Each fire
+	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
+	// then 2 — dodge, block — per enemy fire) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
-		const damage = enemy.takeDamage(skill.calculateDamage());
-		activations.push({ skill, damage, byPlayer: true });
+		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE Defense.
+		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
+		const raw = skill.calculateDamage();
+		const damage = enemy.takeDamage(crit ? raw * player.attributes.getValue(EAttribute.CriticalDamage) : raw);
+		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, blocked: false });
 		skill.applyEffects(enemy, onApplied);
 	});
 
 	if (!enemy.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
-			const damage = player.takeDamage(skill.calculateDamage());
-			activations.push({ skill, damage, byPlayer: false });
+			// Dodge then block, both drawn unconditionally (even on a dodge) so the stream never branches on a
+			// roll result. A dodge zeroes the hit; a non-dodged block flatly subtracts BlockReduction too.
+			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
+			const blocked = rng.next() < player.attributes.getValue(EAttribute.BlockChance);
+			const raw = skill.calculateDamage();
+			let damage = 0;
+			if (!dodged) {
+				damage = blocked
+					? player.takeDamage(raw, player.attributes.getValue(EAttribute.BlockReduction))
+					: player.takeDamage(raw);
+			}
+			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, blocked });
 			skill.applyEffects(player, onApplied);
 		});
 	}

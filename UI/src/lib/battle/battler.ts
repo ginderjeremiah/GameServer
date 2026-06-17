@@ -96,8 +96,10 @@ export class Battler {
 		}
 	}
 
-	public takeDamage(rawDamage: number) {
-		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense));
+	/** Applies `rawDamage` after subtracting flat Defense and the optional `blockReduction` (a second flat
+	 *  reduction in the same clamp, passed only when an incoming hit is blocked), never below zero. */
+	public takeDamage(rawDamage: number, blockReduction = 0) {
+		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense), blockReduction);
 		this.currentHealth -= damage;
 		this.isDead = this.currentHealth <= 0;
 		return damage;

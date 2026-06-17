@@ -1,5 +1,6 @@
 import type { Battler } from './battler';
 import { battleStep } from './battle-step';
+import { Mulberry32 } from '$lib/engine/mulberry32';
 import { tickSize } from '$lib/engine/logical-engine';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
@@ -23,13 +24,17 @@ export interface BattleResult {
 export class BattleSimulator {
 	constructor(
 		private readonly player: Battler,
-		private readonly enemy: Battler
+		private readonly enemy: Battler,
+		private readonly seed: number = 0
 	) {}
 
 	public simulate(maxMs: number = DEFAULT_MAX_BATTLE_MS): BattleResult {
+		// One Mulberry32 seeded once from the battle seed and advanced in lockstep with the backend, so both
+		// simulators draw the crit/dodge/block rolls from the identical stream (battle parity).
+		const rng = new Mulberry32(this.seed);
 		let totalMs = tickSize;
 		for (; totalMs <= maxMs; totalMs += tickSize) {
-			battleStep(this.player, this.enemy, tickSize);
+			battleStep(this.player, this.enemy, tickSize, rng);
 
 			if (this.enemy.isDead) {
 				return { victory: true, playerDied: false, totalMs };

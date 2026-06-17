@@ -25,7 +25,17 @@ Percentage- and multiplier-style attributes are stored so they are consumed **wi
 - **Percentage attributes** are stored as decimal fractions (`0.05` = 5%) and used as-is — a chance is compared directly against a `[0,1)` RNG draw — and rendered scaled ×100 (`0.05` → `5%`).
 - **Multiplier attributes** carry a base ≥ 1 and are read directly as the multiplier. `CooldownRecovery` is a base-`1` cooldown multiplier: a static `1.0` base plus `0.004·Agility + 0.001·Dexterity` (a typical AGI 20 / DEX 10 build sits at `1.09` ≈ +9% charge speed). Reading the attribute directly means a multiplicative modifier scales intuitively — a `×2` `CooldownRecovery` buff genuinely doubles charge speed rather than nudging the old `1 + CDR/100` value. Like the percentage attributes, it renders scaled ×100 (`1.09` → `109%`).
 
-This convention is the foundation the (still-unimplemented) player crit/dodge/block attributes build on — see the [spike](./spikes/178-player-crit-dodge-block.md).
+This convention is the foundation the player crit/dodge/block attributes build on — see [Critical hits, dodge & block](#critical-hits-dodge--block) below and the [spike](./spikes/178-player-crit-dodge-block.md).
+
+## Critical hits, dodge & block
+
+Players can land **critical hits** (deal increased damage), **dodge** (fully avoid an incoming attack), and **block** (flatly reduce one). Enemies do **not** in this version — the asymmetry keeps the shared battle RNG simple and is a deliberate seam for later enemy parity. The mechanic runs in the seeded battle simulation (so the frontend and backend agree tick-for-tick; see [backend-battle.md](./backend-battle.md#battle-runtime--seeded-crit--dodge--block-player-only)):
+
+- **Crit** multiplies the skill's raw damage by `CriticalDamage` (a base-≥1 multiplier read directly) **before** Defense is subtracted, so it can punch through Defense.
+- **Dodge** zeroes the incoming hit entirely.
+- **Block** subtracts a flat `BlockReduction` alongside Defense (`max(raw − Defense − BlockReduction, 0)`).
+
+`CriticalChance`/`DodgeChance`/`BlockChance` are decimal probabilities (`0.05` = 5%) compared directly against the RNG draw. The values currently come from **no source** — the core-attribute derivations and gear authoring that feed them, and the combat-log/display surfacing, are follow-up work, so the feature is inert until then.
 
 ## Experience Rewards
 

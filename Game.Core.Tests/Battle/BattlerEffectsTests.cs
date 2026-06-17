@@ -137,7 +137,7 @@ namespace Game.Core.Tests.Battle
         {
             var player = MakeBattler(Stat(Strength, 10));
             var enemy = MakeBattler(Stat(Strength, 10));
-            var context = new BattleContext(player, enemy, 40);
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
             context.ApplySkillEffect(Effect(1, Strength, Additive, 5, target: ESkillEffectTarget.Self));
             context.ApplySkillEffect(Effect(2, Strength, Additive, 7, target: ESkillEffectTarget.Opponent));
@@ -151,7 +151,7 @@ namespace Game.Core.Tests.Battle
         {
             var player = MakeBattler(Stat(Strength, 10));
             var enemy = MakeBattler(Stat(Strength, 10)); // Defense = 2
-            var context = new BattleContext(player, enemy, 40);
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
             // A skill that scales with Strength and buffs the caster's Strength when it fires.
             var skill = new BattleSkill(new Skill

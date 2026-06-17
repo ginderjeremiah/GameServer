@@ -124,6 +124,11 @@ describe('battle-formulas', () => {
 			expect(applyDefense(10, 10)).toBe(0);
 			expect(applyDefense(10, 40)).toBe(0);
 		});
+
+		it('subtracts block reduction alongside defense in the same clamp', () => {
+			expect(applyDefense(30, 10, 5)).toBe(15); // 30 − 10 − 5
+			expect(applyDefense(30, 10, 25)).toBe(0); // clamps when defense + block exceed the damage
+		});
 	});
 
 	describe('cooldownMultiplier', () => {

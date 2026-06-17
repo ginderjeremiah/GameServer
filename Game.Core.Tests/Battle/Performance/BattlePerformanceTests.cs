@@ -300,7 +300,7 @@ namespace Game.Core.Tests.Battle.Performance
             // their actual effect shape rather than a bespoke one. No multipliers are needed here.
             var active = BuildBattler(skillCount: 1, multiplierCount: 0, effectsPerSkill: 1, effectMode);
             var target = BuildBattler(skillCount: 1, multiplierCount: 0, effectsPerSkill: 1, effectMode);
-            var context = new BattleContext(active, target, GameConstants.MsPerTick);
+            var context = new BattleContext(active, target, GameConstants.MsPerTick, new Mulberry32(0));
 
             var samples = new int[ticks];
             for (var i = 0; i < ticks; i++)

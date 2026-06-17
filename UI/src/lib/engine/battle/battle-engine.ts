@@ -1,4 +1,5 @@
 import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
+import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData } from '$stores';
 import { ELogType, IEnemyInstance } from '$lib/api';
 import { logMessage } from '../log';
@@ -31,6 +32,10 @@ export class BattleEngine {
 	public timeElapsed = 0;
 	public loadingTime = 0;
 	public running = false;
+
+	/** The seeded battle RNG, re-created from each enemy's seed in {@link reset} so the live battle draws the
+	 *  crit/dodge/block rolls from the same stream the backend replays. Seeded to 0 until the first reset. */
+	private rng = new Mulberry32(0);
 
 	private logicalUnhook?: Action;
 	private renderUnhook?: Action;
@@ -95,6 +100,9 @@ export class BattleEngine {
 		// and the awaiting caller is released rather than stranded mid-countdown.
 		this.finishLoading?.();
 		this.timeElapsed = 0;
+		// Seed the battle RNG from the enemy instance's seed (the same value the backend simulates against),
+		// so the crit/dodge/block draws stay in lockstep with the anti-cheat replay.
+		this.rng = new Mulberry32(enemyInstance.seed);
 		this.resetEffectDamage();
 		this.player.reset(playerManager, inventoryManager.equipmentStats);
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
@@ -129,7 +137,13 @@ export class BattleEngine {
 
 	private logicalUpdate(timeDelta: number) {
 		if (this.stage === Active) {
-			for (const { skill, damage, byPlayer } of battleStep(this.player, this.enemy, timeDelta, this.stepLog)) {
+			for (const { skill, damage, byPlayer } of battleStep(
+				this.player,
+				this.enemy,
+				timeDelta,
+				this.rng,
+				this.stepLog
+			)) {
 				if (byPlayer) {
 					logMessage(ELogType.Damage, `You used ${skill.name} and dealt ${formatNum(damage)} damage!`);
 				} else {
