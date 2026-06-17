@@ -11,9 +11,24 @@
 					style:box-shadow="0 0 6px {tintColor(diamondColor, 0.67)}"
 				></div>
 				<span class="tt-category-label" style:color={labelColor}>{label}</span>
-				{@render trailing?.()}
+				{#if masked}
+					<!-- The sealed badge carries the rarity teaser, distinct from the (still-visible) category hue. -->
+					<div
+						class="sealed-badge"
+						style:background={tintColor(badgeAccent, 0.1)}
+						style:border="1px solid {tintColor(badgeAccent, 0.4)}"
+					>
+						<svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke={badgeAccent} stroke-width="1.6">
+							<rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+							<path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" />
+						</svg>
+						<span style:color={badgeAccent}>Sealed</span>
+					</div>
+				{:else}
+					{@render trailing?.()}
+				{/if}
 			</div>
-			<div class="tt-title-name" class:masked>{name}</div>
+			<div class="tt-title-name" class:masked>{masked ? '?????????' : name}</div>
 		</div>
 	</div>
 </div>
@@ -25,21 +40,25 @@ import { tintColor } from '$lib/common';
 interface Props {
 	/** Category/type label shown beside the diamond (e.g. "Skill", "Weapon"). */
 	label: string;
-	/** The tooltip's headline name. */
+	/** The tooltip's headline name. Replaced by a masked placeholder when `masked`. */
 	name: string;
 	/** Colour of the diamond glyph (and its glow). */
 	diamondColor: string;
 	/** Colour of the category/type label text. */
 	labelColor: string;
-	/** Optional trailing content on the category row (e.g. a cooldown pill or equipped badge). */
+	/** Optional trailing content on the category row (e.g. a cooldown pill or equipped badge). Suppressed when `masked`. */
 	trailing?: Snippet;
 	/** Optional leading content to the left of the title block (e.g. an attribute icon). */
 	leading?: Snippet;
-	/** Render the name as a dimmed, wide-tracked placeholder (sealed/teaser tooltips). */
+	/** Render the name as a masked placeholder and show the SEALED badge (sealed/teaser tooltips). */
 	masked?: boolean;
+	/** Accent hue for the SEALED badge (e.g. the rarity hue); defaults to {@link labelColor}. Only used when `masked`. */
+	sealedAccent?: string;
 }
 
-const { label, name, diamondColor, labelColor, trailing, leading, masked = false }: Props = $props();
+const { label, name, diamondColor, labelColor, trailing, leading, masked = false, sealedAccent }: Props = $props();
+
+const badgeAccent = $derived(sealedAccent ?? labelColor);
 </script>
 
 <style lang="scss">
@@ -85,6 +104,22 @@ const { label, name, diamondColor, labelColor, trailing, leading, masked = false
 	font-size: 9.5px;
 	letter-spacing: 1.8px;
 	text-transform: uppercase;
+}
+
+.sealed-badge {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 8px;
+	border-radius: 2px;
+
+	span {
+		font-family: var(--mono);
+		font-size: 9px;
+		letter-spacing: 1.2px;
+		text-transform: uppercase;
+	}
 }
 
 .tt-title-name {

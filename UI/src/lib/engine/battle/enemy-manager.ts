@@ -164,6 +164,13 @@ export class EnemyManager {
 		this.bossUnlockedNextZone = false;
 	}
 
+	/** Whether the boss loop is still the active, settled context — false once a stop / retreat / handoff
+	 *  has transitioned us away. A boss-victory resolution re-checks this after each await so a transition
+	 *  landing mid-resolution abandons it instead of clobbering the new state. */
+	private get bossLoopActive(): boolean {
+		return this.started && this.mode === 'boss' && !this.transitioning;
+	}
+
 	private async watchBattleStage(stage: BattleStage) {
 		// While swapping the active battle, ignore the outgoing battle's resolving stage changes.
 		if (this.transitioning) {
@@ -205,8 +212,18 @@ export class EnemyManager {
 	}
 
 	private async resolveBossVictory() {
-		await this.claimVictory();
+		// Snapshot the boss's zone up front: it identifies the zone being cleared and the gate this clear
+		// may unlock, and must stay fixed even if currentZone shifts (a zone-change / retreat) during the
+		// awaits below — otherwise the clear and the "next zone unlocked" check could target the wrong zone.
 		const clearedZoneId = playerManager.currentZone;
+
+		await this.claimVictory();
+		// A stop / retreat that landed during the victory claim has already transitioned us out of the boss
+		// loop; abandon the resolution so we don't resurrect the cleared overlay over the new state.
+		if (!this.bossLoopActive) {
+			return;
+		}
+
 		// A dedicated-boss victory clears its zone; surface the "Cleared" seal immediately while the
 		// authoritative per-zone statistic is reconciled on the next statistics load.
 		statistics.markZoneCleared(clearedZoneId);
@@ -220,6 +237,11 @@ export class EnemyManager {
 		const nextWasLocked = nextZone != null && !isZoneUnlocked(nextZone, completed);
 		if (nextWasLocked) {
 			await playerChallenges.load(true);
+			// Re-guard after the reload for the same reason — a stop / retreat may have landed while the
+			// challenge refresh was in flight.
+			if (!this.bossLoopActive) {
+				return;
+			}
 		}
 		this.bossUnlockedNextZone = nextWasLocked && nextZone != null && isZoneUnlocked(nextZone, completed);
 
@@ -227,7 +249,7 @@ export class EnemyManager {
 
 		await delay(BOSS_VICTORY_OVERLAY_MS);
 		// A retreat / stop during the overlay window already transitioned us elsewhere.
-		if (!this.started || this.mode !== 'boss') {
+		if (!this.bossLoopActive) {
 			return;
 		}
 		this.bossOutcome = undefined;

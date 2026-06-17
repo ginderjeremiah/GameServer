@@ -1,6 +1,13 @@
 <TooltipShell accent={rarityAccent} hidden={!item} bind:base={container}>
 	{#snippet header()}
-		<TooltipTitle label={categoryName} name={displayName} diamondColor={categoryColor} labelColor={categoryColor}>
+		<TooltipTitle
+			label={categoryName}
+			name={displayName}
+			diamondColor={categoryColor}
+			labelColor={categoryColor}
+			{masked}
+			sealedAccent={rarityAccent}
+		>
 			{#snippet trailing()}
 				{#if item?.equipped}
 					<EquippedBadge />
@@ -9,24 +16,24 @@
 		</TooltipTitle>
 	{/snippet}
 
-	<!-- Stats -->
+	<!-- Stats — count stays truthful while values are redacted when masked -->
 	{#if attributeMap?.length}
 		<TooltipSection label="Stats">
-			<TooltipStatsGrid entries={attributeMap} />
+			<TooltipStatsGrid entries={attributeMap} {masked} accent={rarityAccent} barWidths={STAT_BAR_WIDTHS} />
 		</TooltipSection>
 	{/if}
 
-	<!-- Mods — every slot, filled or empty -->
+	<!-- Mods — every slot, filled or empty (sealed teaser rows when masked) -->
 	{#if modSlots.length}
-		<TooltipSection label="Mods · {filledCount}/{modSlots.length}">
-			<ModList slots={modSlots} />
+		<TooltipSection label="Mods · {masked ? 0 : filledCount}/{modSlots.length}">
+			<ModList slots={modSlots} {masked} accent={rarityAccent} />
 		</TooltipSection>
 	{/if}
 
-	<!-- Description -->
-	{#if item?.description}
+	<!-- Description — masked teaser shows even when the real item has none -->
+	{#if masked || item?.description}
 		<TooltipSection label="Description" last>
-			<TooltipDescription text={item.description} />
+			<TooltipDescription text={item?.description ?? ''} {masked} accent={rarityAccent} lineWidths={DESC_LINE_WIDTHS} />
 		</TooltipSection>
 	{/if}
 </TooltipShell>
@@ -46,9 +53,11 @@ export const getBaseNode = () => container;
 
 type Props = {
 	item: Item | undefined;
+	/** Render a sealed teaser (masked name/stats/mods/description) instead of the real item. */
+	masked?: boolean;
 };
 
-const { item }: Props = $props();
+const { item, masked = false }: Props = $props();
 
 // Bound to the shell's root element and relocated into the global tooltip container
 // by getBaseNode(); reactive so the relocation runs once the shell has mounted.
@@ -74,4 +83,8 @@ const categoryColor = $derived(item ? itemCategoryColor(item.itemCategoryId) : '
 const categoryName = $derived(item ? itemCategoryName(item.itemCategoryId) : 'Item');
 // Item name reflects its applied mods: prefix mod names prepend, suffix names append.
 const displayName = $derived(item ? composeItemName(item.name, item.appliedMods) : '');
+
+// Masked teaser bar widths, cycled so the redacted rows don't look uniform.
+const STAT_BAR_WIDTHS = [78, 60, 92, 70];
+const DESC_LINE_WIDTHS = [236, 188];
 </script>
