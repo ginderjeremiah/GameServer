@@ -96,6 +96,64 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void CalculateDamage_FloatGrouping_MatchesBackend()
+        {
+            // Per-hit-damage parity guard (mirrors battle-formulas.test.ts "groups the multiplier sum like the
+            // backend"). Floating-point addition is not associative, so `base + (m1 + m2)` and a naive
+            // `(base + m1) + m2` can differ by a ULP at a kill boundary — a live-vs-replay desync (#802). Two
+            // contributions each below baseDamage's ULP vanish if added one at a time but survive when summed
+            // first, so the correct grouping lifts the result above baseDamage and the wrong one returns it
+            // unchanged — pinning the exact ordering, not just a coarse outcome.
+            const double tiny = 1e-16; // below the ULP of 1.0, so a single contribution is lost when added to base
+            var multipliers = new List<DamageMultiplier>
+            {
+                new() { Attribute = EAttribute.Strength, Amount = tiny },
+                new() { Attribute = EAttribute.Agility,  Amount = tiny },
+            };
+            var skill = MakeSkill(cooldownMs: 1000, baseDamage: 1, multipliers: multipliers);
+            var battleSkill = new BattleSkill(skill);
+
+            var statAllocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.Strength,  Amount = 1 },
+                new() { Attribute = EAttribute.Agility,   Amount = 1 },
+                new() { Attribute = EAttribute.Endurance, Amount = 50 },
+                new() { Attribute = EAttribute.Intellect, Amount = 0 },
+                new() { Attribute = EAttribute.Dexterity, Amount = 0 },
+                new() { Attribute = EAttribute.Luck,      Amount = 0 },
+            };
+            var attacker = new Battler(new Player
+            {
+                Id = 0,
+                Name = "t",
+                Level = 1,
+                Exp = 0,
+                CurrentZoneId = 0,
+                StatPoints = new PlayerStatPoints
+                { StatAllocations = statAllocations, StatPointsGained = 52, StatPointsUsed = 52 },
+                Inventory = new Inventory(),
+                SelectedSkills = [],
+                Skills = [],
+                LogPreferences = [],
+            });
+            var defender = MakeBattler(strength: 0);
+            var context = new BattleContext(attacker, defender, timeDelta: 0, new Mulberry32(0));
+
+            const double c1 = 1 * tiny;
+            const double c2 = 1 * tiny;
+            const double correct = 1 + (c1 + c2); // base + (m1 + m2)
+            const double naive = 1 + c1 + c2;     // ((base + m1) + m2)
+            // Sanity: the inputs are ULP-sensitive — the two groupings genuinely differ.
+            Assert.NotEqual(correct, naive);
+            Assert.Equal(1.0, naive);
+
+            var damage = battleSkill.CalculateDamage(context);
+
+            Assert.Equal(correct, damage);
+            Assert.True(damage > skill.BaseDamage, "Correct grouping must lift the result above baseDamage.");
+        }
+
+        [Fact]
         public void CalculateDamage_OnHotPath_DoesNotAllocate()
         {
             // CalculateDamage runs on every skill fire, the hottest sub-path of the simulation, so it
