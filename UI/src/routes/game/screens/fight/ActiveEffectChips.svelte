@@ -22,7 +22,7 @@
 				onmouseenter={(ev) => showChipTooltip(effect, ev)}
 				onmousemove={(ev) => tip.controller.move(ev)}
 				onmouseleave={hideChipTooltip}
-				onfocus={(ev) => showChipTooltip(effect, ev.currentTarget)}
+				onfocus={(ev) => focusChipTooltip(effect, ev)}
 				onblur={hideChipTooltip}
 				use:describedByTooltip={tip.controller.describedById}
 			>
@@ -49,7 +49,7 @@ import {
 	formatEffectMagnitude
 } from '$lib/common';
 import { staticData, type TooltipComponent } from '$stores';
-import { type TooltipAnchor } from '$stores/tooltip.svelte';
+import { focusAnchor, type TooltipAnchor } from '$stores/tooltip.svelte';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
@@ -110,6 +110,14 @@ const remainingSweep = (effect: ActiveEffectView) =>
 const showChipTooltip = (effect: ActiveEffectView, anchor: TooltipAnchor) => {
 	shownSourceId = effect.sourceId;
 	tip.controller.show(effect.attribute, anchor);
+};
+// Keyboard focus anchors off the chip's box; a mouse click is left to the hover handlers so the
+// tooltip keeps tracking the cursor instead of jumping (#880).
+const focusChipTooltip = (effect: ActiveEffectView, ev: FocusEvent) => {
+	const anchor = focusAnchor(ev);
+	if (anchor) {
+		showChipTooltip(effect, anchor);
+	}
 };
 const hideChipTooltip = () => {
 	shownSourceId = undefined;
