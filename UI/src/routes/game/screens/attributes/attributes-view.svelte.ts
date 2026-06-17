@@ -24,6 +24,7 @@
 import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle';
 import { attributeName } from '$lib/common';
+import { safeLocalStorage } from '$lib/common/local-storage';
 import { playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -357,17 +358,13 @@ function computeHexMax(draft: number[], committed: number[]): number {
 }
 
 function readStoredMode(): AttributeMode {
-	try {
-		return localStorage.getItem(MODE_STORAGE_KEY) === 'theory' ? 'theory' : 'guided';
-	} catch {
-		// Storage can be unavailable (private mode / SSR); fall back to the default.
-		return 'guided';
-	}
+	// Storage may be null (private mode / SSR); fall back to the default.
+	return safeLocalStorage()?.getItem(MODE_STORAGE_KEY) === 'theory' ? 'theory' : 'guided';
 }
 
 function storeMode(mode: AttributeMode): void {
 	try {
-		localStorage.setItem(MODE_STORAGE_KEY, mode);
+		safeLocalStorage()?.setItem(MODE_STORAGE_KEY, mode);
 	} catch {
 		// Persisting the preference is best-effort; ignore storage failures.
 	}

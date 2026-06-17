@@ -11,6 +11,8 @@
    component; the clamping and persistence logic lives here so it stays
    unit-testable without a DOM. */
 
+import { safeLocalStorage } from '$lib/common/local-storage';
+
 /** Smallest the log panel itself is allowed to get. */
 export const MIN_LOG_PANEL_HEIGHT = 96;
 /** Default panel height — roughly the original fixed combat-log size. */
@@ -27,16 +29,6 @@ const STORAGE_KEY = 'gameserver.logPanelHeight';
 export const clampLogPanelHeight = (height: number, max: number): number => {
 	const upper = Math.max(MIN_LOG_PANEL_HEIGHT, max);
 	return Math.min(Math.max(height, MIN_LOG_PANEL_HEIGHT), upper);
-};
-
-/** Returns local storage when available (absent during SSR), or null otherwise.
- *  Access is wrapped because reading `localStorage` throws in some privacy modes. */
-const storage = (): Storage | null => {
-	try {
-		return typeof localStorage !== 'undefined' ? localStorage : null;
-	} catch {
-		return null;
-	}
 };
 
 export class LogPanelView {
@@ -72,7 +64,7 @@ export class LogPanelView {
 	 *  overflow a smaller one. */
 	hydrate(available?: number): void {
 		this.maxHeight = this.maxFor(available);
-		const raw = storage()?.getItem(STORAGE_KEY);
+		const raw = safeLocalStorage()?.getItem(STORAGE_KEY);
 		if (raw === null || raw === undefined) {
 			return;
 		}
@@ -141,7 +133,7 @@ export class LogPanelView {
 	/** Persist the current height (best-effort; ignore quota/availability errors). */
 	private persist(): void {
 		try {
-			storage()?.setItem(STORAGE_KEY, String(Math.round(this.height)));
+			safeLocalStorage()?.setItem(STORAGE_KEY, String(Math.round(this.height)));
 		} catch {
 			// Persistence is best-effort; ignore quota/availability errors.
 		}
