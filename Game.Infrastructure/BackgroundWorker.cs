@@ -146,7 +146,7 @@ namespace Game.Infrastructure
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occured while creating the worker loop.");
+                    _logger.LogError(ex, "An error occurred while executing the worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
                 }
 
                 IsRunning = false;
@@ -164,7 +164,7 @@ namespace Game.Infrastructure
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occured while creating the async worker loop.");
+                    _logger.LogError(ex, "An error occurred while executing the async worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
                 }
 
                 IsRunning = false;
