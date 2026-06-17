@@ -111,7 +111,6 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
-import { onDestroy } from 'svelte';
 import type { IApiSocketResponse } from '$lib/api';
 
 /** Builds a ChallengeCompleted push response with the given reward ids (defaults: no rewards). */
@@ -176,9 +175,9 @@ describe('startGame', () => {
 		expect(renderEngine.start).toHaveBeenCalledTimes(1);
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
-		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
-		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
-		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed);
+		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced, true);
+		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted, true);
+		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed, true);
 	});
 
 	it('does nothing when the static data is not loaded', () => {
@@ -214,19 +213,6 @@ describe('startGame', () => {
 		void handleSocketReplaced();
 
 		expect(disconnect).toHaveBeenCalledTimes(1);
-	});
-
-	it('unregisters the command listeners on component destroy (listenCommand no longer auto-cleans)', () => {
-		startGame();
-
-		// startGame runs during the game page's init, so it registers an onDestroy that tears the
-		// command listeners down — invoke the captured callback to simulate the page being destroyed.
-		const destroyCallbacks = vi.mocked(onDestroy).mock.calls.map(([fn]) => fn);
-		destroyCallbacks.forEach((fn) => fn());
-
-		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
-		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
-		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
 	});
 });
 
