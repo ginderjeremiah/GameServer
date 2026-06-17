@@ -53,4 +53,11 @@ describe('Attribute Breakdown screen', () => {
 		// Strength is 14 from the allocation; the big value reflects the selection.
 		expect(detail.textContent).toContain('14');
 	});
+
+	it('associates each rail row with the shared attribute tooltip via aria-describedby', () => {
+		render(AttributeBreakdown);
+		// So a screen reader announces the attribute explanation (not just the row name) on focus.
+		const row = screen.getByTestId(`attr-row-${EAttribute.Strength}`);
+		expect(row.getAttribute('aria-describedby')).toMatch(/^tooltip-\d+$/);
+	});
 });

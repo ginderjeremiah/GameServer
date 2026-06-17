@@ -1,11 +1,13 @@
-<div role="tooltip" class="tooltip-container" {style} bind:this={container}>
+<div id={tooltipElementId(id)} role="tooltip" class="tooltip-container" {style} bind:this={container}>
 	<!-- The tooltip content is rendered directly into the container, so it is not present in the markup here. -->
 </div>
 
 <script lang="ts">
-import type { TooltipData } from '$stores';
+import { tooltipElementId, type TooltipData } from '$stores';
 
-let { component, position, visible }: TooltipData = $props();
+// A stable `id` + `role="tooltip"` lets a focusable trigger reference this container via
+// `aria-describedby` (see `describedByTooltip`) so its explanation is announced on focus.
+let { id, component, position, visible }: TooltipData = $props();
 
 let container = $state<HTMLDivElement>();
 

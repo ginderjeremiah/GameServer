@@ -42,6 +42,7 @@ const {
 		// resolves the gating challenge from this same reference data (completion from the store).
 		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
 		registerTooltipComponent: vi.fn(() => ({
+			describedById: 'tooltip-skill',
 			setTooltipPosition: vi.fn(),
 			showTooltip: vi.fn(),
 			hideTooltip: vi.fn()
@@ -482,5 +483,27 @@ describe('Skills screen', () => {
 		// Alpha is an unlocked, equipped skill — hovering it must not show any gate.
 		await fireEvent.mouseEnter(rowByName(container, 'Alpha')!, { clientX: 5, clientY: 5 });
 		expect(screen.queryByText('Slay Ten')).toBeNull();
+	});
+
+	it('associates a gated skill row with the gate tooltip via aria-describedby, but not an unlocked one', async () => {
+		staticData.challenges = [
+			{
+				id: 0,
+				name: 'Slay Ten',
+				description: 'Defeat 10 enemies',
+				challengeTypeId: 0,
+				progressGoal: 10,
+				rewardSkillId: 4
+			}
+		] as unknown as IChallenge[];
+		const { container } = render(Skills);
+
+		// Reveal locked skills so Echo (gated) appears in the rail.
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
+		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
+
+		// Only the gated row references the gate explanation, so a screen reader announces it on focus.
+		expect(rowByName(container, 'Echo')!.getAttribute('aria-describedby')).toBe('tooltip-skill');
+		expect(rowByName(container, 'Alpha')!.getAttribute('aria-describedby')).toBeNull();
 	});
 });

@@ -137,6 +137,17 @@ describe('ActiveEffectChips', () => {
 		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
 
+	it('associates each chip with the shared attribute tooltip via aria-describedby', () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		battler.applyEffect(effect({ id: 2, attributeId: EAttribute.Defense, amount: -5 }));
+		const { container } = render(ActiveEffectChips, { props: { battler } });
+
+		const ids = [...container.querySelectorAll('.effect-chip')].map((c) => c.getAttribute('aria-describedby'));
+		// Each chip points at the row's single shared panel, so its effect detail is announced on focus.
+		expect(ids.every((id) => id != null && /^tooltip-\d+$/.test(id))).toBe(true);
+		expect(new Set(ids).size).toBe(1);
+	});
+
 	it('closes the tooltip when the hovered effect expires under the cursor', async () => {
 		// A reactive battler so the chip's removal propagates (the live app statifies its battlers).
 		const live = statify(makeBattler());

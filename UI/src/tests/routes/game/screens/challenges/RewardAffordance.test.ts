@@ -96,6 +96,7 @@ describe('RewardAffordance', () => {
 
 	describe('keyboard / screen-reader accessibility', () => {
 		const stubController = (): RewardTooltipController => ({
+			describedById: 'tooltip-reward',
 			show: vi.fn(),
 			move: vi.fn(),
 			hide: vi.fn()
@@ -148,6 +149,16 @@ describe('RewardAffordance', () => {
 			await fireEvent.blur(button);
 
 			expect(controller.hide).toHaveBeenCalledTimes(1);
+		});
+
+		it('associates the trigger with the shared tooltip via aria-describedby', () => {
+			const controller = stubController();
+			const { getByRole } = render(RewardAffordanceFixture, {
+				props: { reward: modReward(true), variant: 'tile', controller }
+			});
+
+			// So a screen reader announces the reward explanation (not just the name) on focus.
+			expect(getByRole('button').getAttribute('aria-describedby')).toBe('tooltip-reward');
 		});
 	});
 });

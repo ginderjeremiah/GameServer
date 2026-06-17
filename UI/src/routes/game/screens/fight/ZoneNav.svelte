@@ -15,6 +15,7 @@
 			onclick={handleClickLeft}
 			onfocus={(e) => focusLock(leftLocked, prevZone?.unlockChallengeId, e)}
 			onblur={hideLock}
+			use:describedByTooltip={leftLocked ? describedById : undefined}
 		>
 			{#if leftLocked}<LockGlyph />{:else}&#8249;{/if}
 		</button>
@@ -39,6 +40,7 @@
 			onclick={handleClickRight}
 			onfocus={(e) => focusLock(rightLocked, nextZone?.unlockChallengeId, e)}
 			onblur={hideLock}
+			use:describedByTooltip={rightLocked ? describedById : undefined}
 		>
 			{#if rightLocked}<LockGlyph />{:else}&#8250;{/if}
 		</button>
@@ -60,6 +62,7 @@ import {
 import { playerManager } from '$lib/engine';
 import { isZoneUnlocked, zonesByOrder } from '$lib/common';
 import { ChallengeTooltip } from '$components';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import LockGlyph from './LockGlyph.svelte';
 
 // A locked zone is always gated on a challenge (an ungated zone is never locked), so the lock
@@ -69,7 +72,7 @@ import LockGlyph from './LockGlyph.svelte';
 // `aria-disabled` rather than `disabled`).
 let tooltip = $state<TooltipComponent>();
 let challengeId = $state<number | undefined>();
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 // Anchor the lock tooltip at the cursor (mouse) or off the focused arrow's box (focus).
 const showLock = (locked: boolean, gateChallengeId: number | undefined, anchor: TooltipAnchor) => {

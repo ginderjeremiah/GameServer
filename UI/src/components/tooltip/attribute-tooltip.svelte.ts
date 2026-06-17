@@ -36,6 +36,8 @@ export interface AttributeEffectContext {
  * focused element (positioned off its box) — so a trigger is reachable by mouse and keyboard alike.
  */
 export interface AttributeTooltipController {
+	/** Stable DOM id of the shared panel, for wiring a focusable trigger's `aria-describedby`. */
+	readonly describedById: string;
 	show: (attributeId: EAttribute, anchor: TooltipAnchor) => void;
 	move: (anchor: TooltipAnchor) => void;
 	hide: () => void;
@@ -60,9 +62,10 @@ export interface AttributeTooltipHandle {
  */
 export function createAttributeTooltip(getComponent: () => TooltipComponent | undefined): AttributeTooltipHandle {
 	let attributeId = $state<EAttribute | undefined>();
-	const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(getComponent);
+	const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(getComponent);
 
 	const controller: AttributeTooltipController = {
+		describedById,
 		show(id, anchor) {
 			attributeId = id;
 			setTooltipPosition(anchorPosition(anchor));

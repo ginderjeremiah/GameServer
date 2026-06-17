@@ -14,6 +14,8 @@ import type { ResolvedReward } from './challenges-view.svelte';
  * affordance is reachable by keyboard/screen reader as well as by mouse.
  */
 export interface RewardTooltipController {
+	/** Stable DOM id of the shared panel, for wiring a focusable trigger's `aria-describedby`. */
+	readonly describedById: string;
 	show: (reward: ResolvedReward, anchor: TooltipAnchor) => void;
 	move: (anchor: TooltipAnchor) => void;
 	hide: () => void;

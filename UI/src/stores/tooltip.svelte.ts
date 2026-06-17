@@ -22,6 +22,13 @@ export interface Position {
  *  (positioned off its box), so a tooltip is reachable by both mouse and keyboard focus. */
 export type TooltipAnchor = MouseEvent | HTMLElement;
 
+/**
+ * The DOM id given to a tooltip's container, shared between the rendered container ({@link Tooltip})
+ * and any focusable trigger that references it via `aria-describedby` (see `describedByTooltip`). The
+ * registration's numeric id is the single source of this id, so the two sides always agree.
+ */
+export const tooltipElementId = (id: number): string => `tooltip-${id}`;
+
 /** Resolve a tooltip {@link Position} from a cursor (pointer) or an element's box (focus). */
 export const anchorPosition = (anchor: TooltipAnchor): Position => {
 	if (anchor instanceof HTMLElement) {
@@ -72,6 +79,11 @@ export const registerTooltipComponent = <T extends TooltipComponent>(component: 
 	});
 
 	return {
+		/**
+		 * Stable DOM id of this tooltip's container, for wiring a focusable trigger's `aria-describedby`
+		 * (via `describedByTooltip`) so assistive tech announces the tooltip's explanation on focus.
+		 */
+		describedById: tooltipElementId(tooltipId),
 		setTooltipPosition,
 		showTooltip,
 		hideTooltip
