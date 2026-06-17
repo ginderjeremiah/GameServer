@@ -36,6 +36,9 @@
 		<path d="M5 2.5h6v3a3 3 0 0 1-6 0z" stroke-linejoin="round" />
 		<path d="M5 3.3H3.2a1.5 1.5 0 0 0 1.9 2.2M11 3.3h1.8a1.5 1.5 0 0 1-1.9 2.2" />
 		<path d="M8 8.5v2.2M6 13.5h4M6.6 11h2.8l.4 2.5H6.2z" stroke-linecap="round" stroke-linejoin="round" />
+	{:else if kind === 'inbox'}
+		<path d="M2.5 3.5h11v9h-11z" stroke-linejoin="round" />
+		<path d="M2.5 9h3l1 1.5h3l1-1.5h3" stroke-linejoin="round" />
 	{/if}
 </svg>
 
@@ -51,7 +54,8 @@ export type AdminGlyphKind =
 	| 'pin'
 	| 'tag'
 	| 'back'
-	| 'trophy';
+	| 'trophy'
+	| 'inbox';
 </script>
 
 <script lang="ts">

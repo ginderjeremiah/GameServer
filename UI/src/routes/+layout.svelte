@@ -170,6 +170,15 @@ $effect(() => {
 	--change-modified: #{colors.$warning};
 	--change-removed: #{colors.$enemy-accent};
 
+	// Dead-letter ops severity accents. The admin Ops console classifies a dead-lettered
+	// event by how worthwhile a replay is — poison (re-fails), poison-ish (unhandled type),
+	// or replayable. They currently match --error / --warning / --accent but are a distinct
+	// functional concern from validation/change-state, so they are declared separately and a
+	// theme can restyle ops-severity affordances on their own.
+	--dead-letter-poison: #{colors.$error};
+	--dead-letter-warn: #{colors.$warning};
+	--dead-letter-ok: #{colors.$accent};
+
 	// Combat-log palette — semantic colours for log messages, shared by the log
 	// panel, the options live preview, and the per-type rows (via `logColors` in
 	// log-kind.ts). Most reuse a base token; only the softer enemy hue is its own.
