@@ -30,7 +30,14 @@
 				<span>{view.equipped.length}/{view.cap}</span>
 			</div>
 			{#each view.equippedRail as metrics (metrics.skill.id)}
-				<SkillRow {metrics} {view} onGateShow={showChallenge} onGateMove={moveChallenge} onGateLeave={hideChallenge} />
+				<SkillRow
+					{metrics}
+					{view}
+					gateDescribedById={describedById}
+					onGateShow={showChallenge}
+					onGateMove={moveChallenge}
+					onGateLeave={hideChallenge}
+				/>
 			{/each}
 		{/if}
 		<div class="grp">
@@ -39,7 +46,14 @@
 		</div>
 		{#if view.availableRail.length}
 			{#each view.availableRail as metrics (metrics.skill.id)}
-				<SkillRow {metrics} {view} onGateShow={showChallenge} onGateMove={moveChallenge} onGateLeave={hideChallenge} />
+				<SkillRow
+					{metrics}
+					{view}
+					gateDescribedById={describedById}
+					onGateShow={showChallenge}
+					onGateMove={moveChallenge}
+					onGateLeave={hideChallenge}
+				/>
 			{/each}
 		{:else}
 			<div class="empty">none match the filter</div>
@@ -74,7 +88,7 @@ const { view }: Props = $props();
 // these callbacks only for gated rows.
 let tooltip = $state<TooltipComponent>();
 let challengeId = $state<number | undefined>();
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 const showChallenge = (metrics: SkillMetrics, anchor: TooltipAnchor) => {
 	if (metrics.source == null) {

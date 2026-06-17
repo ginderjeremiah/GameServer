@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { EAttribute } from '$lib/api';
 import { attributeHover } from '$components/tooltip/attribute-hover';
 
-const makeController = () => ({ show: vi.fn(), move: vi.fn(), hide: vi.fn() });
+const makeController = () => ({ describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() });
 
 describe('attributeHover action', () => {
 	it('shows anchored at the cursor on hover and hides on leave', () => {

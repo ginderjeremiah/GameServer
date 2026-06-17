@@ -24,6 +24,7 @@
 				onmouseleave={hideChipTooltip}
 				onfocus={(ev) => showChipTooltip(effect, ev.currentTarget)}
 				onblur={hideChipTooltip}
+				use:describedByTooltip={tip.controller.describedById}
 			>
 				<AttributeIcon id={effect.attribute} size={26} />
 				<CooldownOverlay sweep={remainingSweep(effect)} />
@@ -53,6 +54,7 @@ import AttributeIcon from '$components/AttributeIcon.svelte';
 import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import type { ActiveEffectView, Battler } from '$lib/battle';
 
 type Props = {

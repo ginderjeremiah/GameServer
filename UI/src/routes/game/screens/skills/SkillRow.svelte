@@ -9,6 +9,7 @@
 	onmouseleave={gated ? onGateLeave : undefined}
 	onfocus={gated ? onGateFocus : undefined}
 	onblur={gated ? onGateLeave : undefined}
+	use:describedByTooltip={gated ? gateDescribedById : undefined}
 >
 	<SkillIcon skill={metrics.skill} locked={!metrics.unlocked} size={30} />
 	<span class="body">
@@ -27,6 +28,7 @@
 <script lang="ts">
 import { formatNum } from '$lib/common';
 import type { TooltipAnchor } from '$stores';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
@@ -39,9 +41,12 @@ type Props = {
 	onGateShow?: (metrics: SkillMetrics, anchor: TooltipAnchor) => void;
 	onGateMove?: (ev: MouseEvent) => void;
 	onGateLeave?: () => void;
+	/** Stable id of the shared gate tooltip, wired to a gated row's `aria-describedby` so a screen
+	 *  reader announces the gate explanation on focus. */
+	gateDescribedById?: string;
 };
 
-const { metrics, view, onGateShow, onGateMove, onGateLeave }: Props = $props();
+const { metrics, view, onGateShow, onGateMove, onGateLeave, gateDescribedById }: Props = $props();
 
 const fmt = (n: number) => formatNum(Math.round(n));
 

@@ -15,6 +15,7 @@
 		onmouseleave={onLeave}
 		onfocus={onFocus}
 		onblur={onLeave}
+		use:describedByTooltip={tooltip?.describedById}
 	>
 		<RewardIcon {reward} size={18} {glow} />
 		<span class="chip-name" style:color={accent}>{reward.revealed ? reward.name : '???'}</span>
@@ -32,6 +33,7 @@
 		onmouseleave={onLeave}
 		onfocus={onFocus}
 		onblur={onLeave}
+		use:describedByTooltip={tooltip?.describedById}
 	>
 		<RewardIcon {reward} size={46} {glow} animate={!reward.revealed} />
 		<div class="tile-text">
@@ -63,6 +65,7 @@
 
 <script lang="ts">
 import { tintColor } from '$lib/common';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import RewardIcon from './RewardIcon.svelte';
 import { getRewardTooltip } from './reward-tooltip-context';
 import type { ResolvedReward } from './challenges-view.svelte';

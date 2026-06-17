@@ -77,11 +77,12 @@ let frame: HTMLDivElement;
 let tooltip = $state<TooltipComponent>();
 let hoveredReward = $state<ResolvedReward>();
 
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 // One reward tooltip for the whole screen, driven through context so nested
 // reward affordances don't have to thread hover handlers down the tree.
 const controller: RewardTooltipController = {
+	describedById,
 	show: (reward, anchor) => {
 		hoveredReward = reward;
 		setTooltipPosition(anchorPosition(anchor));

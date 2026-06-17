@@ -14,7 +14,9 @@ vi.mock('$stores', () => ({
 		get data() {
 			return mockTooltipsData;
 		}
-	}
+	},
+	// Tooltip.svelte derives its container id from this.
+	tooltipElementId: (id: number) => `tooltip-${id}`
 }));
 
 import TooltipBase from '$components/TooltipBase.svelte';

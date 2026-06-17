@@ -26,6 +26,11 @@ describe('Tooltip', () => {
 		expect(container.querySelector('[role="tooltip"]')).toBeTruthy();
 	});
 
+	it('gives the container a stable id derived from the tooltip id (for aria-describedby)', () => {
+		const { container } = render(Tooltip, { props: makeProps({ id: 7 }) });
+		expect(container.querySelector('[role="tooltip"]')?.id).toBe('tooltip-7');
+	});
+
 	it('does not set display:block when not visible', () => {
 		const { container } = render(Tooltip, { props: makeProps({ visible: false, position: { x: 50, y: 50 } }) });
 		const tooltip = container.querySelector('[role="tooltip"]') as HTMLElement;

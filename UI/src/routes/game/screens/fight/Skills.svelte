@@ -17,6 +17,7 @@
 					onmouseleave={() => handleLeave(index)}
 					onfocus={(ev) => handleFocus(ev, index)}
 					onblur={() => handleLeave(index)}
+					use:describedByTooltip={describedById}
 				>
 					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
 					<CooldownOverlay sweep={charge.sweep} />
@@ -47,6 +48,7 @@ import {
 } from '$stores/tooltip.svelte';
 import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 import CooldownOverlay from '$components/CooldownOverlay.svelte';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import SkillTooltip from './SkillTooltip.svelte';
 
 type Props = {
@@ -67,7 +69,7 @@ const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
 const readyAccent = $derived(accent ?? 'var(--accent)');
 const pulseColor = $derived(tintColor(accent ?? (side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)'), 0.6));
 
-const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
 
 const handleMouseMove = (ev: MouseEvent) => {
 	setTooltipPosition(anchorPosition(ev));

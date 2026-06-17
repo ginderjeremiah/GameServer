@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
-import { anchorPosition, tooltips } from '$stores/tooltip.svelte';
+import { anchorPosition, tooltipElementId, tooltips } from '$stores/tooltip.svelte';
 import Registrar from './TooltipRegistrarFixture.svelte';
 import Consumer from './TooltipConsumerFixture.svelte';
 import Nav from './TooltipNavFixture.svelte';
+import DescribedBy from './TooltipDescribedByFixture.svelte';
 
 afterEach(() => {
 	cleanup();
@@ -66,6 +67,22 @@ describe('tooltip store', () => {
 
 		expect([...tooltips.data].every((t) => t !== undefined)).toBe(true);
 		expect([...tooltips.data]).toHaveLength(2);
+	});
+
+	it('returns a describedById matching its container id, for aria-describedby wiring', () => {
+		const { getByTestId } = render(DescribedBy);
+		flushSync();
+
+		const [data] = [...tooltips.data];
+		expect(data).toBeDefined();
+		// The trigger's aria-describedby points at the container the renderer gives this id.
+		expect(getByTestId('described-by-id').textContent).toBe(tooltipElementId(data.id));
+	});
+});
+
+describe('tooltipElementId', () => {
+	it('derives a stable container id from a numeric tooltip id', () => {
+		expect(tooltipElementId(42)).toBe('tooltip-42');
 	});
 });
 

@@ -139,4 +139,15 @@ describe('Skills', () => {
 		expect(container.querySelector('[role="grid"]')).toBeNull();
 		expect(container.querySelector('[role="gridcell"]')).toBeNull();
 	});
+
+	it('associates every skill slot with the shared tooltip via aria-describedby', () => {
+		battler.skills = [makeSkill(battler, { name: 'Slash' }), makeSkill(battler, { id: 2, name: 'Cleave' })];
+		const { container } = render(Skills, { props: { battler, side: 'player' } });
+
+		const slots = [...container.querySelectorAll('.skill-slot')] as HTMLElement[];
+		const ids = slots.map((s) => s.getAttribute('aria-describedby'));
+		// Each slot points at the row's single shared tooltip container, so its breakdown is announced on focus.
+		expect(ids.every((id) => id != null && /^tooltip-\d+$/.test(id))).toBe(true);
+		expect(new Set(ids).size).toBe(1);
+	});
 });

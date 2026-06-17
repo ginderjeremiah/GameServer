@@ -19,6 +19,7 @@ const { mockPlayerManager, staticData, playerChallenges, registerTooltipComponen
 	},
 	playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
 	registerTooltipComponent: vi.fn(() => ({
+		describedById: 'tooltip-zone',
 		setTooltipPosition: vi.fn(),
 		showTooltip: vi.fn(),
 		hideTooltip: vi.fn()
@@ -220,6 +221,20 @@ describe('ZoneNav', () => {
 
 		await fireEvent.focus(right);
 		expect(screen.queryByText('Cull the Swarm')).toBeNull();
+	});
+
+	it('associates a locked arrow with the gate tooltip via aria-describedby, but not an unlocked one', () => {
+		// Left is gated (locked), right is open (navigable).
+		staticData.zones = [zone(10, 1, 'Alpha', 5), zone(20, 2, 'Beta')];
+		mockPlayerManager.currentZone = 20;
+		playerChallenges.isChallengeCompleted.mockReturnValue(false);
+
+		render(ZoneNav);
+		const [left, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		// Only the locked arrow references the gate explanation, so a screen reader announces it on focus.
+		expect(left.getAttribute('aria-describedby')).toBe('tooltip-zone');
+		expect(right.getAttribute('aria-describedby')).toBeNull();
 	});
 
 	it('does not surface a tooltip when hovering an unlocked (navigable) arrow', async () => {
