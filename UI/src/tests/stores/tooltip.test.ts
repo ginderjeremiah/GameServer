@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
-import { anchorPosition, tooltipElementId, tooltips } from '$stores/tooltip.svelte';
+import { anchorPosition, focusAnchor, tooltipElementId, tooltips } from '$stores/tooltip.svelte';
 import Registrar from './TooltipRegistrarFixture.svelte';
 import Consumer from './TooltipConsumerFixture.svelte';
 import Nav from './TooltipNavFixture.svelte';
@@ -108,5 +108,35 @@ describe('anchorPosition', () => {
 				toJSON: () => ({})
 			}) as DOMRect;
 		expect(anchorPosition(el)).toEqual({ x: 120, y: 200 });
+	});
+});
+
+describe('focusAnchor', () => {
+	// The module tracks input modality off document-level keydown/pointerdown; only `currentTarget`
+	// is read from the event, so a lightweight stand-in suffices.
+	const focusEventOn = (target: EventTarget | null) => ({ currentTarget: target }) as unknown as FocusEvent;
+
+	it('returns the focused element after a keyboard interaction (anchors off the box)', () => {
+		document.dispatchEvent(new Event('keydown'));
+		const el = document.createElement('button');
+		expect(focusAnchor(focusEventOn(el))).toBe(el);
+	});
+
+	it('returns undefined after a mouse/pointer interaction, so the focus does not re-anchor (#880)', () => {
+		document.dispatchEvent(new Event('pointerdown'));
+		const el = document.createElement('button');
+		expect(focusAnchor(focusEventOn(el))).toBeUndefined();
+	});
+
+	it('re-tracks keyboard modality when a keydown follows a pointer interaction', () => {
+		document.dispatchEvent(new Event('pointerdown'));
+		document.dispatchEvent(new Event('keydown'));
+		const el = document.createElement('button');
+		expect(focusAnchor(focusEventOn(el))).toBe(el);
+	});
+
+	it('returns undefined when the focus target is not an element', () => {
+		document.dispatchEvent(new Event('keydown'));
+		expect(focusAnchor(focusEventOn(null))).toBeUndefined();
 	});
 });

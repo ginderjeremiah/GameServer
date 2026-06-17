@@ -1,4 +1,5 @@
 import type { EAttribute } from '$lib/api';
+import { focusAnchor } from '$stores/tooltip.svelte';
 import type { AttributeTooltipController } from './attribute-tooltip.svelte';
 
 export interface AttributeHoverParams {
@@ -20,7 +21,14 @@ export function attributeHover(node: HTMLElement, params: AttributeHoverParams) 
 	const onEnter = (e: MouseEvent) => controller?.show(id, e);
 	const onMove = (e: MouseEvent) => controller?.move(e);
 	const onLeave = () => controller?.hide();
-	const onFocus = () => controller?.show(id, node);
+	// Pin the tooltip off the element's box only on keyboard focus; a mouse click is left to the hover
+	// handlers (which already track the cursor) so the tooltip doesn't jump on click (#880).
+	const onFocus = (e: FocusEvent) => {
+		const anchor = focusAnchor(e);
+		if (anchor) {
+			controller?.show(id, anchor);
+		}
+	};
 	const onBlur = () => controller?.hide();
 
 	node.addEventListener('mouseenter', onEnter);

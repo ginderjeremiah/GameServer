@@ -65,6 +65,7 @@
 
 <script lang="ts">
 import { tintColor } from '$lib/common';
+import { focusAnchor } from '$stores/tooltip.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import RewardIcon from './RewardIcon.svelte';
 import { getRewardTooltip } from './reward-tooltip-context';
@@ -100,11 +101,13 @@ const onEnter = (ev: MouseEvent) => {
 	}
 };
 const onMove = (ev: MouseEvent) => tooltip?.move(ev);
-// Keyboard focus opens the same tooltip, positioned off the element's box.
+// Keyboard focus opens the same tooltip off the element's box; a mouse click is left to the hover
+// handlers so the tooltip keeps tracking the cursor instead of jumping (#880).
 const onFocus = (ev: FocusEvent) => {
-	hovered = true;
-	if (reward && ev.currentTarget instanceof HTMLElement) {
-		tooltip?.show(reward, ev.currentTarget);
+	const anchor = focusAnchor(ev);
+	if (reward && anchor) {
+		hovered = true;
+		tooltip?.show(reward, anchor);
 	}
 };
 const onLeave = () => {

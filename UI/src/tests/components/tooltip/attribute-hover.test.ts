@@ -24,16 +24,38 @@ describe('attributeHover action', () => {
 		action.destroy();
 	});
 
-	it('shows anchored off the element on focus and hides on blur', () => {
+	it('shows anchored off the element on keyboard focus and hides on blur', () => {
 		const node = document.createElement('button');
 		const controller = makeController();
 		const action = attributeHover(node, { controller, id: EAttribute.Agility });
 
+		// A preceding keydown marks the focus as keyboard-driven, so it anchors off the element's box.
+		document.dispatchEvent(new Event('keydown'));
 		node.dispatchEvent(new FocusEvent('focus'));
 		expect(controller.show).toHaveBeenCalledWith(EAttribute.Agility, node);
 
 		node.dispatchEvent(new FocusEvent('blur'));
 		expect(controller.hide).toHaveBeenCalledTimes(1);
+
+		action.destroy();
+	});
+
+	it('does not re-anchor on a mouse-click focus, leaving the tooltip tracking the cursor (#880)', () => {
+		const node = document.createElement('button');
+		const controller = makeController();
+		const action = attributeHover(node, { controller, id: EAttribute.Agility });
+
+		// A mouse click hovers (tooltip shown at the cursor) and then focuses the element; the focus
+		// must not re-anchor the tooltip off the box, or it would jump away from the pointer.
+		const enter = new MouseEvent('mouseenter');
+		node.dispatchEvent(enter);
+		expect(controller.show).toHaveBeenCalledTimes(1);
+		expect(controller.show).toHaveBeenLastCalledWith(EAttribute.Agility, enter);
+
+		document.dispatchEvent(new Event('pointerdown'));
+		node.dispatchEvent(new FocusEvent('focus'));
+		// No additional show: the focus was a no-op, so the hover's cursor anchor still stands.
+		expect(controller.show).toHaveBeenCalledTimes(1);
 
 		action.destroy();
 	});

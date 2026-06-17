@@ -28,6 +28,7 @@
 <script lang="ts">
 import { formatNum } from '$lib/common';
 import type { TooltipAnchor } from '$stores';
+import { focusAnchor } from '$stores/tooltip.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
@@ -50,10 +51,12 @@ const { metrics, view, onGateShow, onGateMove, onGateLeave, gateDescribedById }:
 
 const fmt = (n: number) => formatNum(Math.round(n));
 
-// Anchor the gate tooltip off the focused row's box (focus has no cursor position).
+// Keyboard focus anchors the gate tooltip off the row's box; a mouse click is left to the hover
+// handlers so the tooltip keeps tracking the cursor instead of jumping (#880).
 const onGateFocus = (ev: FocusEvent) => {
-	if (ev.currentTarget instanceof HTMLElement) {
-		onGateShow?.(metrics, ev.currentTarget);
+	const anchor = focusAnchor(ev);
+	if (anchor) {
+		onGateShow?.(metrics, anchor);
 	}
 };
 

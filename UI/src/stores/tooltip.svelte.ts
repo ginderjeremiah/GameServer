@@ -38,6 +38,26 @@ export const anchorPosition = (anchor: TooltipAnchor): Position => {
 	return { x: anchor.clientX, y: anchor.clientY };
 };
 
+// Whether the user's most recent focus-moving interaction came from the keyboard rather than a
+// pointer. A mouse click also focuses the element it hits, but that element's hover handlers are
+// already tracking the cursor, so re-anchoring the tooltip off the element's box on that focus would
+// make it jump away from the pointer (#880). `:focus-visible` isn't reliably readable inside a focus
+// handler, so we mirror its heuristic from the raw input events: keydown ⇒ keyboard, pointer ⇒ mouse.
+let focusViaKeyboard = true;
+if (typeof document !== 'undefined') {
+	// Capture phase so the modality is recorded before the focus the interaction triggers fires.
+	document.addEventListener('keydown', () => (focusViaKeyboard = true), true);
+	document.addEventListener('pointerdown', () => (focusViaKeyboard = false), true);
+}
+
+/**
+ * The element a tooltip should anchor off of for a focus event, or `undefined` when the focus was a
+ * mouse/pointer click — whose hover handlers already track the cursor, so re-anchoring off the box
+ * would make the tooltip jump. Keyboard focus has no cursor, so it still pins the tooltip to the box.
+ */
+export const focusAnchor = (event: FocusEvent): HTMLElement | undefined =>
+	focusViaKeyboard && event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+
 // Keyed by the tooltip's stable id rather than held in a reactive array. An
 // array relied on `findIndex(... === data)` + `splice` to unregister, which is
 // not robust when screens overlap during navigation (the new screen mounts its

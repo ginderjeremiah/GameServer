@@ -42,6 +42,7 @@ import type { Battler, Skill } from '$lib/battle';
 import { tintColor } from '$lib/common';
 import {
 	anchorPosition,
+	focusAnchor,
 	registerTooltipComponent,
 	type TooltipAnchor,
 	type TooltipComponent
@@ -86,9 +87,12 @@ const handleEnter = (ev: MouseEvent, index: number) => {
 	reveal(index, ev);
 };
 
+// Keyboard focus anchors off the slot's box; a mouse click is left to the hover handlers so the
+// tooltip keeps tracking the cursor instead of jumping (#880).
 const handleFocus = (ev: FocusEvent, index: number) => {
-	if (ev.currentTarget instanceof HTMLElement) {
-		reveal(index, ev.currentTarget);
+	const anchor = focusAnchor(ev);
+	if (anchor) {
+		reveal(index, anchor);
 	}
 };
 

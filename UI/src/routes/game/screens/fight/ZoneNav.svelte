@@ -53,6 +53,7 @@
 import type { IZone } from '$lib/api';
 import {
 	anchorPosition,
+	focusAnchor,
 	staticData,
 	playerChallenges,
 	registerTooltipComponent,
@@ -84,9 +85,12 @@ const showLock = (locked: boolean, gateChallengeId: number | undefined, anchor: 
 	showTooltip();
 };
 const moveLock = (ev: MouseEvent) => setTooltipPosition(anchorPosition(ev));
+// Keyboard focus anchors off the arrow's box; a mouse click is left to the hover handlers so the
+// tooltip keeps tracking the cursor instead of jumping (#880).
 const focusLock = (locked: boolean, gateChallengeId: number | undefined, ev: FocusEvent) => {
-	if (ev.currentTarget instanceof HTMLElement) {
-		showLock(locked, gateChallengeId, ev.currentTarget);
+	const anchor = focusAnchor(ev);
+	if (anchor) {
+		showLock(locked, gateChallengeId, anchor);
 	}
 };
 const hideLock = () => {

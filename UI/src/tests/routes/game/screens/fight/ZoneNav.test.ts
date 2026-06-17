@@ -32,7 +32,10 @@ vi.mock('$stores', () => ({
 	playerChallenges,
 	registerTooltipComponent,
 	// The tooltip content under test is driven by `challengeId`; position is irrelevant here.
-	anchorPosition: () => ({ x: 0, y: 0 })
+	anchorPosition: () => ({ x: 0, y: 0 }),
+	// Models keyboard focus (returns the element); the real modality heuristic is unit-tested in
+	// `tests/stores/tooltip.test.ts`.
+	focusAnchor: (ev: FocusEvent) => (ev.currentTarget instanceof HTMLElement ? ev.currentTarget : undefined)
 }));
 
 import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
