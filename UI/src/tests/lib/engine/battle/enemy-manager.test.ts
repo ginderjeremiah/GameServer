@@ -153,3 +153,26 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(manager.currentEnemy).toEqual(enemy);
 	});
 });
+
+describe('EnemyManager.start', () => {
+	let manager: EnemyManager;
+	let sendSocketCommand: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		manager = new EnemyManager();
+		vi.mocked(logMessage).mockClear();
+		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
+		sendSocketCommand.mockReset();
+	});
+
+	it('re-kicks the idle loop from the Idle baseline, e.g. returning from the admin screen (#881)', async () => {
+		// The mocked battleEngine.stage is the Idle baseline that battleEngine.stop() leaves behind. start()
+		// reads it and fetches a fresh enemy rather than leaving the fight frozen on resume.
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(5)));
+
+		manager.start();
+
+		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 }));
+		expect(manager.currentEnemy).toEqual(makeEnemy(5));
+	});
+});

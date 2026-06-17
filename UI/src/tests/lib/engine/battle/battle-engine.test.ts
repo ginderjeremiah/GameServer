@@ -169,6 +169,28 @@ describe('BattleEngine', () => {
 			engine.stop();
 			expect(engine.running).toBe(false);
 		});
+
+		it('resets the stage to Idle on stop so a restart begins from a clean baseline (#881)', () => {
+			engine.start();
+			// Park in the post-victory Loading cooldown — the stage a navigation to the admin screen most
+			// often interrupts. Without the reset it would stay Loading, stranding the fight on the next start().
+			engine.startLoading(1000);
+			expect(engine.stage).toBe(BattleStage.Loading);
+
+			engine.stop();
+
+			expect(engine.stage).toBe(BattleStage.Idle);
+		});
+
+		it('resets a Paused stage to Idle on stop (a navigation mid boss-swap)', () => {
+			engine.start();
+			engine.pause();
+			expect(engine.stage).toBe(BattleStage.Paused);
+
+			engine.stop();
+
+			expect(engine.stage).toBe(BattleStage.Idle);
+		});
 	});
 
 	describe('battle state transitions', () => {
