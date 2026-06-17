@@ -142,7 +142,10 @@ describe('EntityStore', () => {
 		it('clears the saved flag after the flash interval elapses', async () => {
 			vi.useFakeTimers();
 			try {
-				const store = new EntityStore(makeConfig(async () => seed), seed);
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
 				store.addItem();
 				await store.save();
 				expect(store.saved).toBe(true);
@@ -157,7 +160,10 @@ describe('EntityStore', () => {
 		it('dispose cancels a pending flash so saved is not flipped after teardown', async () => {
 			vi.useFakeTimers();
 			try {
-				const store = new EntityStore(makeConfig(async () => seed), seed);
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
 				store.addItem();
 				await store.save();
 				expect(store.saved).toBe(true);
@@ -176,7 +182,10 @@ describe('EntityStore', () => {
 		it('re-arming the flash clears the prior timer (no early reset)', async () => {
 			vi.useFakeTimers();
 			try {
-				const store = new EntityStore(makeConfig(async () => seed), seed);
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
 				store.addItem();
 				await store.save();
 
