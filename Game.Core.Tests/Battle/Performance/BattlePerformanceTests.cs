@@ -378,7 +378,8 @@ namespace Game.Core.Tests.Battle.Performance
         {
             return new BattleSimulator(
                 BuildBattler(skillCount, multiplierCount, effectsPerSkill, effectMode),
-                BuildBattler(skillCount, multiplierCount, effectsPerSkill, effectMode));
+                BuildBattler(skillCount, multiplierCount, effectsPerSkill, effectMode),
+                seed: 0);
         }
 
         /// <summary>

@@ -25,7 +25,7 @@ export class BattleSimulator {
 	constructor(
 		private readonly player: Battler,
 		private readonly enemy: Battler,
-		private readonly seed: number = 0
+		private readonly seed: number
 	) {}
 
 	public simulate(maxMs: number = DEFAULT_MAX_BATTLE_MS): BattleResult {

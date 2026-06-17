@@ -556,7 +556,7 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]);
 
-            var sim = new BattleSimulator(new Battler(player), enemy);
+            var sim = new BattleSimulator(new Battler(player), enemy, ParitySeed);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);

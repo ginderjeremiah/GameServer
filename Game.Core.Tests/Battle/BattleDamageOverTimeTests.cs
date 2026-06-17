@@ -90,7 +90,7 @@ namespace Game.Core.Tests.Battle
                 [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Opponent, DamageTakenPerSecond, 50)]);
             var enemy = MakeBattler([Stat(Strength, 0)]); // MaxHealth 50, no skills
 
-            var result = new BattleSimulator(player, enemy).Simulate();
+            var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
 
             Assert.True(result.Victory);
             Assert.Equal(50, result.Stats.PlayerDamageDealt);
@@ -108,7 +108,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattler([Stat(Strength, 0)],
                 [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Opponent, DamageTakenPerSecond, 50)]);
 
-            var result = new BattleSimulator(player, enemy).Simulate();
+            var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
 
             Assert.True(result.PlayerDied);
             Assert.Equal(50, result.Stats.PlayerDamageTaken);
@@ -124,7 +124,7 @@ namespace Game.Core.Tests.Battle
                 [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Self, HealthRegenPerSecond, 75)]);
             var enemy = MakeBattler([Stat(Strength, 0)], [DamageSkill(2, baseDamage: 7)]);
 
-            var result = new BattleSimulator(player, enemy).Simulate(maxMs: 200);
+            var result = new BattleSimulator(player, enemy, seed: 0).Simulate(maxMs: 200);
 
             Assert.False(result.Victory);
             Assert.False(result.PlayerDied);

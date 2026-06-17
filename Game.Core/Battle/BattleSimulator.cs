@@ -6,7 +6,7 @@ namespace Game.Core.Battle
         private Battler EnemyBattler { get; set; }
         private readonly uint _seed;
 
-        public BattleSimulator(Battler playerBattler, Battler enemyBattler, uint seed = 0)
+        public BattleSimulator(Battler playerBattler, Battler enemyBattler, uint seed)
         {
             PlayerBattler = playerBattler;
             EnemyBattler = enemyBattler;

@@ -795,7 +795,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(2.18, 10);
 		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
 
-		const result = new BattleSimulator(player, enemy).simulate();
+		const result = new BattleSimulator(player, enemy, PARITY_SEED).simulate();
 		expect(result.totalMs).toBe(3360);
 		expect(result.totalMs).toBeLessThan(6720);
 	});
