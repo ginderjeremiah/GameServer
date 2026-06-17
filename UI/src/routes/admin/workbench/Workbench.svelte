@@ -34,7 +34,7 @@
 </div>
 
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, onDestroy } from 'svelte';
 import { Loading } from '$components';
 import './workbench.scss';
 import type { EntityConfig, Identified } from './entities/types';
@@ -61,6 +61,10 @@ onMount(async () => {
 	store = new EntityStore(entity, seed);
 	selId = seed[0]?.id ?? 0;
 });
+
+// Cancel any pending "saved" flash timer so a save that lands near unmount can't
+// write into a torn-down store.
+onDestroy(() => store?.dispose());
 
 const selected = $derived(store ? (store.items.find((it) => it.id === selId) ?? store.items[0]) : undefined);
 const selectedBaseline = $derived(store && selected ? store.baselineOf(selected.id) : undefined);

@@ -22,6 +22,7 @@ export class EntityStore<T extends Identified> {
 	saved = $state(false);
 	saving = $state(false);
 	private nextId = -1;
+	#flashTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(config: EntityConfig<T>, seed: T[]) {
 		this.config = config;
@@ -165,8 +166,7 @@ export class EntityStore<T extends Identified> {
 			this.items = fresh.map(clone);
 			this.base = fresh.map(clone);
 			this.deleted.clear();
-			this.saved = true;
-			setTimeout(() => (this.saved = false), 1900);
+			this.flashSaved();
 		} catch (ex) {
 			// Without this, a failed persist reset only the saving flag and the
 			// user was left with unsaved edits and no indication anything broke.
@@ -180,5 +180,24 @@ export class EntityStore<T extends Identified> {
 		this.items = this.base.map(clone);
 		this.deleted.clear();
 		this.saved = false;
+	}
+
+	/** Briefly flash the "Changes saved" confirmation. The timer handle is owned so a
+	 *  re-arm clears the prior one and {@link dispose} can cancel a pending flash — a save
+	 *  that lands just before the Workbench unmounts must not write into a dead store. */
+	private flashSaved() {
+		this.saved = true;
+		if (this.#flashTimer) {
+			clearTimeout(this.#flashTimer);
+		}
+		this.#flashTimer = setTimeout(() => {
+			this.saved = false;
+		}, 1900);
+	}
+
+	dispose() {
+		if (this.#flashTimer) {
+			clearTimeout(this.#flashTimer);
+		}
 	}
 }

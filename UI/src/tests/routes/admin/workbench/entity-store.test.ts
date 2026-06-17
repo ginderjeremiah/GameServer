@@ -138,6 +138,75 @@ describe('EntityStore', () => {
 		expect(persist).not.toHaveBeenCalled();
 	});
 
+	describe('saved flash timer', () => {
+		it('clears the saved flag after the flash interval elapses', async () => {
+			vi.useFakeTimers();
+			try {
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
+				store.addItem();
+				await store.save();
+				expect(store.saved).toBe(true);
+
+				vi.advanceTimersByTime(1900);
+				expect(store.saved).toBe(false);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('dispose cancels a pending flash so saved is not flipped after teardown', async () => {
+			vi.useFakeTimers();
+			try {
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
+				store.addItem();
+				await store.save();
+				expect(store.saved).toBe(true);
+
+				// Teardown (Workbench unmount) before the flash fires must not leave a
+				// live timer that writes into the dead store.
+				store.dispose();
+				vi.advanceTimersByTime(1900);
+				expect(store.saved).toBe(true);
+				expect(vi.getTimerCount()).toBe(0);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('re-arming the flash clears the prior timer (no early reset)', async () => {
+			vi.useFakeTimers();
+			try {
+				const store = new EntityStore(
+					makeConfig(async () => seed),
+					seed
+				);
+				store.addItem();
+				await store.save();
+
+				// A second save part-way through the first flash should restart, not stack.
+				vi.advanceTimersByTime(1000);
+				store.addItem();
+				await store.save();
+				expect(vi.getTimerCount()).toBe(1);
+
+				// The first timer would have fired here; the re-armed one must keep saved true.
+				vi.advanceTimersByTime(900);
+				expect(store.saved).toBe(true);
+
+				vi.advanceTimersByTime(1000);
+				expect(store.saved).toBe(false);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+	});
+
 	describe('retire', () => {
 		it('isRetired reflects the retiredAt field', () => {
 			const store = new EntityStore(makeConfig(), [
