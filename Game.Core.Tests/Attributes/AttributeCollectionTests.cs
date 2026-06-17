@@ -234,6 +234,69 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
+        public void RemoveModifier_AttributeReadButNeverWritten_ReturnsFalseAndKeepsValue()
+        {
+            // Reading an empty slot lazily creates its node but allocates no modifier list. Removing
+            // against that node must take the "no modifiers to remove" path (the node exists, the list
+            // does not) and leave the cached value intact.
+            var collection = new AttributeCollection([]);
+            Assert.Equal(0, collection[EAttribute.Luck]);
+
+            var removed = collection.RemoveModifier(Additive(EAttribute.Luck, 5));
+
+            Assert.False(removed);
+            Assert.Equal(0, collection[EAttribute.Luck]);
+        }
+
+        [Fact]
+        public void RemoveModifier_DerivedOnlySource_ReturnsFalseWithoutDisturbingValue()
+        {
+            // A derived-source attribute (Endurance) is never directly modified, so its node exists
+            // only because the derived link created it and it holds no stored modifier list. Removing a
+            // modifier targeting that source must return false and not disturb the derived value.
+            var collection = new AttributeCollection([]);
+            Assert.Equal(50, collection[EAttribute.MaxHealth]);
+            collection.AddModifier(Additive(EAttribute.Endurance, 10));
+            Assert.Equal(250, collection[EAttribute.MaxHealth]);
+
+            // No modifier with this exact identity was ever stored on Endurance via the remove path.
+            var removed = collection.RemoveModifier(Additive(EAttribute.Endurance, 10));
+
+            Assert.False(removed);
+            Assert.Equal(250, collection[EAttribute.MaxHealth]);
+        }
+
+        [Fact]
+        public void Indexer_DerivedOnlyAttribute_ComputesWithoutStoredModifierList()
+        {
+            // MaxHealth carries only static derived modifiers from a fresh collection; reading it
+            // exercises value computation over an attribute whose contributions come purely through
+            // the derived path, with the read-side null-list handling in play.
+            var collection = new AttributeCollection([]);
+
+            Assert.Equal(50, collection[EAttribute.MaxHealth]);
+        }
+
+        [Fact]
+        public void AddModifier_AfterReadThenRemove_RoundTripsCorrectly()
+        {
+            // Read an empty slot (node created, no list), add (list allocated), remove (back to the
+            // no-list-equivalent empty state), then add again — every transition must stay correct.
+            var collection = new AttributeCollection([]);
+            Assert.Equal(0, collection[EAttribute.Strength]);
+
+            var first = Additive(EAttribute.Strength, 4);
+            collection.AddModifier(first);
+            Assert.Equal(4, collection[EAttribute.Strength]);
+
+            Assert.True(collection.RemoveModifier(first));
+            Assert.Equal(0, collection[EAttribute.Strength]);
+
+            collection.AddModifier(Additive(EAttribute.Strength, 9));
+            Assert.Equal(9, collection[EAttribute.Strength]);
+        }
+
+        [Fact]
         public void AllModifiers_ReturnsAllAddedModifiers()
         {
             var modifiers = new List<AttributeModifier>

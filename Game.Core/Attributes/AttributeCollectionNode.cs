@@ -11,9 +11,20 @@ namespace Game.Core.Attributes
         private static readonly IComparer<AttributeModifier> TypeComparer =
             Comparer<AttributeModifier>.Create(static (x, y) => x.Type - y.Type);
 
-        public SortedLinkedList<AttributeModifier> Modifiers { get; } = new(TypeComparer);
+        // Allocated lazily on the first stored modifier (see GetOrCreateModifiers). A node that only
+        // ever holds a derived/cached value — an untouched derived-source attribute, or an empty slot
+        // read through the indexer — never allocates the list, so on this hot path a null Modifiers
+        // means "no stored modifiers". The read and remove paths treat null as the empty set.
+        public SortedLinkedList<AttributeModifier>? Modifiers { get; private set; }
         public double? CachedValue { get; private set; }
         public HashSet<AttributeCollectionNode> DerivedNodes { get; } = [];
+
+        // Returns the modifier list, allocating it on first use. Only the add path calls this; the
+        // read and remove paths leave the list null when no modifier was ever stored.
+        public SortedLinkedList<AttributeModifier> GetOrCreateModifiers()
+        {
+            return Modifiers ??= new(TypeComparer);
+        }
 
         public void SetCachedValue(double? value)
         {

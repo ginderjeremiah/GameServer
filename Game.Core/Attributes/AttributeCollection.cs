@@ -48,7 +48,8 @@ namespace Game.Core.Attributes
         /// <param name="modifier"></param>
         public bool RemoveModifier(AttributeModifier modifier)
         {
-            // A null slot (never created) holds no modifiers, so there is nothing to remove.
+            // A null slot (never created) or a node whose modifier list was never allocated (it only
+            // ever cached a derived value) holds no modifiers, so there is nothing to remove.
             var node = _attributeNodes[(int)modifier.Attribute];
 
             // Identity removal: a node can hold several modifiers with the same Type (the
@@ -110,7 +111,9 @@ namespace Game.Core.Attributes
         {
             var node = GetOrCreateNode((int)modifier.Attribute);
 
-            node.Modifiers.Add(modifier);
+            // Allocates the modifier list on the first stored modifier; nodes that only ever cache a
+            // derived value keep a null list and pay no SortedLinkedList allocation.
+            node.GetOrCreateModifiers().Add(modifier);
 
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
@@ -131,11 +134,18 @@ namespace Game.Core.Attributes
         /// </summary>
         private void UnhookDerivedLink(AttributeCollectionNode node, EAttribute derivedSource)
         {
-            foreach (var modifier in node.Modifiers)
+            // Reached only after a Derived modifier was removed from this node. If any remaining
+            // modifier still derives from the source, keep the link; otherwise (including the empty or
+            // never-allocated list) unhook it below.
+            var modifiers = node.Modifiers;
+            if (modifiers is not null)
             {
-                if (modifier.Source is EAttributeModifierSource.Derived && modifier.DerivedSource == derivedSource)
+                foreach (var modifier in modifiers)
                 {
-                    return;
+                    if (modifier.Source is EAttributeModifierSource.Derived && modifier.DerivedSource == derivedSource)
+                    {
+                        return;
+                    }
                 }
             }
 
