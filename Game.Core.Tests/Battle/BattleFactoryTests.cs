@@ -53,7 +53,7 @@ namespace Game.Core.Tests.Battle
             var enemy = _factory.CreateBattleEnemy(
                 MakeZone(levelMin: 1, levelMax: 1), resolveEnemy: level => MakeEnemyAtLevel(level, skillCount: 6));
 
-            // The random idle encounter caps the loadout at the MaxBattleSkills limit (4).
+            // The random idle encounter caps the loadout at the MaxSelectedSkills limit (4).
             Assert.Equal(4, enemy.BattleSkills.Count);
         }
 
