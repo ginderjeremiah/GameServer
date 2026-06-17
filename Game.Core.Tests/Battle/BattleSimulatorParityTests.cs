@@ -413,14 +413,15 @@ namespace Game.Core.Tests.Battle
                 // taken in lockstep on both sides, so these pin the player-only crit/dodge/block math and draw
                 // order while staying hand-computable.
 
-                // A forced crit (CriticalChance 1) multiplies the raw damage by CriticalDamage BEFORE Defense:
-                // 20 raw × 2 = 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs
-                // hit 6 / 2400ms at the un-critted 18/hit).
+                // A forced crit (CriticalChance 1) multiplies the raw damage by CriticalDamage BEFORE Defense.
+                // CriticalDamage is the base 1.5 (sourced by #799) plus a 0.5 allocation = 2.0 total: 20 raw × 2
+                // = 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit 6 /
+                // 2400ms at the un-critted 18/hit).
                 ["forcedCrit"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
                         skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
-                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0)]),
+                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
@@ -441,15 +442,16 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
 
-                // A forced block (BlockChance 1) flatly reduces each incoming hit by Defense + BlockReduction:
-                // 25 − 2 − 20 = 3/hit instead of 23/hit. At 23/hit the enemy (firing every 5 ticks) kills the
-                // 100-HP player on its 5th hit at tick 25; at 3/hit the player survives to kill the 200-HP enemy
-                // (48/hit every 10 ticks) on hit 5 at tick 50 → 2000ms. Block flips the loss into a win.
+                // A forced block (BlockChance 1) flatly reduces each incoming hit by Defense + BlockReduction.
+                // BlockReduction is the base 2 (sourced by #799) plus an 18 allocation = 20 total: 25 − 2 − 20
+                // = 3/hit instead of 23/hit. At 23/hit the enemy (firing every 5 ticks) kills the 100-HP player
+                // on its 5th hit at tick 25; at 3/hit the player survives to kill the 200-HP enemy (48/hit every
+                // 10 ticks) on hit 5 at tick 50 → 2000ms. Block flips the loss into a win.
                 ["forcedBlock"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
                         skills: [MakeSkill(1, baseDamage: 50, cooldownMs: 400)],
-                        extra: [(EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 20.0)]),
+                        extra: [(EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 18.0)]),
                     Enemy: () => MakeEnemy(
                         strength: 30, endurance: 0,
                         skills: [MakeSkill(2, baseDamage: 25, cooldownMs: 200)]),
@@ -459,9 +461,11 @@ namespace Game.Core.Tests.Battle
 
                 // Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two
                 // enemy skills (two dodge+block draw pairs) fire on the same ticks, so a mis-ordered or
-                // mis-counted draw stream would diverge between the two simulators. The player crits both hits
-                // (10×2−2=18, 15×2−2=28 → 46/tick) and blocks both enemy hits (12−2−10=0, 14−2−10=2 → 2/tick).
-                // The 100-HP enemy dies on the player's tick-30 volley → 1200ms; the player ends at 96 HP.
+                // mis-counted draw stream would diverge between the two simulators. CriticalDamage and
+                // BlockReduction each fold in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction).
+                // The player crits both hits (10×2−2=18, 15×2−2=28 → 46/tick) and blocks both enemy hits
+                // (12−2−10=0, 14−2−10=2 → 2/tick). The 100-HP enemy dies on the player's tick-30 volley →
+                // 1200ms; the player ends at 96 HP.
                 ["drawOrderMultiSkill"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
@@ -472,8 +476,8 @@ namespace Game.Core.Tests.Battle
                         ],
                         extra:
                         [
-                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0),
-                            (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 10.0),
+                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5),
+                            (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 8.0),
                         ]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 0,
@@ -646,8 +650,9 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
 
-            // Extra non-core attributes (e.g. forced crit/dodge/block chances) ride in as additive allocations,
-            // since the static derivations that will eventually feed them are a later sourcing concern (#799).
+            // Extra non-core attributes (e.g. forced crit/dodge/block chances) ride in as additive allocations
+            // layered on top of the static derivations that now source them (#799) — so injected CriticalDamage
+            // and BlockReduction amounts here are deltas over their derived bases (1.5 and 2).
             if (extra is not null)
             {
                 foreach (var (attribute, amount) in extra)

@@ -83,8 +83,8 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerCrit_MultipliesRawBeforeDefense()
         {
-            // CriticalChance 1 always succeeds; CriticalDamage 2 reads directly as the multiplier.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 2));
+            // CriticalChance 1 always succeeds; CriticalDamage is the base 1.5 + 0.5 = 2, read directly as the multiplier.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Defense 2
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
@@ -126,7 +126,8 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerBlocksEnemyHit_SubtractsDefenseAndBlockReduction()
         {
-            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 10)); // Defense 2
+            // BlockReduction is the base 2 + 8 = 10; Defense 2.
+            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();

@@ -197,11 +197,17 @@ describe('AttributeBreakdownView', () => {
 		const secondary = view.groups.find((g) => g.type === EAttributeType.Secondary);
 		// Only the allocated core attributes self-select into Primary.
 		expect(primary?.attrs.map((a) => a.meta.id)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
-		// The engine base/derived aggregates always contribute, so they stay in Secondary.
+		// The engine base/derived aggregates always contribute, so they stay in Secondary — including the
+		// crit/dodge/block set, which now derives from the core attributes (#799).
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Defense,
-			EAttribute.CooldownRecovery
+			EAttribute.CooldownRecovery,
+			EAttribute.CriticalChance,
+			EAttribute.CriticalDamage,
+			EAttribute.DodgeChance,
+			EAttribute.BlockChance,
+			EAttribute.BlockReduction
 		]);
 		// CooldownRecovery carries its reference-data precision (0 decimals) and percentage flag.
 		const cdrMeta = secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta;
@@ -210,15 +216,24 @@ describe('AttributeBreakdownView', () => {
 	});
 
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
-		// No allocations or gear: only the engine base/derived formulas contribute, so just the
-		// Secondary aggregates surface — the obsolete/unimplemented attributes and the combat-only
-		// Status channels have no contributors and drop out, and no Primary group is shown.
+		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
+		// surface — MaxHealth/Defense/CooldownRecovery plus the crit/dodge/block set, which now derives from
+		// the core attributes (#799). The obsolete attribute and the combat-only Status channels have no
+		// contributors and drop out, and no Primary group is shown.
 		const view = new AttributeBreakdownView();
 		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
-		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(ids).toEqual([
+			EAttribute.MaxHealth,
+			EAttribute.Defense,
+			EAttribute.CooldownRecovery,
+			EAttribute.CriticalChance,
+			EAttribute.CriticalDamage,
+			EAttribute.DodgeChance,
+			EAttribute.BlockChance,
+			EAttribute.BlockReduction
+		]);
 		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
 		expect(ids).not.toContain(EAttribute.DropBonus);
-		expect(ids).not.toContain(EAttribute.CriticalChance);
 		expect(ids).not.toContain(EAttribute.DamageTakenPerSecond);
 	});
 

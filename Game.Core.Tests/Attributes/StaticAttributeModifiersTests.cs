@@ -29,6 +29,19 @@ namespace Game.Core.Tests.Attributes
                 (EAttribute.MaxHealth, 50.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.MaxHealth, 20.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 (EAttribute.MaxHealth, 5.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Strength),
+                // CriticalChance = 0.002·Dexterity + 0.001·Luck
+                (EAttribute.CriticalChance, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
+                (EAttribute.CriticalChance, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
+                // CriticalDamage = 1.5 (base) + 0.0025·Luck
+                (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
+                // DodgeChance = 0.001·Agility
+                (EAttribute.DodgeChance, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
+                // BlockChance = 0.002·Endurance
+                (EAttribute.BlockChance, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
+                // BlockReduction = 2 (base) + 0.5·Endurance
+                (EAttribute.BlockReduction, 2.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.BlockReduction, 0.5, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
             };
 
             Assert.Equal(expected.Length, StaticAttributeModifiers.All.Count);

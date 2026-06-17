@@ -48,6 +48,52 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
+        public void CriticalChance_IsTwoThousandthsDexterityPlusOneThousandthLuck()
+        {
+            var collection = MakeCollection(
+                (EAttribute.Dexterity, 20),
+                (EAttribute.Luck, 10));
+
+            Assert.Equal(0.002 * 20 + 0.001 * 10, collection[EAttribute.CriticalChance], 10);
+        }
+
+        [Fact]
+        public void CriticalDamage_IsBaseOneAndHalfPlusQuarterPercentLuck()
+        {
+            var collection = MakeCollection(
+                (EAttribute.Luck, 20));
+
+            Assert.Equal(1.5 + 0.0025 * 20, collection[EAttribute.CriticalDamage], 10);
+        }
+
+        [Fact]
+        public void DodgeChance_IsOneThousandthAgility()
+        {
+            var collection = MakeCollection(
+                (EAttribute.Agility, 20));
+
+            Assert.Equal(0.001 * 20, collection[EAttribute.DodgeChance], 10);
+        }
+
+        [Fact]
+        public void BlockChance_IsTwoThousandthsEndurance()
+        {
+            var collection = MakeCollection(
+                (EAttribute.Endurance, 20));
+
+            Assert.Equal(0.002 * 20, collection[EAttribute.BlockChance], 10);
+        }
+
+        [Fact]
+        public void BlockReduction_IsTwoPlusHalfEndurance()
+        {
+            var collection = MakeCollection(
+                (EAttribute.Endurance, 20));
+
+            Assert.Equal(2 + 0.5 * 20, collection[EAttribute.BlockReduction]);
+        }
+
+        [Fact]
         public void ZeroBaseStats_StillHaveDerivedBaseValues()
         {
             var collection = MakeCollection();
@@ -55,6 +101,12 @@ namespace Game.Core.Tests.Attributes
             Assert.Equal(50, collection[EAttribute.MaxHealth]);
             Assert.Equal(2, collection[EAttribute.Defense]);
             Assert.Equal(1, collection[EAttribute.CooldownRecovery]);
+            // CriticalDamage and BlockReduction carry a base; the three chances have none, so they are 0.
+            Assert.Equal(1.5, collection[EAttribute.CriticalDamage]);
+            Assert.Equal(2, collection[EAttribute.BlockReduction]);
+            Assert.Equal(0, collection[EAttribute.CriticalChance]);
+            Assert.Equal(0, collection[EAttribute.DodgeChance]);
+            Assert.Equal(0, collection[EAttribute.BlockChance]);
         }
 
         private static AttributeCollection MakeCollection(params (EAttribute Attribute, double Amount)[] allocations)

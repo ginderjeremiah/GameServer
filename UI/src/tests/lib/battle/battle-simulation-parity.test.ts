@@ -627,7 +627,8 @@ const scenarios: ParityScenario[] = [
 	// on both sides. Mirrors the backend `forcedCrit` / `forcedDodge` / `forcedBlock` / `drawOrderMultiSkill`
 	// / `enemyForcedChanceIgnored` scenarios.
 
-	// Forced crit: 20 raw × 2 CriticalDamage = 40, −2 def = 38/hit, so the 100-HP enemy dies on hit 3 at 1200ms.
+	// Forced crit: CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, so 20 raw × 2 = 40, −2 def =
+	// 38/hit, and the 100-HP enemy dies on hit 3 at 1200ms.
 	{
 		name: 'forcedCrit',
 		player: () =>
@@ -635,7 +636,7 @@ const scenarios: ParityScenario[] = [
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 2 }
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
 				[makeSkill(20, 400)]
 			),
@@ -659,9 +660,9 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
 	},
 
-	// Forced block: 25 − 2 def − 20 block = 3/hit instead of 23/hit, so the player survives the enemy's
-	// every-5-tick assault long enough to kill the 200-HP enemy (48/hit) on hit 5 at 2000ms. Block flips
-	// the loss (player would die at tick 25) into a win.
+	// Forced block: BlockReduction is the base 2 (sourced by #799) + 18 = 20, so 25 − 2 def − 20 block =
+	// 3/hit instead of 23/hit, and the player survives the enemy's every-5-tick assault long enough to kill
+	// the 200-HP enemy (48/hit) on hit 5 at 2000ms. Block flips the loss (player would die at tick 25) into a win.
 	{
 		name: 'forcedBlock',
 		player: () =>
@@ -669,7 +670,7 @@ const scenarios: ParityScenario[] = [
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 20 }
+					{ id: EAttribute.BlockReduction, amount: 18 }
 				],
 				[makeSkill(50, 400)]
 			),
@@ -678,8 +679,9 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy
-	// skills (two dodge+block draw pairs) fire on the same ticks. Player crits both hits (18 + 28 = 46/tick)
-	// and blocks both enemy hits (0 + 2 = 2/tick); the 100-HP enemy dies on the player's tick-30 volley → 1200ms.
+	// skills (two dodge+block draw pairs) fire on the same ticks. CriticalDamage and BlockReduction each fold
+	// in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction). Player crits both hits (18 + 28 =
+	// 46/tick) and blocks both enemy hits (0 + 2 = 2/tick); the 100-HP enemy dies on the player's tick-30 volley → 1200ms.
 	{
 		name: 'drawOrderMultiSkill',
 		player: () =>
@@ -687,9 +689,9 @@ const scenarios: ParityScenario[] = [
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 2 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 },
 					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 10 }
+					{ id: EAttribute.BlockReduction, amount: 8 }
 				],
 				[makeSkill(10, 400), makeSkill(15, 400)]
 			),

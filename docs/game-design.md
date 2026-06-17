@@ -35,7 +35,7 @@ Players can land **critical hits** (deal increased damage), **dodge** (fully avo
 - **Dodge** zeroes the incoming hit entirely.
 - **Block** subtracts a flat `BlockReduction` alongside Defense (`max(raw − Defense − BlockReduction, 0)`).
 
-`CriticalChance`/`DodgeChance`/`BlockChance` are decimal probabilities (`0.05` = 5%) compared directly against the RNG draw. The values currently come from **no source** — the core-attribute derivations and gear authoring that feed them, and the combat-log/display surfacing, are follow-up work, so the feature is inert until then.
+`CriticalChance`/`DodgeChance`/`BlockChance` are decimal probabilities (`0.05` = 5%) compared directly against the RNG draw. They are **sourced from the core attributes** so the mechanic is live from raw allocations — `Dexterity`/`Luck` feed crit, `Agility` feeds dodge, `Endurance` feeds block — and `CriticalDamage` (base `1.5`) and `BlockReduction` (base `2`) carry a base so a crit/block matters before any gear. Items, item-mods, and skill-effects can also grant any of them through the normal modifier path. The derivation coefficients are a conservative strawman expected to be tuned during balancing (the exact formulas live in `StaticAttributeModifiers`). Only the combat-log/display surfacing of crit/dodge/block remains follow-up work.
 
 ## Experience Rewards
 

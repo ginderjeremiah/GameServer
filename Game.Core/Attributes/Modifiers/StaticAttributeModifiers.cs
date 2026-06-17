@@ -39,6 +39,30 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = MaxHealth, Amount = 50.0, Source = BaseValue, Type = Additive },
             new() { Attribute = MaxHealth, Amount = 20.0, Source = Derived, DerivedSource = Endurance, Type = Additive },
             new() { Attribute = MaxHealth, Amount = 5.0, Source = Derived, DerivedSource = Strength, Type = Additive },
+
+            // The crit/dodge/block derivations make the mechanic live from raw allocations (the values are
+            // also grantable by gear/item-mods/skill-effects through the normal modifier path). All use the
+            // decimal convention — a chance is compared directly against the [0,1) battle RNG draw — and the
+            // coefficients are a conservative strawman expected to be tuned during balancing.
+
+            // CriticalChance = 0.002·Dexterity + 0.001·Luck (no base, so 0 until something feeds it).
+            new() { Attribute = CriticalChance, Amount = 0.002, Source = Derived, DerivedSource = Dexterity, Type = Additive },
+            new() { Attribute = CriticalChance, Amount = 0.001, Source = Derived, DerivedSource = Luck, Type = Additive },
+
+            // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
+            // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.
+            new() { Attribute = CriticalDamage, Amount = 1.5, Source = BaseValue, Type = Additive },
+            new() { Attribute = CriticalDamage, Amount = 0.0025, Source = Derived, DerivedSource = Luck, Type = Additive },
+
+            // DodgeChance = 0.001·Agility (no base).
+            new() { Attribute = DodgeChance, Amount = 0.001, Source = Derived, DerivedSource = Agility, Type = Additive },
+
+            // BlockChance = 0.002·Endurance (no base).
+            new() { Attribute = BlockChance, Amount = 0.002, Source = Derived, DerivedSource = Endurance, Type = Additive },
+
+            // BlockReduction = 2 (base) + 0.5·Endurance. A flat reduction (like Defense), subtracted in the same clamp on a block.
+            new() { Attribute = BlockReduction, Amount = 2.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = BlockReduction, Amount = 0.5, Source = Derived, DerivedSource = Endurance, Type = Additive },
         ];
     }
 }
