@@ -113,7 +113,7 @@ namespace Game.Api.Tests.Unit
             var context = CreateContext(socket);
 
             // A payload larger than one frame, so it is sent as multiple chunks under the send lock.
-            var payload = new string('x', SocketContextTests.MaxFrameSize + 1000);
+            var payload = new string('x', SocketContext.MAX_MESSAGE_SIZE + 1000);
             using var cts = new CancellationTokenSource();
             // Cancel the moment the first (non-final) chunk has gone out — mid-frame.
             socket.AfterSendChunk = isFinal =>
@@ -205,9 +205,6 @@ namespace Game.Api.Tests.Unit
             var session = new SessionService(new NoOpSessionStore());
             return new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
         }
-
-        /// <summary>The frame chunk size <see cref="SocketContext"/> splits outbound sends at (4 KB).</summary>
-        private const int MaxFrameSize = 1024 * 4;
 
         /// <summary>
         /// A <see cref="WebSocket"/> stand-in that scripts receives (data / close / a zero-length flood) and
