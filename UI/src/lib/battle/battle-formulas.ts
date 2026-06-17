@@ -20,13 +20,16 @@ const contributionValue = (mult: IAttributeMultiplier, attributes: BattleAttribu
 	attributes.getValue(mult.attributeId) * mult.multiplier;
 
 /** Raw damage of a skill at the given attributes: base plus each multiplier applied to the
- *  attribute it scales. */
+ *  attribute it scales. Accumulate the multiplier bonus from zero and add baseDamage last, exactly
+ *  mirroring the backend grouping (`BattleSkill.CalculateDamage`): floating-point addition is not
+ *  associative, so this `base + (m1 + m2 + …)` order keeps the result bit-for-bit identical and the
+ *  anti-cheat replay in parity for skills with two or more damage multipliers. */
 export function calculateSkillDamage(skill: ISkill, attributes: BattleAttributes): number {
-	let damage = skill.baseDamage;
+	let multiplierBonus = 0;
 	for (const mult of skill.damageMultipliers) {
-		damage += contributionValue(mult, attributes);
+		multiplierBonus += contributionValue(mult, attributes);
 	}
-	return damage;
+	return skill.baseDamage + multiplierBonus;
 }
 
 /** Per-attribute breakdown of a skill's scaling at the given attributes — the decomposition of

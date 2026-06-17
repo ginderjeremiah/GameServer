@@ -68,6 +68,38 @@ describe('battle-formulas', () => {
 
 			expect(calculateSkillDamage(skill, makeAttributes())).toBe(10);
 		});
+
+		// Per-hit-damage parity guard (mirrors BattleSkillTests.CalculateDamage_FloatGrouping_MatchesBackend).
+		// Floating-point addition is not associative, so the backend's `base + (m1 + m2)` and a naive
+		// `(base + m1) + m2` can differ by a ULP at a kill boundary — a live-vs-replay desync (#802). Two
+		// contributions each below baseDamage's ULP vanish if added one at a time but survive when summed
+		// first, so the correct grouping lifts the result above baseDamage and the wrong one returns it
+		// unchanged — pinning the exact ordering, not just a coarse outcome.
+		it('groups the multiplier sum like the backend (base added last) for ≥2 multipliers', () => {
+			const tiny = 1e-16; // below the ULP of 1.0, so a single contribution is lost when added to base
+			const skill = makeSkillData({
+				baseDamage: 1,
+				damageMultipliers: [
+					{ attributeId: EAttribute.Strength, multiplier: tiny },
+					{ attributeId: EAttribute.Agility, multiplier: tiny }
+				]
+			});
+			const attributes = makeAttributes([
+				[EAttribute.Strength, 1],
+				[EAttribute.Agility, 1]
+			]);
+
+			const c1 = 1 * tiny;
+			const c2 = 1 * tiny;
+			const correct = skill.baseDamage + (c1 + c2); // base + (m1 + m2)
+			const naive = skill.baseDamage + c1 + c2; // ((base + m1) + m2)
+			// Sanity: the inputs are ULP-sensitive — the two groupings genuinely differ.
+			expect(correct).not.toBe(naive);
+			expect(naive).toBe(skill.baseDamage);
+
+			expect(calculateSkillDamage(skill, attributes)).toBe(correct);
+			expect(calculateSkillDamage(skill, attributes)).toBeGreaterThan(skill.baseDamage);
+		});
 	});
 
 	describe('skillContributions', () => {
