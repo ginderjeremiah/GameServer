@@ -9,7 +9,7 @@ import { ApiSocketRequest } from './api-socket-request';
 import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
 import { getAccessToken, getRefreshToken } from './token-store';
-import { handleAuthFailure, refreshTokens } from './auth';
+import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
 const NORMAL_CLOSURE = 1000;
@@ -84,22 +84,56 @@ export class ApiSocket {
 	// Pending "the connection has proven stable" timer that refills the auth-retry budget; cleared if the
 	// socket closes before it fires (so a brief open doesn't reset the count mid-loop).
 	private connectionStableTimer: ReturnType<typeof setTimeout> | null = null;
+	// Single-flight guard for the async open path: the in-flight open promise (null when not connecting),
+	// shared by concurrent ensureSocket callers so the pre-emptive-refresh await can't race two opens.
+	private connecting: Promise<void> | null = null;
 
-	private ensureSocket() {
-		if (!socket || socket.readyState === socket.CLOSED) {
-			this.socketOpened = false;
-			// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
-			// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
-			const accessToken = getAccessToken();
-			const url = accessToken ? `/socket?access_token=${encodeURIComponent(accessToken)}` : '/socket';
-			socket = new WebSocket(url);
-			socket.onopen = this.onStart.bind(this);
-			socket.onmessage = this.receiveResponse.bind(this);
-			socket.onerror = this.handleError.bind(this);
-			socket.onclose = this.handleClose.bind(this);
-			if (this.pingIntervalId === null) {
-				this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
-			}
+	/**
+	 * Ensures a live (or still-connecting) socket exists, opening one if needed. The open path is async
+	 * because it pre-emptively refreshes the access token first (see openSocket), so concurrent callers
+	 * are collapsed onto a single in-flight open via the `connecting` guard — otherwise a keepalive ping
+	 * and a queued command could each pass the "is there a socket?" check during the refresh await and
+	 * race to create (and leak) two sockets.
+	 */
+	private ensureSocket(): Promise<void> {
+		if (socket && socket.readyState !== socket.CLOSED) {
+			return Promise.resolve();
+		}
+		if (this.connecting) {
+			return this.connecting;
+		}
+		this.connecting = this.openSocket().finally(() => {
+			this.connecting = null;
+		});
+		return this.connecting;
+	}
+
+	private async openSocket(): Promise<void> {
+		this.socketOpened = false;
+		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
+		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
+		// single-use refresh token recovering in handleClose.
+		const hadRefreshToken = getRefreshToken() !== null;
+		const accessToken = await ensureValidAccessToken();
+		// A logged-in session whose pre-emptive refresh failed (refresh token spent/revoked) is
+		// unrecoverable: route to the auth-failure handler rather than opening a doomed handshake the close
+		// handler can no longer recover from (its refresh token is now gone). A never-logged-in caller
+		// (no prior refresh token) still opens an unauthenticated socket below.
+		if (!accessToken && hadRefreshToken) {
+			this.stopPingInterval();
+			handleAuthFailure();
+			return;
+		}
+		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
+		// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
+		const url = accessToken ? `/socket?access_token=${encodeURIComponent(accessToken)}` : '/socket';
+		socket = new WebSocket(url);
+		socket.onopen = this.onStart.bind(this);
+		socket.onmessage = this.receiveResponse.bind(this);
+		socket.onerror = this.handleError.bind(this);
+		socket.onclose = this.handleClose.bind(this);
+		if (this.pingIntervalId === null) {
+			this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
 		}
 	}
 
@@ -113,7 +147,9 @@ export class ApiSocket {
 		const id = (this.commandCounter++).toString();
 		const request = new ApiSocketRequest(id, commandName, params);
 		this.socketCommandQueue.push(request);
-		this.processCommandQueue();
+		// Fire-and-forget: the socket-open path is async (pre-emptive refresh), so the command is sent once
+		// the socket is ready; the caller awaits the response below, not the connection.
+		void this.processCommandQueue();
 		return await request.getResponse();
 	}
 
@@ -134,7 +170,7 @@ export class ApiSocket {
 			this.stopPingInterval();
 			return;
 		}
-		this.ensureSocket();
+		void this.ensureSocket();
 		if (socket && socket.readyState === socket.OPEN) {
 			this.lastPing = performance.now();
 			socket.send('ping');
@@ -180,8 +216,8 @@ export class ApiSocket {
 		return hook;
 	}
 
-	private processCommandQueue() {
-		this.ensureSocket();
+	private async processCommandQueue() {
+		await this.ensureSocket();
 		if (socket && socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
@@ -303,8 +339,9 @@ export class ApiSocket {
 		this.socketAuthRetries++;
 		refreshTokens().then((tokens) => {
 			if (tokens) {
-				this.ensureSocket();
-				this.processCommandQueue();
+				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
+				// any queued-but-unsent commands.
+				void this.processCommandQueue();
 			} else {
 				// Refresh is spent/revoked — the session is unrecoverable. Stop the keepalive before routing
 				// to login so it can't fire a reconnect on the now-cleared token during the teardown.
@@ -325,7 +362,7 @@ export class ApiSocket {
 			this.connectionStableTimer = null;
 		}, STABLE_CONNECTION_MS);
 		this.attemptPing();
-		this.processCommandQueue();
+		void this.processCommandQueue();
 	}
 }
 
