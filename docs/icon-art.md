@@ -23,7 +23,7 @@ Chosen by exploring four directions on a single sword (bold "sticker", soft cel,
 pastel, minimal) and picking **soft cel + cool UI-matched palette**:
 
 - **Soft, clean cartoon cel-shading.** Gentle shading, softly rounded forms.
-- **Thin, subtle dark outline** — *not* a thick "sticker" outline.
+- **Thin, subtle dark outline** — _not_ a thick "sticker" outline.
 - **Cool, interface-matched palette:** cool blue-grey for steel/iron; muted soft
   gold-bronze for brass/bronze; muted, desaturated warm browns for leather/wood.
   Subject-defined colours still win where they're part of the identity (the
@@ -40,6 +40,7 @@ Two steps: generate on a solid chroma background, then key it out to transparenc
 Gemini cannot emit a real alpha channel (see gotchas), so we cannot skip the strip.
 
 Tooling:
+
 - `/image` skill → `.claude/skills/image/scripts/generate.py` (Gemini wrapper).
 - `strip-bg.py` — chroma background remover. Bundled with the `/image` skill at
   `.claude/skills/image/scripts/strip-bg.py` (alongside `generate.py`), so it travels
@@ -62,21 +63,21 @@ python <repo>\.claude\skills\image\scripts\generate.py `
   --name <kebab-slug> --dir <staging-dir> --model nb2 --aspect 1:1
 ```
 
-- **Model choice (workflow).** Iterate the *design* cheaply on **`--model flash`**
+- **Model choice (workflow).** Iterate the _design_ cheaply on **`--model flash`**
   (`gemini-2.5-flash-image`, fast/cheap, and the only tier that returns a lossless
   **PNG**); once the composition is locked, do the **final render on `--model nb2`**
   (`gemini-3.1-flash-image`, "Nano Banana 2") — a generation newer than 2.5 flash
   with markedly better prompt adherence (~2× the cost, still ~5–7¢/icon). For an
-  *already-locked* design (e.g. regenerating a catalog icon) skip straight to `nb2`.
+  _already-locked_ design (e.g. regenerating a catalog icon) skip straight to `nb2`.
   `--model pro` (`gemini-3-pro-image`, "Nano Banana Pro", GA) is the top-quality
   tier and supports `--size` 1K/2K/4K — reach for it only for maximum fidelity or
   large output.
-- **`nb2`/`pro` return JPEG, not PNG — and that's fine here.** The strip is a *hue*
+- **`nb2`/`pro` return JPEG, not PNG — and that's fine here.** The strip is a _hue_
   key, not an edge cleanup: because the lime backdrop's hue sits far from real
   subject colours, the JPEG's edge ringing keys out cleanly anyway. Validated on
   red, gold-adjacent steel, the bow's interior transparency, the staff's cyan
   crystal, and the periwinkle skill hands — no green fringe survived. (Only a
-  subject coloured *near* lime would suffer; those use the magenta backdrop.)
+  subject coloured _near_ lime would suffer; those use the magenta backdrop.)
 - `--aspect 1:1` (icons are square). Output lands in `<staging-dir>/<slug>-vN.<ext>`
   (`.jpg` for `nb2`/`pro`, `.png` for `flash`), auto-incrementing the version.
   Refine with `--edit` (edits the latest version).
@@ -98,7 +99,7 @@ python <repo>\.claude\skills\image\scripts\generate-agy.py --name <slug> --strip
 
 `agy`'s built-in `generate_image` tool uses the NB2-class image model (matches our
 finals) and saves a native 1024×1024 JPEG to its session folder; `--strip` keys that
-JPEG straight to a transparent PNG (no format conversion). The agy *agent* model (the LLM
+JPEG straight to a transparent PNG (no format conversion). The agy _agent_ model (the LLM
 that calls the tool) defaults to `Claude Sonnet 4.6 (Thinking)` and auto-falls back to
 `Gemini 3.5 Flash (Low)` when Sonnet usage is exhausted — override with `--model` /
 `--fallback-model`. It also **edits and combines**: `--edit` feeds the latest `<name>-v<N>`
@@ -109,7 +110,7 @@ when you need `--aspect` / non-square output (agy is square-only).
 
 **Why `--detached`.** `agy` checks for a real console (TTY) and hangs forever in a
 headless/piped shell, so it can't be driven directly from an agent's tool calls.
-`--detached` makes the script re-spawn *itself* attached to its own **hidden** console
+`--detached` makes the script re-spawn _itself_ attached to its own **hidden** console
 (`subprocess.Popen(creationflags=CREATE_NO_WINDOW)`) — that console IS a real TTY, so agy
 runs — then it polls a status file the child writes on exit and returns success or
 failure. Nothing appears on the desktop and no typing is needed. (agy's tty check is on
@@ -143,11 +144,19 @@ Composite the `-cut.png` onto `#0f1014` and check at large and ~46–96px sizes 
 green fringe and small-size legibility. When approved, copy into `UI/static/img/`
 under the exact display-name filename.
 
+**Then record the exact final prompt in the [catalog](#icon-catalog) below — this is a
+required step, not optional.** Every icon that ships MUST have the verbatim final subject
+prompt that produced it listed there (recover it from `agy`'s conversation DBs under
+`~/.gemini/antigravity-cli/conversations/*.db` if you lost it — a raw-text scan between
+`this exact Prompt:` and `After the tool reports` yields it). The catalog is only useful for
+reproducing and matching the set if it stays complete.
+
 ## Reusable prompt blocks
 
 Compose every prompt as `"<SUBJECT>. <STYLE> <BACKGROUND>"`.
 
 **STYLE** (verbatim, locked):
+
 > Art style: a soft, clean cartoon game icon. Smooth, gentle cel-shading with
 > softly rounded forms and a thin, subtle dark outline, no thick heavy outline.
 > Cool, interface-matched palette: steel in cool blue-grey, brass/bronze in muted
@@ -156,6 +165,7 @@ Compose every prompt as `"<SUBJECT>. <STYLE> <BACKGROUND>"`.
 > and NO glow or rim light. Crisp, low-detail, readable at small sizes.
 
 **BACKGROUND** (verbatim — the edge-to-edge wording matters, see gotchas):
+
 > Background: the lime-green background MUST completely fill the entire square
 > frame, bleeding off all four edges and into all four corners. Do NOT draw any
 > rounded panel, card, sticker border, frame, rounded rectangle, or vignette. The
@@ -167,14 +177,14 @@ Compose every prompt as `"<SUBJECT>. <STYLE> <BACKGROUND>"`.
 ## Gotchas (learned the hard way)
 
 1. **No real transparency from Gemini.** Asking for a "transparent background"
-   makes the model *paint a fake checkerboard* and return a **JPEG** (no alpha).
+   makes the model _paint a fake checkerboard_ and return a **JPEG** (no alpha).
    This is why we generate on a solid chroma colour and key it out.
 2. **Only 2.5 `flash` returns PNG; `nb2` and `pro` return JPEG.** That's fine — the
    strip is a hue key, so the JPEG edge ringing in the lime→subject transition keys
    out cleanly (the backdrop hue is far from any subject colour). Don't avoid
    `nb2`/`pro` over the format; do keep the lime/magenta backdrop that makes the hue
    separation work.
-3. **API key is User-scoped only.** `GEMINI_API_KEY` is set at the Windows *User*
+3. **API key is User-scoped only.** `GEMINI_API_KEY` is set at the Windows _User_
    environment scope and is **not** inherited by Bash/PowerShell tool sessions.
    Pull it per-invocation: `[System.Environment]::GetEnvironmentVariable('GEMINI_API_KEY','User')`.
 4. **Lime green and gold/yellow are adjacent hues.** The old global RGB-threshold
@@ -211,8 +221,14 @@ Compose every prompt as `"<SUBJECT>. <STYLE> <BACKGROUND>"`.
 All entries use the shared STYLE + BACKGROUND blocks above; only the subject
 differs. "Version" notes how many iterations it took / any edit step.
 
+**Every shipped icon must appear here with the exact, verbatim final subject prompt** (the
+part before the STYLE block) that generated it — recording it is a required ship step (see
+[Verify, then ship](#3-verify-then-ship)). If an icon was re-rolled, list the prompt of the
+version that actually shipped, not an earlier draft.
+
 ### Weapons
 
+<!-- prettier-ignore -->
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
 | `Beginner Sword.png` | a basic starter sword. The sword has a straight steel blade with a subtle central fuller, a simple crossguard, a short wrapped grip, and a small round pommel. Composed at a 45-degree diagonal, blade pointing toward the upper right, centered and filling most of the frame with a small margin. | Style anchor. Cool blue-grey blade, muted gold guard/pommel, brown grip. |
@@ -224,6 +240,7 @@ differs. "Version" notes how many iterations it took / any edit step.
 
 ### Armor
 
+<!-- prettier-ignore -->
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
 | `Bronze Helm.png` | a medieval barbute-style metal helmet with a tall rounded dome and a T-shaped face opening, with a subtle riveted edge. Front three-quarter view. The metal is a muted, soft, slightly-darker bronze (a warm muted bronze, NOT bright shiny gold or polished brass), kept perfectly smooth and clean: no scratches, grime, rust, distressing, patina, or texture. | NB2's default bronze ran too bright/gold, so the prompt forces a muted darker bronze. Keep it explicitly **clean** — an `--edit` asking for "weathered/aged" bronze made it add grime/blotches, which breaks the flat-fill style. Re-rolled fresh, not edited. |
@@ -241,6 +258,7 @@ ties to the UI accent) so the icons don't imply a character's race. Skills rende
 smallest, so keep them bold; they were generated with the stronger anti-panel
 BACKGROUND wording.
 
+<!-- prettier-ignore -->
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
 | `Fire Bolt.png` | a fiery projectile spell shaped like a comet: a small rounded leading flame head toward the upper right, with a long, thin, tapering trailing streak of flame and a few sparks stretching toward the lower left. Bright yellow/orange core, deeper red-orange edges. | On 2.5-flash this paneled every attempt and lost a yellow-green core pixel (needed `--trim-corners --fill-holes`); the NB2 regen filled the frame and keyed clean with a plain `--bg-hue 85`. |
@@ -262,6 +280,7 @@ sentence to force small-size legibility, in place of the gear closing sentence:
 > A single bold, iconic, centred symbol with minimal internal detail - it must stay
 > clearly readable when shown as small as 16 pixels.
 
+<!-- prettier-ignore -->
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
 | `Strength.png` | A single flexed muscular arm bent at the elbow with a clenched fist, a strong bulging bicep — the classic 'strength' flex, side view. Periwinkle blue-violet skin (≈ `#a8c0f0`). | Periwinkle skin like the skill hands. |
@@ -276,6 +295,56 @@ sentence to force small-size legibility, in place of the gear closing sentence:
 | `Damage Taken Per Second.png` | Two blood droplets — one large dominant teardrop with a small highlight, plus a second much smaller drop beside/below it. Deep red. Fills most of the frame. | Two-drop motif separates it from the single Max Health heart. |
 | `Health Regen Per Second.png` | A single heart with a small upward arrow and a tiny sparkle above it. A fresh healing **green** heart (not red). | **Magenta backdrop** (green subject), `--bg-hue 300`. |
 
+### Crit / dodge / block (issue #801)
+
+The player crit/dodge/block attributes (the #178 spike) share a small **visual
+language** so the five attributes read as three families. Each family has **one clean
+base symbol**; the _magnitude_ attribute uses the clean symbol unchanged, and the
+_chance_ attribute reuses it with a **composited `%` badge** in the lower-right corner:
+
+- **Crit** — an explosive impact burst (white-hot core, jagged shockwave rays).
+- **Dodge** — a cool blue-grey humanoid silhouette mid-sidestep with two faded **phantom
+  afterimages** trailing it.
+- **Block** — two forearms crossed in an **X**, in **brown leather vambraces with bronze
+  studs** (warm leather deliberately set apart from the cool-steel `Defense` shield and the
+  periwinkle `Punch` fist).
+
+**Base symbols.** The three exact subject prompts (the part before STYLE), generated on the
+`agy`/NB2 backend on the lime backdrop, keyed with the default `--bg-hue 85` (no green
+subjects). Like the other attributes they use the locked STYLE **minus** the metal/leather
+palette sentence **plus** the 16px legibility sentence, with the bracer/skin colours baked
+into the subject:
+
+<!-- prettier-ignore -->
+| Base | Subject prompt (the part before STYLE) |
+|---|---|
+| crit | A single bold explosive critical-hit impact burst - a sharp jagged multi-pointed starburst exploding outward with a bright white-hot center and sharp angular shockwave rays of varying length, conveying a powerful high-impact strike. Centred, filling most of the frame. Bright white-yellow core, vivid orange middle, deep red-orange pointed tips. |
+| dodge | A single sleek bold humanoid silhouette dodging to the side - leaning and stepping sideways to evade an incoming attack, the body angled and weight shifted to one side so it clearly reads as sidestepping rather than running forward, with two translucent phantom afterimage copies trailing to show the quick evasive motion. The leading silhouette is a solid cool slate blue-grey, the trailing afterimages a faded lighter blue-grey, never green. Centred, filling most of the frame. |
+| block | Two forearms crossed in a bold X shape in a defensive block-and-brace pose, each forearm wearing a sturdy brown leather vambrace arm-guard with small bronze studs and buckles. Soft periwinkle blue-violet skin on the visible hands. The crossed brown leather bracers forming a clear X are the focal point. Centred, filling most of the frame. |
+
+**Files.** Each base ships twice — the clean symbol and a `%`-badged variant:
+
+<!-- prettier-ignore -->
+| File | Base | Variant |
+|---|---|---|
+| `Critical Damage.png` | crit | clean (magnitude) |
+| `Critical Chance.png` | crit | + `%` (chance) |
+| `Dodge.png` | dodge | clean — standalone, for the combat-float popup |
+| `Dodge Chance.png` | dodge | + `%` (chance) |
+| `Block Reduction.png` | block | clean (magnitude) |
+| `Block Chance.png` | block | + `%` (chance) |
+
+The `%` badge is **not generated** — it is composited onto the stripped base PNG (a bold
+outlined off-white `%`, lower-right, ~46% of the icon width with a thick dark outline so it
+reads even over the light dodge figure), so the chance and magnitude siblings stay
+pixel-identical apart from the badge, and the badge is trivially restyled.
+
+The clean symbols double as the **combat-float popup** art: `CombatFloaters.svelte` has a
+`.floater-icon` slot (still a placeholder square) for the per-outcome CRIT/DODGE/BLOCK
+floaters — `Critical Damage.png` / `Dodge.png` / `Block Reduction.png` are the intended art
+for it. `Dodge` needs its own file because dodge has no magnitude attribute to carry the
+clean symbol.
+
 ## Status
 
 All 14 current icons (11 gear + 3 skills above) were **regenerated on `nb2`
@@ -284,6 +353,7 @@ All 14 current icons (11 gear + 3 skills above) were **regenerated on `nb2`
 paneling, the bow's arrow direction, and the Punch thumb on the first try; only
 `daggers` and `leather-pants` still needed `--trim-corners`). The **11 attribute
 icons** (the Attributes section above) were generated the same way on `nb2` on
-2026-06-14 (issue #531). **Drops** (`Rat Tail`, `Slime Ball`) are slated for removal —
-do not regenerate them. Skill slots are expected to grow to a **64×64 minimum (possibly
-96×96)**, so favour legibility at those sizes for new skill art.
+2026-06-14 (issue #531). The **crit/dodge/block set** (5 attribute icons + the standalone
+`Dodge.png`, three base symbols) was added on the `agy`/NB2 backend on **2026-06-17** (issue
+#801) — see the _Crit / dodge / block_ section above. Skill slots are expected to grow to a
+**64×64 minimum (possibly 96×96)**, so favour legibility at those sizes for new skill art.

@@ -11,7 +11,7 @@
 			style:color={floater.color}
 			style:font-size="{floater.size}px"
 		>
-			<span class="floater-icon"></span>
+			{#if floater.icon}<img class="floater-icon" src={floater.icon} alt="" />{/if}
 			{#if floater.amount}<span>{floater.amount}</span>{/if}
 			{#if floater.label}<span class="floater-label">{floater.label}</span>{/if}
 		</div>
@@ -37,9 +37,19 @@ interface Floater {
 	color: string;
 	size: number;
 	crit: boolean;
+	icon: string;
 	amount: string;
 	label: string;
 }
+
+/** Clean per-outcome icon art (in `static/img`) for the crit/dodge/block floaters; a plain hit has
+ *  none. These reuse the clean base symbols — the crit/block magnitude attribute icons plus the
+ *  standalone `Dodge` — so the popup and the attribute display share one visual language. */
+const FLOAT_ICON: Partial<Record<CombatFloatEvent['kind'], string>> = {
+	crit: '/img/Critical Damage.png',
+	dodge: '/img/Dodge.png',
+	block: '/img/Block Reduction.png'
+};
 
 /** Matches the float animation length in `common.scss` (`dmg-rise`), with a small grace margin. */
 const DURATION_MS = 1500;
@@ -79,14 +89,14 @@ const spawn = (event: CombatFloatEvent) => {
 		return;
 	}
 	const crit = event.kind === 'crit';
-	const labelOnly = event.amount === undefined;
 	const id = nextId++;
 	floaters.push({
 		id,
 		x: 24 + Math.random() * 52,
 		color: colorFor(event),
-		size: crit ? 30 : labelOnly ? 20 : 21,
+		size: crit ? 30 : 21,
 		crit,
+		icon: FLOAT_ICON[event.kind] ?? '',
 		amount: event.amount === undefined ? '' : formatNum(event.amount),
 		label: labelFor(event.kind)
 	});
@@ -120,26 +130,23 @@ onMount(() => onCombatFloat(spawn));
 	&.crit {
 		text-shadow:
 			0 1px 4px color-mix(in srgb, var(--black) 85%, transparent),
-			0 0 10px currentColor;
+			0 0 6px currentColor;
 	}
 }
 
-// Placeholder for the per-outcome combat icons that will drop in later.
+// Per-outcome combat icon (crit/dodge/block); sized in em so it tracks the floater's font-size.
 .floater-icon {
-	display: inline-block;
-	width: 0.62em;
-	height: 0.62em;
-	border: 1px solid currentColor;
-	border-radius: 2px;
-	opacity: 0.5;
-	margin-right: 0.26em;
-	vertical-align: 0.02em;
+	width: 1.15em;
+	height: 1.15em;
+	margin-right: -0.22em;
+	vertical-align: -0.22em;
+	object-fit: contain;
 }
 
 .floater-label {
-	font-size: 0.6em;
+	font-size: 0.7em;
 	letter-spacing: 0.13em;
-	margin-left: 0.32em;
+	margin-left: -0.12em;
 	font-weight: 600;
 	opacity: 0.95;
 }

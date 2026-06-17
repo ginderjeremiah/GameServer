@@ -117,10 +117,12 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.MaxHealth)).toBe('/img/Max Health.png');
 		expect(attributeIcon(EAttribute.CooldownRecovery)).toBe('/img/Cooldown Recovery.png');
 		expect(attributeIcon(EAttribute.DamageTakenPerSecond)).toBe('/img/Damage Taken Per Second.png');
+		expect(attributeIcon(EAttribute.CriticalChance)).toBe('/img/Critical Chance.png');
+		expect(attributeIcon(EAttribute.BlockReduction)).toBe('/img/Block Reduction.png');
 	});
 
-	it('maps every currently-visible attribute to a non-empty path', () => {
-		const visible = [
+	it('maps every attribute with art to a non-empty path', () => {
+		const withArt = [
 			EAttribute.Strength,
 			EAttribute.Endurance,
 			EAttribute.Intellect,
@@ -130,19 +132,23 @@ describe('attributeIcon', () => {
 			EAttribute.MaxHealth,
 			EAttribute.Defense,
 			EAttribute.CooldownRecovery,
+			EAttribute.CriticalChance,
+			EAttribute.CriticalDamage,
+			EAttribute.DodgeChance,
+			EAttribute.BlockChance,
+			EAttribute.BlockReduction,
 			EAttribute.DamageTakenPerSecond,
 			EAttribute.HealthRegenPerSecond
 		];
-		for (const id of visible) {
+		for (const id of withArt) {
 			expect(attributeIcon(id)).toMatch(/^\/img\/.+\.png$/);
 		}
 	});
 
-	it('returns "" for attributes without art yet and for unknown ids', () => {
-		// The unimplemented crit/dodge/block set and the obsolete DropBonus have no art; an
-		// out-of-range id resolves the same way so the AttributeIcon component renders nothing.
+	it('returns "" for the obsolete DropBonus and for unknown ids', () => {
+		// DropBonus is obsolete and has no art; an out-of-range id resolves the same way so the
+		// AttributeIcon component renders nothing rather than a broken image.
 		expect(attributeIcon(EAttribute.DropBonus)).toBe('');
-		expect(attributeIcon(EAttribute.CriticalChance)).toBe('');
 		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });

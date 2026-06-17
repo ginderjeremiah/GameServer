@@ -41,6 +41,8 @@ describe('CombatFloaters', () => {
 		expect(floaters[0].textContent).toContain('247');
 		// A player hit lands on the enemy in the brand accent.
 		expect((floaters[0] as HTMLElement).getAttribute('style')).toContain('var(--accent)');
+		// A plain hit carries no outcome icon.
+		expect(floaters[0].querySelector('img.floater-icon')).toBeNull();
 	});
 
 	it('ignores events targeting the other side', () => {
@@ -58,6 +60,7 @@ describe('CombatFloaters', () => {
 		expect(floater.querySelector('.floater-label')?.textContent).toBe('CRIT');
 		expect(floater.classList.contains('crit')).toBe(true);
 		expect(floater.getAttribute('style')).toContain('var(--gold)');
+		expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Critical Damage.png');
 	});
 
 	it('shows a dodge as a label with no number', () => {
@@ -66,8 +69,20 @@ describe('CombatFloaters', () => {
 
 		const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
 		expect(floater.querySelector('.floater-label')?.textContent).toBe('DODGE');
+		expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Dodge.png');
 		// No amount span beyond the icon + label.
 		expect(floater.textContent?.trim()).toBe('DODGE');
+	});
+
+	it('shows a block with its icon, number, and label', () => {
+		const { getByTestId } = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
+		emit({ target: 'player', kind: 'block', amount: 12 });
+
+		const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
+		expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Block Reduction.png');
+		expect(floater.querySelector('.floater-label')?.textContent).toBe('BLOCK');
+		expect(floater.textContent).toContain('12');
+		expect(floater.getAttribute('style')).toContain('var(--block-color)');
 	});
 
 	it('colours an incoming hit on the player with the enemy hue', () => {

@@ -30,8 +30,9 @@ export const attributeColor = (id: EAttribute): string => {
 
 /** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
  *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
- *  paths. Only the 11 currently-visible attributes have art; the unimplemented crit/dodge/block
- *  set and the obsolete `DropBonus` are intentionally absent. */
+ *  paths. Every attribute except the obsolete `DropBonus` has art. The crit/dodge/block set
+ *  follows a shared visual language: the magnitude attributes (`CriticalDamage`/`BlockReduction`)
+ *  use the clean base symbol, and the chance attributes reuse that symbol with a `%` badge. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Strength]: 'Strength',
 	[EAttribute.Endurance]: 'Endurance',
@@ -42,6 +43,11 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.MaxHealth]: 'Max Health',
 	[EAttribute.Defense]: 'Defense',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
+	[EAttribute.CriticalChance]: 'Critical Chance',
+	[EAttribute.CriticalDamage]: 'Critical Damage',
+	[EAttribute.DodgeChance]: 'Dodge Chance',
+	[EAttribute.BlockChance]: 'Block Chance',
+	[EAttribute.BlockReduction]: 'Block Reduction',
 	[EAttribute.DamageTakenPerSecond]: 'Damage Taken Per Second',
 	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second'
 };
