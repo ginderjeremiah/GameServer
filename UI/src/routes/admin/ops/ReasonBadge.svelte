@@ -39,15 +39,16 @@ const meta = $derived(reasonMeta(reason));
 		flex-shrink: 0;
 	}
 
-	// Tone keys off a semantic token so a theme restyles every badge by overriding the variable alone.
+	// Tone keys off a dedicated ops-severity token so a theme restyles every badge by overriding the
+	// variable alone — and these stay distinct from validation (--warning) / change-state (--change-*).
 	&.poison {
-		color: var(--change-removed);
+		color: var(--dead-letter-poison);
 	}
 	&.warn {
-		color: var(--warning);
+		color: var(--dead-letter-warn);
 	}
 	&.ok {
-		color: var(--accent);
+		color: var(--dead-letter-ok);
 	}
 }
 </style>

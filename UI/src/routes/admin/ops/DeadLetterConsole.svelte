@@ -59,7 +59,7 @@
 	<div class="dl-body">
 		{#if !queue.loaded && queue.loading}
 			<Loading loading={true} delay={150} />
-		{:else if queue.entries.length === 0}
+		{:else if queue.loaded && queue.entries.length === 0}
 			<div class="dl-empty" data-testid="dl-empty">
 				<div class="glyph">
 					<svg
@@ -78,7 +78,7 @@
 				<div class="et">The dead-letter queue is empty</div>
 				<div class="es">Failed player updates will appear here for inspection and replay.</div>
 			</div>
-		{:else}
+		{:else if queue.entries.length > 0}
 			<table class="dl-table" data-testid="dl-table">
 				<thead>
 					<tr>

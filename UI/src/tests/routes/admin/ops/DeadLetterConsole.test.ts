@@ -72,6 +72,8 @@ describe('DeadLetterConsole', () => {
 
 		await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('queue unreachable'));
 		expect(screen.getByTestId('dl-error').textContent).toBe('queue unreachable');
+		// The empty-state illustration must not show on a failed load — depth is unknown, not zero.
+		expect(screen.queryByTestId('dl-empty')).toBeNull();
 	});
 
 	it('disables replay-selected until entries are selected', async () => {
@@ -133,5 +135,24 @@ describe('DeadLetterConsole', () => {
 				payloads: ['p0']
 			})
 		);
+	});
+
+	it('warns in the replay-selected confirmation when the selection includes poison entries', async () => {
+		getMock.mockResolvedValue(
+			inspection([
+				entry({ index: 0, reason: EDeadLetterReason.Replayable, rawPayload: 'p0' }),
+				entry({ index: 1, reason: EDeadLetterReason.Malformed, rawPayload: 'p1' })
+			])
+		);
+		confirmModalMock.mockResolvedValue(false);
+		render(DeadLetterConsole);
+
+		await waitFor(() => expect(screen.getByTestId('dl-table')).toBeTruthy());
+		await fireEvent.click(screen.getByTestId('dl-select-all'));
+		await fireEvent.click(screen.getByTestId('dl-replay-selected'));
+
+		await waitFor(() => expect(confirmModalMock).toHaveBeenCalled());
+		const body = confirmModalMock.mock.calls[0][0].body as string;
+		expect(body).toContain('1 of them is non-replayable');
 	});
 });

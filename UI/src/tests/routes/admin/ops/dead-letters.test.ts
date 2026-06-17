@@ -200,6 +200,21 @@ describe('DeadLetterConsoleState.replay', () => {
 		});
 	});
 
+	it('returns the success result and swallows a failed post-replay refresh', async () => {
+		// The post succeeds but the subsequent refresh inspect fails. The replay genuinely happened,
+		// so the result is returned and the blocking error panel is left clear (operator can Refresh).
+		getMock.mockResolvedValueOnce(inspection([entry({ index: 0 })])).mockRejectedValueOnce(new Error('refresh down'));
+		postMock.mockResolvedValue(replayResult(2, 0));
+		const state = new DeadLetterConsoleState();
+		await state.load();
+
+		const result = await state.replay('all');
+
+		expect(result).toEqual(replayResult(2, 0));
+		expect(state.error).toBeNull();
+		expect(state.replaying).toBe(false);
+	});
+
 	it('sets an error and returns null when replay fails', async () => {
 		getMock.mockResolvedValue(inspection([entry({ index: 0 })]));
 		postMock.mockRejectedValue(new Error('replay failed'));

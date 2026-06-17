@@ -154,7 +154,12 @@ export class DeadLetterConsoleState {
 				all: scope === 'all',
 				payloads: scope === 'selected' ? this.selectedPayloads : undefined
 			});
-			await this.load();
+			// The replay itself succeeded (entries are durably re-enqueued); a failed refresh afterwards
+			// must not raise the blocking error panel and contradict the success result. Swallow it — the
+			// returned counts are accurate and the operator can Refresh to re-sync the now-stale list.
+			if (!(await this.load())) {
+				this.error = null;
+			}
 			return result;
 		} catch (ex) {
 			this.error = ex instanceof Error ? ex.message : 'Failed to replay dead-letter entries.';
