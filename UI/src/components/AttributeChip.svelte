@@ -1,14 +1,15 @@
 <!-- A monospace attribute pill (icon + code) tinted by the attribute's colour. Opens the shared
-     attribute tooltip on hover whenever a screen provides a controller via `setAttributeTooltip`;
+     attribute tooltip on hover or focus whenever a screen provides a controller via `setAttributeTooltip`;
      otherwise it is purely presentational. -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <span
 	class="achip"
 	class:wide
+	role="img"
+	tabindex="0"
+	aria-label={attributeName(attributeId, staticData.attributes)}
 	style:--ac={attributeColor(attributeId)}
-	onmouseenter={(e) => attrTip?.show(attributeId, e)}
-	onmousemove={(e) => attrTip?.move(e)}
-	onmouseleave={() => attrTip?.hide()}
+	use:attributeHover={{ controller: attrTip, id: attributeId }}
 >
 	<AttributeIcon id={attributeId} size={iconSize} />
 	{attributeCode(attributeId, staticData.attributes)}
@@ -16,10 +17,11 @@
 
 <script lang="ts">
 import type { EAttribute } from '$lib/api';
-import { attributeCode, attributeColor } from '$lib/common';
+import { attributeCode, attributeColor, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
+import { attributeHover } from '$components/tooltip/attribute-hover';
 
 interface Props {
 	attributeId: EAttribute;
@@ -52,6 +54,11 @@ const attrTip = getAttributeTooltip();
 		justify-content: center;
 		min-width: 46px;
 		text-align: center;
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--ac);
+		outline-offset: 2px;
 	}
 }
 </style>

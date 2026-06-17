@@ -6,7 +6,7 @@ import { EAttribute } from '$lib/api';
 const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
 
 // The chip resolves the screen-level controller via context; the action/controller wiring is
-// covered elsewhere, so here we stub it to assert the chip drives it on hover.
+// covered elsewhere, so here we stub it to assert the chip drives it on hover and focus.
 vi.mock('$components/tooltip/attribute-tooltip.svelte', () => ({
 	getAttributeTooltip: () => controller
 }));
@@ -39,6 +39,14 @@ describe('AttributeChip', () => {
 		expect(wide.container.querySelector('.achip')?.classList.contains('wide')).toBe(true);
 	});
 
+	it('is keyboard-reachable with tabindex, role, and an aria-label', () => {
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		const chip = container.querySelector('.achip') as HTMLElement;
+		expect(chip.getAttribute('tabindex')).toBe('0');
+		expect(chip.getAttribute('role')).toBe('img');
+		expect(chip.getAttribute('aria-label')).toBe('Strength');
+	});
+
 	it('drives the shared attribute tooltip across hover (enter/move/leave)', async () => {
 		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
 		const chip = container.querySelector('.achip') as HTMLElement;
@@ -47,6 +55,15 @@ describe('AttributeChip', () => {
 		await fireEvent.mouseMove(chip);
 		expect(controller.move).toHaveBeenCalled();
 		await fireEvent.mouseLeave(chip);
+		expect(controller.hide).toHaveBeenCalled();
+	});
+
+	it('opens the tooltip on focus and closes on blur', async () => {
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		const chip = container.querySelector('.achip') as HTMLElement;
+		await fireEvent.focus(chip);
+		expect(controller.show).toHaveBeenCalledWith(EAttribute.Strength, chip);
+		await fireEvent.blur(chip);
 		expect(controller.hide).toHaveBeenCalled();
 	});
 });
