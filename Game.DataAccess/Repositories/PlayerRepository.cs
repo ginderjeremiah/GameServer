@@ -92,18 +92,12 @@ namespace Game.DataAccess.Repositories
 
         private async Task<Player?> GetPlayerFromDb(int playerId, CancellationToken cancellationToken)
         {
-            // Only the player-specific relational data is fetched here; the reference-data portion
-            // (item/skill/mod definitions and their attributes) is resolved from the in-memory cached
-            // catalogs in PlayerMapper.ToCore, avoiding redundant deep joins on every player load.
+            // IncludePlayerGraph applies the full navigation graph PlayerMapper.ToCore reads, so the contract
+            // is enforced structurally rather than per-query. The reference-data portion (item/skill/mod
+            // definitions) is resolved from the in-memory cached catalogs in the mapper, not joined here.
             var entity = await _context.Players
                 .AsNoTracking()
-                .Include(p => p.PlayerAttributes)
-                .Include(p => p.PlayerSkills)
-                .Include(p => p.UnlockedItems)
-                .Include(p => p.UnlockedMods)
-                .Include(p => p.AppliedMods)
-                .Include(p => p.LogPreferences)
-                .AsSplitQuery()
+                .IncludePlayerGraph()
                 .FirstOrDefaultAsync(p => p.Id == playerId, cancellationToken);
 
             return entity is null ? null : PlayerMapper.ToCore(entity, _items, _itemMods, _skills);
