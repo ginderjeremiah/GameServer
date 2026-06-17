@@ -477,21 +477,6 @@
 		border-radius: 2px;
 		flex-shrink: 0;
 	}
-	.share-bar {
-		height: 4px;
-		border-radius: 2px;
-		background: color-mix(in srgb, var(--accent) 20%, transparent);
-		position: relative;
-		overflow: hidden;
-
-		> span {
-			position: absolute;
-			inset: 0;
-			background: var(--accent);
-			box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
-			border-radius: 2px;
-		}
-	}
 	.share-pct {
 		font-family: var(--mono);
 		font-size: 11px;

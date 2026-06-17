@@ -1,18 +1,26 @@
-<div class="progress-track" data-testid="progress-bar">
-	<div
-		class="progress-fill"
-		class:error-fill={view.phase === 'error'}
-		class:done-fill={view.phase === 'done'}
-		style:width="{view.progressPct}%"
-	></div>
-</div>
+<!-- Boot-sequence progress bar: the shared Bar primitive accented by load phase (accent while
+     loading, error tint when paused, accent→success gradient when done), with the companion
+     count/status labels beneath. -->
+<Bar
+	value={view.progressPct}
+	testId="progress-bar"
+	ariaLabel="Loading progress"
+	valueText="{view.completed} of {view.items.length}"
+	--bar-height="2px"
+	--bar-radius="1px"
+	--bar-track-bg="color-mix(in srgb, var(--text-primary) 14%, transparent)"
+	--bar-fill={fill}
+	--bar-fill-shadow="0 0 6px color-mix(in srgb, var(--accent) 45%, transparent)"
+	--bar-transition="width 480ms cubic-bezier(0.4, 0, 0.2, 1), background 200ms"
+/>
 <div class="progress-labels">
 	<span>{view.completed} of {view.items.length}</span>
 	<span>{statusLabel}</span>
 </div>
 
 <script lang="ts">
-import type { LoadingView } from './loading-view.svelte';
+import Bar from '$components/Bar.svelte';
+import type { LoadingView, Phase } from './loading-view.svelte';
 
 type Props = {
 	view: LoadingView;
@@ -27,36 +35,16 @@ const STATUS_LABELS = {
 	loading: 'loading'
 } as const;
 
+const PHASE_FILLS: Partial<Record<Phase, string>> = {
+	error: 'color-mix(in srgb, var(--error) 85%, transparent)',
+	done: 'linear-gradient(90deg, var(--accent) 0%, var(--success) 100%)'
+};
+
 const statusLabel = $derived(STATUS_LABELS[view.phase]);
+const fill = $derived(PHASE_FILLS[view.phase] ?? 'var(--accent)');
 </script>
 
 <style lang="scss">
-.progress-track {
-	height: 2px;
-	background: color-mix(in srgb, var(--text-primary) 14%, transparent);
-	border-radius: 1px;
-	overflow: hidden;
-	position: relative;
-}
-
-.progress-fill {
-	position: absolute;
-	inset: 0;
-	background: var(--accent);
-	box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
-	transition:
-		width 480ms cubic-bezier(0.4, 0, 0.2, 1),
-		background 200ms;
-
-	&.error-fill {
-		background: color-mix(in srgb, var(--error) 85%, transparent);
-	}
-
-	&.done-fill {
-		background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
-	}
-}
-
 .progress-labels {
 	display: flex;
 	justify-content: space-between;

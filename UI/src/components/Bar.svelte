@@ -2,17 +2,10 @@
      ARIA `progressbar` wiring. The visual treatment (height, radius, track/fill colour, glow and
      transition) is supplied by the consumer through `--bar-*` CSS custom properties so every accent
      stays a themeable token; an optional `children` snippet overlays extra marks (e.g. a position
-     cursor) inside the track. Text-bearing/multi-layer bars (`HpBar`) stay specialised. -->
-<div
-	class="bar-track"
-	role="progressbar"
-	aria-label={ariaLabel}
-	aria-valuenow={Math.round(clampedValue)}
-	aria-valuemin={min}
-	aria-valuemax={max}
-	aria-valuetext={valueText}
-	data-testid={testId}
->
+     cursor) inside the track. Set `presentational` for a decorative bar whose value is conveyed
+     elsewhere (renders `role="presentation"`, no progressbar ARIA). Text-bearing/multi-layer bars
+     (`HpBar`) stay specialised. -->
+<div class="bar-track" data-testid={testId} {...semantics}>
 	<div class="bar-fill" style:width="{fillPercent}%"></div>
 	{@render children?.()}
 </div>
@@ -31,16 +24,33 @@ interface Props {
 	ariaLabel?: string;
 	/** Human-readable value (sets `aria-valuetext`); omitted when not provided. */
 	valueText?: string;
+	/** Render decoratively (`role="presentation"`, no progressbar ARIA) when the value is shown elsewhere. */
+	presentational?: boolean;
 	testId?: string;
 	/** Optional overlay rendered inside the track, above the fill (e.g. a position cursor). */
 	children?: Snippet;
 }
 
-const { value, max = 100, min = 0, ariaLabel, valueText, testId, children }: Props = $props();
+const { value, max = 100, min = 0, ariaLabel, valueText, presentational = false, testId, children }: Props = $props();
 
 const clampedValue = $derived(Math.min(max, Math.max(min, value)));
 // Guard the degenerate zero-width range so the fill stays empty rather than NaN.
 const fillPercent = $derived(max > min ? ((clampedValue - min) / (max - min)) * 100 : 0);
+
+// Presentational bars drop the progressbar role and its ARIA so AT ignores a value shown elsewhere;
+// undefined ARIA values are omitted from the DOM by Svelte's attribute spread.
+const semantics = $derived(
+	presentational
+		? { role: 'presentation' }
+		: {
+				role: 'progressbar',
+				'aria-label': ariaLabel,
+				'aria-valuenow': Math.round(clampedValue),
+				'aria-valuemin': min,
+				'aria-valuemax': max,
+				'aria-valuetext': valueText
+			}
+);
 </script>
 
 <style lang="scss">
