@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
 import XpBar from '$components/XpBar.svelte';
 
 afterEach(cleanup);
@@ -39,5 +40,26 @@ describe('XpBar', () => {
 		});
 		const bar = getByTestId('player-xp-bar');
 		expect(bar.getAttribute('aria-label')).toBe('Aelara experience');
+	});
+
+	it('flashes the fill only when the level rises, not on first mount', async () => {
+		const { container, rerender } = render(XpBar, { props: { level: 7, exp: 50, nextLevelThreshold: 700 } });
+		const fill = container.querySelector('.xp-fill') as HTMLElement;
+		// The mount guard records the baseline level without flashing.
+		expect(fill.style.animation).not.toContain('levelup-flash');
+
+		await rerender({ level: 8, exp: 10, nextLevelThreshold: 800 });
+		flushSync();
+		expect(fill.style.animation).toContain('levelup-flash');
+	});
+
+	it('does not flash when the level is unchanged', async () => {
+		const { container, rerender } = render(XpBar, { props: { level: 7, exp: 50, nextLevelThreshold: 700 } });
+		const fill = container.querySelector('.xp-fill') as HTMLElement;
+
+		// Only exp moved within the same level — no level-up, so no flash.
+		await rerender({ level: 7, exp: 120, nextLevelThreshold: 700 });
+		flushSync();
+		expect(fill.style.animation).not.toContain('levelup-flash');
 	});
 });
