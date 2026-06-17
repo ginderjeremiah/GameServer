@@ -3,7 +3,9 @@
 		<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
 
 		<div class="admin-workspace">
-			{#if reference.loaded && activeEntity}
+			{#if active === DEAD_LETTERS_TOOL_KEY}
+				<DeadLetterConsole />
+			{:else if reference.loaded && activeEntity}
 				{#key active}
 					<Workbench entity={activeEntity} groupLabel={groupLabelFor(active)} />
 				{/key}
@@ -30,8 +32,9 @@ import { resolve } from '$app/paths';
 import { Loading } from '$components';
 import AdminSidebar from './AdminSidebar.svelte';
 import Workbench from './workbench/Workbench.svelte';
+import DeadLetterConsole from './ops/DeadLetterConsole.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
-import { adminGroups, adminTools } from './workbench/nav';
+import { adminGroups, adminTools, DEAD_LETTERS_TOOL_KEY } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
 import { toastError } from '$stores';

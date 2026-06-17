@@ -13,11 +13,15 @@ export interface AdminToolDef {
 	glyph: AdminGlyphKind;
 }
 
-/** Nav groups mirror the workbench entity groups (Combat / Items / World). */
-export const adminGroups: AdminGroupDef[] = workbenchGroups.map((group) => ({ key: group.key, label: group.label }));
+/** Nav key for the operations group and its dead-letter ops tool (not an entity Workbench surface). */
+export const OPS_GROUP_KEY = 'ops';
+export const DEAD_LETTERS_TOOL_KEY = 'dead-letters';
+
+/** Workbench nav groups mirror the entity groups (Combat / Items / World / Progression). */
+const workbenchGroupDefs: AdminGroupDef[] = workbenchGroups.map((group) => ({ key: group.key, label: group.label }));
 
 /** One sidebar item per workbench entity, placed in its group. */
-export const adminTools: AdminToolDef[] = workbenchGroups.flatMap((group) =>
+const workbenchToolDefs: AdminToolDef[] = workbenchGroups.flatMap((group) =>
 	group.entityKeys
 		.map((entityKey) => workbenchEntities.find((entity) => entity.key === entityKey))
 		.filter((entity) => !!entity)
@@ -28,3 +32,15 @@ export const adminTools: AdminToolDef[] = workbenchGroups.flatMap((group) =>
 			glyph: entity.glyph as AdminGlyphKind
 		}))
 );
+
+/**
+ * Operations/diagnostics tools — a different kind of surface from the entity-authoring Workbench, so
+ * they live in their own group and render their own views rather than an EntityConfig-driven panel.
+ */
+const opsGroupDefs: AdminGroupDef[] = [{ key: OPS_GROUP_KEY, label: 'Ops' }];
+const opsToolDefs: AdminToolDef[] = [
+	{ key: DEAD_LETTERS_TOOL_KEY, label: 'Dead Letters', group: OPS_GROUP_KEY, glyph: 'inbox' }
+];
+
+export const adminGroups: AdminGroupDef[] = [...workbenchGroupDefs, ...opsGroupDefs];
+export const adminTools: AdminToolDef[] = [...workbenchToolDefs, ...opsToolDefs];
