@@ -14,6 +14,7 @@ vi.mock('$stores', () => ({
 }));
 
 import { Battler, Skill, battleStep } from '$lib/battle';
+import { Mulberry32 } from '$lib/engine/mulberry32';
 import { battlerFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
 
 /**
@@ -299,7 +300,7 @@ describe('Battler skill-effect bookkeeping', () => {
 		);
 		const enemy = make([{ id: EAttribute.Strength, amount: 10 }], []); // Defense = 2
 
-		battleStep(player, enemy, 40); // charges 40 ≥ 40 cooldown → fires this tick
+		battleStep(player, enemy, 40, new Mulberry32(0)); // charges 40 ≥ 40 cooldown → fires this tick
 
 		// The carrying hit used pre-buff Strength (10): 10 - 2 defense = 8 dealt.
 		expect(enemy.currentHealth).toBe(92);

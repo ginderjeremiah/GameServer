@@ -4,18 +4,22 @@ namespace Game.Core.Battle
     {
         private Battler PlayerBattler { get; set; }
         private Battler EnemyBattler { get; set; }
+        private readonly uint _seed;
 
-        public BattleSimulator(Battler playerBattler, Battler enemyBattler)
+        public BattleSimulator(Battler playerBattler, Battler enemyBattler, uint seed)
         {
             PlayerBattler = playerBattler;
             EnemyBattler = enemyBattler;
+            _seed = seed;
         }
 
         public BattleResult Simulate(int? maxMs = null)
         {
             var msPerTick = GameConstants.MsPerTick;
             var limit = maxMs ?? GameConstants.DefaultMaxBattleMs;
-            var context = new BattleContext(PlayerBattler, EnemyBattler, msPerTick);
+            // One Mulberry32 seeded once from the battle seed and advanced in lockstep with the frontend, so
+            // both simulators draw the crit/dodge/block rolls from the identical stream (battle parity).
+            var context = new BattleContext(PlayerBattler, EnemyBattler, msPerTick, new Mulberry32(_seed));
 
             int totalMs;
             for (totalMs = msPerTick; totalMs <= limit; totalMs += msPerTick)

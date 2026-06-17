@@ -87,7 +87,7 @@ namespace Game.Core.Tests.Battle
 
             var attacker = MakeBattler(strength: 10);
             var defender = MakeBattler(strength: 0);
-            var context = new BattleContext(attacker, defender, timeDelta: 0);
+            var context = new BattleContext(attacker, defender, timeDelta: 0, new Mulberry32(0));
 
             var damage = battleSkill.CalculateDamage(context);
 
@@ -113,7 +113,7 @@ namespace Game.Core.Tests.Battle
 
             var attacker = MakeBattler(strength: 10);
             var defender = MakeBattler(strength: 0);
-            var context = new BattleContext(attacker, defender, timeDelta: 0);
+            var context = new BattleContext(attacker, defender, timeDelta: 0, new Mulberry32(0));
 
             // Warm up so JIT compilation and the AttributeCollection's first-access value caching
             // happen before measuring — otherwise their one-off allocations would be counted.
@@ -153,7 +153,7 @@ namespace Game.Core.Tests.Battle
         {
             var attacker = MakeBattler(strength: 0);
             var defender = MakeBattler(strength: 0);
-            return new BattleContext(attacker, defender, timeDelta);
+            return new BattleContext(attacker, defender, timeDelta, new Mulberry32(0));
         }
 
         private static Battler MakeBattler(double strength = 0)

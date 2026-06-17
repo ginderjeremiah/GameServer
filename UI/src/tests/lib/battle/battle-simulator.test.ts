@@ -30,7 +30,7 @@ describe('BattleSimulator', () => {
 		const player = makeBattler(baseStats, [makeSkill(100, 40)]); // one-shots on the first tick
 		const enemy = makeBattler(baseStats, []);
 
-		const result = new BattleSimulator(player, enemy).simulate();
+		const result = new BattleSimulator(player, enemy, 0).simulate();
 
 		expect(result).toEqual({ victory: true, playerDied: false, totalMs: 40 });
 	});
@@ -39,7 +39,7 @@ describe('BattleSimulator', () => {
 		const player = makeBattler(baseStats, []); // never damages the enemy
 		const enemy = makeBattler(baseStats, [makeSkill(100, 40)]);
 
-		const result = new BattleSimulator(player, enemy).simulate();
+		const result = new BattleSimulator(player, enemy, 0).simulate();
 
 		expect(result).toEqual({ victory: false, playerDied: true, totalMs: 40 });
 	});
@@ -48,7 +48,7 @@ describe('BattleSimulator', () => {
 		const player = makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]);
 		const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]);
 
-		const result = new BattleSimulator(player, enemy).simulate();
+		const result = new BattleSimulator(player, enemy, 0).simulate();
 
 		expect(result).toEqual({ victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS });
 	});
@@ -57,7 +57,7 @@ describe('BattleSimulator', () => {
 		const player = makeBattler(baseStats, [makeSkill(100, 1200)]); // can't fire before the cap
 		const enemy = makeBattler(baseStats, [makeSkill(100, 1200)]);
 
-		const result = new BattleSimulator(player, enemy).simulate(200);
+		const result = new BattleSimulator(player, enemy, 0).simulate(200);
 
 		expect(result).toEqual({ victory: false, playerDied: false, totalMs: 200 });
 	});

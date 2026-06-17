@@ -31,6 +31,11 @@ import { battlerFactory, equipmentFactory, makeSkill, makeEffect } from './battl
 /** A duration long enough that an effect never expires within a battle (for "permanent" buffs). */
 const PERMANENT = 1_000_000;
 
+/** The shared battle-RNG seed both simulators construct their Mulberry32 from — mirrors the backend's
+ *  ParitySeed. Immaterial to these scenarios (their crit/dodge/block chances are forced to 1/0, so the
+ *  outcome never depends on a draw) but both suites must seed identically. */
+const PARITY_SEED = 0x9e3779b9;
+
 /**
  * The parity matrix below asserts the full outcome (victory / playerDied /
  * totalMs) of the production `BattleSimulator` — the same code the live
@@ -614,6 +619,103 @@ const scenarios: ParityScenario[] = [
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
 		maxMs: 3000,
 		expected: { victory: false, playerDied: false, totalMs: 3000 }
+	},
+
+	// ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
+	// Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a chance ≥ 1
+	// always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still taken in lockstep
+	// on both sides. Mirrors the backend `forcedCrit` / `forcedDodge` / `forcedBlock` / `drawOrderMultiSkill`
+	// / `enemyForcedChanceIgnored` scenarios.
+
+	// Forced crit: 20 raw × 2 CriticalDamage = 40, −2 def = 38/hit, so the 100-HP enemy dies on hit 3 at 1200ms.
+	{
+		name: 'forcedCrit',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 2 }
+				],
+				[makeSkill(20, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// Forced dodge: the enemy's 1000-damage one-shot is negated every hit, so the player grinds it down
+	// (18/hit) for the win on hit 6 at 2400ms instead of dying at tick 10.
+	{
+		name: 'forcedDodge',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.DodgeChance, amount: 1 }
+				],
+				[makeSkill(20, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(1000, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Forced block: 25 − 2 def − 20 block = 3/hit instead of 23/hit, so the player survives the enemy's
+	// every-5-tick assault long enough to kill the 200-HP enemy (48/hit) on hit 5 at 2000ms. Block flips
+	// the loss (player would die at tick 25) into a win.
+	{
+		name: 'forcedBlock',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.BlockChance, amount: 1 },
+					{ id: EAttribute.BlockReduction, amount: 20 }
+				],
+				[makeSkill(50, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 30 }], [makeSkill(25, 200)]),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
+	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy
+	// skills (two dodge+block draw pairs) fire on the same ticks. Player crits both hits (18 + 28 = 46/tick)
+	// and blocks both enemy hits (0 + 2 = 2/tick); the 100-HP enemy dies on the player's tick-30 volley → 1200ms.
+	{
+		name: 'drawOrderMultiSkill',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 2 },
+					{ id: EAttribute.BlockChance, amount: 1 },
+					{ id: EAttribute.BlockReduction, amount: 10 }
+				],
+				[makeSkill(10, 400), makeSkill(15, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(12, 400), makeSkill(14, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// Enemies never crit/dodge/block: with every chance forced to 1 on the enemy, its hit still lands
+	// un-critted (18, not 38) and the player's hits still land in full (not zeroed by its 50 BlockReduction),
+	// so the player wins on hit 6 at 2400ms — proving the rolls are gated on the player alone.
+	{
+		name: 'enemyForcedChanceIgnored',
+		player: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400)]),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 2 },
+					{ id: EAttribute.DodgeChance, amount: 1 },
+					{ id: EAttribute.BlockChance, amount: 1 },
+					{ id: EAttribute.BlockReduction, amount: 50 }
+				],
+				[makeSkill(20, 400)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
 	}
 ];
 
@@ -626,7 +728,7 @@ describe('Battle simulation parity with backend', () => {
 
 	for (const scenario of scenarios) {
 		it(`matches the backend for the ${scenario.name} scenario`, () => {
-			const sim = new BattleSimulator(scenario.player(), scenario.enemy());
+			const sim = new BattleSimulator(scenario.player(), scenario.enemy(), PARITY_SEED);
 			const result = sim.simulate(scenario.maxMs);
 
 			expect(result).toEqual(scenario.expected);
@@ -693,7 +795,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(2.18, 10);
 		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
 
-		const result = new BattleSimulator(player, enemy).simulate();
+		const result = new BattleSimulator(player, enemy, PARITY_SEED).simulate();
 		expect(result.totalMs).toBe(3360);
 		expect(result.totalMs).toBeLessThan(6720);
 	});

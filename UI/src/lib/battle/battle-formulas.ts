@@ -39,9 +39,10 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
 	}));
 }
 
-/** Damage dealt after subtracting the defender's flat Defense, never below zero. */
-export function applyDefense(rawDamage: number, defense: number): number {
-	return Math.max(rawDamage - defense, 0);
+/** Damage dealt after subtracting the defender's flat Defense and the optional flat blockReduction (a
+ *  second reduction in the same clamp, supplied only when an incoming hit is blocked), never below zero. */
+export function applyDefense(rawDamage: number, defense: number, blockReduction = 0): number {
+	return Math.max(rawDamage - defense - blockReduction, 0);
 }
 
 /** The cooldown multiplier — the CooldownRecovery attribute read directly. It is a base-1 multiplier
