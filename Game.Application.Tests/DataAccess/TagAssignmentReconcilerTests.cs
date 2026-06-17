@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Game.DataAccess.Repositories.Admin;
 using Xunit;
 
@@ -8,22 +9,26 @@ namespace Game.Application.Tests.DataAccess
         // Stands in for the two real join rows (ItemTag / ItemModTag), which differ only in their owner FK.
         private sealed record TestJoinRow(int TagId);
 
-        private static async IAsyncEnumerable<int> AsAsync(params int[] ids)
+        // Mirrors how EF's AsAsyncEnumerable honours the token ToHashSetAsync forwards via WithCancellation:
+        // the enumerator observes the token, so cancellation surfaces on materialization.
+        private static async IAsyncEnumerable<int> AsAsync(int[] ids, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             foreach (var id in ids)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 yield return id;
             }
 
             await Task.CompletedTask;
         }
 
-        private static Task Reconcile(int[] current, int[] desired, RecordingEntityStore store) =>
+        private static Task Reconcile(int[] current, int[] desired, RecordingEntityStore store, CancellationToken cancellationToken = default) =>
             TagAssignmentReconciler.ReconcileAsync(
                 AsAsync(current),
                 AsAsync(desired),
                 store,
-                tagId => new TestJoinRow(tagId));
+                tagId => new TestJoinRow(tagId),
+                cancellationToken);
 
         private static List<int> TagIds(IEnumerable<object> rows) =>
             rows.Cast<TestJoinRow>().Select(r => r.TagId).OrderBy(id => id).ToList();
@@ -68,6 +73,22 @@ namespace Game.Application.Tests.DataAccess
             var store = new RecordingEntityStore();
 
             await Reconcile(current: [1, 2], desired: [1, 2], store);
+
+            Assert.Empty(store.Inserted);
+            Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public async Task ReconcileAsync_AlreadyCancelledToken_ThrowsAndStagesNothing()
+        {
+            var store = new RecordingEntityStore();
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // The token must reach the ToHashSetAsync materialization, so a pre-cancelled request unwinds
+            // before any join row is staged.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => Reconcile(current: [1, 2], desired: [2, 3], store, cts.Token));
 
             Assert.Empty(store.Inserted);
             Assert.Empty(store.Deleted);

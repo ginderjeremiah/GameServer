@@ -15,10 +15,11 @@ namespace Game.DataAccess.Repositories.Admin
             IAsyncEnumerable<int> currentTagIds,
             IAsyncEnumerable<int> desiredTagIds,
             IEntityStore entityStore,
-            Func<int, TJoin> toJoinRow) where TJoin : class
+            Func<int, TJoin> toJoinRow,
+            CancellationToken cancellationToken) where TJoin : class
         {
-            var current = await currentTagIds.ToHashSetAsync();
-            var desired = await desiredTagIds.ToHashSetAsync();
+            var current = await currentTagIds.ToHashSetAsync(cancellationToken: cancellationToken);
+            var desired = await desiredTagIds.ToHashSetAsync(cancellationToken: cancellationToken);
 
             ChildCollectionReconciler.Reconcile(
                 existing: current,

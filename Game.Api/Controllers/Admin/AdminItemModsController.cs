@@ -35,7 +35,7 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> SetTagsForItemMod([FromBody] SetTagsData setTagsData)
         {
-            return await _adminItemMods.SetTags(setTagsData);
+            return await _adminItemMods.SetTags(setTagsData, HttpContext.RequestAborted);
         }
     }
 }

@@ -17,6 +17,6 @@ namespace Game.Abstractions.DataAccess.Admin
         AdminSaveResult SetAttributes(AddEditAttributesData data);
 
         /// <summary>Replaces an item mod's tag associations. Fails if the item mod does not exist.</summary>
-        Task<AdminSaveResult> SetTags(SetTagsData data);
+        Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default);
     }
 }
