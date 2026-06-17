@@ -11,5 +11,8 @@ namespace Game.Abstractions.DataAccess
         // The precomputed statistic -> challenges reverse index, bundled with (and swapped atomically
         // alongside) the cached list, so per-battle challenge evaluation is scoped without re-indexing.
         public ChallengeIndex Index();
+
+        /// <inheritdoc cref="IItems.VersionKey"/>
+        public object VersionKey { get; }
     }
 }

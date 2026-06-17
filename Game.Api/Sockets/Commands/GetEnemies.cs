@@ -22,5 +22,7 @@ namespace Game.Api.Sockets.Commands
         {
             return _enemies.All();
         }
+
+        protected override object VersionKey => _enemies.VersionKey;
     }
 }

@@ -9,5 +9,8 @@ namespace Game.Abstractions.DataAccess
         // Whether an item mod with the given id exists; lets callers validate before GetItemMod without touching the entity.
         public bool ValidateItemModId(int itemModId);
         public CoreItemMod GetItemMod(int itemModId);
+
+        /// <inheritdoc cref="IItems.VersionKey"/>
+        public object VersionKey { get; }
     }
 }

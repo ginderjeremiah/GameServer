@@ -11,6 +11,9 @@ namespace Game.DataAccess.Repositories
     {
         private EnemySnapshot Snapshot => holder.Current;
 
+        // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
+        public object VersionKey => Snapshot;
+
         public List<Contracts.Enemy> All()
         {
             return [.. Snapshot.Enemies.Select(EnemyMapper.ToContract)];

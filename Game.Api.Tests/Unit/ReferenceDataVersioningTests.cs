@@ -58,5 +58,65 @@ namespace Game.Api.Tests.Unit
             // SHA-256 rendered as uppercase hex is always 64 characters.
             Assert.Equal(64, first.Length);
         }
+
+        [Fact]
+        public void GetOrComputeVersion_MatchesDirectComputeVersion()
+        {
+            var snapshot = SampleSet();
+
+            var memoized = ReferenceDataVersioning.GetOrComputeVersion<Sample>(snapshot, () => snapshot);
+
+            Assert.Equal(ReferenceDataVersioning.ComputeVersion(snapshot), memoized);
+        }
+
+        [Fact]
+        public void GetOrComputeVersion_ComputesOncePerSnapshotKey()
+        {
+            var snapshot = SampleSet();
+            var computeCount = 0;
+
+            string ComputeFor() => ReferenceDataVersioning.GetOrComputeVersion<Sample>(snapshot, () =>
+            {
+                computeCount++;
+                return snapshot;
+            });
+
+            var first = ComputeFor();
+            var second = ComputeFor();
+
+            // The hash is serialized once for the snapshot instance, then served from the memo.
+            Assert.Equal(1, computeCount);
+            Assert.Same(first, second);
+        }
+
+        [Fact]
+        public void GetOrComputeVersion_RecomputesForNewSnapshotInstance()
+        {
+            // A cache swap publishes a new snapshot instance; keying on it must recompute even when the
+            // underlying values are identical, because the memo is per-instance, not per-value.
+            var firstSnapshot = SampleSet();
+            var secondSnapshot = SampleSet();
+            var computeCount = 0;
+
+            ReferenceDataVersioning.GetOrComputeVersion<Sample>(firstSnapshot, () => { computeCount++; return firstSnapshot; });
+            ReferenceDataVersioning.GetOrComputeVersion<Sample>(secondSnapshot, () => { computeCount++; return secondSnapshot; });
+
+            Assert.Equal(2, computeCount);
+        }
+
+        [Fact]
+        public void GetOrComputeVersion_NewSnapshotReflectsChangedData()
+        {
+            // The new snapshot's hash must track its (changed) contents, mirroring a real cache swap.
+            var firstSnapshot = SampleSet();
+            var firstVersion = ReferenceDataVersioning.GetOrComputeVersion<Sample>(firstSnapshot, () => firstSnapshot);
+
+            var secondSnapshot = SampleSet();
+            secondSnapshot[1].Name = "Gamma";
+            var secondVersion = ReferenceDataVersioning.GetOrComputeVersion<Sample>(secondSnapshot, () => secondSnapshot);
+
+            Assert.NotEqual(firstVersion, secondVersion);
+            Assert.Equal(ReferenceDataVersioning.ComputeVersion(secondSnapshot), secondVersion);
+        }
     }
 }
