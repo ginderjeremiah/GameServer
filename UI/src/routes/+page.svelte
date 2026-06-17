@@ -238,5 +238,10 @@ const handleSubmit = async () => {
 	cursor: pointer;
 	padding: 6px;
 	display: flex;
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
 }
 </style>

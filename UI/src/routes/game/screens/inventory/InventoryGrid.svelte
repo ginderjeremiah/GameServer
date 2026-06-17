@@ -34,12 +34,16 @@
 		{:else}
 			<span class="mono-label">{view.visible.length} items</span>
 			<div class="pager">
-				<button class="page-btn" disabled={pageClamped === 0} onclick={() => (view.page = Math.max(0, pageClamped - 1))}
-					>‹</button
+				<button
+					class="page-btn"
+					aria-label="Previous page"
+					disabled={pageClamped === 0}
+					onclick={() => (view.page = Math.max(0, pageClamped - 1))}>‹</button
 				>
 				<span class="page-indicator">{pageClamped + 1} / {pages}</span>
 				<button
 					class="page-btn"
+					aria-label="Next page"
 					disabled={pageClamped === pages - 1}
 					onclick={() => (view.page = Math.min(pages - 1, pageClamped + 1))}>›</button
 				>
@@ -145,6 +149,11 @@ const handleHoverLeave = () => tooltip?.hide();
 	&:disabled {
 		opacity: 0.3;
 		cursor: default;
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 }
 

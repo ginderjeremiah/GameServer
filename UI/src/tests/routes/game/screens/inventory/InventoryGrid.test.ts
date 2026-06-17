@@ -132,6 +132,14 @@ describe('InventoryGrid', () => {
 		const { container } = render(InventoryGrid, { props: { view: makeView(items, { page: 1 }) } });
 		expect(container.querySelector('.page-indicator')!.textContent).toBe('2 / 2');
 	});
+
+	it('exposes accessible names on the icon-only pager buttons', () => {
+		const items = Array.from({ length: 50 }, (_, i) => makeGridItem(i + 1));
+		const { getByRole } = render(InventoryGrid, { props: { view: makeView(items) } });
+		// The glyphs (‹/›) carry no accessible name, so screen readers rely on the aria-labels.
+		expect(getByRole('button', { name: 'Previous page' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Next page' })).toBeTruthy();
+	});
 });
 
 describe('InventoryGrid — tooltip suppression', () => {

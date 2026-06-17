@@ -36,5 +36,10 @@ const { mode, onToggle }: Props = $props();
 	font-family: inherit;
 	font-size: inherit;
 	letter-spacing: inherit;
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
 }
 </style>
