@@ -41,9 +41,15 @@ Gemini cannot emit a real alpha channel (see gotchas), so we cannot skip the str
 
 Tooling:
 - `/image` skill → `.claude/skills/image/scripts/generate.py` (Gemini wrapper).
-- `strip-bg.py` — chroma background remover. Lives in the local **`image-editing`**
-  project (a sibling repo, an additional working directory), alongside `input/`,
-  `output/`, and the older `edit-image.py`.
+- `strip-bg.py` — chroma background remover. Bundled with the `/image` skill at
+  `.claude/skills/image/scripts/strip-bg.py` (alongside `generate.py`), so it travels
+  with the repo.
+- `generate-agy.py` — **default** generation backend: routes through the Antigravity
+  CLI (`agy`) on your **subscription's image quota** instead of billing the paid API.
+  Same prompt; `--strip` chains `strip-bg.py`. `agy` needs a real console, so run it
+  from an interactive terminal — or pass `--detached` to let a headless caller (e.g.
+  Claude's shell) drive it. See step 1 below; fall back to `generate.py` for large
+  batches or non-square output.
 
 ### 1. Generate (on a lime-green backdrop)
 
@@ -75,10 +81,46 @@ python <repo>\.claude\skills\image\scripts\generate.py `
   (`.jpg` for `nb2`/`pro`, `.png` for `flash`), auto-incrementing the version.
   Refine with `--edit` (edits the latest version).
 
+**Subscription-backed generation (no API spend) — the `/image` skill's default.**
+`generate-agy.py` (same `--prompt`/`--name` as `generate.py`) generates on your
+Antigravity/Pro subscription's image quota via the `agy` CLI. Add `--strip` to key out
+the background in one step:
+
+```powershell
+# Interactive terminal — agy runs in the current console:
+python <repo>\.claude\skills\image\scripts\generate-agy.py --name <slug> --strip `
+  --prompt "<SUBJECT>. <STYLE> <BACKGROUND>"
+
+# Headless caller (e.g. Claude's shell) — add --detached:
+python <repo>\.claude\skills\image\scripts\generate-agy.py --name <slug> --strip --detached `
+  --prompt "<SUBJECT>. <STYLE> <BACKGROUND>"
+```
+
+`agy`'s built-in `generate_image` tool uses the NB2-class image model (matches our
+finals) and saves a native 1024×1024 JPEG to its session folder; `--strip` keys that
+JPEG straight to a transparent PNG (no format conversion). The agy *agent* model (the LLM
+that calls the tool) defaults to `Claude Sonnet 4.6 (Thinking)` and auto-falls back to
+`Gemini 3.5 Flash (Low)` when Sonnet usage is exhausted — override with `--model` /
+`--fallback-model`. It also **edits and combines**: `--edit` feeds the latest `<name>-v<N>`
+back in to refine an icon (e.g. tweak one detail while keeping the rest), and `--input <path>`
+(repeatable) adds reference images to combine — up to 3 base images total (the tool's cap).
+Its image quota resets ~every 5h, so fall back to `generate.py` (API) for large batches or
+when you need `--aspect` / non-square output (agy is square-only).
+
+**Why `--detached`.** `agy` checks for a real console (TTY) and hangs forever in a
+headless/piped shell, so it can't be driven directly from an agent's tool calls.
+`--detached` makes the script re-spawn *itself* attached to its own **hidden** console
+(`subprocess.Popen(creationflags=CREATE_NO_WINDOW)`) — that console IS a real TTY, so agy
+runs — then it polls a status file the child writes on exit and returns success or
+failure. Nothing appears on the desktop and no typing is needed. (agy's tty check is on
+the console handle, not window visibility, so a windowless console passes. Passing the
+prompt through the subprocess argv list also dodges the `Start-Process` quote-mangling
+that splits a multi-word prompt into bad args.)
+
 ### 2. Strip the background to transparency
 
 ```powershell
-python strip-bg.py <staging-dir>\<slug>-vN.png <staging-dir>\<slug>-cut.png --bg-hue 85
+python <repo>\.claude\skills\image\scripts\strip-bg.py <staging-dir>\<slug>-vN.png <staging-dir>\<slug>-cut.png --bg-hue 85
 ```
 
 `strip-bg.py` is a **hue key**: it clears every pixel whose hue matches the
@@ -213,8 +255,12 @@ bake a per-subject colour into the subject. They render **very small** — down 
 combat effect chips and skill code chips — so each is a single bold, iconic silhouette.
 The two **green** subjects (Luck, Health Regen) can't be lime-keyed, so they generate on
 the **magenta** backdrop (`--bg-hue 300`); the rest use lime. The Strength arm uses the
-same **periwinkle-blue skin** as the skill hands. All 11 were rendered on `nb2`; the batch
-driver and exact prompts live in `image-editing/attr-icons/attr-batch.py`.
+same **periwinkle-blue skin** as the skill hands. All 11 were rendered on `nb2`. Their
+STYLE drops the metal/leather palette sentence (like skills) **and** appends one extra
+sentence to force small-size legibility, in place of the gear closing sentence:
+
+> A single bold, iconic, centred symbol with minimal internal detail - it must stay
+> clearly readable when shown as small as 16 pixels.
 
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
