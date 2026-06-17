@@ -10,7 +10,11 @@ import {
 } from '$lib/api/token-store';
 
 function makeToken(payload: Record<string, unknown>): string {
-	const body = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	// Mirror how the backend serializes a JWT payload: UTF-8 encode the JSON, base64-encode the raw
+	// bytes (so multi-byte claims survive), then base64url-ify and strip the `=` padding.
+	const bytes = new TextEncoder().encode(JSON.stringify(payload));
+	const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+	const body = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 	return `header.${body}.signature`;
 }
 
@@ -112,5 +116,39 @@ describe('token-store', () => {
 		setTokens({ accessToken: makeToken({ role: ['Admin', 5, null] }), refreshToken: 'r' });
 
 		expect(getRoles()).toEqual(['Admin']);
+	});
+
+	it('decodes a payload whose base64url length is not a multiple of 4 (needs re-padding)', () => {
+		// `makeToken` strips `=` padding, so pick a payload whose base64url length isn't divisible by
+		// 4 to exercise the re-pad path before `atob`.
+		const token = makeToken({ role: 'Admin', sub: 'abc' });
+		const body = token.split('.')[1];
+		expect(body.length % 4).not.toBe(0);
+
+		setTokens({ accessToken: token, refreshToken: 'r' });
+
+		expect(getRoles()).toEqual(['Admin']);
+	});
+
+	it('round-trips a role claim containing multi-byte UTF-8 (accented + emoji)', () => {
+		const role = 'Admiñ-🛡';
+		setTokens({ accessToken: makeToken({ role }), refreshToken: 'r' });
+
+		expect(getRoles()).toEqual([role]);
+	});
+
+	it('decodes an expiry claim alongside a non-ASCII username claim', () => {
+		const exp = Math.floor(Date.now() / 1000) + 1000;
+		setTokens({ accessToken: makeToken({ exp, name: 'José 🎮' }), refreshToken: 'r' });
+
+		expect(getAccessTokenExpiry()).toBe(exp);
+	});
+
+	it('fails closed on a malformed (non-base64) payload segment', () => {
+		// A third segment is present so the split passes, but the payload isn't valid base64/JSON.
+		setTokens({ accessToken: 'header.@@not-base64@@.signature', refreshToken: 'r' });
+
+		expect(getAccessTokenExpiry()).toBeNull();
+		expect(getRoles()).toEqual([]);
 	});
 });
