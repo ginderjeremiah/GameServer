@@ -4,7 +4,8 @@ const config: PlaywrightTestConfig = {
 	webServer: {
 		command: 'npm run dev -- --port 4173',
 		port: 4173,
-		reuseExistingServer: true
+		// Reuse a server only for local dev; in CI always start a known-good server.
+		reuseExistingServer: !process.env.CI
 	},
 	testDir: 'e2e-tests',
 	testMatch: /(.+\.)?(test|spec)\.[jt]s/,
