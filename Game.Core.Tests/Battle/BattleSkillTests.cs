@@ -4,6 +4,7 @@ using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
 using Xunit;
+using static Game.Core.EAttribute;
 
 namespace Game.Core.Tests.Battle
 {
@@ -190,6 +191,52 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, allocatedBytes);
         }
 
+        // ── Per-skill stats reconcile with global stats (#835) ───────────────
+
+        [Fact]
+        public void Update_PlayerCrit_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
+        {
+            // A crit makes the raw pre-mitigation value understate the real hit: BaseDamage 20, crit
+            // ×2 ⇒ 40, then −2 enemy Defense ⇒ 38 actual. The per-skill stat must book 38 (not the raw
+            // 20) so it reconciles with the global stat DamageTarget books from the same hit.
+            var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
+            var battleSkill = new BattleSkill(skill);
+
+            // CriticalChance 1 always crits; CriticalDamage base 1.5 + 0.5 = 2.0.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Defense 2
+            var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
+
+            battleSkill.Update(context);
+
+            var skillStats = context.Stats.SkillStats[skill.Id];
+            Assert.Equal(38.0, skillStats.TotalDamage, 0.001);
+            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-crit/pre-defense value
+            Assert.Equal(context.Stats.PlayerDamageDealt, skillStats.TotalDamage, 0.001);
+            Assert.Equal(context.Stats.HighestPlayerAttack, skillStats.HighestSingleAttack, 0.001);
+        }
+
+        [Fact]
+        public void Update_EnemyDefenseClamp_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
+        {
+            // High enemy Defense makes the raw value overstate the real hit (the other direction of the
+            // bug): BaseDamage 20 − 12 Defense ⇒ 8 actual. The per-skill stat must book 8, not 20.
+            var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
+            var battleSkill = new BattleSkill(skill);
+
+            var player = MakeBattlerWith((CriticalChance, 0)); // never crits
+            var enemy = MakeBattlerWith((Endurance, 10));      // Defense = 2 + 10 = 12, MaxHealth 250
+            var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
+
+            battleSkill.Update(context);
+
+            var skillStats = context.Stats.SkillStats[skill.Id];
+            Assert.Equal(8.0, skillStats.TotalDamage, 0.001);
+            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-defense value
+            Assert.Equal(context.Stats.PlayerDamageDealt, skillStats.TotalDamage, 0.001);
+            Assert.Equal(context.Stats.HighestPlayerAttack, skillStats.HighestSingleAttack, 0.001);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Skill MakeSkill(int cooldownMs, double baseDamage, List<DamageMultiplier>? multipliers = null) => new()
@@ -234,6 +281,27 @@ namespace Game.Core.Tests.Battle
                 CurrentZoneId = 0,
                 StatPoints = new PlayerStatPoints
                 { StatAllocations = statAllocations, StatPointsGained = 50, StatPointsUsed = 50 },
+                Inventory = new Inventory(),
+                SelectedSkills = [],
+                Skills = [],
+                LogPreferences = [],
+            };
+            return new Battler(player);
+        }
+
+        private static Battler MakeBattlerWith(params (EAttribute Attribute, double Amount)[] attributes)
+        {
+            var statAllocations = attributes
+                .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
+                .ToList();
+            var player = new Player
+            {
+                Id = 0,
+                Name = "t",
+                Level = 1,
+                Exp = 0,
+                CurrentZoneId = 0,
+                StatPoints = new PlayerStatPoints { StatAllocations = statAllocations, StatPointsGained = 0, StatPointsUsed = 0 },
                 Inventory = new Inventory(),
                 SelectedSkills = [],
                 Skills = [],
