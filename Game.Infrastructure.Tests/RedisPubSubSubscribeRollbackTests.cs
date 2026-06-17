@@ -41,6 +41,13 @@ namespace Game.Infrastructure.Tests
                 service.Subscribe("rollback-channel", "rollback-queue", (Func<(IPubSubQueue queue, string channel), Task>)(_ => Task.CompletedTask), id));
         }
 
+        [Fact]
+        public async Task Subscribe_PlainActionWithIdOverload_WhenSubscribeAsyncFails_RollsBackIdForRetry()
+        {
+            await AssertFailedSubscribeFreesId((service, id) =>
+                service.Subscribe("rollback-channel", (Action<(string message, string channel)>)(_ => { }), id));
+        }
+
         // Subscribes the same id twice against a failing connection. Both attempts must fail at SubscribeAsync
         // (RedisConnectionException); a second attempt failing at the registry (InvalidOperationException) would
         // mean the first failure wedged the id — the leak this rolls back.
