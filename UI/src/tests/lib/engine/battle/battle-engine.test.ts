@@ -346,7 +346,7 @@ describe('BattleEngine', () => {
 
 			logicalUpdateCallbacks[0](500);
 
-			expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining('Slash'));
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining('Slash'), 'player-hit');
 		});
 
 		it('does not process updates when not Active', () => {
@@ -503,7 +503,8 @@ describe('BattleEngine', () => {
 
 				expect(logMessage).toHaveBeenCalledWith(
 					ELogType.Damage,
-					expect.stringContaining('You landed a critical hit with Slash')
+					expect.stringContaining('You landed a critical hit with Slash'),
+					'player-crit'
 				);
 			});
 
@@ -514,7 +515,7 @@ describe('BattleEngine', () => {
 
 				logicalUpdateCallbacks[0](500);
 
-				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, "You dodged Goblin's Slash!");
+				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, "You dodged Goblin's Slash!", 'player-dodge');
 			});
 
 			it('logs a block line when the player blocks an incoming enemy hit', () => {
@@ -524,7 +525,11 @@ describe('BattleEngine', () => {
 
 				logicalUpdateCallbacks[0](500);
 
-				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining("You blocked Goblin's Slash"));
+				expect(logMessage).toHaveBeenCalledWith(
+					ELogType.Damage,
+					expect.stringContaining("You blocked Goblin's Slash"),
+					'player-block'
+				);
 			});
 		});
 	});

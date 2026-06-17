@@ -1,48 +1,74 @@
 import { describe, it, expect } from 'vitest';
 import { ELogType } from '$lib/api';
+import type { LogOutcome } from '$lib/engine/log';
 import { logKind, formatLogTime, logColors } from '../../../components/log-panel/log-kind';
 
-type LogMessage = { id: number; logType: ELogType; message: string };
+type LogMessage = { id: number; logType: ELogType; message: string; outcome?: LogOutcome };
 
-function makeLog(logType: ELogType, message: string): LogMessage {
-	return { id: 1, logType, message };
+function makeLog(logType: ELogType, message: string, outcome?: LogOutcome): LogMessage {
+	return { id: 1, logType, message, outcome };
 }
 
 describe('logKind', () => {
 	describe('ELogType.Damage', () => {
-		it('returns the player-hit treatment when the message starts with "You"', () => {
-			const result = logKind(makeLog(ELogType.Damage, 'You used Slash for 42 damage.'));
+		// Glyph selection is driven by the structured `outcome`, not the message text — so the message
+		// passed here is deliberately empty/mismatched to prove the prose is no longer load-bearing.
+		it('returns the player-hit treatment for the "player-hit" outcome', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'player-hit'));
 			expect(result.color).toBe(logColors.player);
 			expect(result.glyph).toBe('hit');
 			expect(result.label).toBe('Hit');
 		});
 
-		it('returns the enemy-hit treatment when the message does not start with "You"', () => {
-			const result = logKind(makeLog(ELogType.Damage, 'Goblin hit you for 15 damage.'));
+		it('returns the enemy-hit treatment for the "enemy-hit" outcome', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'enemy-hit'));
 			expect(result.color).toBe(logColors.enemy);
 			expect(result.glyph).toBe('enemy');
 			expect(result.label).toBe('Hurt');
 		});
 
-		it('returns the crit treatment for a player critical-hit line', () => {
-			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit with Slash for 84 damage!'));
+		it('returns the crit treatment for the "player-crit" outcome', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'player-crit'));
 			expect(result.color).toBe(logColors.player);
 			expect(result.glyph).toBe('crit');
 			expect(result.label).toBe('Crit');
 		});
 
-		it('returns the dodge treatment for a dodged incoming hit', () => {
-			const result = logKind(makeLog(ELogType.Damage, "You dodged Goblin's Slash!"));
+		it('returns the dodge treatment for the "player-dodge" outcome', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'player-dodge'));
 			expect(result.color).toBe(logColors.enemy);
 			expect(result.glyph).toBe('dodge');
 			expect(result.label).toBe('Dodge');
 		});
 
-		it('returns the block treatment for a blocked incoming hit', () => {
-			const result = logKind(makeLog(ELogType.Damage, "You blocked Goblin's Slash, taking only 12 damage!"));
+		it('returns the block treatment for the "player-block" outcome', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'player-block'));
 			expect(result.color).toBe(logColors.enemy);
 			expect(result.glyph).toBe('block');
 			expect(result.label).toBe('Block');
+		});
+
+		it('keys the glyph off the outcome even when the message reads like a different outcome', () => {
+			// A reworded/misleading message must not flip the glyph: the outcome wins.
+			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit!', 'player-hit'));
+			expect(result.glyph).toBe('hit');
+			expect(result.glyph).not.toBe('crit');
+		});
+
+		describe('without a structured outcome (e.g. Options live-preview samples)', () => {
+			it('falls back to the player-hit treatment when the message starts with "You"', () => {
+				const result = logKind(makeLog(ELogType.Damage, 'You used Slash for 42 damage.'));
+				expect(result.color).toBe(logColors.player);
+				expect(result.glyph).toBe('hit');
+				expect(result.label).toBe('Hit');
+			});
+
+			it('falls back to the enemy-hit treatment when the message does not start with "You"', () => {
+				const result = logKind(makeLog(ELogType.Damage, 'Goblin hit you for 15 damage.'));
+				expect(result.color).toBe(logColors.enemy);
+				expect(result.glyph).toBe('enemy');
+				expect(result.label).toBe('Hurt');
+			});
 		});
 	});
 

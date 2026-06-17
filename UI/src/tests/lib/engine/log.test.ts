@@ -35,10 +35,17 @@ describe('logMessage', () => {
 		];
 	});
 
-	it('forwards an enabled log type to the store', () => {
+	it('forwards an enabled log type to the store (no outcome by default)', () => {
 		logMessage(ELogType.Exp, 'Earned 50 exp.');
 
-		expect(addLog).toHaveBeenCalledWith(ELogType.Exp, 'Earned 50 exp.');
+		expect(addLog).toHaveBeenCalledWith(ELogType.Exp, 'Earned 50 exp.', undefined);
+	});
+
+	it('forwards a structured outcome through to the store', () => {
+		mockPlayerManager.logPreferences = [{ id: ELogType.Damage, enabled: true }];
+		logMessage(ELogType.Damage, 'You used Slash and dealt 10 damage!', 'player-hit');
+
+		expect(addLog).toHaveBeenCalledWith(ELogType.Damage, 'You used Slash and dealt 10 damage!', 'player-hit');
 	});
 
 	it('does not forward a disabled log type', () => {
@@ -50,6 +57,6 @@ describe('logMessage', () => {
 	it('forwards an unknown log type (defaults to enabled)', () => {
 		logMessage(ELogType.EnemyDefeated, 'Enemy defeated!');
 
-		expect(addLog).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Enemy defeated!');
+		expect(addLog).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Enemy defeated!', undefined);
 	});
 });

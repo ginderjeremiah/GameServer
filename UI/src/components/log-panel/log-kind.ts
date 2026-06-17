@@ -1,5 +1,5 @@
 import { ELogType } from '$lib/api';
-import type { LogMessage } from '$lib/engine/log';
+import type { LogMessage, LogOutcome } from '$lib/engine/log';
 
 export type GlyphKind = 'hit' | 'crit' | 'dodge' | 'block' | 'enemy' | 'loot' | 'system' | 'kill' | 'effect';
 
@@ -36,30 +36,35 @@ const SYSTEM = logColors.system;
 const EFFECT = logColors.effect;
 
 /**
+ * Visual treatment per structured combat outcome. The `Damage` channel carries player-vs-enemy and
+ * the player-only crit/dodge/block outcomes (#178) on one `ELogType`; keying the glyph off the typed
+ * {@link LogOutcome} the engine sets keeps it stable when a message is reworded.
+ */
+const damageKinds: Record<LogOutcome, LogKind> = {
+	'player-hit': { color: PLAYER, glyph: 'hit', label: 'Hit' },
+	'player-crit': { color: PLAYER, glyph: 'crit', label: 'Crit' },
+	'player-dodge': { color: ENEMY, glyph: 'dodge', label: 'Dodge' },
+	'player-block': { color: ENEMY, glyph: 'block', label: 'Block' },
+	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' }
+};
+
+/**
  * Maps a {@link LogMessage} to its visual treatment for the sliding manifest.
  *
- * The log model only stores a flat `message` + `logType`, so player-vs-enemy
- * actions (both `ELogType.Damage`) are disambiguated by the message prefix the
- * battle engine produces ("You used …" / "You've been defeated!"). The player-only
- * crit/dodge/block outcomes (#178) ride the same `ELogType.Damage` channel and are
- * told apart by the distinctive phrasing `damageLogMessage` produces.
+ * `Damage` entries carry a structured {@link LogOutcome} (set by the battle engine at the log site),
+ * so the glyph is chosen from that typed value rather than the message text. Entries without one
+ * (e.g. the Options live-preview samples) and the `EnemyDefeated` channel still disambiguate
+ * player-vs-enemy by the "You" message prefix the engine produces.
  */
 export function logKind(log: LogMessage): LogKind {
 	const fromPlayer = log.message.startsWith('You');
 	switch (log.logType) {
 		case ELogType.Damage:
-			if (log.message.startsWith('You landed a critical hit')) {
-				return { color: PLAYER, glyph: 'crit', label: 'Crit' };
+			if (log.outcome) {
+				return damageKinds[log.outcome];
 			}
-			if (log.message.startsWith('You dodged')) {
-				return { color: ENEMY, glyph: 'dodge', label: 'Dodge' };
-			}
-			if (log.message.startsWith('You blocked')) {
-				return { color: ENEMY, glyph: 'block', label: 'Block' };
-			}
-			return fromPlayer
-				? { color: PLAYER, glyph: 'hit', label: 'Hit' }
-				: { color: ENEMY, glyph: 'enemy', label: 'Hurt' };
+			// No structured outcome (e.g. live-preview samples): fall back to the "You" prefix split.
+			return fromPlayer ? damageKinds['player-hit'] : damageKinds['enemy-hit'];
 		case ELogType.ItemFound:
 			return { color: LOOT, glyph: 'loot', label: 'Loot' };
 		case ELogType.Exp:
