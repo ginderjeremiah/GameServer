@@ -160,10 +160,10 @@ const hasTip = $derived(
 	align-items: flex-start;
 	padding-top: 3px;
 	border-style: dashed;
-	border-color: color-mix(in srgb, var(--health-remaining-color) 50%, transparent);
-	background: color-mix(in srgb, var(--health-remaining-color) 12%, transparent);
-	box-shadow: inset 0 0 16px color-mix(in srgb, var(--health-remaining-color) 12%, transparent);
-	color: color-mix(in srgb, var(--health-remaining-color) 35%, var(--white));
+	border-color: color-mix(in srgb, var(--block-color) 50%, transparent);
+	background: color-mix(in srgb, var(--block-color) 12%, transparent);
+	box-shadow: inset 0 0 16px color-mix(in srgb, var(--block-color) 12%, transparent);
+	color: color-mix(in srgb, var(--block-color) 35%, var(--white));
 	font-size: 10px;
 	letter-spacing: 0.12em;
 }

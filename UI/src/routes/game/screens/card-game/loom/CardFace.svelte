@@ -151,14 +151,14 @@ const { card, index, slot, view }: Props = $props();
 
 /* block cards (Guard / Dodge) */
 .card.lane-b {
-	border-left-color: var(--health-remaining-color);
-	--card-glow: color-mix(in srgb, var(--health-remaining-color) 50%, transparent);
+	border-left-color: var(--block-color);
+	--card-glow: color-mix(in srgb, var(--block-color) 50%, transparent);
 
 	.type .d {
-		background: var(--health-remaining-color);
+		background: var(--block-color);
 	}
 	.t {
-		color: color-mix(in srgb, var(--health-remaining-color) 45%, var(--text-primary));
+		color: color-mix(in srgb, var(--block-color) 45%, var(--text-primary));
 	}
 }
 

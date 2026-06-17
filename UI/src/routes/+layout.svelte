@@ -113,6 +113,7 @@ $effect(() => {
 	--health-missing-color: #{colors.$hp-red-bg};
 	--health-remaining-color: #{colors.$hp-green};
 	--health-remaining-dark: #{colors.$hp-green-dark};
+	--block-color: #{colors.$hp-green};
 	--health-disappearing-color: #{colors.$hp-red-disappearing};
 	--slot-background-color: #{colors.$white};
 	--surface: #{colors.$surface};

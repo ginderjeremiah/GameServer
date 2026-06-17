@@ -63,9 +63,9 @@ const ITEMS = [
 	background: color-mix(in srgb, var(--rarity-epic) 20%, transparent);
 }
 .sw.bl {
-	border-color: var(--health-remaining-color);
+	border-color: var(--block-color);
 	border-style: dashed;
-	background: color-mix(in srgb, var(--health-remaining-color) 18%, transparent);
+	background: color-mix(in srgb, var(--block-color) 18%, transparent);
 }
 .sw.cr {
 	border-color: var(--gold);
