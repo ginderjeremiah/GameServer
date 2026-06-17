@@ -4,9 +4,12 @@ vi.mock('svelte', () => ({
 	onDestroy: vi.fn()
 }));
 
-// The close handler's auth-retry path delegates to auth.ts; mock it so the refresh/reconnect
-// decision can be driven without touching the real token endpoints.
+// The open path pre-emptively refreshes via ensureValidAccessToken and the close handler's auth-retry
+// path delegates to refreshTokens; mock auth.ts so both can be driven without touching the real token
+// endpoints. ensureValidAccessToken defaults (in beforeEach) to returning the stored access token, so the
+// handshake-URL tests still exercise "whatever token the open path resolves ends up in the URL".
 vi.mock('$lib/api/auth', () => ({
+	ensureValidAccessToken: vi.fn(),
 	refreshTokens: vi.fn(),
 	handleAuthFailure: vi.fn()
 }));
@@ -47,10 +50,17 @@ const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
-import { setTokens } from '$lib/api/token-store';
-import { refreshTokens, handleAuthFailure } from '$lib/api/auth';
+import { setTokens, getAccessToken } from '$lib/api/token-store';
+import { ensureValidAccessToken, refreshTokens, handleAuthFailure } from '$lib/api/auth';
 
-const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0));
+// Opening a socket is now asynchronous (it awaits the pre-emptive refresh before `new WebSocket`), so a
+// command no longer creates the socket synchronously. Drain the promise microtask queue to let the
+// open → queue-flush chain settle. Microtask-based (not setTimeout) so it also works under fake timers.
+const flushMicrotasks = async () => {
+	for (let i = 0; i < 10; i++) {
+		await Promise.resolve();
+	}
+};
 
 describe('ApiSocket', () => {
 	let apiSocket: ApiSocket;
@@ -66,6 +76,10 @@ describe('ApiSocket', () => {
 		localStorage.clear();
 		vi.mocked(refreshTokens).mockReset();
 		vi.mocked(handleAuthFailure).mockClear();
+		// Default: the open path resolves to the currently stored access token (no implicit refresh), so
+		// URL assertions reflect the token in the store rather than triggering the real refresh machinery.
+		vi.mocked(ensureValidAccessToken).mockReset();
+		vi.mocked(ensureValidAccessToken).mockImplementation(() => Promise.resolve(getAccessToken()));
 		apiSocket = new ApiSocket();
 	});
 
@@ -89,24 +103,81 @@ describe('ApiSocket', () => {
 	};
 
 	describe('authentication', () => {
-		it('passes the stored access token as the access_token query parameter', () => {
+		it('passes the stored access token as the access_token query parameter', async () => {
 			setTokens({ accessToken: 'token-123', refreshToken: 'r' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 
 			expect(lastSocketUrl).toBe('/socket?access_token=token-123');
 		});
 
-		it('opens an unauthenticated socket when no token is stored', () => {
+		it('opens an unauthenticated socket when no token is stored', async () => {
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 
 			expect(lastSocketUrl).toBe('/socket');
+			// A never-logged-in caller (no prior refresh token) must not be routed to the auth-failure path.
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('pre-emptive token refresh on open', () => {
+		it('refreshes the access token pre-emptively and opens the handshake with the refreshed token', async () => {
+			setTokens({ accessToken: 'stale', refreshToken: 'r' });
+			// The open path mints a fresh token before building the handshake URL.
+			vi.mocked(ensureValidAccessToken).mockResolvedValue('fresh-token');
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
+
+			expect(ensureValidAccessToken).toHaveBeenCalled();
+			expect(lastSocketUrl).toBe('/socket?access_token=fresh-token');
+		});
+
+		it('opens only one socket when concurrent callers race the async open', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			// Hold the pre-emptive refresh open so both callers pass the "is there a socket?" check while
+			// awaiting, exercising the single-flight guard.
+			let releaseRefresh: (token: string | null) => void = () => {};
+			vi.mocked(ensureValidAccessToken).mockReturnValue(
+				new Promise<string | null>((resolve) => {
+					releaseRefresh = resolve;
+				})
+			);
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.attemptPing(); // a second concurrent open attempt while the refresh is still in flight
+
+			// Both callers are awaiting the single in-flight refresh; no socket exists yet.
+			expect(webSocketMock).not.toHaveBeenCalled();
+			expect(ensureValidAccessToken).toHaveBeenCalledTimes(1);
+
+			releaseRefresh('a');
+			await flushMicrotasks();
+
+			expect(webSocketMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('routes to auth failure (without opening) when the pre-emptive refresh fails for a logged-in session', async () => {
+			setTokens({ accessToken: 'expired', refreshToken: 'r' });
+			// Refresh token spent/revoked: no usable token can be obtained.
+			vi.mocked(ensureValidAccessToken).mockResolvedValue(null);
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
+
+			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
+			// No doomed unauthenticated handshake is opened, and the keepalive is not left running.
+			expect(webSocketMock).not.toHaveBeenCalled();
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
 		});
 	});
 
 	describe('sendSocketCommand', () => {
 		it('creates a WebSocket and sends the command', async () => {
 			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			expect(ws.send).toHaveBeenCalledTimes(1);
@@ -123,6 +194,7 @@ describe('ApiSocket', () => {
 		it('assigns incrementing command IDs', async () => {
 			const p1 = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
 			const p2 = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			const sent1 = JSON.parse(ws.send.mock.calls[0][0]);
@@ -145,6 +217,7 @@ describe('ApiSocket', () => {
 
 		it('prunes the in-flight entry once its response resolves', async () => {
 			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			const sent = JSON.parse(ws.send.mock.calls[0][0]);
 			expect(inFlightSize(apiSocket)).toBe(1);
@@ -157,6 +230,7 @@ describe('ApiSocket', () => {
 
 		it('settles pending in-flight requests with an error when the socket closes', async () => {
 			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			expect(inFlightSize(apiSocket)).toBe(1);
 
@@ -182,6 +256,7 @@ describe('ApiSocket', () => {
 			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const connecting = lastWs();
 			expect(connecting.send).not.toHaveBeenCalled();
 			expect(inFlightSize(apiSocket)).toBe(0);
@@ -207,6 +282,7 @@ describe('ApiSocket', () => {
 			vi.useFakeTimers();
 			try {
 				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				expect(inFlightSize(apiSocket)).toBe(1);
 
 				// No response arrives and the socket never closes, so only the backstop can settle it.
@@ -226,6 +302,7 @@ describe('ApiSocket', () => {
 			vi.useFakeTimers();
 			try {
 				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				const ws = lastWs();
 				const sent = JSON.parse(ws.send.mock.calls[0][0]);
 
@@ -253,6 +330,7 @@ describe('ApiSocket', () => {
 				});
 
 				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				const connecting = lastWs();
 				expect(connecting.send).not.toHaveBeenCalled();
 				expect(inFlightSize(apiSocket)).toBe(0);
@@ -265,6 +343,7 @@ describe('ApiSocket', () => {
 				// so pick the command payload out of the send calls rather than assuming it's the first).
 				connecting.readyState = connecting.OPEN;
 				connecting.onopen?.();
+				await flushMicrotasks();
 				const sentRaw = connecting.send.mock.calls.map((c) => c[0]).find((d) => d !== 'ping' && d !== 'pong');
 				const sent = JSON.parse(sentRaw);
 				expect(sent.name).toBe('DefeatEnemy');
@@ -277,11 +356,12 @@ describe('ApiSocket', () => {
 	});
 
 	describe('listenCommand', () => {
-		it('calls listener when matching command arrives', () => {
+		it('calls listener when matching command arrives', async () => {
 			const listener = vi.fn();
 			apiSocket.listenCommand('SocketReplaced', listener, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
@@ -289,13 +369,14 @@ describe('ApiSocket', () => {
 			expect(listener).toHaveBeenCalledTimes(1);
 		});
 
-		it('supports multiple listeners for the same command', () => {
+		it('supports multiple listeners for the same command', async () => {
 			const listener1 = vi.fn();
 			const listener2 = vi.fn();
 			apiSocket.listenCommand('SocketReplaced', listener1, false);
 			apiSocket.listenCommand('SocketReplaced', listener2, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
@@ -304,11 +385,12 @@ describe('ApiSocket', () => {
 			expect(listener2).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not call listeners for different commands', () => {
+		it('does not call listeners for different commands', async () => {
 			const listener = vi.fn();
 			apiSocket.listenCommand('SocketReplaced', listener, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			receive(ws, JSON.stringify({ id: '0', name: 'DefeatEnemy', data: {} }));
@@ -318,8 +400,9 @@ describe('ApiSocket', () => {
 	});
 
 	describe('ping/pong', () => {
-		it('responds with pong when ping received', () => {
+		it('responds with pong when ping received', async () => {
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			receive(ws, 'ping');
@@ -329,10 +412,11 @@ describe('ApiSocket', () => {
 	});
 
 	describe('error handling', () => {
-		it('logs error and does not crash on malformed JSON', () => {
+		it('logs error and does not crash on malformed JSON', async () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			receive(ws, 'not-json');
 
@@ -340,7 +424,7 @@ describe('ApiSocket', () => {
 			consoleSpy.mockRestore();
 		});
 
-		it('catches listener callback errors and logs them', () => {
+		it('catches listener callback errors and logs them', async () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const badListener = vi.fn(() => {
 				throw new Error('listener error');
@@ -349,6 +433,7 @@ describe('ApiSocket', () => {
 			apiSocket.listenCommand('SocketReplaced', badListener, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
 
@@ -363,6 +448,7 @@ describe('ApiSocket', () => {
 	describe('fetchSocketData', () => {
 		it('resolves with the response data when the command succeeds', async () => {
 			const promise = fetchSocketData('GetZones');
+			await flushMicrotasks();
 			const ws = lastWs();
 			const sent = JSON.parse(ws.send.mock.calls[0][0]);
 			expect(sent.name).toBe('GetZones');
@@ -374,6 +460,7 @@ describe('ApiSocket', () => {
 
 		it('throws when the server reports an error', async () => {
 			const promise = fetchSocketData('GetZones');
+			await flushMicrotasks();
 			const ws = lastWs();
 			const sent = JSON.parse(ws.send.mock.calls[0][0]);
 
@@ -384,12 +471,13 @@ describe('ApiSocket', () => {
 	});
 
 	describe('socket error propagation', () => {
-		it('notifies onSocketError listeners when the socket errors', () => {
+		it('notifies onSocketError listeners when the socket errors', async () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const handler = vi.fn();
 			onSocketError(handler, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			ws.onerror?.();
 
@@ -413,6 +501,7 @@ describe('ApiSocket', () => {
 			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			webSocketMock.mockClear();
 
@@ -430,6 +519,7 @@ describe('ApiSocket', () => {
 			vi.mocked(refreshTokens).mockResolvedValue(null);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			closeUnopened(ws);
@@ -443,6 +533,7 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			ws.onopen?.(); // marks the socket as opened
 
@@ -456,6 +547,7 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			closeUnopened(ws, 1000);
@@ -467,6 +559,7 @@ describe('ApiSocket', () => {
 		it('does not retry when there is no refresh token to use', async () => {
 			// localStorage cleared in beforeEach → getRefreshToken() returns null.
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			closeUnopened(ws);
@@ -477,11 +570,12 @@ describe('ApiSocket', () => {
 	});
 
 	describe('listenCommand unhook', () => {
-		it('returns an unhook function that removes the listener', () => {
+		it('returns an unhook function that removes the listener', async () => {
 			const listener = vi.fn();
 			const unhook = apiSocket.listenCommand('SocketReplaced', listener, false);
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
@@ -495,19 +589,21 @@ describe('ApiSocket', () => {
 	});
 
 	describe('keepalive ping lifecycle', () => {
-		it('arms the keepalive interval when a socket is created', () => {
+		it('arms the keepalive interval when a socket is created', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 		});
 
-		it('stops the keepalive and does not reconnect once the session is gone (post-logout)', () => {
+		it('stops the keepalive and does not reconnect once the session is gone (post-logout)', async () => {
 			vi.useFakeTimers();
 			try {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 				const socketsBefore = socketInstances.length;
 
@@ -524,9 +620,10 @@ describe('ApiSocket', () => {
 			}
 		});
 
-		it('stops the keepalive on a normal (clean) closure', () => {
+		it('stops the keepalive on a normal (clean) closure', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 
@@ -536,9 +633,10 @@ describe('ApiSocket', () => {
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
 		});
 
-		it('disconnect() stops the keepalive and closes the socket', () => {
+		it('disconnect() stops the keepalive and closes the socket', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 			const ws = lastWs();
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 
@@ -562,6 +660,7 @@ describe('ApiSocket', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
 
 			// Each reconnect is rejected pre-open again; without a stable open the budget is never refilled.
 			for (let i = 0; i < 10; i++) {
@@ -575,13 +674,14 @@ describe('ApiSocket', () => {
 			warnSpy.mockRestore();
 		});
 
-		it('refills the retry budget only after the connection stays open (stable), not on open', () => {
+		it('refills the retry budget only after the connection stays open (stable), not on open', async () => {
 			vi.useFakeTimers();
 			try {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				internals(apiSocket).socketAuthRetries = 3;
 
 				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				const ws = lastWs();
 				ws.onopen?.();
 				// Opening alone does not refill the budget — it only arms the stability timer.
@@ -595,13 +695,14 @@ describe('ApiSocket', () => {
 			}
 		});
 
-		it('does not refill the retry budget when the socket closes before becoming stable', () => {
+		it('does not refill the retry budget when the socket closes before becoming stable', async () => {
 			vi.useFakeTimers();
 			try {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				internals(apiSocket).socketAuthRetries = 3;
 
 				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
 				const ws = lastWs();
 				ws.onopen?.(); // arms the stability timer
 				ws.readyState = ws.CLOSED;
