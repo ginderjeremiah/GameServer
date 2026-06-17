@@ -114,6 +114,31 @@ export class InventoryView {
 
 	/* ── actions ─────────────────────────────────────────────────────── */
 
+	// Filter/sort changes snap back to the first page here — where the user intent originates —
+	// so page-reset never lives in an effect that writes tracked state. `pageClamped` in the grid
+	// remains the out-of-range safety net (e.g. when the visible list shrinks for other reasons).
+	setSort(sort: SortKey) {
+		this.sort = sort;
+		this.page = 0;
+	}
+
+	setFilterCat(filterCat: EItemCategory | null) {
+		this.filterCat = filterCat;
+		this.page = 0;
+	}
+
+	setFavOnly(favOnly: boolean) {
+		this.favOnly = favOnly;
+		this.page = 0;
+	}
+
+	/** The "All" affordance clears both the category and favorites filters in one action. */
+	showAll() {
+		this.filterCat = null;
+		this.favOnly = false;
+		this.page = 0;
+	}
+
 	select(itemId: number | null) {
 		this.selectedId = itemId;
 	}
