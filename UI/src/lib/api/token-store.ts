@@ -47,6 +47,18 @@ export const getAccessToken = (): string | null => getTokens()?.accessToken ?? n
 export const getRefreshToken = (): string | null => getTokens()?.refreshToken ?? null;
 
 /**
+ * Decodes a base64url-encoded string (the JWT segment encoding) to a UTF-8 string. base64url swaps
+ * `+`/`/` for `-`/`_` and drops the `=` padding, so we restore both before `atob`, then UTF-8-decode
+ * the raw bytes — `atob` alone would mangle any multi-byte claim (e.g. an accented username).
+ */
+const decodeBase64Url = (value: string): string => {
+	const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+	const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+	return new TextDecoder().decode(bytes);
+};
+
+/**
  * Decodes the (unverified) payload of the stored JWT access token. Verifying the signature is the
  * server's job; the client only reads a couple of claims (expiry, roles) to drive pre-emptive
  * refresh and role-based UI gating. Returns null when there is no token, it is not a well-formed
@@ -64,8 +76,7 @@ const decodeAccessTokenPayload = (): Record<string, unknown> | null => {
 	}
 
 	try {
-		const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-		return JSON.parse(atob(base64)) as Record<string, unknown>;
+		return JSON.parse(decodeBase64Url(parts[1])) as Record<string, unknown>;
 	} catch {
 		return null;
 	}
