@@ -44,21 +44,21 @@ namespace Game.Core.Progress
         public IReadOnlyCollection<(EStatisticType Type, int? EntityId)> RecordBattleCompleted(
             Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats, bool isBossBattle, int zoneId)
         {
-            Increment(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
-            SetMax(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
-            Increment(EStatisticType.DamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
-            Increment(EStatisticType.DamageHealed, null, (decimal)Math.Round(stats.PlayerDamageHealed, 3));
-            Increment(EStatisticType.EnemiesEncountered, null, 1);
-            Increment(EStatisticType.EnemiesEncountered, enemy.Id, 1);
+            Record(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
+            Record(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
+            Record(EStatisticType.DamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
+            Record(EStatisticType.DamageHealed, null, (decimal)Math.Round(stats.PlayerDamageHealed, 3));
+            Record(EStatisticType.EnemiesEncountered, null, 1);
+            Record(EStatisticType.EnemiesEncountered, enemy.Id, 1);
 
             if (victory)
             {
-                Increment(EStatisticType.BattlesWon, null, 1);
-                Increment(EStatisticType.BattlesWon, enemy.Id, 1);
-                SetMin(EStatisticType.FastestVictory, null, totalMs / 1000m);
-                SetMin(EStatisticType.FastestVictory, enemy.Id, totalMs / 1000m);
-                Increment(EStatisticType.EnemiesKilled, null, 1);
-                Increment(EStatisticType.EnemiesKilled, enemy.Id, 1);
+                Record(EStatisticType.BattlesWon, null, 1);
+                Record(EStatisticType.BattlesWon, enemy.Id, 1);
+                Record(EStatisticType.FastestVictory, null, totalMs / 1000m);
+                Record(EStatisticType.FastestVictory, enemy.Id, totalMs / 1000m);
+                Record(EStatisticType.EnemiesKilled, null, 1);
+                Record(EStatisticType.EnemiesKilled, enemy.Id, 1);
 
                 // A dedicated-boss victory both farms the boss and (on the first clear) clears its zone. The
                 // boss-ness comes from the explicit challenge marker (threaded from PlayerState), not the
@@ -69,47 +69,47 @@ namespace Game.Core.Progress
                     // BossesDefeated is the farm counter: it increments on every dedicated-boss victory,
                     // tracked globally and per-boss so challenges can target either "defeat any boss" or a
                     // specific boss repeatedly.
-                    Increment(EStatisticType.BossesDefeated, null, 1);
-                    Increment(EStatisticType.BossesDefeated, enemy.Id, 1);
+                    Record(EStatisticType.BossesDefeated, null, 1);
+                    Record(EStatisticType.BossesDefeated, enemy.Id, 1);
 
                     // ZonesCleared counts distinct zones ever cleared, not boss-victory events. The per-zone
                     // entry is a binary "cleared" flag, and the global counter only bumps on a zone's first
                     // clear (its 0 -> 1 transition), so re-farming a boss never re-counts the zone.
                     if (GetStatisticValue(EStatisticType.ZonesCleared, zoneId) == 0)
                     {
-                        Increment(EStatisticType.ZonesCleared, null, 1);
-                        Increment(EStatisticType.ZonesCleared, zoneId, 1);
+                        Record(EStatisticType.ZonesCleared, null, 1);
+                        Record(EStatisticType.ZonesCleared, zoneId, 1);
                     }
                 }
             }
             else if (playerDied)
             {
                 // The player died, so the battle was genuinely lost.
-                Increment(EStatisticType.BattlesLost, null, 1);
-                Increment(EStatisticType.BattlesLost, enemy.Id, 1);
+                Record(EStatisticType.BattlesLost, null, 1);
+                Record(EStatisticType.BattlesLost, enemy.Id, 1);
             }
             else
             {
                 // Neither combatant died — the battle was abandoned mid-fight (e.g. the player retreated
                 // from a boss or switched zones). Tracked separately from a loss so the two are distinct
                 // numbers (#202).
-                Increment(EStatisticType.BattlesAbandoned, null, 1);
-                Increment(EStatisticType.BattlesAbandoned, enemy.Id, 1);
+                Record(EStatisticType.BattlesAbandoned, null, 1);
+                Record(EStatisticType.BattlesAbandoned, enemy.Id, 1);
             }
 
             if (playerDied)
             {
-                Increment(EStatisticType.PlayerDeaths, null, 1);
+                Record(EStatisticType.PlayerDeaths, null, 1);
             }
 
-            Increment(EStatisticType.TotalBattleTime, null, totalMs / 1000m);
-            Increment(EStatisticType.SkillsUsed, null, stats.PlayerSkillsUsed);
+            Record(EStatisticType.TotalBattleTime, null, totalMs / 1000m);
+            Record(EStatisticType.SkillsUsed, null, stats.PlayerSkillsUsed);
 
             foreach (var (skillId, skillStats) in stats.SkillStats)
             {
-                Increment(EStatisticType.SkillsUsed, skillId, skillStats.Uses);
-                Increment(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(skillStats.TotalDamage, 3));
-                SetMax(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
+                Record(EStatisticType.SkillsUsed, skillId, skillStats.Uses);
+                Record(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(skillStats.TotalDamage, 3));
+                Record(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
             }
 
             // The mutated rows are exactly the statistics this battle touched (the aggregate was freshly
@@ -184,14 +184,40 @@ namespace Game.Core.Progress
             return exists;
         }
 
-        private decimal Increment(EStatisticType type, int? entityId, decimal amount)
+        /// <summary>
+        /// Records a reported value for a statistic, aggregating it according to the statistic type's
+        /// <see cref="StatisticType.AggregationKind"/>. This single dispatch is the one place a statistic's
+        /// aggregation direction is consumed — the same derived fact drives a challenge's goal comparison —
+        /// so adding a "lower is better" statistic needs no change here, only its mapping on
+        /// <see cref="StatisticType"/>.
+        /// </summary>
+        private void Record(EStatisticType type, int? entityId, decimal value)
+        {
+            var aggregationKind = StatisticType.GetAggregationKind(type);
+            switch (aggregationKind)
+            {
+                case EAggregationKind.Sum:
+                    Increment(type, entityId, value);
+                    break;
+                case EAggregationKind.Max:
+                    SetMax(type, entityId, value);
+                    break;
+                case EAggregationKind.Min:
+                    SetMin(type, entityId, value);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(type),
+                        $"Statistic {type} has an unhandled aggregation kind {aggregationKind}.");
+            }
+        }
+
+        private void Increment(EStatisticType type, int? entityId, decimal amount)
         {
             var stat = GetOrCreate(type, entityId, out _);
             stat.Value += amount;
-            return stat.Value;
         }
 
-        private decimal SetMax(EStatisticType type, int? entityId, decimal value)
+        private void SetMax(EStatisticType type, int? entityId, decimal value)
         {
             var stat = GetOrCreate(type, entityId, out var created);
             // Record on the first write (created) or a strictly greater value, so the first recorded value
@@ -200,11 +226,9 @@ namespace Game.Core.Progress
             {
                 stat.Value = value;
             }
-
-            return stat.Value;
         }
 
-        private decimal SetMin(EStatisticType type, int? entityId, decimal value)
+        private void SetMin(EStatisticType type, int? entityId, decimal value)
         {
             var stat = GetOrCreate(type, entityId, out var created);
             // Record on the first write (created) or a strictly lesser value. Keying off the explicit
@@ -214,8 +238,6 @@ namespace Game.Core.Progress
             {
                 stat.Value = value;
             }
-
-            return stat.Value;
         }
 
         private PlayerStatistic GetOrCreate(EStatisticType type, int? entityId, out bool created)
