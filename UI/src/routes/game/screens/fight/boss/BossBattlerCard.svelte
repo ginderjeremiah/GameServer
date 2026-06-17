@@ -2,6 +2,8 @@
      a dedicated boss is engaged: a Zone-Boss ribbon, gold chrome, the phase-pip HP
      bar, and the boss's full skill loadout (glowing in the boss accent). -->
 <div class="boss-card" data-testid="boss-card">
+	<CombatFloaters side="enemy" testId="boss-floaters" />
+
 	<div class="ribbon">
 		<BossKicker>Zone Boss</BossKicker>
 		<BossDiamond size={8} />
@@ -29,6 +31,7 @@
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
 import ActiveEffectChips from '../ActiveEffectChips.svelte';
+import CombatFloaters from '../CombatFloaters.svelte';
 import Skills from '../Skills.svelte';
 import BossKicker from './BossKicker.svelte';
 import BossDiamond from './BossDiamond.svelte';

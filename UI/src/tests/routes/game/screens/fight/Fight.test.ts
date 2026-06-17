@@ -9,13 +9,19 @@ const {
 	mockBattleEngine,
 	mockPlayerManager,
 	mockEnemyManager,
+	onCombatFloat,
 	staticData,
 	statistics,
 	playerChallenges,
 	registerTooltipComponent
 } = vi.hoisted(() => ({
-	mockBattleEngine: { player: undefined as unknown, enemy: undefined as unknown, getOpponent: vi.fn() },
-	mockPlayerManager: { currentZone: 0 },
+	mockBattleEngine: {
+		player: undefined as unknown,
+		enemy: undefined as unknown,
+		timeElapsed: 0,
+		getOpponent: vi.fn()
+	},
+	mockPlayerManager: { currentZone: 0, level: 7, exp: 280, nextLevelThreshold: 700 },
 	mockEnemyManager: {
 		mode: 'idle' as 'idle' | 'boss',
 		autoFight: false,
@@ -32,13 +38,15 @@ const {
 		setTooltipPosition: vi.fn(),
 		showTooltip: vi.fn(),
 		hideTooltip: vi.fn()
-	}))
+	})),
+	onCombatFloat: vi.fn(() => () => {})
 }));
 
 vi.mock('$lib/engine', () => ({
 	battleEngine: mockBattleEngine,
 	playerManager: mockPlayerManager,
-	enemyManager: mockEnemyManager
+	enemyManager: mockEnemyManager,
+	onCombatFloat
 }));
 vi.mock('$stores', () => ({ staticData, statistics, playerChallenges, registerTooltipComponent }));
 
@@ -60,6 +68,7 @@ const makeZone = (over: Partial<IZone> = {}): IZone => ({
 beforeEach(() => {
 	mockBattleEngine.player = makeBattler({ name: 'Aelara' });
 	mockBattleEngine.enemy = makeBattler({ name: 'Dire Wolf' });
+	mockBattleEngine.timeElapsed = 0;
 	mockPlayerManager.currentZone = 0;
 	mockEnemyManager.mode = 'idle';
 	mockEnemyManager.autoFight = false;
@@ -79,6 +88,14 @@ describe('Fight', () => {
 		expect(screen.getByTestId('vs-badge')).toBeTruthy();
 		expect(screen.getByTestId('player-card')).toBeTruthy();
 		expect(screen.getByTestId('enemy-card')).toBeTruthy();
+	});
+
+	it('shows the battle timer above the versus badge', () => {
+		mockBattleEngine.timeElapsed = 48000;
+		render(Fight);
+		const timer = screen.getByTestId('battle-timer');
+		expect(timer.textContent).toContain('0:48');
+		expect(timer.textContent).toContain('/ 2:00 limit');
 	});
 
 	it('wires each battler to its own card', () => {

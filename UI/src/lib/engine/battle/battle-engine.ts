@@ -25,6 +25,22 @@ const battleStageChangedHook = createHook<[BattleStage]>();
 const notifyBattleStageChanged = battleStageChangedHook.notify;
 export const onBattleStageChanged = battleStageChangedHook.onNotified;
 
+/** One combat outcome surfaced for the fight screen's floating numbers. `target` is the battler the
+ *  float spawns over (the side that was struck / defended); `kind` picks its colour and label, and
+ *  `amount` is the damage to show — omitted for a dodge, which has no number. Player-only crit/dodge/
+ *  block mirror the battle-step roll surface (the enemy never dodges/blocks/crits). */
+export interface CombatFloatEvent {
+	target: 'player' | 'enemy';
+	kind: 'hit' | 'crit' | 'dodge' | 'block';
+	amount?: number;
+}
+
+const combatFloatHook = createHook<[CombatFloatEvent]>();
+const notifyCombatFloat = combatFloatHook.notify;
+/** Subscribe to per-activation combat outcomes for the floating-number layer. Fires once per skill
+ *  activation during the live battle loop; the headless simulator never emits these. */
+export const onCombatFloat = combatFloatHook.onNotified;
+
 export class BattleEngine {
 	public stage = Idle;
 	public player: Battler = new Battler();
@@ -151,6 +167,7 @@ export class BattleEngine {
 			)) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged, blocked);
 				logMessage(ELogType.Damage, this.damageLogMessage(skill.name, damage, outcome), outcome);
+				notifyCombatFloat(combatFloatEvent(byPlayer, crit, dodged, blocked, damage));
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
@@ -266,4 +283,26 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, blo
 		return 'player-block';
 	}
 	return 'enemy-hit';
+}
+
+/** Maps one activation's flags to the float that spawns for it, mirroring {@link damageLogOutcome}'s
+ *  decision. A player hit floats over the enemy (crit when it crit); an incoming enemy hit floats over
+ *  the player as a dodge (no number), a block, or a plain hit. */
+function combatFloatEvent(
+	byPlayer: boolean,
+	crit: boolean,
+	dodged: boolean,
+	blocked: boolean,
+	damage: number
+): CombatFloatEvent {
+	if (byPlayer) {
+		return { target: 'enemy', kind: crit ? 'crit' : 'hit', amount: damage };
+	}
+	if (dodged) {
+		return { target: 'player', kind: 'dodge' };
+	}
+	if (blocked) {
+		return { target: 'player', kind: 'block', amount: damage };
+	}
+	return { target: 'player', kind: 'hit', amount: damage };
 }

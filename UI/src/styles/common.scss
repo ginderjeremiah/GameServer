@@ -167,25 +167,48 @@ input::placeholder {
 	}
 }
 
+// Floating combat number: a "punchy" pop that overshoots, settles, then drifts up and fades.
+// The element is centred on its spawn x via translate(-50%), so every frame keeps that offset.
 @keyframes dmg-rise {
 	0% {
-		transform: translate(-50%, 8px) scale(0.85);
 		opacity: 0;
+		transform: translate(-50%, 6px) scale(0.42);
 	}
-	15% {
-		transform: translate(-50%, 0) scale(1.05);
+	16% {
 		opacity: 1;
+		transform: translate(-50%, -8px) scale(1.4);
 	}
-	25% {
-		transform: translate(-50%, -4px) scale(1);
-		opacity: 1;
+	30% {
+		transform: translate(-50%, -12px) scale(1);
 	}
-	85% {
+	82% {
 		opacity: 1;
 	}
 	100% {
-		transform: translate(-50%, -64px);
 		opacity: 0;
+		transform: translate(-50%, -76px) scale(1);
+	}
+}
+
+// Specular sweep that travels across the XP bar fill.
+@keyframes xp-shimmer {
+	0% {
+		transform: translateX(-160%);
+	}
+	55%,
+	100% {
+		transform: translateX(420%);
+	}
+}
+
+// Gold flash pulsed on the XP bar fill when the player levels up.
+@keyframes levelup-flash {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 transparent;
+	}
+	30% {
+		box-shadow: 0 0 16px 3px var(--gold);
 	}
 }
 

@@ -1,11 +1,29 @@
 <div class="battler-card" class:player={side === 'player'} class:enemy={side === 'enemy'} data-testid="{side}-card">
+	<CombatFloaters {side} testId="{side}-floaters" />
+
 	<!-- Name + Level -->
-	<div class="battler-header" class:reversed={side === 'enemy'}>
+	<div class="battler-header" class:reversed={side === 'enemy'} class:player={side === 'player'}>
 		<div class="battler-identity" class:reversed={side === 'enemy'}>
 			<div class="accent-bar" style:background={accent} style:box-shadow="0 0 8px {tintColor(accent, 0.5)}"></div>
 			<span class="battler-name">{battler.name}</span>
 		</div>
-		<span class="battler-level">LV · {battler.level}</span>
+		{#if side === 'player'}
+			<!-- The player's level + XP progress toward the next level (gold track). -->
+			<div class="player-progress">
+				<span class="player-level">LV {playerManager.level}</span>
+				<div class="xp-bar-slot">
+					<XpBar
+						level={playerManager.level}
+						exp={playerManager.exp}
+						nextLevelThreshold={playerManager.nextLevelThreshold}
+						ariaLabel="{battler.name} experience"
+						testId="player-xp-bar"
+					/>
+				</div>
+			</div>
+		{:else}
+			<span class="battler-level">LV · {battler.level}</span>
+		{/if}
 	</div>
 
 	<!-- HP Bar -->
@@ -27,8 +45,10 @@
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
 import { tintColor } from '$lib/common';
-import { HpBar } from '$components';
+import { playerManager } from '$lib/engine';
+import { HpBar, XpBar } from '$components';
 import ActiveEffectChips from './ActiveEffectChips.svelte';
+import CombatFloaters from './CombatFloaters.svelte';
 import Skills from './Skills.svelte';
 
 type Props = {
@@ -78,6 +98,29 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 	&.reversed {
 		flex-direction: row-reverse;
 	}
+
+	// The player's XP column is taller than the name, so bottom-align the row.
+	&.player {
+		align-items: flex-end;
+	}
+}
+
+.player-progress {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 3px;
+}
+
+.player-level {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	color: var(--accent-light);
+	letter-spacing: 0.8px;
+}
+
+.xp-bar-slot {
+	width: 104px;
 }
 
 .battler-identity {

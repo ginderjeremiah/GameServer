@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@keyframes fx-subtle{0%{opacity:0;transform:translate(-50%,8px) scale(.92)}14%{opacity:1;transform:translate(-50%,0) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-58px) scale(1)}}
+@keyframes fx-punchy{0%{opacity:0;transform:translate(-50%,6px) scale(.42)}16%{opacity:1;transform:translate(-50%,-8px) scale(1.4)}30%{transform:translate(-50%,-12px) scale(1)}82%{opacity:1}100%{opacity:0;transform:translate(-50%,-76px) scale(1)}}
+@keyframes fx-arc{0%{opacity:0;transform:translate(-50%,6px) scale(.7) rotate(0deg)}15%{opacity:1;transform:translate(calc(-50% + (var(--dx) * 0.35)),-10px) scale(1.12) rotate(calc(var(--rot) * 0.4))}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),-62px) scale(.95) rotate(var(--rot))}}
+@keyframes ready-pulse{0%,100%{box-shadow:inset 0 0 8px rgba(161,194,247,.3),0 0 6px rgba(161,194,247,.35)}50%{box-shadow:inset 0 0 10px rgba(161,194,247,.5),0 0 14px rgba(161,194,247,.85)}}
+@keyframes ready-pulse-enemy{0%,100%{box-shadow:inset 0 0 8px rgba(224,135,120,.3),0 0 6px rgba(224,135,120,.35)}50%{box-shadow:inset 0 0 10px rgba(224,135,120,.5),0 0 14px rgba(224,135,120,.85)}}
+@keyframes xp-shimmer{0%{transform:translateX(-160%)}55%{transform:translateX(420%)}100%{transform:translateX(420%)}}
+@keyframes levelup-flash{0%,100%{box-shadow:0 0 0 0 transparent}30%{box-shadow:0 0 16px 3px var(--gold)}}
+@keyframes soft-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+</style>
+</helmet>
+
+<div style="--page:#0f1014;--surface:#14151b;--panel:#16171e;--panel-2:#1b1c24;--accent:#a1c2f7;--accent-light:#c0d8ff;--enemy-accent:#e08778;--gold:#e8c878;--text-primary:#f0f0f0;--text-secondary:rgba(240,240,240,.78);--text-tertiary:rgba(240,240,240,.55);--text-muted:rgba(240,240,240,.4);--white:#fff;--black:#000;--border-subtle:rgba(255,255,255,.08);--border-light:rgba(255,255,255,.14);--border-medium:rgba(255,255,255,.18);--success:#bde0b4;--warning:#f0d28a;--block-color:#7fc28b;--health-missing-color:rgba(224,138,120,.18);--health-remaining-color:#7fc28b;--health-remaining-dark:#5da66a;--health-disappearing-color:rgba(224,138,120,.55);--violet:#c4b6ec;--mono:'Geist Mono',ui-monospace,monospace;--sans:Geist,system-ui,sans-serif;min-height:100vh;background:#0b0c0f;font-family:var(--sans);color:var(--text-primary);padding:40px 32px 80px;box-sizing:border-box;">
+
+  <div style="max-width:1080px;margin:0 auto;">
+
+    <div style="margin-bottom:8px;font-family:var(--mono);font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:var(--text-muted);">Fight Screen · Enhancements</div>
+    <h1 style="margin:0 0 6px;font-size:26px;font-weight:600;letter-spacing:-.3px;">Combat feedback &amp; progression</h1>
+    <p style="margin:0 0 36px;font-size:14px;line-height:1.55;color:var(--text-secondary);max-width:640px;">A live mock of the current Mirror layout with three additions: a player XP track in the card header, floating combat numbers, and a 2:00 battle timer. The hero below auto-plays — adjust treatments in <span style="font-family:var(--mono);font-size:12px;color:var(--accent-light);">Tweaks</span>.</p>
+
+    <!-- ===================== HERO: LIVE FIGHT ===================== -->
+    <div style="margin-bottom:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-tertiary);">Live · auto-playing</div>
+    <div style="position:relative;background:linear-gradient(0deg,#0d0e12,#15161c);border:1px solid var(--border-light);border-radius:4px;padding:24px 28px 44px;overflow:hidden;margin-bottom:52px;box-shadow:0 24px 60px rgba(0,0,0,.45);">
+
+      <!-- zone nav -->
+      <div style="display:flex;justify-content:center;margin-bottom:18px;">
+        <div style="display:inline-flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);border:1px solid var(--border-light);border-radius:3px;padding:6px 10px 6px 6px;">
+          <div style="width:24px;height:24px;background:rgba(255,255,255,.03);border:1px solid var(--border-medium);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:rgba(240,240,240,.85);">&#8249;</div>
+          <div style="display:flex;align-items:baseline;gap:10px;min-width:200px;justify-content:center;">
+            <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(192,216,255,.85);">Zone · 03</span>
+            <span style="font-size:16px;letter-spacing:.1px;">Ashfall Reach</span>
+          </div>
+          <div style="width:24px;height:24px;background:rgba(255,255,255,.03);border:1px solid var(--border-medium);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:rgba(240,240,240,.85);">&#8250;</div>
+        </div>
+      </div>
+
+      <!-- combatants -->
+      <div style="display:flex;align-items:flex-start;justify-content:center;gap:40px;padding-top:8px;">
+
+        <!-- PLAYER CARD -->
+        <div style="position:relative;background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-left:3px solid var(--accent);border-radius:3px;padding:16px 18px;width:300px;box-shadow:0 0 0 1px rgba(0,0,0,.4),-4px 0 18px rgba(161,194,247,.1);">
+          <div id="fl-player" style="position:absolute;inset:-12px 0 0 0;pointer-events:none;overflow:visible;z-index:6;"></div>
+          <!-- header -->
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              <div style="width:4px;height:18px;background:var(--accent);box-shadow:0 0 8px rgba(161,194,247,.5);"></div>
+              <span style="font-size:18px;font-weight:500;letter-spacing:-.1px;">Aelara</span>
+            </div>
+            <sc-if value="{{ showPlainLevel }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:var(--mono);font-size:10.5px;color:rgba(240,240,240,.6);letter-spacing:.6px;">LV · {{ level }}</span>
+            </sc-if>
+            <sc-if value="{{ placementHeader }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+                <span style="font-family:var(--mono);font-size:9.5px;color:var(--accent-light);letter-spacing:.8px;">LV {{ level }}</span>
+                <div style="position:relative;width:104px;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;">
+                  <div id="hero-xpbar" style="position:absolute;inset:0;width: {{ xpPct }};background:#e8c878;border-radius:2px;transition:width .35s ease-out;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:24px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 2.8s ease-in-out infinite;"></div></div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <!-- hp -->
+          <div style="position:relative;height:20px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-bottom:14px;">
+            <div style="position:absolute;inset:0;width: {{ pHpPct }};background:var(--health-disappearing-color);transition:width 1s ease-out;"></div>
+            <div style="position:absolute;inset:0;width: {{ pHpPct }};background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));transition:width .12s ease-out;"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7);letter-spacing:.3px;">{{ pHpText }}</div>
+          </div>
+          <!-- skills -->
+          <div style="display:flex;gap:10px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(161,194,247,.5);border-radius:2px;overflow:hidden;animation:ready-pulse 1.3s ease-in-out infinite;"><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(161,194,247,.18),transparent 65%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-light);">Strike</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 150deg,transparent 150deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Guard</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 250deg,transparent 250deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Rally</span></div>
+          </div>
+          <!-- level bar: under-card -->
+          <sc-if value="{{ placementUnder }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;"><span style="color:var(--accent-light);">Lv {{ level }}</span><span style="color:var(--text-muted);">{{ xpText }}</span></div>
+              <div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.06);border:1px solid var(--border-subtle);overflow:hidden;"><div id="hero-xpbar" style="position:absolute;inset:0;width: {{ xpPct }};background:#e8c878;border-radius:3px;transition:width .35s ease-out;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:30px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 2.8s ease-in-out infinite;"></div></div></div>
+            </div>
+          </sc-if>
+          <!-- level bar: badge + readout -->
+          <sc-if value="{{ placementBadge }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;display:flex;align-items:center;gap:10px;">
+              <div style="flex-shrink:0;width:34px;height:34px;border-radius:3px;background:linear-gradient(150deg,rgba(232,200,120,.18),rgba(196,182,236,.18));border:1px solid rgba(232,200,120,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;"><span style="font-family:var(--mono);font-size:7px;letter-spacing:.5px;color:var(--text-muted);">LV</span><span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--gold);">{{ level }}</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+                <div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.06);border:1px solid var(--border-subtle);overflow:hidden;"><div id="hero-xpbar" style="position:absolute;inset:0;width: {{ xpPct }};background:#e8c878;border-radius:3px;transition:width .35s ease-out;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:30px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 2.8s ease-in-out infinite;"></div></div></div>
+                <span style="font-family:var(--mono);font-size:9px;letter-spacing:.6px;color:var(--text-muted);text-align:right;">{{ xpText }}</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- center: timer above VS -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:18px;flex-shrink:0;align-self:center;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:124px;">
+            <sc-if value="{{ notTimedOut }}" hint-placeholder-val="{{ true }}">
+              <div style="font-family:var(--mono);font-weight:500;font-size:28px;letter-spacing:1.5px;line-height:1;color:var(--text-primary);">{{ timerText }}</div>
+              <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);">/ 2:00 limit</div>
+            </sc-if>
+            <sc-if value="{{ timedOut }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family:var(--mono);font-weight:600;font-size:20px;letter-spacing:2.5px;line-height:1;color:var(--enemy-accent);">TIMEOUT</div>
+              <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);">draw</div>
+            </sc-if>
+            <sc-if value="{{ showTrack }}" hint-placeholder-val="{{ true }}">
+              <div style="width:120px;height:2px;background:rgba(255,255,255,.09);border-radius:1px;overflow:hidden;margin-top:3px;">
+                <div style="height:100%;width: {{ timePct }};background: {{ timerFillColor }};transition:width .12s linear,background .4s;"></div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="width:56px;height:56px;position:relative;display:flex;align-items:center;justify-content:center;">
+            <div style="position:absolute;inset:0;border:1px solid var(--border-medium);transform:rotate(45deg);background:rgba(20,21,27,.6);"></div>
+            <div style="position:absolute;inset:14px;background:rgba(255,255,255,.04);transform:rotate(45deg);box-shadow:inset 0 0 12px rgba(255,255,255,.08);"></div>
+            <span style="position:relative;font-family:var(--mono);font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:rgba(240,240,240,.85);">vs</span>
+          </div>
+        </div>
+
+        <!-- ENEMY CARD -->
+        <div style="position:relative;background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-right:3px solid var(--enemy-accent);border-radius:3px;padding:16px 18px;width:300px;box-shadow:0 0 0 1px rgba(0,0,0,.4),4px 0 18px rgba(224,135,120,.1);">
+          <div id="fl-enemy" style="position:absolute;inset:-12px 0 0 0;pointer-events:none;overflow:visible;z-index:6;"></div>
+          <div style="display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:baseline;margin-bottom:14px;">
+            <div style="display:flex;flex-direction:row-reverse;align-items:center;gap:9px;">
+              <div style="width:4px;height:18px;background:var(--enemy-accent);box-shadow:0 0 8px rgba(224,135,120,.5);"></div>
+              <span style="font-size:18px;font-weight:500;letter-spacing:-.1px;">Cinder Wraith</span>
+            </div>
+            <span style="font-family:var(--mono);font-size:10.5px;color:rgba(240,240,240,.6);letter-spacing:.6px;">LV · 9</span>
+          </div>
+          <div style="position:relative;height:20px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-bottom:14px;">
+            <div style="position:absolute;inset:0;width: {{ eHpPct }};background:var(--health-disappearing-color);transition:width 1s ease-out;"></div>
+            <div style="position:absolute;inset:0;width: {{ eHpPct }};background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));transition:width .12s ease-out;"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7);letter-spacing:.3px;">{{ eHpText }}</div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 90deg,transparent 90deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Gnash</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(224,135,120,.5);border-radius:2px;overflow:hidden;animation:ready-pulse-enemy 1.3s ease-in-out infinite;"><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(224,135,120,.18),transparent 65%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--enemy-accent);">Howl</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;"><div style="width:58px;height:58px;position:relative;background:rgba(255,255,255,.05);border:1px solid var(--border-light);border-radius:2px;overflow:hidden;"><div style="position:absolute;inset:0;background:conic-gradient(from -90deg,rgba(0,0,0,.6) 210deg,transparent 210deg);"></div><div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 60%);"></div></div><span style="font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:rgba(240,240,240,.6);">Rend</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== B: LEVEL / XP BAR ===================== -->
+    <div style="margin-bottom:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-tertiary);">01 · Player level progress</div>
+    <h2 style="margin:0 0 4px;font-size:19px;font-weight:600;">XP track placements</h2>
+    <p style="margin:0 0 22px;font-size:13px;color:var(--text-secondary);max-width:620px;">Gold→violet fill (your pick). The track is mirrorable — left-anchored on the fight card, right-anchored on the Attributes screen.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;">
+
+      <!-- under-card -->
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">A · Flush under card</div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-left:3px solid var(--accent);border-radius:3px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;"><div style="width:4px;height:16px;background:var(--accent);"></div><span style="font-size:16px;font-weight:500;">Aelara</span></div><span style="font-family:var(--mono);font-size:10px;color:rgba(240,240,240,.6);">LV · 7</span></div>
+          <div style="height:18px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;position:relative;"><div style="position:absolute;inset:0;width:72%;background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));"></div></div>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;"><span style="color:var(--accent-light);">Lv 7</span><span style="color:var(--text-muted);">340 / 700 XP</span></div>
+            <div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.06);border:1px solid var(--border-subtle);overflow:hidden;"><div style="position:absolute;inset:0;width:49%;background:#e8c878;border-radius:3px;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:28px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 3s ease-in-out infinite;"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- badge -->
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">B · Badge + readout</div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-left:3px solid var(--accent);border-radius:3px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;"><div style="width:4px;height:16px;background:var(--accent);"></div><span style="font-size:16px;font-weight:500;">Aelara</span></div></div>
+          <div style="height:18px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;position:relative;"><div style="position:absolute;inset:0;width:72%;background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));"></div></div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+            <div style="flex-shrink:0;width:34px;height:34px;border-radius:3px;background:linear-gradient(150deg,rgba(232,200,120,.18),rgba(196,182,236,.18));border:1px solid rgba(232,200,120,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;"><span style="font-family:var(--mono);font-size:7px;color:var(--text-muted);">LV</span><span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--gold);">7</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+              <div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.06);border:1px solid var(--border-subtle);overflow:hidden;"><div style="position:absolute;inset:0;width:49%;background:#e8c878;border-radius:3px;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:28px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 3s ease-in-out infinite;"></div></div></div>
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);text-align:right;">340 / 700 XP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- in header -->
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">C · In header row</div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-left:3px solid var(--accent);border-radius:3px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;"><div style="width:4px;height:16px;background:var(--accent);"></div><span style="font-size:16px;font-weight:500;">Aelara</span></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--mono);font-size:9.5px;color:var(--accent-light);">LV 7</span><div style="position:relative;width:104px;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;"><div style="position:absolute;inset:0;width:49%;background:#e8c878;border-radius:2px;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:22px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 3s ease-in-out infinite;"></div></div></div></div>
+          </div>
+          <div style="height:18px;background:var(--health-missing-color);border:1px solid rgba(255,255,255,.12);border-radius:2px;overflow:hidden;position:relative;"><div style="position:absolute;inset:0;width:72%;background:linear-gradient(180deg,var(--health-remaining-color),var(--health-remaining-dark));"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- mirror -->
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Mirrored · Attributes screen (right-anchored)</div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border-light);border-right:3px solid var(--accent);border-radius:3px;padding:16px 20px;display:flex;flex-direction:row-reverse;align-items:center;gap:16px;margin-bottom:52px;">
+      <div style="flex-shrink:0;text-align:right;"><div style="font-size:17px;font-weight:500;">Aelara</div><div style="font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-top:2px;">Level 7 · 340 / 700 XP</div></div>
+      <div style="flex:1;position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.06);border:1px solid var(--border-subtle);overflow:hidden;"><div style="position:absolute;top:0;bottom:0;right:0;width:49%;background:#e8c878;border-radius:4px;overflow:hidden;"><div style="position:absolute;top:0;bottom:0;left:0;width:36px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:xp-shimmer 3s ease-in-out infinite;"></div></div></div>
+    </div>
+
+    <!-- ===================== C: FLOATING NUMBERS ===================== -->
+    <div style="margin-bottom:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-tertiary);">02 · Floating combat numbers</div>
+    <h2 style="margin:0 0 4px;font-size:19px;font-weight:600;">Motion styles &amp; outcome coding</h2>
+    <p style="margin:0 0 22px;font-size:13px;color:var(--text-secondary);max-width:620px;">Three live treatments, same event stream. Color + a square icon placeholder (real icons drop in later) + short label.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;">
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Subtle · rise &amp; fade</div>
+        <div id="demo-subtle" style="position:relative;height:200px;background:radial-gradient(120% 80% at 50% 100%,rgba(161,194,247,.06),transparent),rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;overflow:hidden;"></div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Punchy · pop &amp; drift</div>
+        <div id="demo-punchy" style="position:relative;height:200px;background:radial-gradient(120% 80% at 50% 100%,rgba(232,200,120,.07),transparent),rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;overflow:hidden;"></div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Arc · scatter</div>
+        <div id="demo-arc" style="position:relative;height:200px;background:radial-gradient(120% 80% at 50% 100%,rgba(224,135,120,.06),transparent),rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;overflow:hidden;"></div>
+      </div>
+    </div>
+
+    <!-- legend -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px 22px;background:rgba(255,255,255,.02);border:1px solid var(--border-subtle);border-radius:3px;padding:14px 18px;margin-bottom:52px;">
+      <div style="display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:11px;height:11px;border:1px solid var(--accent);border-radius:2px;opacity:.6;"></span><span style="font-family:var(--mono);font-size:11px;color:var(--accent);">247</span><span style="font-size:11px;color:var(--text-tertiary);">player hit</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:11px;height:11px;border:1px solid var(--gold);border-radius:2px;opacity:.6;"></span><span style="font-family:var(--mono);font-size:11px;color:var(--gold);font-weight:600;">438 CRIT</span><span style="font-size:11px;color:var(--text-tertiary);">critical</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:11px;height:11px;border:1px solid var(--enemy-accent);border-radius:2px;opacity:.6;"></span><span style="font-family:var(--mono);font-size:11px;color:var(--enemy-accent);">182</span><span style="font-size:11px;color:var(--text-tertiary);">incoming</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:11px;height:11px;border:1px solid var(--text-secondary);border-radius:2px;opacity:.6;"></span><span style="font-family:var(--mono);font-size:11px;color:var(--text-secondary);">DODGE</span><span style="font-size:11px;color:var(--text-tertiary);">evaded</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="display:inline-block;width:11px;height:11px;border:1px solid var(--block-color);border-radius:2px;opacity:.6;"></span><span style="font-family:var(--mono);font-size:11px;color:var(--block-color);">BLOCK 39</span><span style="font-size:11px;color:var(--text-tertiary);">absorbed</span></div>
+    </div>
+
+    <!-- ===================== D: TIMER ===================== -->
+    <div style="margin-bottom:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-tertiary);">03 · Battle timer</div>
+    <h2 style="margin:0 0 4px;font-size:19px;font-weight:600;">Elapsed vs 2:00 limit</h2>
+    <p style="margin:0 0 22px;font-size:13px;color:var(--text-secondary);max-width:620px;">Stacked mono readout (your pick). The hero above places it <span style="color:var(--accent-light);">over the VS badge</span> — below the zone-nav/boss-header band, so it never collides. Three candidate spots:</p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:14px;">
+      <!-- A: in zone nav -->
+      <div>
+        <div style="position:relative;height:150px;background:rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;overflow:hidden;">
+          <div style="position:absolute;top:13px;left:50%;transform:translateX(-50%);width:78px;height:15px;border-radius:3px;background:rgba(255,255,255,.05);border:1px solid var(--border-light);"></div>
+          <div style="position:absolute;top:13px;left:calc(50% + 44px);height:17px;padding:0 6px;display:flex;align-items:center;border-radius:3px;background:rgba(161,194,247,.16);border:1px solid rgba(161,194,247,.55);box-shadow:0 0 10px rgba(161,194,247,.35);font-family:var(--mono);font-size:9px;color:var(--accent-light);">0:48</div>
+          <div style="position:absolute;top:34px;left:50%;transform:translateX(-50%);width:118px;height:13px;border-radius:3px;background:rgba(232,200,120,.1);border:1px solid rgba(232,200,120,.25);"></div>
+          <div style="position:absolute;top:62px;left:16px;width:64px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-left:2px solid var(--accent);"></div>
+          <div style="position:absolute;top:62px;right:16px;width:64px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-right:2px solid var(--enemy-accent);"></div>
+          <div style="position:absolute;top:85px;left:50%;transform:translate(-50%,0) rotate(45deg);width:15px;height:15px;border:1px solid var(--border-medium);background:rgba(20,21,27,.7);"></div>
+        </div>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">A · Inside zone nav</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">Compact, always visible.</div>
+      </div>
+      <!-- B: above VS (recommended) -->
+      <div>
+        <div style="position:relative;height:150px;background:rgba(255,255,255,.02);border:1px solid rgba(161,194,247,.4);border-radius:3px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(161,194,247,.12);">
+          <div style="position:absolute;top:13px;left:50%;transform:translateX(-50%);width:78px;height:15px;border-radius:3px;background:rgba(255,255,255,.05);border:1px solid var(--border-light);"></div>
+          <div style="position:absolute;top:34px;left:50%;transform:translateX(-50%);width:118px;height:13px;border-radius:3px;background:rgba(232,200,120,.1);border:1px solid rgba(232,200,120,.25);"></div>
+          <div style="position:absolute;top:62px;left:16px;width:60px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-left:2px solid var(--accent);"></div>
+          <div style="position:absolute;top:62px;right:16px;width:60px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-right:2px solid var(--enemy-accent);"></div>
+          <div style="position:absolute;top:64px;left:50%;transform:translateX(-50%);height:17px;padding:0 7px;display:flex;align-items:center;border-radius:3px;background:rgba(161,194,247,.18);border:1px solid rgba(161,194,247,.6);box-shadow:0 0 12px rgba(161,194,247,.4);font-family:var(--mono);font-size:10px;color:var(--accent-light);">0:48</div>
+          <div style="position:absolute;top:96px;left:50%;transform:translate(-50%,0) rotate(45deg);width:15px;height:15px;border:1px solid var(--border-medium);background:rgba(20,21,27,.7);"></div>
+        </div>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--accent-light);">B · Above the VS badge · recommended</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">Centered, clears the boss header.</div>
+      </div>
+      <!-- C: corner -->
+      <div>
+        <div style="position:relative;height:150px;background:rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;overflow:hidden;">
+          <div style="position:absolute;top:13px;left:50%;transform:translateX(-50%);width:78px;height:15px;border-radius:3px;background:rgba(255,255,255,.05);border:1px solid var(--border-light);"></div>
+          <div style="position:absolute;top:11px;right:12px;height:17px;padding:0 6px;display:flex;align-items:center;border-radius:3px;background:rgba(161,194,247,.16);border:1px solid rgba(161,194,247,.55);box-shadow:0 0 10px rgba(161,194,247,.35);font-family:var(--mono);font-size:9px;color:var(--accent-light);">0:48</div>
+          <div style="position:absolute;top:34px;left:50%;transform:translateX(-50%);width:118px;height:13px;border-radius:3px;background:rgba(232,200,120,.1);border:1px solid rgba(232,200,120,.25);"></div>
+          <div style="position:absolute;top:62px;left:16px;width:64px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-left:2px solid var(--accent);"></div>
+          <div style="position:absolute;top:62px;right:16px;width:64px;height:62px;border-radius:2px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-right:2px solid var(--enemy-accent);"></div>
+          <div style="position:absolute;top:85px;left:50%;transform:translate(-50%,0) rotate(45deg);width:15px;height:15px;border:1px solid var(--border-medium);background:rgba(20,21,27,.7);"></div>
+        </div>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">C · Arena corner</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">Out of the way.</div>
+      </div>
+    </div>
+
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Treatment states</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px;">
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border-light);border-radius:3px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+        <div style="font-family:var(--mono);font-weight:500;font-size:30px;letter-spacing:1.5px;line-height:1;">0:48</div>
+        <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--text-muted);">/ 2:00 limit</div>
+        <div style="width:148px;height:2px;background:rgba(255,255,255,.09);border-radius:1px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:40%;background:var(--accent);"></div></div>
+        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-tertiary);margin-top:8px;">running</div>
+      </div>
+      <div style="background:rgba(255,255,255,.02);border:1px solid rgba(240,210,138,.3);border-radius:3px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+        <div style="font-family:var(--mono);font-weight:500;font-size:30px;letter-spacing:1.5px;line-height:1;color:var(--warning);">1:52</div>
+        <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--text-muted);">/ 2:00 limit</div>
+        <div style="width:148px;height:2px;background:rgba(255,255,255,.09);border-radius:1px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:93%;background:var(--warning);"></div></div>
+        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warning);margin-top:8px;animation:soft-pulse 1.1s ease-in-out infinite;">final seconds</div>
+      </div>
+      <div style="background:rgba(255,255,255,.02);border:1px solid rgba(224,135,120,.3);border-radius:3px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+        <div style="font-family:var(--mono);font-weight:600;font-size:24px;letter-spacing:3px;line-height:1;color:var(--enemy-accent);margin-top:4px;">TIMEOUT</div>
+        <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--text-muted);">draw</div>
+        <div style="width:148px;height:2px;background:rgba(255,255,255,.09);border-radius:1px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:100%;background:var(--enemy-accent);"></div></div>
+        <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-tertiary);margin-top:8px;">idle farm continues</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1160,&quot;height&quot;:2480},&quot;levelBarPlacement&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;under-card&quot;,&quot;badge-readout&quot;,&quot;in-header&quot;],&quot;default&quot;:&quot;in-header&quot;,&quot;tsType&quot;:&quot;'under-card'|'badge-readout'|'in-header'&quot;},&quot;floatingMotion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;subtle&quot;,&quot;punchy&quot;,&quot;arc&quot;],&quot;default&quot;:&quot;punchy&quot;,&quot;tsType&quot;:&quot;'subtle'|'punchy'|'arc'&quot;},&quot;showTimerTrack&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;timeScale&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;min&quot;:1,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  state = {
+    level: 7,
+    xpInLevel: 280,
+    pMax: 1180, pHp: 1180,
+    eMax: 940, eHp: 940,
+    timeMs: 0,
+    timedOut: false,
+  };
+
+  _ts() { return this.props.timeScale ?? 4; }
+
+  componentDidMount() {
+    this._dead = false;
+    this._clock = setInterval(() => this._tick(), 100);
+    this._scheduleAttack();
+    this._demo = setInterval(() => this._demoTick(), 1050);
+    this._demoTick();
+  }
+
+  componentWillUnmount() {
+    this._dead = true;
+    clearInterval(this._clock);
+    clearInterval(this._demo);
+    clearTimeout(this._atk);
+    clearTimeout(this._rst);
+  }
+
+  _tick() {
+    if (this._dead || this.state.timedOut) return;
+    const t = this.state.timeMs + 100 * this._ts();
+    if (t >= 120000) {
+      this.setState({ timeMs: 120000, timedOut: true });
+      this._rst = setTimeout(() => {
+        if (this._dead) return;
+        this.setState({ timeMs: 0, timedOut: false, pHp: this.state.pMax, eHp: this.state.eMax });
+      }, 1700);
+      return;
+    }
+    this.setState({ timeMs: t });
+  }
+
+  _scheduleAttack() {
+    const delay = 520 + Math.random() * 460;
+    this._atk = setTimeout(() => {
+      this._resolve();
+      this._scheduleAttack();
+    }, delay);
+  }
+
+  _resolve() {
+    if (this._dead || this.state.timedOut) return;
+    const playerAtt = Math.random() < 0.6;
+    const r = Math.random();
+    if (playerAtt) {
+      if (r < 0.10) { this._float('fl-enemy', { label: 'DODGE', color: 'var(--text-secondary)' }); return; }
+      if (r < 0.20) { const a = Math.round(20 + Math.random() * 30); this._float('fl-enemy', { amount: a, label: 'BLOCK', color: 'var(--block-color)' }); this._dmg('e', a); return; }
+      const crit = Math.random() < 0.20;
+      const dmg = Math.round((80 + Math.random() * 90) * (crit ? 2.1 : 1));
+      this._float('fl-enemy', { amount: dmg, label: crit ? 'CRIT' : '', color: crit ? 'var(--gold)' : 'var(--accent)', crit });
+      this._dmg('e', dmg);
+    } else {
+      if (r < 0.12) { this._float('fl-player', { label: 'DODGE', color: 'var(--text-secondary)' }); return; }
+      if (r < 0.22) { const a = Math.round(15 + Math.random() * 25); this._float('fl-player', { amount: a, label: 'BLOCK', color: 'var(--block-color)' }); this._dmg('p', a); return; }
+      const crit = Math.random() < 0.14;
+      const dmg = Math.round((55 + Math.random() * 65) * (crit ? 1.9 : 1));
+      this._float('fl-player', { amount: dmg, label: crit ? 'CRIT' : '', color: 'var(--enemy-accent)', crit });
+      this._dmg('p', dmg);
+    }
+  }
+
+  _dmg(who, amount) {
+    if (who === 'e') {
+      const hp = this.state.eHp - amount;
+      if (hp <= 0) { this._kill(); return; }
+      this.setState({ eHp: hp });
+    } else {
+      const hp = this.state.pHp - amount;
+      if (hp < this.state.pMax * 0.14) {
+        this._float('fl-player', { amount: Math.round(this.state.pMax * 0.4), label: '', color: 'var(--success)', heal: true });
+        this.setState({ pHp: Math.min(this.state.pMax, hp + this.state.pMax * 0.45) });
+      } else {
+        this.setState({ pHp: hp });
+      }
+    }
+  }
+
+  _kill() {
+    const gain = 30 + Math.round(Math.random() * 30);
+    let xp = this.state.xpInLevel + gain;
+    let level = this.state.level;
+    let leveled = false;
+    let need = level * 100;
+    while (xp >= need) { xp -= need; level++; leveled = true; need = level * 100; }
+    this.setState({ eHp: this.state.eMax, xpInLevel: xp, level });
+    if (leveled) {
+      this._float('fl-player', { label: 'LEVEL UP', color: 'var(--gold)', crit: true });
+      const bar = document.getElementById('hero-xpbar');
+      if (bar) { bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = 'levelup-flash 900ms ease-out'; }
+    }
+  }
+
+  _demoTick() {
+    if (this._dead) return;
+    const D = [
+      { amount: 247, color: 'var(--accent)' },
+      { amount: 438, label: 'CRIT', color: 'var(--gold)', crit: true },
+      { label: 'DODGE', color: 'var(--text-secondary)' },
+      { amount: 39, label: 'BLOCK', color: 'var(--block-color)' },
+      { amount: 182, color: 'var(--enemy-accent)' }
+    ];
+    this._di = this._di || 0;
+    const s = D[this._di % D.length];
+    this._di++;
+    this._float('demo-subtle', Object.assign({}, s, { motion: 'subtle' }));
+    this._float('demo-punchy', Object.assign({}, s, { motion: 'punchy' }));
+    this._float('demo-arc', Object.assign({}, s, { motion: 'arc' }));
+  }
+
+  _float(layerId, o) {
+    const layer = document.getElementById(layerId);
+    if (!layer) return;
+    const m = o.motion || (this.props.floatingMotion ?? 'punchy');
+    const anim = m === 'subtle' ? 'fx-subtle' : m === 'arc' ? 'fx-arc' : 'fx-punchy';
+    const dur = m === 'subtle' ? 1500 : m === 'arc' ? 1750 : 1500;
+    const x = 24 + Math.random() * 52;
+    const dx = (Math.random() * 2 - 1) * 42;
+    const rot = (Math.random() * 2 - 1) * 16;
+    const labelOnly = o.amount == null;
+    const size = o.crit ? 30 : labelOnly ? 20 : 21;
+    const amtTxt = o.amount != null ? (o.heal ? '+' + o.amount : '' + o.amount) : '';
+    const ico = '<span style="display:inline-block;width:.62em;height:.62em;border:1px solid currentColor;border-radius:2px;opacity:.5;margin-right:.26em;vertical-align:.02em;"></span>';
+    const amt = amtTxt ? '<span>' + amtTxt + '</span>' : '';
+    const lbl = o.label ? '<span style="font-size:.6em;letter-spacing:.13em;margin-left:.32em;font-weight:600;opacity:.95;">' + o.label + '</span>' : '';
+    const el = document.createElement('div');
+    el.innerHTML = ico + amt + lbl;
+    const glow = o.crit ? ',0 0 10px ' + o.color : '';
+    el.style.cssText = 'position:absolute;left:' + x + '%;top:54%;color:' + o.color + ';font-family:var(--mono);font-weight:700;font-size:' + size + 'px;white-space:nowrap;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.85)' + glow + ';--dx:' + dx + 'px;--rot:' + rot + 'deg;animation:' + anim + ' ' + dur + 'ms cubic-bezier(.18,.7,.28,1) forwards;';
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), dur + 80);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const pPct = Math.max(0, (s.pHp / s.pMax) * 100);
+    const ePct = Math.max(0, (s.eHp / s.eMax) * 100);
+    const need = s.level * 100;
+    const xpPct = Math.min(100, (s.xpInLevel / need) * 100);
+    const fmt = (n) => Math.round(n).toLocaleString();
+    const placement = this.props.levelBarPlacement ?? 'in-header';
+    const totalS = Math.floor(s.timeMs / 1000);
+    const mm = Math.floor(totalS / 60);
+    const ss = totalS % 60;
+    const warn = s.timeMs >= 100000;
+    return {
+      level: s.level,
+      pHpPct: pPct + '%',
+      eHpPct: ePct + '%',
+      pHpText: fmt(s.pHp) + ' / ' + fmt(s.pMax),
+      eHpText: fmt(s.eHp) + ' / ' + fmt(s.eMax),
+      xpPct: xpPct + '%',
+      xpText: Math.round(s.xpInLevel) + ' / ' + need + ' XP',
+      timerText: mm + ':' + String(ss).padStart(2, '0'),
+      timePct: (s.timeMs / 120000) * 100 + '%',
+      timerFillColor: warn ? 'var(--warning)' : 'var(--accent)',
+      timedOut: s.timedOut,
+      notTimedOut: !s.timedOut,
+      showTrack: this.props.showTimerTrack ?? true,
+      placementUnder: placement === 'under-card',
+      placementBadge: placement === 'badge-readout',
+      placementHeader: placement === 'in-header',
+      showPlainLevel: placement !== 'in-header'
+    };
+  }
+}
+</script>
+</body>
+</html>
