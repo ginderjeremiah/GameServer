@@ -14,6 +14,7 @@ const {
 	setFavorite,
 	applyMod,
 	removeMod,
+	toastError,
 	unlockedMods,
 	sampleItems,
 	sampleSlots,
@@ -25,6 +26,7 @@ const {
 	setFavorite: vi.fn(),
 	applyMod: vi.fn(),
 	removeMod: vi.fn(),
+	toastError: vi.fn(),
 	unlockedMods: new Set<number>(),
 	sampleItems: [] as Item[],
 	sampleSlots: new Array(6).fill(undefined) as (Item | undefined)[],
@@ -62,7 +64,7 @@ vi.mock('$lib/engine', () => ({
 	}
 }));
 
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, toastError }));
 
 import { itemCategoryColor, itemCategoryName } from '$lib/common';
 import { InventoryView, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
@@ -86,11 +88,13 @@ const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERar
 	}) as unknown as Item;
 
 beforeEach(() => {
-	equipItem.mockClear();
-	unequipItem.mockClear();
+	// Default the optimistic mutations to a successful persist; failure cases override per-test.
+	equipItem.mockReset().mockResolvedValue(true);
+	unequipItem.mockReset().mockResolvedValue(true);
+	applyMod.mockReset().mockResolvedValue(true);
+	removeMod.mockReset().mockResolvedValue(true);
 	setFavorite.mockClear();
-	applyMod.mockClear();
-	removeMod.mockClear();
+	toastError.mockClear();
 	unlockedMods.clear();
 	staticData.itemMods = [];
 	sampleSlots.fill(undefined);
@@ -245,6 +249,59 @@ describe('InventoryView delegation', () => {
 	it('removeMod delegates to the manager', () => {
 		new InventoryView().removeMod(2, 0);
 		expect(removeMod).toHaveBeenCalledWith(2, 0);
+	});
+});
+
+describe('InventoryView persist-failure feedback', () => {
+	it('toasts when an equip fails to persist', async () => {
+		equipItem.mockResolvedValue(false);
+		await new InventoryView().equip(2, 4);
+		expect(toastError).toHaveBeenCalledWith('Your equipment change could not be saved. Please try again.');
+	});
+
+	it('stays silent when an equip persists', async () => {
+		await new InventoryView().equip(2, 4);
+		expect(toastError).not.toHaveBeenCalled();
+	});
+
+	it('toasts when an unequip fails to persist', async () => {
+		unequipItem.mockResolvedValue(false);
+		await new InventoryView().unequip(4);
+		expect(toastError).toHaveBeenCalledWith('Your equipment change could not be saved. Please try again.');
+	});
+
+	it('toggleEquip surfaces the underlying equip failure', async () => {
+		equipItem.mockResolvedValue(false);
+		await new InventoryView().toggleEquip(sampleItems[1]); // unequipped weapon → equip path
+		expect(toastError).toHaveBeenCalledWith('Your equipment change could not be saved. Please try again.');
+	});
+
+	it('toggleEquip surfaces the underlying unequip failure', async () => {
+		unequipItem.mockResolvedValue(false);
+		const equippedWeapon = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary, {
+			equipped: true,
+			equipmentSlotId: 4
+		});
+		await new InventoryView().toggleEquip(equippedWeapon);
+		expect(toastError).toHaveBeenCalledWith('Your equipment change could not be saved. Please try again.');
+	});
+
+	it('toasts when applying a mod fails to persist', async () => {
+		applyMod.mockResolvedValue(false);
+		await new InventoryView().applyMod(2, 0, 7);
+		expect(toastError).toHaveBeenCalledWith('Your modifier change could not be saved. Please try again.');
+	});
+
+	it('toasts when removing a mod fails to persist', async () => {
+		removeMod.mockResolvedValue(false);
+		await new InventoryView().removeMod(2, 0);
+		expect(toastError).toHaveBeenCalledWith('Your modifier change could not be saved. Please try again.');
+	});
+
+	it('stays silent when a mod change persists', async () => {
+		await new InventoryView().applyMod(2, 0, 7);
+		await new InventoryView().removeMod(2, 0);
+		expect(toastError).not.toHaveBeenCalled();
 	});
 });
 
