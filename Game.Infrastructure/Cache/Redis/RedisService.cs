@@ -31,6 +31,10 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task<string?> Get(string key, CancellationToken cancellationToken = default)
         {
+            // Honour an already-cancelled budget before issuing the read: WaitAsync alone is racy because it
+            // returns the inner task unchanged when that task is already complete (it checks IsCompleted before
+            // the token), so a command that finished first would silently swallow the cancellation.
+            cancellationToken.ThrowIfCancellationRequested();
             return await Redis.StringGetAsync(key).WaitAsync(cancellationToken);
         }
 
