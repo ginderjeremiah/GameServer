@@ -1,5 +1,4 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { flushSync } from 'svelte';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EItemCategory, ERarity } from '$lib/api';
 import { BattleAttributes, type Item } from '$lib/battle';
@@ -185,37 +184,5 @@ describe('InventoryGrid — drag interactions', () => {
 		const { container } = render(InventoryGrid, { props: { view } });
 		await fireEvent.dragEnd(container.querySelector('.overlay-button')!);
 		expect(view.dragItemId).toBeNull();
-	});
-});
-
-describe('InventoryGrid — page reset on filter/sort change', () => {
-	it('resets view.page to 0 when filterCat changes', () => {
-		const view = new InventoryView();
-		render(InventoryGrid, { props: { view } });
-		flushSync();
-		view.page = 2;
-		view.filterCat = EItemCategory.Weapon;
-		flushSync();
-		expect(view.page).toBe(0);
-	});
-
-	it('resets view.page to 0 when sort changes', () => {
-		const view = new InventoryView();
-		render(InventoryGrid, { props: { view } });
-		flushSync();
-		view.page = 2;
-		view.sort = 'name';
-		flushSync();
-		expect(view.page).toBe(0);
-	});
-
-	it('resets view.page to 0 when favOnly changes', () => {
-		const view = new InventoryView();
-		render(InventoryGrid, { props: { view } });
-		flushSync();
-		view.page = 2;
-		view.favOnly = true;
-		flushSync();
-		expect(view.page).toBe(0);
 	});
 });

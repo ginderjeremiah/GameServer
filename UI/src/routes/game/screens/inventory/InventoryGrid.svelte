@@ -63,14 +63,6 @@ const pages = $derived(Math.max(1, Math.ceil(view.visible.length / perPage)));
 const pageClamped = $derived(Math.min(view.page, pages - 1));
 const slice = $derived(view.visible.slice(pageClamped * perPage, pageClamped * perPage + perPage));
 
-// Reset to the first page whenever the filter/sort changes.
-$effect(() => {
-	void view.sort;
-	void view.filterCat;
-	void view.favOnly;
-	view.page = 0;
-});
-
 const tooltip = getItemTooltip();
 
 // Suppress the tooltip while an item is selected or being dragged — a rule the grid owns since the

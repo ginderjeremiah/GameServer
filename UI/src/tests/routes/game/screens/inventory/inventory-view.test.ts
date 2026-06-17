@@ -203,6 +203,57 @@ describe('InventoryView derivations', () => {
 	});
 });
 
+describe('InventoryView filter/sort setters reset the page', () => {
+	it('setSort changes the sort and snaps back to the first page', () => {
+		const view = new InventoryView();
+		view.page = 3;
+		view.setSort('name');
+		expect(view.sort).toBe('name');
+		expect(view.page).toBe(0);
+	});
+
+	it('setFilterCat changes the category filter and snaps back to the first page', () => {
+		const view = new InventoryView();
+		view.page = 3;
+		view.setFilterCat(EItemCategory.Weapon);
+		expect(view.filterCat).toBe(EItemCategory.Weapon);
+		expect(view.page).toBe(0);
+	});
+
+	it('setFavOnly toggles the favorites filter and snaps back to the first page', () => {
+		const view = new InventoryView();
+		view.page = 3;
+		view.setFavOnly(true);
+		expect(view.favOnly).toBe(true);
+		expect(view.page).toBe(0);
+	});
+
+	it('showAll clears both filters and snaps back to the first page', () => {
+		const view = new InventoryView();
+		view.filterCat = EItemCategory.Weapon;
+		view.favOnly = true;
+		view.page = 3;
+		view.showAll();
+		expect(view.filterCat).toBeNull();
+		expect(view.favOnly).toBe(false);
+		expect(view.page).toBe(0);
+	});
+
+	// The grid clamps an out-of-range page as a safety net even when page-reset doesn't fire (the
+	// visible list can shrink for reasons other than a filter/sort action). This mirrors the
+	// `pageClamped = Math.min(view.page, pages - 1)` derivation in InventoryGrid.svelte.
+	it('an out-of-range page still clamps into the last available page', () => {
+		const view = new InventoryView();
+		const perPage = 48;
+		view.page = 5;
+		const pages = Math.max(1, Math.ceil(view.visible.length / perPage));
+		const pageClamped = Math.min(view.page, pages - 1);
+		expect(view.visible.length).toBeLessThanOrEqual(perPage);
+		expect(pages).toBe(1);
+		expect(pageClamped).toBe(0);
+	});
+});
+
 describe('InventoryView delegation', () => {
 	it('equip delegates to the manager', () => {
 		new InventoryView().equip(2, 4);

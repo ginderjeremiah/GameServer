@@ -1,13 +1,6 @@
 <div class="toolbar">
 	<div class="chips">
-		<button
-			class="chip"
-			class:active={view.filterCat == null && !view.favOnly}
-			onclick={() => {
-				view.filterCat = null;
-				view.favOnly = false;
-			}}
-		>
+		<button class="chip" class:active={view.filterCat == null && !view.favOnly} onclick={() => view.showAll()}>
 			All <span class="chip-count">{view.counts.all}</span>
 		</button>
 
@@ -16,7 +9,7 @@
 				class="chip"
 				class:active={view.filterCat === cat}
 				style:--chip-accent={itemCategoryColor(cat)}
-				onclick={() => (view.filterCat = view.filterCat === cat ? null : cat)}
+				onclick={() => view.setFilterCat(view.filterCat === cat ? null : cat)}
 			>
 				<span class="chip-diamond" style:background={itemCategoryColor(cat)}></span>
 				{itemCategoryName(cat)} <span class="chip-count">{view.counts.cats[cat] ?? 0}</span>
@@ -27,7 +20,7 @@
 			class="chip fav"
 			class:active={view.favOnly}
 			title="Show favorites only"
-			onclick={() => (view.favOnly = !view.favOnly)}
+			onclick={() => view.setFavOnly(!view.favOnly)}
 		>
 			<FavoriteStar filled={view.favOnly} size={11} />
 			Favorites <span class="chip-count">{view.counts.fav}</span>
@@ -38,7 +31,7 @@
 		<span class="mono-label">Sort</span>
 		<div class="sort-toggle">
 			{#each sortKeys as key (key)}
-				<button class="sort-option" class:active={view.sort === key} onclick={() => (view.sort = key)}>
+				<button class="sort-option" class:active={view.sort === key} onclick={() => view.setSort(key)}>
 					{SORTS[key].label}
 				</button>
 			{/each}
