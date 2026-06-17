@@ -76,6 +76,11 @@ export class BattleEngine {
 			this.logicalUnhook?.();
 			this.renderUnhook?.();
 			this.enemyLoadedUnhook?.();
+			// Tear down to the clean Idle baseline. Leaving a transient stage (e.g. the post-victory
+			// Loading cooldown, or Paused mid boss-swap) would strand the fight on the next start():
+			// the enemy manager only re-fetches from Idle/Victorious/Defeated, while Loading/Paused make
+			// no progress on their own. Resetting here lets a return from the admin screen resume cleanly.
+			this.setBattleStage(Idle);
 		}
 		// A loading countdown is driven by the render engine independently of `running`, so cancel it
 		// unconditionally — otherwise its render hook leaks and the awaiting getNewEnemy path hangs.
