@@ -99,15 +99,25 @@ namespace Game.Infrastructure.PubSub.Redis
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)
         {
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}'.", channel);
-            if (id is not null)
+            if (id is not null && !_handles.TryAdd(id, (handle, null)))
             {
-                if (!_handles.TryAdd(id, (handle, null)))
-                {
-                    throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
-                }
+                throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
             }
 
-            await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+            // Keep registration and subscribe atomic: a SubscribeAsync failure rolls back the id so a transient
+            // Redis error can't wedge it permanently with "a handle already exists" while nothing is subscribed (#655).
+            try
+            {
+                await Subscriber.SubscribeAsync(RedisChannel.Literal(channel), handle);
+            }
+            catch
+            {
+                if (id is not null)
+                {
+                    _handles.TryRemove(id, out _);
+                }
+                throw;
+            }
 
             void handle(RedisChannel _, RedisValue message)
             {
