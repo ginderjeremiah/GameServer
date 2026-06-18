@@ -94,12 +94,16 @@ export function deriveStats(coreValues: number[]): Record<number, number> {
 }
 
 /** The marginal change to each surfaced derived stat from +1 in the core
- *  attribute at `coreIndex`. Auto-derived by diffing the real formulas, so it
- *  stays correct if those formulas change. */
-export function perPointYields(coreIndex: number, coreValues: number[]): PerPointYield[] {
-	const bumped = [...coreValues];
-	bumped[coreIndex] = (bumped[coreIndex] ?? 0) + 1;
-	const before = deriveStats(coreValues);
+ *  attribute at `coreIndex`, computed by diffing the real formulas against a
+ *  neutral baseline. The surfaced derived stats are linear in the core
+ *  attributes (purely additive modifiers — see `STATIC_ATTRIBUTE_MODIFIERS`), so
+ *  this marginal delta is constant per index and independent of the current
+ *  allocation; it is auto-derived so it stays correct if those formulas change. */
+function computePerPointYields(coreIndex: number): PerPointYield[] {
+	const baseline = CORE_ATTRIBUTES.map(() => 0);
+	const bumped = [...baseline];
+	bumped[coreIndex] = 1;
+	const before = deriveStats(baseline);
 	const after = deriveStats(bumped);
 	const yields: PerPointYield[] = [];
 	for (const def of DERIVED_STATS) {
@@ -111,17 +115,17 @@ export function perPointYields(coreIndex: number, coreValues: number[]): PerPoin
 	return yields;
 }
 
-/** The derived stats a core attribute feeds — intrinsic to the formulas, so it
- *  is computed once from a neutral baseline. */
-const CORE_FEEDS: EAttribute[][] = CORE_ATTRIBUTES.map((_, i) =>
-	perPointYields(
-		i,
-		CORE_ATTRIBUTES.map(() => 1)
-	).map((y) => y.id)
-);
+/** Per-point yields memoised by core index, computed once from the (constant)
+ *  marginal formulas rather than re-derived per allocation change. */
+const PER_POINT_YIELDS: PerPointYield[][] = CORE_ATTRIBUTES.map((_, i) => computePerPointYields(i));
+
+/** The constant marginal yields for the core attribute at `coreIndex`. */
+export function perPointYields(coreIndex: number): PerPointYield[] {
+	return PER_POINT_YIELDS[coreIndex] ?? [];
+}
 
 export function feedsFor(coreIndex: number): EAttribute[] {
-	return CORE_FEEDS[coreIndex] ?? [];
+	return perPointYields(coreIndex).map((y) => y.id);
 }
 
 /** Maps a pointer position (in the radar's SVG user space) to the attribute

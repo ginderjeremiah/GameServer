@@ -88,33 +88,60 @@ describe('deriveStats', () => {
 });
 
 describe('perPointYields', () => {
-	const base = CORE_ATTRIBUTES.map(() => 5);
-
 	it('STR yields +5 Max Health per point', () => {
-		expect(perPointYields(idx.str, base)).toEqual([{ id: EAttribute.MaxHealth, delta: 5 }]);
+		expect(perPointYields(idx.str)).toEqual([{ id: EAttribute.MaxHealth, delta: 5 }]);
 	});
 
 	it('END yields +20 Max Health and +1 Defense per point', () => {
-		expect(perPointYields(idx.end, base)).toEqual([
+		expect(perPointYields(idx.end)).toEqual([
 			{ id: EAttribute.MaxHealth, delta: 20 },
 			{ id: EAttribute.Defense, delta: 1 }
 		]);
 	});
 
 	it('AGI yields +0.5 Defense and +0.004 Cooldown Recovery per point', () => {
-		expect(perPointYields(idx.agi, base)).toEqual([
+		expect(perPointYields(idx.agi)).toEqual([
 			{ id: EAttribute.Defense, delta: 0.5 },
 			{ id: EAttribute.CooldownRecovery, delta: 0.004 }
 		]);
 	});
 
 	it('DEX yields +0.001 Cooldown Recovery per point (a small multiplier increment, not rounded away)', () => {
-		expect(perPointYields(idx.dex, base)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.001 }]);
+		expect(perPointYields(idx.dex)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.001 }]);
 	});
 
 	it('INT and LUK have no surfaced derived yield yet', () => {
-		expect(perPointYields(idx.int, base)).toEqual([]);
-		expect(perPointYields(idx.luk, base)).toEqual([]);
+		expect(perPointYields(idx.int)).toEqual([]);
+		expect(perPointYields(idx.luk)).toEqual([]);
+	});
+
+	it('is constant per index — the marginal yield does not depend on the current allocation', () => {
+		// The surfaced derived stats are linear (purely additive modifiers), so a point's marginal
+		// yield is invariant to how many points are already allocated. This is what lets the per-point
+		// line be memoised once instead of re-derived on every stepper click / radar drag.
+		expect(perPointYields(idx.end)).toEqual(perPointYields(idx.end));
+		const allocations = [
+			[0, 0, 0, 0, 0, 0],
+			[5, 5, 5, 5, 5, 5],
+			[99, 3, 17, 42, 8, 61]
+		];
+		for (const values of allocations) {
+			for (let i = 0; i < CORE_ATTRIBUTES.length; i++) {
+				const bumped = [...values];
+				bumped[i] += 1;
+				const before = deriveStats(values);
+				const after = deriveStats(bumped);
+				const expected = DERIVED_STATS.flatMap((def) => {
+					const delta = Math.round((after[def.id] - before[def.id]) * 1e6) / 1e6;
+					return delta !== 0 ? [{ id: def.id, delta }] : [];
+				});
+				expect(perPointYields(i)).toEqual(expected);
+			}
+		}
+	});
+
+	it('returns the same memoised array reference across calls (no per-call rebuild)', () => {
+		expect(perPointYields(idx.agi)).toBe(perPointYields(idx.agi));
 	});
 });
 
