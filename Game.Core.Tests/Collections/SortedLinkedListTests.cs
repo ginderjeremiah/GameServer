@@ -97,125 +97,6 @@ namespace Game.Core.Tests.Collections
         }
 
         [Fact]
-        public void Remove_ExistingElement_RemovesAndReturnsTrue()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(1);
-            list.Add(2);
-            list.Add(3);
-
-            var removed = list.Remove(2);
-
-            Assert.True(removed);
-            Assert.Equal(2, list.Count);
-            Assert.Equal(new[] { 1, 3 }, list.ToList());
-        }
-
-        [Fact]
-        public void Remove_Head_RemovesFirst()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(1);
-            list.Add(2);
-            list.Add(3);
-
-            var removed = list.Remove(1);
-
-            Assert.True(removed);
-            Assert.Equal(new[] { 2, 3 }, list.ToList());
-        }
-
-        [Fact]
-        public void Remove_Tail_RemovesLast()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(1);
-            list.Add(2);
-            list.Add(3);
-
-            var removed = list.Remove(3);
-
-            Assert.True(removed);
-            Assert.Equal(new[] { 1, 2 }, list.ToList());
-        }
-
-        [Fact]
-        public void Remove_NonExistentElement_ReturnsFalse()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(1);
-            list.Add(3);
-
-            var removed = list.Remove(2);
-
-            Assert.False(removed);
-            Assert.Equal(2, list.Count);
-        }
-
-        [Fact]
-        public void Remove_FromEmpty_ReturnsFalse()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-
-            Assert.False(list.Remove(1));
-        }
-
-        [Fact]
-        public void Remove_Duplicate_RemovesOnlyFirst()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(2);
-            list.Add(2);
-            list.Add(2);
-
-            list.Remove(2);
-
-            Assert.Equal(2, list.Count);
-            Assert.Equal(new[] { 2, 2 }, list.ToList());
-        }
-
-        [Fact]
-        public void Remove_OnlyElement_LeavesEmpty()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(5);
-
-            list.Remove(5);
-
-            Assert.Equal(0, list.Count);
-            Assert.Empty(list.ToList());
-        }
-
-        [Fact]
-        public void Clear_RemovesAllElements()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default)
-            {
-                1,
-                2,
-                3
-            };
-
-            list.Clear();
-
-            Assert.Equal(0, list.Count);
-            Assert.Empty(list.ToList());
-        }
-
-        [Fact]
-        public void Clear_ThenAdd_WorksCorrectly()
-        {
-            var list = new SortedLinkedList<int>(Comparer<int>.Default);
-            list.Add(5);
-            list.Add(3);
-            list.Clear();
-            list.Add(1);
-            list.Add(2);
-
-            Assert.Equal(new[] { 1, 2 }, list.ToList());
-        }
-
-        [Fact]
         public void Enumeration_EmptyList_YieldsNothing()
         {
             var list = new SortedLinkedList<int>(Comparer<int>.Default);
@@ -282,7 +163,7 @@ namespace Game.Core.Tests.Collections
             list.Add(1);
             list.Add(2);
             list.Add(3);
-            list.Remove(2);
+            list.Remove(2, EqualityComparer<int>.Default);
 
             Assert.Equal(2, list.Count);
         }

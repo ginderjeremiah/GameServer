@@ -66,8 +66,7 @@ namespace Game.Core.Players.Inventories
         /// <summary>
         /// Resolves the mods currently applied to the equipped item with the given
         /// <paramref name="itemId"/>. Applied mods live on the player's <see cref="UnlockedItemSlot"/>
-        /// rather than on the shared, reference-data <see cref="Item.ModSlots"/> (whose
-        /// <see cref="ItemModSlot.ItemMod"/> is always null).
+        /// rather than on the shared, reference-data <see cref="Item.ModSlots"/>.
         /// </summary>
         private IEnumerable<ItemMod> GetAppliedMods(int itemId)
         {

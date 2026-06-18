@@ -1,5 +1,4 @@
 ﻿using Game.Core.Attributes.Modifiers;
-using Game.Core.Tags;
 
 namespace Game.Core.Items
 {
@@ -40,11 +39,6 @@ namespace Game.Core.Items
         /// The mod slots that the item has.
         /// </summary>
         public required IReadOnlyList<ItemModSlot> ModSlots { get; init; }
-
-        /// <summary>
-        /// The tags that describe the item.
-        /// </summary>
-        public required IReadOnlyList<Tag> Tags { get; init; }
 
         /// <summary>
         /// The attribute modifiers this item contributes when equipped: its own <see cref="Attributes"/>

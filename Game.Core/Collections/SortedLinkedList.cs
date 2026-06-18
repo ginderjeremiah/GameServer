@@ -43,36 +43,6 @@ namespace Game.Core.Collections
             Count++;
         }
 
-        public bool Remove(T value)
-        {
-            if (_head is null)
-            {
-                return false;
-            }
-
-            if (_comparer.Compare(_head.Value, value) == 0)
-            {
-                _head = _head.Next;
-                Count--;
-                return true;
-            }
-
-            var current = _head;
-            while (current.Next is not null)
-            {
-                if (_comparer.Compare(current.Next.Value, value) == 0)
-                {
-                    current.Next = current.Next.Next;
-                    Count--;
-                    return true;
-                }
-
-                current = current.Next;
-            }
-
-            return false;
-        }
-
         /// <summary>
         /// Removes the first node matching <paramref name="value"/> per
         /// <paramref name="equalityComparer"/> rather than the ordering comparer. Use this to
@@ -107,12 +77,6 @@ namespace Game.Core.Collections
             }
 
             return false;
-        }
-
-        public void Clear()
-        {
-            _head = null;
-            Count = 0;
         }
 
         public Enumerator GetEnumerator() => new(_head);

@@ -1,5 +1,4 @@
 ﻿using Game.Core.Attributes.Modifiers;
-using Game.Core.Tags;
 
 namespace Game.Core.Items
 {
@@ -34,10 +33,5 @@ namespace Game.Core.Items
         /// The attribute modifiers that the item mod applies.
         /// </summary>
         public required IReadOnlyList<AttributeModifier> Attributes { get; init; }
-
-        /// <summary>
-        /// The tags that describe the item mod.
-        /// </summary>
-        public required IReadOnlyList<Tag> Tags { get; init; }
     }
 }

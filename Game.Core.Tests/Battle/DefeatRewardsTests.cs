@@ -239,7 +239,6 @@ namespace Game.Core.Tests.Battle
                 Rarity = ERarity.Common,
                 Attributes = attributes,
                 ModSlots = [],
-                Tags = [],
             };
             player.Inventory.UnlockItem(item);
             player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);

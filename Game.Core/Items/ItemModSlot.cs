@@ -3,7 +3,8 @@ namespace Game.Core.Items
     /// <summary>
     /// Represents a slot in an item that can have a mod applied to it. Part of the shared, cached
     /// <see cref="Item"/> graph and therefore structurally immutable (init-only) so a consumer cannot
-    /// set <see cref="ItemMod"/> on the shared instance and corrupt the cache for every player (#547).
+    /// mutate the shared instance and corrupt the cache for every player (#547). The applied mod lives
+    /// on the player's <see cref="Players.Inventories.AppliedModSlot"/>, not on this shared slot.
     /// </summary>
     public class ItemModSlot
     {
@@ -16,10 +17,5 @@ namespace Game.Core.Items
         /// The type of item mod that can be applied to this slot.
         /// </summary>
         public required EItemModType Type { get; init; }
-
-        /// <summary>
-        /// The item mod currently applied in this slot (if any).
-        /// </summary>
-        public ItemMod? ItemMod { get; init; }
     }
 }
