@@ -107,23 +107,31 @@ describe('EquipSlot — interactions', () => {
 		expect(overlay!.getAttribute('aria-label')).toBe('Iron Helm');
 	});
 
-	it('shows the unequip button on mouse enter', async () => {
-		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem() } });
-		await fireEvent.mouseEnter(container.querySelector('.equip-tile')!);
-		expect(container.querySelector('.unequip')).toBeTruthy();
+	it('keeps the unequip button in the DOM as a real <button> so keyboard/touch can reach it', () => {
+		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem({ name: 'Iron Helm' }) } });
+		const unequip = container.querySelector('.unequip');
+		expect(unequip?.tagName).toBe('BUTTON');
+		expect(unequip!.getAttribute('aria-label')).toBe('Unequip Iron Helm');
 	});
 
-	it('hides the unequip button after mouse leave', async () => {
+	it('reveals the unequip button (adds "show" class) on mouse enter', async () => {
+		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem() } });
+		await fireEvent.mouseEnter(container.querySelector('.equip-tile')!);
+		expect(container.querySelector('.unequip')!.classList.contains('show')).toBe(true);
+	});
+
+	it('hides the unequip button ("show" removed) on mouse leave but keeps it in the DOM', async () => {
 		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem() } });
 		await fireEvent.mouseEnter(container.querySelector('.equip-tile')!);
 		await fireEvent.mouseLeave(container.querySelector('.equip-tile')!);
-		expect(container.querySelector('.unequip')).toBeNull();
+		const unequip = container.querySelector('.unequip')!;
+		expect(unequip.classList.contains('show')).toBe(false);
+		expect(unequip).toBeTruthy();
 	});
 
-	it('calls onUnequip with the slot id when the unequip button is clicked', async () => {
+	it('calls onUnequip with the slot id when the unequip button is activated without a prior hover', async () => {
 		const onUnequip = vi.fn();
 		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem(), onUnequip } });
-		await fireEvent.mouseEnter(container.querySelector('.equip-tile')!);
 		await fireEvent.click(container.querySelector('.unequip')!);
 		expect(onUnequip).toHaveBeenCalledWith(helmSlot.id);
 	});

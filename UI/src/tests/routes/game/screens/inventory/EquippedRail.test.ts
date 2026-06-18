@@ -140,9 +140,7 @@ describe('EquippedRail — drop handling', () => {
 		const item = makeItem();
 		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
 		const { container } = render(EquippedRail, { props: { view } });
-		// Hover over the weapon tile to reveal the unequip button.
-		const tiles = container.querySelectorAll('.equip-tile');
-		await fireEvent.mouseEnter(tiles[4]);
+		// The unequip button is always in the DOM (keyboard/touch-reachable), no hover needed.
 		await fireEvent.click(container.querySelector('.unequip')!);
 		expect(view.unequip).toHaveBeenCalledWith(4);
 	});
