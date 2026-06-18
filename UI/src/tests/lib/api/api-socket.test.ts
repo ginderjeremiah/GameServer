@@ -569,6 +569,86 @@ describe('ApiSocket', () => {
 		});
 	});
 
+	describe('queued-but-unsent settlement on a terminal close', () => {
+		// Queue a command against a socket that is still CONNECTING, so it sits unsent in the queue (never
+		// in-flight, no timeout armed) — the exact state a connect that fails before onopen leaves behind.
+		const queueOnConnectingSocket = (s: ApiSocket) => {
+			webSocketMock.mockImplementationOnce(function (url?: string) {
+				const ws = createMockWebSocket(url);
+				ws.readyState = 0; // CONNECTING
+				return ws;
+			});
+			return s.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+		};
+
+		it('settles an unsent queued command when a normal closure arrives before it ever opened', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			const promise = queueOnConnectingSocket(apiSocket);
+			await flushMicrotasks();
+			const connecting = lastWs();
+			expect(connecting.send).not.toHaveBeenCalled();
+
+			connecting.readyState = connecting.CLOSED;
+			connecting.onclose?.({ code: 1000 });
+
+			const response = await promise;
+			expect(response.error).toBeDefined();
+		});
+
+		it('settles an unsent queued command when the auth-retry budget is already exhausted', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			internals(apiSocket).socketAuthRetries = 5; // MAX_SOCKET_AUTH_RETRIES
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+			const promise = queueOnConnectingSocket(apiSocket);
+			await flushMicrotasks();
+			const connecting = lastWs();
+			expect(connecting.send).not.toHaveBeenCalled();
+
+			connecting.readyState = connecting.CLOSED;
+			connecting.onclose?.({ code: 1006 });
+
+			const response = await promise;
+			expect(response.error).toBeDefined();
+			expect(refreshTokens).not.toHaveBeenCalled();
+			warnSpy.mockRestore();
+		});
+
+		it('settles an unsent queued command when there is no refresh token to reconnect with', async () => {
+			// localStorage cleared in beforeEach → an anonymous, token-less caller.
+			const promise = queueOnConnectingSocket(apiSocket);
+			await flushMicrotasks();
+			const connecting = lastWs();
+			expect(connecting.send).not.toHaveBeenCalled();
+
+			connecting.readyState = connecting.CLOSED;
+			connecting.onclose?.({ code: 1006 });
+
+			const response = await promise;
+			expect(response.error).toBeDefined();
+			expect(refreshTokens).not.toHaveBeenCalled();
+		});
+
+		it('settles an unsent queued command when the reconnect refresh fails', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue(null);
+
+			const promise = queueOnConnectingSocket(apiSocket);
+			await flushMicrotasks();
+			const connecting = lastWs();
+			expect(connecting.send).not.toHaveBeenCalled();
+
+			connecting.readyState = connecting.CLOSED;
+			connecting.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			const response = await promise;
+			expect(response.error).toBeDefined();
+			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe('listenCommand unhook', () => {
 		it('returns an unhook function that removes the listener', async () => {
 			const listener = vi.fn();
