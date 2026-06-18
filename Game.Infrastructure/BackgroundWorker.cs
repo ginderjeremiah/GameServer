@@ -18,11 +18,16 @@ namespace Game.Infrastructure
         private readonly string _uniqueId = Guid.NewGuid().ToString();
         private readonly RegisteredWaitHandle _workerHandle;
 
-        // Teardown flags written by Kill()/Dispose() and read by Start(), potentially from different threads, so
-        // they are volatile to publish the write promptly: without it a Start() racing a Dispose() could read a
-        // stale _disposed == false and then Set() an already-disposed _resetEvent.
+        // Serializes the Start()/Dispose() transition. A bare volatile flag only publishes the write — it cannot make
+        // Start()'s check-then-Set() atomic, so a Start() that passed the _disposed guard could still be preempted by a
+        // full Dispose() and then Set() an already-disposed _resetEvent. Disposing the reset event and reading/Set()-ing
+        // it both happen under this lock so the two can never interleave.
+        private readonly object _disposeLock = new();
+
+        // _hasBeenKilled is written by Kill() (callable outside the lock) and read by Start(), so it stays volatile to
+        // publish the write promptly. _disposed is only touched under _disposeLock, which provides its own barrier.
         private volatile bool _hasBeenKilled = false;
-        private volatile bool _disposed = false;
+        private bool _disposed = false;
 
         // Written on the Start() caller's thread and on the thread-pool worker-loop thread, and read from
         // arbitrary threads, so it is volatile to guarantee writes are published and reads observe transitions
@@ -74,27 +79,34 @@ namespace Game.Infrastructure
         /// <exception cref="ObjectDisposedException"></exception>
         public void Start()
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            // Hold the lock across the disposed check and the Set() so a concurrent Dispose() cannot slip in between
+            // them and release _resetEvent — that interleaving is the race this guard exists to close. The disposed
+            // check stays ahead of the killed check because Dispose() implies Kill(), so a disposed worker must still
+            // report ObjectDisposedException rather than the killed state.
+            lock (_disposeLock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (_hasBeenKilled)
-            {
-                _logger.LogError("The background worker '{Name}' ({UniqueId}) has been killed and cannot be started.", Name, _uniqueId);
-                throw new InvalidOperationException("The background worker has been killed and cannot be started.");
-            }
+                if (_hasBeenKilled)
+                {
+                    _logger.LogError("The background worker '{Name}' ({UniqueId}) has been killed and cannot be started.", Name, _uniqueId);
+                    throw new InvalidOperationException("The background worker has been killed and cannot be started.");
+                }
 
-            // Publish IsRunning = true before signaling the worker loop. The loop's trailing IsRunning = false
-            // therefore always happens-after this write (the Set() / wait pairing establishes the ordering), so a
-            // fast run can never be left wedged 'true' by a late write — the bug this ordering guards against.
-            IsRunning = true;
-            if (_resetEvent.Set())
-            {
-                _logger.LogTrace("Starting background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
-            }
-            else
-            {
-                // Signaling failed, so no run was queued; undo the optimistic running state.
-                IsRunning = false;
-                _logger.LogError("Failed to start background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                // Publish IsRunning = true before signaling the worker loop. The loop's trailing IsRunning = false
+                // therefore always happens-after this write (the Set() / wait pairing establishes the ordering), so a
+                // fast run can never be left wedged 'true' by a late write — the bug this ordering guards against.
+                IsRunning = true;
+                if (_resetEvent.Set())
+                {
+                    _logger.LogTrace("Starting background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                }
+                else
+                {
+                    // Signaling failed, so no run was queued; undo the optimistic running state.
+                    IsRunning = false;
+                    _logger.LogError("Failed to start background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                }
             }
         }
 
@@ -115,20 +127,27 @@ namespace Game.Infrastructure
         /// </summary>
         public void Dispose()
         {
-            if (_disposed)
+            // The whole teardown runs under the lock so an in-flight Start() either completes its Set() before this
+            // point or observes _disposed and throws cleanly — it can never Set() a disposed handle. The lock also
+            // makes repeat calls idempotent: a second Dispose() sees _disposed and returns.
+            lock (_disposeLock)
             {
-                return;
-            }
-            _disposed = true;
+                if (_disposed)
+                {
+                    return;
+                }
+                _disposed = true;
 
-            if (!_hasBeenKilled)
-            {
-                Kill();
-            }
+                // Kill() first so the thread pool stops waiting on _resetEvent (Unregister(null) is non-blocking)
+                // before it is disposed; the worker loop never touches _resetEvent, so disposing it is then safe even
+                // if a delegate is still in progress.
+                if (!_hasBeenKilled)
+                {
+                    Kill();
+                }
 
-            // The worker loop never touches _resetEvent, and once Unregister has returned the thread pool no longer
-            // waits on it, so disposing it here is safe even if a delegate is still in progress.
-            _resetEvent.Dispose();
+                _resetEvent.Dispose();
+            }
         }
 
         private RegisteredWaitHandle RegisterWorker(WaitOrTimerCallback callback)

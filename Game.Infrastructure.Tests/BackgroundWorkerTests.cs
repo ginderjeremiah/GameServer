@@ -279,6 +279,89 @@ namespace Game.Infrastructure.Tests
             Assert.Throws<ObjectDisposedException>(worker.Start);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Start_AfterDispose_ThrowsCleanObjectDisposedExceptionForTheWorker(bool useAsync)
+        {
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = CreateWorker(useAsync, probe);
+
+            worker.Dispose();
+
+            // The disposed guard must surface as an ObjectDisposedException naming the worker — not the internal
+            // AutoResetEvent leaking its own disposed exception from a Set() on a released handle (issue #905).
+            var ex = Assert.Throws<ObjectDisposedException>(worker.Start);
+            Assert.Equal(typeof(BackgroundWorker).FullName, ex.ObjectName);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Start_RacingDispose_NeverLeaksTheResetEventDisposedException(bool useAsync)
+        {
+            // Stress the check-then-act window between Start()'s disposed guard and its _resetEvent.Set(): a Start()
+            // that raced a full Dispose() previously resumed and called Set() on the released AutoResetEvent, leaking
+            // an ObjectDisposedException naming the handle (issue #905). The fix serializes the two under a lock, so a
+            // losing Start() must instead throw the clean worker-named guard. Several starter threads spin Start() in a
+            // tight loop while one disposer disposes mid-flight, and the whole thing repeats many times — that crosses
+            // the window reliably (it reproduced the leak on the pre-fix code). The assertion stays deterministic: any
+            // ObjectDisposedException is allowed, but only if it names the worker, never the AutoResetEvent.
+            const int starterThreads = 4;
+
+            for (var iteration = 0; iteration < 100; iteration++)
+            {
+                using var probe = new WorkerProbe(startReleased: true);
+                var worker = CreateWorker(useAsync, probe);
+                using var ready = new Barrier(starterThreads + 1);
+
+                var starters = new Task[starterThreads];
+                for (var i = 0; i < starterThreads; i++)
+                {
+                    starters[i] = Task.Run(() =>
+                    {
+                        ready.SignalAndWait();
+                        SpinStartUntilTornDown(worker);
+                    });
+                }
+
+                var disposer = Task.Run(() =>
+                {
+                    ready.SignalAndWait();
+                    worker.Dispose();
+                });
+
+                var race = Task.WhenAll([disposer, .. starters]);
+                var finished = await Task.WhenAny(race, Task.Delay(WaitTimeout, TestContext.Current.CancellationToken));
+                Assert.True(finished == race, "The race tasks did not complete in time.");
+                // Re-await the completed race so a failed assertion on a starter thread propagates as the test failure.
+                await race;
+            }
+        }
+
+        // Calls Start() repeatedly until the worker is torn down, asserting any disposed exception is the clean
+        // worker-named guard rather than a leaked AutoResetEvent disposal (the issue #905 race).
+        private static void SpinStartUntilTornDown(BackgroundWorker worker)
+        {
+            while (true)
+            {
+                try
+                {
+                    worker.Start();
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    Assert.Equal(typeof(BackgroundWorker).FullName, ex.ObjectName);
+                    return;
+                }
+                catch (InvalidOperationException)
+                {
+                    // Dispose() implies Kill(); observing the killed state is a legitimate teardown outcome.
+                    return;
+                }
+            }
+        }
+
         private static BackgroundWorker CreateWorker(bool useAsync, WorkerProbe probe)
         {
             var logger = NullLogger<BackgroundWorker>.Instance;
