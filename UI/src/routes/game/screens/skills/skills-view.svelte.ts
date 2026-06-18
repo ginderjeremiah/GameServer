@@ -193,7 +193,17 @@ export class SkillsView {
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
 		const cdMultiplier = cooldownMultiplier(attrs);
-		const challenges = staticData.challenges ?? [];
+		// Index the rewarding challenge by skill id once, so the per-skill source
+		// lookup stays O(1) rather than scanning every challenge per skill.
+		// A transient memo local to the derivation, not reactive state.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const challengeBySkillId = new Map<number, IChallenge>();
+		for (const challenge of staticData.challenges ?? []) {
+			// First-match wins, mirroring the previous `find`, when two challenges reward the same skill.
+			if (challenge.rewardSkillId != null && !challengeBySkillId.has(challenge.rewardSkillId)) {
+				challengeBySkillId.set(challenge.rewardSkillId, challenge);
+			}
+		}
 		const byId: Record<number, SkillMetrics> = {};
 		for (const skill of this.catalogue) {
 			byId[skill.id] = {
@@ -202,7 +212,7 @@ export class SkillsView {
 				rawDamage: calculateSkillDamage(skill, attrs),
 				cooldown: cdMultiplier > 0 ? skill.cooldownMs / 1000 / cdMultiplier : skill.cooldownMs / 1000,
 				contributions: skillContributions(skill, attrs),
-				source: challenges.find((c) => c.rewardSkillId === skill.id)
+				source: challengeBySkillId.get(skill.id)
 			};
 		}
 		return byId;

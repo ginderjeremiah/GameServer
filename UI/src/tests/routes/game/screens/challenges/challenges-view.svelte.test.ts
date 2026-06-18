@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { flushSync } from 'svelte';
 import {
 	EAttribute,
 	EChallengeGoalComparison,
@@ -14,10 +15,11 @@ import {
 	type IPlayerChallenge
 } from '$lib/api';
 
-// The view-model reads everything from the reference-data store; mock it with a
-// small fixture (collections are indexed by id, matching the real store).
-// `vi.hoisted` keeps the object initialised before the hoisted vi.mock factory.
-const { staticData } = vi.hoisted(() => ({
+// The view-model reads the challenge catalogue from the reference-data store and the player's
+// progress from the playerChallenges store. Mock staticData with a small fixture, but keep the REAL
+// playerChallenges store (only its socket fetch stubbed) so the view-model is exercised against the
+// genuine reactive `$state` — a live `markCompleted()` push then re-runs its `$derived` chain.
+const { staticData, mockFetchSocket } = vi.hoisted(() => ({
 	staticData: {
 		challenges: [] as IChallenge[],
 		challengeTypes: [] as IChallengeType[],
@@ -26,10 +28,20 @@ const { staticData } = vi.hoisted(() => ({
 		enemies: [] as { id: number; name: string }[],
 		zones: [] as { id: number; name: string; order?: number; unlockChallengeId?: number }[],
 		skills: [] as { id: number; name: string }[]
-	}
+	},
+	mockFetchSocket: vi.fn()
 }));
 
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/api')>();
+	return { ...actual, fetchSocketData: mockFetchSocket };
+});
+vi.mock('$stores', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$stores')>();
+	return { ...actual, staticData };
+});
+
+import { playerChallenges } from '$stores';
 
 import {
 	ChallengesView,
@@ -293,9 +305,15 @@ describe('ChallengesView', () => {
 		{ challengeId: 9, progress: 0, completed: false }
 	];
 
+	beforeEach(async () => {
+		// Seed the real store through its socket fetch so the view-model reads genuine reactive state.
+		playerChallenges.reset();
+		mockFetchSocket.mockResolvedValue(player.map((p) => ({ ...p })));
+		await playerChallenges.load(true);
+	});
+
 	it('builds the reactive view-model from store + player progress', () => {
 		const view = new ChallengesView();
-		view.playerChallenges = player;
 		expect(view.all).toHaveLength(3);
 		expect(view.summary).toMatchObject({ total: 3, done: 1 });
 		expect(view.groups.map((g) => g.typeId)).toEqual([EChallengeType.EnemiesKilled, EChallengeType.TimeTrial]);
@@ -303,7 +321,6 @@ describe('ChallengesView', () => {
 
 	it('switches the detail pane and resorts when selection/sort change', () => {
 		const view = new ChallengesView();
-		view.playerChallenges = player;
 
 		expect(view.selectedGroup).toBeNull(); // overview by default
 		view.select(EChallengeType.EnemiesKilled);
@@ -312,5 +329,33 @@ describe('ChallengesView', () => {
 
 		view.setSort('name');
 		expect(view.detail.map((c) => c.name)).toEqual(['First Blood', 'Goblin Bane']);
+	});
+
+	it('reflects a live markCompleted() push without re-seeding the view (issue #908)', () => {
+		const view = new ChallengesView();
+		view.select(EChallengeType.EnemiesKilled);
+
+		let detailIds: number[] = [];
+		let summaryDone = -1;
+		const cleanup = $effect.root(() => {
+			$effect(() => {
+				detailIds = view.detail.map((c) => c.id);
+				summaryDone = view.summary.done;
+			});
+		});
+
+		flushSync();
+		// Challenge 2 starts in progress (active) and sorts ahead of the completed challenge 1.
+		expect(detailIds).toEqual([2, 1]);
+		expect(summaryDone).toBe(1);
+
+		// A live ChallengeCompleted push on the shared store must flip the card without a remount.
+		playerChallenges.markCompleted(2);
+		flushSync();
+		expect(summaryDone).toBe(2);
+		// Now both are done; the progress sort moves the freshly-completed challenge to the done bucket.
+		expect(detailIds).toEqual([1, 2]);
+
+		cleanup();
 	});
 });
