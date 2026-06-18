@@ -39,6 +39,15 @@ describe('ApiResponse', () => {
 			expect(() => response.data).toThrow('Not found');
 		});
 
+		it('throws when both data and errorMessage are present (business failure is not swallowed)', () => {
+			const raw = makeRaw({
+				responseText: JSON.stringify({ data: { id: 1, name: 'Test' }, errorMessage: 'Not found' })
+			});
+			const response = new ApiResponse(raw);
+
+			expect(() => response.data).toThrow('Not found');
+		});
+
 		it('returns null data when no errorMessage', () => {
 			const raw = makeRaw({
 				responseText: JSON.stringify({ data: null })

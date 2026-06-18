@@ -38,11 +38,13 @@
 				<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={40} />
 			{/if}
 			<OverlayButton label={item.name} onActivate={() => onSelect?.(item)} />
-			{#if hover}
-				<button class="unequip" title="Unequip" aria-label="Unequip {item.name}" onclick={() => onUnequip?.(slot.id)}
-					>×</button
-				>
-			{/if}
+			<button
+				class="unequip"
+				class:show={hover}
+				title="Unequip"
+				aria-label="Unequip {item.name}"
+				onclick={() => onUnequip?.(slot.id)}>×</button
+			>
 			{#if item.appliedMods.length}
 				<span class="mod-count">{item.appliedMods.length}◈</span>
 			{/if}
@@ -188,6 +190,15 @@ const handleDrop = (e: DragEvent) => {
 	font-size: 11px;
 	line-height: 1;
 	padding: 0;
+	// Always in the DOM (so keyboard/touch can reach it); revealed on hover or keyboard focus,
+	// mirroring GridSlot's favorite star.
+	opacity: 0;
+	transition: opacity 120ms;
+
+	&.show,
+	&:focus-visible {
+		opacity: 1;
+	}
 }
 
 .mod-count {

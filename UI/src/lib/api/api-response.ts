@@ -38,8 +38,14 @@ export class ApiResponse<T extends ApiResponseType> {
 		return this.status >= 200 && this.status < 300 && !this.responseJson.errorMessage;
 	}
 
+	/**
+	 * The parsed response payload. Throws whenever the body carries an `errorMessage` — regardless of
+	 * whether `data` is also populated — so the throw-on-error `ApiRequest.get`/`post` helpers can never
+	 * treat a business failure as success. This keys off `errorMessage` alone, matching `ok` and the
+	 * socket layer's `fetchSocketData`.
+	 */
 	public get data(): T {
-		if (!this.responseJson.data && this.responseJson.errorMessage) {
+		if (this.responseJson.errorMessage) {
 			throw new Error(this.error);
 		} else {
 			return this.responseJson.data;

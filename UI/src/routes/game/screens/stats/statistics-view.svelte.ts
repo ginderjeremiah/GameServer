@@ -307,10 +307,12 @@ export class StatisticsView {
 		return q ? list.filter((e) => e.name.toLowerCase().includes(q)) : list;
 	});
 
-	/** The resolved selected entity (falls back to the first match / first item). */
+	/** The resolved selected entity. When `entId` doesn't resolve to a concrete
+	 *  entity it falls back to the head of the *unfiltered* list — never the
+	 *  search-filtered list — so typing in the picker narrows the list without
+	 *  moving the active dossier. */
 	readonly selectedEntity = $derived.by(
-		() =>
-			this.data.entity(this.entKind, this.entId) ?? this.filteredEntities[0] ?? this.data.entityList(this.entKind)[0]
+		() => this.data.entity(this.entKind, this.entId) ?? this.data.entityList(this.entKind)[0]
 	);
 
 	/** Every statistic referencing the selected entity. */

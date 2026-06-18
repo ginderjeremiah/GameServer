@@ -228,6 +228,29 @@ describe('StatisticsView navigation', () => {
 		view.setQuery('gob');
 		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
 	});
+
+	it('keeps the resolved selection stable while the search query narrows the list', () => {
+		const view = seededView();
+		view.goEntity('enemy', 1);
+		// A concrete selection must not move as the picker filters, even when the
+		// query excludes the selected entity from the filtered list.
+		view.setQuery('bat');
+		expect(view.filteredEntities.map((e) => e.id)).toEqual([0]);
+		expect(view.selectedEntity?.id).toBe(1);
+	});
+
+	it('falls back to the unfiltered list head (not the search box) when entId is unresolved', () => {
+		const view = seededView();
+		view.mode = 'entity';
+		// An entId that resolves to no concrete entity for the kind (e.g. initial
+		// state or a kind-switch landing on a missing id).
+		view.entId = 99;
+		expect(view.selectedEntity?.id).toBe(0);
+		// Narrowing the picker to a different entity must not drag the dossier along.
+		view.setQuery('gob');
+		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
+		expect(view.selectedEntity?.id).toBe(0);
+	});
 });
 
 describe('StatisticsView data wiring', () => {
