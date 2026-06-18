@@ -105,9 +105,9 @@ onMount(async () => {
 		// Don't conflate a failed load with a genuine no-progress result — a
 		// dropped fetch would otherwise render every challenge as zero progress.
 		toastError('Your challenge progress could not be loaded. Please try again later.');
-	} else {
-		view.playerChallenges = playerChallenges.all;
 	}
+	// The view-model reads progress straight from the shared store, so a live `ChallengeCompleted`
+	// push (markCompleted) flips an open card reactively — no manual snapshot to keep in sync.
 	view.loading = false;
 });
 </script>

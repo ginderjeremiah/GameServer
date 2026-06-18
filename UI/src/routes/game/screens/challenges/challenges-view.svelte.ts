@@ -18,7 +18,7 @@ import {
 	resolveUnlockReward,
 	zonesUnlockedBy
 } from '$lib/common';
-import { staticData } from '$stores';
+import { playerChallenges, staticData } from '$stores';
 import { challengeTypeUnit } from './challenge-meta';
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
@@ -281,15 +281,15 @@ export class ChallengesView {
 	/** Selected rail entry: a type id, or `'all'` for the overview. */
 	selectedType = $state<EChallengeType | 'all'>('all');
 	sort = $state<SortKey>('progress');
-	playerChallenges = $state<IPlayerChallenge[]>([]);
 	loading = $state(true);
 	/** A failed `GetPlayerChallenges` load — kept distinct from a genuine
 	 *  no-progress result so it isn't shown as a wall of zero-progress cards. */
 	error = $state(false);
 
-	// Rebuilt from reactive deps on each change (a lookup, not mutable held state).
+	// Rebuilt from reactive deps on each change (a lookup, not mutable held state). Reads progress
+	// straight from the shared store so a live `markCompleted()` push flips a card without a remount.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	readonly #progressById = $derived(new Map(this.playerChallenges.map((pc) => [pc.challengeId, pc])));
+	readonly #progressById = $derived(new Map(playerChallenges.all.map((pc) => [pc.challengeId, pc])));
 
 	readonly all = $derived.by<ChallengeVM[]>(() => {
 		// Build the type→comparison lookup once per rebuild instead of scanning the list per challenge.
