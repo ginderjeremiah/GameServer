@@ -59,6 +59,29 @@ describe('HpBar', () => {
 		expect((container.querySelector('.hp-remaining') as HTMLElement).getAttribute('style')).toContain('width: 100%');
 	});
 
+	it('clamps the bar to 100% when current health transiently exceeds max', () => {
+		const { container } = render(HpBar, {
+			props: { currentHealth: 150, maxHealth: 100, ariaLabel: 'health' }
+		});
+		expect((container.querySelector('.hp-remaining') as HTMLElement).getAttribute('style')).toContain('width: 100%');
+	});
+
+	it('clamps the bar to 0% for negative current health', () => {
+		const { container } = render(HpBar, {
+			props: { currentHealth: -50, maxHealth: 100, ariaLabel: 'health' }
+		});
+		expect((container.querySelector('.hp-remaining') as HTMLElement).getAttribute('style')).toContain('width: 0%');
+	});
+
+	it('renders NaN health without throwing (geometry is numeric, not a throwing formatter)', () => {
+		// The old `formatNum`-based geometry threw on NaN; the numeric clamp must render instead.
+		expect(() =>
+			render(HpBar, {
+				props: { currentHealth: Number.NaN, maxHealth: 100, ariaLabel: 'health' }
+			})
+		).not.toThrow();
+	});
+
 	it('overlays a phase pip for each provided percentage', () => {
 		const { container } = render(HpBar, {
 			props: { currentHealth: 50, maxHealth: 100, ariaLabel: 'Boss health', phasePips: [25, 50, 75] }

@@ -33,7 +33,7 @@
 	</div>
 
 	<div class="loadout-footer">
-		<button class="loadout-button" title="Saved loadouts — coming soon" disabled>+ Save loadout</button>
+		<button type="button" class="loadout-button" title="Saved loadouts — coming soon" disabled>+ Save loadout</button>
 	</div>
 </div>
 
@@ -128,7 +128,7 @@ const handleDrop = (slotId: number) => {
 .loadout-button {
 	width: 100%;
 	padding: 7px 0;
-	font-family: Geist, sans-serif;
+	font-family: var(--sans);
 	font-size: 11.5px;
 	color: var(--text-muted);
 	background: transparent;

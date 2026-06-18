@@ -7,7 +7,7 @@
 	>
 		{#snippet trailing()}
 			<RarityTag rarityId={item.rarityId} style="margin-left: auto" />
-			<button class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
+			<button type="button" class="close" onclick={() => view.select(null)} aria-label="Close">×</button>
 		{/snippet}
 	</TooltipTitle>
 </div>
@@ -31,7 +31,7 @@
 </div>
 
 <div class="drawer-footer">
-	<button class="equip-button" class:equipped onclick={() => view.toggleEquip(item)}>
+	<button type="button" class="equip-button" class:equipped onclick={() => view.toggleEquip(item)}>
 		{equipped ? 'Unequip' : 'Equip'}
 		<span class="equip-hint">{equipped ? '⌘·click' : 'or drag'}</span>
 	</button>
@@ -91,7 +91,7 @@ const attributeMap = $derived(item.totalAttributes?.getAttributeMap());
 .equip-button {
 	width: 100%;
 	padding: 8px 16px;
-	font-family: Geist, sans-serif;
+	font-family: var(--sans);
 	font-size: 12.5px;
 	font-weight: 500;
 	cursor: pointer;

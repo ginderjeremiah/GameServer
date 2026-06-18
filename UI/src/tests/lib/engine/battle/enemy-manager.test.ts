@@ -99,6 +99,18 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(logMessage).not.toHaveBeenCalled();
 	});
 
+	it('backs off by the default retry delay on a no-enemy response with cooldown 0 (no tight loop)', async () => {
+		// A no-enemy response carrying `cooldown: 0` must still wait out the default retry delay rather
+		// than spinning the loop with zero backoff; the explicit retry delay applies whenever there is no enemy.
+		sendSocketCommand.mockResolvedValueOnce(cooldownResponse(0)).mockResolvedValueOnce(enemyResponse(makeEnemy(8)));
+
+		await manager.getNewEnemy();
+
+		expect(delay).toHaveBeenCalledWith(1000);
+		expect(delay).not.toHaveBeenCalledWith(0);
+		expect(manager.currentEnemy).toEqual(makeEnemy(8));
+	});
+
 	it('does not throw on an error response, but logs it and retries after a backoff', async () => {
 		sendSocketCommand.mockResolvedValueOnce(errorResponse('boom')).mockResolvedValueOnce(enemyResponse(makeEnemy(4)));
 

@@ -43,7 +43,9 @@ const { currentHealth, maxHealth, ariaLabel, tall = false, phasePips = [], testI
 // Full "current / max" string carried only by aria-valuetext; the visible text renders
 // current/max in separate elements so the current value's changing width can't shift the rest.
 const healthText = $derived(`${formatNum(currentHealth)} / ${formatNum(maxHealth)}`);
-const healthPerc = $derived(maxHealth ? formatNum(Math.max((currentHealth * 100) / maxHealth, 0)) : 100);
+// Bar fill geometry is a clamped number (0–100), independent of the display formatter — a transient
+// currentHealth > maxHealth can't overflow the bar, and a zero/NaN maxHealth resolves to full.
+const healthPerc = $derived(maxHealth ? Math.min(100, Math.max(0, (currentHealth * 100) / maxHealth)) : 100);
 </script>
 
 <style lang="scss">

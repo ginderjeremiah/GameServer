@@ -1,11 +1,17 @@
 <div class="toolbar">
 	<div class="chips">
-		<button class="chip" class:active={view.filterCat == null && !view.favOnly} onclick={() => view.showAll()}>
+		<button
+			type="button"
+			class="chip"
+			class:active={view.filterCat == null && !view.favOnly}
+			onclick={() => view.showAll()}
+		>
 			All <span class="chip-count">{view.counts.all}</span>
 		</button>
 
 		{#each FILTER_CATEGORIES as cat (cat)}
 			<button
+				type="button"
 				class="chip"
 				class:active={view.filterCat === cat}
 				style:--chip-accent={itemCategoryColor(cat)}
@@ -17,6 +23,7 @@
 		{/each}
 
 		<button
+			type="button"
 			class="chip fav"
 			class:active={view.favOnly}
 			title="Show favorites only"
@@ -31,7 +38,7 @@
 		<span class="mono-label">Sort</span>
 		<div class="sort-toggle">
 			{#each sortKeys as key (key)}
-				<button class="sort-option" class:active={view.sort === key} onclick={() => view.setSort(key)}>
+				<button type="button" class="sort-option" class:active={view.sort === key} onclick={() => view.setSort(key)}>
 					{SORTS[key].label}
 				</button>
 			{/each}
@@ -68,7 +75,7 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 	align-items: center;
 	gap: 6px;
 	padding: 4px 10px;
-	font-family: Geist, sans-serif;
+	font-family: var(--sans);
 	font-size: 11.5px;
 	line-height: 1.2;
 	background: transparent;
@@ -129,7 +136,7 @@ const sortKeys = Object.keys(SORTS) as SortKey[];
 
 .sort-option {
 	padding: 4px 11px;
-	font-family: Geist, sans-serif;
+	font-family: var(--sans);
 	font-size: 11.5px;
 	cursor: pointer;
 	border: none;
