@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
+using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Players;
@@ -28,10 +29,16 @@ namespace Game.Application.Services
         private readonly ISkills _skills = skills;
         private readonly BattleFactory _battleFactory = battleFactory;
 
-        // Symmetric clock-skew tolerance for the client-claimed victory timestamp: benign skew in either
-        // direction (client clock lagging behind or leading the server) is absorbed, while a claim outside
-        // this envelope on either side is rejected by the anti-cheat check in EndBattleVictory.
-        private static readonly TimeSpan ClaimedTimestampSkewTolerance = TimeSpan.FromMilliseconds(100);
+        // Symmetric clock-skew tolerance for the client-claimed victory timestamp: one logical tick, because
+        // the frontend's battle-start may sit up to a tick off the backend's (a battle started mid-tick counts
+        // its first partial tick as a full one). Benign skew within a tick in either direction is absorbed,
+        // while a claim outside this envelope on either side is rejected by the anti-cheat check in EndBattleVictory.
+        private static readonly TimeSpan ClaimedTimestampSkewTolerance = TimeSpan.FromMilliseconds(GameConstants.MsPerTick);
+
+        // Post-battle enemy cooldown, shared by the win and loss paths so the two cannot diverge. The win path
+        // anchors it to the client's claimed completion time and the loss path to the server clock, but the
+        // duration is identical.
+        private static readonly TimeSpan PostBattleCooldown = TimeSpan.FromSeconds(5);
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, CancellationToken cancellationToken = default)
         {
@@ -154,7 +161,7 @@ namespace Game.Application.Services
 
             var rewards = RecordVictory(player, enemy, result, state);
 
-            state.SetCooldown(claimedTimestamp.AddSeconds(5));
+            state.SetCooldown(claimedTimestamp + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
@@ -183,7 +190,7 @@ namespace Game.Application.Services
 
             player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
-            state.SetCooldown(DateTime.UtcNow.AddSeconds(5));
+            state.SetCooldown(DateTime.UtcNow + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
@@ -226,8 +233,8 @@ namespace Game.Application.Services
         // out the same way, regardless of how the battle was ended.
         //
         // Anti-cheat note: the two callers gate this payout differently and that asymmetry is intentional.
-        // EndBattleVictory validates the *client-supplied* claimed timestamp (within 100ms of the simulated
-        // earliest defeat, and not in the future) before paying out. The won-abandon path performs no such
+        // EndBattleVictory validates the *client-supplied* claimed timestamp (within one logical tick of the
+        // simulated earliest defeat, and not in the future) before paying out. The won-abandon path performs no such
         // timestamp check because it re-simulates capped at the *server-measured* elapsed wall-clock time
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
