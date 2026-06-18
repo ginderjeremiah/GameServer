@@ -690,17 +690,99 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task StopAsync_CompletesWithoutError()
+        public async Task StopAsync_NoDrainInFlight_CompletesWithoutWarning()
         {
             using var scope = CreateScope();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
-            // The synchronizer holds no per-process resources to release, so shutdown is a no-op that must not throw.
+            // With no drain holding the gate, shutdown acquires it immediately and completes without the
+            // bounded-wait warning.
             await synchronizer.StopAsync(CancellationToken.None);
 
             Assert.Empty(logger.Entries);
+        }
+
+        [Fact]
+        public async Task StartAsync_CancellationAlreadyRequested_SkipsReclaimAndStartupDrain()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 42,
+                Exp: 4242,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100);
+
+            var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
+            await queue.AddToQueueAsync(Serialize(validEvent));
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            // A host that cancels startup mid-boot must not run the reclaim/drain: the token is honored, so the
+            // item is left on the queue (to be drained on a later, uncancelled startup) rather than applied.
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+            await synchronizer.StartAsync(cts.Token);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            // The event was never drained: it is still waiting on the queue and the player is unchanged.
+            Assert.Equal(Serialize(validEvent), await queue.GetNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(5, persisted.Level);
+        }
+
+        [Fact]
+        public async Task StopAsync_DrainInFlight_StopsAtCleanBoundaryAndAwaitsIt()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+
+            // Two malformed items so processing needs no database: each is dead-lettered, and the gate sits on
+            // the acknowledge of the first so the drain is provably in flight (holding the drain gate) when the
+            // stop arrives.
+            var gatedQueue = new GatedDrainQueue("malformed-1", "malformed-2");
+            var pubsub = new SingleQueuePubSubService(gatedQueue);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(5));
+
+            // The startup drain reserves + dead-letters the first item, then blocks inside its acknowledge.
+            var startTask = synchronizer.StartAsync(CancellationToken.None);
+            await gatedQueue.AcknowledgeReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Stop while that drain holds the gate. StopAsync must not complete until the gate is released, so it
+            // is still pending while the drain is parked.
+            var stopTask = synchronizer.StopAsync(CancellationToken.None);
+            Assert.False(stopTask.IsCompleted);
+
+            // Let the acknowledge finish. With stopping signalled, the drain loop exits at the boundary instead
+            // of reserving the second item, releasing the gate so StopAsync can complete.
+            gatedQueue.ReleaseAcknowledge.SetResult();
+            await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The drain stopped at a clean boundary: only the first item was reserved; the second is untouched
+            // and still waiting (reclaimed/drained on the next startup).
+            Assert.Equal(1, gatedQueue.ReservedCount);
+            Assert.Equal("malformed-2", await gatedQueue.GetNextAsync());
+
+            // It completed within the bounded wait, so no give-up warning was logged.
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("did not complete"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
         }
 
         [Fact]
@@ -1233,6 +1315,90 @@ namespace Game.Application.Tests.DataAccess
             public Task UnSubscribe(string channel) => inner.UnSubscribe(channel);
             public Task UnSubscribe(string channel, string id) => inner.UnSubscribe(channel, id);
             public IPubSubQueue GetQueue(string queueName) => inner.GetQueue(queueName);
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubService"/> that exposes a single fixed queue for the player update queue (and a
+        /// throwaway in-memory queue for any other name, e.g. the dead-letter queue) and treats every subscribe
+        /// as a no-op, so a test can drive only the startup drain over a queue it fully controls.
+        /// </summary>
+        private sealed class SingleQueuePubSubService(IPubSubQueue playerQueue) : IPubSubService
+        {
+            public IPubSubQueue GetQueue(string queueName) =>
+                queueName == Constants.PUBSUB_PLAYER_QUEUE ? playerQueue : new InMemoryPubSubQueue();
+
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task UnSubscribe(string channel) => Task.CompletedTask;
+            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubQueue"/> that parks the drain inside the acknowledge of its first item: it signals
+        /// <see cref="AcknowledgeReached"/> and then awaits <see cref="ReleaseAcknowledge"/> before completing, so
+        /// a test can hold the synchronizer's drain in flight (gate held) while it triggers a stop, then release
+        /// it. Counts reserves so the test can confirm the drain stopped at a clean boundary instead of reserving
+        /// further items.
+        /// </summary>
+        private sealed class GatedDrainQueue : IPubSubQueue
+        {
+            private readonly Queue<string> _items;
+            private readonly List<string> _processing = [];
+            private bool _firstAcknowledge = true;
+
+            public TaskCompletionSource AcknowledgeReached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource ReleaseAcknowledge { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public int ReservedCount { get; private set; }
+
+            public GatedDrainQueue(params string[] items)
+            {
+                _items = new Queue<string>(items);
+            }
+
+            public Task<string?> ReserveNextAsync()
+            {
+                if (_items.Count == 0)
+                {
+                    return Task.FromResult<string?>(null);
+                }
+
+                ReservedCount++;
+                var value = _items.Dequeue();
+                _processing.Add(value);
+                return Task.FromResult<string?>(value);
+            }
+
+            public async Task AcknowledgeAsync(string value)
+            {
+                if (_firstAcknowledge)
+                {
+                    _firstAcknowledge = false;
+                    AcknowledgeReached.SetResult();
+                    await ReleaseAcknowledge.Task;
+                }
+
+                _processing.Remove(value);
+            }
+
+            public Task<long> ReclaimProcessingAsync() => Task.FromResult(0L);
+            public Task<long> GetLengthAsync() => Task.FromResult((long)_items.Count);
+            public Task<string?> GetNextAsync() => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
+
+            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public string? GetNext() => throw new NotSupportedException();
+            public void AddToQueue(string value) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+            public T? GetNext<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public void AddToQueue<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
