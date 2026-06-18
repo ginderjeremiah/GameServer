@@ -26,6 +26,24 @@ describe('HpBar', () => {
 		expect(container.querySelector('.hp-text')?.textContent).toContain('412.55 / 523.5');
 	});
 
+	it('anchors the current value in its own slot so its width changes do not shift the max', () => {
+		const { container } = render(HpBar, {
+			props: { currentHealth: 80.6, maxHealth: 100, ariaLabel: 'Aelara health' }
+		});
+
+		// The current value renders in a dedicated element, separate from the stable "/ max",
+		// so its changing width (a decimal appearing/disappearing under DoT) stays in its own slot.
+		const current = container.querySelector('.hp-current') as HTMLElement;
+		const max = container.querySelector('.hp-max') as HTMLElement;
+		expect(current.textContent).toBe('80.6');
+		expect(max.textContent).toBe('/ 100');
+
+		// The visible split text is hidden from the a11y tree; aria-valuetext carries the full string.
+		const text = container.querySelector('.hp-text') as HTMLElement;
+		expect(text.getAttribute('aria-hidden')).toBe('true');
+		expect((container.querySelector('.hp-bar') as HTMLElement).getAttribute('aria-valuetext')).toBe('80.6 / 100');
+	});
+
 	it('sizes the remaining bar to the health percentage', () => {
 		const { container } = render(HpBar, {
 			props: { currentHealth: 50, maxHealth: 200, ariaLabel: 'health' }

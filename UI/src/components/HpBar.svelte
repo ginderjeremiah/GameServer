@@ -17,7 +17,10 @@
 	{#each phasePips as pip (pip)}
 		<div class="phase-pip" style:left="{pip}%" aria-hidden="true"></div>
 	{/each}
-	<div class="hp-text">{healthText}</div>
+	<div class="hp-text" aria-hidden="true">
+		<span class="hp-current">{formatNum(currentHealth)}</span>
+		<span class="hp-max">/ {formatNum(maxHealth)}</span>
+	</div>
 </div>
 
 <script lang="ts">
@@ -37,6 +40,8 @@ type Props = {
 
 const { currentHealth, maxHealth, ariaLabel, tall = false, phasePips = [], testId }: Props = $props();
 
+// Full "current / max" string carried only by aria-valuetext; the visible text renders
+// current/max in separate elements so the current value's changing width can't shift the rest.
 const healthText = $derived(`${formatNum(currentHealth)} / ${formatNum(maxHealth)}`);
 const healthPerc = $derived(maxHealth ? formatNum(Math.max((currentHealth * 100) / maxHealth, 0)) : 100);
 </script>
@@ -84,11 +89,27 @@ const healthPerc = $derived(maxHealth ? formatNum(Math.max((currentHealth * 100)
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	gap: 0.25em;
 	font-family: var(--mono);
 	font-size: 11px;
 	color: var(--white);
 	text-shadow: 0 1px 2px color-mix(in srgb, var(--black) 70%, transparent);
 	letter-spacing: 0.3px;
+	// Tabular figures keep digit width constant so a value gaining/losing a decimal under DoT
+	// changes only within its own slot.
+	font-variant-numeric: tabular-nums;
+}
+
+// Right-align the current value in a reserved slot: its width can grow/shrink (decimal toggling)
+// without nudging the "/ max" beside it, eliminating the centered-text jitter.
+.hp-current {
+	min-width: 5ch;
+	text-align: right;
+}
+
+.hp-max {
+	text-align: left;
+	white-space: nowrap;
 }
 
 .tall .hp-text {
