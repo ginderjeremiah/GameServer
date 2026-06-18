@@ -116,7 +116,6 @@ namespace Game.Api.Tests.Unit
             Rarity = ERarity.Common,
             Attributes = [],
             ModSlots = [],
-            Tags = [],
         };
     }
 }

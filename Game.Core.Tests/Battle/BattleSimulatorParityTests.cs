@@ -707,7 +707,6 @@ namespace Game.Core.Tests.Battle
                     Id = index,
                     Type = mod.Type,
                 }).ToList(),
-                Tags = [],
             };
 
             var player = MakePlayer(strength, endurance, skills: skills);
@@ -730,7 +729,6 @@ namespace Game.Core.Tests.Battle
             Type = type,
             Rarity = ERarity.Common,
             Attributes = attributes,
-            Tags = [],
         };
 
         private static AttributeModifier ItemAttr(EAttribute attribute, double amount) => new()

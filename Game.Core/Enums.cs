@@ -1,5 +1,4 @@
 ﻿using Game.Core.Items;
-using Game.Core.Tags;
 
 namespace Game.Core
 {
@@ -260,7 +259,7 @@ namespace Game.Core
     }
 
     /// <summary>
-    /// The possible categories for a <see cref="Tag"/>.
+    /// The possible categories for a tag.
     /// </summary>
     public enum ETagCategory
     {

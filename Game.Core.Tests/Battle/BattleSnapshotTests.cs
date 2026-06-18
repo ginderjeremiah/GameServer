@@ -317,7 +317,6 @@ namespace Game.Core.Tests.Battle
                 Rarity = ERarity.Common,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
-                Tags = [],
             };
 
         private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier>? attributes = null) => new()
@@ -328,7 +327,6 @@ namespace Game.Core.Tests.Battle
             Type = type,
             Rarity = ERarity.Common,
             Attributes = attributes ?? [],
-            Tags = [],
         };
 
         private static Skill MakeSkill(int id) => new()

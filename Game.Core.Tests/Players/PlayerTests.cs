@@ -709,7 +709,6 @@ namespace Game.Core.Tests.Players
                 Rarity = rarity,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
-                Tags = [],
             };
 
         /// <summary>An accessory carrying a single Prefix mod slot (Id 0), for the apply/remove-mod paths.</summary>
@@ -726,7 +725,6 @@ namespace Game.Core.Tests.Players
             Type = type,
             Rarity = ERarity.Common,
             Attributes = [],
-            Tags = [],
         };
 
         private static Skill MakeSkill(int id) => new()

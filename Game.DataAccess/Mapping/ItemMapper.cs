@@ -31,9 +31,7 @@ namespace Game.DataAccess.Mapping
                     {
                         Id = ims.Id,
                         Type = (EItemModType)ims.ItemModSlotTypeId,
-                        ItemMod = null,
                     }).ToList(),
-                Tags = [],
             };
         }
 
@@ -54,7 +52,6 @@ namespace Game.DataAccess.Mapping
                         Type = EModifierType.Additive,
                         Source = EAttributeModifierSource.ItemMod,
                     }).ToList(),
-                Tags = [],
             };
         }
 

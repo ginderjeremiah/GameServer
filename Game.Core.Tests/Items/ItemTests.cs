@@ -55,7 +55,6 @@ namespace Game.Core.Tests.Items
             Rarity = ERarity.Common,
             Attributes = attributes,
             ModSlots = [],
-            Tags = [],
         };
 
         private static ItemMod MakeMod(int id, List<AttributeModifier> attributes) => new()
@@ -66,7 +65,6 @@ namespace Game.Core.Tests.Items
             Type = EItemModType.Prefix,
             Rarity = ERarity.Common,
             Attributes = attributes,
-            Tags = [],
         };
 
         private static AttributeModifier MakeModifier(EAttribute attribute, double amount) => new()

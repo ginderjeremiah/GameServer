@@ -179,7 +179,6 @@ namespace Game.Core.Tests.Players
                 Type = EItemModType.Prefix,
                 Rarity = ERarity.Uncommon,
                 Attributes = [],
-                Tags = [],
             };
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
@@ -209,7 +208,6 @@ namespace Game.Core.Tests.Players
                 Type = EItemModType.Prefix,
                 Rarity = ERarity.Uncommon,
                 Attributes = [],
-                Tags = [],
             };
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
@@ -236,7 +234,6 @@ namespace Game.Core.Tests.Players
                 Type = EItemModType.Suffix, // Wrong type — slot expects Prefix
                 Rarity = ERarity.Uncommon,
                 Attributes = [],
-                Tags = [],
             };
 
             var result = inventory.TryApplyMod(1, 10, 0, mod);
@@ -357,7 +354,6 @@ namespace Game.Core.Tests.Players
                 Type = EItemModType.Prefix,
                 Rarity = ERarity.Uncommon,
                 Attributes = [],
-                Tags = [],
             };
             inventory.TryApplyMod(1, 10, 0, mod);
 
@@ -622,7 +618,6 @@ namespace Game.Core.Tests.Players
                 Rarity = rarity,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
-                Tags = [],
             };
 
         private static void AddUnlockedItem(Inventory inventory, Item item)
@@ -638,7 +633,6 @@ namespace Game.Core.Tests.Players
             Type = type,
             Rarity = ERarity.Common,
             Attributes = attributes ?? [],
-            Tags = [],
         };
 
         private static AttributeModifier MakeModifier(EAttribute attribute, double amount,

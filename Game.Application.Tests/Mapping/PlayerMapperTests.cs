@@ -160,7 +160,6 @@ namespace Game.Application.Tests.Mapping
                 Rarity = ERarity.Common,
                 Attributes = [],
                 ModSlots = [],
-                Tags = [],
             };
 
             public CoreItemMod GetItemMod(int itemModId) => new()
@@ -171,7 +170,6 @@ namespace Game.Application.Tests.Mapping
                 Type = EItemModType.Component,
                 Rarity = ERarity.Common,
                 Attributes = [],
-                Tags = [],
             };
 
             public CoreSkill GetSkill(int skillId) => new()
