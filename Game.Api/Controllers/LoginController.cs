@@ -86,7 +86,7 @@ namespace Game.Api.Controllers
         {
             if (!_sessionService.Authenticated)
             {
-                return ApiResponse.Error("Not logged in");
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
             // Load (or rehydrate) the session so the selected player id resolves; the HTTP pipeline no
@@ -98,7 +98,7 @@ namespace Game.Api.Controllers
             var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId);
             if (player is null)
             {
-                return ApiResponse.Error("Player data not found");
+                return ApiResponse.Error("Player data not found", ApiErrorCategory.NotFound);
             }
 
             return ApiResponse.Success(PlayerData.FromPlayer(player));
@@ -114,7 +114,7 @@ namespace Game.Api.Controllers
         {
             if (!_sessionService.Authenticated)
             {
-                return ApiResponse.Error("Not logged in");
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
             // Load (or rehydrate) the session so the selected player id resolves for the presence check;

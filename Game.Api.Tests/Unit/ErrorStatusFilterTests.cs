@@ -1,3 +1,5 @@
+using Game.Abstractions;
+using Game.Api;
 using Game.Api.Filters;
 using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Http;
@@ -10,8 +12,9 @@ using Xunit;
 namespace Game.Api.Tests.Unit
 {
     /// <summary>
-    /// Covers the 200→400 rewrite the whole error contract depends on: a success-status response
-    /// carrying an <see cref="IApiResponse"/> error is rewritten to 400, while every other shape
+    /// Covers the success-status → error-status rewrite the whole error contract depends on: a 200 response
+    /// carrying an <see cref="IApiResponse"/> error is rewritten to the status implied by its
+    /// <see cref="IApiResponse.ErrorCategory"/> (401/404, defaulting to 400), while every other shape
     /// (no error, non-response value, non-object result, already-non-200 status) is left untouched.
     /// </summary>
     public class ErrorStatusFilterTests
@@ -32,9 +35,45 @@ namespace Game.Api.Tests.Unit
         [Fact]
         public void RewritesTo400_WhenResponseCarriesAnError()
         {
+            // An uncategorised error defaults to BadRequest, preserving the original collapse-to-400 behaviour.
             var result = new ObjectResult(ApiResponse.Error("Something went wrong."));
 
             Assert.Equal(StatusCodes.Status400BadRequest, RunFilter(result));
+        }
+
+        [Fact]
+        public void RewritesTo401_WhenErrorCategoryIsUnauthorized()
+        {
+            var result = new ObjectResult(ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized));
+
+            Assert.Equal(StatusCodes.Status401Unauthorized, RunFilter(result));
+        }
+
+        [Fact]
+        public void RewritesTo404_WhenErrorCategoryIsNotFound()
+        {
+            var result = new ObjectResult(ApiResponse.Error("Player data not found", ApiErrorCategory.NotFound));
+
+            Assert.Equal(StatusCodes.Status404NotFound, RunFilter(result));
+        }
+
+        [Fact]
+        public void RewritesTo400_WhenErrorCategoryIsBadRequest()
+        {
+            var result = new ObjectResult(ApiResponse.Error("Invalid input", ApiErrorCategory.BadRequest));
+
+            Assert.Equal(StatusCodes.Status400BadRequest, RunFilter(result));
+        }
+
+        [Fact]
+        public void RewritesTypedResponse_UsingErrorCategoryFromImplicitConversion()
+        {
+            // A categorised ApiResponse.Error implicitly converted to a typed ApiResponse<T> (the controller
+            // return shape) must carry the category through so the status is still mapped correctly.
+            ApiResponse<TestModel> typed = ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            var result = new ObjectResult(typed);
+
+            Assert.Equal(StatusCodes.Status401Unauthorized, RunFilter(result));
         }
 
         [Fact]
@@ -77,5 +116,8 @@ namespace Game.Api.Tests.Unit
 
             Assert.Equal(StatusCodes.Status201Created, RunFilter(result, StatusCodes.Status201Created));
         }
+
+        // Minimal IModel payload for exercising the typed ApiResponse<T> conversion path.
+        private sealed class TestModel : IModel { }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Game.Api.Filters
 {
@@ -10,12 +11,17 @@ namespace Game.Api.Filters
     public class ErrorStatusFilter : IResultFilter
     {
         /// <inheritdoc/>
-        /// <remarks>Attempts to determine if the endpoint result contains a standard error response and updates the status code accordingly.</remarks>
+        /// <remarks>
+        /// Rewrites a success-status response carrying an <see cref="IApiResponse"/> error to the status
+        /// implied by its <see cref="IApiResponse.ErrorCategory"/> (defaulting to 400), preserving the
+        /// distinct HTTP semantics of auth (401) and missing-resource (404) failures.
+        /// </remarks>
         public void OnResultExecuting(ResultExecutingContext context)
         {
-            if (context.HttpContext.Response.StatusCode == StatusCodes.Status200OK && HasError(context.Result))
+            if (context.HttpContext.Response.StatusCode == StatusCodes.Status200OK
+                && TryGetError(context.Result, out var response))
             {
-                context.HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                context.HttpContext.Response.StatusCode = StatusForCategory(response.ErrorCategory);
             }
         }
 
@@ -23,16 +29,35 @@ namespace Game.Api.Filters
         /// <remarks>Does nothing here.</remarks>
         public void OnResultExecuted(ResultExecutedContext context) { }
 
-        /// <summary>
-        /// Checks if the given <paramref name="result"/> contains a <see cref="IApiResponse"/> and it contains an <see cref="IApiResponse.ErrorMessage"/>.
-        /// </summary>s
-        /// <param name="result"></param>
-        /// <returns>True if the <see cref="IActionResult"/> represents an <see cref="IApiResponse"/> with an error and false otherwise.</returns>
-        private static bool HasError(IActionResult result)
+        // Maps an error category to its HTTP status. An unrecognised category defaults to 400 so a newly
+        // added category fails safe rather than passing the failure through as a 200.
+        private static int StatusForCategory(ApiErrorCategory category)
         {
-            return result is ObjectResult objectResult
-                && objectResult.Value is IApiResponse response
-                && response.ErrorMessage is not null and not "";
+            return category switch
+            {
+                ApiErrorCategory.Unauthorized => StatusCodes.Status401Unauthorized,
+                ApiErrorCategory.NotFound => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status400BadRequest,
+            };
+        }
+
+        /// <summary>
+        /// Determines whether the given <paramref name="result"/> carries an <see cref="IApiResponse"/> with
+        /// a non-empty <see cref="IApiResponse.ErrorMessage"/>, surfacing the response so its category can
+        /// steer the status code.
+        /// </summary>
+        private static bool TryGetError(IActionResult result, [NotNullWhen(true)] out IApiResponse? response)
+        {
+            if (result is ObjectResult objectResult
+                && objectResult.Value is IApiResponse apiResponse
+                && apiResponse.ErrorMessage is not null and not "")
+            {
+                response = apiResponse;
+                return true;
+            }
+
+            response = null;
+            return false;
         }
     }
 }
