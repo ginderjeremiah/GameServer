@@ -509,6 +509,39 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Logout_ExpiredAccessTokenButValidRefreshToken_StillEvictsSession()
+        {
+            // The common logout path (#906): the 15-minute access token has already expired, so the client
+            // logs out anonymously with just its refresh token. No request principal means no recorded
+            // UserId, yet the cached session must still be evicted — derived from the consumed refresh token.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "expiredlogout", "logoutpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            // Logging in establishes the cached session; the refresh token outlives the access token.
+            var login = await LoginAsync("expiredlogout", "logoutpass");
+            await AssertSessionPresentAsync(user.Id);
+
+            // Act — log out over the unauthenticated client (no bearer token, mimicking the expired access
+            // token) carrying only the still-valid refresh token.
+            var response = await Client.PostAsJsonAsync("/api/Login/Logout",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+
+            // Assert — logout succeeds and the session is evicted despite the absent access token.
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            await AssertSessionEvictedAsync(user.Id);
+
+            // The consumed refresh token can no longer be exchanged for new tokens.
+            var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
+                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
+        }
+
+        [Fact]
         public async Task Logout_Unauthenticated_Succeeds()
         {
             // Logout is AllowAnonymous so it always succeeds, even without a valid session/token.
@@ -519,6 +552,44 @@ namespace Game.Api.Tests.Integration
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
+        }
+
+        // The session store write after login is fire-and-forget, so poll until the session is cached.
+        private async Task AssertSessionPresentAsync(int userId)
+        {
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await sessionStore.GetSession(userId) is not null)
+                {
+                    return;
+                }
+
+                await Task.Delay(25, CancellationToken);
+            }
+
+            Assert.Fail("The session was not established in the cache after login.");
+        }
+
+        // The Clear on logout is fire-and-forget, so poll until the session disappears.
+        private async Task AssertSessionEvictedAsync(int userId)
+        {
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await sessionStore.GetSession(userId) is null)
+                {
+                    return;
+                }
+
+                await Task.Delay(25, CancellationToken);
+            }
+
+            Assert.Fail("The session was not evicted from the cache on logout.");
         }
 
         [Fact]

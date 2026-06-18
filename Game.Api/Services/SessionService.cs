@@ -59,13 +59,18 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Clears all session state (called when a token is invalid or on logout).
+        /// Clears all session state (called when a token is invalid or on logout). The cached session is
+        /// evicted for <paramref name="userId"/> when supplied (e.g. the user resolved from a consumed
+        /// refresh token on logout), otherwise for the token-recorded <see cref="UserId"/>. The explicit id
+        /// is what makes logout deterministically evict the session even when the access token has already
+        /// expired and no <see cref="UserId"/> was recorded for the request.
         /// </summary>
-        public void ClearSession()
+        public void ClearSession(int? userId = null)
         {
-            if (Authenticated)
+            var sessionUserId = userId ?? (Authenticated ? UserId : (int?)null);
+            if (sessionUserId is int id)
             {
-                _sessionStore.Clear(UserId);
+                _sessionStore.Clear(id);
             }
 
             UserId = 0;

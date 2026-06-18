@@ -42,14 +42,6 @@ namespace Game.DataAccess.Repositories
             return await _cache.GetDelete<RefreshTokenData>(Key(refreshToken));
         }
 
-        public async Task Revoke(string refreshToken)
-        {
-            if (!string.IsNullOrEmpty(refreshToken))
-            {
-                await _cache.Delete(Key(refreshToken));
-            }
-        }
-
         private static string Key(string token)
         {
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));

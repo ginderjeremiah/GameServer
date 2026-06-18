@@ -365,11 +365,26 @@ namespace Game.Application.Tests.Services
             var login = await accountService.Login("logoutuser", "logoutpass");
             Assert.True(login.Success);
 
-            await accountService.Logout(login.Tokens.RefreshToken);
+            // Logout resolves the owning user from the consumed token so the caller can evict that session.
+            var loggedOutUserId = await accountService.Logout(login.Tokens.RefreshToken);
+            Assert.Equal(user.Id, loggedOutUserId);
 
             // The revoked refresh token can no longer be exchanged for a new pair.
             var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
             Assert.Null(refreshed);
+        }
+
+        [Fact]
+        public async Task Logout_UnknownToken_ReturnsNull()
+        {
+            // An unknown/expired/already-consumed token resolves to no user — a safe no-op so the caller
+            // evicts nothing rather than throwing.
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var loggedOutUserId = await accountService.Logout("not-a-real-token");
+
+            Assert.Null(loggedOutUserId);
         }
 
         private static AccountService CreateAccountService(IServiceProvider provider, int iterations = 1000)

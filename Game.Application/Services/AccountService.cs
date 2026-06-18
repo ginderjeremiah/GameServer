@@ -134,11 +134,15 @@ namespace Game.Application.Services
         }
 
         /// <summary>
-        /// Revokes a refresh token without issuing a replacement (logout). No-op if the token is unknown.
+        /// Revokes a refresh token without issuing a replacement (logout) by consuming it (single use).
+        /// Returns the user the token resolved to so the caller can evict that user's session deterministically
+        /// even when the access token has already expired, or <see langword="null"/> when the token was
+        /// missing, expired, or already consumed.
         /// </summary>
-        public async Task Logout(string refreshToken)
+        public async Task<int?> Logout(string refreshToken)
         {
-            await _refreshTokenStore.Revoke(refreshToken);
+            var session = await _refreshTokenStore.Consume(refreshToken);
+            return session?.UserId;
         }
 
         /// <summary>
