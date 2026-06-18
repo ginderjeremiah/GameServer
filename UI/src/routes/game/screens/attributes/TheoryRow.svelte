@@ -67,7 +67,8 @@ const attrTip = getAttributeTooltip();
 const value = $derived(view.values[i]);
 const saved = $derived(view.savedValues[i]);
 const changed = $derived(value !== saved);
-const yields = $derived(perPointYields(i, view.values));
+// O(1) lookup of the constant per-point yields, memoised by index in the view model.
+const yields = $derived(perPointYields(i));
 
 // Allocation bar segments are scaled against the same radar maximum so the bar
 // and the radar agree visually.

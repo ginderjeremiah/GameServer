@@ -259,6 +259,15 @@ describe('SkillsView — initial state', () => {
 		expect(view.maxDamage).toBe(100); // skill 4 base damage
 	});
 
+	it('resolves each skill metric to the challenge that rewards it (by rewardSkillId)', () => {
+		// Challenge 0 rewards skill 3, challenge 1 rewards skill 4; skills with no rewarding
+		// challenge have no source. The lookup is hoisted into a Map keyed by rewardSkillId,
+		// so resolution stays O(1) per skill rather than scanning every challenge.
+		expect(view.metric(3)?.source?.name).toBe('Slay Ten');
+		expect(view.metric(4)?.source?.name).toBe('Clear the Vale');
+		expect(view.metric(0)?.source).toBeUndefined();
+	});
+
 	it('resolves metrics through the shared battle formulas and the derived attribute composition', () => {
 		// Strength feeds Alpha's 1× multiplier directly; Agility derives CooldownRecovery (0.004/pt).
 		mockPlayerManager.attributes = [
