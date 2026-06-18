@@ -76,8 +76,11 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> Logout([FromBody] RefreshRequest request)
         {
-            await _accountService.Logout(request.RefreshToken);
-            _sessionService.ClearSession();
+            // Consuming the refresh token resolves the owning user, so the session is evicted by that id
+            // even on the common path where the access token has already expired and no request principal
+            // (and thus no SessionService.UserId) is present.
+            var userId = await _accountService.Logout(request.RefreshToken);
+            _sessionService.ClearSession(userId);
             return ApiResponse.Success();
         }
 

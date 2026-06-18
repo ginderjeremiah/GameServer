@@ -119,6 +119,46 @@ namespace Game.Api.Tests.Unit
             Assert.Throws<InvalidOperationException>(() => session.Player);
         }
 
+        [Fact]
+        public void ClearSession_Authenticated_EvictsSessionForRecordedUser()
+        {
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+            session.SetAuthenticatedUser(5);
+
+            session.ClearSession();
+
+            Assert.Equal(5, Assert.Single(store.Cleared));
+        }
+
+        [Fact]
+        public void ClearSession_ExplicitUserId_EvictsThatUserEvenWhenUnauthenticated()
+        {
+            // The common logout path: the access token has expired, so no UserId was recorded for the
+            // request, yet the user resolved from the consumed refresh token must still have their session
+            // evicted (#906).
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+
+            session.ClearSession(userId: 9);
+
+            Assert.False(session.Authenticated);
+            Assert.Equal(9, Assert.Single(store.Cleared));
+        }
+
+        [Fact]
+        public void ClearSession_NoUserResolvedAndUnauthenticated_EvictsNothing()
+        {
+            // An unknown/expired refresh token resolves to no user, so there is nothing to evict and the
+            // store must not be touched.
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+
+            session.ClearSession(userId: null);
+
+            Assert.Empty(store.Cleared);
+        }
+
         private static Player MakePlayer(int id) => new()
         {
             Id = id,
@@ -139,6 +179,7 @@ namespace Game.Api.Tests.Unit
         {
             public PlayerState? Session { get; set; }
             public List<(PlayerState State, int UserId)> Updates { get; } = [];
+            public List<int> Cleared { get; } = [];
             public CancellationToken LastGetSessionToken { get; private set; }
 
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
@@ -148,7 +189,7 @@ namespace Game.Api.Tests.Unit
             }
 
             public void Update(PlayerState sessionData, int userId) => Updates.Add((sessionData, userId));
-            public void Clear(int userId) { }
+            public void Clear(int userId) => Cleared.Add(userId);
         }
     }
 }

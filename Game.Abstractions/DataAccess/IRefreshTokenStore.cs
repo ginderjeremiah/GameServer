@@ -19,11 +19,6 @@ namespace Game.Abstractions.DataAccess
         /// expired, or already consumed.
         /// </summary>
         Task<RefreshTokenData?> Consume(string refreshToken);
-
-        /// <summary>
-        /// Revokes a refresh token without issuing a replacement (e.g. on logout). No-op if unknown.
-        /// </summary>
-        Task Revoke(string refreshToken);
     }
 
     /// <summary>
