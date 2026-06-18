@@ -8,6 +8,23 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
     {
         public async Task HandleAsync(ProgressUpdatedEvent evt)
         {
+            // The load-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event can
+            // insert a row between our load and save. On the resulting unique violation, clear and re-run
+            // once: the now-existing rows load as updates, so the second pass carries no conflicting insert.
+            // A second failure propagates to the queue's retry policy rather than looping here.
+            try
+            {
+                await ApplyAsync(evt);
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                context.ChangeTracker.Clear();
+                await ApplyAsync(evt);
+            }
+        }
+
+        private async Task ApplyAsync(ProgressUpdatedEvent evt)
+        {
             // Absolute upserts so re-applying the event under the retry policy converges to the same state.
             // Batched like the attribute-allocations handler: load the touched rows, set/insert, save once.
             if (evt.Statistics.Count > 0)
@@ -27,7 +44,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                         && typeIds.Contains(ps.StatisticTypeId)
                         && entityIds.Contains(ps.EntityId))
                     .ToListAsync();
-                var byKey = existing.ToDictionary(ps => (ps.StatisticTypeId, ps.EntityId));
+                // Group-by-first rather than ToDictionary: the unique index makes a duplicate (type, entity)
+                // impossible, but taking the first per key keeps a stray duplicate row from throwing here and
+                // permanently poisoning this player's progress stream.
+                var byKey = existing
+                    .GroupBy(ps => (ps.StatisticTypeId, ps.EntityId))
+                    .ToDictionary(g => g.Key, g => g.First());
 
                 foreach (var stat in evt.Statistics)
                 {
@@ -54,7 +76,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 var existing = await context.PlayerChallenges
                     .Where(pc => pc.PlayerId == evt.PlayerId && challengeIds.Contains(pc.ChallengeId))
                     .ToListAsync();
-                var byId = existing.ToDictionary(pc => pc.ChallengeId);
+                // Group-by-first for the same reason as the statistics lookup above: the (player, challenge)
+                // primary key makes a duplicate impossible, but defending the grouping keeps a stray duplicate
+                // from throwing and poisoning the stream.
+                var byId = existing
+                    .GroupBy(pc => pc.ChallengeId)
+                    .ToDictionary(g => g.Key, g => g.First());
 
                 foreach (var challenge in evt.Challenges)
                 {
