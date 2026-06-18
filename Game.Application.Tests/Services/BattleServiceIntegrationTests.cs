@@ -323,18 +323,21 @@ namespace Game.Application.Tests.Services
             // side is satisfied), isolating the future-side skew check.
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            // A benign client clock that leads the server by less than the skew tolerance must NOT void
-            // the win — the prior zero-tolerance future check would have dropped this legitimate victory.
-            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(50);
+            // A benign client clock that leads the server by less than one logical tick (the skew tolerance)
+            // must NOT void the win — the frontend's battle-start can sit up to a tick off the backend's.
+            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(GameConstants.MsPerTick / 2);
             var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
 
             Assert.NotNull(result);
             Assert.True(result.ExpReward >= 0);
             Assert.False(state.HasActiveBattle);
+            // The victory cooldown is anchored to the client's claimed completion time (claimed + 5s),
+            // NOT to the server clock, so server load / network latency never affect the play rate.
+            Assert.Equal(claimedTimestamp.AddSeconds(5), state.EnemyCooldown);
         }
 
         [Fact]
-        public async Task EndBattleVictory_ClaimedFarAheadOfServer_BeyondSkewTolerance_ReturnsNull()
+        public async Task EndBattleVictory_ClaimedAheadOfServer_BeyondSkewTolerance_ReturnsNull()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -366,9 +369,9 @@ namespace Game.Application.Tests.Services
             // Backdate so the "too early" side is satisfied, isolating the future-side skew check.
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            // A claim far beyond the skew tolerance into the future is anti-cheat and must still be rejected,
+            // A claim beyond the one-tick skew tolerance into the future is anti-cheat and must be rejected,
             // and the active battle must remain so the client can re-claim with a corrected timestamp.
-            var claimedTimestamp = DateTime.UtcNow.AddSeconds(2);
+            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(GameConstants.MsPerTick + 200);
             var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
 
             Assert.Null(result);
