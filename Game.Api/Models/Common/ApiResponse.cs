@@ -1,4 +1,5 @@
 ﻿using Game.Abstractions.DataAccess.Admin;
+using System.Text.Json.Serialization;
 
 namespace Game.Api.Models.Common
 {
@@ -7,11 +8,15 @@ namespace Game.Api.Models.Common
         public T? Data { get; set; }
         public string? ErrorMessage { get; set; }
 
+        [JsonIgnore]
+        public ApiErrorCategory ErrorCategory { get; set; }
+
         public static implicit operator ApiResponse<T>(ApiResponse result)
         {
             return new()
             {
                 ErrorMessage = result.ErrorMessage,
+                ErrorCategory = result.ErrorCategory,
             };
         }
     }
@@ -21,11 +26,15 @@ namespace Game.Api.Models.Common
         public IEnumerable<T>? Data { get; set; }
         public string? ErrorMessage { get; set; }
 
+        [JsonIgnore]
+        public ApiErrorCategory ErrorCategory { get; set; }
+
         public static implicit operator ApiEnumerableResponse<T>(ApiResponse result)
         {
             return new()
             {
                 ErrorMessage = result.ErrorMessage,
+                ErrorCategory = result.ErrorCategory,
             };
         }
     }
@@ -35,11 +44,15 @@ namespace Game.Api.Models.Common
         public IAsyncEnumerable<T>? Data { get; set; }
         public string? ErrorMessage { get; set; }
 
+        [JsonIgnore]
+        public ApiErrorCategory ErrorCategory { get; set; }
+
         public static implicit operator ApiAsyncEnumerableResponse<T>(ApiResponse result)
         {
             return new()
             {
                 ErrorMessage = result.ErrorMessage,
+                ErrorCategory = result.ErrorCategory,
             };
         }
     }
@@ -47,6 +60,9 @@ namespace Game.Api.Models.Common
     public class ApiResponse : IApiResponse
     {
         public string? ErrorMessage { get; set; }
+
+        [JsonIgnore]
+        public ApiErrorCategory ErrorCategory { get; set; }
 
         // Maps the admin data tier's unified write result to the API response once, so every admin
         // endpoint can hand its result back directly instead of re-deriving the success/error mapping.
@@ -84,11 +100,19 @@ namespace Game.Api.Models.Common
             };
         }
 
+        // The category defaults to BadRequest, so an unqualified Error stays a 400 — the overload below
+        // is only needed when an endpoint wants 401/404 (or another non-validation) semantics.
         public static ApiResponse Error(string message)
+        {
+            return Error(message, ApiErrorCategory.BadRequest);
+        }
+
+        public static ApiResponse Error(string message, ApiErrorCategory category)
         {
             return new ApiResponse
             {
-                ErrorMessage = message
+                ErrorMessage = message,
+                ErrorCategory = category,
             };
         }
     }
@@ -108,5 +132,13 @@ namespace Game.Api.Models.Common
     public interface IApiResponse
     {
         public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// The intended error category for a failure response, mapped to an HTTP status by
+        /// <see cref="Filters.ErrorStatusFilter"/>. Not serialized — the wire contract stays the
+        /// <c>{ errorMessage }</c> envelope; the category only steers the status code.
+        /// </summary>
+        [JsonIgnore]
+        public ApiErrorCategory ErrorCategory { get; set; }
     }
 }
