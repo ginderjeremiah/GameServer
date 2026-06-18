@@ -6,12 +6,15 @@ import type { CombatFloatEvent } from '$lib/engine';
 // CombatFloaters subscribes to the engine's combat-float hook at init. Capture the registered
 // callback so the test can drive events directly; the real `$lib/common` formatNum is used.
 const { onCombatFloat, captured } = vi.hoisted(() => {
-	const captured = { emit: undefined as ((event: CombatFloatEvent) => void) | undefined };
+	const captured = {
+		emit: undefined as ((event: CombatFloatEvent) => void) | undefined,
+		unsubscribe: vi.fn()
+	};
 	return {
 		captured,
 		onCombatFloat: vi.fn((callback: (event: CombatFloatEvent) => void) => {
 			captured.emit = callback;
-			return () => {};
+			return captured.unsubscribe;
 		})
 	};
 });
@@ -28,6 +31,7 @@ const emit = (event: CombatFloatEvent) => {
 afterEach(() => {
 	cleanup();
 	captured.emit = undefined;
+	captured.unsubscribe.mockClear();
 	vi.useRealTimers();
 });
 
@@ -102,5 +106,31 @@ describe('CombatFloaters', () => {
 		vi.advanceTimersByTime(1600);
 		flushSync();
 		expect(getByTestId('enemy-floaters').querySelectorAll('.floater')).toHaveLength(0);
+	});
+
+	it('drives the CSS animation duration from the JS constant via a custom property', () => {
+		const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+		// The removal timer (DURATION_MS) and the dmg-rise animation read one source so they can't drift.
+		expect(getByTestId('enemy-floaters').style.getPropertyValue('--float-duration')).toBe('1500ms');
+	});
+
+	it('clears pending removal timers and unsubscribes on unmount (no write-after-destroy)', () => {
+		vi.useFakeTimers();
+		const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+		const { unmount } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+		// Spawn a few floaters so there are pending removal timers, then tear the component down.
+		emit({ target: 'enemy', kind: 'hit', amount: 1 });
+		emit({ target: 'enemy', kind: 'crit', amount: 2 });
+
+		unmount();
+
+		expect(captured.unsubscribe).toHaveBeenCalledTimes(1);
+		// Both pending removal timers are cleared, so neither callback fires after the component is gone.
+		expect(clearSpy).toHaveBeenCalledTimes(2);
+		expect(() => {
+			vi.advanceTimersByTime(1600);
+			flushSync();
+		}).not.toThrow();
+		clearSpy.mockRestore();
 	});
 });

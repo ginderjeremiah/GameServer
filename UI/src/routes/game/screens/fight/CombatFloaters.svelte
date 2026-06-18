@@ -2,7 +2,7 @@
      combat events and, for the events striking this card's side, spawns a short-lived number/label
      that pops and drifts up. Colour and label are coded by outcome (crit/dodge/block/hit). Purely
      presentational (aria-hidden) — the combat log is the accessible record of the same events. -->
-<div class="floaters" aria-hidden="true" data-testid={testId}>
+<div class="floaters" aria-hidden="true" data-testid={testId} style:--float-duration="{DURATION_MS}ms">
 	{#each floaters as floater (floater.id)}
 		<div
 			class="floater"
@@ -51,11 +51,16 @@ const FLOAT_ICON: Partial<Record<CombatFloatEvent['kind'], string>> = {
 	block: '/img/Block Reduction.png'
 };
 
-/** Matches the float animation length in `common.scss` (`dmg-rise`), with a small grace margin. */
+/** Drives both the JS removal timer and the CSS `dmg-rise` animation (via the `--float-duration`
+ *  custom property) so the two can't drift; the timer adds a small grace margin over the animation. */
 const DURATION_MS = 1500;
 
 let floaters = $state<Floater[]>([]);
 let nextId = 0;
+// Pending removal timers, tracked so they can be cleared on unmount (no write-after-destroy).
+// Plain Set — pure bookkeeping that's never read reactively (mirrors ToastContainer's removalTimers).
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const removalTimers = new Set<ReturnType<typeof setTimeout>>();
 
 const colorFor = (event: CombatFloatEvent): string => {
 	switch (event.kind) {
@@ -100,13 +105,25 @@ const spawn = (event: CombatFloatEvent) => {
 		amount: event.amount === undefined ? '' : formatNum(event.amount),
 		label: labelFor(event.kind)
 	});
-	setTimeout(() => {
+	const timer = setTimeout(() => {
+		removalTimers.delete(timer);
 		floaters = floaters.filter((floater) => floater.id !== id);
 	}, DURATION_MS + 80);
+	removalTimers.add(timer);
 };
 
-// Subscribe client-side only (the engine emits nothing during SSR); onMount's return is the cleanup.
-onMount(() => onCombatFloat(spawn));
+// Subscribe client-side only (the engine emits nothing during SSR); the cleanup unsubscribes and
+// clears any pending removal timers so none fire (and write the array) after the component is gone.
+onMount(() => {
+	const unsubscribe = onCombatFloat(spawn);
+	return () => {
+		unsubscribe();
+		for (const timer of removalTimers) {
+			clearTimeout(timer);
+		}
+		removalTimers.clear();
+	};
+});
 </script>
 
 <style lang="scss">
@@ -125,7 +142,7 @@ onMount(() => onCombatFloat(spawn));
 	font-weight: 700;
 	white-space: nowrap;
 	text-shadow: 0 1px 4px color-mix(in srgb, var(--black) 85%, transparent);
-	animation: dmg-rise 1500ms cubic-bezier(0.18, 0.7, 0.28, 1) forwards;
+	animation: dmg-rise var(--float-duration) cubic-bezier(0.18, 0.7, 0.28, 1) forwards;
 
 	&.crit {
 		text-shadow:
