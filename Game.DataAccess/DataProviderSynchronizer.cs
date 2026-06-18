@@ -8,12 +8,26 @@ using System.Text.Json;
 
 namespace Game.DataAccess
 {
-    internal class DataProviderSynchronizer : IHostedService
+    internal class DataProviderSynchronizer : IHostedService, IDisposable
     {
+        /// <summary>
+        /// How long <see cref="StopAsync"/> waits for an in-flight drain to reach a clean item boundary and
+        /// release the gate before giving up. Sized well under the host's default 30s shutdown timeout so the
+        /// give-up path runs (and is observable) rather than the host force-killing the process first; anything
+        /// left unprocessed is reclaimed and re-applied on the next startup, so the bound loses nothing.
+        /// </summary>
+        private static readonly TimeSpan DefaultDrainTimeout = TimeSpan.FromSeconds(5);
+
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
         private readonly ILogger<DataProviderSynchronizer> _logger;
         private readonly PlayerUpdateRetryPolicy _retryPolicy;
+        private readonly TimeSpan _drainTimeout;
+
+        // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
+        // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
+        private readonly CancellationTokenSource _stopping = new();
+        private bool _disposed;
 
         // Serializes queue drains so at most one runs at a time. The pub/sub background worker re-arms its wait
         // independently of callback completion, so a second wake arriving mid-drain can dispatch a second
@@ -34,12 +48,13 @@ namespace Game.DataAccess
         // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
         private long _lastReportedDeadLetterDepth;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy)
+        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy, TimeSpan? drainTimeout = null)
         {
             _services = services;
             _pubsub = pubsub;
             _logger = logger;
             _retryPolicy = retryPolicy;
+            _drainTimeout = drainTimeout ?? DefaultDrainTimeout;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -47,6 +62,16 @@ namespace Game.DataAccess
             await InitSubscriber();
 
             var queue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
+
+            // A stop requested mid-boot (host shutdown during a large reclaim/drain) must unwind the startup
+            // work too, so honor both the host's startup token and our own stopping signal. The queue ops
+            // themselves aren't cancelable, so the token is checked at each boundary between them.
+            using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
+            var startupToken = startupCts.Token;
+            if (startupToken.IsCancellationRequested)
+            {
+                return;
+            }
 
             // Recover any items a previous run reserved but never acknowledged — it crashed (deploy, scale-down,
             // kill) mid-apply — before draining, so an event in flight when that run died is re-applied rather
@@ -59,6 +84,11 @@ namespace Game.DataAccess
                 _logger.LogInformation("Reclaimed {Count} in-flight player update(s) orphaned by a previous run on queue '{Queue}'.", reclaimed, Constants.PUBSUB_PLAYER_QUEUE);
             }
 
+            if (startupToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
             // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
             // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
@@ -66,20 +96,37 @@ namespace Game.DataAccess
             // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
             // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
             // (the reserve/acknowledge read is idempotent, so a concurrent first wake can never double-apply) (#560).
-            await ProcessQueue(queue);
+            await ProcessQueue(queue, startupToken);
         }
 
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            // Signal the in-flight drain (startup or a pub/sub wake) to stop reserving new items and unwind at
+            // a clean item boundary, then wait for it to release the gate so an in-progress apply finishes
+            // cleanly rather than being cut off. The wait is bounded so a stuck drain can't hold up host
+            // shutdown — anything left queued (or an item reserved but not yet acknowledged) is reclaimed and
+            // re-applied on the next boot, so the bound loses nothing.
+            _stopping.Cancel();
+
+            if (await _drainGate.WaitAsync(_drainTimeout))
+            {
+                _drainGate.Release();
+            }
+            else
+            {
+                _logger.LogWarning("Player update drain did not complete within {Timeout} on shutdown; remaining items will be reclaimed on the next startup.", _drainTimeout);
+            }
+        }
 
         private async Task InitSubscriber()
         {
             await _pubsub.Subscribe(
                 Constants.PUBSUB_PLAYER_CHANNEL,
                 Constants.PUBSUB_PLAYER_QUEUE,
-                async args => await ProcessQueue(args.queue));
+                async args => await ProcessQueue(args.queue, _stopping.Token));
         }
 
-        internal async Task ProcessQueue(IPubSubQueue queue)
+        internal async Task ProcessQueue(IPubSubQueue queue, CancellationToken cancellationToken = default)
         {
             // Record the wake before attempting to claim the gate. If another drain is already in progress it
             // will observe this flag when it re-checks after releasing (below) and drain on our behalf, so the
@@ -88,7 +135,8 @@ namespace Game.DataAccess
 
             // Re-check after each release: a wake that set the flag while we held the gate failed to claim it
             // (WaitAsync(0) returned false for that caller), so we loop back to honor it rather than strand it.
-            while (Volatile.Read(ref _drainRequested) == 1 && await _drainGate.WaitAsync(0))
+            // A requested stop short-circuits the whole thing so a late wake during shutdown is a no-op.
+            while (!cancellationToken.IsCancellationRequested && Volatile.Read(ref _drainRequested) == 1 && await _drainGate.WaitAsync(0))
             {
                 try
                 {
@@ -96,9 +144,9 @@ namespace Game.DataAccess
                     // a wake arriving during the drain re-sets it to 1, so the loop runs another pass and picks up
                     // the freshly enqueued events — the whole queue is drained without ever running two passes
                     // concurrently.
-                    while (Interlocked.Exchange(ref _drainRequested, 0) == 1)
+                    while (!cancellationToken.IsCancellationRequested && Interlocked.Exchange(ref _drainRequested, 0) == 1)
                     {
-                        await DrainQueueAsync(queue);
+                        await DrainQueueAsync(queue, cancellationToken);
                     }
                 }
                 finally
@@ -108,23 +156,33 @@ namespace Game.DataAccess
             }
         }
 
-        private async Task DrainQueueAsync(IPubSubQueue queue)
+        private async Task DrainQueueAsync(IPubSubQueue queue, CancellationToken cancellationToken)
         {
             var deadLetterQueue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE);
 
             // Reserve each item (move it to the processing list) instead of destructively popping it, and only
             // acknowledge (remove it) once ProcessMessage has durably applied or dead-lettered it. A crash
             // anywhere in between leaves the item on the processing list to be reclaimed on next startup rather
-            // than lost (#769). At-least-once is safe because the handlers are idempotent.
-            var next = await queue.ReserveNextAsync();
-            while (next is not null)
+            // than lost (#769). At-least-once is safe because the handlers are idempotent. Stopping is checked
+            // between items so a shutdown ends at a clean boundary — the just-acknowledged item is durable and
+            // anything still queued is reclaimed on the next startup.
+            while (!cancellationToken.IsCancellationRequested)
             {
+                var next = await queue.ReserveNextAsync();
+                if (next is null)
+                {
+                    break;
+                }
+
                 await ProcessMessage(next, deadLetterQueue);
                 await queue.AcknowledgeAsync(next);
-                next = await queue.ReserveNextAsync();
             }
 
-            await SurfaceDeadLetterDepth(deadLetterQueue);
+            // Skip the extra Redis round-trip if we stopped early; the depth is surfaced again on the next drain.
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                await SurfaceDeadLetterDepth(deadLetterQueue);
+            }
         }
 
         /// <summary>
@@ -219,6 +277,19 @@ namespace Game.DataAccess
             using var scope = _services.CreateScope();
             var dispatcher = new PlayerUpdateEventDispatcher(scope.ServiceProvider);
             await dispatcher.DispatchAsync(envelope);
+        }
+
+        public void Dispose()
+        {
+            // The container disposes this singleton once on shutdown (after StopAsync), so a guard is belt-and-
+            // suspenders. The drain gate is intentionally left undisposed (see its field comment).
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _stopping.Dispose();
         }
     }
 }
