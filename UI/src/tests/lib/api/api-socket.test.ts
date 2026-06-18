@@ -674,6 +674,39 @@ describe('ApiSocket', () => {
 			warnSpy.mockRestore();
 		});
 
+		it('stops the keepalive and routes to re-auth when the retry budget is exhausted', async () => {
+			vi.useFakeTimers();
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
+				expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+
+				// Reject every reconnect pre-open so the budget is spent and the next close hits the cap.
+				for (let i = 0; i < 6; i++) {
+					rejectHandshake(lastWs());
+					await flushMicrotasks();
+				}
+
+				// Exhausting the budget is terminal: the keepalive is torn down and the user is routed to
+				// re-auth, rather than being left to silently reconnect.
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+				expect(handleAuthFailure).toHaveBeenCalled();
+
+				// With the interval cleared, the keepalive can no longer fire to resurrect a socket and
+				// bypass the bound: advancing past the ping cadence opens no new connection.
+				const socketsBefore = socketInstances.length;
+				await vi.advanceTimersByTimeAsync(30000);
+				expect(socketInstances.length).toBe(socketsBefore);
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+
 		it('refills the retry budget only after the connection stays open (stable), not on open', async () => {
 			vi.useFakeTimers();
 			try {

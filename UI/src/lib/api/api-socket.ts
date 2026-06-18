@@ -334,6 +334,13 @@ export class ApiSocket {
 
 		if (this.socketAuthRetries >= MAX_SOCKET_AUTH_RETRIES) {
 			console.warn(`Socket auth retry limit (${MAX_SOCKET_AUTH_RETRIES}) reached; not refreshing again.`);
+			// Budget exhausted: repeated freshly-refreshed tokens are still being rejected at the handshake,
+			// so the session is effectively unrecoverable. Stop the keepalive and route to re-auth (mirroring
+			// the refresh-failure branch below) — otherwise the ping would keep calling ensureSocket on the
+			// still-present access token, reconnecting via a path that never increments socketAuthRetries and
+			// so bypassing this very bound.
+			this.stopPingInterval();
+			handleAuthFailure();
 			return;
 		}
 
