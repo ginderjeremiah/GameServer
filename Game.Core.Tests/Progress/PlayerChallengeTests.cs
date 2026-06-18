@@ -105,6 +105,18 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void UpdateProgress_AtMost_NoData_LeavesProgressUntouched()
+        {
+            // The 0 placeholder for an absent statistic must not be stored: for an "at most" goal a 0
+            // reads as the best possible progress, so writing it would surface a misleading 0 best.
+            var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial, initialProgress: 42m);
+
+            playerChallenge.UpdateProgress(0m, hasData: false);
+
+            Assert.Equal(42m, playerChallenge.Progress);
+        }
+
+        [Fact]
         public void UpdateProgress_AtMost_GenuineZeroValue_Completes()
         {
             // A recorded 0 (e.g. an instant victory) is a legitimate value at or below the goal, so it
@@ -117,7 +129,7 @@ namespace Game.Core.Tests.Progress
             Assert.NotNull(playerChallenge.CompletedAt);
         }
 
-        private static PlayerChallenge MakePlayerChallenge(decimal goal, EChallengeType type = EChallengeType.EnemiesKilled)
+        private static PlayerChallenge MakePlayerChallenge(decimal goal, EChallengeType type = EChallengeType.EnemiesKilled, decimal initialProgress = 0m)
         {
             var challenge = new Challenge
             {
@@ -128,7 +140,7 @@ namespace Game.Core.Tests.Progress
                 ProgressGoal = goal,
             };
 
-            return new PlayerChallenge(challenge, progress: 0m, completed: false);
+            return new PlayerChallenge(challenge, initialProgress, completed: false);
         }
     }
 }
