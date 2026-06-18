@@ -3,6 +3,7 @@ using Game.Core.Players.Events;
 using Game.Core.Progress;
 using Game.DataAccess;
 using Game.DataAccess.PlayerUpdates;
+using Game.DataAccess.PlayerUpdates.Handlers;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -156,6 +157,39 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(1, await CountAsync(c => c.PlayerStatistics.CountAsync(ps => ps.PlayerId == playerId && ps.StatisticTypeId == (int)EStatisticType.EnemiesKilled, CancellationToken)));
             Assert.Equal(1, await CountAsync(c => c.PlayerChallenges.CountAsync(pc => pc.PlayerId == playerId && pc.ChallengeId == challengeId, CancellationToken)));
         }
+
+        // Deterministic guard for the invariant the concurrent-apply test above relies on but can only
+        // provoke under a timing race (which a fast, idle machine rarely hits). EntityId is null for global
+        // statistics, and a default Postgres unique index treats nulls as distinct — so two
+        // (player, type, null) rows would silently coexist, defeating the handler's
+        // unique-violation-then-retry idempotency. NULLS NOT DISTINCT must make the second insert collide.
+        [Fact]
+        public async Task PlayerStatistics_DuplicateGlobalStatistic_RejectedByUniqueIndex()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                context.PlayerStatistics.Add(NewGlobalEnemiesKilled(playerId, 1m));
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            using var dupScope = CreateScope();
+            var dupContext = dupScope.ServiceProvider.GetRequiredService<GameContext>();
+            dupContext.PlayerStatistics.Add(NewGlobalEnemiesKilled(playerId, 2m));
+
+            var ex = await Assert.ThrowsAsync<DbUpdateException>(() => dupContext.SaveChangesAsync(CancellationToken));
+            Assert.True(ex.IsUniqueViolation());
+        }
+
+        private static Infrastructure.Entities.PlayerStatistic NewGlobalEnemiesKilled(int playerId, decimal value) => new()
+        {
+            PlayerId = playerId,
+            StatisticTypeId = (int)EStatisticType.EnemiesKilled,
+            EntityId = null,
+            Value = value,
+        };
 
         private static ProgressUpdatedEvent MakeProgressEvent(int playerId, int challengeId, decimal statValue, decimal challengeProgress, bool completed) => new()
         {
