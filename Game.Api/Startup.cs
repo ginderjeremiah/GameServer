@@ -5,6 +5,7 @@ using Game.Api.CodeGen;
 using Game.Api.Cors;
 using Game.Api.Events;
 using Game.Api.Filters;
+using Game.Api.Forwarding;
 using Game.Api.Middleware;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
@@ -75,6 +76,15 @@ namespace Game.Api
                 .BindConfiguration(CorsOptions.SectionName)
                 .Validate(options => options.AllowedOrigins.Count > 0, "Cors:AllowedOrigins not set")
                 .ValidateOnStart();
+
+            // Trusted reverse proxies whose X-Forwarded-For is honoured are deployment-specific and default
+            // to empty (trust nothing). The pipeline below only enables the forwarded-headers middleware
+            // when at least one is configured, so by default a spoofed X-Forwarded-For from a direct client
+            // is ignored and the recorded IP stays the socket peer address (#910).
+            builder.Services.AddOptions<ForwardedHeadersConfig>()
+                .BindConfiguration(ForwardedHeadersConfig.SectionName);
+            builder.Services.AddOptions<ForwardedHeadersOptions>()
+                .Configure<IOptions<ForwardedHeadersConfig>>((options, config) => config.Value.Apply(options));
 
             ConfigureAuth(builder);
 
@@ -159,6 +169,17 @@ namespace Game.Api
             // problem surfaces as a boot failure rather than on the first player request (#357), and so
             // every cache has a published snapshot before any read (#358).
             await app.Services.InitializeReferenceCachesAsync();
+
+            // Apply X-Forwarded-For first so RemoteIpAddress reflects the real client for everything
+            // downstream (login tracking, logging). Run the middleware only when trusted proxies are
+            // configured: with an empty allowlist it would skip its known-proxy check and trust the header
+            // unconditionally, so leaving it off keeps RemoteIpAddress as the socket peer and a spoofed
+            // header is ignored (#910).
+            var forwardedHeadersConfig = app.Services.GetRequiredService<IOptions<ForwardedHeadersConfig>>().Value;
+            if (forwardedHeadersConfig.HasTrustedProxies)
+            {
+                app.UseForwardedHeaders();
+            }
 
             app.UseCors(builder =>
             {

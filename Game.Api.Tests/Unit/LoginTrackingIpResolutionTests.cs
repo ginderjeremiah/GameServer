@@ -6,9 +6,9 @@ using Xunit;
 namespace Game.Api.Tests.Unit
 {
     /// <summary>
-    /// Covers <see cref="LoginTrackingMiddleware.ResolveIpAddress"/>: the <c>X-Forwarded-For</c>
-    /// split/trim, the empty/whitespace fallback to the transport remote address, and the final
-    /// "unknown" fallback — the multi-entry/whitespace branches that integration coverage missed.
+    /// Covers <see cref="LoginTrackingMiddleware.ResolveIpAddress"/>: it reads the transport remote address
+    /// (corrected by the forwarded-headers middleware only for trusted proxies), never trusts a raw
+    /// <c>X-Forwarded-For</c> header itself, and falls back to "unknown" when there is no remote address.
     /// </summary>
     public class LoginTrackingIpResolutionTests
     {
@@ -24,23 +24,7 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void PrefersSingleForwardedForEntry_Trimmed()
-        {
-            var context = ContextWith("  203.0.113.5  ", IPAddress.Parse("10.0.0.1"));
-
-            Assert.Equal("203.0.113.5", LoginTrackingMiddleware.ResolveIpAddress(context));
-        }
-
-        [Fact]
-        public void TakesFirstEntry_FromMultiHopForwardedFor()
-        {
-            var context = ContextWith("203.0.113.5, 70.41.3.18, 150.172.238.178", IPAddress.Parse("10.0.0.1"));
-
-            Assert.Equal("203.0.113.5", LoginTrackingMiddleware.ResolveIpAddress(context));
-        }
-
-        [Fact]
-        public void FallsBackToRemoteAddress_WhenForwardedForMissing()
+        public void UsesRemoteAddress()
         {
             var context = ContextWith(forwardedFor: null, IPAddress.Parse("198.51.100.7"));
 
@@ -48,15 +32,17 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void FallsBackToRemoteAddress_WhenForwardedForIsWhitespace()
+        public void IgnoresSpoofedForwardedForHeader()
         {
-            var context = ContextWith("   ", IPAddress.Parse("198.51.100.7"));
+            // A direct client setting X-Forwarded-For must not influence the resolved IP — only the
+            // forwarded-headers middleware (for a trusted proxy) may rewrite RemoteIpAddress.
+            var context = ContextWith("203.0.113.5", IPAddress.Parse("198.51.100.7"));
 
             Assert.Equal("198.51.100.7", LoginTrackingMiddleware.ResolveIpAddress(context));
         }
 
         [Fact]
-        public void ReturnsUnknown_WhenNoForwardedForAndNoRemoteAddress()
+        public void ReturnsUnknown_WhenNoRemoteAddress()
         {
             var context = ContextWith(forwardedFor: null, remoteIp: null);
 

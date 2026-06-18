@@ -45,17 +45,12 @@ namespace Game.Api.Middleware
         }
 
         /// <summary>
-        /// Resolves the originating client IP, preferring the first <c>X-Forwarded-For</c> entry when the
-        /// request arrives through a reverse proxy, and falling back to the transport remote address.
+        /// Resolves the originating client IP from the transport remote address. The forwarded-headers
+        /// middleware corrects this to the real client only when the request arrives through a configured
+        /// trusted proxy, so a spoofed <c>X-Forwarded-For</c> from a direct client is never honoured (#910).
         /// </summary>
         internal static string ResolveIpAddress(HttpContext context)
         {
-            var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
-            if (!string.IsNullOrWhiteSpace(forwardedFor))
-            {
-                return forwardedFor.Split(',')[0].Trim();
-            }
-
             return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         }
     }
