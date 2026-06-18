@@ -283,8 +283,13 @@ namespace Game.Infrastructure.Database
             {
                 entity.HasKey(ps => ps.Id);
 
+                // EntityId is null for global statistics (e.g. EnemiesKilled). A default unique index treats
+                // nulls as distinct, so concurrent at-least-once applies of the same global statistic would
+                // never collide — defeating the write-behind handler's unique-violation-then-retry idempotency
+                // and leaving duplicate rows. NULLS NOT DISTINCT makes (player, type, null) collide as intended.
                 entity.HasIndex(ps => new { ps.PlayerId, ps.StatisticTypeId, ps.EntityId })
-                    .IsUnique();
+                    .IsUnique()
+                    .AreNullsDistinct(false);
 
                 entity.Property(c => c.Value)
                     .HasPrecision(36, 3);
