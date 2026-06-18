@@ -158,6 +158,102 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(1, await CountAsync(c => c.PlayerChallenges.CountAsync(pc => pc.PlayerId == playerId && pc.ChallengeId == challengeId, CancellationToken)));
         }
 
+        [Fact]
+        public async Task AttributeAllocationsChanged_AppliedTwice_UpsertsAllocationsWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            // Intellect has no seeded row (insert), Strength does (update). The second apply carries different
+            // amounts: the existing rows are updated in place, not duplicated, so allocations converge.
+            await ApplyAsync(MakeAttributeEvent(playerId, intellect: 10d, strength: 20d));
+            await ApplyAsync(MakeAttributeEvent(playerId, intellect: 30d, strength: 40d));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var intellect = Assert.Single(await context.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerId && pa.AttributeId == (int)EAttribute.Intellect)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(30m, intellect.Amount);
+            var strength = Assert.Single(await context.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerId && pa.AttributeId == (int)EAttribute.Strength)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(40m, strength.Amount);
+        }
+
+        [Fact]
+        public async Task AttributeAllocationsChanged_AppliedConcurrently_InsertsOneRowPerAttributeWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            // Intellect starts with no row, so the concurrent applies race on its insert; the clear-and-re-apply
+            // path resolves the conflict to an update on the second pass rather than throwing.
+            await ApplyConcurrentlyAsync(MakeAttributeEvent(playerId, intellect: 15d, strength: 25d));
+
+            Assert.Equal(1, await CountAsync(c => c.PlayerAttributes.CountAsync(pa => pa.PlayerId == playerId && pa.AttributeId == (int)EAttribute.Intellect, CancellationToken)));
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var intellect = Assert.Single(await context.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerId && pa.AttributeId == (int)EAttribute.Intellect)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(15m, intellect.Amount);
+        }
+
+        [Fact]
+        public async Task ModApplied_AppliedTwice_ConvergesToOneRowWithLatestMod()
+        {
+            var (playerId, itemId, slotId, firstModId) = await SeedAppliedModFixtureAsync();
+            int secondModId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                secondModId = (await TestDataSeeder.CreateItemModAsync(context, name: "Second Mod")).Id;
+            }
+
+            // The second apply swaps the slot's mod: the delete-then-insert replaces the row in place rather
+            // than duplicating, so the slot converges to the latest mod.
+            await ApplyAsync(new ModAppliedEvent(playerId, itemId, slotId, firstModId));
+            await ApplyAsync(new ModAppliedEvent(playerId, itemId, slotId, secondModId));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await verifyContext.AppliedMods.AsNoTracking()
+                .Where(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(secondModId, row.ItemModId);
+        }
+
+        [Fact]
+        public async Task ModApplied_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            var (playerId, itemId, slotId, modId) = await SeedAppliedModFixtureAsync();
+
+            await ApplyConcurrentlyAsync(new ModAppliedEvent(playerId, itemId, slotId, modId));
+
+            Assert.Equal(1, await CountAsync(c => c.AppliedMods.CountAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId, CancellationToken)));
+        }
+
+        private static AttributeAllocationsChangedEvent MakeAttributeEvent(int playerId, double intellect, double strength) => new(
+            playerId,
+            [
+                new AttributeAllocationEntry(EAttribute.Intellect, intellect),
+                new AttributeAllocationEntry(EAttribute.Strength, strength),
+            ]);
+
+        // Seeds an item with a mod slot plus a mod the player has unlocked, the prerequisites a ModAppliedEvent
+        // assumes already exist.
+        private async Task<(int playerId, int itemId, int slotId, int modId)> SeedAppliedModFixtureAsync()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemId = (await TestDataSeeder.CreateItemAsync(context)).Id;
+            var slotId = (await TestDataSeeder.AddItemModSlotAsync(context, itemId)).Id;
+            var modId = (await TestDataSeeder.CreateItemModAsync(context)).Id;
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, itemId);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerId, modId);
+            return (playerId, itemId, slotId, modId);
+        }
+
         // Deterministic guard for the invariant the concurrent-apply test above relies on but can only
         // provoke under a timing race (which a fast, idle machine rarely hits). EntityId is null for global
         // statistics, and a default Postgres unique index treats nulls as distinct — so two
