@@ -92,11 +92,12 @@ export class EnemyManager {
 
 				// No enemy this time: either the zone is on cooldown (wait it out) or the request failed
 				// (`data` is absent — note the optional chaining; an error response carries no data).
-				// Back off in both cases, then retry.
+				// `||` (not `??`) so a no-enemy response with `cooldown: 0` still backs off rather than
+				// tight-looping; an explicit positive cooldown is honored.
 				if (result.error) {
 					logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
 				}
-				await delay(result.data?.cooldown ?? NEW_ENEMY_RETRY_DELAY_MS);
+				await delay(result.data?.cooldown || NEW_ENEMY_RETRY_DELAY_MS);
 			}
 		} finally {
 			this.fetchingEnemy = false;

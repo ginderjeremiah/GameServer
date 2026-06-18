@@ -101,7 +101,7 @@ $effect(() => {
 	user-select: none;
 	background: colors.$dark-light-gray-grad;
 	color: colors.$text-primary;
-	font-family: Geist, Arial, Helvetica, sans-serif;
+	font-family: var(--sans);
 
 	--border-radius: 3px;
 	--default-glow-color: #{colors.$accent};

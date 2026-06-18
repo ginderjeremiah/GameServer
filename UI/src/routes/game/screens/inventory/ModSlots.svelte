@@ -33,6 +33,7 @@
 							<div class="picker-options">
 								{#each options as mod (mod.id)}
 									<button
+										type="button"
 										class="picker-option"
 										style:border-left-color={accent}
 										onclick={() => {
@@ -76,6 +77,7 @@
 
 	{#if applied}
 		<button
+			type="button"
 			class="mod-remove"
 			title="Remove mod"
 			aria-label="Remove {applied.name}"

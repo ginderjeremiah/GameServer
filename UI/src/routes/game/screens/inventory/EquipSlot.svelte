@@ -39,6 +39,7 @@
 			{/if}
 			<OverlayButton label={item.name} onActivate={() => onSelect?.(item)} />
 			<button
+				type="button"
 				class="unequip"
 				class:show={hover}
 				title="Unequip"

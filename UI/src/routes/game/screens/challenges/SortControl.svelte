@@ -49,7 +49,7 @@ const { value, onChange }: Props = $props();
 
 .sort-option {
 	padding: 4px 11px;
-	font-family: Geist, sans-serif;
+	font-family: var(--sans);
 	font-size: 11px;
 	cursor: pointer;
 	border: none;

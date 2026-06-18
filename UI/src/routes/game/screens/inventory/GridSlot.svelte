@@ -40,6 +40,7 @@
 	/>
 
 	<button
+		type="button"
 		class="fav-star"
 		class:on={item.favorite}
 		class:show={hover}

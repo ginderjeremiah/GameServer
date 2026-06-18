@@ -63,7 +63,7 @@ setItemTooltip(tip.controller);
 	flex-direction: column;
 	position: relative;
 	color: var(--text-primary);
-	font-family: Geist, Arial, Helvetica, sans-serif;
+	font-family: var(--sans);
 	overflow: hidden;
 }
 
