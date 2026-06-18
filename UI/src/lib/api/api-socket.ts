@@ -39,6 +39,11 @@ const REQUEST_TIMEOUT_MS = 30000;
 /** Surfaced via the resolve-with-error contract when a sent request exceeds REQUEST_TIMEOUT_MS. */
 const REQUEST_TIMEOUT_ERROR = 'Timed out waiting for the server.';
 
+/** Surfaced via the resolve-with-error contract when the socket drops (or closes for good) before a
+ *  pending command could be answered — both in-flight commands and queued-but-unsent ones on a close
+ *  that won't reconnect, so neither leaves its caller awaiting a response that will never come. */
+const CONNECTION_LOST_ERROR = 'Connection lost. Please try again.';
+
 export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 	id: string;
 	name: T;
@@ -282,6 +287,18 @@ export class ApiSocket {
 		this.inFlightRequests.clear();
 	}
 
+	/** Resolves every queued-but-unsent command with an error response and empties the queue. These
+	 *  commands were never sent (so they're not in the in-flight map) and never had a timeout armed, so on
+	 *  a close that won't reconnect and re-flush them they'd otherwise await a response forever. Only the
+	 *  reconnecting paths (the keepalive after a post-open drop, the auth-retry after a refresh) keep the
+	 *  queue to re-send it; every terminal close settles it here. */
+	private settleQueuedRequests(error: string) {
+		let request: ApiSocketRequest | undefined;
+		while ((request = this.socketCommandQueue.shift())) {
+			request.settleWithError(error);
+		}
+	}
+
 	/** Backstop for a request that was sent but whose response never arrived while the socket stayed
 	 *  open (so the close-handler never settled it). Settles it through the same resolve-with-error
 	 *  contract and prunes the entry, so the caller surfaces it via `response.error` rather than
@@ -313,9 +330,8 @@ export class ApiSocket {
 	private handleClose(ev: CloseEvent) {
 		// A command sent before the drop will never get a response on this dead socket, and we deliberately
 		// don't blind-resend (commands like DefeatEnemy aren't idempotent). Settle each pending request with
-		// an error so the awaiting caller surfaces a toast / retries instead of hanging forever. Queued-but-
-		// unsent commands are untouched, so the auth-retry path below still re-sends them on reconnect.
-		this.settleInFlightRequests('Connection lost. Please try again.');
+		// an error so the awaiting caller surfaces a toast / retries instead of hanging forever.
+		this.settleInFlightRequests(CONNECTION_LOST_ERROR);
 
 		// The socket didn't stay open, so cancel any pending "connection is now stable" budget refill.
 		this.clearConnectionStableTimer();
@@ -323,21 +339,31 @@ export class ApiSocket {
 		if (ev.code === NORMAL_CLOSURE) {
 			// A clean, intentional close (e.g. an explicit disconnect or a server-side graceful shutdown):
 			// stop the keepalive rather than reconnecting. A later user-initiated command re-arms it via
-			// ensureSocket.
+			// ensureSocket. Nothing will re-flush the queue, so settle any unsent commands instead of
+			// stranding them (a NORMAL_CLOSURE received before the socket ever opened never sent them).
 			this.stopPingInterval();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 
 		if (this.socketOpened) {
+			// A socket that opened before dropping flushed its queue in onStart; the keepalive ping will
+			// reconnect and re-flush anything queued since, so leave the queue for it to re-send.
 			return;
 		}
 
 		if (this.socketAuthRetries >= MAX_SOCKET_AUTH_RETRIES) {
+			// Budget exhausted: we won't reconnect, so settle the unsent queue rather than leaving it to
+			// await a response that will never come.
 			console.warn(`Socket auth retry limit (${MAX_SOCKET_AUTH_RETRIES}) reached; not refreshing again.`);
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 
 		if (!getRefreshToken()) {
+			// No refresh token to recover with (anonymous / token-less caller): the handshake won't be
+			// retried, so settle the unsent queue here too.
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 
@@ -349,8 +375,10 @@ export class ApiSocket {
 				void this.processCommandQueue();
 			} else {
 				// Refresh is spent/revoked — the session is unrecoverable. Stop the keepalive before routing
-				// to login so it can't fire a reconnect on the now-cleared token during the teardown.
+				// to login so it can't fire a reconnect on the now-cleared token during the teardown, and
+				// settle the unsent queue since nothing will re-flush it.
 				this.stopPingInterval();
+				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 				handleAuthFailure();
 			}
 		});
