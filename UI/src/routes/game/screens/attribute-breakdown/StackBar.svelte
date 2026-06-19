@@ -29,12 +29,15 @@
 </div>
 
 <script lang="ts">
-import { groupBySource, type ComputedAttribute } from '$lib/battle';
+import { groupBySource, type ComputedAttribute, type GroupedBySource } from '$lib/battle';
 import { sourceColor, sourceLabel } from './source-display';
 import { fmtSigned, type LabeledModifier } from './attribute-breakdown-view.svelte';
 
 interface Props {
 	computed: ComputedAttribute<LabeledModifier>;
+	/** Pre-grouped source decomposition; derived from `computed` when omitted. Pass
+	 *  the view-model's already-computed grouping to avoid re-running groupBySource. */
+	grouped?: GroupedBySource<LabeledModifier>;
 	height?: number;
 	radius?: number;
 	/** Width the full bar represents; defaults to this attribute's own total so
@@ -42,11 +45,11 @@ interface Props {
 	scaleMax?: number;
 }
 
-let { computed, height = 14, radius = 2, scaleMax }: Props = $props();
+let { computed, grouped, height = 14, radius = 2, scaleMax }: Props = $props();
 
-const grouped = $derived(groupBySource(computed));
-const groups = $derived(grouped.groups);
-const mults = $derived(grouped.mults);
+const resolved = $derived(grouped ?? groupBySource(computed));
+const groups = $derived(resolved.groups);
+const mults = $derived(resolved.mults);
 const scale = $derived(scaleMax || Math.max(computed.total, computed.additiveSubtotal) || 1);
 </script>
 

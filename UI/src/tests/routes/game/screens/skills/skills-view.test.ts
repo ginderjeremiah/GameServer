@@ -321,6 +321,22 @@ describe('SkillsView — rail filtering & sorting', () => {
 		expect(view.equippedRail.map((m) => m.skill.id)).toEqual([0, 1, 2]);
 		expect(view.availableRail.map((m) => m.skill.id)).toEqual([3]);
 	});
+
+	it('keeps the full equipped loadout in the rail when a search filter excludes it', () => {
+		// 'delta' matches only the unequipped skill 3; the equipped rail must still show
+		// the whole loadout (the header counts it) while the available rail is filtered.
+		view.search = 'delta';
+		expect(view.equippedRail.map((m) => m.skill.id)).toEqual([0, 1, 2]);
+		expect(view.availableRail.map((m) => m.skill.id)).toEqual([3]);
+	});
+
+	it('keeps the equipped rail intact when an attribute filter matches no equipped skill', () => {
+		// No fixture skill scales on Luck, so the attribute filter empties railList — the
+		// equipped rail is built from the unfiltered loadout and must survive.
+		view.toggleAttributeFilter(EAttribute.Luck);
+		expect(view.equippedRail.map((m) => m.skill.id)).toEqual([0, 1, 2]);
+		expect(view.availableRail).toEqual([]);
+	});
 });
 
 describe('SkillsView — loadout edits persist the ordered loadout', () => {

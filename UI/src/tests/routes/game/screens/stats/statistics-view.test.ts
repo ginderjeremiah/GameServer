@@ -160,11 +160,32 @@ describe('StatisticsData.statHeadline', () => {
 	});
 });
 
+describe('StatisticsData.summaryFor', () => {
+	it('bundles the rows, bar max, and headline for a statistic', () => {
+		const summary = data().summaryFor(EStatisticType.EnemiesKilled);
+		expect(summary.rows.map((r) => r.entityId)).toEqual([0, 1]);
+		expect(summary.maxVal).toBe(100); // the leading row's value
+		expect(summary.headline).toBe(120); // null-entity grand total
+	});
+
+	it('returns an empty (rows-less) summary for a total-only statistic', () => {
+		const summary = data().summaryFor(EStatisticType.PlayerDeaths);
+		expect(summary.rows).toEqual([]);
+		expect(summary.maxVal).toBe(1);
+		expect(summary.headline).toBe(7);
+	});
+
+	it('memoises a single summary instance per statistic', () => {
+		const d = data();
+		expect(d.summaryFor(EStatisticType.EnemiesKilled)).toBe(d.summaryFor(EStatisticType.EnemiesKilled));
+	});
+});
+
 describe('StatisticsData.statsForEntity', () => {
-	it('lists every statistic referencing an entity with its rank and headline', () => {
+	it('lists every statistic referencing an entity with its rank', () => {
 		const infos = data().statsForEntity('enemy', 0);
 		const killed = infos.find((i) => i.stat.id === EStatisticType.EnemiesKilled)!;
-		expect(killed).toMatchObject({ value: 100, rank: 1, of: 2, headline: 120 });
+		expect(killed).toMatchObject({ value: 100, rank: 1, of: 2 });
 		const fastest = infos.find((i) => i.stat.id === EStatisticType.FastestVictory)!;
 		expect(fastest).toMatchObject({ value: 2.0, rank: 1, of: 2 });
 	});

@@ -35,22 +35,22 @@ import CategoryTag from './CategoryTag.svelte';
 import KindBadge from './KindBadge.svelte';
 import CompHint from './CompHint.svelte';
 import StatCardRow from './StatCardRow.svelte';
-import type { StatisticsData, StatType, StatEntityKind } from './statistics-view.svelte';
+import type { StatSummary, StatType, StatEntityKind } from './statistics-view.svelte';
 import { fmtValue, statKindPlural } from './statistics-display';
 
 interface Props {
-	data: StatisticsData;
+	/** Memoised rows + bar max + headline for this stat (computed on StatisticsData). */
+	summary: StatSummary;
 	stat: StatType;
 	onPickEntity: (kind: StatEntityKind, id: number) => void;
 }
 
-let { data, stat, onPickEntity }: Props = $props();
+let { summary, stat, onPickEntity }: Props = $props();
 
-const rows = $derived(data.rowsForStat(stat.id));
-const headline = $derived(data.statHeadline(stat.id));
-const maxVal = $derived(Math.max(...rows.map((r) => r.value), 1));
-const top = $derived(rows.slice(0, 4));
-const more = $derived(rows.length - top.length);
+const headline = $derived(summary.headline);
+const maxVal = $derived(summary.maxVal);
+const top = $derived(summary.rows.slice(0, 4));
+const more = $derived(summary.rows.length - top.length);
 // Safe to read only when kind !== 'none' (guarded in the template).
 const asKind = $derived(stat.kind as StatEntityKind);
 </script>

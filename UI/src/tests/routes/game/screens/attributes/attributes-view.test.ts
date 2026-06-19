@@ -31,6 +31,7 @@ import {
 	deriveStats,
 	perPointYields,
 	feedsFor,
+	contributorsFor,
 	derivedShortLabel,
 	radarValueAtPointer
 } from '$routes/game/screens/attributes/attributes-view.svelte';
@@ -153,6 +154,19 @@ describe('feedsFor', () => {
 		expect(feedsFor(idx.dex)).toEqual([EAttribute.CooldownRecovery]);
 		expect(feedsFor(idx.int)).toEqual([]);
 		expect(feedsFor(idx.luk)).toEqual([]);
+	});
+});
+
+describe('contributorsFor', () => {
+	it('reports the core attributes feeding each derived stat (inverse of feedsFor)', () => {
+		expect(contributorsFor(EAttribute.MaxHealth)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
+		expect(contributorsFor(EAttribute.Defense)).toEqual([EAttribute.Endurance, EAttribute.Agility]);
+		expect(contributorsFor(EAttribute.CooldownRecovery)).toEqual([EAttribute.Agility, EAttribute.Dexterity]);
+	});
+
+	it('returns no contributors for an attribute no core stat derives', () => {
+		expect(contributorsFor(EAttribute.Strength)).toEqual([]);
+		expect(contributorsFor(EAttribute.Luck)).toEqual([]);
 	});
 });
 

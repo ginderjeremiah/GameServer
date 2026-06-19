@@ -6,7 +6,7 @@
 		{#each visibleGroups as group (group)}
 			<div class="group">
 				<div class="group-label">{group}</div>
-				{#each statsIn(group) as d (d.id)}
+				{#each STATS_BY_GROUP[group] as d (d.id)}
 					{@const from = view.savedDerived[d.id]}
 					{@const to = view.derived[d.id]}
 					{@const isChanged = from !== to}
@@ -44,12 +44,11 @@ import AttributeIcon from '$components/AttributeIcon.svelte';
 import {
 	DERIVED_GROUPS,
 	DERIVED_STATS,
-	CORE_ATTRIBUTES,
-	feedsFor,
+	contributorsFor,
 	type AttributesView,
-	type DerivedGroup
+	type DerivedGroup,
+	type DerivedStatDef
 } from './attributes-view.svelte';
-import type { EAttribute } from '$lib/api';
 
 interface Props {
 	view: AttributesView;
@@ -57,13 +56,16 @@ interface Props {
 
 const { view }: Props = $props();
 
-const statsIn = (group: DerivedGroup) => DERIVED_STATS.filter((d) => d.group === group);
-const visibleGroups = DERIVED_GROUPS.filter((g) => statsIn(g).length > 0);
-
-/** The core attributes that feed a derived stat — the live inverse of `feedsFor`,
- *  so the "fed by" line never goes stale. */
-const contributorsFor = (derivedId: EAttribute): EAttribute[] =>
-	CORE_ATTRIBUTES.filter((_, i) => feedsFor(i).includes(derivedId));
+// The derived stats grouped once (static reference data) so the panel doesn't
+// re-scan DERIVED_STATS on every reactive update.
+const STATS_BY_GROUP = DERIVED_GROUPS.reduce(
+	(map, group) => {
+		map[group] = DERIVED_STATS.filter((d) => d.group === group);
+		return map;
+	},
+	{} as Record<DerivedGroup, DerivedStatDef[]>
+);
+const visibleGroups = DERIVED_GROUPS.filter((g) => STATS_BY_GROUP[g].length > 0);
 </script>
 
 <style lang="scss">

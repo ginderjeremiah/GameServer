@@ -27,22 +27,22 @@
 import CategoryTag from './CategoryTag.svelte';
 import CompHint from './CompHint.svelte';
 import MiniBar from './MiniBar.svelte';
-import type { EntityStatInfo, StatisticsData, StatEntityKind } from './statistics-view.svelte';
+import type { EntityStatInfo, StatSummary, StatEntityKind } from './statistics-view.svelte';
 import { fmtValue, statKindColor } from './statistics-display';
 
 interface Props {
 	info: EntityStatInfo;
-	data: StatisticsData;
+	/** Memoised rows + bar max for this stat (computed on StatisticsData). */
+	summary: StatSummary;
 	kind: StatEntityKind;
 	selId: number;
 	onPickStat: (cat: EntityStatInfo['stat']['cat']) => void;
 }
 
-let { info, data, kind, selId, onPickStat }: Props = $props();
+let { info, summary, kind, selId, onPickStat }: Props = $props();
 
-const rows = $derived(data.rowsForStat(info.stat.id));
-const maxVal = $derived(Math.max(...rows.map((r) => r.value), 1));
-const top = $derived(rows[0]);
+const maxVal = $derived(summary.maxVal);
+const top = $derived(summary.rows[0]);
 const isTop = $derived(top?.entityId === selId);
 const kindColor = $derived(statKindColor(kind));
 </script>
