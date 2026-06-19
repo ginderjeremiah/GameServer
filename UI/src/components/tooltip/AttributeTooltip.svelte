@@ -35,7 +35,24 @@
 			<div class="at-effect" data-testid="attr-tip-effect">
 				<span class="at-effect-mag" style:color={effectDetail.color}>{effectDetail.magnitude}</span>
 				<span class="at-effect-dir" style:color={effectDetail.color}>{effectDetail.label}</span>
+				{#if effectDetail.applications}
+					<span class="at-effect-total-label">total</span>
+				{/if}
 			</div>
+			{#if effectDetail.applications}
+				<!-- The effect is stacked: list each application's individual amount and remaining time. -->
+				<div class="at-effect-stacks" data-testid="attr-tip-stacks">
+					<span class="at-effect-stacks-label">{effectDetail.applications.length} applications</span>
+					<ul class="at-effect-stack-list">
+						{#each effectDetail.applications as app, index (index)}
+							<li class="at-effect-stack-row">
+								<span class="at-effect-stack-mag" style:color={effectDetail.color}>{app.magnitude}</span>
+								<span class="at-effect-stack-time">{app.remaining}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 			{#if effectDetail.sourceName}
 				<div class="at-effect-source">
 					<span class="at-effect-source-label">Source</span>
@@ -106,11 +123,22 @@ const effectDetail = $derived.by(() => {
 			text: `${(remainingMs / 1000).toFixed(1)}s`
 		};
 	}
+	// When more than one application is active the effect is stacked: break down each application's
+	// individual amount and its own remaining time, while the headline magnitude stays the combined total.
+	const stacked = effect.applications && effect.applications.length > 1;
+	const stackAmount = effect.stackAmount ?? effect.amount;
+	const applications = stacked
+		? effect.applications?.map((app) => ({
+				magnitude: formatEffectMagnitude(effect.modifierType, stackAmount),
+				remaining: `${(app.remainingMs / 1000).toFixed(1)}s`
+			}))
+		: undefined;
 	return {
 		label: direction === 'buff' ? 'Buff' : 'Debuff',
 		color: effectDirectionColor(direction),
 		magnitude: formatEffectMagnitude(effect.modifierType, effect.amount),
 		sourceName: effect.sourceName,
+		applications,
 		pill
 	};
 });
@@ -141,6 +169,54 @@ const effectDetail = $derived.by(() => {
 	font-size: 8.5px;
 	letter-spacing: 1.4px;
 	text-transform: uppercase;
+}
+
+.at-effect-total-label {
+	font-family: var(--mono);
+	font-size: 8px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.at-effect-stacks {
+	margin-top: 6px;
+}
+
+.at-effect-stacks-label {
+	font-family: var(--mono);
+	font-size: 8px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.at-effect-stack-list {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.at-effect-stack-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.at-effect-stack-mag {
+	font-family: var(--mono);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.at-effect-stack-time {
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--text-tertiary);
 }
 
 .at-effect-source {

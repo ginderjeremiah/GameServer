@@ -116,7 +116,7 @@ describe('battleStep', () => {
 			expect(log.appliedEffects[0].onPlayer).toBe(false); // it landed on the enemy
 		});
 
-		it('does not record a refreshed effect as a new application', () => {
+		it('records each stacked application of an already-active effect', () => {
 			const player = makeBattler(baseStats, [
 				makeSkill(
 					0,
@@ -132,8 +132,12 @@ describe('battleStep', () => {
 			expect(log.appliedEffects).toHaveLength(1);
 			expect(log.appliedEffects[0].onPlayer).toBe(true);
 
-			battleStep(player, enemy, 40, noRng(), log); // fires again while still active → refresh, not recorded
-			expect(log.appliedEffects).toHaveLength(0);
+			// Firing again while still active now STACKS a new application, so it is recorded again (the
+			// sink is reset each tick, so this tick's lone new application is the single entry).
+			battleStep(player, enemy, 40, noRng(), log);
+			expect(log.appliedEffects).toHaveLength(1);
+			expect(log.appliedEffects[0].onPlayer).toBe(true);
+			expect(player.activeEffects).toHaveLength(2); // two applications now stacked on the player
 		});
 
 		it('reports per-tick DoT on one side and HoT on the other', () => {

@@ -30,6 +30,12 @@ export const effectDirection = (isHarmful: boolean, modifierType: EModifierType,
 	return beneficial ? 'buff' : 'debuff';
 };
 
+/** The combined magnitude of `count` stacked applications of the same effect: additive amounts sum
+ *  (`+15` ×3 → `+45`), multiplicative factors compound (`×1.5` ×3 → `×3.375`), matching how the real
+ *  attribute modifiers each application adds aggregate in the battle math. */
+export const combineEffectAmount = (modifierType: EModifierType, amount: number, count: number): number =>
+	modifierType === EModifierType.Multiplicative ? amount ** count : amount * count;
+
 /** The magnitude badge for an effect: a signed delta for additive amounts (`+15` / `-15`) or a
  *  `×factor` for multiplicative ones (`×1.5` / `×0.5`). */
 export const formatEffectMagnitude = (modifierType: EModifierType, amount: number): string => {

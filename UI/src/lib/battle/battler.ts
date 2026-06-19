@@ -13,13 +13,16 @@ interface BattlerData {
 	name: string;
 }
 
-/** A timed skill effect active on a battler, as the UI renders it (the active-effect chips). Holds the
- *  authored effect's id (the refresh key), the attribute/modifier it shifts, its full and remaining
+/** A single timed skill-effect application active on a battler, as the UI renders it (the active-effect
+ *  chips). Each application is its own entry — re-applying an effect stacks a new one — so it carries a
+ *  per-battler unique {@link applicationId} (to match its modifier on expiry and key it stably in the
+ *  chips) alongside the authored effect's id, the attribute/modifier it shifts, its full and remaining
  *  durations, and a render-only remaining duration interpolated between ticks for a smooth countdown —
  *  the chip analogue of {@link Skill.renderChargeTime}. The modifier instance itself is kept off this
  *  view (in {@link Battler.effectModifiers}) so the view can be a reactive `statify` projection without
  *  a reactive proxy breaking the reference identity {@link BattleAttributes.removeModifier} matches on. */
 export interface ActiveEffectView {
+	applicationId: number;
 	sourceId: number;
 	attribute: EAttribute;
 	modifierType: EModifierType;
@@ -45,11 +48,17 @@ export class Battler {
 	 *  it reactive is safe (see {@link ActiveEffectView}). */
 	public activeEffects: ActiveEffectView[] = [];
 
-	/** The modifier each active effect added to the attribute set, keyed by the effect's authored id.
+	/** The modifier each active effect application added to the attribute set, keyed by the application's
+	 *  unique id (not the authored effect id — applications stack, so an effect id maps to many).
 	 *  A private (`#`) field so `statify` leaves it — and the modifier references it holds —
 	 *  non-reactive, keeping the reference identity {@link BattleAttributes.removeModifier} matches on
 	 *  intact (a reactive array would deep-proxy its elements). */
 	#effectModifiers = new Map<number, AttributeModifier>();
+
+	/** Monotonic per-battler counter handing each effect application a unique {@link
+	 *  ActiveEffectView.applicationId}, so stacked applications of the same effect stay individually
+	 *  addressable for expiry and chip keying. */
+	#nextApplicationId = 0;
 
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
 	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
@@ -130,20 +139,12 @@ export class Battler {
 		return 0;
 	}
 
-	/** Applies a timed skill `effect` to this battler. Re-applying an already-active effect (matched by
-	 *  its authored id) refreshes its remaining duration without adding a second modifier (no stacking);
-	 *  a new effect adds a modifier and may shift MaxHealth, so the health is re-clamped. Returns `true`
-	 *  when the effect was newly applied and `false` on a refresh, so the live engine can log only the
-	 *  genuinely new applications (a refresh is already conveyed by the chip countdown resetting). */
-	public applyEffect(effect: ISkillEffect): boolean {
-		for (const active of this.activeEffects) {
-			if (active.sourceId === effect.id) {
-				active.remainingMs = effect.durationMs;
-				active.renderRemainingMs = effect.durationMs;
-				return false;
-			}
-		}
-
+	/** Applies a timed skill `effect` to this battler. Each application STACKS — it adds its own modifier
+	 *  and its own timed entry, so re-applying an already-active effect sums the magnitudes (additive
+	 *  amounts add, multiplicative factors compound) and each application expires on its own schedule. A
+	 *  new modifier may shift MaxHealth, so the health is re-clamped. */
+	public applyEffect(effect: ISkillEffect): void {
+		const applicationId = this.#nextApplicationId++;
 		const modifier: AttributeModifier = {
 			attribute: effect.attributeId,
 			amount: effect.amount,
@@ -151,8 +152,9 @@ export class Battler {
 			source: EAttributeModifierSource.SkillEffect
 		};
 		this.attributes.addModifier(modifier);
-		this.#effectModifiers.set(effect.id, modifier);
+		this.#effectModifiers.set(applicationId, modifier);
 		this.activeEffects.push({
+			applicationId,
 			sourceId: effect.id,
 			attribute: effect.attributeId,
 			modifierType: effect.modifierTypeId,
@@ -162,7 +164,6 @@ export class Battler {
 			renderRemainingMs: effect.durationMs
 		});
 		this.clampHealthToMaxHealth();
-		return true;
 	}
 
 	/** Advances every active effect by `timeDelta`, removing any whose duration has elapsed (its modifier
@@ -178,10 +179,10 @@ export class Battler {
 			const active = this.activeEffects[i];
 			active.remainingMs -= timeDelta;
 			if (active.remainingMs <= 0) {
-				const modifier = this.#effectModifiers.get(active.sourceId);
+				const modifier = this.#effectModifiers.get(active.applicationId);
 				if (modifier) {
 					this.attributes.removeModifier(modifier);
-					this.#effectModifiers.delete(active.sourceId);
+					this.#effectModifiers.delete(active.applicationId);
 				}
 				this.activeEffects.splice(i, 1);
 				removedAny = true;
