@@ -383,3 +383,4 @@ FodyWeavers.xsd
 
 # Output from the /image skill (.claude/skills/image) -- generated images, not source
 generated-images/
+art-staging
