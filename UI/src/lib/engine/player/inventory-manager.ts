@@ -242,19 +242,26 @@ export class InventoryManager {
 	 * updated optimistically; a failed send keeps the local state (it re-syncs on the next toggle or
 	 * on reload) rather than rolling back, since a favourite flag is low-stakes. The transport resolves
 	 * every failure with `response.error` (it never rejects), so the failure is observed and logged.
+	 *
+	 * Routed through {@link serialize} like the other optimistic mutations so its optimistic write can't
+	 * interleave with an in-flight item op's snapshot/rollback baseline — a favorite toggle resolving
+	 * between another op's snapshot and its rollback would otherwise race the rebuild. The no-rollback
+	 * policy lives inside the serialized closure (the toggle stays applied on a failed persist).
 	 */
-	public async setFavorite(itemId: number, favorite: boolean) {
-		const item = this.unlockedItems.get(itemId);
-		if (!item) {
-			return false;
-		}
+	public setFavorite(itemId: number, favorite: boolean): Promise<boolean> {
+		return this.serialize(async () => {
+			const item = this.unlockedItems.get(itemId);
+			if (!item) {
+				return false;
+			}
 
-		item.favorite = favorite;
-		const response = await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
-		if (response.error) {
-			logMessage(ELogType.Debug, 'There was an error setting the item favorite: ' + response.error);
-		}
-		return true;
+			item.favorite = favorite;
+			const response = await apiSocket.sendSocketCommand('SetItemFavorite', { itemId, favorite });
+			if (response.error) {
+				logMessage(ELogType.Debug, 'There was an error setting the item favorite: ' + response.error);
+			}
+			return true;
+		});
 	}
 
 	/** Called when the player unlocks a new item from a challenge reward. */
@@ -285,7 +292,7 @@ export class InventoryManager {
 	}
 
 	/**
-	 * Serializes the optimistic mutations (equip/unequip/applyMod/removeMod) so each one captures its
+	 * Serializes the optimistic mutations (equip/unequip/applyMod/removeMod/setFavorite) so each one captures its
 	 * rollback baseline only after the previous mutation has fully settled — persist and any rollback
 	 * included. Overlapping callers (a double-click equip, dragging a second item while the first
 	 * persist is still in flight) would otherwise interleave baselines: one operation's rollback could

@@ -119,8 +119,12 @@ export class PlayerManager implements IPlayerData {
 	public grantExp(exp: number) {
 		logMessage(ELogType.Exp, `Earned ${formatNum(exp)} exp.`);
 		this.exp += exp;
-		while (this.exp >= this.nextLevelThreshold) {
+		let threshold = this.nextLevelThreshold;
+		// A non-positive threshold (a hypothetical EXP_PER_LEVEL constant regression) would spin this
+		// loop forever; guard it so a single bad constant can't lock up the game.
+		while (threshold > 0 && this.exp >= threshold) {
 			this.levelUp();
+			threshold = this.nextLevelThreshold;
 		}
 	}
 

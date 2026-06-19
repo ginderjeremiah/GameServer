@@ -50,6 +50,14 @@ export class EnemyManager {
 	/** Re-entrancy guard for getNewEnemy: overlapping stage handlers must not both spawn-and-notify an
 	 *  enemy (a double-spawn the backend replay would flag as cheating). */
 	private fetchingEnemy = false;
+	/** Bumped whenever the active enemy-fetch loop is superseded (a stop, or a transition taking over).
+	 *  The running getNewEnemy captures this value and exits once it no longer matches, so a stale loop
+	 *  under a sustained outage can't keep spinning — nor later clobber the new fight with an enemy
+	 *  nobody is waiting for. */
+	private fetchGeneration = 0;
+	/** Resolver that short-circuits an in-flight retry backoff so a stop / superseding transition need
+	 *  not wait out the full delay before the loop re-checks whether it should still be running. */
+	private cancelBackoff?: () => void;
 
 	public start() {
 		if (!this.started) {
@@ -63,6 +71,9 @@ export class EnemyManager {
 		if (this.started) {
 			this.started = false;
 			this.battleStageUnhook?.();
+			// Cut short an in-flight retry backoff so a getNewEnemy parked under a sustained outage exits
+			// at once on the cleared `started` flag rather than after the full backoff window.
+			this.interruptFetch();
 			this.returnToIdle();
 		}
 	}
@@ -76,11 +87,14 @@ export class EnemyManager {
 			return;
 		}
 		this.fetchingEnemy = true;
+		const generation = this.fetchGeneration;
 		try {
 			// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
-			// (a sustained outage no longer grows the async chain without bound) and `stop()` cancels
-			// the loop by flipping `started`.
-			while (this.started) {
+			// (a sustained outage no longer grows the async chain without bound). The loop ends as soon
+			// as `stop()` flips `started` or a transition supersedes this fetch (bumping the generation);
+			// because the retry backoff is cancellable, either takes effect immediately rather than after
+			// the full delay — so the controls don't feel frozen while a backoff is parked.
+			while (this.started && generation === this.fetchGeneration) {
 				const result = await apiSocket.sendSocketCommand('NewEnemy', {
 					newZoneId: playerManager.currentZone
 				});
@@ -97,11 +111,45 @@ export class EnemyManager {
 				if (result.error) {
 					logMessage(ELogType.Debug, 'There was an error loading a new enemy: ' + result.error);
 				}
-				await delay(result.data?.cooldown || NEW_ENEMY_RETRY_DELAY_MS);
+				await this.backoff(result.data?.cooldown || NEW_ENEMY_RETRY_DELAY_MS);
 			}
 		} finally {
 			this.fetchingEnemy = false;
 		}
+	}
+
+	/**
+	 * A cancellable retry backoff: resolves after `ms`, or early if {@link interruptFetch} fires, so a
+	 * stop / superseding transition during a sustained outage need not wait out the full delay before
+	 * the fetch loop re-checks its run condition. Still delegates the actual sleep to `delay` (so a
+	 * positive cooldown is honored) rather than re-implementing the timer.
+	 */
+	private backoff(ms: number): Promise<void> {
+		return new Promise<void>((resolve) => {
+			let settled = false;
+			const finish = () => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				// Only clear the shared handle if it still points at this backoff — a later backoff may
+				// have already replaced it (e.g. the real timer firing after an early cancel).
+				if (this.cancelBackoff === finish) {
+					this.cancelBackoff = undefined;
+				}
+				resolve();
+			};
+			this.cancelBackoff = finish;
+			delay(ms).then(finish);
+		});
+	}
+
+	/** Supersedes any in-flight enemy fetch: the running getNewEnemy loop ends at its next check (the
+	 *  bumped generation no longer matches) and its retry backoff is cut short so the supersession takes
+	 *  effect immediately rather than after the parked delay. */
+	private interruptFetch() {
+		this.fetchGeneration++;
+		this.cancelBackoff?.();
 	}
 
 	/**
@@ -111,9 +159,15 @@ export class EnemyManager {
 	 */
 	public async challengeBoss() {
 		if (this.transitioning) {
+			// A rapid press while a prior transition is parked in its enemy-fetch backoff: cut that backoff
+			// short so the prior transition settles (releasing the guard) instead of holding the controls
+			// for the full retry window. This press is still dropped — the player presses again once freed.
+			this.interruptFetch();
 			return;
 		}
 		this.transitioning = true;
+		// Supersede any in-flight idle-loop fetch so its retry can't later overwrite the boss being loaded.
+		this.interruptFetch();
 		this.mode = 'boss';
 		this.bossOutcome = undefined;
 		this.bossUnlockedNextZone = false;
@@ -140,7 +194,13 @@ export class EnemyManager {
 
 	/** Retreat from an in-progress boss fight back to the normal idle farm loop. */
 	public async retreatFromBoss() {
-		if (this.mode !== 'boss' || this.transitioning) {
+		if (this.transitioning) {
+			// As in challengeBoss: a rapid press while a prior transition is parked in its backoff frees it
+			// (releasing the guard) rather than holding the controls for the full retry window.
+			this.interruptFetch();
+			return;
+		}
+		if (this.mode !== 'boss') {
 			return;
 		}
 		this.transitioning = true;
