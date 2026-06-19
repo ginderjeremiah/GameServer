@@ -412,6 +412,87 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(row.EquipmentSlotId);
         }
 
+        [Fact]
+        public async Task ItemFavoriteChanged_ItemRowMissing_InsertsFavoritedRowInsteadOfDropping()
+        {
+            // Models an ItemFavoriteChangedEvent reordered ahead of the item's ItemUnlockedEvent: the
+            // unlocked-item row doesn't exist yet, so the pre-fix ExecuteUpdate matched zero rows and the
+            // favorite was silently dropped until a later edit self-healed the DB.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.True(row.Favorite);
+            Assert.Null(row.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_RowMissingThenUnlockArrives_ConvergesToFavoritedWithoutDuplicating()
+        {
+            // The favorite inserts the row early; the later unlock must no-op on it rather than duplicate or
+            // clear the flag, so the player keeps the favorite they set.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true));
+            await ApplyAsync(new ItemUnlockedEvent(playerId, itemId));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.True(row.Favorite);
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_AppliedTwice_ConvergesToLatestFlagWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                // The item is already unlocked and favorited (the common in-order case).
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, itemId, favorite: true);
+            }
+
+            // Re-apply with the opposite value: the existing row is updated in place, not duplicated.
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: false));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.False(row.Favorite);
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            // The item has no unlocked-item row, so the concurrent applies race on its insert; the
+            // clear-and-re-apply path resolves the conflict to an update on the second pass rather than throwing.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyConcurrentlyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true));
+
+            Assert.Equal(1, await CountAsync(c => c.UnlockedItems.CountAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken)));
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.True(row.Favorite);
+        }
+
         private static AttributeAllocationsChangedEvent MakeAttributeEvent(int playerId, double intellect, double strength) => new(
             playerId,
             [
