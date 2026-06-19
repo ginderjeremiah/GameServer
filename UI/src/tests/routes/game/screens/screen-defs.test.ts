@@ -47,4 +47,22 @@ describe('GAME_SCREENS', () => {
 
 		expect(gated).toEqual(['admin']);
 	});
+
+	// These entries navigate or open a dialog instead of rendering a screen component, so the page
+	// returns early before deriving a component for them.
+	const ACTION_KEYS = ['admin', 'quit'];
+
+	it('gives every built, renderable screen a component (single-source registry)', () => {
+		const missing = GAME_SCREENS.filter((s) => s.built && !ACTION_KEYS.includes(s.key) && !s.component).map(
+			(s) => s.key
+		);
+
+		expect(missing).toEqual([]);
+	});
+
+	it('leaves "wip" placeholder screens without a component (they fall back to the placeholder)', () => {
+		const wipWithComponent = GAME_SCREENS.filter((s) => !s.built && s.component).map((s) => s.key);
+
+		expect(wipWithComponent).toEqual([]);
+	});
 });
