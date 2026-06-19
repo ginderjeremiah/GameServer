@@ -5,7 +5,7 @@ import { BattleAttributes, type Item } from '$lib/battle';
 
 // The grid consumes the screen-level item-tooltip controller via context; here we stub that context
 // hook to assert the grid drives the shared controller (and honours its suppression rule).
-const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+const controller = { describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() };
 vi.mock('$routes/game/screens/inventory/item-tooltip.svelte', () => ({
 	getItemTooltip: () => controller
 }));
@@ -162,6 +162,27 @@ describe('InventoryGrid — tooltip suppression', () => {
 		const { container } = render(InventoryGrid, { props: { view: makeView(items, { dragItemId: 1 }) } });
 		await fireEvent.mouseEnter(container.querySelector('.grid-slot')!);
 		expect(controller.show).not.toHaveBeenCalled();
+	});
+
+	it('surfaces the shared tooltip on keyboard focus of a tile, anchored off its box', async () => {
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items) } });
+		const overlay = container.querySelector('.overlay-button')!;
+		await fireEvent.focus(overlay);
+		expect(controller.show).toHaveBeenCalledWith(items[0], overlay);
+	});
+
+	it('applies the suppression rule to keyboard focus too (selected item)', async () => {
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items, { selectedId: 1 }) } });
+		await fireEvent.focus(container.querySelector('.overlay-button')!);
+		expect(controller.show).not.toHaveBeenCalled();
+	});
+
+	it('wires the shared tooltip id onto each tile for screen readers', () => {
+		const items = [makeGridItem(1)];
+		const { container } = render(InventoryGrid, { props: { view: makeView(items) } });
+		expect(container.querySelector('.overlay-button')!.getAttribute('aria-describedby')).toBe('tooltip-1');
 	});
 });
 

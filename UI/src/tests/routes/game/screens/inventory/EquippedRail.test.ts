@@ -5,7 +5,7 @@ import type { Item } from '$lib/battle';
 
 // The rail consumes the screen-level item-tooltip controller via context; here we stub that context
 // hook to assert the rail drives the shared controller on hover.
-const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+const controller = { describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() };
 vi.mock('$routes/game/screens/inventory/item-tooltip.svelte', () => ({
 	getItemTooltip: () => controller
 }));
@@ -173,5 +173,21 @@ describe('EquippedRail — tooltip handling', () => {
 		const tiles = container.querySelectorAll('.equip-tile');
 		await fireEvent.mouseMove(tiles[4]);
 		expect(controller.move).toHaveBeenCalled();
+	});
+
+	it('surfaces the shared tooltip on keyboard focus of a filled slot, anchored off its box', async () => {
+		const item = makeItem();
+		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
+		const { container } = render(EquippedRail, { props: { view } });
+		const overlay = container.querySelector('.overlay-button')!;
+		await fireEvent.focus(overlay);
+		expect(controller.show).toHaveBeenCalledWith(item, overlay);
+	});
+
+	it('wires the shared tooltip id onto a filled slot for screen readers', () => {
+		const item = makeItem();
+		const view = makeView({ equippedBySlot: { 4: item } as Record<number, Item> });
+		const { container } = render(EquippedRail, { props: { view } });
+		expect(container.querySelector('.overlay-button')!.getAttribute('aria-describedby')).toBe('tooltip-1');
 	});
 });

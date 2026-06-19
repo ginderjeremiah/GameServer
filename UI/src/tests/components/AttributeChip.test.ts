@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EAttribute } from '$lib/api';
 
-const controller = { show: vi.fn(), move: vi.fn(), hide: vi.fn() };
+const controller = { describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() };
 
 // The chip resolves the screen-level controller via context; the action/controller wiring is
 // covered elsewhere, so here we stub it to assert the chip drives it on hover and focus.
@@ -65,5 +65,10 @@ describe('AttributeChip', () => {
 		expect(controller.show).toHaveBeenCalledWith(EAttribute.Strength, chip);
 		await fireEvent.blur(chip);
 		expect(controller.hide).toHaveBeenCalled();
+	});
+
+	it('wires the shared tooltip id onto aria-describedby so the explanation is announced on focus', () => {
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		expect(container.querySelector('.achip')!.getAttribute('aria-describedby')).toBe('tooltip-1');
 	});
 });

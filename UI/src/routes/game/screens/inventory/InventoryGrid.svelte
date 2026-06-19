@@ -9,6 +9,7 @@
 				<GridSlot
 					{item}
 					selected={view.selectedId === item.itemId}
+					describedById={tooltip?.describedById}
 					onSelect={(it) => view.select(view.selectedId === it.itemId ? null : it.itemId)}
 					onToggleEquip={(it) => view.toggleEquip(it)}
 					onToggleFav={(it) => view.toggleFavorite(it.itemId)}
@@ -56,6 +57,7 @@
 import GridSlot from './GridSlot.svelte';
 import InventoryToolbar from './InventoryToolbar.svelte';
 import type { Item } from '$lib/battle';
+import type { TooltipAnchor } from '$stores/tooltip.svelte';
 import type { InventoryView } from './inventory-view.svelte';
 import { getItemTooltip } from './item-tooltip.svelte';
 
@@ -70,12 +72,12 @@ const slice = $derived(view.visible.slice(pageClamped * perPage, pageClamped * p
 const tooltip = getItemTooltip();
 
 // Suppress the tooltip while an item is selected or being dragged — a rule the grid owns since the
-// rail has no such constraint.
-const handleHoverEnter = (item: Item, ev: MouseEvent) => {
+// rail has no such constraint. Drives both hover (cursor anchor) and keyboard focus (the tile's box).
+const handleHoverEnter = (item: Item, anchor: TooltipAnchor) => {
 	if (view.selectedId != null || view.dragItemId != null) {
 		return;
 	}
-	tooltip?.show(item, ev);
+	tooltip?.show(item, anchor);
 };
 const handleHoverMove = (ev: MouseEvent) => tooltip?.move(ev);
 const handleHoverLeave = () => tooltip?.hide();

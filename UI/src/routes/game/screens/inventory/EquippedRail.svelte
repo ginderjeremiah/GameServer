@@ -18,6 +18,7 @@
 								item={view.equippedBySlot[slot.id]}
 								dragItem={view.dragItem}
 								selected={!!view.selected && view.equippedBySlot[slot.id]?.itemId === view.selected.itemId}
+								describedById={tooltip?.describedById}
 								onSelect={(item) => view.select(item.itemId)}
 								onDrop={handleDrop}
 								onUnequip={(slotId) => view.unequip(slotId)}
@@ -40,6 +41,7 @@
 <script lang="ts">
 import EquipSlot from './EquipSlot.svelte';
 import type { Item } from '$lib/battle';
+import type { TooltipAnchor } from '$stores/tooltip.svelte';
 import { EQUIP_GROUPS, EQUIP_SLOTS, type InventoryView } from './inventory-view.svelte';
 import { getItemTooltip } from './item-tooltip.svelte';
 
@@ -47,7 +49,8 @@ const { view }: { view: InventoryView } = $props();
 
 const tooltip = getItemTooltip();
 
-const handleHoverEnter = (item: Item, ev: MouseEvent) => tooltip?.show(item, ev);
+// Drives both hover (cursor anchor) and keyboard focus (the tile's box) of a filled slot.
+const handleHoverEnter = (item: Item, anchor: TooltipAnchor) => tooltip?.show(item, anchor);
 const handleHoverMove = (ev: MouseEvent) => tooltip?.move(ev);
 const handleHoverLeave = () => tooltip?.hide();
 

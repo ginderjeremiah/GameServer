@@ -12,6 +12,8 @@ import { anchorPosition, registerTooltipComponent, type TooltipAnchor, type Tool
  * element positioned off its box) so the tooltip stays reachable by mouse and keyboard alike.
  */
 export interface ItemTooltipController {
+	/** Stable DOM id of the shared panel, for wiring a focusable trigger's `aria-describedby`. */
+	readonly describedById: string;
 	show: (item: Item, anchor: TooltipAnchor) => void;
 	move: (anchor: TooltipAnchor) => void;
 	hide: () => void;
@@ -33,9 +35,10 @@ export interface ItemTooltipHandle {
  */
 export function createItemTooltip(getComponent: () => TooltipComponent | undefined): ItemTooltipHandle {
 	let item = $state<Item | undefined>();
-	const { setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(getComponent);
+	const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(getComponent);
 
 	const controller: ItemTooltipController = {
+		describedById,
 		show(next, anchor) {
 			item = next;
 			setTooltipPosition(anchorPosition(anchor));
