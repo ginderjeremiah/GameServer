@@ -55,6 +55,14 @@ export class EnemyManager {
 	 *  under a sustained outage can't keep spinning — nor later clobber the new fight with an enemy
 	 *  nobody is waiting for. */
 	private fetchGeneration = 0;
+	/** The generation the in-flight fetch loop captured at its start. Lets a fresh getNewEnemy tell a
+	 *  genuine re-entrant duplicate (same generation — the running loop will still spawn, so drop) apart
+	 *  from a superseded loop (older generation — it will abandon without spawning, so wait it out then
+	 *  fetch fresh rather than be dropped by the re-entrancy guard). */
+	private fetchingGeneration = 0;
+	/** The in-flight fetch loop, so a superseding caller (e.g. a failing boss-challenge falling back to
+	 *  the idle loop) can await its teardown before fetching afresh — keeping a single fetch in flight. */
+	private inFlightFetch?: Promise<void>;
 	/** Resolver that short-circuits an in-flight retry backoff so a stop / superseding transition need
 	 *  not wait out the full delay before the loop re-checks whether it should still be running. */
 	private cancelBackoff?: () => void;
@@ -78,16 +86,33 @@ export class EnemyManager {
 		}
 	}
 
-	public async getNewEnemy() {
-		// Single re-entrancy guard: overlapping stage handlers (e.g. an idle victory racing an Idle/
-		// Defeated change) can both reach here, and each would request-and-notify a new enemy —
-		// double-counting a spawn. Because the backend replays what the client reports, a double-spawn
-		// has anti-cheat consequences, so the second, re-entrant call drops; the first still spawns one.
-		if (this.fetchingEnemy) {
-			return;
-		}
-		this.fetchingEnemy = true;
+	public async getNewEnemy(): Promise<void> {
 		const generation = this.fetchGeneration;
+		if (this.fetchingEnemy) {
+			// A fetch is already running. If it captured this same generation it's a genuine re-entrant
+			// duplicate — overlapping stage handlers (e.g. an idle victory racing an Idle/Defeated change)
+			// each request-and-notify a spawn, and a double-spawn has anti-cheat consequences (the backend
+			// replays what the client reports). Drop it; the running fetch still spawns one.
+			if (this.fetchingGeneration === generation) {
+				return;
+			}
+			// Otherwise this call's generation is newer, so the running fetch has been superseded (a
+			// transition bumped the generation) and will abandon without spawning. Wait for it to tear
+			// down, then fall through and fetch fresh so this fallback spawn isn't dropped by the guard.
+			await this.inFlightFetch;
+			// The wait can overlap a stop or a further supersession; bail if either landed meanwhile.
+			if (!this.started || generation !== this.fetchGeneration) {
+				return;
+			}
+		}
+		const run = this.runFetchLoop(generation);
+		this.inFlightFetch = run;
+		await run;
+	}
+
+	private async runFetchLoop(generation: number): Promise<void> {
+		this.fetchingEnemy = true;
+		this.fetchingGeneration = generation;
 		try {
 			// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
 			// (a sustained outage no longer grows the async chain without bound). The loop ends as soon
