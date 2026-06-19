@@ -170,6 +170,49 @@ describe('EnemyManager.getNewEnemy', () => {
 		releaseDelay(); // the real timer firing late is harmless (the backoff already settled)
 	});
 
+	it('does not apply a successful enemy when stop() lands while parked on the NewEnemy request', async () => {
+		// The narrow window the loop condition alone doesn't cover: the fetch is parked on the in-flight
+		// NewEnemy command (not the backoff) when stop() lands, and the command then resolves with an
+		// enemy. The post-await guard must drop it rather than spawn-and-notify over the stopped manager.
+		const enemy = makeEnemy(9);
+		let resolveSend!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		sendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const fetch = manager.getNewEnemy();
+		await flush(); // park the loop on the in-flight NewEnemy request
+		manager.stop(); // supersede mid-request (clears started, bumps the generation)
+		resolveSend(enemyResponse(enemy));
+		await fetch;
+
+		expect(manager.currentEnemy).toBeUndefined();
+		expect(loaded).toEqual([]);
+	});
+
+	it('does not apply a successful enemy when the fetch is superseded while parked on the NewEnemy request', async () => {
+		// Same narrow window, but the supersession is a transition (generation bump) rather than a stop:
+		// the manager stays started, so only the generation re-check catches it. The enemy a superseded
+		// idle fetch receives must not overwrite the fight the transition moved on to.
+		const enemy = makeEnemy(11);
+		let resolveSend!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		sendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const fetch = manager.getNewEnemy();
+		await flush(); // park the loop on the in-flight NewEnemy request
+		// Simulate a transition (e.g. challengeBoss) superseding this fetch via interruptFetch: the
+		// generation moves on while the manager stays started.
+		(manager as unknown as { interruptFetch(): void }).interruptFetch();
+		resolveSend(enemyResponse(enemy));
+		await fetch;
+
+		expect(manager.started).toBe(true);
+		expect(manager.currentEnemy).toBeUndefined();
+		expect(loaded).toEqual([]);
+	});
+
 	it('drops a concurrent re-entrant call so a stage-change race spawns a single enemy', async () => {
 		// Two overlapping stage handlers (e.g. an idle victory racing an Idle change) can both reach
 		// getNewEnemy; each would request-and-notify an enemy, double-counting the spawn. Since the
