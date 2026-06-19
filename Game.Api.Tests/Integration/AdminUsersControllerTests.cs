@@ -513,6 +513,33 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SetUserRoles_RemovingAdminWhenOnlyOtherAdminIsBanned_IsRejected()
+        {
+            // The only other admin is banned, so it is not a usable admin that could recover the instance.
+            // Removing the target's Admin role would strand the system with only banned admins, so the
+            // last-admin guard — sharing the usable-admin definition with the archive/ban guard — rejects it.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var target = await TestDataSeeder.CreateUserAsync(context, "cleanadmin", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, target.Id, ERole.Admin);
+
+            var bannedAdmin = await TestDataSeeder.CreateUserAsync(context, "bannedadmin", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, bannedAdmin.Id, ERole.Admin);
+            bannedAdmin.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.SetUserRoles(actor.Id, target.Id, Array.Empty<int>());
+
+            Assert.Equal(SetUserRolesStatus.LastAdmin, status);
+            // The rejected change must not mutate state — the target keeps Admin.
+            Assert.Equal(new[] { nameof(ERole.Admin) }, await LoadRoleNamesAsync(target.Id));
+        }
+
+        [Fact]
         public async Task SetUserRoles_ConcurrentDemotionsOfDistinctAdmins_LeaveOneAdminStanding()
         {
             // Two admins are the only admins; a ghost actor concurrently demotes each. The atomic

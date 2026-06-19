@@ -283,6 +283,51 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task Login_BannedUser_ReturnsBanned()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // A fully valid account (correct credentials and a loadable player) that is then banned — so the
+            // rejection can only be the ban, not a missing player or bad password.
+            var user = await TestDataSeeder.CreateUserAsync(context, "banneduser", "bannedpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            user.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("banneduser", "bannedpass");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.Banned, result.Status);
+            Assert.Null(result.Tokens);
+        }
+
+        [Fact]
+        public async Task Login_BannedUserWithWrongPassword_ReturnsInvalidCredentials()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "bannedwrongpass", "correctpass");
+            user.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // The ban is disclosed only after the credentials verify, so a wrong password yields the generic
+            // invalid-credentials result rather than leaking that the account is banned.
+            var result = await accountService.Login("bannedwrongpass", "incorrect");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+            Assert.Null(result.Tokens);
+        }
+
+        [Fact]
         public async Task ResolveSelectedPlayerId_UserWithPlayer_ReturnsFirstPlayerId()
         {
             using var scope = CreateScope();

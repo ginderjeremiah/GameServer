@@ -24,7 +24,7 @@ namespace Game.Core.Tests.Identity
         public void CheckRoleChange_NonLockoutChanges_AreAllowed(
             bool targetHasAdminRole,
             bool requestedRolesIncludeAdmin,
-            bool otherAdminsRemain)
+            bool otherUsableAdminsRemain)
         {
             // Acting on a different user (1 vs 2) to isolate from the self-removal rule.
             var result = AdminLockoutPolicy.CheckRoleChange(
@@ -32,7 +32,7 @@ namespace Game.Core.Tests.Identity
                 targetUserId: 2,
                 targetHasAdminRole,
                 requestedRolesIncludeAdmin,
-                otherAdminsRemain);
+                otherUsableAdminsRemain);
 
             Assert.Equal(RoleChangeProtection.Allowed, result);
         }
@@ -45,7 +45,7 @@ namespace Game.Core.Tests.Identity
                 targetUserId: 7,
                 targetHasAdminRole: true,
                 requestedRolesIncludeAdmin: false,
-                otherAdminsRemain: true);
+                otherUsableAdminsRemain: true);
 
             Assert.Equal(RoleChangeProtection.SelfAdminRemoval, result);
         }
@@ -59,7 +59,7 @@ namespace Game.Core.Tests.Identity
                 targetUserId: 7,
                 targetHasAdminRole: true,
                 requestedRolesIncludeAdmin: false,
-                otherAdminsRemain: false);
+                otherUsableAdminsRemain: false);
 
             Assert.Equal(RoleChangeProtection.SelfAdminRemoval, result);
         }
@@ -72,7 +72,7 @@ namespace Game.Core.Tests.Identity
                 targetUserId: 2,
                 targetHasAdminRole: true,
                 requestedRolesIncludeAdmin: false,
-                otherAdminsRemain: false);
+                otherUsableAdminsRemain: false);
 
             Assert.Equal(RoleChangeProtection.LastAdmin, result);
         }
@@ -86,7 +86,7 @@ namespace Game.Core.Tests.Identity
                 targetUserId: 7,
                 targetHasAdminRole: true,
                 requestedRolesIncludeAdmin: true,
-                otherAdminsRemain: false);
+                otherUsableAdminsRemain: false);
 
             Assert.Equal(RoleChangeProtection.Allowed, result);
         }

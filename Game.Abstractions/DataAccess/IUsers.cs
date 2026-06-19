@@ -52,9 +52,11 @@ namespace Game.Abstractions.DataAccess
         Task<bool> CreateAccount(NewAccount account, NewPlayer player);
 
         /// <summary>
-        /// Loads the credentials of the active (non-archived) account with the given username — the data
-        /// the login use case needs to authenticate and establish a session. Returns <see langword="null"/>
-        /// when no active account matches.
+        /// Loads the credentials of the non-archived account with the given username — the data the login
+        /// use case needs to authenticate and establish a session. A banned account is still returned,
+        /// flagged via <see cref="AccountCredentials.IsBanned"/> so the login flow can reject it with a
+        /// distinct reason. Returns <see langword="null"/> when no such account matches (archived accounts
+        /// are excluded, freeing the username for reuse).
         /// </summary>
         Task<AccountCredentials?> GetUser(string username);
 

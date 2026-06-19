@@ -58,13 +58,13 @@ namespace Game.Core.Identity
         /// <param name="targetUserId">The user whose roles are being replaced.</param>
         /// <param name="targetHasAdminRole">Whether the target currently holds the Admin role.</param>
         /// <param name="requestedRolesIncludeAdmin">Whether the requested role set keeps the Admin role.</param>
-        /// <param name="otherAdminsRemain">Whether any admin other than the target would remain afterwards.</param>
+        /// <param name="otherUsableAdminsRemain">Whether any usable admin (non-archived, non-banned) other than the target would remain afterwards.</param>
         public static RoleChangeProtection CheckRoleChange(
             int actingUserId,
             int targetUserId,
             bool targetHasAdminRole,
             bool requestedRolesIncludeAdmin,
-            bool otherAdminsRemain)
+            bool otherUsableAdminsRemain)
         {
             var removesAdminRole = targetHasAdminRole && !requestedRolesIncludeAdmin;
             if (!removesAdminRole)
@@ -77,7 +77,7 @@ namespace Game.Core.Identity
                 return RoleChangeProtection.SelfAdminRemoval;
             }
 
-            return otherAdminsRemain ? RoleChangeProtection.Allowed : RoleChangeProtection.LastAdmin;
+            return otherUsableAdminsRemain ? RoleChangeProtection.Allowed : RoleChangeProtection.LastAdmin;
         }
 
         /// <summary>

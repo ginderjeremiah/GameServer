@@ -73,6 +73,14 @@ namespace Game.Application.Services
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
+            // Reject a banned account only after its credentials check out, so an anonymous probe can't
+            // enumerate ban status — only the account owner learns they are banned. This is also the first
+            // gate after verification, so a banned login never loads the player or re-hashes the credential.
+            if (account.IsBanned)
+            {
+                return AccountLoginResult.Failed(LoginStatus.Banned);
+            }
+
             if (account.PlayerIds.Count == 0)
             {
                 return AccountLoginResult.Failed(LoginStatus.NoPlayer);
