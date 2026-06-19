@@ -1,7 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -101,7 +101,7 @@ namespace Game.Api.Tests.Unit
         public void Player_AfterSetPlayer_ReturnsSameInstance()
         {
             var session = new SessionService(new FakeSessionStore());
-            var player = MakePlayer(7);
+            var player = new PlayerBuilder().WithId(7).Build();
 
             session.SetPlayer(player);
 
@@ -112,7 +112,7 @@ namespace Game.Api.Tests.Unit
         public void ClearSession_ResetsLoadedPlayer()
         {
             var session = new SessionService(new FakeSessionStore());
-            session.SetPlayer(MakePlayer(7));
+            session.SetPlayer(new PlayerBuilder().WithId(7).Build());
 
             session.ClearSession();
 
@@ -158,20 +158,6 @@ namespace Game.Api.Tests.Unit
 
             Assert.Empty(store.Cleared);
         }
-
-        private static Player MakePlayer(int id) => new()
-        {
-            Id = id,
-            Name = "Test",
-            Level = 1,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
 
         // An in-memory session store that serves a single optional cached session and records writes, so
         // the cache-hit/miss and rehydration paths can be exercised without Redis.

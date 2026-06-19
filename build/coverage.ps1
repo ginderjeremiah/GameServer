@@ -45,7 +45,7 @@ try {
     -reports:$cobertura `
     -targetdir:coverage/backend-report `
     -reporttypes:"TextSummary;JsonSummary;Html" `
-    "-assemblyfilters:+Game.*;-Game.*.Tests;-Game.TestInfrastructure" `
+    "-assemblyfilters:+Game.*;-Game.*.Tests;-Game.TestInfrastructure;-Game.Core.TestInfrastructure" `
     "-classfilters:-System.Text.RegularExpressions.Generated*" `
     "-filefilters:-**/obj/**;-**/Migrations/**"
   if ($LASTEXITCODE -ne 0) { throw "ReportGenerator failed" }

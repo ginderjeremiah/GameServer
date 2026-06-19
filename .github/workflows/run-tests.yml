@@ -44,6 +44,7 @@ jobs:
             - 'Game.Application/**'
             - 'Game.Application.Tests/**'
             - 'Game.Core/**'
+            - 'Game.Core.TestInfrastructure/**'
             - 'Game.Core.Tests/**'
             - 'Game.DataAccess/**'
             - 'Game.Infrastructure/**'

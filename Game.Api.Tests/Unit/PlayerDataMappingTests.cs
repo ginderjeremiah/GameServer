@@ -1,8 +1,8 @@
 using Game.Core;
 using Game.Core.Items;
-using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 using CorePlayer = Game.Core.Players.Player;
 using PlayerDataModel = Game.Api.Models.Player.PlayerData;
@@ -82,19 +82,15 @@ namespace Game.Api.Tests.Unit
             Assert.Null(unequippedHelm.EquipmentSlotId);
         }
 
-        private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null) => new()
+        private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null)
         {
-            Id = 1,
-            Name = "Test",
-            Level = 1,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = inventory ?? new Inventory(),
-            Skills = skills,
-            SelectedSkills = selectedSkills,
-            LogPreferences = [],
-        };
+            var builder = new PlayerBuilder().WithSkills(skills).WithSelectedSkills(selectedSkills);
+            if (inventory is not null)
+            {
+                builder.WithInventory(inventory);
+            }
+            return builder.Build();
+        }
 
         private static Skill MakeSkill(int id) => new()
         {

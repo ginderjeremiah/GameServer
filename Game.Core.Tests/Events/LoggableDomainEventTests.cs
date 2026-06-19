@@ -3,7 +3,7 @@ using Game.Core.Battle.Events;
 using Game.Core.Enemies;
 using Game.Core.Players;
 using Game.Core.Players.Events;
-using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Events
@@ -18,7 +18,7 @@ namespace Game.Core.Tests.Events
         [Fact]
         public void BattleCompletedEvent_GetLogProperties_ReturnsOnlyCuratedSafeScalars()
         {
-            var player = MakePlayer(id: 7, name: "SecretPlayerName");
+            var player = new PlayerBuilder().WithId(7).WithName("SecretPlayerName").Build();
             var enemy = MakeEnemy(id: 5, name: "SecretEnemyName");
             var stats = new BattleStats { PlayerDamageDealt = 1234.5 };
             var evt = new BattleCompletedEvent(
@@ -47,7 +47,7 @@ namespace Game.Core.Tests.Events
         [Fact]
         public void PlayerLeveledUpEvent_GetLogProperties_ReturnsOnlyCuratedSafeScalars()
         {
-            var player = MakePlayer(id: 7, name: "SecretPlayerName");
+            var player = new PlayerBuilder().WithId(7).WithName("SecretPlayerName").Build();
             var evt = new PlayerLeveledUpEvent(player, NewLevel: 12, StatPointsGained: 60);
 
             var properties = evt.GetLogProperties().ToDictionary(p => p.Key, p => p.Value);
@@ -60,20 +60,6 @@ namespace Game.Core.Tests.Events
             var serialized = string.Join("|", properties.Select(p => $"{p.Key}={p.Value}"));
             Assert.DoesNotContain("SecretPlayerName", serialized);
         }
-
-        private static Player MakePlayer(int id, string name) => new()
-        {
-            Id = id,
-            Name = name,
-            Level = 1,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
 
         private static Enemy MakeEnemy(int id, string name) => new()
         {

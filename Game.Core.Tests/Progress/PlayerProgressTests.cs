@@ -2,8 +2,8 @@ using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Progress;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Progress
@@ -538,7 +538,7 @@ namespace Game.Core.Tests.Progress
         public void EvaluateChallenges_LevelReached_UsesPlayerLevel()
         {
             var challenge = MakeChallenge(id: 0, EChallengeType.LevelReached, goal: 5);
-            var progress = MakeProgress(player: MakePlayer(level: 5));
+            var progress = MakeProgress(player: new PlayerBuilder().WithLevel(5).Build());
 
             var completed = progress.EvaluateChallenges([challenge]);
 
@@ -549,7 +549,7 @@ namespace Game.Core.Tests.Progress
         public void EvaluateChallenges_LevelReachedBelowGoal_DoesNotComplete()
         {
             var challenge = MakeChallenge(id: 0, EChallengeType.LevelReached, goal: 10);
-            var progress = MakeProgress(player: MakePlayer(level: 5));
+            var progress = MakeProgress(player: new PlayerBuilder().WithLevel(5).Build());
 
             var completed = progress.EvaluateChallenges([challenge]);
 
@@ -715,7 +715,7 @@ namespace Game.Core.Tests.Progress
             IEnumerable<PlayerStatistic>? statistics = null,
             IEnumerable<PlayerChallenge>? challenges = null)
         {
-            return new PlayerProgress(player ?? MakePlayer(), statistics ?? [], challenges ?? []);
+            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? []);
         }
 
         private static PlayerStatistic Stat(EStatisticType type, int? entityId, decimal value) =>
@@ -753,18 +753,5 @@ namespace Game.Core.Tests.Progress
             AvailableSkills = [],
         };
 
-        private static Player MakePlayer(int level = 1) => new()
-        {
-            Id = 1,
-            Name = "Test",
-            Level = level,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
     }
 }

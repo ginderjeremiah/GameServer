@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Game.Core\Game.Core.csproj" />
     <ProjectReference Include="..\Game.DataAccess\Game.DataAccess.csproj" />
     <ProjectReference Include="..\Game.Infrastructure\Game.Infrastructure.csproj" />
+    <ProjectReference Include="..\Game.Core.TestInfrastructure\Game.Core.TestInfrastructure.csproj" />
   </ItemGroup>
 
 </Project>
