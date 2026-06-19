@@ -1,4 +1,4 @@
-import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketResponseTypes } from './types/api-socket-type-map';
+import { ApiSocketCommand, ApiSocketCommandWithRequest, ApiSocketRequestTypes } from './types/api-socket-type-map';
 import { IApiSocketResponse } from './api-socket';
 
 export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
@@ -6,12 +6,12 @@ export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
 	private promiseResolver: (value: IApiSocketResponse<T>) => void;
 	id: string;
 	commandName: T;
-	parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never;
+	parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketRequestTypes[T] : never;
 
 	constructor(
 		id: string,
 		commandName: T,
-		parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketResponseTypes[T] : never
+		parameters?: T extends ApiSocketCommandWithRequest ? ApiSocketRequestTypes[T] : never
 	) {
 		this.id = id;
 		this.commandName = commandName;
