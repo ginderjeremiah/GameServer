@@ -46,6 +46,11 @@ namespace Game.Api.Services
         private readonly object _drainLock = new();
         private Task? _drainTask;
 
+        // Set once (under _drainLock, together with the drain snapshot) the instant draining begins. It gates
+        // Register so a socket whose handshake completes after the snapshot is drained on the spot rather than
+        // being tracked-but-undrained — see Register and DrainAsync (#904).
+        private bool _draining;
+
         public SocketConnectionRegistry(IHostApplicationLifetime lifetime, ILogger<SocketConnectionRegistry> logger, TimeSpan? drainTimeout = null)
         {
             _lifetime = lifetime;
@@ -65,12 +70,29 @@ namespace Game.Api.Services
 
         /// <summary>
         /// Registers a freshly-accepted socket and starts its loops, wiring the shutdown tokens so a drain
-        /// can tear it down. Replaces the handler's untracked <c>Task.Run</c> start.
+        /// can tear it down. Tracking and starting the socket happen under <see cref="_drainLock"/> so a
+        /// concurrent <see cref="DrainAsync"/> snapshot can never catch a half-registered handler whose
+        /// <see cref="SocketHandler.Listen"/> hasn't wired its shutdown tokens yet.
+        ///
+        /// A handshake that completes <b>after</b> the drain snapshot (the <see cref="_draining"/> gate is
+        /// closed) would otherwise be tracked-but-undrained: never sent a close frame, its inactivity
+        /// watchdog exiting at once on the already-cancelled <see cref="_stoppingCts"/>, and its receive
+        /// blocking until the host force-kills the process. Such a latecomer is instead drained on the spot —
+        /// returned so the caller awaits its clean close — so no socket slips past the drain (#904).
         /// </summary>
-        public void Register(SocketHandler handler)
+        public Task Register(SocketHandler handler)
         {
-            _handlers[handler.Id] = handler;
-            handler.Listen(_stoppingCts.Token, _drainCts.Token);
+            lock (_drainLock)
+            {
+                if (!_draining)
+                {
+                    _handlers[handler.Id] = handler;
+                    handler.Listen(_stoppingCts.Token, _drainCts.Token);
+                    return Task.CompletedTask;
+                }
+            }
+
+            return DrainLateSocketAsync(handler);
         }
 
         /// <summary>Removes a socket from the live set as it tears down (a clean close, replacement, etc.).</summary>
@@ -90,7 +112,16 @@ namespace Game.Api.Services
             // Inactivity close would just race the ServerShuttingDown close below.
             _stoppingCts.Cancel();
 
-            var handlers = _handlers.Values.ToArray();
+            SocketHandler[] handlers;
+            lock (_drainLock)
+            {
+                // Close the gate and snapshot atomically: from here every socket is either in this snapshot
+                // or will observe _draining in Register and drain itself — none is silently leaked between
+                // the two (#904).
+                _draining = true;
+                handlers = _handlers.Values.ToArray();
+            }
+
             if (handlers.Length == 0)
             {
                 return;
@@ -137,6 +168,30 @@ namespace Game.Api.Services
             finally
             {
                 Unregister(handler.Id);
+            }
+        }
+
+        /// <summary>
+        /// Drains a socket that registered after the drain already snapshotted. Starts its loops so
+        /// <see cref="SocketHandler.ShutdownAsync"/> has something to await, then closes it bounded by the
+        /// same <see cref="_drainTimeout"/> — a latecomer whose client never completes the handshake trips
+        /// the deadline (cancelling <see cref="_drainCts"/>) instead of blocking, exactly as the batch drain
+        /// does. Faults are swallowed by <see cref="DrainHandlerAsync"/>, so the await can't throw.
+        /// </summary>
+        private async Task DrainLateSocketAsync(SocketHandler handler)
+        {
+            handler.Listen(_stoppingCts.Token, _drainCts.Token);
+
+            var drain = DrainHandlerAsync(handler);
+            try
+            {
+                await drain.WaitAsync(_drainTimeout);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("A socket registered during shutdown did not drain within {Timeout}; aborting it.", _drainTimeout);
+                _drainCts.Cancel();
+                await drain;
             }
         }
 

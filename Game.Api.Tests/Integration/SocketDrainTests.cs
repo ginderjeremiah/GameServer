@@ -43,7 +43,7 @@ namespace Game.Api.Tests.Integration
             var (socket, handler) = CreateHandler(scope, echoServerClose: true);
             var registry = CreateRegistry(scope, TimeSpan.FromSeconds(30));
 
-            registry.Register(handler);
+            await registry.Register(handler);
             await socket.ReceiveStarted.WaitAsync(WaitTimeout, CancellationToken);
 
             await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);
@@ -67,7 +67,7 @@ namespace Game.Api.Tests.Integration
             var (socket, handler) = CreateHandler(scope, echoServerClose: false);
             var registry = CreateRegistry(scope, TimeSpan.FromMilliseconds(300));
 
-            registry.Register(handler);
+            await registry.Register(handler);
             await socket.ReceiveStarted.WaitAsync(WaitTimeout, CancellationToken);
 
             // Without the bounded-drain abort the read loop's receive would block forever; the drain
@@ -118,6 +118,46 @@ namespace Game.Api.Tests.Integration
             Assert.DoesNotContain(
                 _capturingProvider.Entries,
                 e => e.Category == RegistryCategory && e.Level == LogLevel.Warning);
+        }
+
+        [Fact]
+        public async Task Register_AfterDrainSnapshot_CooperativeClient_ClosesSocketWithServerShuttingDownReason()
+        {
+            using var scope = CreateScope();
+            var (socket, handler) = CreateHandler(scope, echoServerClose: true);
+            var registry = CreateRegistry(scope, TimeSpan.FromSeconds(30));
+
+            // A drain over no live sockets closes the gate; a register afterwards models a handshake that
+            // completed just after the snapshot — exactly the socket #904 would have leaked.
+            await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);
+            await registry.Register(handler).WaitAsync(WaitTimeout, CancellationToken);
+
+            // The latecomer is closed cleanly with the same shutting-down reason instead of being leaked, and
+            // its loops wound down (no lingering receive with neither a watchdog nor a drain).
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.SentCloseStatus);
+            Assert.NotNull(socket.SentCloseDescription);
+            Assert.Contains("shutting down", socket.SentCloseDescription, StringComparison.OrdinalIgnoreCase);
+            Assert.True(handler.Completion.IsCompletedSuccessfully);
+        }
+
+        [Fact]
+        public async Task Register_AfterDrainSnapshot_ClientNeverCompletesHandshake_AbortsAfterTimeoutInsteadOfHanging()
+        {
+            using var scope = CreateScope();
+            var (socket, handler) = CreateHandler(scope, echoServerClose: false);
+            var registry = CreateRegistry(scope, TimeSpan.FromMilliseconds(300));
+
+            await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);
+
+            // An unresponsive latecomer's receive would block forever without the bounded late-drain; the
+            // register task completing at all is what proves the deadline abort unwedged it.
+            await registry.Register(handler).WaitAsync(WaitTimeout, CancellationToken);
+
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.SentCloseStatus);
+            Assert.True(handler.Completion.IsCompleted);
+            Assert.Contains(
+                _capturingProvider.Entries,
+                e => e.Category == RegistryCategory && e.Level == LogLevel.Warning && e.Message.Contains("registered during shutdown"));
         }
 
         private (DrainableWebSocket Socket, SocketHandler Handler) CreateHandler(IServiceScope scope, bool echoServerClose)

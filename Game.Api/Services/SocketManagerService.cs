@@ -55,8 +55,9 @@ namespace Game.Api.Services
 
                 await RegisterSocketCommandListener(socketHandler);
                 // Register before starting the loops so the registry tracks the socket — and threads its
-                // shutdown tokens into Listen — for a graceful drain on host shutdown (#526).
-                _socketRegistry.Register(socketHandler);
+                // shutdown tokens into Listen — for a graceful drain on host shutdown (#526). Awaited because
+                // a socket arriving mid-drain is closed cleanly here rather than tracked-but-undrained (#904).
+                await _socketRegistry.Register(socketHandler);
             }
             catch
             {
