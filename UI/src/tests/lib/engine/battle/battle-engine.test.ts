@@ -105,6 +105,7 @@ vi.mock('$lib/engine/battle/enemy-manager', () => ({
 
 import { BattleEngine, BattleStage, onCombatFloat, type CombatFloatEvent } from '$lib/engine/battle/battle-engine';
 import { logMessage } from '$lib/engine/log';
+import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 describe('BattleEngine', () => {
 	let engine: BattleEngine;
@@ -262,6 +263,36 @@ describe('BattleEngine', () => {
 
 			expect(engine.stage).toBe(BattleStage.Defeated);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, "You've been defeated!");
+		});
+
+		it('ends the battle as a draw (TIMEOUT) when the time limit is reached with both battlers alive', () => {
+			// A true stalemate: neither side deals damage, so nobody can ever land the killing blow.
+			mockSkills[0].baseDamage = 0;
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			// Just short of the 2-minute cap: the battle is still in progress.
+			logicalUpdateCallbacks[0](DEFAULT_MAX_BATTLE_MS - 40);
+			expect(engine.stage).toBe(BattleStage.Active);
+
+			// Crossing the cap with both battlers alive ends the fight as a draw, not a win or a loss.
+			logicalUpdateCallbacks[0](40);
+			expect(engine.stage).toBe(BattleStage.Drawn);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
+		});
+
+		it('does not draw when the enemy dies on the same tick the cap is reached (death wins)', () => {
+			engine.start();
+			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			// Pre-kill the enemy, then cross the cap in one tick: the death branch is checked before the
+			// timeout, so the outcome is a victory rather than a draw.
+			engine.enemy.takeDamage(1e9);
+			logicalUpdateCallbacks[0](DEFAULT_MAX_BATTLE_MS);
+
+			expect(engine.stage).toBe(BattleStage.Victorious);
 		});
 	});
 

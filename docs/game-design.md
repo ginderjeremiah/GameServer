@@ -99,9 +99,11 @@ Every completed battle is classified by its **outcome**, and the three outcomes 
 
 - **`BattlesWon`** — the enemy died (the player won).
 - **`BattlesLost`** — the player died.
-- **`BattlesAbandoned`** — neither combatant died; the player walked away from an unfinished fight (e.g. retreating from a boss or switching zones mid-battle). Abandoning is deliberately **not** counted as a loss, since the player never actually fell (#202).
+- **`BattlesAbandoned`** — neither combatant died. This covers the player walking away from an unfinished fight (e.g. retreating from a boss or switching zones mid-battle) **and** the 2-minute battle timeout being reached in a stalemate (a **draw**) — both resolve as "neither died", carry no rewards, and are deliberately **not** counted as a loss since the player never actually fell (#202, #886).
 
-The classification keys off the simulated outcome (`victory` / `playerDied`), not which code path ended the battle — a battle abandoned via `AbandonBattle` in which the player had in fact already died is still a loss. All three are recorded both globally and per-enemy. Like `BattlesLost`, `BattlesAbandoned` is a "lower is better" statistic on the Statistics screen.
+The classification keys off the simulated outcome (`victory` / `playerDied`), not which code path ended the battle — a battle abandoned via `AbandonBattle` in which the player had in fact already died is still a loss, and a timeout that neither side could have survived past the cap is an abandon (a draw), not a loss. All three are recorded both globally and per-enemy. Like `BattlesLost`, `BattlesAbandoned` is a "lower is better" statistic on the Statistics screen.
+
+The live engine enforces the cap as a real outcome (not just the display): when `timeElapsed` reaches `DEFAULT_MAX_BATTLE_MS` with both battlers alive the fight ends as a draw — the idle farm continues (a boss draw drops back to the idle loop rather than re-spawning the boss), and the unresolved battle is recorded as a draw through the same `AbandonBattle` re-simulation, which is clamped to `DefaultMaxBattleMs` so the backend replay resolves the reported stalemate identically to the client (parity) rather than running past the cap into a spurious win/loss.
 
 ## Challenge Goal Comparison Direction
 

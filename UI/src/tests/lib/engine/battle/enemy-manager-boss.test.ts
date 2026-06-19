@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
 		startLoading: vi.fn(() => Promise.resolve()),
 		pause: vi.fn()
 	},
-	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5 },
+	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5, Drawn: 6 },
 	playerManager: { currentZone: 3, grantExp: vi.fn() },
 	staticData: {
 		enemies: [{ id: 0, name: 'Catacomb Lich', isBoss: true }],
@@ -373,6 +373,23 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
 	});
 
+	it('on a boss draw (timeout): retreats to the idle loop with auto-fight off, recording no loss', async () => {
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+
+		await fireStage(h.BattleStage.Drawn);
+
+		// A draw is not a death, so no loss is recorded and the zone is not cleared; the player drops back
+		// to the idle farm (boss available) rather than re-spawning the boss, with auto-fight turned off.
+		// The unresolved boss battle is recorded as abandoned by the backend when the next enemy starts.
+		expect(send).not.toHaveBeenCalledWith('BattleLost');
+		expect(send).not.toHaveBeenCalledWith('DefeatEnemy', expect.anything());
+		expect(manager.mode).toBe('idle');
+		expect(manager.autoFight).toBe(false);
+		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+	});
+
 	it('retreats from a boss fight back to the idle loop', async () => {
 		await manager.challengeBoss();
 		expect(manager.mode).toBe('boss');
@@ -468,6 +485,21 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ timestamp: expect.any(Number) }));
 		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(manager.mode).toBe('idle');
+	});
+
+	it('on an idle draw (timeout): fetches the next enemy without claiming a victory or recording a loss', async () => {
+		// A 2-minute stalemate ends as a draw. The idle farm simply continues — no DefeatEnemy (no rewards)
+		// and no BattleLost (a draw is not a death); the unresolved battle is recorded as abandoned by the
+		// backend when the next enemy starts.
+		await manager.getNewEnemy();
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Drawn);
+
+		expect(send).not.toHaveBeenCalledWith('DefeatEnemy', expect.anything());
+		expect(send).not.toHaveBeenCalledWith('BattleLost');
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
 		expect(manager.mode).toBe('idle');
 	});

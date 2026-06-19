@@ -823,6 +823,71 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandonReplayCappedAtMaxBattleDuration_KeepsTimeoutAStalemate()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The player wields a one-shot skill whose cooldown only charges PAST the 2-minute battle cap, so
+            // it never fires within a real battle — the client would draw at the cap. The enemy's skill never
+            // fires either. Without clamping the abandon replay to DefaultMaxBattleMs, a long wall-clock window
+            // would let the re-simulation run until the player's skill finally fires and mint a spurious win;
+            // the clamp keeps the reported stalemate a draw (recorded as BattlesAbandoned, never a win).
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(
+                context, "LateSmash", baseDamage: 100_000m, cooldownMs: GameConstants.DefaultMaxBattleMs + 60_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            // Pin the encounter level so the abandoned enemy is deterministic.
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            var abandonedEnemyId = state.ActiveEnemyId;
+            var expBefore = player.Exp;
+
+            // A wall-clock window far past the player skill's charge time: an unclamped replay would fire it
+            // and resolve a win. The clamp caps the replay at the 2-minute battle duration, before it fires.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-20);
+
+            // Starting a new battle abandons the in-progress one.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The write-behind handler wrote the abandon to the progress cache (its source of truth); the
+            // command's unit-of-work commit still runs (now a no-op for progress), then read the stats back.
+            await unitOfWork.CommitAsync();
+            var stats = await progressRepo.GetStatistics(playerEntity.Id);
+
+            decimal StatValue(EStatisticType type, int? entityId) =>
+                stats.FirstOrDefault(s => s.Type == type && s.EntityId == entityId)?.Value ?? 0m;
+
+            // The reported stalemate stays a draw: recorded as abandoned (global + per-enemy), never a win,
+            // and no exp is granted.
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
+            Assert.Equal(expBefore, player.Exp);
+        }
+
+        [Fact]
         public async Task StartBattle_WithNewZoneId_ChangesPlayerZone()
         {
             using var scope = CreateScope();

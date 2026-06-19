@@ -202,9 +202,15 @@ namespace Game.Application.Services
         {
             var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
 
+            // Clamp the anti-cheat replay window to the battle's maximum duration. A battle never runs past
+            // DefaultMaxBattleMs on the client — it ends as a draw at the cap — so the replay must not either:
+            // wall-clock time elapsed between the client's draw and the next battle starting must not let the
+            // re-simulation run past the cap and resolve a reported stalemate into a spurious win or loss.
+            var simulateMs = Math.Min(elapsedMs, GameConstants.DefaultMaxBattleMs);
+
             // No active battle (nothing to resolve) or no elapsed window to re-simulate against — clear
             // and return without recording an outcome or persisting.
-            if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, elapsedMs))
+            if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, simulateMs))
             {
                 state.ClearBattle();
                 return;
