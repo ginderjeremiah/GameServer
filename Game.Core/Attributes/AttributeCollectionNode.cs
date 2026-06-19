@@ -7,7 +7,8 @@ namespace Game.Core.Attributes
     {
         // Orders modifiers by type. Built from a non-nullable Comparison delegate so the comparer needs
         // no null-forgiving operator on this mid-battle add/remove hot path, and shared as a single static
-        // instance rather than allocated per node.
+        // instance rather than allocated per node. Enum subtraction is used as a micro optimization.
+        // There is no need to worry about overflow here.
         private static readonly IComparer<AttributeModifier> TypeComparer =
             Comparer<AttributeModifier>.Create(static (x, y) => x.Type - y.Type);
 
