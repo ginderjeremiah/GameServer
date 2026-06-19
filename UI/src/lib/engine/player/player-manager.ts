@@ -24,15 +24,42 @@ export class PlayerManager implements IPlayerData {
 	#enabledByType = new Map<ELogType, boolean>();
 
 	/**
-	 * The equipped skill ids in loadout order, derived from the unlocked set. The wire payload
-	 * carries only the richer {@link unlockedSkills}; the ordered equipped list is its single
-	 * source of truth (parallel to deriving equipped items from inventoryData.unlockedItems).
+	 * Memoised equipped skill ids in loadout order, derived from {@link unlockedSkills}. The wire
+	 * payload carries only the richer unlocked set; this ordered list is its single source of truth
+	 * (parallel to deriving equipped items from inventoryData.unlockedItems). Rebuilt only on the
+	 * mutations that change the loadout ({@link initialize}/{@link setSelectedSkills}/
+	 * {@link addUnlockedSkill}), so the per-spawn battle reset and reactive consumers read a stable
+	 * array instead of re-running filter+sort+map on every access (#811).
 	 */
+	private selectedSkillsCache: number[] = [];
+
 	public get selectedSkills(): number[] {
-		return this.unlockedSkills
+		return this.selectedSkillsCache;
+	}
+
+	/** Recomputes the memoised {@link selectedSkills} from the current unlocked set's selected/order. */
+	private refreshSelectedSkills() {
+		this.selectedSkillsCache = this.unlockedSkills
 			.filter((skill) => skill.selected)
 			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 			.map((skill) => skill.skillId);
+	}
+
+	/**
+	 * Replaces the equipped loadout with `orderedIds` in priority order, updating each unlocked skill's
+	 * selected flag + slot order and refreshing the memoised {@link selectedSkills}. The single loadout
+	 * mutation path (mirroring how the inventory manager centralizes equipment changes), so battles and
+	 * other screens read the new equipped set/order without a reload.
+	 */
+	public setSelectedSkills(orderedIds: number[]) {
+		for (const unlockedSkill of this.unlockedSkills) {
+			const order = orderedIds.indexOf(unlockedSkill.skillId);
+			unlockedSkill.selected = order >= 0;
+			// An unequipped skill has no loadout slot, so clear its order rather than pinning it to 0
+			// (which would conflate "unequipped" with "first slot").
+			unlockedSkill.order = order >= 0 ? order : undefined;
+		}
+		this.refreshSelectedSkills();
 	}
 
 	/** The player's combat-log preferences. Assigning rebuilds the by-type enabled lookup. */
@@ -61,6 +88,7 @@ export class PlayerManager implements IPlayerData {
 		this.unlockedSkills = data.unlockedSkills;
 		this.logPreferences = data.logPreferences;
 		this.inventoryData = data.inventoryData;
+		this.refreshSelectedSkills();
 	}
 
 	/**
@@ -73,6 +101,9 @@ export class PlayerManager implements IPlayerData {
 			return;
 		}
 		this.unlockedSkills.push({ skillId, selected: false });
+		// A newly-unlocked skill is unselected, so the equipped loadout is unchanged — but refresh the
+		// memo so it stays consistent with the unlocked set rather than relying on that invariant.
+		this.refreshSelectedSkills();
 		logMessage(ELogType.ItemFound, 'New skill unlocked!');
 	}
 

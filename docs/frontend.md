@@ -36,6 +36,8 @@ The parity suite drives the production `BattleSimulator` (not a hand-rolled copy
 
 **Mid-battle attributes are a modifier graph, not a frozen snapshot.** `BattleAttributes` retains its modifier list instead of flattening to numbers at battle start, composing per-attribute totals through the same `computeAttributes` path the breakdown screen uses (memoised, recomputed only on add/remove). This mirrors the backend `AttributeCollection`, so both sides resolve derived attributes through one composition path even as values change mid-fight — the surface skill effects build on.
 
+**The per-spawn player reset skips redundant re-derivation.** An idle farm re-spawns enemies continuously, but the player's battler only needs its full attribute graph (and skill set) rebuilt when something actually changed. `BattleEngine` re-derives the player only when its inputs differ since the last derive — the memoised `InventoryManager.equipmentStats`, `PlayerManager.selectedSkills`, the attribute distribution, and the level — and otherwise cheaply re-arms the existing battler (clears effects, resets health + skill charges). Those getters are memoised on the managers and invalidated by the managers' own mutation methods (equip/unequip/mod, and `PlayerManager.setSelectedSkills` — the single loadout mutation path). The change-detection compares the inputs **by reference**, so every producer must **reassign** its cached array on change, never mutate it in place.
+
 ## Authentication
 
 The frontend authenticates against the backend's JWT scheme (see `backend.md` for the server side). All token handling lives in the API client layer (`lib/api`) so the rest of the app never touches tokens:

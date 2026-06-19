@@ -423,28 +423,17 @@ export class SkillsView {
 
 	/* ── persistence ─────────────────────────────────────────────────────────── */
 
-	/** Optimistically apply a new loadout, persist it atomically, and revert on failure. */
+	/** Optimistically apply a new loadout, persist it atomically, and revert on failure. The player
+	 *  manager owns the loadout mutation (so battles/other screens see it without a reload). */
 	private async commit(next: number[]): Promise<void> {
 		const previous = this.equipped;
 		this.equipped = next;
-		this.applyToPlayer(next);
+		playerManager.setSelectedSkills(next);
 		const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
 		if (response.error) {
 			this.equipped = previous;
-			this.applyToPlayer(previous);
+			playerManager.setSelectedSkills(previous);
 			toastError('Your loadout could not be saved. Please try again.');
-		}
-	}
-
-	/** Mirror the loadout onto the player manager so battles and other screens read
-	 *  the new equipped set/order without a reload. */
-	private applyToPlayer(orderedIds: number[]): void {
-		for (const unlockedSkill of playerManager.unlockedSkills) {
-			const order = orderedIds.indexOf(unlockedSkill.skillId);
-			unlockedSkill.selected = order >= 0;
-			// An unequipped skill has no loadout slot, so clear its order rather than
-			// pinning it to 0 (which would conflate "unequipped" with "first slot").
-			unlockedSkill.order = order >= 0 ? order : undefined;
 		}
 	}
 }

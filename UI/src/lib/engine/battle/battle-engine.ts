@@ -1,7 +1,7 @@
 import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData } from '$stores';
-import { ELogType, IEnemyInstance } from '$lib/api';
+import { ELogType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
 import { logMessage, type LogOutcome } from '../log';
 import { formatNum, createHook, Action, effectLogMessage, attributeIsHarmful, attributeName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
@@ -79,13 +79,24 @@ export class BattleEngine {
 	private readonly effectDamage = { enemyDot: 0, playerDot: 0, enemyHot: 0, playerHot: 0 };
 	private effectDamageElapsedMs = 0;
 
+	/** The inputs of the last *full* player attribute derive — the equipment stats, attribute
+	 *  distribution, loadout, and level. An idle farm re-spawns with all four unchanged, so the
+	 *  per-enemy reset can re-arm the existing player battler instead of rebuilding the whole attribute
+	 *  graph (and every Skill) from scratch on each cooldown (#811). The arrays are compared by
+	 *  reference — every producer reassigns rather than mutates in place, so a reference match means the
+	 *  inputs are unchanged. */
+	private lastEquipmentStats?: IBattlerAttribute[];
+	private lastPlayerAttributes?: IBattlerAttribute[];
+	private lastSelectedSkills?: number[];
+	private lastPlayerLevel?: number;
+
 	public start() {
 		if (!this.running) {
 			this.running = true;
 			this.logicalUnhook = onLogicalUpdate((delta) => this.logicalUpdate(delta));
 			this.renderUnhook = onRenderUpdate((_, logicalDelta) => this.renderUpdate(logicalDelta));
 			this.enemyLoadedUnhook = onNewEnemyLoaded((enemy) => this.reset(enemy));
-			this.player.reset(playerManager, inventoryManager.equipmentStats);
+			this.resetPlayer();
 		}
 	}
 
@@ -128,10 +139,34 @@ export class BattleEngine {
 		// so the crit/dodge/block draws stay in lockstep with the anti-cheat replay.
 		this.rng = new Mulberry32(enemyInstance.seed);
 		this.resetEffectDamage();
-		this.player.reset(playerManager, inventoryManager.equipmentStats);
+		this.resetPlayer();
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
 		this.resume();
 	};
+
+	/** Resets the player battler for a new enemy, re-deriving the full attribute graph only when the
+	 *  equipment / attributes / loadout / level changed since the last derive; otherwise re-arms the
+	 *  existing battler (clears effects, resets health + skill charges) without the full rebuild (#811). */
+	private resetPlayer() {
+		const equipmentStats = inventoryManager.equipmentStats;
+		const attributes = playerManager.attributes;
+		const selectedSkills = playerManager.selectedSkills;
+		const level = playerManager.level;
+		if (
+			equipmentStats === this.lastEquipmentStats &&
+			attributes === this.lastPlayerAttributes &&
+			selectedSkills === this.lastSelectedSkills &&
+			level === this.lastPlayerLevel
+		) {
+			this.player.reset();
+			return;
+		}
+		this.player.reset(playerManager, equipmentStats);
+		this.lastEquipmentStats = equipmentStats;
+		this.lastPlayerAttributes = attributes;
+		this.lastSelectedSkills = selectedSkills;
+		this.lastPlayerLevel = level;
+	}
 
 	public getOpponent(battler: Battler) {
 		return battler.id === this.player.id ? this.enemy : this.player;

@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
 
 // Engine + stores are mocked so importing the view-model doesn't drag in the real
-// game engine. `playerManager.unlockedSkills` is a plain writable array (the view
-// reassigns it on persist) and `selectedSkills` derives the equipped order from it,
-// mirroring the real PlayerManager. `vi.hoisted` keeps these ready before the
-// hoisted vi.mock factories run.
+// game engine. `playerManager.unlockedSkills` is a plain writable array and
+// `setSelectedSkills`/`selectedSkills` mirror the real PlayerManager (the view now
+// routes loadout changes through the manager). `vi.hoisted` keeps these ready before
+// the hoisted vi.mock factories run.
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
@@ -16,6 +16,13 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 				.filter((s) => s.selected)
 				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 				.map((s) => s.skillId);
+		},
+		setSelectedSkills(orderedIds: number[]) {
+			for (const unlockedSkill of playerManager.unlockedSkills) {
+				const order = orderedIds.indexOf(unlockedSkill.skillId);
+				unlockedSkill.selected = order >= 0;
+				unlockedSkill.order = order >= 0 ? order : undefined;
+			}
 		}
 	};
 	return {

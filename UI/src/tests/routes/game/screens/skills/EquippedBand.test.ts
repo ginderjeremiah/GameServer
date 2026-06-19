@@ -15,6 +15,13 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 				.filter((s) => s.selected)
 				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 				.map((s) => s.skillId);
+		},
+		setSelectedSkills(orderedIds: number[]) {
+			for (const unlockedSkill of playerManager.unlockedSkills) {
+				const order = orderedIds.indexOf(unlockedSkill.skillId);
+				unlockedSkill.selected = order >= 0;
+				unlockedSkill.order = order >= 0 ? order : undefined;
+			}
 		}
 	};
 	return {

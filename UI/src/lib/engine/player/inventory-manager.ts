@@ -50,6 +50,14 @@ export class InventoryManager {
 	 */
 	public items: Item[] = [];
 
+	/**
+	 * Memoised combined attributes of all equipped items + their applied mods. Rebuilt only on the
+	 * equip/unequip/mod mutations below (and their rollbacks), so the per-spawn battle reset and the
+	 * inventory/skills `$derived` chains read a stable array instead of re-flattening every equipped
+	 * item + mod on each access (#811).
+	 */
+	private equipmentStatsCache: IBattlerAttribute[] = [];
+
 	/** Tail of the optimistic-mutation queue; each mutation chains off it so rollback baselines never interleave. */
 	private lastOperation: Promise<unknown> = Promise.resolve();
 
@@ -82,14 +90,22 @@ export class InventoryManager {
 		}
 
 		this.publish();
+		this.refreshEquipmentStats();
 	}
 
 	public get unlockedItemList(): Item[] {
 		return this.items;
 	}
 
-	/** Computes combined attributes from all equipped items and their applied mods. */
+	/** Combined attributes from all equipped items and their applied mods (memoised — recomputed only
+	 *  by {@link refreshEquipmentStats} on an equip/unequip/mod change, so reads are O(1)). */
 	public get equipmentStats(): IBattlerAttribute[] {
+		return this.equipmentStatsCache;
+	}
+
+	/** Rebuilds the memoised {@link equipmentStats} from the currently equipped items + their mods.
+	 *  Called after every mutation that can change them (and after a rollback restores the prior state). */
+	private refreshEquipmentStats() {
 		const stats: IBattlerAttribute[] = [];
 		for (const item of this.equippedSlots) {
 			if (item) {
@@ -99,7 +115,7 @@ export class InventoryManager {
 				}
 			}
 		}
-		return stats;
+		this.equipmentStatsCache = stats;
 	}
 
 	public equipItem(itemId: number, slotId: EEquipmentSlot): Promise<boolean> {
@@ -124,6 +140,7 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
+				this.refreshEquipmentStats();
 				return false;
 			}
 
@@ -147,6 +164,7 @@ export class InventoryManager {
 			const slots = [...this.equippedSlots];
 			slots[slotId] = undefined;
 			this.equippedSlots = slots;
+			this.refreshEquipmentStats();
 
 			const response = await apiSocket.sendSocketCommand('UnequipItem', {
 				itemId: item.itemId,
@@ -154,6 +172,7 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
+				this.refreshEquipmentStats();
 				return false;
 			}
 
@@ -173,6 +192,7 @@ export class InventoryManager {
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = [...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId), mod];
 			this.refreshItemAttributes(item);
+			this.refreshEquipmentStatsIfEquipped(item);
 
 			const response = await apiSocket.sendSocketCommand('ApplyMod', {
 				itemId,
@@ -181,6 +201,7 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
+				this.refreshEquipmentStatsIfEquipped(item);
 				return false;
 			}
 
@@ -199,6 +220,7 @@ export class InventoryManager {
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
 			this.refreshItemAttributes(item);
+			this.refreshEquipmentStatsIfEquipped(item);
 
 			const response = await apiSocket.sendSocketCommand('RemoveMod', {
 				itemId,
@@ -206,6 +228,7 @@ export class InventoryManager {
 			});
 			if (response.error) {
 				rollback();
+				this.refreshEquipmentStatsIfEquipped(item);
 				return false;
 			}
 
@@ -306,12 +329,21 @@ export class InventoryManager {
 		slots[slotId] = item;
 
 		this.equippedSlots = slots;
+		this.refreshEquipmentStats();
 	}
 
 	/** Rebuilds an item's cached totalAttributes after its applied mods change. */
 	private refreshItemAttributes(item: Item) {
 		const allAttributes = [...item.attributes, ...item.appliedMods.flatMap((mod) => mod.attributes)];
 		item.totalAttributes = new BattleAttributes(allAttributes, false);
+	}
+
+	/** Refreshes the memoised equipmentStats only when the changed item is equipped — an unequipped
+	 *  item's mods don't contribute, so its mod edits must not churn the cache (or its consumers). */
+	private refreshEquipmentStatsIfEquipped(item: Item) {
+		if (item.equipped) {
+			this.refreshEquipmentStats();
+		}
 	}
 
 	/**
