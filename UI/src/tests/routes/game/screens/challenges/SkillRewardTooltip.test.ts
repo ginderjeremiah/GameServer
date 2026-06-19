@@ -57,7 +57,9 @@ describe('SkillRewardTooltip', () => {
 							attributeId: EAttribute.Strength,
 							modifierTypeId: EModifierType.Additive,
 							amount: 5,
-							durationMs: 5000
+							durationMs: 5000,
+							scalingAttributeId: EAttribute.Strength,
+							scalingAmount: 0
 						}
 					]
 				})
@@ -100,7 +102,9 @@ describe('SkillRewardTooltip', () => {
 						attributeId: EAttribute.Strength,
 						modifierTypeId: EModifierType.Additive,
 						amount: 5,
-						durationMs: 5000
+						durationMs: 5000,
+						scalingAttributeId: EAttribute.Strength,
+						scalingAmount: 0
 					}
 				]
 			});

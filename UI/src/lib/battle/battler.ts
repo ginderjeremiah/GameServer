@@ -139,15 +139,18 @@ export class Battler {
 		return 0;
 	}
 
-	/** Applies a timed skill `effect` to this battler. Each application STACKS — it adds its own modifier
-	 *  and its own timed entry, so re-applying an already-active effect sums the magnitudes (additive
-	 *  amounts add, multiplicative factors compound) and each application expires on its own schedule. A
-	 *  new modifier may shift MaxHealth, so the health is re-clamped. */
-	public applyEffect(effect: ISkillEffect): void {
+	/** Applies a timed skill `effect` to this battler, using the already-resolved `amount` as its
+	 *  magnitude — the caster-attribute scaling is computed by {@link Skill.applyEffects} before this is
+	 *  reached, so `amount` defaults to the unscaled authored amount only for the direct (test) callers
+	 *  that don't scale. Each application STACKS — it adds its own modifier and its own timed entry, so
+	 *  re-applying an already-active effect sums the magnitudes (additive amounts add, multiplicative
+	 *  factors compound) and each application expires on its own schedule. A new modifier may shift
+	 *  MaxHealth, so the health is re-clamped. */
+	public applyEffect(effect: ISkillEffect, amount: number = effect.amount): void {
 		const applicationId = this.#nextApplicationId++;
 		const modifier: AttributeModifier = {
 			attribute: effect.attributeId,
-			amount: effect.amount,
+			amount,
 			type: effect.modifierTypeId,
 			source: EAttributeModifierSource.SkillEffect
 		};
@@ -158,7 +161,7 @@ export class Battler {
 			sourceId: effect.id,
 			attribute: effect.attributeId,
 			modifierType: effect.modifierTypeId,
-			amount: effect.amount,
+			amount,
 			durationMs: effect.durationMs,
 			remainingMs: effect.durationMs,
 			renderRemainingMs: effect.durationMs

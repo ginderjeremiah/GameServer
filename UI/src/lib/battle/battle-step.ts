@@ -27,6 +27,8 @@ export interface AppliedEffect {
 	effect: ISkillEffect;
 	/** Whether the effect landed on the player (`true`) or the enemy (`false`). */
 	onPlayer: boolean;
+	/** The resolved (caster-scaled) magnitude that was applied — what the combat log should report. */
+	amount: number;
 }
 
 /**
@@ -77,7 +79,8 @@ export function battleStep(
 		log.playerHotHeal = 0;
 	}
 	const onApplied = log
-		? (effect: ISkillEffect, target: Battler) => log.appliedEffects.push({ effect, onPlayer: target === player })
+		? (effect: ISkillEffect, target: Battler, amount: number) =>
+				log.appliedEffects.push({ effect, onPlayer: target === player, amount })
 		: undefined;
 
 	// Expire timed effects at the start of the tick, before either side fires, so an effect influences

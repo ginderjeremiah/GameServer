@@ -61,7 +61,8 @@ namespace Game.Application.Tests.DataAccess
                     new Change<Contracts.SkillEffect>
                     {
                         ChangeType = EChangeType.Add,
-                        Item = NewEffect(EAttribute.Intellect, amount: 30m),
+                        Item = NewEffect(EAttribute.Intellect, amount: 30m,
+                            scalingAttribute: EAttribute.Dexterity, scalingAmount: 0.5m),
                     },
                     new Change<Contracts.SkillEffect>
                     {
@@ -93,7 +94,11 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(2, effects.Count);
                 Assert.DoesNotContain(effects, e => e.Id == removedEffectId);
                 Assert.Equal(99m, effects.Single(e => e.Id == editedEffectId).Amount);
-                Assert.Contains(effects, e => e.AttributeId == (int)EAttribute.Intellect && e.Amount == 30m);
+                var added = effects.Single(e => e.AttributeId == (int)EAttribute.Intellect);
+                Assert.Equal(30m, added.Amount);
+                // The added effect's caster-attribute scaling round-trips through persistence.
+                Assert.Equal((int)EAttribute.Dexterity, added.ScalingAttributeId);
+                Assert.Equal(0.5m, added.ScalingAmount);
             }
         }
 
@@ -211,13 +216,17 @@ namespace Game.Application.Tests.DataAccess
                 ModifierType = (int)EModifierType.Additive,
                 Amount = amount,
                 DurationMs = 1000,
+                ScalingAttributeId = (int)EAttribute.Strength,
+                ScalingAmount = 0m,
             };
             context.SkillEffects.Add(effect);
             await context.SaveChangesAsync();
             return effect;
         }
 
-        private static Contracts.SkillEffect NewEffect(EAttribute attribute, decimal amount, int id = 0)
+        private static Contracts.SkillEffect NewEffect(
+            EAttribute attribute, decimal amount, int id = 0,
+            EAttribute scalingAttribute = EAttribute.Strength, decimal scalingAmount = 0m)
         {
             return new Contracts.SkillEffect
             {
@@ -227,6 +236,8 @@ namespace Game.Application.Tests.DataAccess
                 ModifierTypeId = EModifierType.Additive,
                 Amount = amount,
                 DurationMs = 1000,
+                ScalingAttributeId = scalingAttribute,
+                ScalingAmount = scalingAmount,
             };
         }
     }

@@ -400,6 +400,29 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 400),
 
+                // Effect magnitude scales with the CASTER's attribute (#741): a poison whose authored amount is
+                // 0 but scales with the caster's Intellect at 1.0/point. Intellect feeds no derived attribute,
+                // so it perturbs nothing but this scaling — keeping the timing hand-computable.
+                //   Player: Intellect=50; skill baseDamage 0, cooldown 2000 → fires once at tick 50 (cdMult=1).
+                //     Effect: Opponent +DamageTakenPerSecond, base 0 + Intellect(50)×1.0 = 50 DTPS, permanent.
+                //   Enemy:  Str=0, End=0 → MaxHealth=50, no skills. DoT (bypassing Defense) = 50×40/1000 = 2/tick.
+                //   From tick 50 the enemy loses 2/tick; 50 HP / 2 = 25 ticks → dies on tick 74 → 2960ms.
+                //   (Without scaling the authored 0 would deal nothing and the battle would never resolve.)
+                ["effectScalesWithCasterIntellect"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 2000,
+                                effects: [MakeEffect(209, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 0, Permanent,
+                                    scalingAttribute: EAttribute.Intellect, scalingAmount: 1.0)]),
+                        ],
+                        extra: [(EAttribute.Intellect, 50)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2960),
+
                 // ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
                 // Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a
                 // chance ≥ 1 always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still
@@ -610,7 +633,8 @@ namespace Game.Core.Tests.Battle
 
         private static SkillEffect MakeEffect(
             int id, ESkillEffectTarget target, EAttribute attribute,
-            EModifierType modifierType, double amount, int durationMs) => new()
+            EModifierType modifierType, double amount, int durationMs,
+            EAttribute scalingAttribute = EAttribute.Strength, double scalingAmount = 0) => new()
             {
                 Id = id,
                 Target = target,
@@ -618,6 +642,8 @@ namespace Game.Core.Tests.Battle
                 ModifierType = modifierType,
                 Amount = amount,
                 DurationMs = durationMs,
+                ScalingAttributeId = scalingAttribute,
+                ScalingAmount = scalingAmount,
             };
 
         private static Battler MakeBattler(

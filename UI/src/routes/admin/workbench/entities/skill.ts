@@ -115,7 +115,9 @@ export const skillEntity: EntityConfig<ISkill> = {
 				attributeId: EAttribute.Strength,
 				modifierTypeId: EModifierType.Additive,
 				amount: 0,
-				durationMs: 3000
+				durationMs: 3000,
+				scalingAttributeId: EAttribute.Strength,
+				scalingAmount: 0
 			}),
 			columns: [
 				{
@@ -140,7 +142,15 @@ export const skillEntity: EntityConfig<ISkill> = {
 					width: 140
 				},
 				{ key: 'amount', label: 'Amount', type: 'number', align: 'r', width: 100, allowNegative: true },
-				{ key: 'durationMs', label: 'Duration (ms)', type: 'number', align: 'r', width: 130 }
+				{ key: 'durationMs', label: 'Duration (ms)', type: 'number', align: 'r', width: 130 },
+				{
+					key: 'scalingAttributeId',
+					label: 'Scales with',
+					type: 'select',
+					options: reference.attributeOptions,
+					min: 170
+				},
+				{ key: 'scalingAmount', label: 'Per point', type: 'number', align: 'r', width: 110, allowNegative: true }
 			]
 		}
 	],

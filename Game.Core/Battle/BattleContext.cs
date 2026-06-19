@@ -45,12 +45,16 @@ namespace Game.Core.Battle
         /// <summary>
         /// Applies a skill <paramref name="effect"/> to the battler its <see cref="ESkillEffectTarget"/>
         /// selects: <see cref="ESkillEffectTarget.Self"/> to the active (casting) battler,
-        /// <see cref="ESkillEffectTarget.Opponent"/> to the target battler.
+        /// <see cref="ESkillEffectTarget.Opponent"/> to the target battler. The effect's magnitude scales
+        /// off the <b>caster</b> (active battler) — <c>Amount + casterAttribute × ScalingAmount</c>, mirroring
+        /// how a <see cref="Skills.DamageMultiplier"/> scales skill damage off the caster — so a
+        /// <c>ScalingAmount</c> of <c>0</c> leaves the authored amount unchanged.
         /// </summary>
         public void ApplySkillEffect(SkillEffect effect)
         {
+            var amount = effect.Amount + _activeBattler.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
-            battler.ApplyEffect(effect);
+            battler.ApplyEffect(effect, amount);
         }
 
         /// <summary>

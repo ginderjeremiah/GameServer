@@ -258,10 +258,10 @@ export class BattleEngine {
 	 *  follows the shared `.find`-by-id convention (#297), falling back to the formatted enum name when
 	 *  the reference set is unavailable. */
 	private logEffectApplications() {
-		for (const { effect, onPlayer } of this.stepLog.appliedEffects) {
+		for (const { effect, onPlayer, amount } of this.stepLog.appliedEffects) {
 			const name = attributeName(effect.attributeId, staticData.attributes);
 			const isHarmful = attributeIsHarmful(effect.attributeId, staticData.attributes);
-			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, isHarmful, onPlayer, this.enemy.name));
+			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, isHarmful, onPlayer, this.enemy.name, amount));
 		}
 	}
 

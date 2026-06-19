@@ -5,7 +5,7 @@
    sit under the cross-implementation parity suite, which therefore guards these formulas
    against backend drift too. */
 
-import { EAttribute, type IAttributeMultiplier, type ISkill } from '$lib/api';
+import { EAttribute, type IAttributeMultiplier, type ISkill, type ISkillEffect } from '$lib/api';
 import type { BattleAttributes } from './battle-attributes';
 
 /** One attribute's contribution to a skill's raw damage. */
@@ -52,4 +52,14 @@ export function applyDefense(rawDamage: number, defense: number, blockReduction 
  *  (1.0 = normal charge speed, 1.09 = +9%), so a multiplicative buff scales it intuitively. */
 export function cooldownMultiplier(attributes: BattleAttributes): number {
 	return attributes.getValue(EAttribute.CooldownRecovery);
+}
+
+/** A skill effect's magnitude after caster-attribute scaling: the authored amount plus the caster's
+ *  scaling-attribute value times the per-point coefficient (`scalingAmount`). A `scalingAmount` of 0
+ *  leaves the authored amount unchanged. The `attributes` are the CASTER's, mirroring how a damage
+ *  multiplier scales off the caster — so e.g. the player's Dexterity strengthens a poison they apply.
+ *  This is the single definition consumed by both the battle runtime (`Skill.applyEffects`) and the
+ *  skill tooltip, kept bit-for-bit identical to the backend `BattleContext.ApplySkillEffect`. */
+export function scaledEffectAmount(effect: ISkillEffect, attributes: BattleAttributes): number {
+	return effect.amount + attributes.getValue(effect.scalingAttributeId) * effect.scalingAmount;
 }

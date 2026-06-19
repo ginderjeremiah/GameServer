@@ -358,7 +358,9 @@ describe('Skills screen', () => {
 			attributeId: EAttribute.Defense,
 			modifierTypeId: EModifierType.Additive,
 			amount: -10,
-			durationMs: 5000
+			durationMs: 5000,
+			scalingAttributeId: EAttribute.Strength,
+			scalingAmount: 0
 		};
 		staticData.skills = [skill({ id: 0, name: 'Alpha', effects: [effect] }), ...SKILLS.slice(1)];
 		const { container } = render(Skills);
@@ -380,7 +382,9 @@ describe('Skills screen', () => {
 			attributeId: EAttribute.Defense,
 			modifierTypeId: EModifierType.Additive,
 			amount: -10,
-			durationMs: 5000
+			durationMs: 5000,
+			scalingAttributeId: EAttribute.Strength,
+			scalingAmount: 0
 		};
 		staticData.skills = [skill({ id: 0, name: 'Alpha', effects: [effect] }), ...SKILLS.slice(1)];
 		const { container } = render(Skills);

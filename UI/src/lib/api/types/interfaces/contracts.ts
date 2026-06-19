@@ -108,6 +108,8 @@ export interface ISkillEffect {
 	modifierTypeId: EModifierType;
 	amount: number;
 	durationMs: number;
+	scalingAttributeId: EAttribute;
+	scalingAmount: number;
 }
 
 export interface ITag {

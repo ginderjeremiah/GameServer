@@ -21,7 +21,7 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10));
 
-            battler.ApplyEffect(Effect(1, Strength, Additive, 5));
+            Apply(battler, Effect(1, Strength, Additive, 5));
 
             Assert.Equal(15, battler.GetAttributeValue(Strength));
         }
@@ -32,8 +32,8 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5);
 
-            battler.ApplyEffect(effect);
-            battler.ApplyEffect(effect);
+            Apply(battler, effect);
+            Apply(battler, effect);
 
             // Each application adds its own modifier, so re-applying the same authored effect stacks the
             // magnitude (20 = 10 base + 5 + 5).
@@ -45,8 +45,8 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10));
 
-            battler.ApplyEffect(Effect(1, Strength, Additive, 5));
-            battler.ApplyEffect(Effect(2, Strength, Additive, 3));
+            Apply(battler, Effect(1, Strength, Additive, 5));
+            Apply(battler, Effect(2, Strength, Additive, 3));
 
             Assert.Equal(18, battler.GetAttributeValue(Strength));
         }
@@ -58,7 +58,7 @@ namespace Game.Core.Tests.Battle
         public void AdvanceEffects_RemovesEffect_AfterItsDurationInTicks(int durationMs, int influencedTicks)
         {
             var battler = MakeBattler(Stat(Strength, 10));
-            battler.ApplyEffect(Effect(1, Strength, Additive, 5, durationMs));
+            Apply(battler, Effect(1, Strength, Additive, 5, durationMs));
             Assert.Equal(15, battler.GetAttributeValue(Strength));
 
             // The effect remains for (influencedTicks - 1) further ticks after the one it was applied on.
@@ -79,11 +79,11 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5, durationMs: 80);
 
-            battler.ApplyEffect(effect); // application A: expires at 80
+            Apply(battler, effect); // application A: expires at 80
             Assert.Equal(15, battler.GetAttributeValue(Strength));
 
             battler.AdvanceEffects(40);  // elapsed 40, A still active
-            battler.ApplyEffect(effect); // application B: expires at 40 + 80 = 120
+            Apply(battler, effect); // application B: expires at 40 + 80 = 120
             Assert.Equal(20, battler.GetAttributeValue(Strength)); // both stacked
 
             battler.AdvanceEffects(40); // elapsed 80 → A expires, B remains
@@ -99,7 +99,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(100, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(100, battler.CurrentHealth);
 
-            battler.ApplyEffect(Effect(1, Strength, Additive, 10)); // Str 10 → 20
+            Apply(battler, Effect(1, Strength, Additive, 10)); // Str 10 → 20
 
             Assert.Equal(20, battler.GetAttributeValue(Strength));
             Assert.Equal(150, battler.GetAttributeValue(MaxHealth)); // 50 + 5*20
@@ -111,7 +111,7 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10)); // MaxHealth = CurrentHealth = 100
 
-            battler.ApplyEffect(Effect(1, MaxHealth, Multiplicative, 0.5));
+            Apply(battler, Effect(1, MaxHealth, Multiplicative, 0.5));
 
             Assert.Equal(50, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(50, battler.CurrentHealth); // clamped down to the new max
@@ -124,8 +124,8 @@ namespace Game.Core.Tests.Battle
 
             // H (additive, 1 tick) lifts the additive subtotal to 200; L (×0.5, long) then halves it back to
             // 100, so CurrentHealth (100) is not clamped while both are active.
-            battler.ApplyEffect(Effect(1, MaxHealth, Additive, 100, durationMs: 40));
-            battler.ApplyEffect(Effect(2, MaxHealth, Multiplicative, 0.5, durationMs: 1000));
+            Apply(battler, Effect(1, MaxHealth, Additive, 100, durationMs: 40));
+            Apply(battler, Effect(2, MaxHealth, Multiplicative, 0.5, durationMs: 1000));
             Assert.Equal(100, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(100, battler.CurrentHealth);
 
@@ -147,6 +147,51 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(15, player.GetAttributeValue(Strength));
             Assert.Equal(17, enemy.GetAttributeValue(Strength));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_ScalesAmountWithCasterAttribute()
+        {
+            // The issue's example: a poison applied to the enemy whose magnitude scales with the caster's
+            // Dexterity. Base 10 + Dexterity(20) × 0.5 = 20 DamageTakenPerSecond on the enemy.
+            var player = MakeBattler(Stat(Dexterity, 20));
+            var enemy = MakeBattler(Stat(Dexterity, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 10,
+                target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 0.5));
+
+            Assert.Equal(20, enemy.GetAttributeValue(DamageTakenPerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_ScalingReadsCasterNotTarget()
+        {
+            // An Opponent effect scaling with Dexterity reads the CASTER's Dexterity, not the target's, so a
+            // high-Dexterity enemy target does not inflate a low-Dexterity caster's debuff.
+            var player = MakeBattler(Stat(Dexterity, 4));   // caster
+            var enemy = MakeBattler(Stat(Dexterity, 100));  // target
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 0,
+                target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 1.0));
+
+            // 0 + caster Dexterity(4) × 1.0 = 4, not the target's 100 (DamageTakenPerSecond has base 0).
+            Assert.Equal(4, enemy.GetAttributeValue(DamageTakenPerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_ZeroScalingAmount_LeavesAmountUnchanged()
+        {
+            var player = MakeBattler(Stat(Dexterity, 50));
+            var enemy = MakeBattler(Stat(Dexterity, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            // ScalingAmount 0 ⇒ the authored amount is used verbatim regardless of the caster's attribute.
+            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 7,
+                target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 0));
+
+            Assert.Equal(7, enemy.GetAttributeValue(DamageTakenPerSecond));
         }
 
         [Fact]
@@ -179,6 +224,11 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(20, player.GetAttributeValue(Strength));
         }
 
+        /// <summary>Applies an effect with its authored amount (no caster scaling), the common case these
+        /// bookkeeping tests exercise. Scaling is computed by <see cref="BattleContext.ApplySkillEffect"/>
+        /// and covered separately.</summary>
+        private static void Apply(Battler battler, SkillEffect effect) => battler.ApplyEffect(effect, effect.Amount);
+
         private static Battler MakeBattler(params AttributeModifier[] modifiers) =>
             new(new AttributeCollection(modifiers), [], 1);
 
@@ -192,7 +242,8 @@ namespace Game.Core.Tests.Battle
 
         private static SkillEffect Effect(
             int id, EAttribute attribute, EModifierType type, double amount,
-            int durationMs = 1000, ESkillEffectTarget target = ESkillEffectTarget.Self) => new()
+            int durationMs = 1000, ESkillEffectTarget target = ESkillEffectTarget.Self,
+            EAttribute scalingAttribute = EAttribute.Strength, double scalingAmount = 0) => new()
             {
                 Id = id,
                 Target = target,
@@ -200,6 +251,8 @@ namespace Game.Core.Tests.Battle
                 ModifierType = type,
                 Amount = amount,
                 DurationMs = durationMs,
+                ScalingAttributeId = scalingAttribute,
+                ScalingAmount = scalingAmount,
             };
     }
 }

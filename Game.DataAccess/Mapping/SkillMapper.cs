@@ -36,6 +36,8 @@ namespace Game.DataAccess.Mapping
                         ModifierTypeId = (EModifierType)se.ModifierType,
                         Amount = se.Amount,
                         DurationMs = se.DurationMs,
+                        ScalingAttributeId = (EAttribute)se.ScalingAttributeId,
+                        ScalingAmount = se.ScalingAmount,
                     }).ToList(),
                 RetiredAt = entity.RetiredAt,
             };
@@ -69,6 +71,8 @@ namespace Game.DataAccess.Mapping
                         ModifierType = (EModifierType)se.ModifierType,
                         Amount = (double)se.Amount,
                         DurationMs = se.DurationMs,
+                        ScalingAttributeId = (EAttribute)se.ScalingAttributeId,
+                        ScalingAmount = (double)se.ScalingAmount,
                     }).ToList(),
             };
         }

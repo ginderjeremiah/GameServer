@@ -44,6 +44,8 @@ const effect = (over: Partial<ISkill['effects'][number]> = {}): ISkill['effects'
 	modifierTypeId: EModifierType.Multiplicative,
 	amount: 0.5,
 	durationMs: 3000,
+	scalingAttributeId: EAttribute.Strength,
+	scalingAmount: 0,
 	...over
 });
 
@@ -86,14 +88,16 @@ describe('skillEntity', () => {
 		]);
 	});
 
-	it('effects newRow defaults to an opponent Strength additive over 3s', () => {
+	it('effects newRow defaults to an opponent Strength additive over 3s, with no scaling', () => {
 		expect(tableSection('effects').newRow(skillEntity.newItem(1))).toEqual({
 			id: 0,
 			target: ESkillEffectTarget.Opponent,
 			attributeId: EAttribute.Strength,
 			modifierTypeId: EModifierType.Additive,
 			amount: 0,
-			durationMs: 3000
+			durationMs: 3000,
+			scalingAttributeId: EAttribute.Strength,
+			scalingAmount: 0
 		});
 	});
 

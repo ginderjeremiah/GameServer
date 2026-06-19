@@ -1,8 +1,8 @@
 import { Battler, newItem } from '$lib/battle';
 import {
+	EAttribute,
 	EItemCategory,
 	ERarity,
-	type EAttribute,
 	type EModifierType,
 	type ESkillEffectTarget,
 	type EItemModType,
@@ -42,15 +42,18 @@ export const makeSkill = (
 	effects: ISkillEffect[] = []
 ): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects });
 
-/** A timed skill effect, mirroring the backend parity test's MakeEffect helper. */
+/** A timed skill effect, mirroring the backend parity test's MakeEffect helper. The scaling fields
+ *  default to no scaling (a `scalingAmount` of 0), so existing scenarios are unaffected. */
 export const makeEffect = (
 	id: number,
 	target: ESkillEffectTarget,
 	attributeId: EAttribute,
 	modifierTypeId: EModifierType,
 	amount: number,
-	durationMs: number
-): ISkillEffect => ({ id, target, attributeId, modifierTypeId, amount, durationMs });
+	durationMs: number,
+	scalingAttributeId: EAttribute = EAttribute.Strength,
+	scalingAmount = 0
+): ISkillEffect => ({ id, target, attributeId, modifierTypeId, amount, durationMs, scalingAttributeId, scalingAmount });
 
 /**
  * Binds a `makeBattler` builder to a mock skill registry (the array a test's
