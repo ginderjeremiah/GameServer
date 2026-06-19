@@ -203,6 +203,44 @@ describe('EnemyManager boss mode', () => {
 		expect(loaded).toEqual([bossInstance]);
 	});
 
+	it('falls back to a fresh idle enemy when a failing ChallengeBoss races an in-flight idle fetch', async () => {
+		// The #971 bug: an idle getNewEnemy is mid-flight (fetchingEnemy still true) when a *failing*
+		// ChallengeBoss falls back to getNewEnemy. The fallback must not be silently dropped by the
+		// re-entrancy guard — it waits for the superseded idle fetch to tear down, then spawns a fresh enemy.
+		let releaseIdle!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		const idleGate = new Promise<IApiSocketResponse<'NewEnemy'>>((resolve) => (releaseIdle = resolve));
+		let newEnemyCalls = 0;
+		send.mockImplementation((name: string) => {
+			if (name === 'ChallengeBoss') {
+				return Promise.resolve(challengeError);
+			}
+			if (name === 'NewEnemy') {
+				newEnemyCalls++;
+				// The first NewEnemy is the in-flight idle fetch (held); the fallback fetch is the second.
+				return newEnemyCalls === 1 ? idleGate : Promise.resolve(newEnemyResponse);
+			}
+			return Promise.resolve(newEnemyResponse);
+		});
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const idleFetch = manager.getNewEnemy();
+		await flush(); // park the idle fetch on its held NewEnemy request
+
+		// ChallengeBoss fails and falls back to getNewEnemy while the idle fetch is still in flight.
+		const challenge = manager.challengeBoss();
+		await flush(); // the fallback is now awaiting the superseded idle fetch's teardown
+
+		releaseIdle(newEnemyResponse); // the stale idle fetch resolves and abandons (generation moved on)
+		await Promise.all([idleFetch, challenge]);
+
+		// The fallback issued a second NewEnemy and spawned a fresh idle enemy rather than being dropped.
+		expect(manager.mode).toBe('idle');
+		expect(newEnemyCalls).toBe(2);
+		expect(manager.currentEnemy).toEqual(normalInstance);
+		expect(loaded).toEqual([normalInstance]);
+	});
+
 	it('on a boss victory: reports the defeat, clears the zone, then returns to idle (auto-fight off)', async () => {
 		await manager.challengeBoss();
 
