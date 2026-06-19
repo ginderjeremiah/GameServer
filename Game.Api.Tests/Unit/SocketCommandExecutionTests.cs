@@ -37,6 +37,20 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task HandleMessage_FrameMissingName_RejectsWithMalformedErrorInsteadOfThrowing()
+        {
+            // A structurally-valid frame that omits "name" deserializes to a SocketCommandInfo with a null
+            // Name. It must be rejected with a structured error the client can react to, not throw an
+            // unobserved exception that leaves the client hanging on its request id (#935).
+            var (socket, handler) = CreateHandler(_ => null);
+
+            await handler.HandleMessage("{\"id\":\"c1\",\"parameters\":null}");
+
+            Assert.Contains(socket.SentMessages, m => m.Contains("Malformed command.") && m.Contains("c1"));
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("no name"));
+        }
+
+        [Fact]
         public async Task ExecuteCommand_CommandFaults_SurfacesInternalServerErrorToTheClient()
         {
             var (socket, handler) = CreateHandler(name => name == "Boom" ? new InvalidOperationException("boom") : null);

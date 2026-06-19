@@ -318,7 +318,7 @@ namespace Game.Api.Sockets
             }
         }
 
-        private async Task HandleMessage(string message)
+        internal async Task HandleMessage(string message)
         {
             if (message is "pong")
             {
@@ -336,6 +336,20 @@ namespace Game.Api.Sockets
                 var commandInfo = message.Deserialize<SocketCommandInfo>();
                 if (commandInfo is not null)
                 {
+                    if (string.IsNullOrEmpty(commandInfo.Name))
+                    {
+                        // A structurally-valid frame can omit "name" (System.Text.Json binds it null), so reject
+                        // it with a structured error instead of letting the null reach the command lookup — which
+                        // would throw an unobserved exception and leave the client hanging on its request id.
+                        _logger.LogWarning("Received socket command frame with no name: {Message} on socket: {Id}", message, Id);
+                        await _context.SendData(new ApiSocketResponse
+                        {
+                            Id = commandInfo.Id,
+                            Error = "Malformed command."
+                        });
+                        return;
+                    }
+
                     if (_commandFactory.IsServerInitiatedOnly(commandInfo.Name))
                     {
                         // Server-initiated commands (e.g. ChallengeCompleted, SocketReplaced) are only valid
