@@ -210,6 +210,50 @@ describe('EquippedBand — drag to reorder', () => {
 	});
 });
 
+// HTML5 drag-and-drop is mouse-only, so the move buttons give keyboard and touch users a real,
+// focusable path to change battle priority. The buttons are native <button>s, so a click here
+// faithfully represents both a pointer/touch tap and a keyboard activation.
+describe('EquippedBand — reorder via move buttons (keyboard/touch)', () => {
+	const moveButtons = (card: HTMLElement) => Array.from(card.querySelectorAll<HTMLButtonElement>('.reorder .mv'));
+
+	it('renders move-earlier and move-later buttons on each filled card, labelled for assistive tech', () => {
+		const { container } = render(EquippedBand, { props: { view } });
+		const [earlier, later] = moveButtons(filledCards(container)[1]);
+		expect(earlier.tagName).toBe('BUTTON');
+		expect(earlier.getAttribute('aria-label')).toBe('Move Bravo earlier in priority');
+		expect(later.getAttribute('aria-label')).toBe('Move Bravo later in priority');
+	});
+
+	it('disables move-earlier on the first slot and move-later on the last slot', () => {
+		const { container } = render(EquippedBand, { props: { view } });
+		const cards = filledCards(container);
+		expect(moveButtons(cards[0])[0].disabled).toBe(true); // first slot can't move earlier
+		expect(moveButtons(cards[0])[1].disabled).toBe(false);
+		expect(moveButtons(cards[2])[0].disabled).toBe(false);
+		expect(moveButtons(cards[2])[1].disabled).toBe(true); // last slot can't move later
+	});
+
+	it('moves a skill later in priority when its move-later button is activated', async () => {
+		const { container } = render(EquippedBand, { props: { view } });
+		await fireEvent.click(moveButtons(filledCards(container)[0])[1]);
+		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 0, 2]);
+		expect(view.equipped).toEqual([1, 0, 2]);
+	});
+
+	it('moves a skill earlier in priority when its move-earlier button is activated', async () => {
+		const { container } = render(EquippedBand, { props: { view } });
+		await fireEvent.click(moveButtons(filledCards(container)[2])[0]);
+		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [0, 2, 1]);
+		expect(view.equipped).toEqual([0, 2, 1]);
+	});
+
+	it('hides the move buttons while a swap is pending', () => {
+		view.toggle(3); // full loadout → starts a swap
+		const { container } = render(EquippedBand, { props: { view } });
+		expect(container.querySelector('.reorder')).toBeNull();
+	});
+});
+
 describe('EquippedBand — empty slot', () => {
 	beforeEach(() => {
 		// Free a slot so the band renders one empty card.

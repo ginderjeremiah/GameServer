@@ -202,6 +202,16 @@ const handleDragStart = (e: DragEvent) => {
 	&.on {
 		opacity: 1;
 	}
+
+	// Keyboard parity with hover: a focused star is fully visible, and tabbing onto the slot's
+	// primary action hints the star too — a keyboard user otherwise lands on an invisible control.
+	&:focus-visible {
+		opacity: 1;
+	}
+}
+
+.grid-slot:focus-within .fav-star {
+	opacity: 0.75;
 }
 
 .cat-corner {
