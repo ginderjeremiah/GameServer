@@ -16,6 +16,22 @@ namespace Game.Core.Identity
     }
 
     /// <summary>
+    /// The outcome of evaluating a single-user lifecycle action (archive/ban) against the admin-lockout
+    /// rules.
+    /// </summary>
+    public enum UserActionProtection
+    {
+        /// <summary>The action is safe to apply.</summary>
+        Allowed,
+
+        /// <summary>The action targets the acting admin's own account.</summary>
+        SelfTarget,
+
+        /// <summary>The action would take the last usable admin out of circulation.</summary>
+        LastAdmin,
+    }
+
+    /// <summary>
     /// Pure self-protection rules for privileged user-administration actions, guarding an admin from
     /// locking themselves — or everyone — out: banning/archiving their own account, dropping their own
     /// Admin role, or removing the Admin role from the last remaining admin. The rules take only plain
@@ -62,6 +78,34 @@ namespace Game.Core.Identity
             }
 
             return otherAdminsRemain ? RoleChangeProtection.Allowed : RoleChangeProtection.LastAdmin;
+        }
+
+        /// <summary>
+        /// Evaluates a single-user lifecycle action (archive or ban) for the lockout hazards: targeting the
+        /// acting admin's own account, or taking the last usable admin out of circulation. Acting on a
+        /// non-admin is always allowed, since it cannot reduce the pool of admins.
+        /// </summary>
+        /// <param name="actingUserId">The admin performing the action.</param>
+        /// <param name="targetUserId">The user being archived or banned.</param>
+        /// <param name="targetHasAdminRole">Whether the target currently holds the Admin role.</param>
+        /// <param name="otherUsableAdminsRemain">Whether any usable admin other than the target would remain afterwards.</param>
+        public static UserActionProtection CheckUserAction(
+            int actingUserId,
+            int targetUserId,
+            bool targetHasAdminRole,
+            bool otherUsableAdminsRemain)
+        {
+            if (IsSelfTarget(actingUserId, targetUserId))
+            {
+                return UserActionProtection.SelfTarget;
+            }
+
+            if (!targetHasAdminRole)
+            {
+                return UserActionProtection.Allowed;
+            }
+
+            return otherUsableAdminsRemain ? UserActionProtection.Allowed : UserActionProtection.LastAdmin;
         }
     }
 }

@@ -234,18 +234,74 @@ namespace Game.DataAccess.Repositories
 
         private async Task<UserActionStatus> SetUserTimestamp(int actingUserId, int targetUserId, Action<UserEntity> setTimestamp)
         {
+            // Cheap self-target rejection before touching the database — an admin can never archive or ban
+            // their own account regardless of who else holds the role.
             if (AdminLockoutPolicy.IsSelfTarget(actingUserId, targetUserId))
             {
                 return UserActionStatus.SelfTarget;
             }
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId);
+            var user = await _context.Users
+                .Include(u => u.Roles)
+                .FirstOrDefaultAsync(u => u.Id == targetUserId);
             if (user is null)
             {
                 return UserActionStatus.UserNotFound;
             }
 
+            // Only acting on an admin can trip the lockout rules; archiving/banning a non-admin carries no
+            // hazard and applies on the deferred unit-of-work path.
+            const int adminRoleId = (int)ERole.Admin;
+            var targetHasAdminRole = user.Roles.Any(r => r.Id == adminRoleId);
+            if (!targetHasAdminRole)
+            {
+                setTimestamp(user);
+                return UserActionStatus.Success;
+            }
+
+            return await ApplyLifecycleActionToAdminAtomically(actingUserId, user, setTimestamp, adminRoleId);
+        }
+
+        /// <summary>
+        /// Applies an archive/ban to an admin as an atomic check-then-act so the last-admin invariant holds
+        /// under concurrency. Without it, two simultaneous mutual archives/bans could each observe another
+        /// admin remaining and both commit, leaving the system with zero usable admins. A row lock on the
+        /// Admin role serializes every admin-membership change (here and in <see cref="SetUserRoles"/>)
+        /// through a single point; the surviving-admin fact the domain policy reads is gathered under that
+        /// lock, and the mutation commits in-tier (like <see cref="CreateAccount"/>) rather than deferring to
+        /// the request's unit of work — so the policy's check and the act it gates can't be split apart.
+        /// </summary>
+        private async Task<UserActionStatus> ApplyLifecycleActionToAdminAtomically(
+            int actingUserId,
+            UserEntity user,
+            Action<UserEntity> setTimestamp,
+            int adminRoleId)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            // Lock the Admin role row; the lock is held until commit, serializing concurrent admin changes.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
+
+            // Gather the surviving-admin fact under the lock. A "usable" admin can still log in to recover the
+            // instance, so it must be neither archived nor banned — both archiving and banning the target take
+            // it out of that pool, so the policy must reject the action that would empty it.
+            var otherUsableAdminsRemain = await _context.Users.AnyAsync(u =>
+                u.Id != user.Id && u.ArchivedAt == null && u.BannedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
+
+            var protection = AdminLockoutPolicy.CheckUserAction(
+                actingUserId, user.Id, targetHasAdminRole: true, otherUsableAdminsRemain);
+            switch (protection)
+            {
+                case UserActionProtection.SelfTarget:
+                    return UserActionStatus.SelfTarget;
+                case UserActionProtection.LastAdmin:
+                    return UserActionStatus.LastAdmin;
+            }
+
             setTimestamp(user);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
             return UserActionStatus.Success;
         }
 
