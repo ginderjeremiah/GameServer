@@ -9,8 +9,11 @@ namespace Game.Infrastructure.Entities
         public int ModifierType { get; set; }
         public decimal Amount { get; set; }
         public int DurationMs { get; set; }
+        public int ScalingAttributeId { get; set; }
+        public decimal ScalingAmount { get; set; }
 
         public virtual Skill Skill { get => field ?? throw new NotLoadedException(nameof(Skill)); set; }
         public virtual Attribute Attribute { get => field ?? throw new NotLoadedException(nameof(Attribute)); set; }
+        public virtual Attribute ScalingAttribute { get => field ?? throw new NotLoadedException(nameof(ScalingAttribute)); set; }
     }
 }

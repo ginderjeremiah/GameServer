@@ -71,10 +71,18 @@ export interface EffectDescription {
 
 /** Builds the display pieces (and assembled one-line summary) for an authored skill effect. The
  *  attribute's display name and `isHarmful` flag are supplied by the caller so this stays pure —
- *  reference-data resolution is the component's concern, not this helper's. */
-export const describeEffect = (effect: ISkillEffect, attributeName: string, isHarmful: boolean): EffectDescription => {
-	const direction = effectDirection(isHarmful, effect.modifierTypeId, effect.amount);
-	const magnitude = formatEffectMagnitude(effect.modifierTypeId, effect.amount);
+ *  reference-data resolution is the component's concern, not this helper's. `amount` is the magnitude
+ *  to render (the buff/debuff direction and badge derive from it): callers pass the caster-scaled
+ *  magnitude so the shown value matches what battle applies, defaulting to the unscaled authored
+ *  amount where no caster is available. */
+export const describeEffect = (
+	effect: ISkillEffect,
+	attributeName: string,
+	isHarmful: boolean,
+	amount: number = effect.amount
+): EffectDescription => {
+	const direction = effectDirection(isHarmful, effect.modifierTypeId, amount);
+	const magnitude = formatEffectMagnitude(effect.modifierTypeId, amount);
 	const targetLabel = effectTargetLabel(effect.target);
 	const duration = formatEffectDuration(effect.durationMs);
 	return {
@@ -97,9 +105,10 @@ export const effectLogMessage = (
 	attributeName: string,
 	isHarmful: boolean,
 	onPlayer: boolean,
-	enemyName: string
+	enemyName: string,
+	amount: number = effect.amount
 ): string => {
-	const { direction, magnitude, duration } = describeEffect(effect, attributeName, isHarmful);
+	const { direction, magnitude, duration } = describeEffect(effect, attributeName, isHarmful, amount);
 	const subject = onPlayer ? 'You are' : `${enemyName} is`;
 	const verb = direction === 'buff' ? 'empowered' : 'weakened';
 	return `${subject} ${verb}: ${magnitude} ${attributeName} for ${duration}`;

@@ -19,6 +19,8 @@ const effect = (over: Partial<ISkillEffect> = {}): ISkillEffect => ({
 	modifierTypeId: EModifierType.Additive,
 	amount: 15,
 	durationMs: 5000,
+	scalingAttributeId: EAttribute.Strength,
+	scalingAmount: 0,
 	...over
 });
 
@@ -128,6 +130,19 @@ describe('describeEffect', () => {
 		expect(description.direction).toBe('debuff');
 		expect(description.text).toBe('-10 Defense (enemy), 3s');
 	});
+
+	it('uses the provided (caster-scaled) amount for the magnitude and direction', () => {
+		// The authored base is 5, but a resolved/scaled amount of 23 is what should render.
+		const description = describeEffect(
+			effect({ attributeId: EAttribute.Strength, amount: 5, durationMs: 5000, target: ESkillEffectTarget.Self }),
+			'Strength',
+			false,
+			23
+		);
+
+		expect(description.magnitude).toBe('+23');
+		expect(description.text).toBe('+23 Strength (self), 5s');
+	});
 });
 
 describe('effectLogMessage', () => {
@@ -168,5 +183,18 @@ describe('effectLogMessage', () => {
 			'Goblin'
 		);
 		expect(message).toBe('Goblin is weakened: +12 Damage Taken Per Second for 3s');
+	});
+
+	it('reports the caster-scaled amount when one is supplied', () => {
+		// Authored base 12, but the resolved (scaled) magnitude of 20 is what the log should announce.
+		const message = effectLogMessage(
+			effect({ attributeId: EAttribute.DamageTakenPerSecond, amount: 12, durationMs: 3000 }),
+			'Damage Taken Per Second',
+			true,
+			false,
+			'Goblin',
+			20
+		);
+		expect(message).toBe('Goblin is weakened: +20 Damage Taken Per Second for 3s');
 	});
 });

@@ -24,7 +24,7 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { applyDefense, skillContributions, type Skill } from '$lib/battle';
+import { applyDefense, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
 import { attributeIsHarmful, attributeName, describeEffect } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
@@ -69,12 +69,15 @@ const isReady = $derived(remainingCd <= 0.01);
 const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - remainingCd) / adjustedCd) * 100));
 const remainingCdFormatted = $derived(remainingCd.toFixed(2));
 
+// Show each effect's magnitude resolved against the caster's (owner's) attributes, so a scaling effect
+// reads like the damage total does — the number the skill would actually apply right now.
 const effectLines = $derived(
 	(skill?.effects ?? []).map((effect) =>
 		describeEffect(
 			effect,
 			attributeName(effect.attributeId, staticData.attributes),
-			attributeIsHarmful(effect.attributeId, staticData.attributes)
+			attributeIsHarmful(effect.attributeId, staticData.attributes),
+			skill ? scaledEffectAmount(effect, skill.owner.attributes) : effect.amount
 		)
 	)
 );

@@ -363,6 +363,19 @@ namespace Game.Infrastructure.Database
             {
                 entity.Property(se => se.Amount)
                     .HasPrecision(18, 3);
+
+                entity.Property(se => se.ScalingAmount)
+                    .HasPrecision(18, 3);
+
+                // Two FKs to Attributes (the affected attribute and the scaling attribute) — configure both
+                // explicitly so the convention doesn't have to disambiguate the matching nav/FK pairs.
+                entity.HasOne(se => se.Attribute)
+                    .WithMany()
+                    .HasForeignKey(se => se.AttributeId);
+
+                entity.HasOne(se => se.ScalingAttribute)
+                    .WithMany()
+                    .HasForeignKey(se => se.ScalingAttributeId);
             });
 
             modelBuilder.Entity<StatisticType>(entity =>

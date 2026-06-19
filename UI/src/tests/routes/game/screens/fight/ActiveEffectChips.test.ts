@@ -29,6 +29,8 @@ const effect = (over: Partial<ISkillEffect> = {}): ISkillEffect => ({
 	modifierTypeId: EModifierType.Additive,
 	amount: 5,
 	durationMs: 1000,
+	scalingAttributeId: EAttribute.Strength,
+	scalingAmount: 0,
 	...over
 });
 

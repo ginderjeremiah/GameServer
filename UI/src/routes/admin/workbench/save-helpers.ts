@@ -174,7 +174,9 @@ export function skillEffectChanges(
 			a.attributeId === b.attributeId &&
 			a.modifierTypeId === b.modifierTypeId &&
 			a.amount === b.amount &&
-			a.durationMs === b.durationMs
+			a.durationMs === b.durationMs &&
+			a.scalingAttributeId === b.scalingAttributeId &&
+			a.scalingAmount === b.scalingAmount
 	);
 }
 

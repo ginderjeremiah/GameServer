@@ -309,3 +309,78 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(player.attributes.getValue(EAttribute.Strength)).toBe(20);
 	});
 });
+
+/**
+ * Caster-attribute scaling of a skill effect's magnitude (#741). Mirrors the backend suite's
+ * `BattleContext_ApplySkillEffect_*` scaling tests — the scaling happens at the fire site
+ * ({@link Skill.applyEffects}, the analogue of the backend `BattleContext.ApplySkillEffect`).
+ */
+describe('Skill effect attribute scaling', () => {
+	const skillWith = (effect: ReturnType<typeof makeEffect>, caster: Battler) =>
+		new Skill(
+			{
+				id: 0,
+				name: 'Scaler',
+				baseDamage: 0,
+				cooldownMs: 40,
+				damageMultipliers: [],
+				effects: [effect],
+				description: '',
+				iconPath: ''
+			},
+			caster
+		);
+
+	const poison = (baseAmount: number, scalingAmount: number) =>
+		makeEffect(
+			1,
+			ESkillEffectTarget.Opponent,
+			EAttribute.DamageTakenPerSecond,
+			EModifierType.Additive,
+			baseAmount,
+			1000,
+			EAttribute.Dexterity,
+			scalingAmount
+		);
+
+	it('scales the effect magnitude with the caster attribute', () => {
+		const caster = makeBattler([{ id: EAttribute.Dexterity, amount: 20 }]);
+		const foe = makeBattler([{ id: EAttribute.Dexterity, amount: 0 }]);
+
+		skillWith(poison(10, 0.5), caster).applyEffects(foe);
+
+		// 10 + caster Dexterity(20) × 0.5 = 20
+		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(20);
+	});
+
+	it('reads the caster attribute, not the target', () => {
+		const caster = makeBattler([{ id: EAttribute.Dexterity, amount: 4 }]);
+		const foe = makeBattler([{ id: EAttribute.Dexterity, amount: 100 }]);
+
+		skillWith(poison(0, 1.0), caster).applyEffects(foe);
+
+		// 0 + caster Dexterity(4) × 1.0 = 4, not the target's 100.
+		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(4);
+	});
+
+	it('leaves the amount unchanged when scalingAmount is 0', () => {
+		const caster = makeBattler([{ id: EAttribute.Dexterity, amount: 50 }]);
+		const foe = makeBattler([{ id: EAttribute.Dexterity, amount: 0 }]);
+
+		skillWith(poison(7, 0), caster).applyEffects(foe);
+
+		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(7);
+	});
+
+	it('records the scaled amount on the active-effect view and reports it to onApplied', () => {
+		const caster = makeBattler([{ id: EAttribute.Dexterity, amount: 20 }]);
+		const foe = makeBattler([{ id: EAttribute.Dexterity, amount: 0 }]);
+
+		const applied: number[] = [];
+		skillWith(poison(10, 0.5), caster).applyEffects(foe, (_effect, _target, amount) => applied.push(amount));
+
+		// The chip view and the log both surface the scaled magnitude, not the authored base.
+		expect(foe.activeEffects[0].amount).toBe(20);
+		expect(applied).toEqual([20]);
+	});
+});

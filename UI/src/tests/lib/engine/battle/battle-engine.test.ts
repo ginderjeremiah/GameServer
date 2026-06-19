@@ -428,7 +428,9 @@ describe('BattleEngine', () => {
 					attributeId: EAttribute.Strength,
 					modifierTypeId: EModifierType.Additive,
 					amount: 15,
-					durationMs: 1000
+					durationMs: 1000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
 				}
 			];
 			engine.start();
@@ -480,7 +482,9 @@ describe('BattleEngine', () => {
 				attributeId: EAttribute.HealthRegenPerSecond,
 				modifierTypeId: EModifierType.Additive,
 				amount: 8,
-				durationMs: 100000
+				durationMs: 100000,
+				scalingAttributeId: EAttribute.Strength,
+				scalingAmount: 0
 			});
 
 			for (let i = 0; i < 25; i++) {
@@ -516,7 +520,9 @@ describe('BattleEngine', () => {
 				attributeId: EAttribute.DamageTakenPerSecond,
 				modifierTypeId: EModifierType.Additive,
 				amount: 6,
-				durationMs: 100000
+				durationMs: 100000,
+				scalingAttributeId: EAttribute.Strength,
+				scalingAmount: 0
 			});
 
 			for (let i = 0; i < 25; i++) {
@@ -670,7 +676,9 @@ describe('BattleEngine', () => {
 				attributeId: EAttribute.Strength,
 				modifierTypeId: EModifierType.Additive,
 				amount: 5,
-				durationMs: 1000
+				durationMs: 1000,
+				scalingAttributeId: EAttribute.Strength,
+				scalingAmount: 0
 			});
 
 			// The render hook is invoked with (renderDelta, logicalDelta); the engine interpolates off the
@@ -691,7 +699,9 @@ describe('BattleEngine', () => {
 				attributeId: EAttribute.Strength,
 				modifierTypeId: EModifierType.Additive,
 				amount: 5,
-				durationMs: 1000
+				durationMs: 1000,
+				scalingAttributeId: EAttribute.Strength,
+				scalingAmount: 0
 			});
 			engine.pause();
 

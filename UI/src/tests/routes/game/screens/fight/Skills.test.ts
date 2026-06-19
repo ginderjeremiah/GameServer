@@ -77,7 +77,9 @@ describe('Skills', () => {
 						attributeId: EAttribute.Defense,
 						modifierTypeId: EModifierType.Additive,
 						amount: -5,
-						durationMs: 3000
+						durationMs: 3000,
+						scalingAttributeId: EAttribute.Strength,
+						scalingAmount: 0
 					}
 				]
 			}),

@@ -131,7 +131,9 @@ describe('SkillTooltip', () => {
 					attributeId: EAttribute.Strength,
 					modifierTypeId: EModifierType.Additive,
 					amount: 15,
-					durationMs: 5000
+					durationMs: 5000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
 				},
 				{
 					id: 2,
@@ -139,7 +141,9 @@ describe('SkillTooltip', () => {
 					attributeId: EAttribute.Defense,
 					modifierTypeId: EModifierType.Additive,
 					amount: -10,
-					durationMs: 3000
+					durationMs: 3000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
 				}
 			]
 		});
@@ -154,6 +158,30 @@ describe('SkillTooltip', () => {
 		expect((lines[0].querySelector('.mag') as HTMLElement).style.color).toBe('var(--effect-buff)');
 		expect(lines[1].textContent).toContain('-10');
 		expect((lines[1].querySelector('.mag') as HTMLElement).style.color).toBe('var(--effect-debuff)');
+	});
+
+	it('resolves a scaling effect line against the caster (owner) attributes', async () => {
+		const { EModifierType, ESkillEffectTarget } = await import('$lib/api');
+		staticData.attributes = [makeAttribute(EAttribute.Strength, 'Strength')];
+		// owner Strength is 20; a base 10 effect scaling at 0.5/STR resolves to 10 + 20×0.5 = 20.
+		const skill = makeSkill(owner, {
+			name: 'Empower',
+			effects: [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 10,
+					durationMs: 5000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0.5
+				}
+			]
+		});
+		const { container } = render(SkillTooltip, { props: { skill } });
+		const line = container.querySelector('.effect-line') as HTMLElement;
+		expect(line.textContent).toContain('+20');
 	});
 
 	it('omits the "On hit" section for a skill with no effects', () => {

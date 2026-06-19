@@ -35,7 +35,9 @@ describe('Skill', () => {
 					attributeId: EAttribute.Strength,
 					modifierTypeId: EModifierType.Additive,
 					amount: 5,
-					durationMs: 3000
+					durationMs: 3000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
 				}
 			];
 			const data = makeSkillData({ id: 5, name: 'Fireball', baseDamage: 25, cooldownMs: 2000, effects });

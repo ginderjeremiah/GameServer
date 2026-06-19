@@ -113,18 +113,20 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler. Each application
+        /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler, using the
+        /// already-resolved <paramref name="amount"/> as its magnitude (the caster's attribute scaling is
+        /// applied by <see cref="BattleContext.ApplySkillEffect"/> before this is reached). Each application
         /// <b>stacks</b>: it adds its own <see cref="AttributeModifier"/> to the live collection and its own
         /// timed entry, so re-applying an already-active effect sums the magnitudes (additive amounts add,
         /// multiplicative factors compound) and each application expires on its own schedule. A new modifier
         /// may shift <see cref="MaxHealth"/>, so the health is re-clamped.
         /// </summary>
-        public void ApplyEffect(SkillEffect effect)
+        public void ApplyEffect(SkillEffect effect, double amount)
         {
             var modifier = new AttributeModifier
             {
                 Attribute = effect.AttributeId,
-                Amount = effect.Amount,
+                Amount = amount,
                 Type = effect.ModifierType,
                 Source = EAttributeModifierSource.SkillEffect,
             };

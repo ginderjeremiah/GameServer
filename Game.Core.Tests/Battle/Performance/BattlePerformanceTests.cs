@@ -447,6 +447,8 @@ namespace Game.Core.Tests.Battle.Performance
                     ModifierType = EModifierType.Additive,
                     Amount = EffectBuffAmount,
                     DurationMs = durationMs,
+                    ScalingAttributeId = EAttribute.Strength,
+                    ScalingAmount = 0,
                 });
             }
 

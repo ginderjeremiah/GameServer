@@ -92,6 +92,8 @@ namespace Game.DataAccess.Repositories.Admin
                     ModifierType = (int)effect.ModifierTypeId,
                     Amount = effect.Amount,
                     DurationMs = effect.DurationMs,
+                    ScalingAttributeId = (int)effect.ScalingAttributeId,
+                    ScalingAmount = effect.ScalingAmount,
                 }),
                 // Build fresh, navigation-free entities so cached back-references don't drag
                 // the whole graph into the change tracker.
@@ -108,6 +110,8 @@ namespace Game.DataAccess.Repositories.Admin
                             ModifierType = (int)effect.ModifierTypeId,
                             Amount = effect.Amount,
                             DurationMs = effect.DurationMs,
+                            ScalingAttributeId = (int)effect.ScalingAttributeId,
+                            ScalingAmount = effect.ScalingAmount,
                         });
                     }
                 },

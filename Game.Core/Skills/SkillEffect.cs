@@ -13,5 +13,17 @@ namespace Game.Core.Skills
         public required EModifierType ModifierType { get; init; }
         public required double Amount { get; init; }
         public required int DurationMs { get; init; }
+
+        /// <summary>
+        /// The caster attribute whose value scales this effect's magnitude. Together with
+        /// <see cref="ScalingAmount"/> it adds <c>casterAttribute × ScalingAmount</c> to <see cref="Amount"/>
+        /// when the effect fires, mirroring how a <see cref="DamageMultiplier"/> scales skill damage off the
+        /// caster. A <see cref="ScalingAmount"/> of <c>0</c> means no scaling, leaving <see cref="Amount"/>
+        /// unchanged.
+        /// </summary>
+        public required EAttribute ScalingAttributeId { get; init; }
+
+        /// <summary>The per-point coefficient applied to the caster's <see cref="ScalingAttributeId"/> value.</summary>
+        public required double ScalingAmount { get; init; }
     }
 }

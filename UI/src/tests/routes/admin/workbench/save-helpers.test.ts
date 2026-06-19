@@ -66,6 +66,8 @@ const makeEffect = (id: number, overrides: Partial<ISkillEffect> = {}): ISkillEf
 	modifierTypeId: EModifierType.Additive,
 	amount: 10,
 	durationMs: 3000,
+	scalingAttributeId: EAttribute.Strength,
+	scalingAmount: 0,
 	...overrides
 });
 

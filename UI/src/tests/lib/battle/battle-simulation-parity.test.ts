@@ -563,6 +563,41 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 400 }
 	},
 
+	// Effect magnitude scales with the CASTER's attribute (#741): a poison whose authored amount is 0 but
+	// scales with the caster's Intellect at 1.0/point. Intellect feeds no derived attribute, so it perturbs
+	// nothing but this scaling. The skill (baseDamage 0, cooldown 2000) fires once at tick 50, applying
+	// Opponent +DamageTakenPerSecond = 0 + Intellect(50)×1.0 = 50 DTPS (permanent). 50 DTPS → 2/tick
+	// (bypassing Defense); from tick 50 the 50-HP enemy loses 2/tick and dies on tick 74 → 2960ms. (Without
+	// scaling the authored 0 deals nothing.) Mirrors the backend `effectScalesWithCasterIntellect` scenario.
+	{
+		name: 'effectScalesWithCasterIntellect',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Intellect, amount: 50 }],
+				[
+					makeSkill(
+						0,
+						2000,
+						[],
+						[
+							makeEffect(
+								209,
+								ESkillEffectTarget.Opponent,
+								EAttribute.DamageTakenPerSecond,
+								EModifierType.Additive,
+								0,
+								PERMANENT,
+								EAttribute.Intellect,
+								1.0
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2960 }
+	},
+
 	// ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
 	// Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a chance ≥ 1
 	// always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still taken in lockstep
