@@ -390,6 +390,32 @@ describe('EnemyManager boss mode', () => {
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
 	});
 
+	it('a rapid second press frees a transition parked in its enemy-fetch backoff', async () => {
+		// ChallengeBoss fails, so the transition falls back to getNewEnemy; NewEnemy is also down, so that
+		// fetch parks in its (held-open) retry backoff with `transitioning` still set. A second press is
+		// dropped by the guard but cancels the parked backoff, so the first transition settles promptly
+		// instead of holding the controls for the full retry window.
+		let releaseDelay: () => void = () => {};
+		vi.mocked(delay).mockReturnValue(new Promise<void>((resolve) => (releaseDelay = resolve)));
+		send.mockImplementation((name: string) =>
+			name === 'ChallengeBoss'
+				? Promise.resolve(challengeError)
+				: Promise.resolve({ id: '1', name: 'NewEnemy', error: 'outage' } as IApiSocketResponse<'NewEnemy'>)
+		);
+
+		const first = manager.challengeBoss();
+		await flush(); // park the fallback fetch on its backoff while transitioning is held
+
+		// The second press is dropped (the guard still returns), but it interrupts the parked backoff.
+		await manager.challengeBoss();
+		// The first transition now settles — its fallback fetch loop exits on the superseded generation —
+		// even though the held delay never elapsed. Resolving at all is the proof it was short-circuited.
+		await first;
+
+		expect(manager.mode).toBe('idle');
+		releaseDelay();
+	});
+
 	it('toggles auto-fight', () => {
 		expect(manager.autoFight).toBe(false);
 		manager.setAutoFight(true);

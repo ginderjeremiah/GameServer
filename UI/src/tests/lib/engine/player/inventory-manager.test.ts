@@ -529,6 +529,30 @@ describe('InventoryManager', () => {
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
 			expect(manager.unlockedItems.get(1)?.appliedMods.map((m) => m.id)).toEqual([10]);
 		});
+
+		it('serializes setFavorite behind a pending equip so its optimistic write cannot interleave', async () => {
+			// A favorite toggle must wait out an in-flight item op rather than writing its flag between
+			// that op's snapshot and rollback — so it routes through the same chain as the other mutations.
+			let resolveEquip: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveEquip = resolve)));
+
+			const equip = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			const fav = manager.setFavorite(1, true);
+
+			await flush();
+			// The equip applied optimistically and awaits its persist; the favorite toggle is still queued
+			// behind it — neither its flag write nor its socket call has happened yet.
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(true);
+			expect(manager.unlockedItems.get(1)?.favorite).toBe(false);
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(1);
+
+			resolveEquip({});
+			await Promise.all([equip, fav]);
+
+			expect(mockSendSocketCommand).toHaveBeenCalledTimes(2);
+			expect(mockSendSocketCommand).toHaveBeenLastCalledWith('SetItemFavorite', { itemId: 1, favorite: true });
+			expect(manager.unlockedItems.get(1)?.favorite).toBe(true);
+		});
 	});
 
 	describe('unequipItem', () => {

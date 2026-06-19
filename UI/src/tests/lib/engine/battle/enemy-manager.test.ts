@@ -50,6 +50,10 @@ const cooldownResponse = (cooldown: number): IApiSocketResponse<'NewEnemy'> => (
 const errorResponse = (error: string): IApiSocketResponse<'NewEnemy'> =>
 	({ id: '1', name: 'NewEnemy', error }) as IApiSocketResponse<'NewEnemy'>;
 
+/** Drains the microtask queue (a macrotask boundary) so an in-flight fetch settles up to its next
+ *  awaited point — used to park it on a retry backoff before interleaving a stop. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe('EnemyManager.getNewEnemy', () => {
 	let manager: EnemyManager;
 	let sendSocketCommand: ReturnType<typeof vi.spyOn>;
@@ -143,6 +147,27 @@ describe('EnemyManager.getNewEnemy', () => {
 
 		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
 		expect(manager.currentEnemy).toBeUndefined();
+	});
+
+	it('short-circuits an in-flight retry backoff on stop() rather than waiting out the delay', async () => {
+		// Park the loop in its backoff: the first request fails, so it awaits the delay — hold that delay
+		// open so it can only be released by the cancellation path, not by the timer elapsing.
+		sendSocketCommand.mockResolvedValue(errorResponse('outage'));
+		let releaseDelay: () => void = () => {};
+		vi.mocked(delay).mockReturnValue(new Promise<void>((resolve) => (releaseDelay = resolve)));
+
+		const fetch = manager.getNewEnemy();
+		await flush(); // let the first request resolve and the loop park on the backoff
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+
+		// stop() cancels the backoff and clears `started`; the loop wakes and exits without a further
+		// request, even though the held delay never elapsed.
+		manager.stop();
+		await fetch;
+
+		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
+		expect(manager.currentEnemy).toBeUndefined();
+		releaseDelay(); // the real timer firing late is harmless (the backoff already settled)
 	});
 
 	it('drops a concurrent re-entrant call so a stage-change race spawns a single enemy', async () => {
