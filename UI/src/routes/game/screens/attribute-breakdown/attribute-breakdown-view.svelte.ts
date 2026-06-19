@@ -30,7 +30,7 @@ import {
 	type ComputedAttribute
 } from '$lib/battle';
 import { attributeName } from '$lib/common';
-import { playerManager, inventoryManager, type EEquipmentSlot } from '$lib/engine';
+import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData } from '$stores';
 
 /** An {@link AttributeModifier} carrying display-only provenance so the
@@ -41,8 +41,6 @@ export type LabeledModifier = AttributeModifier & {
 	/** The equipped item or applied mod name; absent for base/points/derived,
 	 *  which are labelled by their source. */
 	label?: string;
-	/** The equipment slot a gear/mod contribution came from. */
-	slot?: EEquipmentSlot;
 	/** The mod type (Component/Prefix/Suffix) for an `ItemMod` contribution. */
 	modType?: EItemModType;
 };
@@ -150,13 +148,6 @@ export function fmtSigned(n: number, dec?: number, pct = false): string {
 
 /* ── contribution-line labels ─────────────────────────────────────────────── */
 
-const SLOT_LABELS = ['Helm', 'Chest', 'Leg', 'Boot', 'Weapon', 'Accessory'];
-
-/** Short equipment-slot label (e.g. `Weapon`) for a gear/mod contribution. */
-export function slotLabel(slot: number | undefined): string {
-	return slot != null ? (SLOT_LABELS[slot] ?? '') : '';
-}
-
 /** Shared shape of a contribution-line label: both the full and the short variants resolve a derived
  *  line to its source attribute and any gear line to the item/mod name, differing only in the fixed
  *  phrasing used for the base-value and stat-point sources (`base`/`statPoints`). */
@@ -222,8 +213,7 @@ export function buildPlayerModifiers(): LabeledModifier[] {
 				amount: attr.amount,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Item,
-				label: item.name,
-				slot
+				label: item.name
 			});
 		}
 		for (const mod of item.appliedMods) {
@@ -234,8 +224,7 @@ export function buildPlayerModifiers(): LabeledModifier[] {
 					type: EModifierType.Additive,
 					source: EAttributeModifierSource.ItemMod,
 					label: mod.name,
-					modType: mod.itemModTypeId,
-					slot
+					modType: mod.itemModTypeId
 				});
 			}
 		}

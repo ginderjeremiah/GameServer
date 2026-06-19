@@ -22,7 +22,7 @@
 			{#each view.entityStats as info (info.stat.id)}
 				<DossierTile
 					{info}
-					data={view.data}
+					summary={view.data.summaryFor(info.stat.id)}
 					kind={view.entKind}
 					selId={entity.id}
 					onPickStat={(cat) => view.goStat(cat)}

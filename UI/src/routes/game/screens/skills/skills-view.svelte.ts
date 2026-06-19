@@ -290,11 +290,11 @@ export class SkillsView {
 		return list.sort(sortMetrics(this.sort, this.defense));
 	});
 
-	/** Equipped rail rows, ordered by loadout slot (not by the active sort). */
+	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
+	 *  the unfiltered loadout so a search/attribute filter can't drop an equipped row while
+	 *  the header still counts it — filtering is reserved for {@link availableRail}. */
 	readonly equippedRail = $derived(
-		this.railList
-			.filter((m) => this.isEquipped(m.skill.id))
-			.sort((a, b) => this.slotOf(a.skill.id) - this.slotOf(b.skill.id))
+		this.equipped.map((id) => this.metricsById[id]).filter((m): m is SkillMetrics => m != null)
 	);
 
 	/** Available (unequipped) rail rows, in the active sort order. */

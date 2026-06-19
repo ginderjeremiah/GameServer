@@ -5,7 +5,7 @@
 	<div class="scroll">
 		<div class="grid" data-testid="stat-card-grid">
 			{#each view.shownStats as stat (stat.id)}
-				<StatCard data={view.data} {stat} onPickEntity={(kind, id) => view.goEntity(kind, id)} />
+				<StatCard summary={view.data.summaryFor(stat.id)} {stat} onPickEntity={(kind, id) => view.goEntity(kind, id)} />
 			{/each}
 		</div>
 	</div>

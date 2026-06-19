@@ -128,6 +128,24 @@ export function feedsFor(coreIndex: number): EAttribute[] {
 	return perPointYields(coreIndex).map((y) => y.id);
 }
 
+/** Inverse of {@link feedsFor}: the core attributes that feed each derived stat,
+ *  precomputed once from the constant per-point yields so the breakdown's "fed by"
+ *  line is an O(1) lookup rather than a per-render scan over every core attribute. */
+const CONTRIBUTORS_BY_DERIVED: Partial<Record<EAttribute, EAttribute[]>> = (() => {
+	const map: Partial<Record<EAttribute, EAttribute[]>> = {};
+	CORE_ATTRIBUTES.forEach((core, i) => {
+		for (const derivedId of feedsFor(i)) {
+			(map[derivedId] ??= []).push(core);
+		}
+	});
+	return map;
+})();
+
+/** The core attributes that feed a derived stat (inverse of {@link feedsFor}). */
+export function contributorsFor(derivedId: EAttribute): EAttribute[] {
+	return CONTRIBUTORS_BY_DERIVED[derivedId] ?? [];
+}
+
 /** Maps a pointer position (in the radar's SVG user space) to the attribute
  *  value its axis vertex would represent if dragged there: projects the pointer
  *  onto the axis direction (so sideways drift is ignored and only the radial
@@ -219,10 +237,6 @@ export class AttributesView {
 	 *  a fixed value for the duration of a drag so allocating points mid-gesture
 	 *  can't rescale the radar (see {@link lockScale}). */
 	readonly hexMax = $derived(this.#lockedHexMax ?? computeHexMax(this.draft, this.committed));
-
-	isDirtyIndex(i: number): boolean {
-		return this.draft[i] !== this.committed[i];
-	}
 
 	/** Whether any attribute can still be incremented (points remain). */
 	canInc(): boolean {

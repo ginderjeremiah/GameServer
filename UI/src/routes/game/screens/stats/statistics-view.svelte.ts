@@ -157,6 +157,17 @@ export interface EntityStatInfo {
 	value: number;
 	rank: number;
 	of: number;
+}
+
+/** Memoised per-statistic display data, computed once on the immutable
+ *  {@link StatisticsData} so the stat cards and dossier tiles read it as a prop
+ *  rather than re-scanning every render. */
+export interface StatSummary {
+	/** Per-entity rows, resolved and sorted best-first (empty for `none` stats). */
+	rows: StatRow[];
+	/** Bar denominator — the leading row's value, floored at 1. */
+	maxVal: number;
+	/** Grand-total headline: the server's null-entity row, else the row aggregate. */
 	headline: number;
 }
 
@@ -180,18 +191,22 @@ export class StatisticsData {
 	readonly statTypes: StatType[];
 	readonly stats: IPlayerStatistic[];
 	readonly entities: Record<StatEntityKind, StatEntity[]>;
-	private readonly byId: Map<EStatisticType, StatType>;
+	/** Entity lookup per kind, built once so id resolution is O(1) (not Array.find per row). */
+	private readonly entityById: Record<StatEntityKind, Map<number, StatEntity>>;
+	/** Per-statistic display summaries, memoised once over the immutable inputs. */
+	private readonly summaries: Map<EStatisticType, StatSummary>;
 
 	constructor(statTypes: StatType[], stats: IPlayerStatistic[], entities: Record<StatEntityKind, StatEntity[]>) {
 		this.statTypes = statTypes;
 		this.stats = stats;
 		this.entities = entities;
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive lookup map
-		this.byId = new Map(statTypes.map((s) => [s.id, s]));
-	}
-
-	statType(type: EStatisticType): StatType | undefined {
-		return this.byId.get(type);
+		this.entityById = {
+			enemy: indexEntities(entities.enemy),
+			zone: indexEntities(entities.zone),
+			skill: indexEntities(entities.skill)
+		};
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive memo map
+		this.summaries = new Map(statTypes.map((s) => [s.id, this.computeSummary(s)]));
 	}
 
 	/** Statistic types in the given category, in catalogue (display) order. */
@@ -204,20 +219,65 @@ export class StatisticsData {
 	}
 
 	entity(kind: StatEntityKind, id: number): StatEntity | undefined {
-		return this.entityList(kind).find((e) => e.id === id);
+		return this.entityById[kind]?.get(id);
+	}
+
+	/** The memoised display summary for a statistic (rows + bar max + headline). */
+	summaryFor(type: EStatisticType): StatSummary {
+		return this.summaries.get(type) ?? EMPTY_SUMMARY;
 	}
 
 	/** Per-entity rows for a statistic, resolved and sorted best-first (ascending
 	 *  for "min" aggregates, where lower is better). Empty for `none` stats. */
 	rowsForStat(type: EStatisticType): StatRow[] {
-		const stat = this.byId.get(type);
-		if (!stat || stat.kind === 'none') {
+		return this.summaryFor(type).rows;
+	}
+
+	/** The grand-total headline for a statistic: the backend's null-entity row if
+	 *  present, otherwise the aggregate of its per-entity rows. */
+	statHeadline(type: EStatisticType): number {
+		return this.summaryFor(type).headline;
+	}
+
+	/** Every statistic that references the given entity, with the entity's value
+	 *  and rank among peers. */
+	statsForEntity(kind: StatEntityKind, entityId: number): EntityStatInfo[] {
+		const out: EntityStatInfo[] = [];
+		for (const stat of this.statTypes) {
+			if (stat.kind !== kind) {
+				continue;
+			}
+			const rows = this.summaryFor(stat.id).rows;
+			const idx = rows.findIndex((r) => r.entityId === entityId);
+			if (idx < 0) {
+				continue;
+			}
+			out.push({ stat, value: rows[idx].value, rank: idx + 1, of: rows.length });
+		}
+		return out;
+	}
+
+	/** Whether the player has recorded any statistic values at all (new player). */
+	get isEmpty(): boolean {
+		return this.stats.length === 0;
+	}
+
+	/** Computes a statistic's display summary once (called from the constructor). */
+	private computeSummary(stat: StatType): StatSummary {
+		const rows = this.computeRows(stat);
+		const maxVal = Math.max(...rows.map((r) => r.value), 1);
+		return { rows, maxVal, headline: this.computeHeadline(stat, rows) };
+	}
+
+	/** Resolves and sorts a statistic's per-entity rows (empty for `none` stats). */
+	private computeRows(stat: StatType): StatRow[] {
+		if (stat.kind === 'none') {
 			return [];
 		}
 		const kind = stat.kind;
 		const rows: StatRow[] = [];
 		for (const s of this.stats) {
-			if (s.statisticTypeId !== type || s.entityId == null) {
+			if (s.statisticTypeId !== stat.id || s.entityId == null) {
 				continue;
 			}
 			const entity = this.entity(kind, s.entityId);
@@ -229,47 +289,25 @@ export class StatisticsData {
 		return rows;
 	}
 
-	/** The grand-total headline for a statistic: the backend's null-entity row if
-	 *  present, otherwise the aggregate of its per-entity rows. */
-	statHeadline(type: EStatisticType): number {
-		const totalRow = this.stats.find((s) => s.statisticTypeId === type && s.entityId == null);
+	private computeHeadline(stat: StatType, rows: StatRow[]): number {
+		const totalRow = this.stats.find((s) => s.statisticTypeId === stat.id && s.entityId == null);
 		if (totalRow) {
 			return totalRow.value;
 		}
-		const stat = this.byId.get(type);
 		return aggregate(
-			this.rowsForStat(type).map((r) => r.value),
-			stat?.agg ?? 'sum'
+			rows.map((r) => r.value),
+			stat.agg
 		);
 	}
-
-	statEntityCount(type: EStatisticType): number {
-		return this.rowsForStat(type).length;
-	}
-
-	/** Every statistic that references the given entity, with the entity's value,
-	 *  rank among peers, and the statistic's headline. */
-	statsForEntity(kind: StatEntityKind, entityId: number): EntityStatInfo[] {
-		const out: EntityStatInfo[] = [];
-		for (const stat of this.statTypes) {
-			if (stat.kind !== kind) {
-				continue;
-			}
-			const rows = this.rowsForStat(stat.id);
-			const idx = rows.findIndex((r) => r.entityId === entityId);
-			if (idx < 0) {
-				continue;
-			}
-			out.push({ stat, value: rows[idx].value, rank: idx + 1, of: rows.length, headline: this.statHeadline(stat.id) });
-		}
-		return out;
-	}
-
-	/** Whether the player has recorded any statistic values at all (new player). */
-	get isEmpty(): boolean {
-		return this.stats.length === 0;
-	}
 }
+
+/** Indexes an entity list by id for O(1) resolution. */
+function indexEntities(list: StatEntity[]): Map<number, StatEntity> {
+	return new Map((list ?? []).map((e) => [e.id, e]));
+}
+
+/** Shared empty summary for an unknown (off-catalogue) statistic id. */
+const EMPTY_SUMMARY: StatSummary = { rows: [], maxVal: 1, headline: 0 };
 
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 

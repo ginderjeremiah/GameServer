@@ -16,7 +16,7 @@
 		<div class="value">{fmtNum(computed.total, view.selectedMeta.dec, view.selectedMeta.pct)}</div>
 	</div>
 
-	<div class="bar"><StackBar {computed} height={18} /></div>
+	<div class="bar"><StackBar {computed} grouped={view.selectedGrouped} height={18} /></div>
 	<div class="legend"><SourceLegend sources={groups.map((g) => g.source)} /></div>
 
 	{#if computed.lines.length === 0}

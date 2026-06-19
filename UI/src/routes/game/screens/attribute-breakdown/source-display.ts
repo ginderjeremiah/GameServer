@@ -8,7 +8,6 @@
    itself is the domain enum `EAttributeModifierSource` from `$lib/battle`. */
 
 import { EAttributeModifierSource } from '$lib/battle';
-import { tintColor } from '$lib/common';
 
 /** Kebab key matching the `--source-*` custom properties (e.g. `points`). */
 const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
@@ -36,10 +35,6 @@ const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
 
 /** Themeable source accent hue, e.g. `var(--source-points)`. */
 export const sourceColor = (source: EAttributeModifierSource): string => `var(--source-${SOURCE_KEY[source]})`;
-
-/** The source accent at a given opacity (themeable via `color-mix`). */
-export const sourceTint = (source: EAttributeModifierSource, alpha: number): string =>
-	tintColor(sourceColor(source), alpha);
 
 /** Human-readable label for a source ("Stat points", "Equipment", …). */
 export const sourceLabel = (source: EAttributeModifierSource): string => SOURCE_LABEL[source];

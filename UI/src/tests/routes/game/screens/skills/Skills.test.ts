@@ -417,12 +417,15 @@ describe('Skills screen', () => {
 		expect(screen.getByText('No attribute scaling.')).toBeTruthy();
 	});
 
-	it('filters the rail by search term', async () => {
+	it('filters the available rail by search term while keeping the equipped loadout visible', async () => {
 		const { container } = render(Skills);
 		const search = container.querySelector<HTMLInputElement>('.search input')!;
 		await fireEvent.input(search, { target: { value: 'delta' } });
-		expect(container.querySelectorAll('.row').length).toBe(1);
+		// The 3 equipped rows stay (the equipped rail is never filtered); the available
+		// rail narrows to the single matching skill, Delta — 4 rows in total.
+		expect(container.querySelectorAll('.row').length).toBe(4);
 		expect(rowByName(container, 'Delta')).toBeTruthy();
+		expect(rowByName(container, 'Alpha')).toBeTruthy();
 	});
 
 	it('surfaces the gating challenge tooltip when hovering a locked, challenge-gated skill', async () => {

@@ -24,7 +24,6 @@ import {
 	fmtSigned,
 	hasNonCombatModifier,
 	modifierLabel,
-	slotLabel,
 	type LabeledModifier
 } from '$routes/game/screens/attribute-breakdown/attribute-breakdown-view.svelte';
 import { makeAttribute } from '../../../../fixtures/attributes';
@@ -133,7 +132,7 @@ describe('buildPlayerModifiers', () => {
 		];
 		const mods = buildPlayerModifiers();
 		const item = mods.find((m) => m.source === EAttributeModifierSource.Item);
-		expect(item).toMatchObject({ attribute: EAttribute.Defense, amount: 14, label: 'Aegis Greathelm', slot: 0 });
+		expect(item).toMatchObject({ attribute: EAttribute.Defense, amount: 14, label: 'Aegis Greathelm' });
 		const mod = mods.find((m) => m.source === EAttributeModifierSource.ItemMod);
 		expect(mod).toMatchObject({
 			attribute: EAttribute.Endurance,
@@ -298,6 +297,5 @@ describe('formatting + labels', () => {
 		expect(
 			modifierLabel({ source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance } as never)
 		).toBe('Endurance');
-		expect(slotLabel(4)).toBe('Weapon');
 	});
 });

@@ -151,11 +151,16 @@ export const SOURCE_ORDER: readonly EAttributeModifierSource[] = [
 	EAttributeModifierSource.Derived
 ];
 
+/** A computed attribute's additive lines bucketed by source (in {@link SOURCE_ORDER}),
+ *  with the multiplicative lines kept separate. */
+export interface GroupedBySource<T extends AttributeModifier = AttributeModifier> {
+	groups: SourceGroup<T>[];
+	mults: AppliedModifier<T>[];
+}
+
 /** Splits a computed attribute's additive lines into per-source groups (in
  *  {@link SOURCE_ORDER}) and returns the multiplicative lines separately. */
-export function groupBySource<T extends AttributeModifier>(
-	computed: ComputedAttribute<T>
-): { groups: SourceGroup<T>[]; mults: AppliedModifier<T>[] } {
+export function groupBySource<T extends AttributeModifier>(computed: ComputedAttribute<T>): GroupedBySource<T> {
 	const groups = new Map<EAttributeModifierSource, SourceGroup<T>>();
 	const mults: AppliedModifier<T>[] = [];
 	for (const line of computed.lines) {

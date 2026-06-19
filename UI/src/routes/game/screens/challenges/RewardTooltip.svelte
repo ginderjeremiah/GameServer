@@ -25,5 +25,7 @@ interface Props {
 
 const { reward }: Props = $props();
 
-let container: HTMLDivElement;
+// Bound to the root element and relocated into the global tooltip container by
+// getBaseNode(); reactive so the relocation runs once this has mounted.
+let container = $state<HTMLDivElement>();
 </script>
