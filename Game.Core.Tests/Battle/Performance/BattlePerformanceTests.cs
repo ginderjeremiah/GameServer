@@ -30,12 +30,12 @@ namespace Game.Core.Tests.Battle.Performance
     ///   is large enough to never flake on a slow runner; subtle regressions are meant to be spotted by
     ///   watching the logged numbers, not by this gate.</item>
     ///   <item><b>Attribute-cache observability.</b> The same typical loadout is measured with both
-    ///   <em>persistent</em> effects (the buffed attribute nodes stay warm) and <em>churning</em> effects
-    ///   (every cooldown cycle expires and re-applies each effect, invalidating those nodes and the
-    ///   derived attributes that cascade from them — the recompute path the
+    ///   <em>persistent</em> effects (each fire stacks, so a bounded window of applications stays active) and
+    ///   <em>churning</em> effects (every cooldown cycle expires and re-applies each effect, invalidating
+    ///   those nodes and the derived attributes that cascade from them — the recompute path the
     ///   <see cref="AttributeCollection"/> cache exists to amortise). The delta between the two is logged
-    ///   so the cache's cost is visible and trackable; the churn is itself <em>asserted</em> to genuinely
-    ///   happen by <see cref="ChurningEffects_RepeatedlyExpireAndReapply_WhilePersistentStaysWarm"/>.</item>
+    ///   so the cache's cost is visible and trackable; both are <em>asserted</em> to genuinely exercise the
+    ///   cache by <see cref="ChurningEffectsExpireAndReapply_WhilePersistentEffectsStack"/>.</item>
     /// </list>
     /// <para>
     /// Scenarios reflect the real loadout cap (<see cref="GameConstants.MaxSelectedSkills"/> = 4 skills,
@@ -105,18 +105,17 @@ namespace Game.Core.Tests.Battle.Performance
         private const int BattlerBaseEndurance = 1000;
 
         // Skills fire every other tick (CooldownMs = 80, MsPerTick = 40). The two effect modes differ only
-        // in how their DurationMs compares to that cooldown, which is exactly what decides whether the
-        // attribute cache churns:
-        //   - Persistent: DurationMs >> cooldown, so each fire REFRESHES the effect before it can expire
-        //     (Battler.ApplyEffect's id-match path). After the first application the modifier stays on the
-        //     collection and the buffed node's cache stays warm for the whole battle — one invalidation,
-        //     ~zero recomputes. This was the prior tests' shape, which never exercised the recompute path.
+        // in how their DurationMs compares to that cooldown, which shapes how the attribute cache churns:
+        //   - Persistent: DurationMs >> cooldown, so each fire STACKS another application before the previous
+        //     expires (effects stack rather than refresh, #740). A modifier is added every fire and a bounded
+        //     window's worth (~DurationMs / cooldown) stays concurrently active, so the buffed node is
+        //     invalidated each fire and its derived dependents recompute over a growing-then-steady modifier set.
         //   - Churning:   DurationMs < cooldown, so the effect EXPIRES every cycle (RemoveModifier) and is
         //     re-applied on the next fire (AddModifier). Each add/remove invalidates the buffed node and
         //     cascades to its derived dependents, so the per-tick reads of those derived attributes pay the
         //     recompute the cache exists to avoid.
         private const int SkillCooldownMs = 80;
-        private const int PersistentEffectDurationMs = 400;   // > cooldown: refreshed before it can expire
+        private const int PersistentEffectDurationMs = 400;   // > cooldown: stacks before any application expires
         private const int ChurningEffectDurationMs = 40;      // one tick: applied on a fire, gone before the next
         private const int EffectBuffAmount = 5;
 
@@ -186,22 +185,22 @@ namespace Game.Core.Tests.Battle.Performance
 
         /// <summary>
         /// Observability for the <see cref="AttributeCollection"/> cache cost. Measures the typical loadout
-        /// twice — once with <em>persistent</em> effects (the buffed nodes stay warm, the prior tests'
-        /// behaviour) and once with <em>churning</em> effects (each cooldown cycle expires and re-applies
-        /// every effect, so the buffed core attributes and their derived dependents are invalidated and
-        /// recomputed on the hot path) — and logs both plus the churn/warm ratio. This is deliberately
-        /// logged, not asserted: the recompute touches only tiny nodes (2–3 modifiers each), so the absolute
-        /// overhead is small and a tight ratio gate would flake; the figure is here to be trend-watched and
-        /// to make the cache's cost visible. The mechanism that makes the churn case genuinely churn is
-        /// pinned deterministically by
-        /// <see cref="ChurningEffects_RepeatedlyExpireAndReapply_WhilePersistentStaysWarm"/>, and a
-        /// catastrophic regression in it would also breach <see cref="WorstCaseBattle_StaysTolerable"/>.
+        /// twice — once with <em>persistent</em> effects (each fire stacks, so a bounded window of applications
+        /// stays active and the buffed node is invalidated per fire over a steady modifier set) and once with
+        /// <em>churning</em> effects (each cooldown cycle expires and re-applies every effect, so the buffed
+        /// core attributes and their derived dependents are invalidated and recomputed on the hot path) — and
+        /// logs both plus the churn/persistent ratio. This is deliberately logged, not asserted: the recompute
+        /// touches only small nodes, so the absolute overhead is small and a tight ratio gate would flake; the
+        /// figure is here to be trend-watched and to make the cache's cost visible. The mechanism that makes
+        /// each scenario genuinely exercise the cache is pinned deterministically by
+        /// <see cref="ChurningEffectsExpireAndReapply_WhilePersistentEffectsStack"/>, and a catastrophic
+        /// regression would also breach <see cref="WorstCaseBattle_StaysTolerable"/>.
         /// </summary>
         [Fact]
-        public void TypicalBattle_WarmVsChurningEffects_LogsCacheChurnCost()
+        public void TypicalBattle_PersistentVsChurningEffects_LogsCacheChurnCost()
         {
-            var warm = Measure(
-                "typical, persistent effects (warm cache)",
+            var persistent = Measure(
+                "typical, persistent effects (stacking)",
                 TypicalSkillCount, TypicalMultiplierCount, TypicalBattleTicks,
                 WarmupIterations, SampleCount, OperationsPerSample, TypicalEffectsPerSkill, EffectMode.Persistent);
 
@@ -210,16 +209,16 @@ namespace Game.Core.Tests.Battle.Performance
                 TypicalSkillCount, TypicalMultiplierCount, TypicalBattleTicks,
                 WarmupIterations, SampleCount, OperationsPerSample, TypicalEffectsPerSkill, EffectMode.Churning);
 
-            var warmPerTickNs = warm.MinMicroseconds / TypicalBattleTicks * 1000.0;
+            var persistentPerTickNs = persistent.MinMicroseconds / TypicalBattleTicks * 1000.0;
             var churnPerTickNs = churn.MinMicroseconds / TypicalBattleTicks * 1000.0;
 
             _output.WriteLine(
-                $"Warm-cache typical battle:   {warm.MinMicroseconds / 1000.0:F3} ms (min), {warmPerTickNs:F1} ns/tick");
+                $"Persistent typical battle:   {persistent.MinMicroseconds / 1000.0:F3} ms (min), {persistentPerTickNs:F1} ns/tick");
             _output.WriteLine(
                 $"Churning typical battle:     {churn.MinMicroseconds / 1000.0:F3} ms (min), {churnPerTickNs:F1} ns/tick");
             _output.WriteLine(
-                $"Attribute-cache churn cost:  {churnPerTickNs - warmPerTickNs:+0.0;-0.0} ns/tick "
-                + $"({churn.MinMicroseconds / warm.MinMicroseconds:F2}x warm)");
+                $"Attribute-cache churn cost:  {churnPerTickNs - persistentPerTickNs:+0.0;-0.0} ns/tick "
+                + $"({churn.MinMicroseconds / persistent.MinMicroseconds:F2}x persistent)");
         }
 
         /// <summary>
@@ -251,19 +250,20 @@ namespace Game.Core.Tests.Battle.Performance
         }
 
         /// <summary>
-        /// Deterministic guard that the churning scenarios above genuinely exercise the cache, independent of
-        /// machine speed (it asserts attribute <em>values</em>, not timings). With <see cref="EffectMode.Churning"/>
-        /// the effect's <see cref="ChurningEffectDurationMs"/> is below the skill cooldown, so a self-buff
-        /// expires between fires and is re-applied on the next one — the buffed attribute toggles
-        /// base → buffed → base repeatedly, each toggle an <c>AddModifier</c>/<c>RemoveModifier</c> that
-        /// invalidates the cache. With <see cref="EffectMode.Persistent"/> the longer duration is refreshed
-        /// before it can expire, so after the first application the value stays buffed and the cache stays
-        /// warm — the prior tests' shape, where the recompute path was never hit. This fails if a future
-        /// change to the durations or cooldown silently turns the churn scenarios back into warm-cache
-        /// battles (the very regression that prompted this pass).
+        /// Deterministic guard that both effect scenarios genuinely exercise the cache, independent of machine
+        /// speed (it asserts attribute <em>values</em>, not timings). With <see cref="EffectMode.Churning"/> the
+        /// effect's <see cref="ChurningEffectDurationMs"/> is below the skill cooldown, so a self-buff expires
+        /// between fires and is re-applied on the next one — the buffed attribute toggles base → buffed → base
+        /// repeatedly, each toggle an <c>AddModifier</c>/<c>RemoveModifier</c> that invalidates the cache. With
+        /// <see cref="EffectMode.Persistent"/> the longer duration outlasts the cooldown, so each fire now
+        /// <em>stacks</em> a fresh application before the previous expires (effects stack rather than refresh,
+        /// #740) — Strength ramps monotonically above a single buff and never returns to base, and every fire
+        /// still adds a modifier (the warm-cache shortcut the old refresh rule gave is gone). This fails if a
+        /// future change to the durations or cooldown silently stops either scenario from exercising the
+        /// recompute path.
         /// </summary>
         [Fact]
-        public void ChurningEffects_RepeatedlyExpireAndReapply_WhilePersistentStaysWarm()
+        public void ChurningEffectsExpireAndReapply_WhilePersistentEffectsStack()
         {
             const int ticks = 12;
             const int buffedStrength = BattlerBaseStrength + EffectBuffAmount;
@@ -282,10 +282,18 @@ namespace Game.Core.Tests.Battle.Performance
                 "Expected the churning effect to expire and re-apply repeatedly, but the sampled Strength "
                 + $"values were [{string.Join(", ", churning)}].");
 
-            // Persistent: once the buff lands it is refreshed before expiry, so Strength never returns to
-            // base — exactly the warm-cache behaviour that made the recompute cost invisible before.
-            Assert.Equal(buffedStrength, persistent[^1]);
-            Assert.Equal(0, CountExpiries(persistent, buffedStrength, BattlerBaseStrength));
+            // Persistent: the duration outlasts the cooldown, so each fire stacks another application before the
+            // previous expires — Strength ramps above a single buff and never returns to base (each fire adds a
+            // modifier, so the recompute path is still hit). It never refreshes back to exactly one buff.
+            Assert.True(
+                persistent[^1] > buffedStrength,
+                "Expected persistent re-application to stack above a single buff, but the sampled Strength "
+                + $"values were [{string.Join(", ", persistent)}].");
+            Assert.DoesNotContain(BattlerBaseStrength, persistent[1..]); // never returns to base after the first fire
+            for (var i = 1; i < persistent.Length; i++)
+            {
+                Assert.True(persistent[i] >= persistent[i - 1], "Stacked Strength should only ramp upward.");
+            }
         }
 
         /// <summary>
@@ -425,11 +433,11 @@ namespace Game.Core.Tests.Battle.Performance
             for (var i = 0; i < effectCount; i++)
             {
                 // A self-targeted additive buff on a core attribute that has derived dependents (rotated so a
-                // full loadout touches every derived attribute). Persistent: spans many cooldowns, so once
-                // each skill has fired the effect stays continuously active (refreshed on every fire) and the
-                // cache stays warm. Churning: shorter than the cooldown, so it expires and re-applies every
-                // cycle, invalidating the buffed node and cascading to its derived attributes — the recompute
-                // path the persistent shape never reaches.
+                // full loadout touches every derived attribute). Persistent: spans many cooldowns, so each fire
+                // STACKS another application before the previous expires (a modifier added per fire, with a
+                // bounded window staying concurrently active). Churning: shorter than the cooldown, so it expires
+                // and re-applies every cycle, invalidating the buffed node and cascading to its derived
+                // attributes — both shapes drive the recompute path the cache exists to amortise.
                 var attribute = BuffableCoreAttributes[((id * effectsPerSkill) + i) % BuffableCoreAttributes.Length];
                 effects.Add(new SkillEffect
                 {

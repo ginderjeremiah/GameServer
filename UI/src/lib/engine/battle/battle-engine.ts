@@ -253,9 +253,10 @@ export class BattleEngine {
 		}
 	}
 
-	/** Logs a line for each effect freshly applied this tick (refreshes are skipped — the chip countdown
-	 *  resetting already conveys them). The attribute name follows the shared `.find`-by-id convention
-	 *  (#297), falling back to the formatted enum name when the reference set is unavailable. */
+	/** Logs a line for each effect applied this tick. Effects now stack — every application is a genuine
+	 *  new entry that raises the total and the chip's stack count — so each is logged. The attribute name
+	 *  follows the shared `.find`-by-id convention (#297), falling back to the formatted enum name when
+	 *  the reference set is unavailable. */
 	private logEffectApplications() {
 		for (const { effect, onPlayer } of this.stepLog.appliedEffects) {
 			const name = attributeName(effect.attributeId, staticData.attributes);

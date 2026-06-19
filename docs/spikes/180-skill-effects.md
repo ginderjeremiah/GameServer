@@ -102,7 +102,7 @@ Tracked in [#336](https://github.com/ginderjeremiah/GameServer/issues/336) (stan
 
 - **Proc chance (`ChanceToApply`)** — lands with/after the seeded-RNG work (#178); requires a defined global RNG draw order across crit/dodge/effect rolls.
 - **Hit-count durations & every-Nth-hit triggers** — the "after x hits" idea: add a duration-type discriminator (e.g. `EEffectDurationType { Time, HitsTaken }`) and/or trigger fields to `SkillEffect` when wanted; needs hit-event bookkeeping on the battler.
-- **Stacking policies** — authored per effect (refresh / stack with cap) if refresh-only proves too limiting.
+- **Stacking policies** — unconditional stacking (each application sums and expires independently, replacing the original refresh-only rule of decision 4) shipped in [#740](https://github.com/ginderjeremiah/GameServer/issues/740). A per-effect authored policy (refresh, or stack with a cap) remains deferred should unbounded stacking prove too strong in balancing.
 - **Per-skill DoT attribution** in `SkillStats` (requires tracking effect provenance through the DoT phase).
 - **Dispel/cleanse and instant-heal effect kinds** — new effect kinds beyond attribute modifiers.
 - **Content authoring** — once shipped, author effect-bearing skills (and revisit enemy loadouts) so the mechanic is actually encountered; content task, not code.

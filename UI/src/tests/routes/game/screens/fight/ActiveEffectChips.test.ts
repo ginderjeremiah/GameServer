@@ -71,6 +71,43 @@ describe('ActiveEffectChips', () => {
 		expect(chips[1].getAttribute('aria-label')).toContain('Defense');
 	});
 
+	it('groups stacked applications of one effect into a single chip with a count badge and combined total', () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		const { container, getByTestId } = render(ActiveEffectChips, { props: { battler } });
+
+		// One chip for the three stacked applications, its magnitude the combined total (+15).
+		const chips = container.querySelectorAll('.effect-chip');
+		expect(chips).toHaveLength(1);
+		expect(chips[0].querySelector('.chip-mag')?.textContent).toContain('+15');
+		// A count badge in the corner shows the number of active applications.
+		expect(getByTestId('chip-count').textContent).toBe('3');
+		expect(chips[0].getAttribute('aria-label')).toContain('3 applications');
+	});
+
+	it('shows no count badge for a single (unstacked) application', () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		const { container, queryByTestId } = render(ActiveEffectChips, { props: { battler } });
+
+		expect(container.querySelectorAll('.effect-chip')).toHaveLength(1);
+		expect(queryByTestId('chip-count')).toBeNull();
+	});
+
+	it('breaks down each stacked application in the tooltip alongside the total', async () => {
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
+		const { container, getByTestId } = render(ActiveEffectChips, { props: { battler } });
+
+		await fireEvent.mouseEnter(container.querySelector('.effect-chip') as HTMLElement);
+
+		// The headline magnitude is the combined total, and the breakdown lists each application.
+		expect(getByTestId('attr-tip-effect').textContent).toContain('+10');
+		const stacks = getByTestId('attr-tip-stacks');
+		expect(stacks.textContent).toContain('2 applications');
+		expect(stacks.querySelectorAll('.at-effect-stack-row')).toHaveLength(2);
+	});
+
 	it('sweeps the radial overlay from the render-interpolated remaining duration', () => {
 		battler.applyEffect(effect({ id: 1, durationMs: 1000 }));
 		battler.activeEffects[0].renderRemainingMs = 500; // half remaining

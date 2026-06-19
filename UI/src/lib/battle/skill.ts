@@ -35,15 +35,13 @@ export class Skill implements ISkill {
 	 *  casting owner, each {@link ESkillEffectTarget.Opponent} effect to the given opponent. Called after
 	 *  the skill's damage is dealt, so a self damage-buff never boosts its own carrying hit. The optional
 	 *  `onApplied` callback — supplied only by the live engine, never the headless simulator — is invoked
-	 *  for each *newly* applied (not refreshed) effect with the battler it landed on, so the combat log
-	 *  can announce it. */
+	 *  for every application (each one stacks) with the battler it landed on, so the combat log can
+	 *  announce it. */
 	public applyEffects(opponent: Battler, onApplied?: (effect: ISkillEffect, target: Battler) => void) {
 		for (const effect of this.effects) {
 			const target = effect.target === ESkillEffectTarget.Self ? this.owner : opponent;
-			const applied = target.applyEffect(effect);
-			if (applied && onApplied) {
-				onApplied(effect, target);
-			}
+			target.applyEffect(effect);
+			onApplied?.(effect, target);
 		}
 	}
 }

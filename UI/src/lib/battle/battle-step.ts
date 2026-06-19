@@ -21,7 +21,8 @@ export interface SkillActivation {
 	blocked: boolean;
 }
 
-/** A skill effect that was newly applied during a tick, with the side it landed on. */
+/** A skill effect application that landed during a tick (each application stacks), with the side it
+ *  landed on. */
 export interface AppliedEffect {
 	effect: ISkillEffect;
 	/** Whether the effect landed on the player (`true`) or the enemy (`false`). */

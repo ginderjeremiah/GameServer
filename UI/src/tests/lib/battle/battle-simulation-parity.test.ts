@@ -249,13 +249,14 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// A self Strength buff: the carrying hit uses the pre-effect attributes and only subsequent hits see
-	// the boost (which also raises damage via the Strength→damage path); re-applying it each fire REFRESHES
-	// rather than stacks. Mirrors the backend `selfStrengthBuffAffectsLaterHits` scenario.
+	// the boost (which also raises damage via the Strength→damage path); re-applying it each fire now STACKS
+	// (each fire adds another +10). Mirrors the backend `selfStrengthBuffStacksEachFire` scenario.
 	//   Player: Str=10, cdMult=1; skill = Str×1.0 raw, cooldown 400. Effect: Self +10 Strength, permanent.
 	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
-	//   Hit 1 deals 10−2=8 (pre-buff); hits 2+ deal 20−2=18. Enemy HP 100 dies on hit 7 at 2800.
+	//   Fire 1 deals 10−2=8 then stacks → Str 20; fire 2 deals 18 → Str 30; fire 3 deals 28; fire 4 deals
+	//   38; fire 5 deals 48. Enemy HP 100 → 92,74,46,8,−40: dies on fire 5 at 2000. (Refresh-only: 2800.)
 	{
-		name: 'selfStrengthBuffAffectsLaterHits',
+		name: 'selfStrengthBuffStacksEachFire',
 		player: () =>
 			makeBattler(
 				[{ id: EAttribute.Strength, amount: 10 }],
@@ -269,15 +270,16 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 2800 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
-	// A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after the first
-	// hit applies it. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
-	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
-	//     Effect: Self +1.0 CooldownRecovery → cdMult=2 once applied (base 1 + 1), permanent.
-	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 18.
-	//   Hit 1 at 400 applies the buff; thereafter the skill fires every 200ms → hit 6 at 1400.
+	// A self CooldownRecovery buff is read live each tick AND stacks on each fire, so the fire interval keeps
+	// shortening as the buff compounds. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
+	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400. Each hit deals 18.
+	//     Effect: Self +1.0 CooldownRecovery (additive), permanent — a stack per fire.
+	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Fire 1 at tick 10 → cdMult=2; next fires 5,4,3,2,2 ticks apart (ticks 15,19,22,24,26). Six 18-dmg
+	//   hits drop the 100-HP enemy on fire 6 at tick 26 → 1040ms. (Refresh-only held cdMult=2 → 1400.)
 	{
 		name: 'cdrBuffShortensFireInterval',
 		player: () =>
@@ -302,14 +304,15 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 1400 }
+		expected: { victory: true, playerDied: false, totalMs: 1040 }
 	},
 
 	// Same-tick ordering: slot 0's self buff (applied after its own pre-buff hit) influences slot 1 firing
-	// after it on the same tick. Mirrors the backend `sameTickEarlierSlotBuffsLaterSlot` scenario.
-	//   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent), slot1 = Str×1.0 (no effect), both cooldown 400.
-	//   Enemy:  Str=16 → MaxHealth=130, Def=2, no skills.
-	//   Tick 400 deals 8 (slot0) + 18 (slot1, buffed) = 26; later ticks deal 36. Enemy HP 130 dies at 1600.
+	// after it on the same tick; the buff also STACKS on each fire, so the per-volley damage ramps. Mirrors
+	// the backend `sameTickEarlierSlotBuffsLaterSlot` scenario.
+	//   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent — a stack per fire), slot1 = Str×1.0 (no
+	//     effect), both cooldown 400 (fire ticks 10,20,30…). Enemy: Str=16 → MaxHealth=130, Def=2, no skills.
+	//   Tick 10: 8 (slot0) + 18 (slot1, Str 20) = 26; tick 20: 18 + 28 = 46; tick 30: 28 + 38 → enemy dies at 1200.
 	{
 		name: 'sameTickEarlierSlotBuffsLaterSlot',
 		player: () =>
@@ -326,15 +329,17 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 16 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 1600 }
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
 	},
 
 	// MaxHealth clamp: an Opponent MaxHealth ×0.5 debuff halves the enemy's maximum and clamps its current
-	// health down to it. Mirrors the backend `opponentMaxHealthDebuffClamps` scenario.
-	//   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400.
-	//     Effect: Opponent ×0.5 MaxHealth (multiplicative), permanent.
+	// health down to it; the debuff also STACKS on each fire, so MaxHealth keeps halving. Mirrors the backend
+	// `opponentMaxHealthDebuffClamps` scenario.
+	//   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400 (fires tick 10,20…).
+	//     Effect: Opponent ×0.5 MaxHealth (multiplicative), permanent — a stack per fire.
 	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
-	//   Tick 400 deals 10 (100→90) then halves MaxHealth to 50 → clamps to 50, then 50→0 → dies at 2400.
+	//   Tick 10: 100→90, ×0.5 → 50 (clamp 90→50); tick 20: →40, ×0.5 → 25; tick 30: →15, ×0.5 → 12.5;
+	//   tick 40: →2.5, ×0.5 → 6.25; tick 50: →dead at 2000ms.
 	{
 		name: 'opponentMaxHealthDebuffClamps',
 		player: () =>
@@ -359,15 +364,15 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// Same-tick CDR ordering: slot 0's self CooldownRecovery buff speeds up slot 1's accrual on the same
-	// tick, because each slot reads the cooldown multiplier live in loadout order. Mirrors the backend
-	// `cdrBuffSpeedsLaterSlotSameTick` scenario.
-	//   Player: base CDR=1. slot0 = pure buffer (0 dmg, cooldown 40, Self +1.0 CDR permanent → cdMult=2),
-	//     slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
-	//   The boosted accrual makes slot1 fire at 200,400,600 → enemy dies on the 3rd hit at 600.
+	// tick, because each slot reads the cooldown multiplier live in loadout order; slot 0 fires every tick
+	// and its buff STACKS, so cdMult climbs 1→2→3→… Mirrors the backend `cdrBuffSpeedsLaterSlotSameTick`.
+	//   Player: base CDR=1. slot0 = pure buffer (0 dmg, cooldown 40, Self +1.0 CDR permanent — a stack per
+	//     tick), slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
+	//   slot1 accrues 80,120,160,200,… so its charge passes 400 at ticks 4, 6, 8 → 3 hits kill at tick 8 → 320ms.
 	{
 		name: 'cdrBuffSpeedsLaterSlotSameTick',
 		player: () =>
@@ -393,199 +398,103 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 5 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 600 }
+		expected: { victory: true, playerDied: false, totalMs: 320 }
 	},
 
-	// DoT kill timing: a pure poison (an Opponent DamageTakenPerSecond debuff, no direct damage) ticks the
-	// enemy down. DTPS 50 -> 50*40/1000 = 2 damage at the END of each tick, bypassing Defense. 2/tick over
+	// DoT kill timing: a constant poison on the enemy (a base DamageTakenPerSecond debuff, no direct damage)
+	// ticks it down. DTPS 50 -> 50*40/1000 = 2 damage at the END of each tick, bypassing Defense. 2/tick over
 	// 25 ticks brings the 50-HP enemy to 0 -> victory at tick 1000.
 	{
 		name: 'poisonKillTiming',
-		player: () =>
+		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
+		enemy: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								200,
-								ESkillEffectTarget.Opponent,
-								EAttribute.DamageTakenPerSecond,
-								EModifierType.Additive,
-								50,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 50 }
+				],
+				[]
 			),
-		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1000 }
 	},
 
-	// Same-tick mutual DoT tie favours the player: both battlers poison each other for 2/tick and would
-	// reach 0 HP on the same tick (1000). The end-of-tick phase resolves the ENEMY first, so its death is
-	// awarded as a victory before the player's identical DoT is applied -- the player never takes the lethal
-	// tick. (Applying the player's DoT first would flip this to a loss.)
+	// Same-tick mutual DoT tie favours the player: both battlers carry a constant DamageTakenPerSecond (base
+	// poison) for 2/tick and reach 0 HP on the same tick (1000). The end-of-tick phase resolves the ENEMY
+	// first, so its death is awarded as a victory before the player's identical DoT is applied -- the player
+	// never takes the lethal tick. (Applying the player's DoT first would flip this to a loss.)
 	{
 		name: 'poisonMutualDotTieFavoursPlayer',
 		player: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								201,
-								ESkillEffectTarget.Opponent,
-								EAttribute.DamageTakenPerSecond,
-								EModifierType.Additive,
-								50,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 50 }
+				],
+				[]
 			),
 		enemy: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								202,
-								ESkillEffectTarget.Opponent,
-								EAttribute.DamageTakenPerSecond,
-								EModifierType.Additive,
-								50,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 50 }
+				],
+				[]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 1000 }
 	},
 
-	// Heal-over-time offsets incoming damage and flips the outcome. The player self-applies
-	// HealthRegenPerSecond 75 -> 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 4 - Def 2). The
-	// regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never dies, and dealing no
-	// damage back the battle runs to the timeout. Without the regen the 2/tick would kill the player at 1000.
+	// Heal-over-time offsets incoming damage and flips the outcome. The player carries a constant
+	// HealthRegenPerSecond 75 (base regen) -> 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 4 -
+	// Def 2). The regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never dies, and
+	// dealing no damage back the battle runs to the timeout. Without the regen the 2/tick would kill at 1000.
 	{
 		name: 'regenOutpacesDamage',
 		player: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								203,
-								ESkillEffectTarget.Self,
-								EAttribute.HealthRegenPerSecond,
-								EModifierType.Additive,
-								75,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
+				],
+				[]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(4, 40)]),
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
 	// Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond is applied and death
-	// checked BEFORE HealthRegenPerSecond. The player is poisoned for 10/tick and self-heals 6/tick (a net
-	// -4 grinding its 50 HP down). On the tick the 10 DoT takes HP from 10 to 0 the player dies -- the 6 heal
-	// that would have saved it (10+6-10=6) never runs because death is checked first. Death at tick 11 -> 440.
+	// checked BEFORE HealthRegenPerSecond. The player carries a constant 250 DamageTakenPerSecond (10/tick)
+	// and 150 HealthRegenPerSecond (6/tick) -- a net -4 grinding its 50 HP down. On the tick the 10 DoT takes
+	// HP from 10 to 0 the player dies -- the 6 heal that would have saved it never runs because death is
+	// checked first. Death at tick 11 -> 440.
 	{
 		name: 'dotBeforeRegenSameTickKills',
 		player: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								204,
-								ESkillEffectTarget.Self,
-								EAttribute.HealthRegenPerSecond,
-								EModifierType.Additive,
-								150,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 250 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 150 }
+				],
+				[]
 			),
-		enemy: () =>
-			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
-				[
-					makeSkill(
-						0,
-						40,
-						[],
-						[
-							makeEffect(
-								205,
-								ESkillEffectTarget.Opponent,
-								EAttribute.DamageTakenPerSecond,
-								EModifierType.Additive,
-								250,
-								PERMANENT
-							)
-						]
-					)
-				]
-			),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
 		expected: { victory: false, playerDied: true, totalMs: 440 }
 	},
 
 	// DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to 0, but
-	// the same skill's Opponent DamageTakenPerSecond 250 -> 10/tick ignores Defense and grinds the enemy's
+	// its constant 250 DamageTakenPerSecond (base poison) -> 10/tick ignores Defense and grinds the enemy's
 	// 250 HP down: victory at tick 1000. If DoT respected Defense (10-12 clamped to 0) the enemy would never die.
 	{
 		name: 'dotBypassesDefense',
-		player: () =>
+		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(10, 40)]),
+		enemy: () =>
 			makeBattler(
-				[{ id: EAttribute.Endurance, amount: 0 }],
 				[
-					makeSkill(
-						10,
-						40,
-						[],
-						[
-							makeEffect(
-								206,
-								ESkillEffectTarget.Opponent,
-								EAttribute.DamageTakenPerSecond,
-								EModifierType.Additive,
-								250,
-								PERMANENT
-							)
-						]
-					)
-				]
+					{ id: EAttribute.Endurance, amount: 10 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 250 }
+				],
+				[]
 			),
-		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1000 }
 	},
 
@@ -619,6 +528,39 @@ const scenarios: ParityScenario[] = [
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
 		maxMs: 3000,
 		expected: { victory: false, playerDied: false, totalMs: 3000 }
+	},
+
+	// DoT stacking: a poison re-applied every tick STACKS (each application adds another
+	// DamageTakenPerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
+	// (cooldown 40) applies Opponent +25 DamageTakenPerSecond each tick; at tick n the enemy carries n
+	// stacks = 25n DTPS → 25n×40/1000 = n damage that tick (bypassing Defense). Cumulative n(n+1)/2 reaches
+	// the 50-HP enemy's total on tick 10 (45 after tick 9, +10 = 55) → victory at 400ms. (Refresh-only would
+	// hold 25 DTPS = 1/tick → 2000ms.) Mirrors the backend `dotStacksEachApplication` scenario.
+	{
+		name: 'dotStacksEachApplication',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Endurance, amount: 0 }],
+				[
+					makeSkill(
+						0,
+						40,
+						[],
+						[
+							makeEffect(
+								208,
+								ESkillEffectTarget.Opponent,
+								EAttribute.DamageTakenPerSecond,
+								EModifierType.Additive,
+								25,
+								PERMANENT
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 400 }
 	},
 
 	// ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
