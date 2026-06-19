@@ -7,6 +7,12 @@ namespace Game.DataAccess.Repositories
 {
     internal class UserLogins : IUserLogins
     {
+        // The get-or-create rows are deduplicated by unique indexes (device fingerprint, browser
+        // user-agent, the user/IP/device login key), so a concurrent connection from the same new
+        // device turns a lost read-then-insert into a unique violation. One reload settles the device
+        // and browser; a second covers the rare case where the login row itself raced too.
+        private const int MaxSaveAttempts = 3;
+
         private readonly GameContext _context;
 
         public UserLogins(GameContext context)
@@ -14,7 +20,7 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public async Task RecordConnection(
+        public Task RecordConnection(
             int userId,
             string ipAddress,
             string deviceFingerprintHash,
@@ -26,42 +32,45 @@ namespace Game.DataAccess.Repositories
         {
             ipAddress = Truncate(ipAddress, UserLogin.MaxIpAddressLength) ?? string.Empty;
 
-            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
-
-            // A brand-new device cannot have an existing login, so skip the lookup and rely on the
-            // navigation to propagate the generated DeviceId onto the new login when saved.
-            if (_context.Entry(device).State == EntityState.Added)
+            return SaveWithConflictRetry(async () =>
             {
-                _context.UserLogins.Add(new UserLogin
+                var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+
+                // A brand-new device cannot have an existing login, so skip the lookup and rely on the
+                // navigation to propagate the generated DeviceId onto the new login when saved.
+                if (_context.Entry(device).State == EntityState.Added)
                 {
-                    UserId = userId,
-                    IpAddress = ipAddress,
-                    Device = device,
-                    LastConnection = DateTime.UtcNow,
-                });
-                return;
-            }
+                    _context.UserLogins.Add(new UserLogin
+                    {
+                        UserId = userId,
+                        IpAddress = ipAddress,
+                        Device = device,
+                        LastConnection = DateTime.UtcNow,
+                    });
+                    return;
+                }
 
-            var login = await _context.UserLogins.FirstOrDefaultAsync(l =>
-                l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id, cancellationToken);
+                var login = await _context.UserLogins.FirstOrDefaultAsync(l =>
+                    l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id, cancellationToken);
 
-            if (login is null)
-            {
-                _context.UserLogins.Add(new UserLogin
+                if (login is null)
                 {
-                    UserId = userId,
-                    IpAddress = ipAddress,
-                    DeviceId = device.Id,
-                    LastConnection = DateTime.UtcNow,
-                });
-            }
-            else
-            {
-                login.LastConnection = DateTime.UtcNow;
-            }
+                    _context.UserLogins.Add(new UserLogin
+                    {
+                        UserId = userId,
+                        IpAddress = ipAddress,
+                        DeviceId = device.Id,
+                        LastConnection = DateTime.UtcNow,
+                    });
+                }
+                else
+                {
+                    login.LastConnection = DateTime.UtcNow;
+                }
+            }, cancellationToken);
         }
 
-        public async Task SaveDeviceInfo(
+        public Task SaveDeviceInfo(
             string deviceFingerprintHash,
             string userAgent,
             string? secChUa,
@@ -71,10 +80,13 @@ namespace Game.DataAccess.Repositories
             int? hardwareConcurrency,
             CancellationToken cancellationToken = default)
         {
-            var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+            return SaveWithConflictRetry(async () =>
+            {
+                var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
 
-            device.DeviceMemory = deviceMemory;
-            device.HardwareConcurrency = hardwareConcurrency;
+                device.DeviceMemory = deviceMemory;
+                device.HardwareConcurrency = hardwareConcurrency;
+            }, cancellationToken);
         }
 
         /// <summary>
@@ -143,6 +155,30 @@ namespace Game.DataAccess.Repositories
             }
 
             return browserInfo;
+        }
+
+        /// <summary>
+        /// Builds and persists the connection-tracking changes, owning its own commit (like
+        /// <see cref="Users.CreateAccount"/>) because it runs in middleware outside the per-action commit
+        /// filter and must retry the build on a unique violation. On a concurrent-insert conflict the
+        /// rolled-back inserts are discarded so the rebuild re-queries the now-committed rows and updates
+        /// in place instead of re-attempting the duplicate insert.
+        /// </summary>
+        private async Task SaveWithConflictRetry(Func<Task> buildChanges, CancellationToken cancellationToken)
+        {
+            for (var attempt = 1; ; attempt++)
+            {
+                await buildChanges();
+                try
+                {
+                    await _context.SaveChangesAsync(cancellationToken);
+                    return;
+                }
+                catch (DbUpdateException ex) when (attempt < MaxSaveAttempts && ex.IsUniqueViolation())
+                {
+                    _context.ChangeTracker.Clear();
+                }
+            }
         }
 
         private static string? Truncate(string? value, int maxLength)
