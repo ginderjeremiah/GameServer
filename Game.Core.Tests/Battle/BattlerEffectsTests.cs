@@ -21,7 +21,7 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10));
 
-            Apply(battler,Effect(1, Strength, Additive, 5));
+            Apply(battler, Effect(1, Strength, Additive, 5));
 
             Assert.Equal(15, battler.GetAttributeValue(Strength));
         }
@@ -32,8 +32,8 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5);
 
-            Apply(battler,effect);
-            Apply(battler,effect);
+            Apply(battler, effect);
+            Apply(battler, effect);
 
             // Each application adds its own modifier, so re-applying the same authored effect stacks the
             // magnitude (20 = 10 base + 5 + 5).
@@ -45,8 +45,8 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10));
 
-            Apply(battler,Effect(1, Strength, Additive, 5));
-            Apply(battler,Effect(2, Strength, Additive, 3));
+            Apply(battler, Effect(1, Strength, Additive, 5));
+            Apply(battler, Effect(2, Strength, Additive, 3));
 
             Assert.Equal(18, battler.GetAttributeValue(Strength));
         }
@@ -58,7 +58,7 @@ namespace Game.Core.Tests.Battle
         public void AdvanceEffects_RemovesEffect_AfterItsDurationInTicks(int durationMs, int influencedTicks)
         {
             var battler = MakeBattler(Stat(Strength, 10));
-            Apply(battler,Effect(1, Strength, Additive, 5, durationMs));
+            Apply(battler, Effect(1, Strength, Additive, 5, durationMs));
             Assert.Equal(15, battler.GetAttributeValue(Strength));
 
             // The effect remains for (influencedTicks - 1) further ticks after the one it was applied on.
@@ -79,11 +79,11 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5, durationMs: 80);
 
-            Apply(battler,effect); // application A: expires at 80
+            Apply(battler, effect); // application A: expires at 80
             Assert.Equal(15, battler.GetAttributeValue(Strength));
 
             battler.AdvanceEffects(40);  // elapsed 40, A still active
-            Apply(battler,effect); // application B: expires at 40 + 80 = 120
+            Apply(battler, effect); // application B: expires at 40 + 80 = 120
             Assert.Equal(20, battler.GetAttributeValue(Strength)); // both stacked
 
             battler.AdvanceEffects(40); // elapsed 80 → A expires, B remains
@@ -99,7 +99,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(100, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(100, battler.CurrentHealth);
 
-            Apply(battler,Effect(1, Strength, Additive, 10)); // Str 10 → 20
+            Apply(battler, Effect(1, Strength, Additive, 10)); // Str 10 → 20
 
             Assert.Equal(20, battler.GetAttributeValue(Strength));
             Assert.Equal(150, battler.GetAttributeValue(MaxHealth)); // 50 + 5*20
@@ -111,7 +111,7 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler(Stat(Strength, 10)); // MaxHealth = CurrentHealth = 100
 
-            Apply(battler,Effect(1, MaxHealth, Multiplicative, 0.5));
+            Apply(battler, Effect(1, MaxHealth, Multiplicative, 0.5));
 
             Assert.Equal(50, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(50, battler.CurrentHealth); // clamped down to the new max
@@ -124,8 +124,8 @@ namespace Game.Core.Tests.Battle
 
             // H (additive, 1 tick) lifts the additive subtotal to 200; L (×0.5, long) then halves it back to
             // 100, so CurrentHealth (100) is not clamped while both are active.
-            Apply(battler,Effect(1, MaxHealth, Additive, 100, durationMs: 40));
-            Apply(battler,Effect(2, MaxHealth, Multiplicative, 0.5, durationMs: 1000));
+            Apply(battler, Effect(1, MaxHealth, Additive, 100, durationMs: 40));
+            Apply(battler, Effect(2, MaxHealth, Multiplicative, 0.5, durationMs: 1000));
             Assert.Equal(100, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(100, battler.CurrentHealth);
 
