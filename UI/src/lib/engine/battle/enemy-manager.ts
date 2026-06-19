@@ -259,7 +259,15 @@ export class EnemyManager {
 			return;
 		}
 
-		if (stage === BattleStage.Victorious || stage === BattleStage.Defeated || stage === BattleStage.Idle) {
+		// A draw (the 2-minute timeout) ends the fight with no rewards; the idle farm simply continues, the
+		// same as a defeat. The unresolved battle is recorded as abandoned by the backend when the next
+		// enemy starts (StartBattle re-simulates and resolves it).
+		if (
+			stage === BattleStage.Victorious ||
+			stage === BattleStage.Defeated ||
+			stage === BattleStage.Drawn ||
+			stage === BattleStage.Idle
+		) {
 			await this.getNewEnemy();
 		}
 	}
@@ -269,6 +277,8 @@ export class EnemyManager {
 			await this.resolveBossVictory();
 		} else if (stage === BattleStage.Defeated && this.currentEnemy) {
 			await this.resolveBossLoss();
+		} else if (stage === BattleStage.Drawn && this.currentEnemy) {
+			await this.resolveBossDraw();
 		}
 	}
 
@@ -337,6 +347,15 @@ export class EnemyManager {
 		if (cooldown > 0) {
 			await battleEngine.startLoading(cooldown);
 		}
+		await this.getNewEnemy();
+	}
+
+	/** Resolve a dedicated-boss fight that reached the 2-minute time limit. A timeout is a draw, not a
+	 *  death, so it is never recorded as a loss — the player simply failed to clear the boss in time. Drop
+	 *  back to the idle farm loop (boss available, auto-fight off) rather than re-spawning the boss; the
+	 *  unresolved boss battle is recorded as abandoned by the backend when the next idle enemy starts. */
+	private async resolveBossDraw() {
+		this.returnToIdle();
 		await this.getNewEnemy();
 	}
 

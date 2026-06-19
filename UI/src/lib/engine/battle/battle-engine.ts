@@ -2,6 +2,7 @@ import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData } from '$stores';
 import { ELogType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
+import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { logMessage, type LogOutcome } from '../log';
 import { formatNum, createHook, Action, effectLogMessage, attributeIsHarmful, attributeName } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
@@ -16,10 +17,12 @@ export enum BattleStage {
 	Victorious,
 	Defeated,
 	Loading,
-	Paused
+	Paused,
+	/** The 2-minute battle cap was reached with both battlers alive — a stalemate draw (no rewards). */
+	Drawn
 }
 
-const { Idle, Active, Victorious, Defeated, Loading, Paused } = BattleStage;
+const { Idle, Active, Victorious, Defeated, Loading, Paused, Drawn } = BattleStage;
 
 const battleStageChangedHook = createHook<[BattleStage]>();
 const notifyBattleStageChanged = battleStageChangedHook.notify;
@@ -196,6 +199,9 @@ export class BattleEngine {
 	}
 
 	private logicalUpdate(timeDelta: number) {
+		// Accumulate first so the timeout check below evaluates against this tick's elapsed time: the live
+		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
+		this.timeElapsed += timeDelta;
 		if (this.stage === Active) {
 			for (const { skill, damage, byPlayer, crit, dodged, blocked } of battleStep(
 				this.player,
@@ -217,9 +223,15 @@ export class BattleEngine {
 				this.flushEffectDamage();
 				this.setBattleStage(Defeated);
 				logMessage(ELogType.EnemyDefeated, "You've been defeated!");
+			} else if (this.timeElapsed >= DEFAULT_MAX_BATTLE_MS) {
+				// Neither side landed the kill within the 2-minute cap: a true stalemate ends as a draw (no
+				// rewards). Death is checked first, so this only fires with both battlers alive — mirroring the
+				// headless simulator's non-victory timeout return, keeping the live loop in FE/BE parity.
+				this.flushEffectDamage();
+				this.setBattleStage(Drawn);
+				logMessage(ELogType.EnemyDefeated, 'Stalemate! The battle reached the time limit and ended in a draw.');
 			}
 		}
-		this.timeElapsed += timeDelta;
 	}
 
 	/** Builds the combat-log line for one skill activation, surfacing the player-only crit/dodge/block
