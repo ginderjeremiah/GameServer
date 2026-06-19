@@ -78,6 +78,41 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetEnemies_DuplicateDesiredKeys_ReturnsFailure()
+        {
+            int zoneId, enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await TestDataSeeder.CreateZoneAsync(context);
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                zoneId = zone.Id;
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The same enemy named twice in the desired set would otherwise double-insert into a
+            // composite-PK violation at commit; it must reject up front instead.
+            var data = new SetZoneEnemiesData
+            {
+                ZoneId = zoneId,
+                ZoneEnemies =
+                [
+                    new Contracts.ZoneEnemy { EnemyId = enemyId, Weight = 1 },
+                    new Contracts.ZoneEnemy { EnemyId = enemyId, Weight = 2 },
+                ],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SetEnemies(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted enemy set contains duplicate entries.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetEnemies_UnknownZone_ReturnsNotFound()
         {
             using var scope = CreateScope();

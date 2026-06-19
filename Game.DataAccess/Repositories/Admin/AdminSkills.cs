@@ -78,6 +78,11 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Skill");
             }
 
+            // Precompute the current effect-id set once so each Edit/Delete membership guard is an O(1)
+            // lookup rather than a per-change linear scan over the skill's effects (matching the other
+            // change-set guards in this layer).
+            var existingEffectIds = skill.SkillEffects.Select(se => se.Id).ToHashSet();
+
             return ChangeSetProcessor.Apply(data.Changes,
                 add: effect => _entityStore.Insert(new Entities.SkillEffect
                 {
@@ -92,7 +97,7 @@ namespace Game.DataAccess.Repositories.Admin
                 // the whole graph into the change tracker.
                 edit: effect =>
                 {
-                    if (skill.SkillEffects.Any(se => se.Id == effect.Id))
+                    if (existingEffectIds.Contains(effect.Id))
                     {
                         _entityStore.Update(new Entities.SkillEffect
                         {
@@ -108,7 +113,7 @@ namespace Game.DataAccess.Repositories.Admin
                 },
                 delete: effect =>
                 {
-                    if (skill.SkillEffects.Any(se => se.Id == effect.Id))
+                    if (existingEffectIds.Contains(effect.Id))
                     {
                         _entityStore.Delete(new Entities.SkillEffect
                         {

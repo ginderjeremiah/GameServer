@@ -1,3 +1,4 @@
+using Game.Abstractions.DataAccess.Admin;
 using Game.DataAccess.Repositories.Admin;
 using Xunit;
 
@@ -18,19 +19,20 @@ namespace Game.Application.Tests.DataAccess
             public List<string> Updated { get; } = [];
         }
 
-        private static void Reconcile(
+        private static AdminSaveResult Reconcile(
             IReadOnlyCollection<ExistingChild> existing,
             IReadOnlyCollection<DesiredChild> desired,
             Recorder recorder,
             bool withUpdate = true)
         {
-            ChildCollectionReconciler.Reconcile(
+            return ChildCollectionReconciler.Reconcile(
                 existing: existing,
                 desired: desired,
                 existingKey: e => e.Key,
                 desiredKey: d => int.Parse(d.Key),
                 delete: e => recorder.Deleted.Add(e.Key),
                 insert: d => recorder.Inserted.Add(d.Payload),
+                resourceName: "child",
                 update: withUpdate ? d => recorder.Updated.Add(d.Payload) : null);
         }
 
@@ -43,11 +45,32 @@ namespace Game.Application.Tests.DataAccess
             var existing = new[] { new ExistingChild(1), new ExistingChild(2) };
             var desired = new[] { new DesiredChild("2", "two"), new DesiredChild("3", "three") };
 
-            Reconcile(existing, desired, recorder);
+            var result = Reconcile(existing, desired, recorder);
 
+            Assert.True(result.Succeeded);
             Assert.Equal([1], recorder.Deleted);
             Assert.Equal(["two"], recorder.Updated);
             Assert.Equal(["three"], recorder.Inserted);
+        }
+
+        [Fact]
+        public void Reconcile_DuplicateDesiredKeys_ReturnsFailureAndInvokesNoHandlers()
+        {
+            // Two desired entries sharing a key would both miss the existing-membership check and
+            // double-insert (a unique violation at commit), so the malformed set is rejected up front and
+            // nothing is staged.
+            var recorder = new Recorder();
+
+            var existing = new[] { new ExistingChild(1) };
+            var desired = new[] { new DesiredChild("2", "two"), new DesiredChild("2", "two-again") };
+
+            var result = Reconcile(existing, desired, recorder);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted child set contains duplicate entries.", result.ErrorMessage);
+            Assert.Empty(recorder.Deleted);
+            Assert.Empty(recorder.Updated);
+            Assert.Empty(recorder.Inserted);
         }
 
         [Fact]
@@ -141,6 +164,7 @@ namespace Game.Application.Tests.DataAccess
                 desiredKey: d => int.Parse(d.Key),
                 delete: e => deletedChild = e,
                 insert: d => insertedItem = d,
+                resourceName: "child",
                 update: d => updatedItem = d);
 
             Assert.Equal(new ExistingChild(1), deletedChild);
