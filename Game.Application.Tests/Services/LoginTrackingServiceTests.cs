@@ -1,5 +1,4 @@
 using Game.Abstractions.DataAccess;
-using Game.Application;
 using Game.Application.Services;
 using Xunit;
 
@@ -8,36 +7,32 @@ namespace Game.Application.Tests.Services
     /// <summary>
     /// Unit tests for <see cref="LoginTrackingService"/>'s cancellation plumbing (#708): the connection-recording
     /// and device-info paths run in middleware/controllers outside the per-action commit pipeline, so they must
-    /// forward the request's cancellation token to both the repository read/write and the unit-of-work commit.
+    /// forward the request's cancellation token to the data tier — which owns the conflict-tolerant save (#907).
     /// </summary>
     public class LoginTrackingServiceTests
     {
         [Fact]
-        public async Task RecordConnection_ForwardsCancellationTokenToRepoAndCommit()
+        public async Task RecordConnection_ForwardsCancellationTokenToRepo()
         {
             var userLogins = new FakeUserLogins();
-            var unitOfWork = new FakeUnitOfWork();
-            var service = new LoginTrackingService(userLogins, unitOfWork);
+            var service = new LoginTrackingService(userLogins);
             using var cts = new CancellationTokenSource();
 
             await service.RecordConnection(5, "127.0.0.1", "fp", "ua", null, null, null, cts.Token);
 
             Assert.Equal(cts.Token, userLogins.LastRecordToken);
-            Assert.Equal(cts.Token, unitOfWork.LastCommitToken);
         }
 
         [Fact]
-        public async Task SaveDeviceInfo_ForwardsCancellationTokenToRepoAndCommit()
+        public async Task SaveDeviceInfo_ForwardsCancellationTokenToRepo()
         {
             var userLogins = new FakeUserLogins();
-            var unitOfWork = new FakeUnitOfWork();
-            var service = new LoginTrackingService(userLogins, unitOfWork);
+            var service = new LoginTrackingService(userLogins);
             using var cts = new CancellationTokenSource();
 
             await service.SaveDeviceInfo("fp", "ua", null, null, null, 8, 4, cts.Token);
 
             Assert.Equal(cts.Token, userLogins.LastSaveToken);
-            Assert.Equal(cts.Token, unitOfWork.LastCommitToken);
         }
 
         private sealed class FakeUserLogins : IUserLogins
@@ -70,17 +65,6 @@ namespace Game.Application.Tests.Services
                 CancellationToken cancellationToken = default)
             {
                 LastSaveToken = cancellationToken;
-                return Task.CompletedTask;
-            }
-        }
-
-        private sealed class FakeUnitOfWork : IUnitOfWork
-        {
-            public CancellationToken LastCommitToken { get; private set; }
-
-            public Task CommitAsync(CancellationToken cancellationToken = default)
-            {
-                LastCommitToken = cancellationToken;
                 return Task.CompletedTask;
             }
         }

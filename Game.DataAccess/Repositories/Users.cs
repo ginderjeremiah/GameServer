@@ -7,7 +7,6 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using UserEntity = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Repositories
@@ -73,7 +72,7 @@ namespace Game.DataAccess.Repositories
                 await _context.SaveChangesAsync();
                 return true;
             }
-            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
             {
                 // The only unique constraint a new account can violate is the active-username index, so a
                 // unique violation means another request created the same active username concurrently.

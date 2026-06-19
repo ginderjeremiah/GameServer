@@ -4,16 +4,15 @@ namespace Game.Application.Services
 {
     /// <summary>
     /// Orchestrates user-connection tracking: recording connections (last-connection upserts) and
-    /// enriching the stored device with the capabilities the frontend reports after login. Each operation
-    /// persists itself via the unit of work, since the connection-recording caller runs in middleware,
-    /// outside the per-action commit pipeline.
+    /// enriching the stored device with the capabilities the frontend reports after login. The data tier
+    /// owns the commit for these operations (like account creation) because each runs outside the
+    /// per-action commit filter and must retry its build-and-save on a concurrent-insert unique violation.
     /// </summary>
-    public class LoginTrackingService(IUserLogins userLogins, IUnitOfWork unitOfWork)
+    public class LoginTrackingService(IUserLogins userLogins)
     {
         private readonly IUserLogins _userLogins = userLogins;
-        private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
-        public async Task RecordConnection(
+        public Task RecordConnection(
             int userId,
             string ipAddress,
             string deviceFingerprintHash,
@@ -23,12 +22,11 @@ namespace Game.Application.Services
             string? secChUaPlatform,
             CancellationToken cancellationToken = default)
         {
-            await _userLogins.RecordConnection(
+            return _userLogins.RecordConnection(
                 userId, ipAddress, deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
-            await _unitOfWork.CommitAsync(cancellationToken);
         }
 
-        public async Task SaveDeviceInfo(
+        public Task SaveDeviceInfo(
             string deviceFingerprintHash,
             string userAgent,
             string? secChUa,
@@ -38,10 +36,9 @@ namespace Game.Application.Services
             int? hardwareConcurrency,
             CancellationToken cancellationToken = default)
         {
-            await _userLogins.SaveDeviceInfo(
+            return _userLogins.SaveDeviceInfo(
                 deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform,
                 deviceMemory, hardwareConcurrency, cancellationToken);
-            await _unitOfWork.CommitAsync(cancellationToken);
         }
     }
 }
