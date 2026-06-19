@@ -355,6 +355,70 @@ describe('ApiSocket', () => {
 		});
 	});
 
+	// The hardest orderings: a request settled by one path must never be re-settled by the other. The
+	// guard is two-sided — timeoutRequest prunes the in-flight entry, and settleInFlightRequests clears
+	// each request's timer — so whichever fires first leaves nothing for the other to settle again.
+	describe('timeout-then-close double-settle guard', () => {
+		const inFlightSize = (s: ApiSocket) =>
+			(s as unknown as { inFlightRequests: Map<string, unknown> }).inFlightRequests.size;
+
+		it('keeps the timeout error and does not re-settle when the socket later closes', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			vi.useFakeTimers();
+			try {
+				// No tokens (localStorage cleared in beforeEach) so the later close only settles — no reconnect.
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+				expect(inFlightSize(apiSocket)).toBe(1);
+
+				// The request times out first: it is settled with the timeout error and pruned from the map.
+				vi.advanceTimersByTime(30000);
+				expect(inFlightSize(apiSocket)).toBe(0);
+
+				// A later close now finds nothing pending to settle a second time, so the promise keeps its
+				// original timeout error rather than being overwritten with the connection-lost one.
+				ws.readyState = ws.CLOSED;
+				ws.onclose?.({ code: 1006 });
+
+				const response = await promise;
+				expect(response.error).toBe('Timed out waiting for the server.');
+				expect(inFlightSize(apiSocket)).toBe(0);
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+
+		it('clears the request timer on close, so a later timer tick cannot re-settle it', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			vi.useFakeTimers();
+			try {
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+				expect(inFlightSize(apiSocket)).toBe(1);
+
+				// The socket closes first: the in-flight request is settled with the connection-lost error and
+				// its timer cleared, pruning the entry.
+				ws.readyState = ws.CLOSED;
+				ws.onclose?.({ code: 1006 });
+				expect(inFlightSize(apiSocket)).toBe(0);
+
+				const response = await promise;
+				expect(response.error).toBe('Connection lost. Please try again.');
+
+				// Advancing past the timeout cap must not re-settle (timer cleared) or warn (entry pruned).
+				vi.advanceTimersByTime(60000);
+				expect(warnSpy).not.toHaveBeenCalled();
+				expect(inFlightSize(apiSocket)).toBe(0);
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+	});
+
 	describe('listenCommand', () => {
 		it('calls listener when matching command arrives', async () => {
 			const listener = vi.fn();
@@ -826,6 +890,27 @@ describe('ApiSocket', () => {
 			} finally {
 				vi.useRealTimers();
 			}
+		});
+
+		it('arms the stability timer on open and clears it on a pre-stable close (the flap-refill guard)', async () => {
+			// Read the refill timer handle directly: the budget-stability tests above assert the counter
+			// side-effect, but the flap guard the issue calls out is the connectionStableTimer being armed
+			// in onStart and torn down in handleClose so a brief open can't schedule a stale refill.
+			const stableTimer = (s: ApiSocket) =>
+				(s as unknown as { connectionStableTimer: ReturnType<typeof setTimeout> | null }).connectionStableTimer;
+
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+
+			ws.onopen?.(); // onStart arms the "connection is now stable" refill timer
+			expect(stableTimer(apiSocket)).not.toBeNull();
+
+			// A flap (closes before the stability window elapses) cancels the pending refill.
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code: 1006 });
+			expect(stableTimer(apiSocket)).toBeNull();
 		});
 	});
 });

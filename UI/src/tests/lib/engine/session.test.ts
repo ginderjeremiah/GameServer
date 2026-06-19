@@ -53,6 +53,19 @@ describe('resumeSession', () => {
 		expect(playerInitialize).not.toHaveBeenCalled();
 	});
 
+	it('returns "login" when restoring the player from a 200 response throws', async () => {
+		// A 200 response whose body can't be turned into a player (e.g. an unparseable/malformed payload):
+		// the throw originates after the status check, so the catch must still route to login, not crash boot.
+		// mockImplementationOnce keeps the throw scoped to restorePlayer's single call (clearAllMocks in the
+		// shared beforeEach resets call records but not a persistent implementation).
+		playerInitialize.mockImplementationOnce(() => {
+			throw new Error('bad player payload');
+		});
+
+		expect(await resumeSession()).toBe('login');
+		expect(hydrateAllFromCache).not.toHaveBeenCalled();
+	});
+
 	it('restores the player and returns "game" when the whole reference cache is current', async () => {
 		expect(await resumeSession()).toBe('game');
 		expect(playerInitialize).toHaveBeenCalledWith(PLAYER);
