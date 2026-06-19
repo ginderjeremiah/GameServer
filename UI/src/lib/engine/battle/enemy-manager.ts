@@ -98,6 +98,13 @@ export class EnemyManager {
 				const result = await apiSocket.sendSocketCommand('NewEnemy', {
 					newZoneId: playerManager.currentZone
 				});
+				// The loop condition only gates the top of each iteration, so a stop / superseding
+				// transition that lands while parked on the await above (not on the cancellable backoff)
+				// would otherwise still apply this response. Re-check before applying so a successful
+				// NewEnemy can't clobber the fight the supersession already moved on to.
+				if (!this.started || generation !== this.fetchGeneration) {
+					return;
+				}
 				if (result.data?.enemyInstance) {
 					this.currentEnemy = result.data.enemyInstance;
 					notifyNewEnemyLoaded(this.currentEnemy);

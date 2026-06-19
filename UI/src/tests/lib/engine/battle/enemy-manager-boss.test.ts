@@ -176,6 +176,33 @@ describe('EnemyManager boss mode', () => {
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, 'There was an error challenging the boss: no boss');
 	});
 
+	it('does not let a superseded idle fetch clobber the boss when its NewEnemy resolves mid-challenge', async () => {
+		// The exact issue scenario: an idle getNewEnemy is parked on its in-flight NewEnemy when
+		// challengeBoss supersedes it (bumping the generation) and loads the boss. When the stale idle
+		// NewEnemy then resolves with an enemy, it must not overwrite the boss the supersession moved to.
+		let releaseNewEnemy!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		const newEnemyGate = new Promise<IApiSocketResponse<'NewEnemy'>>((resolve) => (releaseNewEnemy = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'NewEnemy' ? newEnemyGate : Promise.resolve(challengeResponse)
+		);
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const idleFetch = manager.getNewEnemy();
+		await flush(); // park the idle fetch on the held NewEnemy request
+
+		await manager.challengeBoss(); // supersedes the idle fetch and loads the boss
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(bossInstance);
+
+		releaseNewEnemy(newEnemyResponse); // the superseded idle fetch resolves with a normal enemy
+		await idleFetch;
+
+		// The stale idle enemy was dropped: the boss remains, and only it was ever notified.
+		expect(manager.currentEnemy).toEqual(bossInstance);
+		expect(loaded).toEqual([bossInstance]);
+	});
+
 	it('on a boss victory: reports the defeat, clears the zone, then returns to idle (auto-fight off)', async () => {
 		await manager.challengeBoss();
 
