@@ -231,6 +231,33 @@ describe('InventoryManager', () => {
 				{ attributeId: EAttribute.Agility, amount: 3 }
 			]);
 		});
+
+		it('memoizes the result, returning a stable reference until equipment changes', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+
+			const first = manager.equipmentStats;
+			// Re-reading without a mutation returns the same memoized array rather than re-flattening.
+			expect(manager.equipmentStats).toBe(first);
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+
+			expect(manager.equipmentStats).not.toBe(first);
+			expect(manager.equipmentStats).toEqual([{ attributeId: EAttribute.Strength, amount: 5 }]);
+		});
+
+		it('restores the memoized stats when an equip is rolled back', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+
+			// The optimistic equip is reverted on the failed persist, so the cache must follow it back.
+			expect(manager.equipmentStats).toEqual([]);
+		});
 	});
 
 	describe('items (reactive published list)', () => {

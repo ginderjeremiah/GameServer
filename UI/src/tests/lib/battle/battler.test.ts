@@ -119,6 +119,18 @@ describe('Battler', () => {
 
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 		});
+
+		it('re-arms skill charges on a data-less reset so an unchanged re-spawn starts at zero charge (#811)', () => {
+			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
+			battler.skills[0]!.chargeTime = 300;
+			battler.skills[0]!.renderChargeTime = 300;
+
+			// A data-less re-arm keeps the existing skills, so their charges must be reset here.
+			battler.reset();
+
+			expect(battler.skills[0]!.chargeTime).toBe(0);
+			expect(battler.skills[0]!.renderChargeTime).toBe(0);
+		});
 	});
 
 	describe('advanceCooldowns', () => {

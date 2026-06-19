@@ -221,6 +221,17 @@ export class Battler {
 			this.skills = this.fillSelectedSkills(battlerData);
 		}
 
+		// Re-arm every skill to the battle-start baseline. The data path's fillSelectedSkills already
+		// produced fresh (charge-0) skills; the data-less re-arm (an idle re-spawn with an unchanged
+		// loadout, #811) keeps the existing skills, so their charges must be zeroed here or the next
+		// fight would inherit the previous battle's accrued cooldowns.
+		for (const skill of this.skills) {
+			if (skill) {
+				skill.chargeTime = 0;
+				skill.renderChargeTime = 0;
+			}
+		}
+
 		this.currentHealth = this.attributes.getValue(EAttribute.MaxHealth);
 		this.isDead = false;
 	}

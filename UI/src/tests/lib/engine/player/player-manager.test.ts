@@ -93,6 +93,33 @@ describe('PlayerManager', () => {
 		});
 	});
 
+	describe('setSelectedSkills', () => {
+		it('replaces the loadout, updating each unlocked skill’s selected flag and slot order', () => {
+			manager.initialize(makePlayerData());
+
+			manager.setSelectedSkills([2, 0]);
+
+			expect(manager.selectedSkills).toEqual([2, 0]);
+			expect(manager.unlockedSkills.find((s) => s.skillId === 2)).toMatchObject({ selected: true, order: 0 });
+			expect(manager.unlockedSkills.find((s) => s.skillId === 0)).toMatchObject({ selected: true, order: 1 });
+			// A skill dropped from the loadout is unselected and loses its slot order.
+			expect(manager.unlockedSkills.find((s) => s.skillId === 1)).toMatchObject({ selected: false, order: undefined });
+		});
+
+		it('memoizes selectedSkills, returning a stable reference until the loadout changes', () => {
+			manager.initialize(makePlayerData());
+
+			const first = manager.selectedSkills;
+			// Re-reading without a mutation returns the same memoized array rather than re-deriving.
+			expect(manager.selectedSkills).toBe(first);
+
+			manager.setSelectedSkills([0]);
+
+			expect(manager.selectedSkills).not.toBe(first);
+			expect(manager.selectedSkills).toEqual([0]);
+		});
+	});
+
 	describe('grantExp', () => {
 		it('adds exp and logs the message', () => {
 			manager.initialize(makePlayerData({ level: 1, exp: 0 }));

@@ -27,7 +27,7 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 		]
 	};
 	const mockInventoryManager = {
-		equipmentStats: []
+		equipmentStats: [] as { attributeId: number; amount: number }[]
 	};
 
 	return { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager };
@@ -679,6 +679,52 @@ describe('BattleEngine', () => {
 		it('returns player when given enemy', () => {
 			engine.start();
 			expect(engine.getOpponent(engine.enemy)).toBe(engine.player);
+		});
+	});
+
+	// An idle farm re-spawns with the player's equipment/attributes/loadout/level unchanged, so the
+	// per-enemy reset re-arms the existing battler instead of rebuilding its whole attribute graph.
+	describe('player reset optimization (#811)', () => {
+		const defaultAttributes = mockPlayerManager.attributes;
+		const defaultEquipmentStats = mockInventoryManager.equipmentStats;
+		const defaultLevel = mockPlayerManager.level;
+
+		afterEach(() => {
+			mockPlayerManager.attributes = defaultAttributes;
+			mockInventoryManager.equipmentStats = defaultEquipmentStats;
+			mockPlayerManager.level = defaultLevel;
+		});
+
+		it('re-arms the player without re-deriving when the inputs are unchanged between spawns', () => {
+			engine.start(); // the first reset fully derives the player and caches its inputs
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			// A data-less re-arm (no args) — the expensive attribute graph + skill rebuild is skipped.
+			expect(resetSpy).toHaveBeenCalledTimes(1);
+			expect(resetSpy).toHaveBeenCalledWith();
+		});
+
+		it('re-derives the player when the equipment stats change between spawns', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			const newStats = [{ attributeId: EAttribute.Strength, amount: 5 }];
+			mockInventoryManager.equipmentStats = newStats;
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, newStats);
+		});
+
+		it('re-derives the player when the level changes between spawns (keeps the fight card level fresh)', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			mockPlayerManager.level = 6;
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, mockInventoryManager.equipmentStats);
 		});
 	});
 });
