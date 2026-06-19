@@ -6,6 +6,7 @@ using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 using static Game.Core.EAttribute;
 
@@ -209,24 +210,12 @@ namespace Game.Core.Tests.Battle
 
         private static Player MakePlayer(
             (EAttribute Attribute, double Amount)[] allocations,
-            int statPointsGained = 0) => new()
-            {
-                Id = 1,
-                Name = "Test",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints
-                {
-                    StatAllocations = allocations.Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount }).ToList(),
-                    StatPointsGained = statPointsGained,
-                    StatPointsUsed = (int)allocations.Sum(a => a.Amount),
-                },
-                Inventory = new Inventory(),
-                SelectedSkills = [],
-                Skills = [],
-                LogPreferences = [],
-            };
+            int statPointsGained = 0) =>
+            new PlayerBuilder()
+                .WithStatAllocations(allocations.Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount }))
+                .WithStatPointsGained(statPointsGained)
+                .WithStatPointsUsed((int)allocations.Sum(a => a.Amount))
+                .Build();
 
         private static void EquipAccessory(Player player, List<AttributeModifier> attributes)
         {

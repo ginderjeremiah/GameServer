@@ -1,5 +1,5 @@
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Players
@@ -67,19 +67,11 @@ namespace Game.Core.Tests.Players
             Assert.Equal(scenario.ExpectedStatPoints, player.StatPoints.StatPointsGained);
         }
 
-        private static Player MakePlayer(int level, int exp, int statPointsGained) => new()
-        {
-            Id = 1,
-            Name = "Test",
-            Level = level,
-            Exp = exp,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints
-            { StatAllocations = [], StatPointsGained = statPointsGained, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
+        private static Player MakePlayer(int level, int exp, int statPointsGained) =>
+            new PlayerBuilder()
+                .WithLevel(level)
+                .WithExp(exp)
+                .WithStatPointsGained(statPointsGained)
+                .Build();
     }
 }

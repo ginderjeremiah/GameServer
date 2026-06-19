@@ -4,8 +4,8 @@ using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Events;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Progress;
+using Game.Core.TestInfrastructure.Builders;
 using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -255,18 +255,6 @@ namespace Game.Application.Tests.DataAccess
             return player.Id;
         }
 
-        private static Player MakeDomainPlayer(int id) => new()
-        {
-            Id = id,
-            Name = "Test",
-            Level = 1,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
+        private static Player MakeDomainPlayer(int id) => new PlayerBuilder().WithId(id).Build();
     }
 }

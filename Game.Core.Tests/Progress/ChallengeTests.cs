@@ -1,6 +1,6 @@
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Progress;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Progress
@@ -45,7 +45,7 @@ namespace Game.Core.Tests.Progress
         {
             var challenge = MakeChallenge(EChallengeType.LevelReached, goal: 8);
             var playerChallenge = new PlayerChallenge(challenge, progress: 0m, completed: false);
-            var progress = MakeProgress(player: MakePlayer(level: 8));
+            var progress = MakeProgress(player: new PlayerBuilder().WithLevel(8).Build());
 
             challenge.UpdateChallengeProgress(playerChallenge, progress);
 
@@ -77,20 +77,6 @@ namespace Game.Core.Tests.Progress
         };
 
         private static PlayerProgress MakeProgress(Player? player = null, IEnumerable<PlayerStatistic>? statistics = null) =>
-            new(player ?? MakePlayer(), statistics ?? [], []);
-
-        private static Player MakePlayer(int level = 1) => new()
-        {
-            Id = 1,
-            Name = "Test",
-            Level = level,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
+            new(player ?? new PlayerBuilder().Build(), statistics ?? [], []);
     }
 }

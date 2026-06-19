@@ -4,6 +4,7 @@ using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Battle
@@ -252,19 +253,13 @@ namespace Game.Core.Tests.Battle
         }
 
         private static Player MakePlayer(int level = 1, List<StatAllocation>? allocations = null,
-            List<Skill>? selectedSkills = null) => new()
-            {
-                Id = 1,
-                Name = "Test",
-                Level = level,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints { StatAllocations = allocations ?? [], StatPointsGained = 0, StatPointsUsed = 0 },
-                Inventory = new Inventory(),
-                SelectedSkills = selectedSkills ?? [],
-                Skills = selectedSkills ?? [],
-                LogPreferences = [],
-            };
+            List<Skill>? selectedSkills = null) =>
+            new PlayerBuilder()
+                .WithLevel(level)
+                .WithStatAllocations(allocations ?? [])
+                .WithSkills(selectedSkills ?? [])
+                .WithSelectedSkills(selectedSkills ?? [])
+                .Build();
 
         private static void Equip(Player player, Item item)
         {

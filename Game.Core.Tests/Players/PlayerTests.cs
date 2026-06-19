@@ -7,6 +7,7 @@ using Game.Core.Players;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Players
@@ -668,19 +669,8 @@ namespace Game.Core.Tests.Players
 
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        private static Player MakePlayer(int level = 1, int exp = 0) => new()
-        {
-            Id = 1,
-            Name = "Test",
-            Level = level,
-            Exp = exp,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
+        private static Player MakePlayer(int level = 1, int exp = 0) =>
+            new PlayerBuilder().WithLevel(level).WithExp(exp).Build();
 
         /// <summary>Builds a player whose unlocked set contains a skill for each given id (none equipped).</summary>
         private static Player MakePlayerWithUnlockedSkills(params int[] skillIds)

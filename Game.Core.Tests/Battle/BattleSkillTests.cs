@@ -1,8 +1,8 @@
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 using static Game.Core.EAttribute;
 
@@ -123,20 +123,11 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Dexterity, Amount = 0 },
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
-            var attacker = new Battler(new Player
-            {
-                Id = 0,
-                Name = "t",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints
-                { StatAllocations = statAllocations, StatPointsGained = 52, StatPointsUsed = 52 },
-                Inventory = new Inventory(),
-                SelectedSkills = [],
-                Skills = [],
-                LogPreferences = [],
-            });
+            var attacker = new Battler(new PlayerBuilder()
+                .WithStatAllocations(statAllocations)
+                .WithStatPointsGained(52)
+                .WithStatPointsUsed(52)
+                .Build());
             var defender = MakeBattler(strength: 0);
             var context = new BattleContext(attacker, defender, timeDelta: 0, new Mulberry32(0));
 
@@ -272,20 +263,11 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Dexterity, Amount = 0 },
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
-            var player = new Player
-            {
-                Id = 0,
-                Name = "t",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints
-                { StatAllocations = statAllocations, StatPointsGained = 50, StatPointsUsed = 50 },
-                Inventory = new Inventory(),
-                SelectedSkills = [],
-                Skills = [],
-                LogPreferences = [],
-            };
+            var player = new PlayerBuilder()
+                .WithStatAllocations(statAllocations)
+                .WithStatPointsGained(50)
+                .WithStatPointsUsed(50)
+                .Build();
             return new Battler(player);
         }
 
@@ -294,19 +276,7 @@ namespace Game.Core.Tests.Battle
             var statAllocations = attributes
                 .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
                 .ToList();
-            var player = new Player
-            {
-                Id = 0,
-                Name = "t",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints { StatAllocations = statAllocations, StatPointsGained = 0, StatPointsUsed = 0 },
-                Inventory = new Inventory(),
-                SelectedSkills = [],
-                Skills = [],
-                LogPreferences = [],
-            };
+            var player = new PlayerBuilder().WithStatAllocations(statAllocations).Build();
             return new Battler(player);
         }
     }

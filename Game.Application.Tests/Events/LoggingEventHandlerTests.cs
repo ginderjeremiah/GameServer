@@ -3,7 +3,7 @@ using Game.Core.Battle.Events;
 using Game.Core.Enemies;
 using Game.Core.Events;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -55,7 +55,7 @@ namespace Game.Application.Tests.Events
         public async Task BattleCompletedEvent_LogsCuratedIds_AndNeverSerializesThePlayerAggregate()
         {
             var (handler, capturing) = CreateHandler();
-            var player = MakePlayer(id: 7, name: "SecretPlayerName");
+            var player = new PlayerBuilder().WithId(7).WithName("SecretPlayerName").Build();
             var enemy = MakeEnemy(id: 5, name: "SecretEnemyName");
             var evt = new BattleCompletedEvent(
                 player, enemy, Victory: true, PlayerDied: false, TotalMs: 3200,
@@ -99,20 +99,6 @@ namespace Game.Application.Tests.Events
         {
             public IReadOnlyList<KeyValuePair<string, object?>> GetLogProperties() => Properties;
         }
-
-        private static Player MakePlayer(int id, string name) => new()
-        {
-            Id = id,
-            Name = name,
-            Level = 1,
-            Exp = 0,
-            CurrentZoneId = 0,
-            StatPoints = new PlayerStatPoints { StatAllocations = [], StatPointsGained = 0, StatPointsUsed = 0 },
-            Inventory = new Inventory(),
-            SelectedSkills = [],
-            Skills = [],
-            LogPreferences = [],
-        };
 
         private static Enemy MakeEnemy(int id, string name) => new()
         {

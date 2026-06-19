@@ -1,7 +1,7 @@
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 using static Game.Core.EAttribute;
 
@@ -197,19 +197,7 @@ namespace Game.Core.Tests.Battle
             var statAllocations = attributes
                 .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
                 .ToList();
-            var player = new Player
-            {
-                Id = 0,
-                Name = "t",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints { StatAllocations = statAllocations, StatPointsGained = 0, StatPointsUsed = 0 },
-                Inventory = new Inventory(),
-                SelectedSkills = [],
-                Skills = [],
-                LogPreferences = [],
-            };
+            var player = new PlayerBuilder().WithStatAllocations(statAllocations).Build();
             return new Battler(player);
         }
     }

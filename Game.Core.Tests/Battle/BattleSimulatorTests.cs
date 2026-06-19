@@ -3,8 +3,8 @@ using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Battle
@@ -132,20 +132,13 @@ namespace Game.Core.Tests.Battle
                 }
             ];
 
-            return new Player
-            {
-                Id = 1,
-                Name = "Test",
-                Level = 1,
-                Exp = 0,
-                CurrentZoneId = 0,
-                StatPoints = new PlayerStatPoints
-                { StatAllocations = allocations, StatPointsGained = totalUsed, StatPointsUsed = totalUsed },
-                Inventory = new Inventory(),
-                SelectedSkills = defaultSkills,
-                Skills = defaultSkills,
-                LogPreferences = [],
-            };
+            return new PlayerBuilder()
+                .WithStatAllocations(allocations)
+                .WithStatPointsGained(totalUsed)
+                .WithStatPointsUsed(totalUsed)
+                .WithSkills(defaultSkills)
+                .WithSelectedSkills(defaultSkills)
+                .Build();
         }
 
         private static Battler MakeEnemy(double statTotal, List<Skill>? skills = null)

@@ -28,6 +28,12 @@ The codegen also emits a small amount of **static domain data** that the fronten
 
 Because all of this lands under `UI/src/lib/api/types`, the existing CI codegen-drift check already guards it: a retune of a coefficient (or an enum value) that isn't regenerated fails the `git diff`, so the cross-implementation parity no longer rests on a human keeping the two files in step.
 
+## Shared domain-object test builders
+
+Domain aggregates like `Player` have many `required` members, so tests previously hand-rolled the full object graph in every file that needed one — adding a member meant editing every copy. Shared **fluent builders** (e.g. `PlayerBuilder`) now own that construction with sensible defaults, so a test specifies only the fields it cares about and adding a required member is a one-line change in the builder.
+
+These builders live in their own **`Game.Core.TestInfrastructure`** project that references **only `Game.Core`**, deliberately kept separate from the integration-heavy `Game.TestInfrastructure` (which pulls in EF/Redis/Testcontainers/ASP.NET). That keeps the pure unit-test projects (notably `Game.Core.Tests`) free of out-of-process dependencies, matching the [lean unit-test philosophy](backend.md#testing-guidelines). `Game.TestInfrastructure` references it, so the integration suites get the same builders. New domain-object builders belong here.
+
 ## Integration-Test Containers in Constrained Environments
 
 Integration tests get a real PostgreSQL + Redis via **Testcontainers** (`PostgresContainerFixture`, `RedisContainerFixture`, composed by `IntegrationTestContainers`). Testcontainers depends on Docker **bridge networking**, which is unavailable in constrained sandboxes such as the Claude Code web environment (old kernel, no iptables, no usable bridge). There, Testcontainers cannot create networks or map ports and every integration test fails before it runs. See [anthropics/claude-code#29515](https://github.com/anthropics/claude-code/issues/29515).
