@@ -3,7 +3,11 @@
 
 	<div class="main-content">
 		<div class="screen-container" data-testid="screen-container">
-			<CurrentScreen />
+			{#if CurrentScreen}
+				<CurrentScreen />
+			{:else}
+				<PlaceholderScreen label={currentScreenDef?.label ?? ''} />
+			{/if}
 		</div>
 		<LogPanel />
 	</div>
@@ -13,11 +17,11 @@
 
 <script lang="ts">
 import { NavSidebar, LogPanel } from '$components';
-import { screenMap, type GameScreen, GAME_SCREENS, visibleScreens } from './screens';
+import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
+import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { startGame } from '$lib/engine';
 import { getRoles } from '$lib/api';
 import { browser } from '$app/environment';
-import type { Component } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { onMount } from 'svelte';
@@ -32,7 +36,6 @@ if (browser) {
 }
 
 let currentScreen = $state<string>('fight');
-let CurrentScreen: Component = $state(screenMap.Fight as Component);
 let sidebarPinned = $state(false);
 
 // Roles drive which screens appear in the sidebar (e.g. Admin). Read from the access token after
@@ -45,18 +48,11 @@ onMount(() => {
 
 const screens = $derived(visibleScreens(GAME_SCREENS, roles));
 
-const screenKeyMap: Record<string, GameScreen> = {
-	fight: 'Fight',
-	cardGame: 'CardGame',
-	challenges: 'Challenges',
-	inventory: 'Inventory',
-	skills: 'Skills',
-	attributes: 'Attributes',
-	attributeBreakdown: 'AttributeBreakdown',
-	stats: 'Statistics',
-	options: 'Options',
-	help: 'PlaceholderScreen'
-};
+// The active screen's component is derived from its registry entry, so navigation only updates the
+// current key — no separate key→component map to keep in sync. A "wip" entry has no component and
+// falls back to the placeholder in the template.
+const currentScreenDef = $derived(GAME_SCREENS.find((s) => s.key === currentScreen));
+const CurrentScreen = $derived(currentScreenDef?.component);
 
 const handleNavigate = (key: string) => {
 	if (key === 'admin') {
@@ -68,10 +64,6 @@ const handleNavigate = (key: string) => {
 		return;
 	}
 	currentScreen = key;
-	const mapped = screenKeyMap[key];
-	if (mapped && mapped in screenMap) {
-		CurrentScreen = screenMap[mapped] as Component;
-	}
 };
 </script>
 
