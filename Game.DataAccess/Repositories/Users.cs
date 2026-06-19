@@ -7,6 +7,7 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using RoleEntity = Game.Infrastructure.Entities.Role;
 using UserEntity = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Repositories
@@ -152,17 +153,53 @@ namespace Game.DataAccess.Repositories
                 return SetUserRolesStatus.UnknownRole;
             }
 
-            // Gather the facts the lockout policy needs, then let the domain decide. "Other admins" counts
-            // only active (non-archived) accounts, matching login's notion of a usable account, so a change
-            // that would leave no admin able to log back in is blocked.
+            // Only an Admin-role removal can trip the lockout rules; a grant or any change to a non-admin
+            // carries no hazard and applies on the deferred unit-of-work path. (CheckRoleChange would return
+            // Allowed for those regardless of the surviving-admin count, so they skip the serialized count.)
             const int adminRoleId = (int)ERole.Admin;
             var targetHasAdminRole = user.Roles.Any(r => r.Id == adminRoleId);
             var requestedRolesIncludeAdmin = requestedRoleIds.Contains(adminRoleId);
+            if (!(targetHasAdminRole && !requestedRolesIncludeAdmin))
+            {
+                ApplyRequestedRoles(user, requestedRoleIds, knownRoles);
+                return SetUserRolesStatus.Success;
+            }
+
+            return await RemoveAdminRoleAtomically(
+                actingUserId, user, requestedRoleIds, knownRoles, adminRoleId, targetHasAdminRole, requestedRolesIncludeAdmin);
+        }
+
+        /// <summary>
+        /// Applies an Admin-role removal as an atomic check-then-act so the last-admin invariant holds under
+        /// concurrency. Without it, two simultaneous demotions of different admins could each observe another
+        /// admin remaining and both commit, leaving the system with zero admins. A row lock on the Admin role
+        /// serializes every admin-membership change through a single point; the surviving-admin count the
+        /// domain policy reads is gathered under that lock, and the mutation commits in-tier (like
+        /// <see cref="CreateAccount"/>) rather than deferring to the request's unit of work — so the policy's
+        /// check and the act it gates can't be split apart.
+        /// </summary>
+        private async Task<SetUserRolesStatus> RemoveAdminRoleAtomically(
+            int actingUserId,
+            UserEntity user,
+            List<int> requestedRoleIds,
+            List<RoleEntity> knownRoles,
+            int adminRoleId,
+            bool targetHasAdminRole,
+            bool requestedRolesIncludeAdmin)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            // Lock the Admin role row; the lock is held until commit, serializing concurrent demotions.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
+
+            // Gather the facts under the lock — "other admins" counts only active (non-archived) accounts,
+            // matching login's notion of a usable account — then let the domain policy make the decision.
             var otherAdminsRemain = await _context.Users.AnyAsync(u =>
-                u.Id != targetUserId && u.ArchivedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
+                u.Id != user.Id && u.ArchivedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
 
             var protection = AdminLockoutPolicy.CheckRoleChange(
-                actingUserId, targetUserId, targetHasAdminRole, requestedRolesIncludeAdmin, otherAdminsRemain);
+                actingUserId, user.Id, targetHasAdminRole, requestedRolesIncludeAdmin, otherAdminsRemain);
             switch (protection)
             {
                 case RoleChangeProtection.SelfAdminRemoval:
@@ -171,12 +208,18 @@ namespace Game.DataAccess.Repositories
                     return SetUserRolesStatus.LastAdmin;
             }
 
+            ApplyRequestedRoles(user, requestedRoleIds, knownRoles);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return SetUserRolesStatus.Success;
+        }
+
+        private static void ApplyRequestedRoles(UserEntity user, List<int> requestedRoleIds, List<RoleEntity> knownRoles)
+        {
             user.Roles.RemoveAll(r => !requestedRoleIds.Contains(r.Id));
 
             var existingRoleIds = user.Roles.Select(r => r.Id).ToHashSet();
             user.Roles.AddRange(knownRoles.Where(r => !existingRoleIds.Contains(r.Id)));
-
-            return SetUserRolesStatus.Success;
         }
 
         public Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId)

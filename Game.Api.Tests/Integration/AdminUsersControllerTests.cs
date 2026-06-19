@@ -513,6 +513,52 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SetUserRoles_ConcurrentDemotionsOfDistinctAdmins_LeaveOneAdminStanding()
+        {
+            // Two admins are the only admins; a ghost actor concurrently demotes each. The atomic
+            // check-then-act must let at most one demotion through so the system is never left admin-less —
+            // the exact race the row-locked, in-tier commit exists to prevent.
+            int firstAdminId;
+            int secondAdminId;
+            int actorId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var first = await TestDataSeeder.CreateUserAsync(context, "admin_a", "pw");
+                var second = await TestDataSeeder.CreateUserAsync(context, "admin_b", "pw");
+                var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+                firstAdminId = first.Id;
+                secondAdminId = second.Id;
+                actorId = actor.Id;
+                await TestDataSeeder.AssignRoleToUserAsync(context, first.Id, ERole.Admin);
+                await TestDataSeeder.AssignRoleToUserAsync(context, second.Id, ERole.Admin);
+            }
+
+            // Each demotion runs on its own scope/context (and DB connection) so the two truly race.
+            async Task<SetUserRolesStatus> DemoteAsync(int targetId)
+            {
+                using var scope = CreateScope();
+                var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+                return await users.SetUserRoles(actorId, targetId, Array.Empty<int>());
+            }
+
+            var results = await Task.WhenAll(DemoteAsync(firstAdminId), DemoteAsync(secondAdminId));
+
+            // Exactly one demotion succeeds; the other is rejected by the last-admin guard.
+            Assert.Equal(1, results.Count(r => r == SetUserRolesStatus.Success));
+            Assert.Equal(1, results.Count(r => r == SetUserRolesStatus.LastAdmin));
+
+            // The database is left with exactly one admin — never zero.
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var remainingAdmins = await context.Users
+                    .CountAsync(u => u.ArchivedAt == null && u.Roles.Any(r => r.Id == (int)ERole.Admin), CancellationToken);
+                Assert.Equal(1, remainingAdmins);
+            }
+        }
+
+        [Fact]
         public async Task ArchiveUser_NonPositiveUserId_Returns400()
         {
             using var authClient = await SetupAdminClientAsync();
