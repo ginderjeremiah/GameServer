@@ -29,14 +29,18 @@
 	{/if}
 
 	<!-- Full-bleed primary action: plain activate selects, modifier/double activate equips.
-	     A real <button> gives native keyboard activation (modifier state rides the click). -->
+	     A real <button> gives native keyboard activation (modifier state rides the click). It also
+	     surfaces the item tooltip on keyboard focus (the hover handlers on the tile cover the mouse). -->
 	<OverlayButton
 		label={item.name}
 		draggable
+		{describedById}
 		onActivate={handleActivate}
 		onDoubleClick={() => onToggleEquip?.(item)}
 		onDragStart={handleDragStart}
 		onDragEnd={() => onDragEnd?.()}
+		onFocus={handleFocus}
+		onBlur={() => onHoverLeave?.()}
 	/>
 
 	<button
@@ -70,6 +74,7 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityColor, rarityGlow, rarityLevel, rarityTint, tintColor } from '$lib/common';
+import { focusAnchor, type TooltipAnchor } from '$stores/tooltip.svelte';
 import CategoryGlyph from './CategoryGlyph.svelte';
 import FavoriteStar from './FavoriteStar.svelte';
 import OverlayButton from '$components/OverlayButton.svelte';
@@ -79,10 +84,13 @@ interface Props {
 	size?: number;
 	glow?: boolean;
 	selected?: boolean;
+	/** Tooltip container id wired onto the primary action's `aria-describedby` for screen readers. */
+	describedById?: string;
 	onSelect?: (item: Item) => void;
 	onToggleEquip?: (item: Item) => void;
 	onToggleFav?: (item: Item) => void;
-	onHoverEnter?: (item: Item, ev: MouseEvent) => void;
+	/** Fired on hover (cursor anchor) and keyboard focus (the tile's box) so both surface the tooltip. */
+	onHoverEnter?: (item: Item, anchor: TooltipAnchor) => void;
 	onHoverMove?: (ev: MouseEvent) => void;
 	onHoverLeave?: () => void;
 	onDragStart?: (item: Item) => void;
@@ -94,6 +102,7 @@ const {
 	size = 64,
 	glow = true,
 	selected = false,
+	describedById,
 	onSelect,
 	onToggleEquip,
 	onToggleFav,
@@ -145,6 +154,15 @@ const handleDragStart = (e: DragEvent) => {
 		e.dataTransfer.effectAllowed = 'move';
 	}
 	onDragStart?.(item);
+};
+
+// Surface the tooltip on keyboard focus, anchored off the tile's box. A mouse click is left to the
+// hover handlers (already tracking the cursor) so the tooltip doesn't jump on click.
+const handleFocus = (e: FocusEvent) => {
+	const anchor = focusAnchor(e);
+	if (anchor) {
+		onHoverEnter?.(item, anchor);
+	}
 };
 </script>
 

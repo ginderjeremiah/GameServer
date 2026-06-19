@@ -37,7 +37,13 @@
 			{:else}
 				<CategoryGlyph cat={item.itemCategoryId} color={itemCategoryColor(item.itemCategoryId)} size={40} />
 			{/if}
-			<OverlayButton label={item.name} onActivate={() => onSelect?.(item)} />
+			<OverlayButton
+				label={item.name}
+				{describedById}
+				onActivate={() => onSelect?.(item)}
+				onFocus={handleFocus}
+				onBlur={() => onHoverLeave?.()}
+			/>
 			<button
 				type="button"
 				class="unequip"
@@ -67,6 +73,7 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { itemCategoryColor, rarityTint, tintColor } from '$lib/common';
+import { focusAnchor, type TooltipAnchor } from '$stores/tooltip.svelte';
 import RarityTag from '$components/RarityTag.svelte';
 import CategoryGlyph from './CategoryGlyph.svelte';
 import OverlayButton from '$components/OverlayButton.svelte';
@@ -77,16 +84,30 @@ interface Props {
 	item?: Item;
 	dragItem?: Item | null;
 	selected?: boolean;
+	/** Tooltip container id wired onto the select action's `aria-describedby` for screen readers. */
+	describedById?: string;
 	onSelect?: (item: Item) => void;
 	onDrop?: (slotId: number) => void;
 	onUnequip?: (slotId: number) => void;
-	onHoverEnter?: (item: Item, ev: MouseEvent) => void;
+	/** Fired on hover (cursor anchor) and keyboard focus (the tile's box) so both surface the tooltip. */
+	onHoverEnter?: (item: Item, anchor: TooltipAnchor) => void;
 	onHoverMove?: (ev: MouseEvent) => void;
 	onHoverLeave?: () => void;
 }
 
-const { slot, item, dragItem, selected, onSelect, onDrop, onUnequip, onHoverEnter, onHoverMove, onHoverLeave }: Props =
-	$props();
+const {
+	slot,
+	item,
+	dragItem,
+	selected,
+	describedById,
+	onSelect,
+	onDrop,
+	onUnequip,
+	onHoverEnter,
+	onHoverMove,
+	onHoverLeave
+}: Props = $props();
 
 let over = $state(false);
 let hover = $state(false);
@@ -115,6 +136,15 @@ const handleDrop = (e: DragEvent) => {
 	e.preventDefault();
 	over = false;
 	onDrop?.(slot.id);
+};
+
+// Surface the tooltip on keyboard focus, anchored off the tile's box. A mouse click is left to the
+// hover handlers (already tracking the cursor) so the tooltip doesn't jump on click.
+const handleFocus = (e: FocusEvent) => {
+	const anchor = focusAnchor(e);
+	if (item && anchor) {
+		onHoverEnter?.(item, anchor);
+	}
 };
 </script>
 

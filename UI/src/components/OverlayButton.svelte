@@ -7,20 +7,44 @@
 	ondblclick={onDoubleClick}
 	ondragstart={onDragStart}
 	ondragend={onDragEnd}
+	onfocus={onFocus}
+	onblur={onBlur}
+	use:describedByTooltip={describedById}
 ></button>
 
 <script lang="ts">
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
+
 interface Props {
 	/** Accessible name for the action — the card has no visible button text of its own. */
 	label: string;
 	draggable?: boolean;
+	/**
+	 * Stable id of the tooltip this control surfaces, wired onto its `aria-describedby` so a screen
+	 * reader announces the explanation on focus. The card's tooltip lives on its presentational
+	 * container (hover-anchored), but the focusable control is this button, so the association sits here.
+	 */
+	describedById?: string;
 	onActivate?: (e: MouseEvent) => void;
 	onDoubleClick?: (e: MouseEvent) => void;
 	onDragStart?: (e: DragEvent) => void;
 	onDragEnd?: (e: DragEvent) => void;
+	/** Focus/blur on the button itself, so a card's tooltip can surface on keyboard focus. */
+	onFocus?: (e: FocusEvent) => void;
+	onBlur?: (e: FocusEvent) => void;
 }
 
-const { label, draggable = false, onActivate, onDoubleClick, onDragStart, onDragEnd }: Props = $props();
+const {
+	label,
+	draggable = false,
+	describedById,
+	onActivate,
+	onDoubleClick,
+	onDragStart,
+	onDragEnd,
+	onFocus,
+	onBlur
+}: Props = $props();
 </script>
 
 <style lang="scss">

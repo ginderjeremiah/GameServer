@@ -1,5 +1,15 @@
 <div class="trow">
-	<span class="attr-hit" role="img" aria-label={name} use:attributeHover={{ controller: attrTip, id }}>
+	<!-- The icon is the row's keyboard-reachable tooltip trigger (the name below stays mouse-only to
+	     avoid a redundant second tab stop). svelte-ignore: a labelled role="img" is intentionally focusable. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<span
+		class="attr-hit"
+		role="img"
+		tabindex="0"
+		aria-label={name}
+		use:attributeHover={{ controller: attrTip, id }}
+		use:describedByTooltip={attrTip?.describedById}
+	>
 		<AttributeIcon {id} size={40} />
 	</span>
 	<div class="attr">
@@ -46,6 +56,7 @@ import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { attributeHover } from '$components/tooltip/attribute-hover';
+import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import Stepper from './Stepper.svelte';
 import { CORE_ATTRIBUTES, derivedShortLabel, perPointYields, type AttributesView } from './attributes-view.svelte';
 
@@ -92,6 +103,12 @@ const deltaWidth = $derived((Math.abs(value - saved) / view.hexMax) * 100);
 .attr-hit {
 	display: inline-flex;
 	flex-shrink: 0;
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+		border-radius: 4px;
+	}
 }
 
 .attr {

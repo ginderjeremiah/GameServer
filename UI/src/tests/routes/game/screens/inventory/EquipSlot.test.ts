@@ -142,6 +142,31 @@ describe('EquipSlot — interactions', () => {
 	});
 });
 
+describe('EquipSlot — keyboard-focus tooltip', () => {
+	it('wires the tooltip id onto the filled-slot select action for screen readers', () => {
+		const { container } = render(EquipSlot, {
+			props: { slot: helmSlot, item: makeItem(), describedById: 'tooltip-9' }
+		});
+		expect(container.querySelector('.overlay-button')!.getAttribute('aria-describedby')).toBe('tooltip-9');
+	});
+
+	it('surfaces the tooltip on focus of the select action, anchored off its element box', async () => {
+		const onHoverEnter = vi.fn();
+		const item = makeItem();
+		const { container } = render(EquipSlot, { props: { slot: helmSlot, item, onHoverEnter } });
+		const overlay = container.querySelector('.overlay-button')!;
+		await fireEvent.focus(overlay);
+		expect(onHoverEnter).toHaveBeenCalledWith(item, overlay);
+	});
+
+	it('hides the tooltip on blur of the select action', async () => {
+		const onHoverLeave = vi.fn();
+		const { container } = render(EquipSlot, { props: { slot: helmSlot, item: makeItem(), onHoverLeave } });
+		await fireEvent.blur(container.querySelector('.overlay-button')!);
+		expect(onHoverLeave).toHaveBeenCalled();
+	});
+});
+
 describe('EquipSlot — drag and drop', () => {
 	it('marks the tile "can-accept" when a dragItem has a matching category', () => {
 		const dragItem = makeItem({ itemCategoryId: EItemCategory.Helm });

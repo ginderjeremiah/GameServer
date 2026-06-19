@@ -77,6 +77,28 @@ describe('Attributes screen', () => {
 		expect(screen.getByText('1 attribute changed')).toBeTruthy();
 	});
 
+	it('makes each guided-row attribute icon keyboard-focusable and tied to the shared tooltip', () => {
+		const { container } = render(Attributes);
+		const hits = container.querySelectorAll('.attr-hit');
+		expect(hits.length).toBe(6);
+		for (const hit of hits) {
+			expect(hit.getAttribute('tabindex')).toBe('0');
+			// All rows reference the one shared tooltip container, so the explanation is announced on focus.
+			expect(hit.getAttribute('aria-describedby')).toMatch(/^tooltip-\d+$/);
+		}
+	});
+
+	it('keeps the theory-row attribute icons keyboard-focusable and tooltip-linked', async () => {
+		const { container } = render(Attributes);
+		await fireEvent.click(screen.getByText('Theorycraft'));
+		const hits = container.querySelectorAll('.attr-hit');
+		expect(hits.length).toBe(6);
+		for (const hit of hits) {
+			expect(hit.getAttribute('tabindex')).toBe('0');
+			expect(hit.getAttribute('aria-describedby')).toMatch(/^tooltip-\d+$/);
+		}
+	});
+
 	it('switches into theorycraft mode and reveals the derived-stats panel', async () => {
 		render(Attributes);
 		expect(screen.queryByText('Derived Stats')).toBeNull();

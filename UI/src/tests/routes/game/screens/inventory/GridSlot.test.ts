@@ -184,6 +184,29 @@ describe('GridSlot — hover interactions', () => {
 	});
 });
 
+describe('GridSlot — keyboard-focus tooltip', () => {
+	it('wires the tooltip id onto the primary action for screen readers', () => {
+		const { container } = render(GridSlot, { props: { item: makeItem(), describedById: 'tooltip-3' } });
+		expect(container.querySelector('.overlay-button')!.getAttribute('aria-describedby')).toBe('tooltip-3');
+	});
+
+	it('surfaces the tooltip on focus of the primary action, anchored off its element box', async () => {
+		const onHoverEnter = vi.fn();
+		const item = makeItem();
+		const { container } = render(GridSlot, { props: { item, onHoverEnter } });
+		const overlay = container.querySelector('.overlay-button')!;
+		await fireEvent.focus(overlay);
+		expect(onHoverEnter).toHaveBeenCalledWith(item, overlay);
+	});
+
+	it('hides the tooltip on blur of the primary action', async () => {
+		const onHoverLeave = vi.fn();
+		const { container } = render(GridSlot, { props: { item: makeItem(), onHoverLeave } });
+		await fireEvent.blur(container.querySelector('.overlay-button')!);
+		expect(onHoverLeave).toHaveBeenCalled();
+	});
+});
+
 describe('GridSlot — drag interactions', () => {
 	it('sets dataTransfer text/plain to the itemId string on drag start', async () => {
 		const item = makeItem({ itemId: 42 });
