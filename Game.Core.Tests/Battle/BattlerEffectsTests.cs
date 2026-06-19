@@ -27,7 +27,7 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void ApplyEffect_SameEffectTwice_RefreshesWithoutStacking()
+        public void ApplyEffect_SameEffectTwice_Stacks()
         {
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5);
@@ -35,9 +35,9 @@ namespace Game.Core.Tests.Battle
             battler.ApplyEffect(effect);
             battler.ApplyEffect(effect);
 
-            // A second application of the same authored effect refreshes its duration rather than adding
-            // a second modifier, so the magnitude does not stack (15, not 20).
-            Assert.Equal(15, battler.GetAttributeValue(Strength));
+            // Each application adds its own modifier, so re-applying the same authored effect stacks the
+            // magnitude (20 = 10 base + 5 + 5).
+            Assert.Equal(20, battler.GetAttributeValue(Strength));
         }
 
         [Fact]
@@ -74,18 +74,21 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void ApplyEffect_RefreshResetsRemainingDuration()
+        public void AdvanceEffects_StackedApplications_ExpireIndependently()
         {
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5, durationMs: 80);
 
-            battler.ApplyEffect(effect);
-            battler.AdvanceEffects(40); // remaining 80 → 40
-            battler.ApplyEffect(effect); // refresh remaining back to 80
-
-            battler.AdvanceEffects(40); // 80 → 40, still active
+            battler.ApplyEffect(effect); // application A: expires at 80
             Assert.Equal(15, battler.GetAttributeValue(Strength));
-            battler.AdvanceEffects(40); // 40 → 0, removed
+
+            battler.AdvanceEffects(40);  // elapsed 40, A still active
+            battler.ApplyEffect(effect); // application B: expires at 40 + 80 = 120
+            Assert.Equal(20, battler.GetAttributeValue(Strength)); // both stacked
+
+            battler.AdvanceEffects(40); // elapsed 80 → A expires, B remains
+            Assert.Equal(15, battler.GetAttributeValue(Strength));
+            battler.AdvanceEffects(40); // elapsed 120 → B expires
             Assert.Equal(10, battler.GetAttributeValue(Strength));
         }
 

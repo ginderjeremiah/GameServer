@@ -1,33 +1,40 @@
 <!-- The row of active-effect chips on a battler card: one skill-style icon tile per timed effect
-     currently modifying the battler. Each tile shows the attribute's icon with a radial (conic)
-     cooldown overlay that depletes as the effect's remaining duration ticks down and refills when the
-     effect is refreshed (re-applied), a small magnitude badge, and a buff/debuff direction tint. Reads
-     the battler's reactive `activeEffects` projection, so tiles appear/expire as effects come and go. -->
-{#if battler.activeEffects.length > 0}
+     currently modifying the battler. Effects STACK — re-applying one adds another application — so each
+     tile groups all active applications of a single authored effect: it shows the attribute's icon with
+     a radial (conic) cooldown overlay tracking the longest-remaining application, the combined-total
+     magnitude badge, a buff/debuff direction tint, and (when more than one is active) a count badge in
+     the top-right corner. Reads the battler's reactive `activeEffects` projection, so tiles
+     appear/expire as effects come and go. -->
+{#if effectGroups.length > 0}
 	<div class="effect-chips" class:reversed data-testid="effect-chips">
-		{#each battler.activeEffects as effect (effect.sourceId)}
+		{#each effectGroups as group (group.sourceId)}
 			{@const direction = effectDirection(
-				attributeIsHarmful(effect.attribute, staticData.attributes),
-				effect.modifierType,
-				effect.amount
+				attributeIsHarmful(group.attribute, staticData.attributes),
+				group.modifierType,
+				group.totalAmount
 			)}
-			{@const magnitude = formatEffectMagnitude(effect.modifierType, effect.amount)}
+			{@const magnitude = formatEffectMagnitude(group.modifierType, group.totalAmount)}
 			<!-- A focusable button (mirroring the skill slots) so the attribute tooltip is reachable by
 			     keyboard and screen reader, not just on hover. Its accessible name describes the effect. -->
 			<button
 				type="button"
 				class="effect-chip"
 				style:--chip-accent={effectDirectionColor(direction)}
-				aria-label="{attributeName(effect.attribute, staticData.attributes)} {direction}, {magnitude}"
-				onmouseenter={(ev) => showChipTooltip(effect, ev)}
+				aria-label="{attributeName(group.attribute, staticData.attributes)} {direction}, {magnitude}{group.count > 1
+					? `, ${group.count} applications`
+					: ''}"
+				onmouseenter={(ev) => showChipTooltip(group, ev)}
 				onmousemove={(ev) => tip.controller.move(ev)}
 				onmouseleave={hideChipTooltip}
-				onfocus={(ev) => focusChipTooltip(effect, ev)}
+				onfocus={(ev) => focusChipTooltip(group, ev)}
 				onblur={hideChipTooltip}
 				use:describedByTooltip={tip.controller.describedById}
 			>
-				<AttributeIcon id={effect.attribute} size={26} />
-				<CooldownOverlay sweep={remainingSweep(effect)} />
+				<AttributeIcon id={group.attribute} size={26} />
+				<CooldownOverlay sweep={remainingSweep(group)} />
+				{#if group.count > 1}
+					<span class="chip-count" data-testid="chip-count">{group.count}</span>
+				{/if}
 				<span class="chip-mag">{magnitude}</span>
 			</button>
 		{/each}
@@ -44,6 +51,7 @@
 import {
 	attributeIsHarmful,
 	attributeName,
+	combineEffectAmount,
 	effectDirection,
 	effectDirectionColor,
 	formatEffectMagnitude
@@ -56,6 +64,7 @@ import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import type { ActiveEffectView, Battler } from '$lib/battle';
+import type { EAttribute, EModifierType } from '$lib/api';
 
 type Props = {
 	battler: Battler;
@@ -65,58 +74,113 @@ type Props = {
 
 const { battler, reversed = false }: Props = $props();
 
+/** All active applications of one authored effect, collapsed into a single chip: the shared
+ *  attribute/modifier, the per-application and combined magnitudes, the application count, and the
+ *  applications themselves (sorted longest-remaining first) for the tooltip breakdown and the sweep. */
+interface EffectGroup {
+	sourceId: number;
+	attribute: EAttribute;
+	modifierType: EModifierType;
+	/** Per-application amount (identical across a same-effect stack). */
+	stackAmount: number;
+	/** Combined magnitude of every active application (additive summed, multiplicative compounded). */
+	totalAmount: number;
+	count: number;
+	/** Authored duration, shared by every application — the sweep/pill denominator. */
+	durationMs: number;
+	/** Render-interpolated remaining of the longest-lasting application, driving the sweep/pill. */
+	maxRenderRemainingMs: number;
+	applications: ActiveEffectView[];
+}
+
+// Collapse the flat application list into one group per authored effect, preserving first-seen order so
+// the chips don't reshuffle as stacks come and go. A linear find suffices — a battler carries only a
+// handful of distinct active effects.
+const effectGroups = $derived.by<EffectGroup[]>(() => {
+	const groups: EffectGroup[] = [];
+	for (const effect of battler.activeEffects) {
+		let group = groups.find((g) => g.sourceId === effect.sourceId);
+		if (!group) {
+			group = {
+				sourceId: effect.sourceId,
+				attribute: effect.attribute,
+				modifierType: effect.modifierType,
+				stackAmount: effect.amount,
+				totalAmount: 0,
+				count: 0,
+				durationMs: effect.durationMs,
+				maxRenderRemainingMs: 0,
+				applications: []
+			};
+			groups.push(group);
+		}
+		group.count++;
+		group.applications.push(effect);
+		group.maxRenderRemainingMs = Math.max(group.maxRenderRemainingMs, effect.renderRemainingMs);
+	}
+	for (const group of groups) {
+		group.totalAmount = combineEffectAmount(group.modifierType, group.stackAmount, group.count);
+		group.applications.sort((a, b) => b.remainingMs - a.remainingMs);
+	}
+	return groups;
+});
+
 let tooltip = $state<TooltipComponent>();
 const tip = createAttributeTooltip(() => tooltip);
 
-// The source id of the chip the tooltip is currently anchored to (if any). Tracked so the live
-// effect can be re-resolved each tick and so an expiring chip can close the tooltip itself — a chip
-// removed under the cursor never fires `mouseleave`, which otherwise left the panel stuck open.
+// The source id of the chip the tooltip is currently anchored to (if any). Tracked so the live group
+// can be re-resolved each tick and so an expiring chip can close the tooltip itself — a chip removed
+// under the cursor never fires `mouseleave`, which otherwise left the panel stuck open.
 let shownSourceId = $state<number>();
-const shownEffect = $derived(
-	shownSourceId != null ? battler.activeEffects.find((e) => e.sourceId === shownSourceId) : undefined
-);
+const shownGroup = $derived(shownSourceId != null ? effectGroups.find((g) => g.sourceId === shownSourceId) : undefined);
 
 // The skill an active effect came from: its `sourceId` is the authored skill-effect id, so find the
 // skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown skill.
 const sourceSkillName = (sourceId: number): string | undefined =>
 	staticData.skills?.find((skill) => skill?.effects.some((e) => e.id === sourceId))?.name;
 
-// Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes.
+// Live effect context for the panel: reads renderRemainingMs so the countdown pill (and each stacked
+// application's breakdown row) depletes smoothly.
 const shownEffectContext = $derived(
-	shownEffect
+	shownGroup
 		? {
-				modifierType: shownEffect.modifierType,
-				amount: shownEffect.amount,
-				durationMs: shownEffect.durationMs,
-				remainingMs: shownEffect.renderRemainingMs,
-				sourceName: sourceSkillName(shownEffect.sourceId)
+				modifierType: shownGroup.modifierType,
+				amount: shownGroup.totalAmount,
+				stackAmount: shownGroup.stackAmount,
+				durationMs: shownGroup.durationMs,
+				remainingMs: shownGroup.maxRenderRemainingMs,
+				sourceName: sourceSkillName(shownGroup.sourceId),
+				applications: shownGroup.applications.map((a) => ({
+					remainingMs: a.renderRemainingMs,
+					durationMs: a.durationMs
+				}))
 			}
 		: undefined
 );
 
 // Close the tooltip when the chip it's anchored to expires under the cursor (no `mouseleave` fires).
 $effect(() => {
-	if (shownSourceId != null && !shownEffect) {
+	if (shownSourceId != null && !shownGroup) {
 		hideChipTooltip();
 	}
 });
 
 // The transparent (revealed) arc of the radial overlay: the render-interpolated remaining fraction of
-// the effect's duration, in degrees. Depletes toward 0 as the effect expires; resets to 360 (the icon
-// fully revealed) when the effect is refreshed, since refresh restores `renderRemainingMs`.
-const remainingSweep = (effect: ActiveEffectView) =>
-	effect.durationMs > 0 ? Math.max(0, Math.min(360, (effect.renderRemainingMs / effect.durationMs) * 360)) : 0;
+// the longest-lasting application's duration, in degrees. Depletes toward 0 as the last application
+// expires; jumps back toward 360 when a fresh application restores the longest `renderRemainingMs`.
+const remainingSweep = (group: EffectGroup) =>
+	group.durationMs > 0 ? Math.max(0, Math.min(360, (group.maxRenderRemainingMs / group.durationMs) * 360)) : 0;
 
-const showChipTooltip = (effect: ActiveEffectView, anchor: TooltipAnchor) => {
-	shownSourceId = effect.sourceId;
-	tip.controller.show(effect.attribute, anchor);
+const showChipTooltip = (group: EffectGroup, anchor: TooltipAnchor) => {
+	shownSourceId = group.sourceId;
+	tip.controller.show(group.attribute, anchor);
 };
 // Keyboard focus anchors off the chip's box; a mouse click is left to the hover handlers so the
 // tooltip keeps tracking the cursor instead of jumping (#880).
-const focusChipTooltip = (effect: ActiveEffectView, ev: FocusEvent) => {
+const focusChipTooltip = (group: EffectGroup, ev: FocusEvent) => {
 	const anchor = focusAnchor(ev);
 	if (anchor) {
-		showChipTooltip(effect, anchor);
+		showChipTooltip(group, anchor);
 	}
 };
 const hideChipTooltip = () => {
@@ -165,6 +229,24 @@ const hideChipTooltip = () => {
 	:global(.attr-icon) {
 		opacity: 0.92;
 	}
+}
+
+// Stack count, pinned to the top-right corner above the overlay so it stays legible as the wedge
+// sweeps in. Shown only when more than one application is active.
+.chip-count {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 12px;
+	padding: 0 2px;
+	font-family: var(--mono);
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 12px;
+	text-align: center;
+	color: var(--chip-accent);
+	background: color-mix(in srgb, var(--black) 60%, transparent);
+	border-bottom-left-radius: 3px;
 }
 
 // Sits last in the DOM (above the overlay) so the magnitude stays legible as the wedge sweeps in.

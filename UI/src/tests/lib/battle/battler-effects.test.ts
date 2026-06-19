@@ -55,24 +55,16 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 	});
 
-	it('refreshes without stacking when the same effect is applied twice', () => {
+	it('stacks when the same effect is applied twice', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5);
 
 		battler.applyEffect(e);
 		battler.applyEffect(e);
 
-		// A second application of the same authored effect refreshes its duration rather than adding a
-		// second modifier, so the magnitude does not stack (15, not 20).
-		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
-	});
-
-	it('returns true for a new application and false for a refresh', () => {
-		const battler = makeBattler();
-		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5);
-
-		expect(battler.applyEffect(e)).toBe(true);
-		expect(battler.applyEffect(e)).toBe(false);
+		// Each application adds its own modifier, so re-applying the same authored effect stacks the
+		// magnitude (20 = 10 base + 5 + 5).
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(20);
 	});
 
 	it('stacks two different effects on the same attribute', () => {
@@ -102,17 +94,20 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
 	});
 
-	it('refresh resets the remaining duration', () => {
+	it('expires stacked applications independently', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 80);
 
-		battler.applyEffect(e);
-		battler.advanceEffects(40); // remaining 80 → 40
-		battler.applyEffect(e); // refresh remaining back to 80
-
-		battler.advanceEffects(40); // 80 → 40, still active
+		battler.applyEffect(e); // application A: remaining 80
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
-		battler.advanceEffects(40); // 40 → 0, removed
+
+		battler.advanceEffects(40); // A remaining 80 → 40, still active
+		battler.applyEffect(e); // application B: remaining 80
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(20); // both stacked
+
+		battler.advanceEffects(40); // A 40 → 0 (expires), B 80 → 40
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+		battler.advanceEffects(40); // B 40 → 0 (expires)
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
 	});
 
@@ -220,10 +215,13 @@ describe('Battler skill-effect bookkeeping', () => {
 			{ id: 2, onCaster: false }
 		]);
 
-		// Re-firing while both effects are still active refreshes them, so nothing new is reported.
+		// Re-firing while both effects are still active now STACKS them, so each application is reported.
 		applied.length = 0;
 		skill.applyEffects(foe, (e, target) => applied.push({ id: e.id, onCaster: target === caster }));
-		expect(applied).toHaveLength(0);
+		expect(applied).toEqual([
+			{ id: 1, onCaster: true },
+			{ id: 2, onCaster: false }
+		]);
 	});
 
 	it('exposes a reactive view of active effects for the chips, populated from the authored effect', () => {
@@ -233,6 +231,7 @@ describe('Battler skill-effect bookkeeping', () => {
 
 		expect(battler.activeEffects).toHaveLength(1);
 		expect(battler.activeEffects[0]).toEqual({
+			applicationId: 0,
 			sourceId: 7,
 			attribute: EAttribute.Defense,
 			modifierType: EModifierType.Additive,
@@ -243,18 +242,20 @@ describe('Battler skill-effect bookkeeping', () => {
 		});
 	});
 
-	it('refresh resets the view’s remaining (logical and render) without adding a second view', () => {
+	it('adds a second view when the same effect is applied again (stacking)', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200);
 
 		battler.applyEffect(e);
-		battler.advanceEffects(40); // remaining 200 → 160
+		battler.advanceEffects(40); // first application remaining 200 → 160
 		expect(battler.activeEffects[0].remainingMs).toBe(160);
 
-		battler.applyEffect(e); // refresh
-		expect(battler.activeEffects).toHaveLength(1);
-		expect(battler.activeEffects[0].remainingMs).toBe(200);
-		expect(battler.activeEffects[0].renderRemainingMs).toBe(200);
+		battler.applyEffect(e); // stacks a second application at full duration
+		expect(battler.activeEffects).toHaveLength(2);
+		expect(battler.activeEffects[1].remainingMs).toBe(200);
+		expect(battler.activeEffects[1].renderRemainingMs).toBe(200);
+		// The first application keeps ticking down independently.
+		expect(battler.activeEffects[0].remainingMs).toBe(160);
 	});
 
 	it('drops the view when its effect expires and clears all views on reset', () => {

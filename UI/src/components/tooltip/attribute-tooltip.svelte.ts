@@ -7,21 +7,37 @@ import {
 	type TooltipComponent
 } from '$stores/tooltip.svelte';
 
+/** One active application within a stacked effect, for the tooltip's per-source breakdown. */
+export interface AttributeEffectApplication {
+	/** This application's own remaining time, driving its breakdown-row countdown. */
+	remainingMs: number;
+	durationMs: number;
+}
+
 /**
  * The effect detail shown when an {@link AttributeTooltip} is opened from a combat effect chip: the
  * modifier that produced the chip, from which the tooltip derives the effect's direction and
- * magnitude (via the shared `skill-effect-display` helpers) and — from the live `remainingMs` /
- * `durationMs` — a depleting countdown pill. Omitted on the non-combat attribute surfaces (breakdown
- * rail, point-buy steppers, skill scaling chips), which show only the attribute.
+ * combined magnitude (via the shared `skill-effect-display` helpers) and — from the live `remainingMs`
+ * / `durationMs` — a depleting countdown pill. Effects stack, so when more than one application is
+ * active the panel also breaks down the individual applications and their amounts. Omitted on the
+ * non-combat attribute surfaces (breakdown rail, point-buy steppers, skill scaling chips), which show
+ * only the attribute.
  */
 export interface AttributeEffectContext {
 	modifierType: EModifierType;
+	/** Combined magnitude of all active applications (additive summed, multiplicative compounded). */
 	amount: number;
 	durationMs: number;
-	/** Live remaining time, driving the countdown pill. Omit for a non-timed/static context. */
+	/** Live remaining time of the longest-lasting application, driving the header countdown pill. Omit
+	 *  for a non-timed/static context. */
 	remainingMs?: number;
 	/** Display name of the skill that applied the effect, when it can be resolved. */
 	sourceName?: string;
+	/** Per-application amount (identical across a same-effect stack); the magnitude shown per breakdown
+	 *  row. Defaults to {@link amount} when omitted (a single application). */
+	stackAmount?: number;
+	/** Each active application, shown as a per-source breakdown when more than one is stacked. */
+	applications?: AttributeEffectApplication[];
 }
 
 /**

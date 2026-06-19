@@ -113,30 +113,14 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler. Re-applying an
-        /// already-active effect (matched by its authored id) refreshes its remaining duration to full
-        /// without adding a second modifier (no stacking); a new effect adds a <see cref="AttributeModifier"/>
-        /// to the live collection and may shift <see cref="MaxHealth"/>, so the health is re-clamped.
+        /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler. Each application
+        /// <b>stacks</b>: it adds its own <see cref="AttributeModifier"/> to the live collection and its own
+        /// timed entry, so re-applying an already-active effect sums the magnitudes (additive amounts add,
+        /// multiplicative factors compound) and each application expires on its own schedule. A new modifier
+        /// may shift <see cref="MaxHealth"/>, so the health is re-clamped.
         /// </summary>
         public void ApplyEffect(SkillEffect effect)
         {
-            var expiresAtMs = _elapsedMs + effect.DurationMs;
-
-            if (_activeEffects is not null)
-            {
-                for (var i = 0; i < _activeEffects.Count; i++)
-                {
-                    var active = _activeEffects[i];
-                    if (active.Source.Id == effect.Id)
-                    {
-                        // Refresh: the modifier is already on the collection, so only its expiry moves out.
-                        // ActiveEffect is immutable, so replace the element rather than mutating it.
-                        _activeEffects[i] = new ActiveEffect(active.Source, active.Modifier, expiresAtMs);
-                        return;
-                    }
-                }
-            }
-
             var modifier = new AttributeModifier
             {
                 Attribute = effect.AttributeId,
@@ -145,7 +129,7 @@ namespace Game.Core.Battle
                 Source = EAttributeModifierSource.SkillEffect,
             };
             _attributes.AddModifier(modifier);
-            (_activeEffects ??= []).Add(new ActiveEffect(effect, modifier, expiresAtMs));
+            (_activeEffects ??= []).Add(new ActiveEffect(modifier, _elapsedMs + effect.DurationMs));
             ClampHealthToMaxHealth();
         }
 
@@ -197,14 +181,13 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// A timed skill effect active on a battler: the authored <see cref="SkillEffect"/> it came from, the
-        /// modifier it added to the collection (kept for identity removal on expiry), and the absolute
-        /// simulated time (in <see cref="_elapsedMs"/> ms) at which it expires. Immutable — a refresh replaces
-        /// the instance rather than mutating it, so no per-tick state is rewritten.
+        /// A timed skill effect active on a battler: the modifier it added to the collection (kept for
+        /// identity removal on expiry) and the absolute simulated time (in <see cref="_elapsedMs"/> ms) at
+        /// which it expires. Immutable — each application is its own entry, so stacking adds entries rather
+        /// than mutating one and no per-tick state is rewritten.
         /// </summary>
-        private sealed class ActiveEffect(SkillEffect source, AttributeModifier modifier, long expiresAtMs)
+        private sealed class ActiveEffect(AttributeModifier modifier, long expiresAtMs)
         {
-            public SkillEffect Source { get; } = source;
             public AttributeModifier Modifier { get; } = modifier;
             public long ExpiresAtMs { get; } = expiresAtMs;
         }

@@ -171,16 +171,18 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 7840),
 
-                // A self Strength buff: the hit that CARRIES the effect uses the pre-effect attributes,
-                // and only subsequent hits see the boost (which also raises damage via the Strength→damage
-                // path) — and re-applying it every fire REFRESHES rather than stacks (Str stays 20, not 30+).
+                // A self Strength buff: the hit that CARRIES the effect uses the pre-effect attributes, and
+                // only subsequent hits see the boost (which also raises damage via the Strength→damage path)
+                // — and re-applying it every fire now STACKS (each fire adds another +10), so the buff
+                // compounds rather than refreshing.
                 //   Player: Str=10, cdMult=1; skill = Str×1.0 raw, fires every 10 ticks (cooldown 400).
-                //     Effect: Self +10 Strength (additive), effectively permanent.
+                //     Effect: Self +10 Strength (additive), effectively permanent — a new +10 stack per fire.
                 //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
-                //   Hit 1 deals Str(10)−2 = 8 (pre-buff); hits 2+ deal Str(20)−2 = 18.
-                //   Enemy HP 100 → 92,74,56,38,20,2,−16: dies on hit 7 at tick 2800.
-                //   (A buggy carrying-hit boost would kill on hit 6 = 2400; stacking would kill even sooner.)
-                ["selfStrengthBuffAffectsLaterHits"] = new ParityScenario(
+                //   Fire 1 deals Str(10)−2 = 8 then stacks → Str 20; fire 2 deals 18 → Str 30; fire 3 deals
+                //   28 → Str 40; fire 4 deals 38 → Str 50; fire 5 deals 48.
+                //   Enemy HP 100 → 92,74,46,8,−40: dies on fire 5 at tick 50 → 2000ms.
+                //   (Refresh-only stacking — the old rule — would cap Str at 20 and kill on hit 7 at 2800.)
+                ["selfStrengthBuffStacksEachFire"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
                         skills:
@@ -193,16 +195,16 @@ namespace Game.Core.Tests.Battle
                         skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 2800),
+                    ExpectedTotalMs: 2000),
 
-                // A self CooldownRecovery buff is read live each tick, so it shortens the fire interval after
-                // the first hit applies it — proving CDR buffs change fire ticks.
-                //   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400.
-                //     Effect: Self +1.0 CooldownRecovery (additive) → cdMult=2 once applied (base 1 + 1), effectively permanent.
-                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills. Each hit deals 20−2 = 18.
-                //   Hit 1 fires at 400 (cdMult=1) and applies the buff; thereafter charge/tick = 80, so the
-                //   skill fires every 200ms: hits at 400,600,800,1000,1200,1400 → enemy dies on hit 6 at 1400.
-                //   (Ignoring the live CDR read would keep the 400ms interval → hit 6 at 2400.)
+                // A self CooldownRecovery buff is read live each tick AND stacks on each fire, so the fire
+                // interval keeps shortening as the buff compounds — proving both the live CDR read and stacking.
+                //   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400. Each hit deals 18.
+                //     Effect: Self +1.0 CooldownRecovery (additive), effectively permanent — a stack per fire.
+                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+                //   Fire 1 at tick 10 (cdMult=1) applies a stack → cdMult=2; charge/tick then 80 → next fire 5
+                //   ticks later (15, cdMult=3), then 4 (19, cdMult=4), 3 (22, 5), 2 (24, 6), 2 (26). Six 18-dmg
+                //   hits drop the 100-HP enemy on fire 6 at tick 26 → 1040ms. (Refresh-only held cdMult=2 → 1400.)
                 ["cdrBuffShortensFireInterval"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 20, endurance: 0,
@@ -216,17 +218,19 @@ namespace Game.Core.Tests.Battle
                         skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 1400),
+                    ExpectedTotalMs: 1040),
 
                 // Same-tick ordering: an earlier loadout slot's self buff influences a later slot firing on the
                 // same tick. Slot 0 buffs Strength after dealing its (pre-buff) damage, then slot 1 — firing
-                // after it on the same tick — deals its damage from the already-buffed Strength.
-                //   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent), slot1 = Str×1.0 (no effect),
-                //     both cooldown 400 so they fire together at 400,800,…; cdMult=1.
+                // after it on the same tick — deals its damage from the already-buffed Strength. The buff also
+                // STACKS on each fire, so the per-volley damage ramps.
+                //   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent — a stack per fire), slot1 = Str×1.0
+                //     (no effect), both cooldown 400 so they fire together at ticks 10,20,30…; cdMult=1.
                 //   Enemy:  Str=16 → MaxHealth=130, Def=2, no skills.
-                //   Tick 400: slot0 deals 10−2=8 then buffs Str→20; slot1 deals 20−2=18 → 26 that tick.
-                //   Ticks 800+: both deal 18 → 36/tick. Enemy HP 130 → 104,68,32,−4: dies at tick 1600.
-                //   (If slot1 didn't see slot0's buff, tick 400 would deal only 16 and the kill would slip to 2000.)
+                //   Tick 10: slot0 deals 10−2=8 then stacks Str→20; slot1 deals 20−2=18 → 26 (enemy 130→104).
+                //   Tick 20: slot0 deals 18 then stacks Str→30; slot1 deals 28 → 46 (104→58).
+                //   Tick 30: slot0 deals 28 then stacks Str→40; slot1 deals 38 → enemy 58→−8: dies at tick 1200.
+                //   (If slot1 didn't see slot0's buff, tick 10 would deal only 16; refresh-only would end at 1600.)
                 ["sameTickEarlierSlotBuffsLaterSlot"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
@@ -241,15 +245,18 @@ namespace Game.Core.Tests.Battle
                         skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 1600),
+                    ExpectedTotalMs: 1200),
 
                 // MaxHealth clamp: an Opponent MaxHealth ×0.5 debuff halves the enemy's maximum, and because its
                 // current health exceeds the new max it is clamped down immediately — bringing the kill forward.
-                //   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400.
-                //     Effect: Opponent ×0.5 MaxHealth (multiplicative), effectively permanent.
+                // The debuff also STACKS on each fire, so MaxHealth keeps halving and the clamp bites repeatedly.
+                //   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400 (fires tick 10,20…).
+                //     Effect: Opponent ×0.5 MaxHealth (multiplicative), effectively permanent — a stack per fire.
                 //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
-                //   Tick 400: deals 10 (100→90) then halves MaxHealth to 50 → clamps 90 down to 50.
-                //   Then 50→40→30→20→10→0 over the next hits: dies at tick 2400 (vs 4000 with no debuff).
+                //   Tick 10: deal 10 (100→90), stack ×0.5 → MaxHealth 50, clamp 90→50.
+                //   Tick 20: deal 10 (50→40), stack → MaxHealth 25, clamp 40→25.
+                //   Tick 30: deal 10 (25→15), stack → MaxHealth 12.5, clamp 15→12.5.
+                //   Tick 40: deal 10 (12.5→2.5), stack → MaxHealth 6.25 (no clamp). Tick 50: deal 10 → dead at 2000.
                 ["opponentMaxHealthDebuffClamps"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
@@ -263,17 +270,19 @@ namespace Game.Core.Tests.Battle
                         skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 2400),
+                    ExpectedTotalMs: 2000),
 
                 // Same-tick CDR ordering: slot 0's self CooldownRecovery buff (applied after it fires) speeds
                 // up slot 1's charge accrual ON THE SAME TICK, because each slot reads the cooldown multiplier
                 // live in loadout order — so an earlier slot's effect influences a later slot firing that tick.
+                // Slot 0 fires every tick and its buff STACKS, so cdMult climbs 1→2→3→… and slot 1's accrual
+                // accelerates each tick.
                 //   Player: base CDR=1 (cdMult=1). slot0 = pure buffer (0 damage, cooldown 40, Self +1.0 CDR
-                //     permanent → cdMult=2 once applied); slot1 = baseDamage 27, cooldown 400, no multiplier.
+                //     permanent — a stack per tick); slot1 = baseDamage 27, cooldown 400, no multiplier.
                 //   Enemy:  Str=5 → MaxHealth=75, Def=2, no skills. Each slot1 hit deals 27−2 = 25.
-                //   The buff lifts slot1's accrual to 80/tick from the first tick, so slot1 fires every 200ms at
-                //   ticks 200,400,600 → enemy dies on the 3rd hit at 600. (Accruing every slot before any effect
-                //   — a two-phase order — would slip slot1's first fire to 240 and the kill to 640.)
+                //   cdMult after slot0's tick-n fire is n+1, so slot1 accrues 80,120,160,200,… and its charge
+                //   passes 400 at tick 4 (80+120+160+200=560), then again at ticks 6 and 8 → three 25-dmg hits
+                //   drop the 75-HP enemy at tick 8 → 320ms. (Refresh-only held cdMult=2 → 600.)
                 ["cdrBuffSpeedsLaterSlotSameTick"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
@@ -288,60 +297,37 @@ namespace Game.Core.Tests.Battle
                         skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 600),
+                    ExpectedTotalMs: 320),
 
-                // DoT kill timing: a pure poison (an Opponent DamageTakenPerSecond debuff, no direct damage)
-                // ticks the enemy down. DTPS 50 → 50*40/1000 = 2 damage at the END of each tick, bypassing
+                // DoT kill timing: a constant poison on the enemy (a base DamageTakenPerSecond debuff, no direct
+                // damage) ticks it down. DTPS 50 → 50*40/1000 = 2 damage at the END of each tick, bypassing
                 // Defense. 2/tick over 25 ticks brings the 50-HP enemy to 0 → victory at tick 1000.
                 ["poisonKillTiming"] = new ParityScenario(
-                    Player: () => MakeBattler(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(200, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
-                        ]),
-                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
 
-                // Same-tick mutual DoT tie favours the player: both battlers poison each other for 2/tick and
-                // would reach 0 HP on the same tick (1000). The end-of-tick phase resolves the ENEMY first, so
-                // its death is awarded as a victory before the player's identical DoT is applied — the player
-                // never takes the lethal tick. (Applying the player's DoT first would flip this to a loss.)
+                // Same-tick mutual DoT tie favours the player: both battlers carry a constant DamageTakenPerSecond
+                // (base poison) for 2/tick and reach 0 HP on the same tick (1000). The end-of-tick phase resolves
+                // the ENEMY first, so its death is awarded as a victory before the player's identical DoT is
+                // applied — the player never takes the lethal tick. (Applying the player's DoT first would flip
+                // this to a loss.)
                 ["poisonMutualDotTieFavoursPlayer"] = new ParityScenario(
-                    Player: () => MakeBattler(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(201, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
-                        ]),
-                    Enemy: () => MakeEnemy(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(2, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(202, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, Permanent)]),
-                        ]),
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
 
-                // Heal-over-time offsets incoming damage and flips the outcome. The player self-applies
-                // HealthRegenPerSecond 75 → 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 4 − Def 2).
-                // The regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never dies, and
-                // dealing no damage back the battle runs to the timeout. Without the regen the 2/tick would kill
-                // the player at tick 1000.
+                // Heal-over-time offsets incoming damage and flips the outcome. The player carries a constant
+                // HealthRegenPerSecond 75 (base regen) → 3 HP at each tick's end; the enemy chips 2/tick
+                // (baseDamage 4 − Def 2). The regen fully offsets the chip (capped at MaxHealth), so the 50-HP
+                // player never dies, and dealing no damage back the battle runs to the timeout. Without the regen
+                // the 2/tick would kill the player at tick 1000.
                 ["regenOutpacesDamage"] = new ParityScenario(
-                    Player: () => MakeBattler(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(203, ESkillEffectTarget.Self, EAttribute.HealthRegenPerSecond, EModifierType.Additive, 75, Permanent)]),
-                        ]),
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.HealthRegenPerSecond, 75)]),
                     Enemy: () => MakeEnemy(
                         strength: 0, endurance: 0,
                         skills: [MakeSkill(2, baseDamage: 4, cooldownMs: 40)]),
@@ -350,42 +336,29 @@ namespace Game.Core.Tests.Battle
                     ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
                 // Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond is applied and
-                // death checked BEFORE HealthRegenPerSecond. The player is poisoned for 10/tick and self-heals
-                // 6/tick (a net −4 grinding its 50 HP down). On the tick the 10 DoT takes HP from 10 to 0 the
-                // player dies — the 6 heal that would have saved it (10+6−10=6) never runs because death is
-                // checked first. Death at tick 11 → 440ms. (Healing first would let the player survive past here.)
+                // death checked BEFORE HealthRegenPerSecond. The player carries a constant 250 DamageTakenPerSecond
+                // (10/tick) and 150 HealthRegenPerSecond (6/tick) — a net −4 grinding its 50 HP down. On the tick
+                // the 10 DoT takes HP from 10 to 0 the player dies — the 6 heal that would have saved it
+                // (10+6−10=6) never runs because death is checked first. Death at tick 11 → 440ms. (Healing first
+                // would let the player survive past here.)
                 ["dotBeforeRegenSameTickKills"] = new ParityScenario(
                     Player: () => MakeBattler(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(204, ESkillEffectTarget.Self, EAttribute.HealthRegenPerSecond, EModifierType.Additive, 150, Permanent)]),
-                        ]),
-                    Enemy: () => MakeEnemy(
-                        strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(2, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(205, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, Permanent)]),
-                        ]),
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.DamageTakenPerSecond, 250), (EAttribute.HealthRegenPerSecond, 150)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: true,
                     ExpectedTotalMs: 440),
 
                 // DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to
-                // 0, but the same skill's Opponent DamageTakenPerSecond 250 → 10/tick ignores Defense and grinds
+                // 0, but its constant 250 DamageTakenPerSecond (base poison) → 10/tick ignores Defense and grinds
                 // the enemy's 250 HP down: victory at tick 1000. If DoT respected Defense (10−12 clamped to 0) the
                 // enemy would never die.
                 ["dotBypassesDefense"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
-                        skills:
-                        [
-                            MakeSkill(1, baseDamage: 10, cooldownMs: 40,
-                                effects: [MakeEffect(206, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, Permanent)]),
-                        ]),
-                    Enemy: () => MakeEnemy(strength: 0, endurance: 10, skills: []),
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 40)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 10, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 250)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
@@ -407,6 +380,25 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 3000,
                     MaxMs: 3000),
+
+                // DoT stacking: a poison re-applied every tick STACKS (each application adds another
+                // DamageTakenPerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
+                // (cooldown 40) applies Opponent +25 DamageTakenPerSecond each tick; at tick n the enemy
+                // carries n stacks = 25n DTPS → 25n×40/1000 = n damage that tick (bypassing Defense).
+                // Cumulative n(n+1)/2 reaches the 50-HP enemy's total on tick 10 (45 after tick 9, +10 = 55)
+                // → victory at 400ms. (Refresh-only would hold 25 DTPS = 1/tick → 2000ms.)
+                ["dotStacksEachApplication"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 40,
+                                effects: [MakeEffect(208, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 25, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 400),
 
                 // ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
                 // Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a

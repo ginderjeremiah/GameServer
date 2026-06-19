@@ -86,6 +86,38 @@ describe('AttributeTooltip', () => {
 		expect((container.querySelector('.at-effect-source-name') as HTMLElement).textContent).toBe('Battle Cry');
 	});
 
+	it('breaks down stacked applications and shows the combined total in the chip context', () => {
+		staticData.attributes = [STRENGTH];
+		const { getByTestId } = render(AttributeTooltip, {
+			props: {
+				attributeId: EAttribute.Strength,
+				effect: {
+					modifierType: EModifierType.Additive,
+					amount: 15, // combined total of three +5 applications
+					stackAmount: 5,
+					durationMs: 1000,
+					remainingMs: 1000,
+					sourceName: 'Battle Cry',
+					applications: [
+						{ remainingMs: 1000, durationMs: 1000 },
+						{ remainingMs: 600, durationMs: 1000 },
+						{ remainingMs: 200, durationMs: 1000 }
+					]
+				}
+			}
+		});
+
+		// Headline shows the combined total; the breakdown lists each application's own amount + remaining.
+		expect(getByTestId('attr-tip-effect').textContent).toContain('+15');
+		const stacks = getByTestId('attr-tip-stacks');
+		expect(stacks.textContent).toContain('3 applications');
+		const rows = stacks.querySelectorAll('.at-effect-stack-row');
+		expect(rows).toHaveLength(3);
+		expect(rows[0].textContent).toContain('+5');
+		expect(rows[0].textContent).toContain('1.0s');
+		expect(rows[2].textContent).toContain('0.2s');
+	});
+
 	it('classifies a lowered beneficial attribute as a debuff and depletes the pill', () => {
 		staticData.attributes = [DEFENSE];
 		const { getByTestId, container } = render(AttributeTooltip, {

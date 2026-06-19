@@ -84,11 +84,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DotOnEnemy_CountsTowardPlayerDamageDealt_NotHighestAttackOrSkillStats()
         {
-            // The player poisons the enemy for 2/tick with no direct damage; the 50-HP enemy dies after
-            // exactly 50 DoT damage (25 ticks).
-            var player = MakeBattler([Stat(Strength, 0)],
-                [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Opponent, DamageTakenPerSecond, 50)]);
-            var enemy = MakeBattler([Stat(Strength, 0)]); // MaxHealth 50, no skills
+            // A constant poison on the enemy (a base DamageTakenPerSecond) ticks it for 2/tick; the 50-HP
+            // enemy dies after exactly 50 DoT damage (25 ticks). The player fires a 0-damage skill so a
+            // SkillStats row exists to assert the DoT is NOT attributed to it.
+            var player = MakeBattler([Stat(Strength, 0)], [DamageSkill(1, baseDamage: 0)]);
+            var enemy = MakeBattler(Stat(Strength, 0), Stat(DamageTakenPerSecond, 50)); // MaxHealth 50, no skills
 
             var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
 
@@ -103,10 +103,10 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DotOnPlayer_CountsTowardPlayerDamageTaken()
         {
-            // The enemy poisons the player for 2/tick; the 50-HP player (no damage skill) dies after 50 DoT.
-            var player = MakeBattler([Stat(Strength, 0)]);
-            var enemy = MakeBattler([Stat(Strength, 0)],
-                [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Opponent, DamageTakenPerSecond, 50)]);
+            // A constant poison on the player (a base DamageTakenPerSecond) ticks for 2/tick; the 50-HP
+            // player (no damage skill) dies after 50 DoT.
+            var player = MakeBattler(Stat(Strength, 0), Stat(DamageTakenPerSecond, 50));
+            var enemy = MakeBattler(Stat(Strength, 0));
 
             var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
 
@@ -118,10 +118,10 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void HealOnPlayer_CountsTowardPlayerDamageHealed()
         {
-            // The player self-heals 3/tick while the enemy chips 5/tick (baseDamage 7 − Def 2); the player
-            // stays below MaxHealth so the full 3 is restored each tick. Capped at 5 ticks → 15 healed.
-            var player = MakeBattler([Stat(Strength, 0)],
-                [EffectSkill(1, baseDamage: 0, ESkillEffectTarget.Self, HealthRegenPerSecond, 75)]);
+            // A constant self-regen (a base HealthRegenPerSecond) heals 3/tick while the enemy chips 5/tick
+            // (baseDamage 7 − Def 2); the player stays below MaxHealth so the full 3 is restored each tick.
+            // Capped at 5 ticks → 15 healed.
+            var player = MakeBattler(Stat(Strength, 0), Stat(HealthRegenPerSecond, 75));
             var enemy = MakeBattler([Stat(Strength, 0)], [DamageSkill(2, baseDamage: 7)]);
 
             var result = new BattleSimulator(player, enemy, seed: 0).Simulate(maxMs: 200);
@@ -146,30 +146,6 @@ namespace Game.Core.Tests.Battle
             Type = Additive,
             Source = EAttributeModifierSource.PlayerStatPoints,
         };
-
-        /// <summary>A skill firing every tick that applies a permanent per-second-attribute effect to a target.</summary>
-        private static Skill EffectSkill(
-            int id, double baseDamage, ESkillEffectTarget target, EAttribute attribute, double amount) => new()
-            {
-                Id = id,
-                Name = $"Skill {id}",
-                Description = "",
-                CooldownMs = 40,
-                BaseDamage = baseDamage,
-                DamageMultipliers = [],
-                Effects =
-                [
-                    new SkillEffect
-                    {
-                        Id = id * 10,
-                        Target = target,
-                        AttributeId = attribute,
-                        ModifierType = Additive,
-                        Amount = amount,
-                        DurationMs = 1_000_000,
-                    },
-                ],
-            };
 
         private static Skill DamageSkill(int id, double baseDamage) => new()
         {
