@@ -232,6 +232,186 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(1, await CountAsync(c => c.AppliedMods.CountAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId, CancellationToken)));
         }
 
+        [Fact]
+        public async Task SelectedSkillsChanged_SkillRowMissing_InsertsSelectedRowInsteadOfDropping()
+        {
+            // Models a SelectedSkillsChangedEvent reordered ahead of the skill's SkillUnlockedEvent: the
+            // skill row doesn't exist yet, so the pre-fix handler silently left it unselected.
+            var playerId = await SeedPlayerAsync();
+            var skillId = await SeedSkillAsync();
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [skillId]));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerSkills.AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId && ps.SkillId == skillId)
+                .ToListAsync(CancellationToken));
+            Assert.True(row.Selected);
+            Assert.Equal(0, row.Order);
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_AppliedTwice_ConvergesToOrderedLoadoutWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstSkillId = await SeedSkillAsync();
+            var secondSkillId = await SeedSkillAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                // Both skills already unlocked but unselected (the common in-order case).
+                await TestDataSeeder.LinkSkillToPlayerAsync(context, playerId, firstSkillId, selected: false);
+                await TestDataSeeder.LinkSkillToPlayerAsync(context, playerId, secondSkillId, selected: false);
+            }
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [secondSkillId, firstSkillId]));
+            // Re-apply with a different order: existing rows are updated in place, not duplicated.
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId]));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await verifyContext.PlayerSkills.AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(2, rows.Count);
+            var first = Assert.Single(rows, r => r.SkillId == firstSkillId);
+            Assert.True(first.Selected);
+            Assert.Equal(0, first.Order);
+            var second = Assert.Single(rows, r => r.SkillId == secondSkillId);
+            Assert.False(second.Selected);
+            Assert.Equal(0, second.Order);
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            // The skill has no row, so the concurrent applies race on its insert; the clear-and-re-apply path
+            // resolves the conflict to an update on the second pass rather than throwing.
+            var playerId = await SeedPlayerAsync();
+            var skillId = await SeedSkillAsync();
+
+            await ApplyConcurrentlyAsync(new SelectedSkillsChangedEvent(playerId, [skillId]));
+
+            Assert.Equal(1, await CountAsync(c => c.PlayerSkills.CountAsync(ps => ps.PlayerId == playerId && ps.SkillId == skillId, CancellationToken)));
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerSkills.AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId && ps.SkillId == skillId)
+                .ToListAsync(CancellationToken));
+            Assert.True(row.Selected);
+        }
+
+        [Fact]
+        public async Task ItemEquipped_ItemRowMissing_InsertsEquippedRowInsteadOfLeavingSlotEmpty()
+        {
+            // Models an ItemEquippedEvent reordered ahead of the item's ItemUnlockedEvent: the unlocked-item
+            // row doesn't exist yet, so the pre-fix ExecuteUpdate matched zero rows and left the slot empty.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, (int)EEquipmentSlot.HelmSlot));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal((int)EEquipmentSlot.HelmSlot, row.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ItemEquipped_AppliedTwice_ClearsPriorOccupantAndConvergesWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var incumbentId = await SeedItemAsync();
+            var newItemId = await SeedItemAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                // The slot is already occupied by the incumbent; the new item is unlocked but unequipped.
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, incumbentId, EEquipmentSlot.HelmSlot);
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, newItemId);
+            }
+
+            var evt = new ItemEquippedEvent(playerId, newItemId, (int)EEquipmentSlot.HelmSlot);
+            await ApplyAsync(evt);
+            await ApplyAsync(evt);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var newRow = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == newItemId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal((int)EEquipmentSlot.HelmSlot, newRow.EquipmentSlotId);
+            var incumbentRow = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == incumbentId)
+                .ToListAsync(CancellationToken));
+            Assert.Null(incumbentRow.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ItemEquipped_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            // The item has no unlocked-item row, so the concurrent applies race on its insert; the
+            // clear-and-re-apply path resolves the conflict to an update on the second pass rather than throwing.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyConcurrentlyAsync(new ItemEquippedEvent(playerId, itemId, (int)EEquipmentSlot.HelmSlot));
+
+            Assert.Equal(1, await CountAsync(c => c.UnlockedItems.CountAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken)));
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal((int)EEquipmentSlot.HelmSlot, row.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ItemUnequipped_AppliedTwice_ClearsSlotAndConverges()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, itemId, EEquipmentSlot.HelmSlot);
+            }
+
+            var evt = new ItemUnequippedEvent(playerId, itemId);
+            await ApplyAsync(evt);
+            await ApplyAsync(evt);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.Null(row.EquipmentSlotId);
+        }
+
+        [Fact]
+        public async Task ItemUnequipped_ItemRowMissingThenUnlockArrives_ConvergesToUnequipped()
+        {
+            // Models an ItemUnequippedEvent reordered ahead of the item's ItemUnlockedEvent: the unequip is a
+            // benign no-op against the missing row, and the later unlock inserts it with a null (unequipped)
+            // slot — so "unequipped" still converges without the unequip handler needing an insert.
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemUnequippedEvent(playerId, itemId));
+            await ApplyAsync(new ItemUnlockedEvent(playerId, itemId));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == itemId)
+                .ToListAsync(CancellationToken));
+            Assert.Null(row.EquipmentSlotId);
+        }
+
         private static AttributeAllocationsChangedEvent MakeAttributeEvent(int playerId, double intellect, double strength) => new(
             playerId,
             [
