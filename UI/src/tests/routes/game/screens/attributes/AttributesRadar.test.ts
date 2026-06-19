@@ -8,6 +8,7 @@ const makeView = (
 	overrides: Partial<{
 		canInc: () => boolean;
 		inc: (i: number) => void;
+		dec: (i: number) => void;
 		setValue: (i: number, v: number) => void;
 		lockScale: () => void;
 		unlockScale: () => void;
@@ -19,6 +20,7 @@ const makeView = (
 		hexMax: 20,
 		canInc: vi.fn(() => true),
 		inc: vi.fn(),
+		dec: vi.fn(),
 		setValue: vi.fn(),
 		lockScale: vi.fn(),
 		unlockScale: vi.fn(),
@@ -220,26 +222,65 @@ describe('AttributesRadar — keyboard interaction', () => {
 		expect(view.inc).toHaveBeenCalledWith(1);
 	});
 
-	it('does not call view.inc when a non-activation key is pressed', async () => {
+	it('calls view.inc(i) when ArrowUp or ArrowRight is pressed on a vertex', async () => {
+		const view = makeView({});
+		const { container } = render(AttributesRadar, { props: { view } });
+		const vertices = container.querySelectorAll('[role="button"]');
+		await fireEvent.keyDown(vertices[0], { key: 'ArrowUp' });
+		await fireEvent.keyDown(vertices[1], { key: 'ArrowRight' });
+		expect(view.inc).toHaveBeenCalledWith(0);
+		expect(view.inc).toHaveBeenCalledWith(1);
+	});
+
+	it('calls view.dec(i) when ArrowDown or ArrowLeft is pressed on a vertex', async () => {
+		const view = makeView({});
+		const { container } = render(AttributesRadar, { props: { view } });
+		const vertices = container.querySelectorAll('[role="button"]');
+		await fireEvent.keyDown(vertices[2], { key: 'ArrowDown' });
+		await fireEvent.keyDown(vertices[3], { key: 'ArrowLeft' });
+		expect(view.dec).toHaveBeenCalledWith(2);
+		expect(view.dec).toHaveBeenCalledWith(3);
+	});
+
+	it('still refunds via the arrow keys when canInc() is false (at max budget)', async () => {
+		const view = makeView({ canInc: vi.fn(() => false) });
+		const { container } = render(AttributesRadar, { props: { view } });
+		await fireEvent.keyDown(container.querySelectorAll('[role="button"]')[0], { key: 'ArrowDown' });
+		expect(view.dec).toHaveBeenCalledWith(0);
+	});
+
+	it('does not call inc or dec when a non-activation key is pressed', async () => {
 		const view = makeView({});
 		const { container } = render(AttributesRadar, { props: { view } });
 		const vertex = container.querySelectorAll('[role="button"]')[0];
 		await fireEvent.keyDown(vertex, { key: 'Tab' });
 		expect(view.inc).not.toHaveBeenCalled();
+		expect(view.dec).not.toHaveBeenCalled();
+	});
+
+	it('does not handle keys when interactive=false', async () => {
+		const view = makeView({});
+		const { container } = render(AttributesRadar, { props: { view, interactive: false } });
+		const vertex = container.querySelectorAll('[role="button"]')[0];
+		await fireEvent.keyDown(vertex, { key: 'ArrowDown' });
+		await fireEvent.keyDown(vertex, { key: 'Enter' });
+		expect(view.inc).not.toHaveBeenCalled();
+		expect(view.dec).not.toHaveBeenCalled();
 	});
 });
 
 describe('AttributesRadar — tabindex', () => {
-	it('sets tabindex=0 on all vertices when canInc() is true', () => {
-		const view = makeView({ canInc: vi.fn(() => true) });
+	it('keeps all vertices focusable (tabindex=0) when interactive, even at max budget', () => {
+		// Focusable regardless of canInc so a keyboard user can refund points when the budget is spent.
+		const view = makeView({ canInc: vi.fn(() => false) });
 		const { container } = render(AttributesRadar, { props: { view } });
 		const vertices = container.querySelectorAll('[role="button"]');
 		vertices.forEach((v) => expect(v.getAttribute('tabindex')).toBe('0'));
 	});
 
-	it('sets tabindex=-1 on all vertices when canInc() is false', () => {
-		const view = makeView({ canInc: vi.fn(() => false) });
-		const { container } = render(AttributesRadar, { props: { view } });
+	it('sets tabindex=-1 on all vertices when interactive=false', () => {
+		const view = makeView({});
+		const { container } = render(AttributesRadar, { props: { view, interactive: false } });
 		const vertices = container.querySelectorAll('[role="button"]');
 		vertices.forEach((v) => expect(v.getAttribute('tabindex')).toBe('-1'));
 	});

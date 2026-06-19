@@ -42,11 +42,11 @@
 					group.items.filter((c) => c.state !== 'done'),
 					'progress'
 				)[0]}
-				<button
-					class="type-card"
-					style:border-left="2px solid {tintColor(group.accent, 0.6)}"
-					onclick={() => onPick(group.typeId)}
-				>
+				<!-- Accessible card: a presentational container whose primary action is a full-bleed
+				     OverlayButton (open this challenge type), with the reward chip raised above it so
+				     its own tooltip trigger stays interactive — no nested <button>s. -->
+				<div class="type-card" style:border-left="2px solid {tintColor(group.accent, 0.6)}">
+					<OverlayButton label={`View ${group.label} challenges`} onActivate={() => onPick(group.typeId)} />
 					<div class="type-card-head">
 						<RingMeter {pct} accent={group.accent} size={34} stroke={3} done={complete}>
 							<TypeGlyph typeId={group.typeId} color={complete ? 'var(--success)' : group.accent} size={15} />
@@ -56,14 +56,14 @@
 							<div class="mono-label sm" class:done={complete}>{stats.done}/{stats.total} unlocked</div>
 						</div>
 					</div>
-					<div class="type-card-reward">
+					<div class="type-card-reward" class:raised={next2}>
 						{#if next2}
 							<RewardAffordance reward={next2.reward} variant="chip" />
 						{:else}
 							<span class="all-unlocked">All unlocked ✓</span>
 						{/if}
 					</div>
-				</button>
+				</div>
 			{/each}
 		</div>
 	</div>
@@ -79,6 +79,7 @@ import {
 	type OverallSummary,
 	type TypeGroup
 } from './challenges-view.svelte';
+import OverlayButton from '$components/OverlayButton.svelte';
 import ProgressBar from './ProgressBar.svelte';
 import ProgressReadout from './ProgressReadout.svelte';
 import RewardAffordance from './RewardAffordance.svelte';
@@ -185,6 +186,7 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 }
 
 .type-card {
+	position: relative;
 	text-align: left;
 	cursor: pointer;
 	background: var(--panel);
@@ -212,6 +214,13 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 
 .type-card-reward {
 	margin-top: 11px;
+
+	// Raised above the full-bleed overlay so the reward chip's own tooltip trigger stays clickable;
+	// the non-interactive "All unlocked" state stays flat so clicks fall through to the overlay.
+	&.raised {
+		position: relative;
+		z-index: 2;
+	}
 }
 
 .all-unlocked {

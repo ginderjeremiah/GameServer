@@ -92,8 +92,9 @@ describe('Challenges screen', () => {
 			const { container } = render(Challenges);
 			await screen.findByText('Overview');
 
-			// Click the overview's "Enemies Killed" type card → view.select(type).
-			const typeCard = container.querySelector('.type-card') as HTMLElement;
+			// Activate the overview's "Enemies Killed" type card (its full-bleed overlay button) →
+			// view.select(type).
+			const typeCard = container.querySelector('.type-card .overlay-button') as HTMLElement;
 			await fireEvent.click(typeCard);
 
 			// The detail grid now shows the type's challenge cards + the sort control.
@@ -116,7 +117,7 @@ describe('Challenges screen', () => {
 		it('switches the active sort via the SortControl', async () => {
 			const { container } = render(Challenges);
 			await screen.findByText('Overview');
-			await fireEvent.click(container.querySelector('.type-card') as HTMLElement);
+			await fireEvent.click(container.querySelector('.type-card .overlay-button') as HTMLElement);
 			await screen.findByText('First Blood');
 
 			const nameSort = screen.getByText('Name');

@@ -25,13 +25,13 @@
 			class:interactive
 			class:dragging={dragIndex === i}
 			role="button"
-			tabindex={clickable ? 0 : -1}
+			tabindex={interactive ? 0 : -1}
 			aria-label={clickable
-				? `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag to allocate or click to add a point`
-				: `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag to refund points`}
+				? `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag, or use arrow keys to allocate and refund points`
+				: `Adjust ${attributeName(coreIds[i], staticData.attributes)} — drag, or use arrow keys to refund points`}
 			onpointerdown={(e) => startDrag(e, i)}
 			onclick={() => onVertexClick(i)}
-			onkeydown={(e) => clickable && handleKey(e, i)}
+			onkeydown={(e) => interactive && handleKey(e, i)}
 		>
 			<circle cx={vertex[0]} cy={vertex[1]} r="11" fill="transparent" />
 			<circle cx={vertex[0]} cy={vertex[1]} r={big ? 4.5 : 3.5} class="dot" style="--c: {attributeColor(coreIds[i])}" />
@@ -148,9 +148,15 @@ const labels = $derived(
 );
 
 function handleKey(e: KeyboardEvent, i: number): void {
-	if (e.key === 'Enter' || e.key === ' ') {
+	// Enter/Space and Arrow-up/right allocate a point; Arrow-down/left refunds one. The view's
+	// inc/dec no-op past their bounds, so a keyboard user can refund even at max budget — the
+	// drag-inward affordance the aria-label advertised but the keyboard previously couldn't reach.
+	if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowRight') {
 		e.preventDefault();
 		view.inc(i);
+	} else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+		e.preventDefault();
+		view.dec(i);
 	}
 }
 

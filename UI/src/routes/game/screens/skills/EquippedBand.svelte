@@ -4,7 +4,7 @@
 		<div class="spacer"></div>
 		<button type="button" class="band-chip action" onclick={() => view.cancelSwap()}>Cancel</button>
 	{:else}
-		<span class="label">Equipped loadout — priority left → right · drag to reorder</span>
+		<span class="label">Equipped loadout — priority left → right · drag or use the arrows to reorder</span>
 		<div class="spacer"></div>
 		<span class="band-chip">{view.equipped.length}/{view.cap}</span>
 	{/if}
@@ -47,6 +47,26 @@
 						aria-label="Remove {metrics.skill.name} from loadout"
 						onclick={() => view.toggle(id)}>✕</button
 					>
+					<!-- Keyboard/touch reorder path: HTML5 drag-and-drop is mouse-only, so these real
+					     buttons give a focus- and touch-reachable way to change battle priority. -->
+					<div class="reorder">
+						<button
+							type="button"
+							class="mv"
+							title="Move earlier in priority"
+							aria-label="Move {metrics.skill.name} earlier in priority"
+							disabled={index === 0}
+							onclick={() => view.reorder(index, index - 1)}>‹</button
+						>
+						<button
+							type="button"
+							class="mv"
+							title="Move later in priority"
+							aria-label="Move {metrics.skill.name} later in priority"
+							disabled={index >= view.equipped.length - 1}
+							onclick={() => view.reorder(index, index + 1)}>›</button
+						>
+					</div>
 				{/if}
 				<span class="en">{metrics.skill.name}</span>
 				<div class="es">
@@ -266,6 +286,48 @@ const onDragEnd = () => {
 
 		&:hover {
 			color: var(--enemy-accent);
+		}
+	}
+
+	.reorder {
+		position: absolute;
+		top: 5px;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		gap: 3px;
+		// Above the full-bleed overlay button so the arrows stay clickable.
+		z-index: 2;
+		// Revealed on hover or keyboard focus so the card stays clean by default; tapping the card
+		// (focusing its overlay) reveals them on touch, where there is no hover.
+		opacity: 0;
+		transition: opacity 120ms;
+	}
+
+	&:hover .reorder,
+	&:focus-within .reorder {
+		opacity: 1;
+	}
+
+	.mv {
+		width: 16px;
+		height: 16px;
+		border: none;
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--black) 45%, transparent);
+		color: var(--text-tertiary);
+		font-size: 13px;
+		line-height: 16px;
+		text-align: center;
+		cursor: pointer;
+
+		&:hover:not(:disabled) {
+			color: var(--accent);
+		}
+
+		&:disabled {
+			opacity: 0.3;
+			cursor: default;
 		}
 	}
 

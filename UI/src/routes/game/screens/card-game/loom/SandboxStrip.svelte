@@ -10,6 +10,7 @@
 			type="range"
 			min="0"
 			max="300"
+			aria-label="Agility"
 			value={game.agi}
 			oninput={(e) => view.setStat('agi', +e.currentTarget.value)}
 		/>
@@ -23,6 +24,7 @@
 			type="range"
 			min="1"
 			max="500"
+			aria-label="Dexterity"
 			value={game.dex}
 			oninput={(e) => view.setStat('dex', +e.currentTarget.value)}
 		/>
@@ -36,6 +38,7 @@
 			type="range"
 			min="0"
 			max="60"
+			aria-label="Luck"
 			value={game.luck}
 			oninput={(e) => view.setStat('luck', +e.currentTarget.value)}
 		/>
