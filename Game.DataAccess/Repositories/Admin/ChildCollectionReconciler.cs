@@ -1,3 +1,5 @@
+using Game.Abstractions.DataAccess.Admin;
+
 namespace Game.DataAccess.Repositories.Admin
 {
     /// <summary>
@@ -27,16 +29,29 @@ namespace Game.DataAccess.Repositories.Admin
         // The collections are typed IReadOnlyCollection rather than IEnumerable because each is enumerated
         // twice (once to build its key set, once to diff), so a deferred/lazy source would re-run — and could
         // yield a different sequence the second time. Requiring a materialized collection rules that out.
-        public static void Reconcile<TExisting, TDesired, TKey>(
+        public static AdminSaveResult Reconcile<TExisting, TDesired, TKey>(
             IReadOnlyCollection<TExisting> existing,
             IReadOnlyCollection<TDesired> desired,
             Func<TExisting, TKey> existingKey,
             Func<TDesired, TKey> desiredKey,
             Action<TExisting> delete,
             Action<TDesired> insert,
+            string resourceName,
             Action<TDesired>? update = null) where TKey : notnull
         {
-            var desiredKeys = desired.Select(desiredKey).ToHashSet();
+            // A full desired set must not name the same child twice: a duplicate key slips past the
+            // existing-membership check (both copies miss it) and double-inserts into a unique violation
+            // at commit — or, for an existing key, double-tracks the same entity as Modified, which EF
+            // rejects. The set is malformed input, so reject the whole write up front as a business error.
+            var desiredKeys = new HashSet<TKey>();
+            foreach (var item in desired)
+            {
+                if (!desiredKeys.Add(desiredKey(item)))
+                {
+                    return AdminSaveResult.Failure($"The submitted {resourceName} set contains duplicate entries.");
+                }
+            }
+
             var existingKeys = existing.Select(existingKey).ToHashSet();
 
             foreach (var child in existing)
@@ -58,6 +73,8 @@ namespace Game.DataAccess.Repositories.Admin
                     insert(item);
                 }
             }
+
+            return AdminSaveResult.Success;
         }
     }
 }

@@ -91,7 +91,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Zone");
             }
 
-            ChildCollectionReconciler.Reconcile(
+            return ChildCollectionReconciler.Reconcile(
                 existing: zone.ZoneEnemies,
                 desired: data.ZoneEnemies,
                 existingKey: ze => ze.EnemyId,
@@ -107,14 +107,13 @@ namespace Game.DataAccess.Repositories.Admin
                     EnemyId = ze.EnemyId,
                     Weight = ze.Weight,
                 }),
+                resourceName: "enemy",
                 update: ze => _entityStore.Update(new Entities.ZoneEnemy
                 {
                     ZoneId = data.ZoneId,
                     EnemyId = ze.EnemyId,
                     Weight = ze.Weight,
                 }));
-
-            return AdminSaveResult.Success;
         }
     }
 }

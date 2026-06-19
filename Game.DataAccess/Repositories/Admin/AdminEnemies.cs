@@ -49,7 +49,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Enemy");
             }
 
-            ChildCollectionReconciler.Reconcile(
+            return ChildCollectionReconciler.Reconcile(
                 existing: enemy.AttributeDistributions,
                 desired: data.AttributeDistributions,
                 existingKey: ad => ad.AttributeId,
@@ -66,6 +66,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BaseAmount = ad.BaseAmount,
                     AmountPerLevel = ad.AmountPerLevel,
                 }),
+                resourceName: "attribute distribution",
                 update: ad => _entityStore.Update(new Entities.AttributeDistribution
                 {
                     EnemyId = enemy.Id,
@@ -73,8 +74,6 @@ namespace Game.DataAccess.Repositories.Admin
                     BaseAmount = ad.BaseAmount,
                     AmountPerLevel = ad.AmountPerLevel,
                 }));
-
-            return AdminSaveResult.Success;
         }
 
         public AdminSaveResult SetSkills(SetEnemySkillsData data)
@@ -87,7 +86,7 @@ namespace Game.DataAccess.Repositories.Admin
 
             // An EnemySkill is a pure join row (no payload beyond its key), so a skill present on both
             // sides needs no update — only deletes and inserts apply.
-            ChildCollectionReconciler.Reconcile(
+            return ChildCollectionReconciler.Reconcile(
                 existing: enemy.EnemySkills,
                 desired: data.SkillIds,
                 existingKey: es => es.SkillId,
@@ -101,9 +100,8 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     EnemyId = enemy.Id,
                     SkillId = id,
-                }));
-
-            return AdminSaveResult.Success;
+                }),
+                resourceName: "skill");
         }
 
         public AdminSaveResult SetSpawns(SetEnemySpawnsData data)
@@ -114,7 +112,7 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Enemy");
             }
 
-            ChildCollectionReconciler.Reconcile(
+            return ChildCollectionReconciler.Reconcile(
                 existing: enemy.ZoneEnemies,
                 desired: data.Spawns,
                 existingKey: ze => ze.ZoneId,
@@ -130,14 +128,13 @@ namespace Game.DataAccess.Repositories.Admin
                     EnemyId = enemy.Id,
                     Weight = s.Weight,
                 }),
+                resourceName: "spawn",
                 update: s => _entityStore.Update(new Entities.ZoneEnemy
                 {
                     ZoneId = s.ZoneId,
                     EnemyId = enemy.Id,
                     Weight = s.Weight,
                 }));
-
-            return AdminSaveResult.Success;
         }
     }
 }

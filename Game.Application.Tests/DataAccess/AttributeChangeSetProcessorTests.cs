@@ -31,7 +31,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void Apply_Add_InsertsTheMappedEntity_RegardlessOfMembership()
+        public void Apply_AddOfAbsentAttribute_InsertsTheMappedEntity()
         {
             var store = new RecordingEntityStore();
 
@@ -41,6 +41,41 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal((int)EAttribute.Strength, inserted.AttributeId);
             Assert.Equal(5m, inserted.Amount);
             Assert.Empty(store.Updated);
+            Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public void Apply_AddOfAlreadyPresentAttribute_Upserts()
+        {
+            // An Add of an attribute the owner already has must update, not duplicate-insert into a
+            // composite-PK violation at commit.
+            var store = new RecordingEntityStore();
+            var existing = new[] { new TestEntity((int)EAttribute.Strength, 1m) };
+
+            Apply([Change(EChangeType.Add, EAttribute.Strength, 5m)], existing, store);
+
+            var updated = Assert.IsType<TestEntity>(Assert.Single(store.Updated));
+            Assert.Equal((int)EAttribute.Strength, updated.AttributeId);
+            Assert.Equal(5m, updated.Amount);
+            Assert.Empty(store.Inserted);
+            Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public void Apply_DuplicateAddInSameBatch_InsertsOnceThenUpdates()
+        {
+            // Two Adds of the same key in one batch must not both insert (which would duplicate-key at
+            // commit): the first inserts, the second sees the now-present key and updates.
+            var store = new RecordingEntityStore();
+
+            Apply(
+            [
+                Change(EChangeType.Add, EAttribute.Strength, 5m),
+                Change(EChangeType.Add, EAttribute.Strength, 7m),
+            ], existing: [], store);
+
+            Assert.Equal(5m, Assert.IsType<TestEntity>(Assert.Single(store.Inserted)).Amount);
+            Assert.Equal(7m, Assert.IsType<TestEntity>(Assert.Single(store.Updated)).Amount);
             Assert.Empty(store.Deleted);
         }
 

@@ -21,13 +21,16 @@ namespace Game.DataAccess.Repositories.Admin
             var current = await currentTagIds.ToHashSetAsync(cancellationToken: cancellationToken);
             var desired = await desiredTagIds.ToHashSetAsync(cancellationToken: cancellationToken);
 
+            // The desired ids arrive as a HashSet, so duplicates are structurally impossible here and the
+            // reconciler's duplicate-key rejection can never fire — the result is always success.
             ChildCollectionReconciler.Reconcile(
                 existing: current,
                 desired: desired,
                 existingKey: id => id,
                 desiredKey: id => id,
                 delete: tagId => entityStore.Delete(toJoinRow(tagId)),
-                insert: tagId => entityStore.Insert(toJoinRow(tagId)));
+                insert: tagId => entityStore.Insert(toJoinRow(tagId)),
+                resourceName: "tag");
         }
     }
 }

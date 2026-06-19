@@ -174,6 +174,39 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetAttributeDistributions_DuplicateDesiredKeys_ReturnsFailure()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The same attribute named twice in the desired set would otherwise double-insert into a
+            // composite-PK violation at commit; it must reject up front instead.
+            var data = new SetEnemyAttributeDistributions
+            {
+                EnemyId = enemyId,
+                AttributeDistributions =
+                [
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.Intellect, BaseAmount = 1m, AmountPerLevel = 1m },
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.Intellect, BaseAmount = 2m, AmountPerLevel = 2m },
+                ],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SetAttributeDistributions(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted attribute distribution set contains duplicate entries.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetAttributeDistributions_UnknownEnemy_ReturnsNotFound()
         {
             using var scope = CreateScope();
