@@ -79,23 +79,24 @@ namespace Game.Api.Controllers.Admin
         public async Task<ApiResponse> ArchiveUser([FromBody] UserActionData data)
         {
             var status = await _users.ArchiveUser(_session.UserId, data.UserId);
-            return MapUserAction(status, "You cannot archive your own account.");
+            return MapUserAction(status, "You cannot archive your own account.", "Cannot archive the last remaining admin.");
         }
 
         [HttpPost]
         public async Task<ApiResponse> BanUser([FromBody] UserActionData data)
         {
             var status = await _users.BanUser(_session.UserId, data.UserId);
-            return MapUserAction(status, "You cannot ban your own account.");
+            return MapUserAction(status, "You cannot ban your own account.", "Cannot ban the last remaining admin.");
         }
 
-        private static ApiResponse MapUserAction(UserActionStatus status, string selfTargetMessage)
+        private static ApiResponse MapUserAction(UserActionStatus status, string selfTargetMessage, string lastAdminMessage)
         {
             return status switch
             {
                 UserActionStatus.Success => ApiResponse.Success(),
                 UserActionStatus.UserNotFound => ApiResponse.Error("User not found."),
                 UserActionStatus.SelfTarget => ApiResponse.Error(selfTargetMessage),
+                UserActionStatus.LastAdmin => ApiResponse.Error(lastAdminMessage),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

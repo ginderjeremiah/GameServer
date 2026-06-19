@@ -90,5 +90,61 @@ namespace Game.Core.Tests.Identity
 
             Assert.Equal(RoleChangeProtection.Allowed, result);
         }
+
+        [Theory]
+        // Self-target is rejected regardless of role or surviving-admin state.
+        [InlineData(true, true)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(false, false)]
+        public void CheckUserAction_TargetingSelf_IsSelfTarget(bool targetHasAdminRole, bool otherUsableAdminsRemain)
+        {
+            var result = AdminLockoutPolicy.CheckUserAction(
+                actingUserId: 7,
+                targetUserId: 7,
+                targetHasAdminRole,
+                otherUsableAdminsRemain);
+
+            Assert.Equal(UserActionProtection.SelfTarget, result);
+        }
+
+        [Theory]
+        // Acting on a non-admin never reduces the admin pool, so it is always allowed.
+        [InlineData(true)]
+        [InlineData(false)]
+        public void CheckUserAction_NonAdminTarget_IsAllowed(bool otherUsableAdminsRemain)
+        {
+            var result = AdminLockoutPolicy.CheckUserAction(
+                actingUserId: 1,
+                targetUserId: 2,
+                targetHasAdminRole: false,
+                otherUsableAdminsRemain);
+
+            Assert.Equal(UserActionProtection.Allowed, result);
+        }
+
+        [Fact]
+        public void CheckUserAction_AdminTarget_WhileUsableAdminsRemain_IsAllowed()
+        {
+            var result = AdminLockoutPolicy.CheckUserAction(
+                actingUserId: 1,
+                targetUserId: 2,
+                targetHasAdminRole: true,
+                otherUsableAdminsRemain: true);
+
+            Assert.Equal(UserActionProtection.Allowed, result);
+        }
+
+        [Fact]
+        public void CheckUserAction_AdminTarget_WhenNoUsableAdminsRemain_IsLastAdmin()
+        {
+            var result = AdminLockoutPolicy.CheckUserAction(
+                actingUserId: 1,
+                targetUserId: 2,
+                targetHasAdminRole: true,
+                otherUsableAdminsRemain: false);
+
+            Assert.Equal(UserActionProtection.LastAdmin, result);
+        }
     }
 }

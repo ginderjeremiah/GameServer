@@ -559,6 +559,155 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ArchiveUser_ArchivingAnotherAdmin_WhileAdminsRemain_Succeeds()
+        {
+            var (authClient, _) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+            int otherAdminId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var other = await TestDataSeeder.CreateUserAsync(context, "otheradmin", "pw");
+                otherAdminId = other.Id;
+                await TestDataSeeder.AssignRoleToUserAsync(context, other.Id, ERole.Admin);
+            }
+
+            // The acting admin remains usable, so archiving another admin is not a lockout.
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = otherAdminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var archived = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == otherAdminId, CancellationToken);
+            Assert.NotNull(archived.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task BanUser_BanningAnotherAdmin_WhileAdminsRemain_Succeeds()
+        {
+            var (authClient, _) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+            int otherAdminId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var other = await TestDataSeeder.CreateUserAsync(context, "otheradmin", "pw");
+                otherAdminId = other.Id;
+                await TestDataSeeder.AssignRoleToUserAsync(context, other.Id, ERole.Admin);
+            }
+
+            // The acting admin remains usable, so banning another admin is not a lockout.
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/BanUser", new { UserId = otherAdminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var banned = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == otherAdminId, CancellationToken);
+            Assert.NotNull(banned.BannedAt);
+        }
+
+        [Fact]
+        public async Task ArchiveUser_ArchivingLastAdmin_IsRejected()
+        {
+            // Driven through the repository so the actor is a valid-token admin who is no longer a usable
+            // admin (e.g. concurrently demoted), leaving the target as the last admin standing.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var soleAdmin = await TestDataSeeder.CreateUserAsync(context, "soleadmin", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, soleAdmin.Id, ERole.Admin);
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.ArchiveUser(actor.Id, soleAdmin.Id);
+
+            Assert.Equal(UserActionStatus.LastAdmin, status);
+            var reloaded = await context.Users.AsNoTracking().FirstAsync(u => u.Id == soleAdmin.Id, CancellationToken);
+            Assert.Null(reloaded.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task BanUser_BanningLastAdmin_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var soleAdmin = await TestDataSeeder.CreateUserAsync(context, "soleadmin", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, soleAdmin.Id, ERole.Admin);
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.BanUser(actor.Id, soleAdmin.Id);
+
+            Assert.Equal(UserActionStatus.LastAdmin, status);
+            var reloaded = await context.Users.AsNoTracking().FirstAsync(u => u.Id == soleAdmin.Id, CancellationToken);
+            Assert.Null(reloaded.BannedAt);
+        }
+
+        [Fact]
+        public async Task ArchiveUser_ConcurrentMutualArchives_LeaveOneAdminStanding()
+        {
+            // Two admins are the only admins; a ghost actor concurrently archives each. The atomic
+            // check-then-act must let at most one through so the system is never left admin-less.
+            var (firstAdminId, secondAdminId, actorId) = await SeedTwoAdminsAndGhostActorAsync();
+
+            async Task<UserActionStatus> ArchiveAsync(int targetId)
+            {
+                using var scope = CreateScope();
+                var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+                return await users.ArchiveUser(actorId, targetId);
+            }
+
+            var results = await Task.WhenAll(ArchiveAsync(firstAdminId), ArchiveAsync(secondAdminId));
+
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.Success));
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.LastAdmin));
+            Assert.Equal(1, await CountUsableAdminsAsync());
+        }
+
+        [Fact]
+        public async Task BanUser_ConcurrentMutualBans_LeaveOneAdminStanding()
+        {
+            var (firstAdminId, secondAdminId, actorId) = await SeedTwoAdminsAndGhostActorAsync();
+
+            async Task<UserActionStatus> BanAsync(int targetId)
+            {
+                using var scope = CreateScope();
+                var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+                return await users.BanUser(actorId, targetId);
+            }
+
+            var results = await Task.WhenAll(BanAsync(firstAdminId), BanAsync(secondAdminId));
+
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.Success));
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.LastAdmin));
+            Assert.Equal(1, await CountUsableAdminsAsync());
+        }
+
+        private async Task<(int FirstAdminId, int SecondAdminId, int ActorId)> SeedTwoAdminsAndGhostActorAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var first = await TestDataSeeder.CreateUserAsync(context, "admin_a", "pw");
+            var second = await TestDataSeeder.CreateUserAsync(context, "admin_b", "pw");
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+            await TestDataSeeder.AssignRoleToUserAsync(context, first.Id, ERole.Admin);
+            await TestDataSeeder.AssignRoleToUserAsync(context, second.Id, ERole.Admin);
+            return (first.Id, second.Id, actor.Id);
+        }
+
+        private async Task<int> CountUsableAdminsAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.Users.CountAsync(
+                u => u.ArchivedAt == null && u.BannedAt == null && u.Roles.Any(r => r.Id == (int)ERole.Admin),
+                CancellationToken);
+        }
+
+        [Fact]
         public async Task ArchiveUser_NonPositiveUserId_Returns400()
         {
             using var authClient = await SetupAdminClientAsync();

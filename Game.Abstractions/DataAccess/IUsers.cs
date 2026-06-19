@@ -24,7 +24,8 @@ namespace Game.Abstractions.DataAccess
     /// <summary>
     /// Outcome of a single-user lifecycle action (<see cref="IUsers.ArchiveUser"/> /
     /// <see cref="IUsers.BanUser"/>), so the caller can surface the appropriate message. The data tier
-    /// rejects an admin targeting their own account to prevent a self-inflicted lockout.
+    /// enforces the admin-lockout rules: an admin cannot target their own account, nor take the last
+    /// usable admin out of circulation.
     /// </summary>
     public enum UserActionStatus
     {
@@ -33,6 +34,9 @@ namespace Game.Abstractions.DataAccess
 
         /// <summary>The acting admin attempted the action on their own account.</summary>
         SelfTarget,
+
+        /// <summary>The action would have taken the last usable admin out of circulation.</summary>
+        LastAdmin,
     }
 
     public interface IUsers
@@ -95,15 +99,18 @@ namespace Game.Abstractions.DataAccess
         Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds);
 
         /// <summary>
-        /// Archives (soft-deletes) the target user, freeing their username for reuse. Rejects an admin
-        /// archiving their own account (<see cref="UserActionStatus.SelfTarget"/>) and returns
-        /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
+        /// Archives (soft-deletes) the target user, freeing their username for reuse. Enforces the
+        /// admin-lockout rules: rejects an admin archiving their own account
+        /// (<see cref="UserActionStatus.SelfTarget"/>) and archiving the last usable admin
+        /// (<see cref="UserActionStatus.LastAdmin"/>). Returns <see cref="UserActionStatus.UserNotFound"/>
+        /// if the user does not exist.
         /// </summary>
         Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId);
 
         /// <summary>
-        /// Bans the target user while keeping their username reserved. Rejects an admin banning their own
-        /// account (<see cref="UserActionStatus.SelfTarget"/>) and returns
+        /// Bans the target user while keeping their username reserved. Enforces the admin-lockout rules:
+        /// rejects an admin banning their own account (<see cref="UserActionStatus.SelfTarget"/>) and
+        /// banning the last usable admin (<see cref="UserActionStatus.LastAdmin"/>). Returns
         /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
         /// </summary>
         Task<UserActionStatus> BanUser(int actingUserId, int targetUserId);
