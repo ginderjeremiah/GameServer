@@ -90,7 +90,9 @@ const defineProxiedArrayProp = <T extends object>(
 ) => {
 	statifyArrayValues(data);
 	let state = $state(data);
-	let stateProxy = $state.raw(proxyArray(state));
+	// Wrap the reactive `state` array (not raw `data`) so mutations stay reactive. A $derived rebuilds
+	// the proxy when `state` is reassigned and reads it reactively, avoiding a stale local capture.
+	const stateProxy = $derived(proxyArray(state));
 	Object.defineProperty(statified, property, {
 		get() {
 			return stateProxy;
@@ -98,7 +100,6 @@ const defineProxiedArrayProp = <T extends object>(
 		set(value) {
 			statifyArrayValues(value);
 			state = value;
-			stateProxy = proxyArray(state);
 		}
 	});
 };
