@@ -498,29 +498,147 @@ describe('EnemyManager boss mode', () => {
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
 	});
 
-	it('a rapid second press frees a transition parked in its enemy-fetch backoff', async () => {
-		// ChallengeBoss fails, so the transition falls back to getNewEnemy; NewEnemy is also down, so that
-		// fetch parks in its (held-open) retry backoff with `transitioning` still set. A second press is
-		// dropped by the guard but cancels the parked backoff, so the first transition settles promptly
-		// instead of holding the controls for the full retry window.
+	it('a retreat supersedes an in-flight challenge (last input wins)', async () => {
+		// The player presses Challenge, then changes their mind and Retreats while ChallengeBoss is still
+		// in flight. The retreat takes over: the boss the challenge was loading must not clobber the idle
+		// fight the retreat moved to, and only the idle enemy is ever notified.
+		let releaseChallenge!: (r: IApiSocketResponse<'ChallengeBoss'>) => void;
+		const challengeGate = new Promise<IApiSocketResponse<'ChallengeBoss'>>((resolve) => (releaseChallenge = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'ChallengeBoss' ? challengeGate : Promise.resolve(newEnemyResponse)
+		);
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const challenge = manager.challengeBoss();
+		await flush(); // park on the in-flight ChallengeBoss (mode already 'boss')
+		expect(manager.mode).toBe('boss');
+
+		const retreat = manager.retreatFromBoss(); // a challenge (heading to boss) is in flight → supersede
+		await retreat;
+		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
+
+		releaseChallenge(challengeResponse); // the superseded challenge now resolves
+		await challenge;
+
+		// The boss was dropped: the idle enemy stands and only it was ever notified.
+		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
+		expect(loaded).toEqual([normalInstance]);
+	});
+
+	it('a challenge supersedes an in-flight retreat, cancelling its parked backoff', async () => {
+		// In a boss fight the player Retreats; NewEnemy is down so the retreat parks in its (held-open) retry
+		// backoff. Pressing Challenge supersedes it: the parked backoff is cut short and the boss reloads
+		// promptly rather than after the full retry window.
+		await manager.challengeBoss(); // engage the boss first
+		expect(manager.mode).toBe('boss');
+
 		let releaseDelay: () => void = () => {};
 		vi.mocked(delay).mockReturnValue(new Promise<void>((resolve) => (releaseDelay = resolve)));
 		send.mockImplementation((name: string) =>
-			name === 'ChallengeBoss'
-				? Promise.resolve(challengeError)
-				: Promise.resolve({ id: '1', name: 'NewEnemy', error: 'outage' } as IApiSocketResponse<'NewEnemy'>)
+			name === 'NewEnemy'
+				? Promise.resolve({ id: '1', name: 'NewEnemy', error: 'outage' } as IApiSocketResponse<'NewEnemy'>)
+				: Promise.resolve(challengeResponse)
 		);
 
-		const first = manager.challengeBoss();
-		await flush(); // park the fallback fetch on its backoff while transitioning is held
+		const retreat = manager.retreatFromBoss();
+		await flush(); // park the retreat's fallback fetch on its backoff (mode now 'idle')
+		expect(manager.mode).toBe('idle');
 
-		// The second press is dropped (the guard still returns), but it interrupts the parked backoff.
+		const challenge = manager.challengeBoss(); // supersede: cancel the backoff and reload the boss
+		await Promise.all([retreat, challenge]);
+
+		// Resolving without the held delay elapsing proves the backoff was short-circuited.
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(bossInstance);
+		releaseDelay(); // a late timer firing is harmless
+	});
+
+	it('a second challenge while one is in flight is a no-op (no duplicate ChallengeBoss)', async () => {
+		// A second Challenge press targets the same destination as the in-flight one, so it is ignored rather
+		// than re-sent — a re-send would make the backend abandon and re-spawn the boss (a phantom abandon).
+		let releaseChallenge!: (r: IApiSocketResponse<'ChallengeBoss'>) => void;
+		const challengeGate = new Promise<IApiSocketResponse<'ChallengeBoss'>>((resolve) => (releaseChallenge = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'ChallengeBoss' ? challengeGate : Promise.resolve(newEnemyResponse)
+		);
+		const challengeCount = () => send.mock.calls.filter((c: unknown[]) => c[0] === 'ChallengeBoss').length;
+
+		const first = manager.challengeBoss();
+		await flush(); // park on the in-flight ChallengeBoss
+
+		await manager.challengeBoss(); // same intent → ignored, returns at once
+		expect(challengeCount()).toBe(1);
+
+		releaseChallenge(challengeResponse);
+		await first;
+
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(bossInstance);
+		expect(challengeCount()).toBe(1);
+	});
+
+	it('a second retreat while one is in flight is a no-op (the in-flight retreat continues)', async () => {
+		// A second Retreat press targets the same destination as the in-flight one, so it is ignored and the
+		// in-flight retreat carries on — only a single NewEnemy is requested.
 		await manager.challengeBoss();
-		// The first transition now settles — its fallback fetch loop exits on the superseded generation —
-		// even though the held delay never elapsed. Resolving at all is the proof it was short-circuited.
+		expect(manager.mode).toBe('boss');
+
+		let releaseNewEnemy!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		const newEnemyGate = new Promise<IApiSocketResponse<'NewEnemy'>>((resolve) => (releaseNewEnemy = resolve));
+		let newEnemyCalls = 0;
+		send.mockImplementation((name: string) => {
+			if (name === 'NewEnemy') {
+				newEnemyCalls++;
+				return newEnemyGate;
+			}
+			return Promise.resolve(challengeResponse);
+		});
+
+		const first = manager.retreatFromBoss();
+		await flush(); // park the retreat on its in-flight NewEnemy (mode now 'idle')
+		expect(manager.mode).toBe('idle');
+
+		await manager.retreatFromBoss(); // same intent → ignored, returns at once
+		expect(newEnemyCalls).toBe(1);
+
+		releaseNewEnemy(newEnemyResponse);
 		await first;
 
 		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
+		expect(newEnemyCalls).toBe(1);
+	});
+
+	it('a second challenge after one fails into the idle fallback retries the boss (supersedes)', async () => {
+		// The first ChallengeBoss fails and falls back to the idle loop, which itself parks in a held-open
+		// retry backoff under an outage. Pressing Challenge again supersedes that fallback and retries the
+		// boss rather than being dropped — a player who keeps pressing Challenge wants the boss.
+		let releaseDelay: () => void = () => {};
+		vi.mocked(delay).mockReturnValue(new Promise<void>((resolve) => (releaseDelay = resolve)));
+		let challengeCalls = 0;
+		send.mockImplementation((name: string) => {
+			if (name === 'ChallengeBoss') {
+				challengeCalls++;
+				// The first challenge fails; the retry (second press) succeeds.
+				return challengeCalls === 1 ? Promise.resolve(challengeError) : Promise.resolve(challengeResponse);
+			}
+			// The idle fallback's NewEnemy is down, so the first challenge parks in its backoff.
+			return Promise.resolve({ id: '1', name: 'NewEnemy', error: 'outage' } as IApiSocketResponse<'NewEnemy'>);
+		});
+
+		const first = manager.challengeBoss();
+		await flush(); // first failed → fell back to idle → parked in the held backoff (mode 'idle')
+		expect(manager.mode).toBe('idle');
+
+		const second = manager.challengeBoss(); // supersede the fallback and retry the boss
+		await Promise.all([first, second]);
+
+		expect(challengeCalls).toBe(2);
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(bossInstance);
 		releaseDelay();
 	});
 

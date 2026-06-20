@@ -45,8 +45,14 @@ export class EnemyManager {
 
 	private battleStageUnhook?: Action;
 	/** Guards the challenge/retreat transitions so a resolving stage change for the battle being
-	 *  swapped out is not mistaken for an outcome of the new one. */
+	 *  swapped out is not mistaken for an outcome of the new one. Stays set across a supersession (a
+	 *  press that takes over an in-flight transition) — only the transition that ends up current clears it. */
 	private transitioning = false;
+	/** Bumped whenever a new transition supersedes an in-flight one. A running transition captures this at
+	 *  its start and, after each await, abandons (without applying its result) once it no longer matches — so
+	 *  a superseded challenge/retreat can't clobber the transition that took over, and the superseded one's
+	 *  finally won't release the `transitioning` guard the new transition still holds. */
+	private transitionGeneration = 0;
 	/** Re-entrancy guard for getNewEnemy: overlapping stage handlers must not both spawn-and-notify an
 	 *  enemy (a double-spawn the backend replay would flag as cheating). */
 	private fetchingEnemy = false;
@@ -184,22 +190,39 @@ export class EnemyManager {
 		this.cancelBackoff?.();
 	}
 
+	/** Begins a control transition (challenge/retreat), superseding any in-flight one: it holds the
+	 *  `transitioning` guard, bumps the transition generation (so a superseded transition abandons its
+	 *  result), and cuts short any parked enemy-fetch backoff so the takeover is immediate. Returns the new
+	 *  generation for the caller to re-check after each await. */
+	private beginTransition(): number {
+		this.transitioning = true;
+		this.interruptFetch();
+		return ++this.transitionGeneration;
+	}
+
+	/** Ends a control transition, releasing the guard — but only if this transition is still the current
+	 *  one. A superseded transition leaving its finally must not clear the flag the transition that took
+	 *  over still holds. */
+	private endTransition(generation: number) {
+		if (generation === this.transitionGeneration) {
+			this.transitioning = false;
+		}
+	}
+
 	/**
 	 * Start a dedicated-boss fight against the current zone's boss. Switches into the boss loop
 	 * (the backend abandons any in-progress idle fight) and engages. A bossless zone or a transient
 	 * failure falls back to the idle loop.
 	 */
 	public async challengeBoss() {
-		if (this.transitioning) {
-			// A rapid press while a prior transition is parked in its enemy-fetch backoff: cut that backoff
-			// short so the prior transition settles (releasing the guard) instead of holding the controls
-			// for the full retry window. This press is still dropped — the player presses again once freed.
-			this.interruptFetch();
+		if (this.transitioning && this.mode === 'boss') {
+			// A challenge is already in flight heading to the same destination (boss). Pressing again is
+			// redundant — re-sending ChallengeBoss would make the backend abandon and re-spawn the boss — so
+			// let the in-flight transition continue rather than start a second.
 			return;
 		}
-		this.transitioning = true;
-		// Supersede any in-flight idle-loop fetch so its retry can't later overwrite the boss being loaded.
-		this.interruptFetch();
+		// Otherwise nothing is transitioning, or a retreat (heading to idle) is — supersede it: this press wins.
+		const generation = this.beginTransition();
 		this.mode = 'boss';
 		this.bossOutcome = undefined;
 		this.bossUnlockedNextZone = false;
@@ -209,6 +232,11 @@ export class EnemyManager {
 			const result = await apiSocket.sendSocketCommand('ChallengeBoss', {
 				zoneId: playerManager.currentZone
 			});
+			// A stop, or a later press superseding this challenge, landed while ChallengeBoss was in flight;
+			// abandon so its result can't clobber the transition that took over (mirrors getNewEnemy's guard).
+			if (!this.started || generation !== this.transitionGeneration) {
+				return;
+			}
 			if (result.data?.enemyInstance) {
 				this.currentEnemy = result.data.enemyInstance;
 				notifyNewEnemyLoaded(this.currentEnemy);
@@ -220,28 +248,32 @@ export class EnemyManager {
 				await this.getNewEnemy();
 			}
 		} finally {
-			this.transitioning = false;
+			this.endTransition(generation);
 		}
 	}
 
 	/** Retreat from an in-progress boss fight back to the normal idle farm loop. */
 	public async retreatFromBoss() {
 		if (this.transitioning) {
-			// As in challengeBoss: a rapid press while a prior transition is parked in its backoff frees it
-			// (releasing the guard) rather than holding the controls for the full retry window.
-			this.interruptFetch();
+			if (this.mode === 'idle') {
+				// A transition heading to the same destination (idle) is already in flight — a retreat, or a
+				// failing challenge's idle fallback. Pressing again is redundant, so let it continue.
+				return;
+			}
+			// Otherwise a challenge (heading to boss) is in flight — fall through to supersede it: retreat wins.
+		} else if (this.mode !== 'boss') {
+			// Not transitioning and not in a boss fight: nothing to retreat from.
 			return;
 		}
-		if (this.mode !== 'boss') {
-			return;
-		}
-		this.transitioning = true;
+		const generation = this.beginTransition();
 		this.returnToIdle();
 		battleEngine.pause();
 		try {
+			// getNewEnemy self-guards via the fetch generation, so a press superseding this retreat is
+			// abandoned there; endTransition then leaves the guard for whichever transition is current.
 			await this.getNewEnemy();
 		} finally {
-			this.transitioning = false;
+			this.endTransition(generation);
 		}
 	}
 
