@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { SERVER_STAT_TYPES } from './stat-fixtures';
 
-// EntityPicker reads its entity lists through a StatisticsView, which resolves
-// them from the in-memory staticData store — mocked here.
-const { staticData } = vi.hoisted(() => ({
+// EntityPicker reads its entity lists through a StatisticsView, which resolves them from the
+// in-memory staticData store and (for the enemy deep-link) the navigation store — both mocked here.
+const { staticData, navigation } = vi.hoisted(() => ({
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any
+	staticData: {} as any,
+	navigation: { requestScreen: vi.fn() }
 }));
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, navigation }));
 
 import EntityPicker from '$routes/game/screens/stats/EntityPicker.svelte';
 import { StatisticsView } from '$routes/game/screens/stats/statistics-view.svelte';
@@ -19,8 +20,12 @@ beforeEach(() => {
 		{ id: 0, name: 'Cave Bat', isBoss: false },
 		{ id: 1, name: 'Goblin', isBoss: true }
 	];
-	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 3 }];
+	staticData.zones = [
+		{ id: 0, name: 'Verdant Hollow', order: 3 },
+		{ id: 1, name: 'Frostspire', order: 5 }
+	];
 	staticData.skills = [{ id: 0, name: 'Cleave' }];
+	navigation.requestScreen.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -52,12 +57,26 @@ describe('EntityPicker', () => {
 		expect(screen.getByText('No matches.')).toBeTruthy();
 	});
 
-	it('selects an entity on click, marking its button active', async () => {
+	it('deep-links an enemy to the Codex dossier instead of selecting it in place', async () => {
 		const view = new StatisticsView();
 		render(EntityPicker, { props: { view } });
 
 		await fireEvent.click(screen.getByTestId('entity-1'));
 
+		// Enemies now open in the Codex (their per-entity stats live there); the in-place selection
+		// is untouched.
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies', enemyId: 1, sub: 'statistics' });
+		expect(view.entId).toBe(0);
+	});
+
+	it('selects a non-enemy entity in place, marking its button active', async () => {
+		const view = new StatisticsView();
+		view.switchKind('zone');
+		render(EntityPicker, { props: { view } });
+
+		await fireEvent.click(screen.getByTestId('entity-1'));
+
+		expect(navigation.requestScreen).not.toHaveBeenCalled();
 		expect(view.entId).toBe(1);
 		expect(screen.getByTestId('entity-1').classList.contains('on')).toBe(true);
 	});

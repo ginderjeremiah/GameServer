@@ -18,6 +18,12 @@
 		<path d="M6.3 6.3v3.4M9.3 6.3v3.4" stroke-linecap="round" />
 	{:else if kind === 'stats'}
 		<path d="M2 13.5h12M3.5 13.5V8M7 13.5V4.5M10.5 13.5V10M14 13.5V6" stroke-linecap="round" />
+	{:else if kind === 'codex'}
+		<path
+			d="M8 3.4C6.4 2.4 4.3 2.2 2.5 2.6v9.2c1.8-.4 3.9-.2 5.5.8 1.6-1 3.7-1.2 5.5-.8V2.6c-1.8-.4-3.9-.2-5.5.8zM8 3.4v9.4"
+			stroke-linejoin="round"
+			stroke-linecap="round"
+		/>
 	{:else if kind === 'options'}
 		<circle cx="8" cy="8" r="2.2" />
 		<path

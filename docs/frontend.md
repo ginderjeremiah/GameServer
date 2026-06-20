@@ -104,6 +104,10 @@ A few cross-cutting conventions follow from that rule:
 - **Change-state has its own token trio.** A pending add/edit/remove in the admin editor uses dedicated `--change-added`/`-modified`/`-removed` tokens, deliberately separate from `--accent`/`--warning`/`--enemy-accent` even where they currently share a hue — reserve `--warning` for validation.
 - **Shared chrome is set once in `common.scss`** — the themed scrollbar (`--scrollbar-thumb`/`-hover`), an opaque `html, body` backstop behind the themeable `.page-base` surface (kills the first-frame white flash), and a `prefers-reduced-motion` collapse of transitions/animations. The reduced-motion rule doubles as the root-cause fix for motion-driven Playwright flakiness (the e2e config sets `reducedMotion: 'reduce'`) — prefer it over per-test waits.
 
+## Cross-screen navigation
+
+The active in-game screen is local state in `routes/game/+page.svelte` (a screen key driving the registry lookup). For a screen to **send the player to another screen** — optionally handing it a target to open — there is a small module-level intent store (`$stores/navigation`): a caller invokes `requestScreen(key, payload?)`, the game shell reacts and switches screens through its existing `handleNavigate`, and the destination screen reads its one-shot `payload` via `consumePayload()` on mount. The payload is deliberately **not reactive** (a read-once handoff), so a later manual navigation opens the screen at its defaults. This is the seam for deep-links like the Statistics screen opening an enemy in the Codex dossier, without threading callbacks through the shell.
+
 ## In-game screen design notes
 
 Per-screen design decisions live in **[frontend-screens.md](./frontend-screens.md)**. When you add a new in-game screen, document its notable decisions there — surface a decision in this file only if it establishes a cross-cutting pattern other screens are expected to follow.

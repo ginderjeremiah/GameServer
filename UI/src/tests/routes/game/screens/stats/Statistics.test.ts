@@ -23,6 +23,7 @@ vi.mock('$stores', async (importOriginal) => {
 });
 
 import Statistics from '$routes/game/screens/stats/Statistics.svelte';
+import { navigation } from '$stores';
 
 const STATS: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 300 },
@@ -43,6 +44,8 @@ beforeEach(() => {
 	staticData.skills = [{ id: 0, name: 'Cleave' }];
 	mockToastError.mockClear();
 	mockFetchSocket.mockResolvedValue(STATS);
+	navigation.clear();
+	navigation.consumePayload();
 });
 
 afterEach(() => cleanup());
@@ -74,14 +77,15 @@ describe('Statistics screen', () => {
 		expect(screen.getByText('Fastest Victory')).toBeTruthy();
 	});
 
-	it('pivots from a stat card entity row into that entity’s dossier (cross-link)', async () => {
+	it('deep-links an enemy stat row into the Codex (cross-link)', async () => {
 		render(Statistics);
-		// Cave Bat (entity 0) is the most-killed enemy, so its row is in the
-		// Enemies Killed card (stat id 1) once the values load. Clicking it pivots.
+		// Cave Bat (entity 0) is the most-killed enemy, so its row is in the Enemies Killed card
+		// (stat id 1) once the values load. Clicking an enemy now opens the Codex dossier, where the
+		// per-entity statistics live — it does not open the in-place stats dossier.
 		const row = await screen.findByTestId('stat-row-1-0');
 		await fireEvent.click(row);
-		expect(screen.getByTestId('entity-dossier')).toBeTruthy();
-		expect(screen.getByTestId('entity-picker')).toBeTruthy();
+		expect(navigation.requestedScreen).toBe('codex');
+		expect(screen.queryByTestId('entity-dossier')).toBeNull();
 	});
 
 	it('shows a friendly empty state for a player with no statistics', async () => {

@@ -91,6 +91,15 @@ The Statistics screen (`src/routes/game/screens/stats`) presents the player's tr
 - **Real data, sourced two ways by lifetime.** Statistic *values* are per-player and change, so they're fetched fresh on mount; the type *metadata* and the entity lists are static reference data loaded once. Entity ids resolve against `staticData` by index, the zero-based convention the rest of the app uses.
 - (Empty-vs-error handling follows the shared rule above.)
 
+## Codex screen (the reference glossary)
+
+The Codex screen (`src/routes/game/screens/codex`) is a **read-only reference glossary** of the game's content behind a top-level tab bar (Enemies / Zones / Skills). Each tab is a master/detail: a filterable list beside a detail dossier. Only the **Enemies tab is built**; Zones/Skills show a placeholder (real count badges, "coming soon" body) and are tracked as follow-ups. It's a port of a Claude Design handoff onto live reference/runtime data — none of the prototype's mock catalogues survive.
+
+- **Reference facts come from the stores; nothing is fabricated.** The enemy dossier reads `staticData.enemies/zones/skills/challenges`, the per-enemy player record via the Statistics screen's `StatisticsData.statsForEntity`, and challenge progress from `playerChallenges`. Level bands, spawn shares and the dossier projections live in pure modules (`enemy-level`, `codex-display`) unit-tested without rendering.
+- **Enemy stat scaling reuses the real battle build.** The Attributes sub-tab scales an enemy to a chosen level (a slider for normal enemies; a fixed level for bosses); each primary attribute is `base + perLevel × level` straight from its `attributeDistribution`, and the derived **Max Health / Defense** are computed through the same `BattleAttributes` composition the battle uses (`enemy-stats`, generalising the Skills screen's `enemyDefense`) — so the numbers match combat by construction. The per-level slope of a derived stat is its linear two-point delta. "Show scaling" reveals the base/per-level breakdown.
+- **Per-entity statistics live here, not on the Statistics screen.** The dossier's Statistics sub-tab is the player's record against an enemy, and the Statistics screen now **deep-links an enemy into this dossier** (via the navigation store — see [frontend.md](./frontend.md) → _Cross-screen navigation_) instead of rendering its own in-place enemy dossier. Zones/skills keep the in-place dossier until the Codex gains those tabs.
+- **Cross-links degrade gracefully.** The dossier's Skills/Spawns rows show data but are non-interactive until the Zones/Skills tabs exist; the search box and sort control are display-only in this slice.
+
 ## Card Game screen (the Initiative Loom)
 
 The Card Game screen (`src/routes/game/screens/card-game`) is **"The Initiative Loom"** — a real-time card-boss duel imported from a Claude Design handoff, a deliberate *active* break from the idle grind: the present (a glowing **NOW** line) is a moving deadline, cards are multi-tick **spans** on a scrolling timeline, and each resolves the instant its right edge crosses NOW.

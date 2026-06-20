@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
 
-// StatisticsView reads the statistic-type catalogue + entity lists from the
-// in-memory staticData store, so it is mocked here.
-const { staticData } = vi.hoisted(() => ({
+// StatisticsView reads the statistic-type catalogue + entity lists from the in-memory staticData
+// store, and deep-links enemies into the Codex via the navigation store — both mocked here.
+const { staticData, navigation } = vi.hoisted(() => ({
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any
+	staticData: {} as any,
+	navigation: { requestScreen: vi.fn() }
 }));
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, navigation }));
 
 import {
 	buildStatTypes,
@@ -61,6 +62,7 @@ function seededView(): StatisticsView {
 
 beforeEach(() => {
 	seedStaticData();
+	navigation.requestScreen.mockClear();
 });
 
 describe('buildStatTypes', () => {
@@ -242,6 +244,23 @@ describe('StatisticsView navigation', () => {
 		view.goStat('exploration');
 		expect(view.mode).toBe('stat');
 		expect(view.statCat).toBe('exploration');
+	});
+
+	it('openEntity deep-links an enemy into the Codex (per-entity stats live there)', () => {
+		const view = seededView();
+		view.openEntity('enemy', 1);
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies', enemyId: 1, sub: 'statistics' });
+		// The in-place dossier is left untouched for the enemy.
+		expect(view.mode).toBe('stat');
+	});
+
+	it('openEntity opens a zone/skill in place (no Codex tab for them yet)', () => {
+		const view = seededView();
+		view.openEntity('zone', 0);
+		expect(navigation.requestScreen).not.toHaveBeenCalled();
+		expect(view.mode).toBe('entity');
+		expect(view.entKind).toBe('zone');
+		expect(view.entId).toBe(0);
 	});
 
 	it('filters entities by the search query', () => {

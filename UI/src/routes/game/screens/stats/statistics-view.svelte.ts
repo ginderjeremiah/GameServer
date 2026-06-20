@@ -17,8 +17,9 @@
    the `GetPlayerStatistics` socket command; entity ids resolve against the live staticData. */
 
 import { EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
-import { staticData } from '$stores';
+import { navigation, staticData } from '$stores';
 import { statCategoryLabel } from './statistics-display';
+import type { CodexNavPayload } from '../codex/codex-view.svelte';
 
 export type StatUnit = 'count' | 'damage' | 'time';
 export type StatAgg = 'sum' | 'max' | 'min';
@@ -388,6 +389,21 @@ export class StatisticsView {
 		this.entId = id;
 		this.query = '';
 		this.mode = 'entity';
+	}
+
+	/** Open an entity from a picker/stat row. Enemies deep-link into the Codex dossier (their
+	 *  per-entity statistics live there now); zones/skills still open the in-place dossier until the
+	 *  Codex gains those tabs. */
+	openEntity(kind: StatEntityKind, id: number): void {
+		if (kind === 'enemy') {
+			navigation.requestScreen('codex', {
+				tab: 'enemies',
+				enemyId: id,
+				sub: 'statistics'
+			} satisfies CodexNavPayload);
+			return;
+		}
+		this.goEntity(kind, id);
 	}
 
 	/** Jump from an entity's stat tile back to that stat's category. */

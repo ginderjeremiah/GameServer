@@ -31,7 +31,7 @@
 				class="entity"
 				class:on
 				data-testid="entity-{entity.id}"
-				onclick={() => view.setEntId(entity.id)}
+				onclick={() => view.openEntity(view.entKind, entity.id)}
 			>
 				<StatGlyph kind={view.entKind} size={15} color={on ? statKindColor(view.entKind) : undefined} />
 				<span class="name">{entity.name}</span>

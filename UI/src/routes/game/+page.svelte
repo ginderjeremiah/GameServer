@@ -20,6 +20,7 @@ import { NavSidebar, LogPanel } from '$components';
 import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
 import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { startGame } from '$lib/engine';
+import { navigation } from '$stores';
 import { getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -65,6 +66,16 @@ const handleNavigate = (key: string) => {
 	}
 	currentScreen = key;
 };
+
+// Another screen can request a switch (carrying a one-shot payload the target consumes on mount) via
+// the navigation store — e.g. the Statistics screen deep-linking an enemy into the Codex dossier.
+$effect(() => {
+	const requested = navigation.requestedScreen;
+	if (requested) {
+		handleNavigate(requested);
+		navigation.clear();
+	}
+});
 </script>
 
 <style lang="scss">
