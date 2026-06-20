@@ -1,6 +1,6 @@
-<!-- Codex screen — a read-only reference glossary (bestiary / atlas / skill catalogue). Only the
-     Enemies tab is built; Zones and Skills are placeholders. Per-entity player statistics live in the
-     enemy dossier here, and the Statistics screen deep-links an enemy into it via the navigation store.
+<!-- Codex screen — a read-only reference glossary (bestiary / atlas / skill catalogue). The Enemies
+     and Zones tabs are built; Skills is a placeholder. Per-entity player statistics live in the enemy
+     dossier here, and the Statistics screen deep-links an enemy into it via the navigation store.
      Ported from the `Glossary.dc.html` Claude Design handoff onto live reference/runtime data. -->
 <div class="codex" data-testid="codex-screen">
 	<div class="header">
@@ -14,7 +14,7 @@
 		{#if view.tab === 'enemies'}
 			<EnemiesTab {view} />
 		{:else if view.tab === 'zones'}
-			<ComingSoonPanel label="Zones" accent="var(--accent)" />
+			<ZonesTab {view} />
 		{:else}
 			<ComingSoonPanel label="Skills" accent="var(--attr-intellect)" />
 		{/if}
@@ -28,6 +28,7 @@ import { CodexView, type CodexNavPayload } from './codex-view.svelte';
 import CodexTabBar from './CodexTabBar.svelte';
 import ComingSoonPanel from './ComingSoonPanel.svelte';
 import EnemiesTab from './EnemiesTab.svelte';
+import ZonesTab from './ZonesTab.svelte';
 
 // Consume any deep-link payload (e.g. an enemy handed over from the Statistics screen) once.
 const view = new CodexView(navigation.consumePayload<CodexNavPayload>());

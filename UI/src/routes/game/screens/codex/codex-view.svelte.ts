@@ -1,20 +1,23 @@
-/* Codex screen — a read-only reference glossary of the game's enemies, zones and skills. Only the
-   Enemies tab is built today; Zones and Skills show a "coming soon" placeholder (filed as follow-ups).
+/* Codex screen — a read-only reference glossary of the game's enemies, zones and skills. The Enemies
+   and Zones tabs are built; Skills shows a "coming soon" placeholder (filed as a follow-up).
 
    The Enemies tab is a master/detail: a filterable enemy table beside a dossier with Attributes
    (live level-scaled stats + a "show scaling" breakdown), Statistics (the player's per-enemy record),
-   Skills, Spawns and Challenges sub-tabs. The data is all live reference/runtime data — the screen
-   reuses the real `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`),
-   the Statistics screen's per-entity query (`StatisticsData.statsForEntity`), and the challenge
+   Skills, Spawns and Challenges sub-tabs. The Zones tab is a progression rail (a status dot per zone:
+   cleared / unlocked / locked) beside a zone dossier — level band, spawn pool, boss card, spawn table
+   and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The data is
+   all live reference/runtime data — the screen reuses the real `BattleAttributes` enemy build for stat
+   scaling (`$lib/common/enemy-attributes`), the Statistics screen's per-entity query
+   (`StatisticsData.statsForEntity`), per-zone clears (`statistics.isZoneCleared`) and the challenge
    progress store — rather than hard-coding any of it. Per-entity statistics live here now; the
    Statistics screen deep-links an enemy into this dossier instead of rendering its own.
 
    The view-model only wires reactive state to the pure helpers; the projection maths live in
    `enemy-level` and the shared `$lib/common/enemy-attributes` (unit-tested directly). */
 
-import { EEntityType, type IEnemy, type IPlayerStatistic } from '$lib/api';
+import { EEntityType, type IEnemy, type IPlayerStatistic, type IZone } from '$lib/api';
 import { type EnemyAttributes, challengeTypeColor, challengeTypeName, enemyAttributesAtLevel } from '$lib/common';
-import { playerChallenges, staticData } from '$stores';
+import { playerChallenges, staticData, statistics } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
 import { StatisticsData, buildStatEntities, buildStatTypes } from '../stats/statistics-view.svelte';
 import {
@@ -22,12 +25,14 @@ import {
 	type EnemyFilter,
 	type EnemySort,
 	type EnemySubTab,
+	type ZoneStatus,
 	CODEX_TABS,
 	enemyAccent,
 	enemyKindLabel,
 	formatBand,
 	formatCooldown,
 	matchesEnemySearch,
+	resolveZoneStatus,
 	sortEnemyRows,
 	tabAccent,
 	tabLabel
@@ -38,6 +43,7 @@ import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enem
 export interface CodexNavPayload {
 	tab?: CodexTab;
 	enemyId?: number;
+	zoneId?: number;
 	sub?: EnemySubTab;
 }
 
@@ -99,6 +105,37 @@ export interface EnemyChallengeVM {
 	completed: boolean;
 }
 
+export interface ZoneRowVM {
+	id: number;
+	name: string;
+	band: string;
+	status: ZoneStatus;
+	/** Enemies (excluding the boss) that spawn in this zone. */
+	spawnCount: number;
+	hasBoss: boolean;
+	selected: boolean;
+}
+
+export interface ZoneBossVM {
+	enemyId: number;
+	name: string;
+	level: number;
+}
+
+export interface ZoneSpawnVM {
+	enemyId: number;
+	enemyName: string;
+	share: number;
+	weightLabel: string;
+}
+
+export interface ZoneUnlockVM {
+	challengeId: number;
+	challengeName: string;
+	/** Whether the gate is still sealed (the gating challenge isn't complete). */
+	sealed: boolean;
+}
+
 const SUB_TAB_DEFS: SubTabVM[] = [
 	{ key: 'attributes', label: 'Attributes' },
 	{ key: 'statistics', label: 'Statistics' },
@@ -113,6 +150,8 @@ export class CodexView {
 	tab = $state<CodexTab>('enemies');
 	/** Inspected enemy id (falls back to the head of the list when unresolved). */
 	selectedEnemyId = $state<number>(-1);
+	/** Inspected zone id (falls back to the head of the rail when unresolved). */
+	selectedZoneId = $state<number>(-1);
 	/** Active dossier sub-tab. */
 	sub = $state<EnemySubTab>('attributes');
 	/** Level the Attributes sub-tab scales the selected enemy to. */
@@ -145,6 +184,11 @@ export class CodexView {
 			this.selectedEnemyId = initial.id;
 		}
 		this.level = this.levelFor(initial);
+		// Same for the zone rail, so its selection is highlighted from the first render.
+		const initialZone = this.resolveZone(payload?.zoneId ?? -1);
+		if (initialZone) {
+			this.selectedZoneId = initialZone.id;
+		}
 	}
 
 	/* ── catalogue ───────────────────────────────────────────────────────────── */
@@ -334,6 +378,96 @@ export class CodexView {
 		this.challenges.length > 0 ? [...SUB_TAB_DEFS, { key: 'challenges', label: 'Challenges' }] : SUB_TAB_DEFS
 	);
 
+	/* ── zones catalogue (the progression rail) ─────────────────────────────────── */
+
+	/** Non-retired zones in authored progression order — a retired zone keeps its slot resolvable but
+	 *  drops out of the rail. */
+	readonly zones = $derived((staticData.zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order));
+
+	/** Zone rail rows: a status dot (cleared / unlocked / locked), the level band, the spawn-pool size
+	 *  and whether the zone has a dedicated boss. */
+	readonly zoneRows = $derived.by<ZoneRowVM[]>(() => {
+		const enemies = this.enemies;
+		return this.zones.map((z) => ({
+			id: z.id,
+			name: z.name,
+			band: formatBand({ min: z.levelMin, max: z.levelMax, fixed: false }),
+			status: resolveZoneStatus(statistics.isZoneCleared(z.id), this.isZoneLocked(z)),
+			spawnCount: enemies.filter((e) => e.spawns.some((s) => s.zoneId === z.id)).length,
+			hasBoss: z.bossEnemyId != null,
+			selected: z.id === this.selectedZoneId
+		}));
+	});
+
+	/* ── selected zone + dossier ────────────────────────────────────────────────── */
+
+	/** The inspected zone, falling back to the head of the rail. */
+	readonly selectedZone = $derived<IZone | undefined>(
+		this.zones.find((z) => z.id === this.selectedZoneId) ?? this.zones[0]
+	);
+
+	/** The selected zone's level band (`11–22`). */
+	readonly zoneBand = $derived.by<string>(() => {
+		const z = this.selectedZone;
+		return z ? formatBand({ min: z.levelMin, max: z.levelMax, fixed: false }) : '';
+	});
+
+	/** The selected zone's progression status (drives the dossier seal + header accent). */
+	readonly selectedZoneStatus = $derived.by<ZoneStatus>(() => {
+		const z = this.selectedZone;
+		return z ? resolveZoneStatus(statistics.isZoneCleared(z.id), this.isZoneLocked(z)) : 'unlocked';
+	});
+
+	/** The zone's dedicated boss (its card cross-links to the enemy dossier), or null when none is authored. */
+	readonly zoneBoss = $derived.by<ZoneBossVM | null>(() => {
+		const z = this.selectedZone;
+		if (!z || z.bossEnemyId == null) {
+			return null;
+		}
+		const boss = (staticData.enemies ?? [])[z.bossEnemyId];
+		return boss ? { enemyId: boss.id, name: boss.name, level: z.bossLevel } : null;
+	});
+
+	/** The zone's spawn table — every non-retired enemy that spawns here, with its share of the zone's
+	 *  total spawn weight, ordered by share. Bosses don't populate `spawns`, so they're naturally absent. */
+	readonly zoneSpawns = $derived.by<ZoneSpawnVM[]>(() => {
+		const z = this.selectedZone;
+		if (!z) {
+			return [];
+		}
+		const total = zoneTotalWeight(z.id, this.enemies);
+		return this.enemies
+			.flatMap((e) => {
+				const spawn = e.spawns.find((s) => s.zoneId === z.id);
+				return spawn ? [{ enemy: e, weight: spawn.weight }] : [];
+			})
+			.map(({ enemy, weight }) => ({
+				enemyId: enemy.id,
+				enemyName: enemy.name,
+				share: spawnShare(weight, total),
+				weightLabel: `weight ${weight}`
+			}))
+			.sort((a, b) => b.share - a.share);
+	});
+
+	/** Number of distinct enemies in the zone's spawn pool (the dossier's "N spawns" readout). */
+	readonly zoneSpawnCount = $derived(this.zoneSpawns.length);
+
+	/** The zone's unlock condition — the gating challenge's name plus whether it's still sealed — or
+	 *  null for an always-open zone. */
+	readonly zoneUnlock = $derived.by<ZoneUnlockVM | null>(() => {
+		const z = this.selectedZone;
+		if (!z || z.unlockChallengeId == null) {
+			return null;
+		}
+		const challenge = (staticData.challenges ?? [])[z.unlockChallengeId];
+		return {
+			challengeId: z.unlockChallengeId,
+			challengeName: challenge?.name ?? `Challenge ${z.unlockChallengeId}`,
+			sealed: !playerChallenges.isChallengeCompleted(z.unlockChallengeId)
+		};
+	});
+
 	/* ── handlers ──────────────────────────────────────────────────────────────── */
 
 	selectTab(tab: CodexTab): void {
@@ -363,12 +497,33 @@ export class CodexView {
 		this.filter = filter;
 	}
 
+	selectZone(id: number): void {
+		this.selectedZoneId = id;
+	}
+
+	/** Cross-link: jump to an enemy's dossier from the Zones tab (boss card / spawn row). */
+	openEnemy(id: number): void {
+		this.tab = 'enemies';
+		this.selectEnemy(id);
+	}
+
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */
 
 	/** Resolve an enemy id against the catalogue, falling back to the head of the list. */
 	private resolveEnemy(id: number): IEnemy | undefined {
 		const enemies = (staticData.enemies ?? []).filter((e) => !e.retiredAt);
 		return enemies.find((e) => e.id === id) ?? enemies[0];
+	}
+
+	/** Resolve a zone id against the rail (authored order), falling back to the head. */
+	private resolveZone(id: number): IZone | undefined {
+		const zones = (staticData.zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order);
+		return zones.find((z) => z.id === id) ?? zones[0];
+	}
+
+	/** A zone is locked when it carries an unlock gate the player hasn't completed yet. */
+	private isZoneLocked(zone: IZone): boolean {
+		return zone.unlockChallengeId != null && !playerChallenges.isChallengeCompleted(zone.unlockChallengeId);
 	}
 
 	/** The level to scale an enemy to by default: the boss's fixed level, else its band midpoint. */

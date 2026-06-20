@@ -2,16 +2,24 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EAttribute, EChallengeType, EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 
-// CodexView reads reference data + challenge progress from the stores, and reuses the Statistics
-// screen's query engine — all mocked here. (The Statistics view-model also imports `navigation`.)
-const { staticData, playerChallenges, navigation } = vi.hoisted(() => ({
+// CodexView reads reference data + challenge progress + per-zone clears from the stores, and reuses
+// the Statistics screen's query engine — all mocked here. (The Statistics view-model also imports
+// `navigation`.)
+const { staticData, playerChallenges, navigation, statistics } = vi.hoisted(() => ({
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	playerChallenges: { all: [] as any[] },
-	navigation: { requestScreen: vi.fn(), consumePayload: vi.fn(), clear: vi.fn() }
+	playerChallenges: {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		all: [] as any[],
+		isChallengeCompleted(id: number) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			return this.all.some((c: any) => c.challengeId === id && c.completed);
+		}
+	},
+	navigation: { requestScreen: vi.fn(), consumePayload: vi.fn(), clear: vi.fn() },
+	statistics: { isZoneCleared: vi.fn<(id: number) => boolean>(() => false) }
 }));
-vi.mock('$stores', () => ({ staticData, playerChallenges, navigation }));
+vi.mock('$stores', () => ({ staticData, playerChallenges, navigation, statistics }));
 
 import { CodexView } from '$routes/game/screens/codex/codex-view.svelte';
 
@@ -26,9 +34,36 @@ const dist = () => [
 
 function seed(): void {
 	staticData.zones = [
-		{ id: 0, name: 'Emberreach', order: 1, levelMin: 1, levelMax: 10, bossEnemyId: 2, bossLevel: 10 },
-		{ id: 1, name: 'Ashfen Marsh', order: 2, levelMin: 11, levelMax: 22, bossLevel: 22 },
-		{ id: 2, name: 'Sunken Causeway', order: 3, levelMin: 18, levelMax: 28, bossLevel: 28 }
+		{
+			id: 0,
+			name: 'Emberreach',
+			description: 'Ash-strewn lowlands.',
+			order: 1,
+			levelMin: 1,
+			levelMax: 10,
+			bossEnemyId: 2,
+			bossLevel: 10
+		},
+		// Ashfen Marsh is gated on challenge 0 (uncompleted in the seed) — a locked zone.
+		{
+			id: 1,
+			name: 'Ashfen Marsh',
+			description: 'A drowned bog.',
+			order: 2,
+			levelMin: 11,
+			levelMax: 22,
+			bossLevel: 22,
+			unlockChallengeId: 0
+		},
+		{
+			id: 2,
+			name: 'Sunken Causeway',
+			description: 'A broken road.',
+			order: 3,
+			levelMin: 18,
+			levelMax: 28,
+			bossLevel: 28
+		}
 	];
 	staticData.enemies = [
 		{
@@ -91,6 +126,9 @@ const STATS: IPlayerStatistic[] = [
 beforeEach(() => {
 	seed();
 	navigation.requestScreen.mockClear();
+	// Zone 0 (Emberreach) is cleared by default; individual tests override as needed.
+	statistics.isZoneCleared.mockReset();
+	statistics.isZoneCleared.mockImplementation((id: number) => id === 0);
 });
 
 describe('CodexView tabs', () => {
@@ -294,6 +332,104 @@ describe('CodexView dossier projections', () => {
 	});
 });
 
+describe('CodexView zone rail', () => {
+	it('projects status / band / spawn-pool / boss per zone in authored order', () => {
+		const rows = new CodexView().zoneRows;
+		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
+		// Zone 0 is cleared; zone 1 is gated on the uncompleted challenge 0; zone 2 is open.
+		expect(rows.find((r) => r.id === 0)).toMatchObject({
+			status: 'cleared',
+			band: '1–10',
+			spawnCount: 1,
+			hasBoss: true
+		});
+		expect(rows.find((r) => r.id === 1)).toMatchObject({
+			status: 'locked',
+			band: '11–22',
+			spawnCount: 2,
+			hasBoss: false
+		});
+		expect(rows.find((r) => r.id === 2)).toMatchObject({
+			status: 'unlocked',
+			band: '18–28',
+			spawnCount: 0,
+			hasBoss: false
+		});
+	});
+
+	it('marks a gated zone unlocked once its challenge is completed', () => {
+		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
+		expect(new CodexView().zoneRows.find((r) => r.id === 1)?.status).toBe('unlocked');
+	});
+
+	it('keeps a cleared zone cleared even behind an unmet gate', () => {
+		statistics.isZoneCleared.mockImplementation((id: number) => id === 1);
+		expect(new CodexView().zoneRows.find((r) => r.id === 1)?.status).toBe('cleared');
+	});
+
+	it('orders the rail by authored order, not by id', () => {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		staticData.zones = staticData.zones.map((z: any) => ({ ...z, order: 3 - z.order }));
+		expect(new CodexView().zoneRows.map((r) => r.id)).toEqual([2, 1, 0]);
+	});
+});
+
+describe('CodexView zone dossier', () => {
+	it('falls back to the head of the rail when no zone is selected', () => {
+		const view = new CodexView();
+		view.selectedZoneId = -1;
+		expect(view.selectedZone?.id).toBe(0);
+	});
+
+	it('resolves the zone boss card (enemy + fixed level), null when none is authored', () => {
+		const view = new CodexView();
+		view.selectZone(0);
+		expect(view.zoneBoss).toEqual({ enemyId: 2, name: 'Cinder Tyrant', level: 10 });
+		view.selectZone(1);
+		expect(view.zoneBoss).toBeNull();
+	});
+
+	it('builds the spawn table ordered by share with weight labels', () => {
+		const view = new CodexView();
+		view.selectZone(1); // Bog Lurker (40) + Dust Skitterer (20) → 67% / 33%
+		expect(view.zoneSpawns).toEqual([
+			expect.objectContaining({ enemyId: 1, enemyName: 'Bog Lurker', share: 67, weightLabel: 'weight 40' }),
+			expect.objectContaining({ enemyId: 0, enemyName: 'Dust Skitterer', share: 33, weightLabel: 'weight 20' })
+		]);
+		expect(view.zoneSpawnCount).toBe(2);
+	});
+
+	it('reports the unlock condition (sealed when locked), null for an always-open zone', () => {
+		const view = new CodexView();
+		view.selectZone(1);
+		expect(view.selectedZoneStatus).toBe('locked');
+		expect(view.zoneUnlock).toMatchObject({ challengeId: 0, challengeName: 'Cull the Skitterers', sealed: true });
+		view.selectZone(2);
+		expect(view.zoneUnlock).toBeNull();
+		expect(view.zoneSpawns).toEqual([]);
+	});
+
+	it('unseals the unlock condition once the gating challenge completes', () => {
+		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
+		const view = new CodexView();
+		view.selectZone(1);
+		expect(view.selectedZoneStatus).toBe('unlocked');
+		expect(view.zoneUnlock?.sealed).toBe(false);
+	});
+});
+
+describe('CodexView zone → enemy cross-link', () => {
+	it('openEnemy switches to the Enemies tab and selects the enemy', () => {
+		const view = new CodexView();
+		view.selectTab('zones');
+		view.openEnemy(2);
+		expect(view.tab).toBe('enemies');
+		expect(view.selectedEnemyId).toBe(2);
+		expect(view.sub).toBe('attributes'); // selectEnemy resets the sub-tab
+		expect(view.level).toBe(10); // boss fixed level
+	});
+});
+
 describe('CodexView nav payload', () => {
 	it('seeds tab / enemy / sub-tab / level from a deep-link payload', () => {
 		const view = new CodexView({ tab: 'enemies', enemyId: 2, sub: 'statistics' });
@@ -301,5 +437,11 @@ describe('CodexView nav payload', () => {
 		expect(view.selectedEnemyId).toBe(2);
 		expect(view.sub).toBe('statistics');
 		expect(view.level).toBe(10); // boss fixed level
+	});
+
+	it('seeds the tab + zone from a deep-link payload', () => {
+		const view = new CodexView({ tab: 'zones', zoneId: 2 });
+		expect(view.tab).toBe('zones');
+		expect(view.selectedZoneId).toBe(2);
 	});
 });
