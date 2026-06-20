@@ -59,6 +59,8 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default)
         {
+            // Unlike Set<T>/SetAndForget<T>, a null T is unsupported here: the non-null GetSet rejects null
+            // (no null-means-delete path), so a null would serialize to "null" rather than delete the key.
             var val = await GetSet(key, value.Serialize(), cancellationToken);
             return val.Deserialize<T>();
         }
