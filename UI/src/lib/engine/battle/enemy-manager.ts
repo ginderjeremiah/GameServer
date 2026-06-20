@@ -1,5 +1,5 @@
 import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
-import { Action, createHook, delay, isZoneUnlocked, nextZoneByOrder } from '$lib/common';
+import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOrder } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
 import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
 import { logMessage } from '../log';
@@ -137,6 +137,12 @@ export class EnemyManager {
 					return;
 				}
 				if (result.data?.enemyInstance) {
+					// The server may have relocated the player out of a now-unplayable zone (retired, or
+					// emptied of spawnable enemies); adopt the authoritative zone so the UI and later
+					// requests follow the move instead of re-requesting the stale one.
+					if (result.data.zoneId != null && result.data.zoneId !== playerManager.currentZone) {
+						playerManager.currentZone = result.data.zoneId;
+					}
 					this.currentEnemy = result.data.enemyInstance;
 					notifyNewEnemyLoaded(this.currentEnemy);
 					return;
@@ -368,7 +374,7 @@ export class EnemyManager {
 		// completes the gating challenge during claimVictory) and check whether it flipped open. Skipping
 		// the refresh when nothing could change keeps auto-fight re-farming from spamming the endpoint.
 		const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
-		const nextZone = nextZoneByOrder(staticData.zones ?? [], clearedZoneId);
+		const nextZone = nextZoneByOrder(navigableZones(staticData.zones ?? []), clearedZoneId);
 		const nextWasLocked = nextZone != null && !isZoneUnlocked(nextZone, completed);
 		if (nextWasLocked) {
 			await playerChallenges.load(true);

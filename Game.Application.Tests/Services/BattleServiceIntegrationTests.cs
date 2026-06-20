@@ -1075,5 +1075,151 @@ namespace Game.Application.Tests.Services
             Assert.True(state.HasActiveBattle);
             Assert.True(state.IsBossBattle);
         }
+
+        [Fact]
+        public async Task StartBattle_TransitionToRetiredZone_KeepsPlayerInCurrentZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            // zone2 is retired (out of circulation), so a change into it is refused like a locked one.
+            var zone1 = await TestDataSeeder.CreateZoneAsync(context, "Zone 1", order: 0);
+            var zone2 = await TestDataSeeder.CreateZoneAsync(context, "Zone 2", order: 1, retiredAt: DateTime.UtcNow);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone1.Id, enemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone2.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone1.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // A tampered request to move into the retired zone is ignored: the player stays put and the
+            // battle proceeds in their current (in-circulation) zone.
+            var result = await battleService.StartBattle(player, state, zoneId: zone1.Id, newZoneId: zone2.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(zone1.Id, player.CurrentZoneId);
+            Assert.Equal(zone1.Id, state.BattleZoneId);
+        }
+
+        [Fact]
+        public async Task StartBattle_CurrentZoneRetired_RelocatesToNearestViableZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            // The player is standing in a zone that has since been retired; the nearest viable, unlocked zone
+            // (lowest Order) is where they should land.
+            var viableZone = await TestDataSeeder.CreateZoneAsync(context, "Viable", order: 0);
+            var retiredZone = await TestDataSeeder.CreateZoneAsync(context, "Retired", order: 1, retiredAt: DateTime.UtcNow);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, viableZone.Id, enemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, retiredZone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: retiredZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: retiredZone.Id);
+
+            Assert.NotNull(result);
+            // The idle loop never stalls in a retired zone: the player is relocated and the battle runs there.
+            Assert.Equal(viableZone.Id, player.CurrentZoneId);
+            Assert.Equal(viableZone.Id, state.BattleZoneId);
+        }
+
+        [Fact]
+        public async Task StartBattle_CurrentZoneHasNoSpawnableEnemies_RelocatesToNearestViableZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            // emptyZone is live but has no enemies assigned, so it has no spawn table — the runtime safety net
+            // relocates rather than throwing on GetRandomEnemy.
+            var viableZone = await TestDataSeeder.CreateZoneAsync(context, "Viable", order: 0);
+            var emptyZone = await TestDataSeeder.CreateZoneAsync(context, "Empty", order: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, viableZone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: emptyZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: emptyZone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(viableZone.Id, player.CurrentZoneId);
+            Assert.Equal(viableZone.Id, state.BattleZoneId);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_RetiredZone_ReturnsNullAndStartsNoBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+
+            // The zone has a boss but is retired (out of circulation), so its boss cannot be challenged.
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Retired Boss Zone", bossEnemyId: boss.Id, bossLevel: 5, retiredAt: DateTime.UtcNow);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.Null(result);
+            Assert.False(state.HasActiveBattle);
+        }
     }
 }

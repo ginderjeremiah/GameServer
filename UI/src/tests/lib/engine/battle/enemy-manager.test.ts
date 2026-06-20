@@ -3,6 +3,9 @@ import { apiSocket, ELogType, type IApiSocketResponse, type IEnemyInstance } fro
 import { delay } from '$lib/common';
 import { logMessage } from '$lib/engine/log';
 import { EnemyManager, onNewEnemyLoaded } from '$lib/engine/battle/enemy-manager';
+// The mocked engine index (below) is the same module enemy-manager reads playerManager from, so this
+// import resolves to that mock — letting the relocation-sync test observe the adopted zone.
+import { playerManager } from '$lib/engine';
 
 vi.mock('$lib/engine/log', () => ({ logMessage: vi.fn() }));
 
@@ -91,6 +94,25 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(loaded).toEqual([enemy]);
 		expect(delay).not.toHaveBeenCalled();
 		expect(logMessage).not.toHaveBeenCalled();
+	});
+
+	it('adopts the server-reported zone when the player was relocated out of an unplayable zone', async () => {
+		// The server relocated the player (their zone was retired or emptied of spawnable enemies) and
+		// reports the authoritative zone alongside the enemy; the client must follow it.
+		playerManager.currentZone = 3;
+		sendSocketCommand.mockResolvedValue({
+			id: '1',
+			name: 'NewEnemy',
+			data: { enemyInstance: makeEnemy(1), zoneId: 7 }
+		} as IApiSocketResponse<'NewEnemy'>);
+
+		await manager.getNewEnemy();
+
+		expect(playerManager.currentZone).toBe(7);
+		expect(manager.currentEnemy).toEqual(makeEnemy(1));
+
+		// Restore the shared mock's zone so later tests in the file see the default.
+		playerManager.currentZone = 3;
 	});
 
 	it('waits out a cooldown response, then retries until an enemy arrives', async () => {

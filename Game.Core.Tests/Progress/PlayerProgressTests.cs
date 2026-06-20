@@ -522,6 +522,38 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void EvaluateChallenges_RetiredIncompleteChallenge_IsSkippedEvenWhenGoalMet()
+        {
+            // A retired challenge the player has not already completed is out of circulation: even with a
+            // statistic that meets the goal, it neither completes nor records a progress row.
+            var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5, retiredAt: DateTime.UtcNow);
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.EnemiesKilled, null, 12m)]);
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Empty(completed);
+            Assert.Empty(progress.ChallengeProgress);
+            Assert.Empty(progress.DirtyChallenges);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_RetiredChallengeAlreadyCompleted_KeepsItsCompletion()
+        {
+            // Retirement never revokes an existing completion (or its reward): an already-completed retired
+            // challenge keeps its row and is simply not re-reported.
+            var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5, retiredAt: DateTime.UtcNow);
+            var alreadyCompleted = new PlayerChallenge(challenge, progress: 5m, completed: true, completedAt: DateTime.UtcNow);
+            var progress = MakeProgress(
+                statistics: [Stat(EStatisticType.EnemiesKilled, null, 12m)],
+                challenges: [alreadyCompleted]);
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Empty(completed);
+            Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
+        }
+
+        [Fact]
         public void EvaluateChallenges_PerEntityChallenge_UsesPerEntityStatistic()
         {
             var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 3, targetEntityId: 2);
@@ -763,7 +795,8 @@ namespace Game.Core.Tests.Progress
             int? targetEntityId = null,
             int? rewardItemId = null,
             int? rewardItemModId = null,
-            int? rewardSkillId = null) => new()
+            int? rewardSkillId = null,
+            DateTime? retiredAt = null) => new()
             {
                 Id = id,
                 Name = "Test Challenge",
@@ -774,6 +807,7 @@ namespace Game.Core.Tests.Progress
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
                 RewardSkillId = rewardSkillId,
+                RetiredAt = retiredAt,
             };
 
         // Boss-ness is now driven by the explicit isBossBattle marker passed to RecordBattleCompleted,

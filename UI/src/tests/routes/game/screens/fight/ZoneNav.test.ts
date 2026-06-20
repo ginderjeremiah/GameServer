@@ -43,7 +43,7 @@ import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
 const challenge = (id: number, name: string, description: string): IChallenge =>
 	({ id, name, description, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 }) as IChallenge;
 
-const zone = (id: number, order: number, name: string, unlockChallengeId?: number): IZone => ({
+const zone = (id: number, order: number, name: string, unlockChallengeId?: number, retiredAt?: string): IZone => ({
 	id,
 	name,
 	description: '',
@@ -51,7 +51,8 @@ const zone = (id: number, order: number, name: string, unlockChallengeId?: numbe
 	levelMin: 1,
 	levelMax: 10,
 	bossLevel: 1,
-	unlockChallengeId
+	unlockChallengeId,
+	retiredAt
 });
 
 beforeEach(() => {
@@ -103,6 +104,24 @@ describe('ZoneNav', () => {
 		await fireEvent.click(left);
 		// From order 2 (id 20) back to order 1 (id 10).
 		expect(mockPlayerManager.currentZone).toBe(10);
+	});
+
+	it('skips a retired zone when navigating (it is not a wall blocking later zones)', async () => {
+		// Beta (order 2) is retired and out of circulation, so navigation goes straight from Alpha to
+		// Gamma across it rather than treating it as an impassable middle zone.
+		staticData.zones = [
+			zone(10, 1, 'Alpha'),
+			zone(20, 2, 'Beta', undefined, '2026-01-01T00:00:00Z'),
+			zone(30, 3, 'Gamma')
+		];
+		mockPlayerManager.currentZone = 10;
+
+		render(ZoneNav);
+		const [, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+		await fireEvent.click(right);
+
+		// From Alpha forward to Gamma, skipping the retired Beta entirely.
+		expect(mockPlayerManager.currentZone).toBe(30);
 	});
 
 	it('falls back to the first ordered zone when the current zone is unknown', () => {

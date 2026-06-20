@@ -12,6 +12,16 @@ export function zonesByOrder(zones: IZone[]): IZone[] {
 }
 
 /**
+ * Zones the player can navigate among: in authored order, excluding retired zones (out of
+ * circulation — not navigable). A retired zone is skipped entirely rather than shown as a wall, so a
+ * retired zone in the middle of the order never blocks reaching the zones beyond it. The backend
+ * mirrors this: it refuses a change into a retired zone and lazily relocates a player out of one.
+ */
+export function navigableZones(zones: IZone[]): IZone[] {
+	return zonesByOrder(zones).filter((zone) => zone.retiredAt == null);
+}
+
+/**
  * Whether a zone is unlocked for the player, given a predicate that reports challenge completion.
  * An ungated zone is always unlocked; a gated zone unlocks once its gating challenge is completed.
  */

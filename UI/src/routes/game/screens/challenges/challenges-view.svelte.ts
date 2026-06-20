@@ -297,9 +297,14 @@ export class ChallengesView {
 		const comparisonByType = new Map(
 			(staticData.challengeTypes ?? []).map((t): [EChallengeType, EChallengeGoalComparison] => [t.id, t.goalComparison])
 		);
-		return (staticData.challenges ?? [])
-			.filter(Boolean)
-			.map((ch) => buildChallengeVM(ch, this.#progressById.get(ch.id), comparisonByType));
+		return (
+			(staticData.challenges ?? [])
+				.filter(Boolean)
+				// A retired challenge is out of circulation: hide it unless the player already completed it
+				// (a completed retired challenge stays visible as done — its reward was already earned).
+				.filter((ch) => ch.retiredAt == null || this.#progressById.get(ch.id)?.completed)
+				.map((ch) => buildChallengeVM(ch, this.#progressById.get(ch.id), comparisonByType))
+		);
 	});
 
 	readonly groups = $derived.by(() => groupByType(this.all));

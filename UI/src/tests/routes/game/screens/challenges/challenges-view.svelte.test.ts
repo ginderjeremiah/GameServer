@@ -319,6 +319,21 @@ describe('ChallengesView', () => {
 		expect(view.groups.map((g) => g.typeId)).toEqual([EChallengeType.EnemiesKilled, EChallengeType.TimeTrial]);
 	});
 
+	it('hides a retired-incomplete challenge but keeps a retired-completed one (out of circulation)', () => {
+		// Retire challenge 9 (incomplete) and challenge 1 (already completed). A retired challenge the
+		// player never completed leaves circulation and is hidden; a completed one stays visible as done.
+		staticData.challenges = staticData.challenges.map((ch) =>
+			ch.id === 9 || ch.id === 1 ? { ...ch, retiredAt: '2026-01-01T00:00:00Z' } : ch
+		);
+
+		const view = new ChallengesView();
+
+		const ids = view.all.map((c) => c.id);
+		expect(ids).toContain(1); // retired but completed → still shown
+		expect(ids).toContain(2); // active, not retired → shown
+		expect(ids).not.toContain(9); // retired and incomplete → hidden
+	});
+
 	it('switches the detail pane and resorts when selection/sort change', () => {
 		const view = new ChallengesView();
 

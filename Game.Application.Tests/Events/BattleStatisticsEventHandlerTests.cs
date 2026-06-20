@@ -160,6 +160,42 @@ namespace Game.Application.Tests.Events
             Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(player.Id));
         }
 
+        [Fact]
+        public async Task RetiredChallenge_IsReachedByTheIndexButNotCompleted()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            // A retired challenge whose goal a single kill would satisfy. The victory still moves the
+            // EnemiesKilled statistic, so the relevance index reaches the challenge — but retirement takes it
+            // out of circulation, so the player (who never completed it) can no longer complete it.
+            var retired = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 1m, retiredAt: DateTime.UtcNow);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var handler = new BattleStatisticsEventHandler(
+                scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
+                scope.ServiceProvider.GetRequiredService<IChallenges>(),
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>());
+
+            var battleEvent = new BattleCompletedEvent(
+                loadedPlayer, loadedEnemy, Victory: true, PlayerDied: false, TotalMs: 5000,
+                Stats: new BattleStats(), IsBossBattle: false, ZoneId: loadedPlayer.CurrentZoneId);
+            await handler.HandleAsync(battleEvent, CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            Assert.DoesNotContain(retired.Id, await progressRepo.GetCompletedChallengeIds(player.Id));
+        }
+
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each
         /// reward kind, plus an <see cref="EChallengeType.EnemiesKilled"/> challenge whose goal of 1 a single

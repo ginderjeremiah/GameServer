@@ -39,6 +39,7 @@ export interface IEnemyInstance {
 export interface INewEnemyModel {
 	cooldown?: number;
 	enemyInstance?: IEnemyInstance;
+	zoneId?: number;
 }
 
 export interface INewEnemyRequest {

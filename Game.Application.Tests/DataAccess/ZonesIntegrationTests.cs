@@ -144,5 +144,29 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(zones.LookupZone(99999));
         }
 
+        [Fact]
+        public async Task IsZoneRetired_ReflectsTheCatalogueRetirementFlag()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var active = await TestDataSeeder.CreateZoneAsync(context, "Active Zone", order: 0);
+            var retired = await TestDataSeeder.CreateZoneAsync(context, "Retired Zone", order: 1, retiredAt: DateTime.UtcNow);
+            await ReloadReferenceCachesAsync();
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.False(zones.IsZoneRetired(active.Id));
+            Assert.True(zones.IsZoneRetired(retired.Id));
+        }
+
+        [Fact]
+        public void IsZoneRetired_InvalidId_Throws()
+        {
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => zones.IsZoneRetired(99999));
+        }
     }
 }

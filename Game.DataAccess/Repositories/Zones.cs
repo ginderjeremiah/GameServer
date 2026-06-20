@@ -37,6 +37,13 @@ namespace Game.DataAccess.Repositories
             return ValidateZoneId(zoneId) ? Entities[zoneId] : null;
         }
 
+        public bool IsZoneRetired(int zoneId)
+        {
+            return ValidateZoneId(zoneId)
+                ? Entities[zoneId].RetiredAt is not null
+                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+        }
+
         public bool ValidateZoneId(int zoneId)
         {
             return zoneId >= 0 && zoneId < Entities.Count;
