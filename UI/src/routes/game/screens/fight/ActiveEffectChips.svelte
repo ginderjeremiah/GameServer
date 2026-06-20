@@ -170,6 +170,10 @@ $effect(() => {
 // The transparent (revealed) arc of the radial overlay: the render-interpolated shared remaining as a
 // fraction of the most-recent application's duration, in degrees. Depletes toward 0 as the stack
 // expires; jumps back toward 360 when a fresh application resets the shared `renderRemainingMs`.
+// Note: the remaining is shared per *attribute* but this denominator is the (attribute, modifierType)
+// group's own latest duration. On the rare attribute carrying both an additive and a multiplicative
+// effect, a reset driven by the other type can leave this group's sweep below full rather than at 360°
+// — intended (display-only); don't "fix" it by widening the share to the attribute.
 const remainingSweep = (group: EffectGroup) =>
 	group.durationMs > 0 ? Math.max(0, Math.min(360, (group.renderRemainingMs / group.durationMs) * 360)) : 0;
 
