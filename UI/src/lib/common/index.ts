@@ -4,6 +4,7 @@ export * from './challenge-type';
 export * from './tag-color';
 export * from './challenge-unlocks';
 export * from './zone-progression';
+export * from './enemy-attributes';
 export * from './attribute-display';
 export * from './skill-effect-display';
 export * from './item-display';

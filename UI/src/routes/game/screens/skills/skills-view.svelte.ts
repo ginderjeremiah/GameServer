@@ -14,7 +14,7 @@
    item/mod stats), so the page shows what the game actually fights with by
    construction (#347). */
 
-import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone, apiSocket } from '$lib/api';
+import { EAttribute, type IChallenge, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import {
 	BattleAttributes,
@@ -24,6 +24,7 @@ import {
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
+import { enemyDefense } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -102,38 +103,6 @@ export function sortMetrics(sort: SkillSort, defense: number): (a: SkillMetrics,
  *  midpoint is the expected encounter level — and thus the expected defense — without a server roll. */
 export function zoneSpawnLevel(zone: IZone): number {
 	return (zone.levelMin + zone.levelMax) / 2;
-}
-
-/** Memoised flat-Defense by enemy identity → level. Enemy defense at a fixed level is a pure
- *  function of the (static, immutable mid-session) attribute distribution, so it never changes for a
- *  given enemy record. Keying the outer cache on the enemy object means a record replaced when
- *  reference data reloads is recomputed (and the stale entry GC'd) rather than served a wrong value. */
-const enemyDefenseCache = new WeakMap<IEnemy, Map<number, number>>();
-
-/** An enemy's flat Defense at a given level — the value the battle subtracts in `Battler.takeDamage`.
- *  Mirrors the backend enemy build (`Enemy.GetAttributeModifiers`): each attribute distribution
- *  contributes `baseAmount + amountPerLevel * level` additively, then Defense is resolved through the
- *  same derived-attribute composition the battle uses (base + per-Endurance + per-Agility). Memoised
- *  per enemy+level so a Compare-vs recompute doesn't rebuild a full `BattleAttributes` per pill. */
-export function enemyDefense(enemy: IEnemy, level: number): number {
-	let byLevel = enemyDefenseCache.get(enemy);
-	if (byLevel === undefined) {
-		// A plain memo cache, not reactive state.
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		byLevel = new Map<number, number>();
-		enemyDefenseCache.set(enemy, byLevel);
-	}
-	const cached = byLevel.get(level);
-	if (cached !== undefined) {
-		return cached;
-	}
-	const modifiers = enemy.attributeDistribution.map((dist) => ({
-		attributeId: dist.attributeId,
-		amount: dist.baseAmount + dist.amountPerLevel * level
-	}));
-	const defense = new BattleAttributes(modifiers, true).getValue(EAttribute.Defense);
-	byLevel.set(level, defense);
-	return defense;
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────── */
