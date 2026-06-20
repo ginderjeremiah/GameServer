@@ -10,9 +10,12 @@ namespace Game.Application.Tests.DataAccess
     /// <summary>
     /// Covers the Redis-backed <see cref="ICacheService"/> (RedisService) atomic set-with-expiry-returning-old
     /// primitive (#691) — the one the socket-presence claim relies on so the key can never be written without
-    /// its TTL. RedisService is a thin adapter over an out-of-process dependency, so per the testing guidelines
-    /// it is exercised through an integration test against the DI-resolved interface rather than mocked. Each
-    /// test uses a unique key so it is independent of any residual cache state.
+    /// its TTL — and the null-handling contract on the value-accepting setters (#1015): a null value deletes the
+    /// key for <c>Set</c>/<c>SetAndForget</c> (the de-facto behaviour the generic overloads rely on), while the
+    /// non-expiry <c>GetSet</c> has no such path and is non-null. RedisService is a thin adapter over an
+    /// out-of-process dependency, so per the testing guidelines it is exercised through an integration test
+    /// against the DI-resolved interface rather than mocked. Each test uses a unique key so it is independent of
+    /// any residual cache state.
     /// </summary>
     [Collection("Integration")]
     public class RedisServiceIntegrationTests : ApplicationIntegrationTestBase
@@ -57,6 +60,100 @@ namespace Game.Application.Tests.DataAccess
             var ttl = await ReadTtlAsync(key);
             Assert.NotNull(ttl);
             Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task GetSet_StoresTheNewValueAndReturnsThePriorValue()
+        {
+            var key = $"redis-getset-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            await cache.Set(key, "occupied");
+
+            // Unlike Set/SetAndForget the non-expiry GetSet has no null-means-delete path (its underlying GETSET
+            // rejects null), so its ICacheService contract is non-null — it always returns the prior value and
+            // stores the new one.
+            var prior = await cache.GetSet(key, "replacement");
+
+            Assert.Equal("occupied", prior);
+            Assert.Equal("replacement", await cache.Get(key));
+        }
+
+        [Fact]
+        public async Task Set_WithNullValue_DeletesTheKey()
+        {
+            var key = $"redis-set-null-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            await cache.Set(key, "occupied");
+
+            // A null value deletes the key — the null-means-delete contract the generic Set<T> depends on.
+            await cache.Set(key, null);
+
+            Assert.Null(await cache.Get(key));
+        }
+
+        [Fact]
+        public async Task SetWithExpiry_WithNullValue_DeletesTheKey()
+        {
+            var key = $"redis-set-expiry-null-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            await cache.Set(key, "occupied", TimeSpan.FromSeconds(30));
+
+            // The expiry-carrying Set keeps the same null-means-delete path (the TTL is irrelevant for a delete).
+            await cache.Set(key, null, TimeSpan.FromSeconds(30));
+
+            Assert.Null(await cache.Get(key));
+        }
+
+        [Fact]
+        public async Task SetAndForget_WithNullValue_DeletesTheKey()
+        {
+            var key = $"redis-setforget-null-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            await cache.Set(key, "occupied");
+
+            // Fire-and-forget, so the delete settles asynchronously — poll until the key is gone rather than
+            // racing a fixed delay.
+            cache.SetAndForget(key, null);
+
+            await AssertKeyEventuallyDeletedAsync(cache, key);
+        }
+
+        [Fact]
+        public async Task SetAndForgetWithExpiry_WithNullValue_DeletesTheKey()
+        {
+            var key = $"redis-setforget-expiry-null-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            await cache.Set(key, "occupied", TimeSpan.FromSeconds(30));
+
+            cache.SetAndForget(key, null, TimeSpan.FromSeconds(30));
+
+            await AssertKeyEventuallyDeletedAsync(cache, key);
+        }
+
+        private static async Task AssertKeyEventuallyDeletedAsync(ICacheService cache, string key)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await cache.Get(key) is null)
+                {
+                    return;
+                }
+
+                await Task.Delay(25);
+            }
+
+            Assert.Fail($"Expected the fire-and-forget null write to delete key '{key}' within the timeout.");
         }
 
         private async Task<TimeSpan?> ReadTtlAsync(string key)

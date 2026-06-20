@@ -49,15 +49,19 @@ namespace Game.Infrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
-        public async Task<string?> GetSet(string key, string? value, CancellationToken cancellationToken = default)
+        public async Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default)
         {
-            // Read-and-set is a write (it stores the new value), so it routes through ObserveWrite too.
+            // Read-and-set is a write (it stores the new value), so it routes through ObserveWrite too. The value
+            // is required (non-null): the underlying GETSET has no null-means-delete path — it rejects a null
+            // value — so unlike Set/SetAndForget this overload matches ICacheService's non-null contract (#1015).
             return await ObserveWrite(Redis.StringGetSetAsync(key, value), cancellationToken);
         }
 
         public async Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default)
         {
-            var val = await GetSet(key, value?.Serialize(), cancellationToken);
+            // Unlike Set<T>/SetAndForget<T>, a null T is unsupported here: the non-null GetSet rejects null
+            // (no null-means-delete path), so a null would serialize to "null" rather than delete the key.
+            var val = await GetSet(key, value.Serialize(), cancellationToken);
             return val.Deserialize<T>();
         }
 
