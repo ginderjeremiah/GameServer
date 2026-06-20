@@ -116,13 +116,17 @@ namespace Game.Core.Battle
         /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler, using the
         /// already-resolved <paramref name="amount"/> as its magnitude (the caster's attribute scaling is
         /// applied by <see cref="BattleContext.ApplySkillEffect"/> before this is reached). Each application
-        /// <b>stacks</b>: it adds its own <see cref="AttributeModifier"/> to the live collection and its own
-        /// timed entry, so re-applying an already-active effect sums the magnitudes (additive amounts add,
-        /// multiplicative factors compound) and each application expires on its own schedule. A new modifier
-        /// may shift <see cref="MaxHealth"/>, so the health is re-clamped.
+        /// adds its own <see cref="AttributeModifier"/> to the live collection, so the magnitudes <b>sum</b>
+        /// (additive amounts add, multiplicative factors compound). All active applications targeting the
+        /// <b>same attribute</b> share a single expiry: applying any effect on that attribute resets every
+        /// active application of it to this application's duration, so the whole stack expires together with
+        /// no independent per-portion expirations (#992 / #740). A new modifier may shift
+        /// <see cref="MaxHealth"/>, so the health is re-clamped.
         /// </summary>
         public void ApplyEffect(SkillEffect effect, double amount)
         {
+            var expiresAtMs = _elapsedMs + effect.DurationMs;
+
             var modifier = new AttributeModifier
             {
                 Attribute = effect.AttributeId,
@@ -131,7 +135,18 @@ namespace Game.Core.Battle
                 Source = EAttributeModifierSource.SkillEffect,
             };
             _attributes.AddModifier(modifier);
-            (_activeEffects ??= []).Add(new ActiveEffect(modifier, _elapsedMs + effect.DurationMs));
+
+            _activeEffects ??= [];
+            // Re-applying any effect on this attribute resets the whole stack's shared expiry to the new
+            // application's duration (it may extend a longer-lived application or cut a shorter one short).
+            foreach (var active in _activeEffects)
+            {
+                if (active.Modifier.Attribute == effect.AttributeId)
+                {
+                    active.ExpiresAtMs = expiresAtMs;
+                }
+            }
+            _activeEffects.Add(new ActiveEffect(modifier, expiresAtMs));
             ClampHealthToMaxHealth();
         }
 
@@ -183,15 +198,17 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// A timed skill effect active on a battler: the modifier it added to the collection (kept for
-        /// identity removal on expiry) and the absolute simulated time (in <see cref="_elapsedMs"/> ms) at
-        /// which it expires. Immutable — each application is its own entry, so stacking adds entries rather
-        /// than mutating one and no per-tick state is rewritten.
+        /// A timed skill-effect application active on a battler: the modifier it added to the collection
+        /// (kept for identity removal on expiry) and the absolute simulated time (in <see cref="_elapsedMs"/>
+        /// ms) at which it expires. <see cref="ExpiresAtMs"/> is mutable because applications sharing an
+        /// attribute share one expiry: a re-application resets every sibling's expiry (see
+        /// <see cref="ApplyEffect"/>) rather than each tracking its own. Expiry is still a per-tick comparison
+        /// against the clock, never a per-tick countdown, so the bookkeeping stays allocation-free per tick.
         /// </summary>
         private sealed class ActiveEffect(AttributeModifier modifier, long expiresAtMs)
         {
             public AttributeModifier Modifier { get; } = modifier;
-            public long ExpiresAtMs { get; } = expiresAtMs;
+            public long ExpiresAtMs { get; set; } = expiresAtMs;
         }
     }
 }

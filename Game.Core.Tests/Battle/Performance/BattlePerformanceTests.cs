@@ -30,7 +30,8 @@ namespace Game.Core.Tests.Battle.Performance
     ///   is large enough to never flake on a slow runner; subtle regressions are meant to be spotted by
     ///   watching the logged numbers, not by this gate.</item>
     ///   <item><b>Attribute-cache observability.</b> The same typical loadout is measured with both
-    ///   <em>persistent</em> effects (each fire stacks, so a bounded window of applications stays active) and
+    ///   <em>persistent</em> effects (each fire stacks and resets the shared per-attribute expiry, so the
+    ///   applications accumulate without lapsing) and
     ///   <em>churning</em> effects (every cooldown cycle expires and re-applies each effect, invalidating
     ///   those nodes and the derived attributes that cascade from them — the recompute path the
     ///   <see cref="AttributeCollection"/> cache exists to amortise). The delta between the two is logged
@@ -106,10 +107,10 @@ namespace Game.Core.Tests.Battle.Performance
 
         // Skills fire every other tick (CooldownMs = 80, MsPerTick = 40). The two effect modes differ only
         // in how their DurationMs compares to that cooldown, which shapes how the attribute cache churns:
-        //   - Persistent: DurationMs >> cooldown, so each fire STACKS another application before the previous
-        //     expires (effects stack rather than refresh, #740). A modifier is added every fire and a bounded
-        //     window's worth (~DurationMs / cooldown) stays concurrently active, so the buffed node is
-        //     invalidated each fire and its derived dependents recompute over a growing-then-steady modifier set.
+        //   - Persistent: DurationMs > cooldown, so each fire STACKS another application AND resets the shared
+        //     per-attribute expiry (#992/#740) before any application would lapse — nothing expires during the
+        //     run and the modifier set grows every fire, so the buffed node is invalidated each fire and its
+        //     derived dependents recompute over an ever-growing modifier set.
         //   - Churning:   DurationMs < cooldown, so the effect EXPIRES every cycle (RemoveModifier) and is
         //     re-applied on the next fire (AddModifier). Each add/remove invalidates the buffed node and
         //     cascades to its derived dependents, so the per-tick reads of those derived attributes pay the
@@ -255,10 +256,10 @@ namespace Game.Core.Tests.Battle.Performance
         /// effect's <see cref="ChurningEffectDurationMs"/> is below the skill cooldown, so a self-buff expires
         /// between fires and is re-applied on the next one — the buffed attribute toggles base → buffed → base
         /// repeatedly, each toggle an <c>AddModifier</c>/<c>RemoveModifier</c> that invalidates the cache. With
-        /// <see cref="EffectMode.Persistent"/> the longer duration outlasts the cooldown, so each fire now
-        /// <em>stacks</em> a fresh application before the previous expires (effects stack rather than refresh,
-        /// #740) — Strength ramps monotonically above a single buff and never returns to base, and every fire
-        /// still adds a modifier (the warm-cache shortcut the old refresh rule gave is gone). This fails if a
+        /// <see cref="EffectMode.Persistent"/> the longer duration outlasts the cooldown, so each fire
+        /// <em>stacks</em> a fresh application and resets the shared per-attribute expiry before any would lapse
+        /// (#992/#740) — Strength ramps monotonically above a single buff and never returns to base, and every
+        /// fire adds a modifier the recompute path must fold in. This fails if a
         /// future change to the durations or cooldown silently stops either scenario from exercising the
         /// recompute path.
         /// </summary>
@@ -282,9 +283,9 @@ namespace Game.Core.Tests.Battle.Performance
                 "Expected the churning effect to expire and re-apply repeatedly, but the sampled Strength "
                 + $"values were [{string.Join(", ", churning)}].");
 
-            // Persistent: the duration outlasts the cooldown, so each fire stacks another application before the
-            // previous expires — Strength ramps above a single buff and never returns to base (each fire adds a
-            // modifier, so the recompute path is still hit). It never refreshes back to exactly one buff.
+            // Persistent: the duration outlasts the cooldown and each fire resets the shared per-attribute
+            // expiry, so no application lapses during the run — Strength ramps above a single buff and never
+            // returns to base (each fire adds a modifier the recompute path folds in).
             Assert.True(
                 persistent[^1] > buffedStrength,
                 "Expected persistent re-application to stack above a single buff, but the sampled Strength "
@@ -434,10 +435,10 @@ namespace Game.Core.Tests.Battle.Performance
             {
                 // A self-targeted additive buff on a core attribute that has derived dependents (rotated so a
                 // full loadout touches every derived attribute). Persistent: spans many cooldowns, so each fire
-                // STACKS another application before the previous expires (a modifier added per fire, with a
-                // bounded window staying concurrently active). Churning: shorter than the cooldown, so it expires
-                // and re-applies every cycle, invalidating the buffed node and cascading to its derived
-                // attributes — both shapes drive the recompute path the cache exists to amortise.
+                // STACKS another application and resets the shared per-attribute expiry before any would lapse —
+                // the modifier set grows every fire and nothing expires during the run. Churning: shorter than
+                // the cooldown, so it expires and re-applies every cycle, invalidating the buffed node and
+                // cascading to its derived attributes — both shapes drive the recompute path the cache amortises.
                 var attribute = BuffableCoreAttributes[((id * effectsPerSkill) + i) % BuffableCoreAttributes.Length];
                 effects.Add(new SkillEffect
                 {

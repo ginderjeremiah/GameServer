@@ -14,13 +14,16 @@ interface BattlerData {
 }
 
 /** A single timed skill-effect application active on a battler, as the UI renders it (the active-effect
- *  chips). Each application is its own entry — re-applying an effect stacks a new one — so it carries a
- *  per-battler unique {@link applicationId} (to match its modifier on expiry and key it stably in the
- *  chips) alongside the authored effect's id, the attribute/modifier it shifts, its full and remaining
- *  durations, and a render-only remaining duration interpolated between ticks for a smooth countdown —
- *  the chip analogue of {@link Skill.renderChargeTime}. The modifier instance itself is kept off this
- *  view (in {@link Battler.effectModifiers}) so the view can be a reactive `statify` projection without
- *  a reactive proxy breaking the reference identity {@link BattleAttributes.removeModifier} matches on. */
+ *  chips). Each application is its own entry — re-applying an effect stacks a new one (the magnitudes
+ *  sum) — so it carries a per-battler unique {@link applicationId} (to match its modifier on expiry and
+ *  key it stably in the chips) alongside the authored effect's id, the attribute/modifier it shifts, and
+ *  its full/remaining durations. All applications on the same attribute share one expiry, so their
+ *  {@link remainingMs} move together (re-applying any of them resets them all — see
+ *  {@link Battler.applyEffect}). {@link renderRemainingMs} is a render-only copy interpolated between
+ *  ticks for a smooth countdown — the chip analogue of {@link Skill.renderChargeTime}. The modifier
+ *  instance itself is kept off this view (in {@link Battler.effectModifiers}) so the view can be a
+ *  reactive `statify` projection without a reactive proxy breaking the reference identity
+ *  {@link BattleAttributes.removeModifier} matches on. */
 export interface ActiveEffectView {
 	applicationId: number;
 	sourceId: number;
@@ -142,10 +145,11 @@ export class Battler {
 	/** Applies a timed skill `effect` to this battler, using the already-resolved `amount` as its
 	 *  magnitude — the caster-attribute scaling is computed by {@link Skill.applyEffects} before this is
 	 *  reached, so `amount` defaults to the unscaled authored amount only for the direct (test) callers
-	 *  that don't scale. Each application STACKS — it adds its own modifier and its own timed entry, so
-	 *  re-applying an already-active effect sums the magnitudes (additive amounts add, multiplicative
-	 *  factors compound) and each application expires on its own schedule. A new modifier may shift
-	 *  MaxHealth, so the health is re-clamped. */
+	 *  that don't scale. Each application adds its own modifier, so the magnitudes SUM (additive amounts
+	 *  add, multiplicative factors compound). All active applications on the SAME attribute share a single
+	 *  expiry: re-applying any effect on that attribute resets every active application of it to this
+	 *  application's duration, so the whole stack expires together with no independent per-portion
+	 *  expirations (#992 / #740). A new modifier may shift MaxHealth, so the health is re-clamped. */
 	public applyEffect(effect: ISkillEffect, amount: number = effect.amount): void {
 		const applicationId = this.#nextApplicationId++;
 		const modifier: AttributeModifier = {
@@ -156,6 +160,18 @@ export class Battler {
 		};
 		this.attributes.addModifier(modifier);
 		this.#effectModifiers.set(applicationId, modifier);
+
+		// Re-applying any effect on this attribute resets the whole stack's shared remaining to the new
+		// application's duration (it may extend a longer-lived application or cut a shorter one short).
+		// The backend mirror keys this off an absolute ExpiresAtMs clock; under the fixed tick size the two
+		// expire on the same tick (see advanceEffects).
+		for (const active of this.activeEffects) {
+			if (active.attribute === effect.attributeId) {
+				active.remainingMs = effect.durationMs;
+				active.renderRemainingMs = effect.durationMs;
+			}
+		}
+
 		this.activeEffects.push({
 			applicationId,
 			sourceId: effect.id,

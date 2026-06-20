@@ -445,6 +445,29 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 400),
 
+                // Shared per-attribute expiry (#992 / #740): a poison whose duration (120ms = 3 ticks) outlasts
+                // its skill's cooldown (80ms = 2 ticks), so each fire re-applies WHILE the previous applications
+                // are still active — resetting the whole DamageTakenPerSecond stack's single shared expiry to the
+                // new duration. The reset always lands before the 3-tick duration would lapse, so nothing ever
+                // expires and the stacks accumulate, the damage ramping like a permanent poison.
+                //   Player: skill baseDamage 0, cooldown 80 → fires ticks 2,4,6; Opponent +250 DamageTakenPerSecond, 120ms.
+                //   Enemy:  Str=14 → MaxHealth=120, Def=2, no skills. Each stack = 250 DTPS → 10/tick (bypassing Defense).
+                //   Stacks 1 (ticks 2-3), 2 (4-5), 3 (6-7); DoT/tick = 10×stacks. Cum 10,20,40,60,90,120 → the
+                //   120-HP enemy dies on tick 7 → 280ms. (Independent per-application expiry — the bug this fixes —
+                //   would let the older applications lapse each cycle, oscillating the stack count and killing at 400ms.)
+                ["dotReapplyExtendsSharedExpiration"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 80,
+                                effects: [MakeEffect(211, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, 120)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 14, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 280),
+
                 // Effect magnitude scales with the CASTER's attribute (#741): a poison whose authored amount is
                 // 0 but scales with the caster's Intellect at 1.0/point. Intellect feeds no derived attribute,
                 // so it perturbs nothing but this scaling — keeping the timing hand-computable.

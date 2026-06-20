@@ -74,7 +74,7 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void AdvanceEffects_StackedApplications_ExpireIndependently()
+        public void AdvanceEffects_StackedApplications_ShareResetExpiration_ExtendingTheOlderOne()
         {
             var battler = MakeBattler(Stat(Strength, 10));
             var effect = Effect(1, Strength, Additive, 5, durationMs: 80);
@@ -83,13 +83,49 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(15, battler.GetAttributeValue(Strength));
 
             battler.AdvanceEffects(40);  // elapsed 40, A still active
-            Apply(battler, effect); // application B: expires at 40 + 80 = 120
+            Apply(battler, effect); // application B at elapsed 40: resets the shared expiry to 40 + 80 = 120
             Assert.Equal(20, battler.GetAttributeValue(Strength)); // both stacked
 
-            battler.AdvanceEffects(40); // elapsed 80 → A expires, B remains
-            Assert.Equal(15, battler.GetAttributeValue(Strength));
-            battler.AdvanceEffects(40); // elapsed 120 → B expires
+            // Independent expirations would drop A here (its original expiry was 80); the shared reset to 120
+            // extends it, so both remain.
+            battler.AdvanceEffects(40); // elapsed 80
+            Assert.Equal(20, battler.GetAttributeValue(Strength));
+
+            battler.AdvanceEffects(40); // elapsed 120 → the whole stack expires together
             Assert.Equal(10, battler.GetAttributeValue(Strength));
+        }
+
+        [Fact]
+        public void AdvanceEffects_ReapplyingShorterEffectOnSameAttribute_CutsTheStackShort()
+        {
+            var battler = MakeBattler(Stat(Strength, 10));
+
+            // A long application (5 ticks), then a different, shorter effect (1 tick) on the SAME attribute.
+            Apply(battler, Effect(1, Strength, Additive, 5, durationMs: 200)); // A: expires at 200
+            battler.AdvanceEffects(40); // elapsed 40
+            Apply(battler, Effect(2, Strength, Additive, 3, durationMs: 40)); // B at elapsed 40: resets shared expiry to 80
+            Assert.Equal(18, battler.GetAttributeValue(Strength)); // 10 + 5 + 3 (both stacked)
+
+            // The new (shorter) application sets the shared expiry, cutting A short from 200 to 80, so the
+            // whole stack expires together at elapsed 80.
+            battler.AdvanceEffects(40); // elapsed 80
+            Assert.Equal(10, battler.GetAttributeValue(Strength));
+        }
+
+        [Fact]
+        public void AdvanceEffects_EffectsOnDifferentAttributes_ExpireIndependently()
+        {
+            var battler = MakeBattler(Stat(Strength, 10), Stat(Agility, 10));
+
+            // The shared expiry is per-attribute, so a second effect on a DIFFERENT attribute neither stacks
+            // with nor resets the first.
+            Apply(battler, Effect(1, Strength, Additive, 5, durationMs: 200)); // Strength: expires at 200
+            battler.AdvanceEffects(40); // elapsed 40
+            Apply(battler, Effect(2, Agility, Additive, 3, durationMs: 40)); // Agility: expires at 80, leaves Strength alone
+
+            battler.AdvanceEffects(40); // elapsed 80 → Agility expires, Strength (expiry 200) remains
+            Assert.Equal(15, battler.GetAttributeValue(Strength));
+            Assert.Equal(10, battler.GetAttributeValue(Agility));
         }
 
         [Fact]
@@ -120,16 +156,18 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void AdvanceEffects_BuffExpiry_ClampsCurrentHealthToDroppedMax()
         {
-            var battler = MakeBattler(Stat(Strength, 10)); // base MaxHealth = 100
+            var battler = MakeBattler(Stat(Strength, 10)); // base MaxHealth = 50 + 5*10 = 100
 
-            // H (additive, 1 tick) lifts the additive subtotal to 200; L (×0.5, long) then halves it back to
-            // 100, so CurrentHealth (100) is not clamped while both are active.
-            Apply(battler, Effect(1, MaxHealth, Additive, 100, durationMs: 40));
+            // A Strength buff (1 tick) lifts MaxHealth to (50 + 5*30) = 200 via the derived cascade; a direct
+            // ×0.5 MaxHealth (long) halves it back to 100, so CurrentHealth (100) is not clamped while both
+            // are active. They sit on DIFFERENT attributes (Strength vs MaxHealth), so they expire
+            // independently — the Strength buff can lapse while the MaxHealth debuff persists.
+            Apply(battler, Effect(1, Strength, Additive, 20, durationMs: 40));
             Apply(battler, Effect(2, MaxHealth, Multiplicative, 0.5, durationMs: 1000));
             Assert.Equal(100, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(100, battler.CurrentHealth);
 
-            // H expires: MaxHealth drops to 100 * 0.5 = 50, dragging CurrentHealth down with it.
+            // The Strength buff expires: MaxHealth drops to (50 + 5*10) * 0.5 = 50, dragging CurrentHealth down.
             battler.AdvanceEffects(40);
             Assert.Equal(50, battler.GetAttributeValue(MaxHealth));
             Assert.Equal(50, battler.CurrentHealth);
