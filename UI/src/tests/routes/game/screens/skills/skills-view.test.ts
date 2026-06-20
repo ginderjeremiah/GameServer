@@ -59,7 +59,6 @@ import {
 	damagePerSecond,
 	sortMetrics,
 	zoneSpawnLevel,
-	enemyDefense,
 	type SkillMetrics
 } from '$routes/game/screens/skills/skills-view.svelte';
 
@@ -222,24 +221,6 @@ describe('pure helpers', () => {
 
 	it('takes the midpoint of a zone range as the representative spawn level', () => {
 		expect(zoneSpawnLevel(ZONES[0])).toBe(5); // (2 + 8) / 2
-	});
-
-	it('resolves an enemy Defense through the derived attribute composition', () => {
-		// Defense = 2 (base) + 1·Endurance + 0.5·Agility. Imp has 2·level Endurance only.
-		expect(enemyDefense(ENEMIES[0], 5)).toBe(12); // 2 + 2*5
-		expect(enemyDefense(ENEMIES[2], 10)).toBe(32); // boss: 2 + 3*10
-	});
-
-	it('memoises enemy defense per enemy and level', () => {
-		const e = enemy({ id: 99, attributeDistribution: enemyDist(4) });
-		expect(enemyDefense(e, 5)).toBe(22); // 2 + 4*5
-
-		// The result is cached by enemy identity, so a later mutation of the (in practice immutable)
-		// distribution is not observed at the cached level — proving it is served from the memo.
-		e.attributeDistribution = enemyDist(100);
-		expect(enemyDefense(e, 5)).toBe(22);
-		// A different level is a distinct cache entry and reflects the current distribution.
-		expect(enemyDefense(e, 1)).toBe(102); // 2 + 100*1
 	});
 });
 

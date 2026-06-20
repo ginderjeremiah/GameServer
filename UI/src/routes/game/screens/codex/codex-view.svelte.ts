@@ -4,16 +4,16 @@
    The Enemies tab is a master/detail: a filterable enemy table beside a dossier with Attributes
    (live level-scaled stats + a "show scaling" breakdown), Statistics (the player's per-enemy record),
    Skills, Spawns and Challenges sub-tabs. The data is all live reference/runtime data — the screen
-   reuses the real `BattleAttributes` enemy build for stat scaling (`enemy-stats`), the Statistics
-   screen's per-entity query (`StatisticsData.statsForEntity`), and the challenge progress store —
-   rather than hard-coding any of it. Per-entity statistics live here now; the Statistics screen
-   deep-links an enemy into this dossier instead of rendering its own.
+   reuses the real `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`),
+   the Statistics screen's per-entity query (`StatisticsData.statsForEntity`), and the challenge
+   progress store — rather than hard-coding any of it. Per-entity statistics live here now; the
+   Statistics screen deep-links an enemy into this dossier instead of rendering its own.
 
    The view-model only wires reactive state to the pure helpers; the projection maths live in
-   `enemy-level` / `enemy-stats` (unit-tested directly). */
+   `enemy-level` and the shared `$lib/common/enemy-attributes` (unit-tested directly). */
 
 import { EEntityType, type IEnemy, type IPlayerStatistic } from '$lib/api';
-import { challengeTypeColor, challengeTypeName } from '$lib/common';
+import { type EnemyAttributes, challengeTypeColor, challengeTypeName, enemyAttributesAtLevel } from '$lib/common';
 import { playerChallenges, staticData } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
 import { StatisticsData, buildStatEntities, buildStatTypes } from '../stats/statistics-view.svelte';
@@ -33,7 +33,6 @@ import {
 	tabLabel
 } from './codex-display';
 import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enemy-level';
-import { type EnemyAttributes, enemyAttributesAtLevel } from './enemy-stats';
 
 /** A one-shot payload handed to the Codex via the navigation store (e.g. from the Statistics screen). */
 export interface CodexNavPayload {
