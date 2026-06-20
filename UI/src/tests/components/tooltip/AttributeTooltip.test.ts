@@ -93,29 +93,29 @@ describe('AttributeTooltip', () => {
 				attributeId: EAttribute.Strength,
 				effect: {
 					modifierType: EModifierType.Additive,
-					amount: 15, // combined total of three +5 applications
-					stackAmount: 5,
+					amount: 20, // combined total of the three applications (5 + 10 + 5)
 					durationMs: 1000,
 					remainingMs: 1000,
-					sourceName: 'Battle Cry',
 					applications: [
-						{ remainingMs: 1000, durationMs: 1000 },
-						{ remainingMs: 600, durationMs: 1000 },
-						{ remainingMs: 200, durationMs: 1000 }
+						{ amount: 5, sourceName: 'Battle Cry' },
+						{ amount: 10, sourceName: 'War Drum' },
+						{ amount: 5, sourceName: 'Battle Cry' }
 					]
 				}
 			}
 		});
 
-		// Headline shows the combined total; the breakdown lists each application's own amount + remaining.
-		expect(getByTestId('attr-tip-effect').textContent).toContain('+15');
+		// Headline shows the combined total; the breakdown lists each application's own amount + source (the
+		// stack shares one expiry, shown by the header pill rather than per row).
+		expect(getByTestId('attr-tip-effect').textContent).toContain('+20');
 		const stacks = getByTestId('attr-tip-stacks');
 		expect(stacks.textContent).toContain('3 applications');
 		const rows = stacks.querySelectorAll('.at-effect-stack-row');
 		expect(rows).toHaveLength(3);
 		expect(rows[0].textContent).toContain('+5');
-		expect(rows[0].textContent).toContain('1.0s');
-		expect(rows[2].textContent).toContain('0.2s');
+		expect(rows[0].textContent).toContain('Battle Cry');
+		expect(rows[1].textContent).toContain('+10');
+		expect(rows[1].textContent).toContain('War Drum');
 	});
 
 	it('classifies a lowered beneficial attribute as a debuff and depletes the pill', () => {

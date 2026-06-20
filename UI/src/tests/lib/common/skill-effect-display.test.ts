@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EAttribute, EModifierType, ESkillEffectTarget, type ISkillEffect } from '$lib/api';
 import {
-	combineEffectAmount,
 	describeEffect,
 	effectDirection,
 	effectDirectionColor,
@@ -57,20 +56,6 @@ describe('formatEffectMagnitude', () => {
 		expect(formatEffectMagnitude(EModifierType.Additive, -15)).toBe('-15');
 		expect(formatEffectMagnitude(EModifierType.Multiplicative, 0.5)).toBe('×0.5');
 		expect(formatEffectMagnitude(EModifierType.Multiplicative, 1.5)).toBe('×1.5');
-	});
-});
-
-describe('combineEffectAmount', () => {
-	it('sums additive amounts across stacked applications', () => {
-		expect(combineEffectAmount(EModifierType.Additive, 5, 1)).toBe(5);
-		expect(combineEffectAmount(EModifierType.Additive, 5, 3)).toBe(15);
-		expect(combineEffectAmount(EModifierType.Additive, -10, 2)).toBe(-20);
-	});
-
-	it('compounds multiplicative factors across stacked applications', () => {
-		expect(combineEffectAmount(EModifierType.Multiplicative, 1.5, 1)).toBe(1.5);
-		expect(combineEffectAmount(EModifierType.Multiplicative, 1.5, 2)).toBe(2.25);
-		expect(combineEffectAmount(EModifierType.Multiplicative, 0.5, 3)).toBe(0.125);
 	});
 });
 

@@ -9,33 +9,33 @@ import {
 
 /** One active application within a stacked effect, for the tooltip's per-source breakdown. */
 export interface AttributeEffectApplication {
-	/** This application's own remaining time, driving its breakdown-row countdown. */
-	remainingMs: number;
-	durationMs: number;
+	/** This application's own magnitude — applications can differ when caster-scaling shifts between fires. */
+	amount: number;
+	/** Display name of the skill that applied this application, when it can be resolved. */
+	sourceName?: string;
 }
 
 /**
  * The effect detail shown when an {@link AttributeTooltip} is opened from a combat effect chip: the
  * modifier that produced the chip, from which the tooltip derives the effect's direction and
  * combined magnitude (via the shared `skill-effect-display` helpers) and — from the live `remainingMs`
- * / `durationMs` — a depleting countdown pill. Effects stack, so when more than one application is
- * active the panel also breaks down the individual applications and their amounts. Omitted on the
- * non-combat attribute surfaces (breakdown rail, point-buy steppers, skill scaling chips), which show
- * only the attribute.
+ * / `durationMs` — a depleting countdown pill. All applications on an attribute share one expiry, so
+ * the pill is the whole stack's single countdown; when more than one application is active the panel
+ * also breaks down the individual applications (their amounts and sources). Omitted on the non-combat
+ * attribute surfaces (breakdown rail, point-buy steppers, skill scaling chips), which show only the
+ * attribute.
  */
 export interface AttributeEffectContext {
 	modifierType: EModifierType;
 	/** Combined magnitude of all active applications (additive summed, multiplicative compounded). */
 	amount: number;
 	durationMs: number;
-	/** Live remaining time of the longest-lasting application, driving the header countdown pill. Omit
-	 *  for a non-timed/static context. */
+	/** Live shared remaining time of the stack, driving the header countdown pill. Omit for a
+	 *  non-timed/static context. */
 	remainingMs?: number;
-	/** Display name of the skill that applied the effect, when it can be resolved. */
+	/** Display name of the single source skill — set only when exactly one application is active (the
+	 *  multi-application case names each source per breakdown row instead). */
 	sourceName?: string;
-	/** Per-application amount (identical across a same-effect stack); the magnitude shown per breakdown
-	 *  row. Defaults to {@link amount} when omitted (a single application). */
-	stackAmount?: number;
 	/** Each active application, shown as a per-source breakdown when more than one is stacked. */
 	applications?: AttributeEffectApplication[];
 }

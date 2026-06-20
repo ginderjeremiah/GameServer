@@ -94,7 +94,7 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
 	});
 
-	it('expires stacked applications independently', () => {
+	it('shares a single expiration that resets to the latest application, extending the older one', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 80);
 
@@ -102,13 +102,46 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 
 		battler.advanceEffects(40); // A remaining 80 → 40, still active
-		battler.applyEffect(e); // application B: remaining 80
+		battler.applyEffect(e); // application B resets the shared remaining to 80
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(20); // both stacked
 
-		battler.advanceEffects(40); // A 40 → 0 (expires), B 80 → 40
-		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
-		battler.advanceEffects(40); // B 40 → 0 (expires)
+		// Independent expirations would drop A here (it had 40 left); the shared reset to 80 extends it.
+		battler.advanceEffects(40); // both 80 → 40
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(20);
+
+		battler.advanceEffects(40); // both 40 → 0, the whole stack expires together
 		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
+	});
+
+	it('cuts the stack short when a shorter effect on the same attribute is re-applied', () => {
+		const battler = makeBattler();
+
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200)); // A: remaining 200
+		battler.advanceEffects(40); // A remaining 160
+		battler.applyEffect(effect(2, EAttribute.Strength, EModifierType.Additive, 3, 40)); // B resets shared remaining to 40
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(18); // 10 + 5 + 3 (both stacked)
+
+		// The shorter application sets the shared remaining, cutting A short from 160 to 40, so the whole
+		// stack expires together on the next tick.
+		battler.advanceEffects(40);
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(10);
+	});
+
+	it('expires effects on different attributes independently', () => {
+		const battler = makeBattler([
+			{ id: EAttribute.Strength, amount: 10 },
+			{ id: EAttribute.Agility, amount: 10 }
+		]);
+
+		// The shared expiry is per-attribute, so a second effect on a DIFFERENT attribute neither stacks
+		// with nor resets the first.
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200)); // Strength remaining 200
+		battler.advanceEffects(40); // Strength 160
+		battler.applyEffect(effect(2, EAttribute.Agility, EModifierType.Additive, 3, 40)); // Agility remaining 40, leaves Strength alone
+
+		battler.advanceEffects(40); // Agility expires, Strength (still 120) remains
+		expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+		expect(battler.attributes.getValue(EAttribute.Agility)).toBe(10);
 	});
 
 	it('raises MaxHealth via the derived cascade without healing', () => {
@@ -133,16 +166,17 @@ describe('Battler skill-effect bookkeeping', () => {
 	});
 
 	it('clamps current health to the dropped max when a buff expires', () => {
-		const battler = makeBattler(); // base MaxHealth = 100
+		const battler = makeBattler(); // base MaxHealth = 50 + 5*10 = 100
 
-		// H (additive, 1 tick) lifts the additive subtotal to 200; L (×0.5, long) halves it back to 100,
-		// so currentHealth (100) is not clamped while both are active.
-		battler.applyEffect(effect(1, EAttribute.MaxHealth, EModifierType.Additive, 100, 40));
+		// A Strength buff (1 tick) lifts MaxHealth to (50 + 5*30) = 200 via the derived cascade; a direct
+		// ×0.5 MaxHealth (long) halves it back to 100, so currentHealth (100) is not clamped while both are
+		// active. They sit on DIFFERENT attributes (Strength vs MaxHealth), so they expire independently.
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 20, 40));
 		battler.applyEffect(effect(2, EAttribute.MaxHealth, EModifierType.Multiplicative, 0.5, 1000));
 		expect(battler.attributes.getValue(EAttribute.MaxHealth)).toBe(100);
 		expect(battler.currentHealth).toBe(100);
 
-		// H expires: MaxHealth drops to 100 * 0.5 = 50, dragging currentHealth down with it.
+		// The Strength buff expires: MaxHealth drops to (50 + 5*10) * 0.5 = 50, dragging currentHealth down.
 		battler.advanceEffects(40);
 		expect(battler.attributes.getValue(EAttribute.MaxHealth)).toBe(50);
 		expect(battler.currentHealth).toBe(50);
@@ -242,7 +276,7 @@ describe('Battler skill-effect bookkeeping', () => {
 		});
 	});
 
-	it('adds a second view when the same effect is applied again (stacking)', () => {
+	it('adds a second view when the same effect is applied again (stacking), resetting the shared remaining', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200);
 
@@ -250,12 +284,13 @@ describe('Battler skill-effect bookkeeping', () => {
 		battler.advanceEffects(40); // first application remaining 200 → 160
 		expect(battler.activeEffects[0].remainingMs).toBe(160);
 
-		battler.applyEffect(e); // stacks a second application at full duration
+		battler.applyEffect(e); // stacks a second application and resets the shared remaining to full
 		expect(battler.activeEffects).toHaveLength(2);
 		expect(battler.activeEffects[1].remainingMs).toBe(200);
 		expect(battler.activeEffects[1].renderRemainingMs).toBe(200);
-		// The first application keeps ticking down independently.
-		expect(battler.activeEffects[0].remainingMs).toBe(160);
+		// Same-attribute applications share one expiry, so the first is reset back to full alongside the new one.
+		expect(battler.activeEffects[0].remainingMs).toBe(200);
+		expect(battler.activeEffects[0].renderRemainingMs).toBe(200);
 	});
 
 	it('drops the view when its effect expires and clears all views on reset', () => {

@@ -1,13 +1,13 @@
-<!-- The row of active-effect chips on a battler card: one skill-style icon tile per timed effect
-     currently modifying the battler. Effects STACK — re-applying one adds another application — so each
-     tile groups all active applications of a single authored effect: it shows the attribute's icon with
-     a radial (conic) cooldown overlay tracking the longest-remaining application, the combined-total
-     magnitude badge, a buff/debuff direction tint, and (when more than one is active) a count badge in
-     the top-right corner. Reads the battler's reactive `activeEffects` projection, so tiles
-     appear/expire as effects come and go. -->
+<!-- The row of active-effect chips on a battler card: one skill-style icon tile per (attribute, modifier
+     type) currently modifying the battler. Effects STACK — re-applying one adds another application, and
+     all applications on an attribute share a single expiry (#992) — so each tile groups every active
+     application of one attribute+type: it shows the attribute's icon with a radial (conic) cooldown
+     overlay tracking the shared remaining, the combined-total magnitude badge, a buff/debuff direction
+     tint, and (when more than one is active) a count badge in the top-right corner. Reads the battler's
+     reactive `activeEffects` projection, so tiles appear/expire as effects come and go. -->
 {#if effectGroups.length > 0}
 	<div class="effect-chips" class:reversed data-testid="effect-chips">
-		{#each effectGroups as group (group.sourceId)}
+		{#each effectGroups as group (group.key)}
 			{@const direction = effectDirection(
 				attributeIsHarmful(group.attribute, staticData.attributes),
 				group.modifierType,
@@ -51,7 +51,6 @@
 import {
 	attributeIsHarmful,
 	attributeName,
-	combineEffectAmount,
 	effectDirection,
 	effectDirectionColor,
 	formatEffectMagnitude
@@ -64,7 +63,7 @@ import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import type { ActiveEffectView, Battler } from '$lib/battle';
-import type { EAttribute, EModifierType } from '$lib/api';
+import { EModifierType, type EAttribute } from '$lib/api';
 
 type Props = {
 	battler: Battler;
@@ -74,53 +73,57 @@ type Props = {
 
 const { battler, reversed = false }: Props = $props();
 
-/** All active applications of one authored effect, collapsed into a single chip: the shared
- *  attribute/modifier, the per-application and combined magnitudes, the application count, and the
- *  applications themselves (sorted longest-remaining first) for the tooltip breakdown and the sweep. */
+/** All active applications of one (attribute, modifier type), collapsed into a single chip: the shared
+ *  attribute/modifier, the combined magnitude, the application count, the shared remaining (every
+ *  application on an attribute expires together, #992), and the applications themselves (in application
+ *  order) for the tooltip breakdown. */
 interface EffectGroup {
-	sourceId: number;
+	/** Stable per-chip key — applications sharing an attribute+type collapse into one chip. */
+	key: string;
 	attribute: EAttribute;
 	modifierType: EModifierType;
-	/** Per-application amount (identical across a same-effect stack). */
-	stackAmount: number;
 	/** Combined magnitude of every active application (additive summed, multiplicative compounded). */
 	totalAmount: number;
 	count: number;
-	/** Authored duration, shared by every application — the sweep/pill denominator. */
+	/** Duration of the most-recent application — the sweep/pill denominator the shared remaining resets to. */
 	durationMs: number;
-	/** Render-interpolated remaining of the longest-lasting application, driving the sweep/pill. */
-	maxRenderRemainingMs: number;
+	/** Render-interpolated shared remaining (all applications share one expiry), driving the sweep/pill. */
+	renderRemainingMs: number;
 	applications: ActiveEffectView[];
 }
 
-// Collapse the flat application list into one group per authored effect, preserving first-seen order so
-// the chips don't reshuffle as stacks come and go. A linear find suffices — a battler carries only a
-// handful of distinct active effects.
+// Collapse the flat application list into one group per (attribute, modifier type), preserving first-seen
+// order so the chips don't reshuffle as stacks come and go. A linear find suffices — a battler carries
+// only a handful of distinct active effects.
 const effectGroups = $derived.by<EffectGroup[]>(() => {
 	const groups: EffectGroup[] = [];
 	for (const effect of battler.activeEffects) {
-		let group = groups.find((g) => g.sourceId === effect.sourceId);
+		let group = groups.find((g) => g.attribute === effect.attribute && g.modifierType === effect.modifierType);
 		if (!group) {
 			group = {
-				sourceId: effect.sourceId,
+				key: `${effect.attribute}:${effect.modifierType}`,
 				attribute: effect.attribute,
 				modifierType: effect.modifierType,
-				stackAmount: effect.amount,
-				totalAmount: 0,
+				totalAmount: effect.modifierType === EModifierType.Multiplicative ? 1 : 0,
 				count: 0,
 				durationMs: effect.durationMs,
-				maxRenderRemainingMs: 0,
+				renderRemainingMs: 0,
 				applications: []
 			};
 			groups.push(group);
 		}
 		group.count++;
 		group.applications.push(effect);
-		group.maxRenderRemainingMs = Math.max(group.maxRenderRemainingMs, effect.renderRemainingMs);
-	}
-	for (const group of groups) {
-		group.totalAmount = combineEffectAmount(group.modifierType, group.stackAmount, group.count);
-		group.applications.sort((a, b) => b.remainingMs - a.remainingMs);
+		// Additive amounts sum; multiplicative factors compound — matching the battle math, and read from
+		// each application's own amount (they can differ when caster-scaling shifts between fires).
+		group.totalAmount =
+			effect.modifierType === EModifierType.Multiplicative
+				? group.totalAmount * effect.amount
+				: group.totalAmount + effect.amount;
+		group.renderRemainingMs = Math.max(group.renderRemainingMs, effect.renderRemainingMs);
+		// activeEffects is in application order, so the last one seen is the most recent — its duration is
+		// what the shared remaining was reset to, and so the sweep/pill denominator.
+		group.durationMs = effect.durationMs;
 	}
 	return groups;
 });
@@ -128,51 +131,54 @@ const effectGroups = $derived.by<EffectGroup[]>(() => {
 let tooltip = $state<TooltipComponent>();
 const tip = createAttributeTooltip(() => tooltip);
 
-// The source id of the chip the tooltip is currently anchored to (if any). Tracked so the live group
-// can be re-resolved each tick and so an expiring chip can close the tooltip itself — a chip removed
-// under the cursor never fires `mouseleave`, which otherwise left the panel stuck open.
-let shownSourceId = $state<number>();
-const shownGroup = $derived(shownSourceId != null ? effectGroups.find((g) => g.sourceId === shownSourceId) : undefined);
+// The key of the chip the tooltip is currently anchored to (if any). Tracked so the live group can be
+// re-resolved each tick and so an expiring chip can close the tooltip itself — a chip removed under the
+// cursor never fires `mouseleave`, which otherwise left the panel stuck open.
+let shownKey = $state<string>();
+const shownGroup = $derived(shownKey != null ? effectGroups.find((g) => g.key === shownKey) : undefined);
 
 // The skill an active effect came from: its `sourceId` is the authored skill-effect id, so find the
 // skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown skill.
 const sourceSkillName = (sourceId: number): string | undefined =>
 	staticData.skills?.find((skill) => skill?.effects.some((e) => e.id === sourceId))?.name;
 
-// Live effect context for the panel: reads renderRemainingMs so the countdown pill (and each stacked
-// application's breakdown row) depletes smoothly.
+// Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes smoothly. A
+// single application names its source in the header; a stack names each application's source per row.
 const shownEffectContext = $derived(
 	shownGroup
 		? {
 				modifierType: shownGroup.modifierType,
 				amount: shownGroup.totalAmount,
-				stackAmount: shownGroup.stackAmount,
 				durationMs: shownGroup.durationMs,
-				remainingMs: shownGroup.maxRenderRemainingMs,
-				sourceName: sourceSkillName(shownGroup.sourceId),
-				applications: shownGroup.applications.map((a) => ({
-					remainingMs: a.renderRemainingMs,
-					durationMs: a.durationMs
-				}))
+				remainingMs: shownGroup.renderRemainingMs,
+				sourceName: shownGroup.count === 1 ? sourceSkillName(shownGroup.applications[0].sourceId) : undefined,
+				applications:
+					shownGroup.count > 1
+						? shownGroup.applications.map((a) => ({ amount: a.amount, sourceName: sourceSkillName(a.sourceId) }))
+						: undefined
 			}
 		: undefined
 );
 
 // Close the tooltip when the chip it's anchored to expires under the cursor (no `mouseleave` fires).
 $effect(() => {
-	if (shownSourceId != null && !shownGroup) {
+	if (shownKey != null && !shownGroup) {
 		hideChipTooltip();
 	}
 });
 
-// The transparent (revealed) arc of the radial overlay: the render-interpolated remaining fraction of
-// the longest-lasting application's duration, in degrees. Depletes toward 0 as the last application
-// expires; jumps back toward 360 when a fresh application restores the longest `renderRemainingMs`.
+// The transparent (revealed) arc of the radial overlay: the render-interpolated shared remaining as a
+// fraction of the most-recent application's duration, in degrees. Depletes toward 0 as the stack
+// expires; jumps back toward 360 when a fresh application resets the shared `renderRemainingMs`.
+// Note: the remaining is shared per *attribute* but this denominator is the (attribute, modifierType)
+// group's own latest duration. On the rare attribute carrying both an additive and a multiplicative
+// effect, a reset driven by the other type can leave this group's sweep below full rather than at 360°
+// — intended (display-only); don't "fix" it by widening the share to the attribute.
 const remainingSweep = (group: EffectGroup) =>
-	group.durationMs > 0 ? Math.max(0, Math.min(360, (group.maxRenderRemainingMs / group.durationMs) * 360)) : 0;
+	group.durationMs > 0 ? Math.max(0, Math.min(360, (group.renderRemainingMs / group.durationMs) * 360)) : 0;
 
 const showChipTooltip = (group: EffectGroup, anchor: TooltipAnchor) => {
-	shownSourceId = group.sourceId;
+	shownKey = group.key;
 	tip.controller.show(group.attribute, anchor);
 };
 // Keyboard focus anchors off the chip's box; a mouse click is left to the hover handlers so the
@@ -184,7 +190,7 @@ const focusChipTooltip = (group: EffectGroup, ev: FocusEvent) => {
 	}
 };
 const hideChipTooltip = () => {
-	shownSourceId = undefined;
+	shownKey = undefined;
 	tip.controller.hide();
 };
 </script>

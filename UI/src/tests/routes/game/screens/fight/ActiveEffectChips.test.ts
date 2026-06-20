@@ -88,6 +88,33 @@ describe('ActiveEffectChips', () => {
 		expect(chips[0].getAttribute('aria-label')).toContain('3 applications');
 	});
 
+	it('collapses different source skills on the same attribute+type into one chip, summing actual amounts', async () => {
+		// Two DIFFERENT effects on the same (Strength, additive) from two DIFFERENT skills, with DIFFERENT
+		// amounts — the case the removed `combineEffectAmount(amount × count)` shortcut couldn't total correctly.
+		staticData.skills = [
+			{ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] } as ISkill,
+			{ id: 1, name: 'War Drum', effects: [effect({ id: 2, amount: 3 })] } as ISkill
+		];
+		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
+		battler.applyEffect(effect({ id: 2, attributeId: EAttribute.Strength, amount: 3 }));
+		const { container, getByTestId } = render(ActiveEffectChips, { props: { battler } });
+
+		// One chip for the two applications; the magnitude is the summed total (+8), not amount × count (+10).
+		const chips = container.querySelectorAll('.effect-chip');
+		expect(chips).toHaveLength(1);
+		expect(chips[0].querySelector('.chip-mag')?.textContent).toContain('+8');
+		expect(getByTestId('chip-count').textContent).toBe('2');
+
+		// The tooltip breaks the stack down by each application's own amount and source skill.
+		await fireEvent.mouseEnter(chips[0] as HTMLElement);
+		const rows = getByTestId('attr-tip-stacks').querySelectorAll('.at-effect-stack-row');
+		expect(rows).toHaveLength(2);
+		expect(rows[0].textContent).toContain('+5');
+		expect(rows[0].textContent).toContain('Battle Cry');
+		expect(rows[1].textContent).toContain('+3');
+		expect(rows[1].textContent).toContain('War Drum');
+	});
+
 	it('shows no count badge for a single (unstacked) application', () => {
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
 		const { container, queryByTestId } = render(ActiveEffectChips, { props: { battler } });

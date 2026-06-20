@@ -40,20 +40,22 @@
 				{/if}
 			</div>
 			{#if effectDetail.applications}
-				<!-- The effect is stacked: list each application's individual amount and remaining time. -->
+				<!-- The effect is stacked (one shared expiry, shown in the header pill): list each
+				     application's individual amount and the skill it came from. -->
 				<div class="at-effect-stacks" data-testid="attr-tip-stacks">
 					<span class="at-effect-stacks-label">{effectDetail.applications.length} applications</span>
 					<ul class="at-effect-stack-list">
 						{#each effectDetail.applications as app, index (index)}
 							<li class="at-effect-stack-row">
 								<span class="at-effect-stack-mag" style:color={effectDetail.color}>{app.magnitude}</span>
-								<span class="at-effect-stack-time">{app.remaining}</span>
+								{#if app.sourceName}
+									<span class="at-effect-stack-source">{app.sourceName}</span>
+								{/if}
 							</li>
 						{/each}
 					</ul>
 				</div>
-			{/if}
-			{#if effectDetail.sourceName}
+			{:else if effectDetail.sourceName}
 				<div class="at-effect-source">
 					<span class="at-effect-source-label">Source</span>
 					<span class="at-effect-source-name">{effectDetail.sourceName}</span>
@@ -124,15 +126,15 @@ const effectDetail = $derived.by(() => {
 		};
 	}
 	// When more than one application is active the effect is stacked: break down each application's
-	// individual amount and its own remaining time, while the headline magnitude stays the combined total.
-	const stacked = effect.applications && effect.applications.length > 1;
-	const stackAmount = effect.stackAmount ?? effect.amount;
-	const applications = stacked
-		? effect.applications?.map((app) => ({
-				magnitude: formatEffectMagnitude(effect.modifierType, stackAmount),
-				remaining: `${(app.remainingMs / 1000).toFixed(1)}s`
-			}))
-		: undefined;
+	// individual amount and source (they share one expiry, shown by the header pill), while the headline
+	// magnitude stays the combined total.
+	const applications =
+		effect.applications && effect.applications.length > 1
+			? effect.applications.map((app) => ({
+					magnitude: formatEffectMagnitude(effect.modifierType, app.amount),
+					sourceName: app.sourceName
+				}))
+			: undefined;
 	return {
 		label: direction === 'buff' ? 'Buff' : 'Debuff',
 		color: effectDirectionColor(direction),
@@ -213,8 +215,7 @@ const effectDetail = $derived.by(() => {
 	font-weight: 600;
 }
 
-.at-effect-stack-time {
-	font-family: var(--mono);
+.at-effect-stack-source {
 	font-size: 10px;
 	color: var(--text-tertiary);
 }
