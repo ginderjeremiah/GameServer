@@ -8,6 +8,7 @@ using Game.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Globalization;
 
 namespace Game.Api.Controllers
 {
@@ -36,6 +37,15 @@ namespace Game.Api.Controllers
             var result = await _accountService.Login(creds.Username, creds.Password);
             if (!result.Success)
             {
+                // A backoff rejection surfaces as a 429 with a Retry-After hint (mirroring the IP rate
+                // limiter's 429 shape), distinct from the 400 a plain invalid-credentials failure returns.
+                if (result.Status == LoginStatus.TooManyAttempts && result.RetryAfter is TimeSpan retryAfter)
+                {
+                    Response.Headers.RetryAfter =
+                        ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                    return ApiResponse.Error(LoginErrorMessage(result.Status), ApiErrorCategory.TooManyRequests);
+                }
+
                 return ApiResponse.Error(LoginErrorMessage(result.Status));
             }
 
@@ -169,6 +179,7 @@ namespace Game.Api.Controllers
                 LoginStatus.Banned => "This account has been banned.",
                 LoginStatus.NoPlayer => "User has no player characters",
                 LoginStatus.PlayerDataNotFound => "Player data not found",
+                LoginStatus.TooManyAttempts => "Too many failed login attempts. Please wait a moment and try again.",
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }
