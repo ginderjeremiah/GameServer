@@ -169,7 +169,7 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>
-        /// Resolves an owned reference (item / item mod / skill) against its catalog, rethrowing a failure as a
+        /// Resolves an owned reference (item / item mod / skill) against its catalog, rethrowing a catalog miss as a
         /// loud, diagnosable <see cref="OrphanedReferenceException"/> that names the player, catalog, and missing
         /// id. We never silently drop the player-owned row; instead the aggregate fails loudly so a content-data
         /// mistake (a removed referenced id) is obvious from logs rather than surfacing as an opaque load failure.
@@ -180,8 +180,10 @@ namespace Game.DataAccess.Mapping
             {
                 return resolve(referenceId);
             }
-            catch (Exception ex)
+            catch (ArgumentOutOfRangeException ex)
             {
+                // Only a catalog miss (GetById's documented out-of-range contract) is an orphaned reference;
+                // any other failure propagates unwrapped so the orphaned-reference diagnosis stays truthful.
                 throw new OrphanedReferenceException(playerId, catalogName, referenceId, ex);
             }
         }
