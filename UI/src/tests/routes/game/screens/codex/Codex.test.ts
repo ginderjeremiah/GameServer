@@ -167,10 +167,38 @@ describe('Codex screen', () => {
 		expect(screen.getByText('62/100')).toBeTruthy();
 	});
 
-	it('shows a placeholder for the not-yet-built Zones and Skills tabs', async () => {
+	it('renders the Zones tab as a progression rail + dossier with a boss card and spawn table', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
-		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Zones');
+		// A rail row per zone, and the head zone's dossier by default.
+		expect(screen.getByTestId('codex-zone-rows')).toBeTruthy();
+		expect(screen.getByTestId('codex-zone-0')).toBeTruthy();
+		expect(screen.getByTestId('codex-zone-1')).toBeTruthy();
+		const dossier = screen.getByTestId('codex-zone-dossier');
+		expect(dossier.textContent).toContain('Emberreach');
+		expect(dossier.textContent).toContain('1–10'); // level range
+		// Emberreach's authored boss + its spawn table.
+		expect(screen.getByTestId('codex-zone-boss').textContent).toContain('Cinder Tyrant');
+		expect(screen.getByTestId('codex-zone-spawn-0').textContent).toContain('Dust Skitterer');
+	});
+
+	it('cross-links a zone boss card into the enemy dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		await fireEvent.click(screen.getByTestId('codex-zone-boss'));
+		// Lands on the Enemies tab with the boss's dossier open.
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
+	});
+
+	it('cross-links a zone spawn row into the enemy dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		await fireEvent.click(screen.getByTestId('codex-zone-spawn-0'));
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Dust Skitterer');
+	});
+
+	it('shows a placeholder for the not-yet-built Skills tab', async () => {
+		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
 		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Skills');
 	});

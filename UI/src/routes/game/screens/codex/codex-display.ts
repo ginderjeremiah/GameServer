@@ -5,7 +5,7 @@
 
 import type { LevelRange } from './enemy-level';
 
-/** Top-level Codex tab. Only `enemies` is built today; `zones`/`skills` show a placeholder. */
+/** Top-level Codex tab. Enemies + Zones are built; `skills` shows a placeholder. */
 export type CodexTab = 'enemies' | 'zones' | 'skills';
 /** Enemy dossier sub-tab. `challenges` only appears when the enemy has related challenges. */
 export type EnemySubTab = 'attributes' | 'statistics' | 'skills' | 'spawns' | 'challenges';
@@ -13,6 +13,8 @@ export type EnemySubTab = 'attributes' | 'statistics' | 'skills' | 'spawns' | 'c
 export type EnemyFilter = 'all' | 'normal' | 'boss';
 /** Enemy-table sort metric. */
 export type EnemySort = 'level' | 'name';
+/** A zone's progression status on the Zones rail. */
+export type ZoneStatus = 'cleared' | 'unlocked' | 'locked';
 
 export const CODEX_TABS: CodexTab[] = ['enemies', 'zones', 'skills'];
 
@@ -47,6 +49,24 @@ export const tabLabel = (tab: CodexTab): string => tab[0].toUpperCase() + tab.sl
 export const enemyAccent = (isBoss: boolean): string => (isBoss ? 'var(--boss-accent)' : 'var(--enemy-accent)');
 
 export const enemyKindLabel = (isBoss: boolean): string => (isBoss ? 'Boss' : 'Enemy');
+
+/* ── zone progression status ─────────────────────────────────────────────── */
+
+/** Short status label for the Zones rail / dossier seal. */
+export const ZONE_STATUS_LABELS: Record<ZoneStatus, string> = {
+	cleared: 'Cleared',
+	unlocked: 'Unlocked',
+	locked: 'Locked'
+};
+
+/** The themed status colour: a cleared zone reads in success-green, an open zone in the zone accent,
+ *  and a sealed zone dims to muted text. */
+export const zoneStatusColor = (status: ZoneStatus): string =>
+	status === 'cleared' ? 'var(--success)' : status === 'unlocked' ? 'var(--accent)' : 'var(--text-muted)';
+
+/** A zone's progression status: a clear takes precedence, then a sealed unlock gate, else open. */
+export const resolveZoneStatus = (cleared: boolean, locked: boolean): ZoneStatus =>
+	cleared ? 'cleared' : locked ? 'locked' : 'unlocked';
 
 /** A compact level band: `L18` for a fixed boss encounter, `18–28` for a ranged spawn. */
 export const formatBand = (range: LevelRange): string => (range.fixed ? `L${range.min}` : `${range.min}–${range.max}`);
