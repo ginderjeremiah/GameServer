@@ -39,7 +39,7 @@ namespace Game.DataAccess.Repositories
 
         /// <summary>
         /// Asserts the zero-based-id contiguity invariant the snapshots rely on: the record at index
-        /// <c>i</c> must have <c>Id == i</c>, for every <c>i</c>. <see cref="OrderBy{T}"/>-by-id guarantees
+        /// <c>i</c> must have <c>Id == i</c>, for every <c>i</c>. <c>OrderBy</c>-by-id guarantees
         /// sort order but not that the ids run 0..n-1 with no gaps; a seed/migration gap (the one way a gap
         /// could appear, since hard-delete is blocked) would make every index lookup above the gap silently
         /// resolve the wrong record. Throwing here fails the build-then-swap so the prior good snapshot stays
