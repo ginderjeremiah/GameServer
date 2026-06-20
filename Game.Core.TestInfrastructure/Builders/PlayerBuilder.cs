@@ -17,6 +17,7 @@ namespace Game.Core.TestInfrastructure.Builders
         private int _level = 1;
         private int _exp = 0;
         private int _currentZoneId = 0;
+        private DateTime _lastActivity = DateTime.UtcNow;
         private List<StatAllocation> _statAllocations = [];
         private int _statPointsGained = 0;
         private int _statPointsUsed = 0;
@@ -46,6 +47,12 @@ namespace Game.Core.TestInfrastructure.Builders
         public PlayerBuilder WithExp(int exp)
         {
             _exp = exp;
+            return this;
+        }
+
+        public PlayerBuilder WithLastActivity(DateTime lastActivity)
+        {
+            _lastActivity = lastActivity;
             return this;
         }
 
@@ -92,6 +99,7 @@ namespace Game.Core.TestInfrastructure.Builders
             Level = _level,
             Exp = _exp,
             CurrentZoneId = _currentZoneId,
+            LastActivity = _lastActivity,
             StatPoints = new PlayerStatPoints
             {
                 StatAllocations = _statAllocations,

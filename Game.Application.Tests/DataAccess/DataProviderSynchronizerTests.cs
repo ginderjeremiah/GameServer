@@ -44,7 +44,8 @@ namespace Game.Application.Tests.DataAccess
                 Exp: 1234,
                 CurrentZoneId: 0,
                 StatPointsGained: 100,
-                StatPointsUsed: 100);
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow);
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
@@ -86,8 +87,8 @@ namespace Game.Application.Tests.DataAccess
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
 
-            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100);
-            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100);
+            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow);
+            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow);
             var queue = new InMemoryPubSubQueue(Serialize(firstEvent), Serialize(secondEvent));
 
             await synchronizer.ProcessQueue(queue);
@@ -120,7 +121,8 @@ namespace Game.Application.Tests.DataAccess
                 Exp: 4321,
                 CurrentZoneId: 0,
                 StatPointsGained: 100,
-                StatPointsUsed: 100);
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
@@ -719,7 +721,8 @@ namespace Game.Application.Tests.DataAccess
                 Exp: 4242,
                 CurrentZoneId: 0,
                 StatPointsGained: 100,
-                StatPointsUsed: 100);
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
@@ -838,7 +841,8 @@ namespace Game.Application.Tests.DataAccess
                 Exp: 5678,
                 CurrentZoneId: 0,
                 StatPointsGained: 100,
-                StatPointsUsed: 100);
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
 
@@ -885,7 +889,8 @@ namespace Game.Application.Tests.DataAccess
                 Exp: 9876,
                 CurrentZoneId: 0,
                 StatPointsGained: 100,
-                StatPointsUsed: 100);
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);

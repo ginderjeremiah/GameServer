@@ -498,11 +498,13 @@ namespace Game.Application.Tests.DataAccess
         {
             var playerId = await SeedPlayerAsync();
             var zoneId = await SeedZoneAsync();
+            var firstActivity = new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc);
+            var latestActivity = new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc);
 
             // Update-only against the always-present Players row: re-applying with higher absolute values
             // updates the row in place rather than duplicating, so the core fields converge to the latest.
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110));
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity));
 
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -514,6 +516,7 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(zoneId, row.CurrentZoneId);
             Assert.Equal(160, row.StatPointsGained);
             Assert.Equal(140, row.StatPointsUsed);
+            Assert.Equal(latestActivity, row.LastActivity);
         }
 
         [Fact]

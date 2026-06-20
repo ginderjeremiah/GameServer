@@ -27,6 +27,9 @@ namespace Game.DataAccess.Mapping
                 CurrentZoneId = newPlayer.CurrentZoneId,
                 StatPointsGained = newPlayer.StatPointsGained,
                 StatPointsUsed = newPlayer.StatPointsUsed,
+                // Anchor away-time tracking at creation so a brand-new player's first login computes a fresh
+                // (near-zero) away period rather than an enormous one from the default DateTime.
+                LastActivity = DateTime.UtcNow,
             };
 
             player.PlayerSkills = newPlayer.Skills
@@ -155,6 +158,7 @@ namespace Game.DataAccess.Mapping
                 Level = entity.Level,
                 Exp = entity.Exp,
                 CurrentZoneId = entity.CurrentZoneId,
+                LastActivity = entity.LastActivity,
                 StatPoints = new PlayerStatPoints
                 {
                     StatAllocations = statAllocations,
