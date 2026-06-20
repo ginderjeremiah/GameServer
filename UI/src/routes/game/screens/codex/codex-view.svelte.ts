@@ -143,6 +143,16 @@ const SUB_TAB_DEFS: SubTabVM[] = [
 	{ key: 'spawns', label: 'Spawns' }
 ];
 
+/* ── catalogue helpers (one definition, reused by the reactive deriveds and the constructor's
+   non-reactive store reads) — retirement keeps a slot resolvable but out of the glossary. ── */
+
+/** Live (non-retired) enemies. */
+const liveEnemies = (enemies: IEnemy[] | undefined): IEnemy[] => (enemies ?? []).filter((e) => !e.retiredAt);
+
+/** Live (non-retired) zones in authored progression order. */
+const liveZones = (zones: IZone[] | undefined): IZone[] =>
+	(zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order);
+
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class CodexView {
@@ -193,8 +203,7 @@ export class CodexView {
 
 	/* ── catalogue ───────────────────────────────────────────────────────────── */
 
-	/** Non-retired enemies — retirement keeps a slot resolvable but out of the glossary. */
-	readonly enemies = $derived((staticData.enemies ?? []).filter((e) => !e.retiredAt));
+	readonly enemies = $derived(liveEnemies(staticData.enemies));
 
 	readonly filteredEnemies = $derived(
 		this.enemies.filter((e) => this.filter === 'all' || (this.filter === 'boss' ? e.isBoss : !e.isBoss))
@@ -204,7 +213,7 @@ export class CodexView {
 	readonly tabs = $derived.by<CodexTabVM[]>(() => {
 		const counts: Record<CodexTab, number> = {
 			enemies: this.enemies.length,
-			zones: (staticData.zones ?? []).filter((z) => !z.retiredAt).length,
+			zones: this.zones.length,
 			skills: (staticData.skills ?? []).filter((s) => !s.retiredAt).length
 		};
 		return CODEX_TABS.map((key) => ({
@@ -380,9 +389,7 @@ export class CodexView {
 
 	/* ── zones catalogue (the progression rail) ─────────────────────────────────── */
 
-	/** Non-retired zones in authored progression order — a retired zone keeps its slot resolvable but
-	 *  drops out of the rail. */
-	readonly zones = $derived((staticData.zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order));
+	readonly zones = $derived(liveZones(staticData.zones));
 
 	/** Zone rail rows: a status dot (cleared / unlocked / locked), the level band, the spawn-pool size
 	 *  and whether the zone has a dedicated boss. */
@@ -511,13 +518,13 @@ export class CodexView {
 
 	/** Resolve an enemy id against the catalogue, falling back to the head of the list. */
 	private resolveEnemy(id: number): IEnemy | undefined {
-		const enemies = (staticData.enemies ?? []).filter((e) => !e.retiredAt);
+		const enemies = liveEnemies(staticData.enemies);
 		return enemies.find((e) => e.id === id) ?? enemies[0];
 	}
 
 	/** Resolve a zone id against the rail (authored order), falling back to the head. */
 	private resolveZone(id: number): IZone | undefined {
-		const zones = (staticData.zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order);
+		const zones = liveZones(staticData.zones);
 		return zones.find((z) => z.id === id) ?? zones[0];
 	}
 
