@@ -21,6 +21,9 @@ namespace Game.Application.Tests.Mapping
     /// (including the legacy <c>Order == 0</c> tie-break that feeds <c>BattleSnapshot.SkillIds</c>),
     /// the silent skip of an unknown equipment-slot id, and the per-item applied-mod grouping. A
     /// regression here surfaces only as a subtle battle-parity failure, so it is pinned directly.
+    /// Also pins the loud fail-fast missing-reference policy (#1017): an owned item / item mod / skill
+    /// that no longer resolves fails the whole load with a diagnosable <see cref="OrphanedReferenceException"/>
+    /// naming the player, catalog, and missing id rather than silently dropping the player-owned row.
     /// </summary>
     public class PlayerMapperTests
     {
@@ -120,6 +123,57 @@ namespace Game.Application.Tests.Mapping
             Assert.False(pref.Enabled);
         }
 
+        [Fact]
+        public void ToCore_OrphanedItemReference_ThrowsDiagnosableException()
+        {
+            // Player 1 owns item 11, which the catalog can no longer resolve (a content-data mistake).
+            var entity = BuildPlayer(unlockedItems: [new() { ItemId = 11, EquipmentSlotId = null }]);
+            var catalog = Catalog(missingItemIds: [11]);
+
+            var ex = Assert.Throws<OrphanedReferenceException>(
+                () => PlayerMapper.ToCore(entity, catalog, catalog, catalog));
+
+            // The message names the player, the catalog, and the missing id so the mistake is diagnosable from logs.
+            Assert.Contains("Player 1", ex.Message);
+            Assert.Contains("item", ex.Message);
+            Assert.Contains("11", ex.Message);
+            // The originating catalog failure is preserved as the inner exception rather than swallowed.
+            Assert.NotNull(ex.InnerException);
+        }
+
+        [Fact]
+        public void ToCore_OrphanedItemModReference_ThrowsDiagnosableException()
+        {
+            // Item 10 resolves, but its applied mod 100 no longer does.
+            var entity = BuildPlayer(
+                unlockedItems: [new() { ItemId = 10, EquipmentSlotId = null }],
+                appliedMods: [new() { ItemId = 10, ItemModSlotId = 0, ItemModId = 100 }]);
+            var catalog = Catalog(missingItemModIds: [100]);
+
+            var ex = Assert.Throws<OrphanedReferenceException>(
+                () => PlayerMapper.ToCore(entity, catalog, catalog, catalog));
+
+            Assert.Contains("Player 1", ex.Message);
+            Assert.Contains("item mod", ex.Message);
+            Assert.Contains("100", ex.Message);
+            Assert.NotNull(ex.InnerException);
+        }
+
+        [Fact]
+        public void ToCore_OrphanedSkillReference_ThrowsDiagnosableException()
+        {
+            var entity = BuildPlayer(skills: [new() { SkillId = 7, Selected = true, Order = 0 }]);
+            var catalog = Catalog(missingSkillIds: [7]);
+
+            var ex = Assert.Throws<OrphanedReferenceException>(
+                () => PlayerMapper.ToCore(entity, catalog, catalog, catalog));
+
+            Assert.Contains("Player 1", ex.Message);
+            Assert.Contains("skill", ex.Message);
+            Assert.Contains("7", ex.Message);
+            Assert.NotNull(ex.InnerException);
+        }
+
         private static EntityPlayer BuildPlayer(
             List<EntityPlayerSkill>? skills = null,
             List<EntityUnlockedItem>? unlockedItems = null,
@@ -143,45 +197,69 @@ namespace Game.Application.Tests.Mapping
                 LogPreferences = logPreferences ?? [],
             };
 
-        private static InMemoryCatalog Catalog() => new();
+        private static InMemoryCatalog Catalog(
+            int[]? missingItemIds = null,
+            int[]? missingItemModIds = null,
+            int[]? missingSkillIds = null) => new(missingItemIds, missingItemModIds, missingSkillIds);
 
         /// <summary>
         /// A trivial in-memory stand-in for the reference-data caches. ToCore only resolves a domain
         /// model by id, so this builds one on demand rather than depending on the database-backed cache.
+        /// Designated "missing" ids throw the same descriptive <see cref="ArgumentOutOfRangeException"/> the
+        /// real catalog raises for an unresolvable id, exercising the orphaned-reference path.
         /// </summary>
-        private sealed class InMemoryCatalog : IItems, IItemMods, ISkills
+        private sealed class InMemoryCatalog(
+            int[]? missingItemIds,
+            int[]? missingItemModIds,
+            int[]? missingSkillIds) : IItems, IItemMods, ISkills
         {
-            public CoreItem GetItem(int itemId) => new()
-            {
-                Id = itemId,
-                Name = $"Item {itemId}",
-                Description = string.Empty,
-                Category = EItemCategory.Weapon,
-                Rarity = ERarity.Common,
-                Attributes = [],
-                ModSlots = [],
-            };
+            private readonly HashSet<int> _missingItemIds = [.. missingItemIds ?? []];
+            private readonly HashSet<int> _missingItemModIds = [.. missingItemModIds ?? []];
+            private readonly HashSet<int> _missingSkillIds = [.. missingSkillIds ?? []];
 
-            public CoreItemMod GetItemMod(int itemModId) => new()
+            public CoreItem GetItem(int itemId)
             {
-                Id = itemModId,
-                Name = $"Mod {itemModId}",
-                Description = string.Empty,
-                Type = EItemModType.Component,
-                Rarity = ERarity.Common,
-                Attributes = [],
-            };
+                ThrowIfMissing(_missingItemIds, itemId, "item");
+                return new()
+                {
+                    Id = itemId,
+                    Name = $"Item {itemId}",
+                    Description = string.Empty,
+                    Category = EItemCategory.Weapon,
+                    Rarity = ERarity.Common,
+                    Attributes = [],
+                    ModSlots = [],
+                };
+            }
 
-            public CoreSkill GetSkill(int skillId) => new()
+            public CoreItemMod GetItemMod(int itemModId)
             {
-                Id = skillId,
-                Name = $"Skill {skillId}",
-                BaseDamage = 1,
-                Description = string.Empty,
-                CooldownMs = 1000,
-                DamageMultipliers = [],
-                Effects = [],
-            };
+                ThrowIfMissing(_missingItemModIds, itemModId, "item mod");
+                return new()
+                {
+                    Id = itemModId,
+                    Name = $"Mod {itemModId}",
+                    Description = string.Empty,
+                    Type = EItemModType.Component,
+                    Rarity = ERarity.Common,
+                    Attributes = [],
+                };
+            }
+
+            public CoreSkill GetSkill(int skillId)
+            {
+                ThrowIfMissing(_missingSkillIds, skillId, "skill");
+                return new()
+                {
+                    Id = skillId,
+                    Name = $"Skill {skillId}",
+                    BaseDamage = 1,
+                    Description = string.Empty,
+                    CooldownMs = 1000,
+                    DamageMultipliers = [],
+                    Effects = [],
+                };
+            }
 
             public bool ValidateItemModId(int itemModId) => true;
 
@@ -192,6 +270,15 @@ namespace Game.Application.Tests.Mapping
             object IItems.VersionKey => throw new NotSupportedException();
             object IItemMods.VersionKey => throw new NotSupportedException();
             object ISkills.VersionKey => throw new NotSupportedException();
+
+            // Mirrors the real catalog's descriptive out-of-range failure for an unresolvable id.
+            private static void ThrowIfMissing(HashSet<int> missingIds, int id, string setName)
+            {
+                if (missingIds.Contains(id))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(id), id, $"No {setName} exists with Id {id}.");
+                }
+            }
         }
     }
 }
