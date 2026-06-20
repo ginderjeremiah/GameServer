@@ -73,9 +73,10 @@ namespace Game.Core.Progress
                     Record(EStatisticType.BossesDefeated, enemy.Id, 1);
 
                     // ZonesCleared counts distinct zones ever cleared, not boss-victory events. The per-zone
-                    // entry is a binary "cleared" flag, and the global counter only bumps on a zone's first
-                    // clear (its 0 -> 1 transition), so re-farming a boss never re-counts the zone.
-                    if (GetStatisticValue(EStatisticType.ZonesCleared, zoneId) == 0)
+                    // entry is a binary "cleared" flag whose absence (not a magic 0) is the "never cleared"
+                    // state, so the global counter only bumps on a zone's first clear and re-farming a boss
+                    // never re-counts the zone — keying off row presence per the documented invariant.
+                    if (!TryGetStatisticValue(EStatisticType.ZonesCleared, zoneId, out _))
                     {
                         Record(EStatisticType.ZonesCleared, null, 1);
                         Record(EStatisticType.ZonesCleared, zoneId, 1);
@@ -128,20 +129,26 @@ namespace Game.Core.Progress
                     continue;
                 }
 
+                // Evaluate a newly-relevant challenge against a working row without committing it yet: a
+                // challenge that becomes relevant but gains no progress this battle must not persist an
+                // information-free (zero-progress, incomplete) row, which would bloat the write-behind and
+                // the cache snapshot and partially undo the RelevantTo reverse-index scoping.
                 var isNew = playerChallenge is null;
-                if (playerChallenge is null)
-                {
-                    playerChallenge = new PlayerChallenge(challenge, progress: 0, completed: false);
-                    _challenges[challenge.Id] = playerChallenge;
-                }
+                playerChallenge ??= new PlayerChallenge(challenge, progress: 0, completed: false);
 
                 var beforeProgress = playerChallenge.Progress;
                 var beforeCompleted = playerChallenge.Completed;
 
                 challenge.UpdateChallengeProgress(playerChallenge, this);
 
-                if (isNew || playerChallenge.Progress != beforeProgress || playerChallenge.Completed != beforeCompleted)
+                if (playerChallenge.Progress != beforeProgress || playerChallenge.Completed != beforeCompleted)
                 {
+                    // Commit a freshly-created row only once it actually carries information.
+                    if (isNew)
+                    {
+                        _challenges[challenge.Id] = playerChallenge;
+                    }
+
                     _dirtyChallenges.Add(challenge.Id);
                 }
 

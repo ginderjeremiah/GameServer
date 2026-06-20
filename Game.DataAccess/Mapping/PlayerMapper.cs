@@ -99,7 +99,6 @@ namespace Game.DataAccess.Mapping
 
                 unlockedItems.Add(new UnlockedItemSlot
                 {
-                    ItemId = ui.ItemId,
                     Item = coreItem,
                     AppliedMods = appliedMods,
                     Favorite = ui.Favorite,

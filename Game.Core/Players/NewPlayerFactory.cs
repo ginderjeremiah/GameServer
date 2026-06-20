@@ -1,3 +1,5 @@
+using Game.Core.Attributes;
+
 namespace Game.Core.Players
 {
     /// <summary>
@@ -10,9 +12,6 @@ namespace Game.Core.Players
     {
         /// <summary>Number of starter skills granted to a new player (skill ids 0..N-1), all selected.</summary>
         public const int StarterSkillCount = 3;
-
-        /// <summary>Number of core attributes a new player starts with (attribute ids 0..N-1).</summary>
-        public const int AttributeCount = 6;
 
         /// <summary>The starting amount for each of a new player's core attributes.</summary>
         public const double StartingAttributeAmount = 5d;
@@ -37,8 +36,13 @@ namespace Game.Core.Players
                 Skills = Enumerable.Range(0, StarterSkillCount)
                     .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
                     .ToList(),
-                Attributes = Enumerable.Range(0, AttributeCount)
-                    .Select(id => new StatAllocation { Attribute = (EAttribute)id, Amount = StartingAttributeAmount })
+                // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from
+                // the attribute set itself rather than a hardcoded count — so adding a seventh core attribute
+                // automatically grants new players its allocation row (without one, PlayerStatPoints rejects
+                // every allocation into it, permanently blocking the stat).
+                Attributes = Enum.GetValues<EAttribute>()
+                    .Where(Attribute.IsCore)
+                    .Select(attribute => new StatAllocation { Attribute = attribute, Amount = StartingAttributeAmount })
                     .ToList(),
                 LogPreferences = CreateDefaultLogPreferences(),
             };

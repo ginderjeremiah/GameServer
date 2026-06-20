@@ -1,5 +1,6 @@
 using Game.Core.Players;
 using Xunit;
+using CoreAttribute = Game.Core.Attributes.Attribute;
 
 namespace Game.Core.Tests.Players
 {
@@ -43,14 +44,14 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void Create_GrantsEachCoreAttributeAtStartingAmount()
+        public void Create_GrantsAnAllocationRowForEveryCoreAttribute()
         {
             var newPlayer = _factory.Create("hero");
 
-            Assert.Equal(NewPlayerFactory.AttributeCount, newPlayer.Attributes.Count);
-            Assert.Equal(
-                Enumerable.Range(0, NewPlayerFactory.AttributeCount).Select(id => (EAttribute)id),
-                newPlayer.Attributes.Select(attribute => attribute.Attribute));
+            // The seed set is exactly the core (directly-allocatable) attributes — derived from the
+            // attribute taxonomy, not a hardcoded count — so a new core attribute is granted automatically.
+            var expectedCoreAttributes = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToList();
+            Assert.Equal(expectedCoreAttributes, newPlayer.Attributes.Select(attribute => attribute.Attribute));
             Assert.All(newPlayer.Attributes, attribute =>
                 Assert.Equal(NewPlayerFactory.StartingAttributeAmount, attribute.Amount));
         }

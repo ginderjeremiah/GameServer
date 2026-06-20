@@ -263,6 +263,46 @@ namespace Game.Core.Tests.Players
             Assert.Single(player.Skills);
         }
 
+        // ── Idempotent unlocks raise no event on the no-op path ──────────────
+
+        [Fact]
+        public void UnlockItem_AlreadyUnlocked_DoesNotRaiseSecondEvent()
+        {
+            var player = MakePlayer();
+            var item = MakeItem(id: 10);
+            player.UnlockItem(item);
+            player.ClearEvents();
+
+            player.UnlockItem(item);
+
+            // Re-granting an already-owned item is a no-op: no redundant write-behind work or client notice.
+            Assert.Empty(player.DomainEvents.OfType<ItemUnlockedEvent>());
+        }
+
+        [Fact]
+        public void UnlockMod_AlreadyUnlocked_DoesNotRaiseSecondEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockMod(5);
+            player.ClearEvents();
+
+            player.UnlockMod(5);
+
+            Assert.Empty(player.DomainEvents.OfType<ModUnlockedEvent>());
+        }
+
+        [Fact]
+        public void UnlockSkill_AlreadyUnlocked_DoesNotRaiseSecondEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockSkill(MakeSkill(id: 7));
+            player.ClearEvents();
+
+            player.UnlockSkill(MakeSkill(id: 7));
+
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
         // ── CompleteChallenge ────────────────────────────────────────────────
 
         [Fact]

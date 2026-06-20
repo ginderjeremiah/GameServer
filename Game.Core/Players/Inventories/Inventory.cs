@@ -190,24 +190,32 @@ namespace Game.Core.Players.Inventories
             return true;
         }
 
-        public void UnlockItem(Item item)
+        /// <summary>
+        /// Unlocks <paramref name="item"/> for the player, returning whether it was newly unlocked
+        /// (<c>false</c> when the player already owned it) so the caller can skip the no-op event and persist.
+        /// </summary>
+        public bool UnlockItem(Item item)
         {
             if (_unlockedItems.ContainsKey(item.Id))
             {
-                return;
+                return false;
             }
 
             _unlockedItems[item.Id] = new UnlockedItemSlot
             {
-                ItemId = item.Id,
                 Item = item,
                 AppliedMods = [],
             };
+            return true;
         }
 
-        public void UnlockMod(int itemModId)
+        /// <summary>
+        /// Unlocks the modifier with the given <paramref name="itemModId"/>, returning whether it was newly
+        /// unlocked (<c>false</c> when the player already owned it).
+        /// </summary>
+        public bool UnlockMod(int itemModId)
         {
-            UnlockedMods.Add(itemModId);
+            return UnlockedMods.Add(itemModId);
         }
 
         private static List<EquipmentSlot> NewEquippedList()
