@@ -206,13 +206,9 @@ describe('StatisticsData.isEmpty', () => {
 });
 
 describe('StatisticsView navigation', () => {
-	it('initialises to the by-statistic view, defaulting the by-entity kind to zone', () => {
+	it('initialises to the by-statistic view on the combat category', () => {
 		const view = seededView();
-		expect(view.mode).toBe('stat');
 		expect(view.statCat).toBe('combat');
-		// Enemies open in the Codex now, so the in-place by-entity view defaults to a kind it can show.
-		expect(view.entKind).toBe('zone');
-		expect(view.entId).toBe(0);
 	});
 
 	it('filters the shown statistics by the active category', () => {
@@ -222,85 +218,22 @@ describe('StatisticsView navigation', () => {
 		expect(view.shownStats.map((s) => s.id)).toContain(EStatisticType.FastestVictory);
 	});
 
-	it('switchKind resets the selection and query to the new kind', () => {
-		const view = seededView();
-		view.setQuery('bat');
-		view.switchKind('skill');
-		expect(view.entKind).toBe('skill');
-		expect(view.entId).toBe(0);
-		expect(view.query).toBe('');
-	});
-
-	it('switchKind to enemy opens the Codex instead of an in-place dossier', () => {
-		const view = seededView();
-		view.switchKind('enemy');
-		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies' });
-		// The in-place kind is left as-is (no enemy dossier).
-		expect(view.entKind).toBe('zone');
-	});
-
-	it('goEntity pivots into an entity dossier', () => {
-		const view = seededView();
-		view.goEntity('enemy', 1);
-		expect(view.mode).toBe('entity');
-		expect(view.selectedEntity?.id).toBe(1);
-		expect(view.entityStats.some((i) => i.stat.id === EStatisticType.EnemiesKilled)).toBe(true);
-	});
-
-	it('goStat jumps back to a statistic category', () => {
-		const view = seededView();
-		view.goEntity('enemy', 0);
-		view.goStat('exploration');
-		expect(view.mode).toBe('stat');
-		expect(view.statCat).toBe('exploration');
-	});
-
-	it('openEntity deep-links an enemy into the Codex (per-entity stats live there)', () => {
+	it('openEntity deep-links an enemy onto the Codex dossier Statistics sub-tab', () => {
 		const view = seededView();
 		view.openEntity('enemy', 1);
 		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies', enemyId: 1, sub: 'statistics' });
-		// The in-place dossier is left untouched for the enemy.
-		expect(view.mode).toBe('stat');
 	});
 
-	it('openEntity opens a zone/skill in place (no Codex tab for them yet)', () => {
+	it('openEntity deep-links a zone into the Codex Zones dossier', () => {
 		const view = seededView();
 		view.openEntity('zone', 0);
-		expect(navigation.requestScreen).not.toHaveBeenCalled();
-		expect(view.mode).toBe('entity');
-		expect(view.entKind).toBe('zone');
-		expect(view.entId).toBe(0);
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'zones', zoneId: 0 });
 	});
 
-	it('filters entities by the search query', () => {
+	it('openEntity deep-links a skill into the Codex Skills dossier', () => {
 		const view = seededView();
-		view.entKind = 'enemy';
-		view.setQuery('gob');
-		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
-	});
-
-	it('keeps the resolved selection stable while the search query narrows the list', () => {
-		const view = seededView();
-		view.goEntity('enemy', 1);
-		// A concrete selection must not move as the picker filters, even when the
-		// query excludes the selected entity from the filtered list.
-		view.setQuery('bat');
-		expect(view.filteredEntities.map((e) => e.id)).toEqual([0]);
-		expect(view.selectedEntity?.id).toBe(1);
-	});
-
-	it('falls back to the unfiltered list head (not the search box) when entId is unresolved', () => {
-		const view = seededView();
-		view.entKind = 'enemy';
-		view.mode = 'entity';
-		// An entId that resolves to no concrete entity for the kind (e.g. initial
-		// state or a kind-switch landing on a missing id).
-		view.entId = 99;
-		expect(view.selectedEntity?.id).toBe(0);
-		// Narrowing the picker to a different entity must not drag the dossier along.
-		view.setQuery('gob');
-		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
-		expect(view.selectedEntity?.id).toBe(0);
+		view.openEntity('skill', 0);
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'skills', skillId: 0 });
 	});
 });
 

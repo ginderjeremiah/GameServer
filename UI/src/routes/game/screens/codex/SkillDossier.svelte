@@ -80,6 +80,16 @@
 					<div class="empty">Player skill — no enemies use it</div>
 				{/if}
 			</div>
+
+			<div class="section">
+				<StatisticsPanel
+					stats={view.skillStatistics}
+					loading={view.statsLoading}
+					error={view.statsError}
+					emptyMessage="No statistics recorded for this skill yet."
+					testid="codex-skill-stats"
+				/>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -87,6 +97,7 @@
 <script lang="ts">
 import type { CodexView } from './codex-view.svelte';
 import { formatBaseDamage, formatCooldown } from './codex-display';
+import StatisticsPanel from './StatisticsPanel.svelte';
 
 interface Props {
 	view: CodexView;

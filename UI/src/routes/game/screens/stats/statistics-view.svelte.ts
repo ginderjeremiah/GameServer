@@ -1,11 +1,8 @@
-/* Statistics screen — the player's tracked statistics, navigable two ways that
-   cross-link into one system:
-     · "By statistic" — the 14 EStatisticTypes grouped into Combat / Survival /
-       Exploration / Time, each a card with its grand total and a per-entity
-       breakdown (click an entity to pivot to it).
-     · "By entity" — pick an enemy / zone / skill and see every statistic that
-       references it, with this entity's rank among its peers (click a stat to
-       jump back to its category).
+/* Statistics screen — the player's tracked statistics, grouped "by statistic":
+   the EStatisticTypes split into Combat / Survival / Exploration / Time, each a
+   card with its grand total and a per-entity breakdown. Clicking an entity row
+   deep-links into that entity's Codex dossier, where the per-entity statistics
+   live now (the in-place "by entity" dossier was retired — see openEntity).
 
    The statistic→entity-kind mapping comes from the backend's statistic-type
    reference data (`IStatisticType.entityType`, loaded into
@@ -29,7 +26,6 @@ export type StatEntityKind = 'enemy' | 'zone' | 'skill';
 /** A statistic either breaks down by an entity kind, or is a single total. */
 export type StatKind = StatEntityKind | 'none';
 export type StatCategory = 'combat' | 'survival' | 'exploration' | 'time';
-export type ViewMode = 'stat' | 'entity';
 
 /** A reference entity a statistic can break down by — the shape `StatisticsData`
  *  resolves entity ids against (built from `staticData.enemies/zones/skills`). */
@@ -142,8 +138,6 @@ export const STAT_CATEGORIES: { key: StatCategory; label: string }[] = STAT_CATE
 	key,
 	label: statCategoryLabel(key)
 }));
-
-export const ENTITY_KINDS: StatEntityKind[] = ['enemy', 'zone', 'skill'];
 
 /** One per-entity statistic row, resolved against its entity. */
 export interface StatRow {
@@ -320,17 +314,8 @@ export class StatisticsView {
 	/** True when the fetch failed (distinct from a genuine empty result). */
 	error = $state(false);
 
-	/** Top-level view: by statistic or by entity. */
-	mode = $state<ViewMode>('stat');
 	/** Active category tab in the "by statistic" view (or `all`). */
 	statCat = $state<StatCategory | 'all'>('combat');
-	/** Active entity-kind tab in the "by entity" view. Defaults to a kind with an in-place dossier
-	 *  (zone) — the enemy kind now opens the Codex instead (see {@link switchKind}). */
-	entKind = $state<StatEntityKind>('zone');
-	/** Selected entity id in the "by entity" view. */
-	entId = $state<number>(0);
-	/** Entity-picker search query. */
-	query = $state('');
 
 	/** The query engine, rebuilt from the live reference data + fetched values. */
 	readonly data = $derived(
@@ -340,83 +325,20 @@ export class StatisticsView {
 	/** Statistics shown in the current category tab. */
 	readonly shownStats = $derived(this.data.statsInCategory(this.statCat));
 
-	/** Entities matching the picker query within the active kind. */
-	readonly filteredEntities = $derived.by(() => {
-		const q = this.query.trim().toLowerCase();
-		const list = this.data.entityList(this.entKind);
-		return q ? list.filter((e) => e.name.toLowerCase().includes(q)) : list;
-	});
-
-	/** The resolved selected entity. When `entId` doesn't resolve to a concrete
-	 *  entity it falls back to the head of the *unfiltered* list — never the
-	 *  search-filtered list — so typing in the picker narrows the list without
-	 *  moving the active dossier. */
-	readonly selectedEntity = $derived.by(
-		() => this.data.entity(this.entKind, this.entId) ?? this.data.entityList(this.entKind)[0]
-	);
-
-	/** Every statistic referencing the selected entity. */
-	readonly entityStats = $derived.by(() => {
-		const entity = this.selectedEntity;
-		return entity ? this.data.statsForEntity(this.entKind, entity.id) : [];
-	});
-
-	setMode(mode: ViewMode): void {
-		this.mode = mode;
-	}
-
 	setStatCat(cat: StatCategory | 'all'): void {
 		this.statCat = cat;
 	}
 
-	setEntId(id: number): void {
-		this.entId = id;
-	}
-
-	setQuery(query: string): void {
-		this.query = query;
-	}
-
-	/** Switch entity kind, resetting the selection + search to that kind. The Enemy kind opens the
-	 *  Codex instead — enemy reference data and per-entity stats live there now, so an in-place enemy
-	 *  dossier would be a dead-end (every enemy click deep-links to the Codex). Zones/skills stay in
-	 *  place until the Codex gains those tabs (#999). */
-	switchKind(kind: StatEntityKind): void {
-		if (kind === 'enemy') {
-			navigation.requestScreen('codex', { tab: 'enemies' } satisfies CodexNavPayload);
-			return;
-		}
-		this.entKind = kind;
-		this.entId = this.data.entityList(kind)[0]?.id ?? 0;
-		this.query = '';
-	}
-
-	/** Pivot from a stat card's entity row into that entity's dossier. */
-	goEntity(kind: StatEntityKind, id: number): void {
-		this.entKind = kind;
-		this.entId = id;
-		this.query = '';
-		this.mode = 'entity';
-	}
-
-	/** Open an entity from a picker/stat row. Enemies deep-link into the Codex dossier (their
-	 *  per-entity statistics live there now); zones/skills still open the in-place dossier until the
-	 *  Codex gains those tabs. */
+	/** Open an entity from a stat-card row: deep-link into the matching Codex dossier, where the
+	 *  per-entity statistics live now (the Statistics screen no longer renders an in-place dossier).
+	 *  Enemies land on the dossier's Statistics sub-tab; zone/skill dossiers show their record inline. */
 	openEntity(kind: StatEntityKind, id: number): void {
-		if (kind === 'enemy') {
-			navigation.requestScreen('codex', {
-				tab: 'enemies',
-				enemyId: id,
-				sub: 'statistics'
-			} satisfies CodexNavPayload);
-			return;
-		}
-		this.goEntity(kind, id);
-	}
-
-	/** Jump from an entity's stat tile back to that stat's category. */
-	goStat(cat: StatCategory): void {
-		this.statCat = cat;
-		this.mode = 'stat';
+		const payload: CodexNavPayload =
+			kind === 'enemy'
+				? { tab: 'enemies', enemyId: id, sub: 'statistics' }
+				: kind === 'zone'
+					? { tab: 'zones', zoneId: id }
+					: { tab: 'skills', skillId: id };
+		navigation.requestScreen('codex', payload);
 	}
 }

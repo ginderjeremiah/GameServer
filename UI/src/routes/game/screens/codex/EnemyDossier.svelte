@@ -31,7 +31,13 @@
 			{#if view.sub === 'attributes'}
 				<AttributesPanel {view} />
 			{:else if view.sub === 'statistics'}
-				<StatisticsPanel {view} />
+				<StatisticsPanel
+					stats={view.statistics}
+					loading={view.statsLoading}
+					error={view.statsError}
+					emptyMessage="No battles recorded against this enemy yet."
+					testid="codex-enemy-stats"
+				/>
 			{:else if view.sub === 'skills'}
 				<EnemySkillsPanel {view} />
 			{:else if view.sub === 'spawns'}
