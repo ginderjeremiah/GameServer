@@ -35,7 +35,11 @@ const dist = () => [
 
 const STATS = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 100 },
-	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 }
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 },
+	// Per-zone (Emberreach) and per-skill (Cleave) records — the head of each rail/table by default,
+	// so they back the "Your record" section in the zone/skill dossiers.
+	{ statisticTypeId: EStatisticType.ZonesCleared, entityId: 0, value: 3 },
+	{ statisticTypeId: EStatisticType.DamageDealt, entityId: 0, value: 4500 }
 ];
 const PLAYER_CHALLENGES = [{ challengeId: 0, progress: 62, completed: false }];
 
@@ -227,6 +231,14 @@ describe('Codex screen', () => {
 		expect(screen.getByTestId('codex-zone-spawn-0').textContent).toContain('Dust Skitterer');
 	});
 
+	it('renders the player’s per-zone record in the zone dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		// Emberreach (head of the rail) has a recorded clear → its "Your record" section renders.
+		expect(await screen.findByTestId('codex-zone-stats')).toBeTruthy();
+		expect(screen.getByText('Zones Cleared')).toBeTruthy();
+	});
+
 	it('cross-links a zone boss card into the enemy dossier', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
@@ -255,6 +267,14 @@ describe('Codex screen', () => {
 		// Cleave is used by the boss → its used-by pill cross-links into the enemy dossier.
 		await fireEvent.click(screen.getByTestId('codex-skill-usedby-2'));
 		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
+	});
+
+	it('renders the player’s per-skill record in the skill dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
+		// Cleave (head of the table) has recorded damage → its "Your record" section renders.
+		expect(await screen.findByTestId('codex-skill-stats')).toBeTruthy();
+		expect(screen.getByText('Damage Dealt')).toBeTruthy();
 	});
 
 	it('shows a skill’s authored effects in its dossier', async () => {

@@ -118,8 +118,6 @@ export interface EnemySpawnVM {
 export interface EntityStatVM {
 	label: string;
 	value: string;
-	rank: number;
-	of: number;
 }
 
 export interface EnemyChallengeVM {
@@ -694,9 +692,7 @@ export class CodexView {
 	private statVMsFor(kind: StatEntityKind, id: number): EntityStatVM[] {
 		return this.statData.statsForEntity(kind, id).map((info) => ({
 			label: info.stat.name,
-			value: fmtValue(info.value, info.stat.unit),
-			rank: info.rank,
-			of: info.of
+			value: fmtValue(info.value, info.stat.unit)
 		}));
 	}
 
