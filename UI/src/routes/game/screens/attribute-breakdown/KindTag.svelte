@@ -17,7 +17,9 @@ interface Props {
 
 let { type }: Props = $props();
 
-const label = $derived(ATTRIBUTE_TYPE_GROUPS.find((g) => g.type === type)?.label ?? '');
+// Falls back to a visible "Unknown" rather than an empty pill so an unmapped EAttributeType (e.g. a
+// future enum addition the taxonomy hasn't caught up to) surfaces loudly instead of rendering blank.
+const label = $derived(ATTRIBUTE_TYPE_GROUPS.find((g) => g.type === type)?.label ?? 'Unknown');
 </script>
 
 <style lang="scss">
