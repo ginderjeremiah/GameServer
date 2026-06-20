@@ -19,6 +19,7 @@ namespace Game.Application.Services
     {
         Success,
         InvalidCredentials,
+        Banned,
         NoPlayer,
         PlayerDataNotFound,
     }

@@ -143,6 +143,54 @@ namespace Game.Api.Tests.Unit
             Assert.Contains("42", release.Key);
         }
 
+        [Fact]
+        public async Task Processor_PersistentDequeueFault_AbandonsAfterCeilingInsteadOfHotSpinning()
+        {
+            var commands = new CapturingCommandFactory(throwOn: _ => null);
+            var (processor, _) = BuildProcessor(commands);
+
+            // Every dequeue throws (Redis down, or a throw before the pop). Without a ceiling the loop would
+            // hot-spin for the life of the connection, hammering Redis and the log (#909); it must back off
+            // and give up after a bounded number of consecutive failures, returning rather than looping.
+            var queue = new AlwaysThrowingQueue(new InvalidOperationException("dequeue boom"));
+
+            await processor(queue);
+
+            // The processor stopped after exactly the consecutive-failure ceiling rather than spinning, and
+            // it logged the abandonment so the give-up is observable.
+            Assert.Equal(SocketManagerService.MaxConsecutiveDequeueFailures, queue.Attempts);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("Abandoning"));
+        }
+
+        [Fact]
+        public async Task UnRegisterSocket_UnsubscribeThrows_StillReleasesPresenceKey()
+        {
+            // The clean-disconnect teardown runs the same guarded best-effort steps as a rollback: even when
+            // the unsubscribe throws, the presence-key release must still run so the key can't survive its
+            // full TTL reporting a ghost session that makes HasActiveSocket lie until expiry (#909).
+            var cache = new RecordingCacheService();
+            var pubSub = new ThrowingUnsubscribePubSubService(new InvalidOperationException("unsubscribe boom"));
+            var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
+            var registry = new SocketConnectionRegistry(new NoOpHostLifetime(), NullLogger<SocketConnectionRegistry>.Instance);
+            var manager = new SocketManagerService(
+                pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            session.CreateSession(userId: 1, playerId: 77);
+            var context = await manager.RegisterSocket(socket, session);
+
+            // The unsubscribe fault during teardown must be swallowed, not propagated...
+            await manager.UnRegisterSocket(context);
+
+            // ...and the presence key was still released via a compare-and-delete keyed on the socket's own
+            // id (so a newer owner's key would be left intact), on the player's presence key.
+            var release = Assert.Single(cache.CompareAndDeletes);
+            Assert.Contains("77", release.Key);
+            Assert.Equal(context.SocketId, release.DeleteIfValue);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("unsubscribe"));
+        }
+
         private (Func<IPubSubQueue, Task> Processor, CapturingPubSubService PubSub) BuildProcessor(CapturingCommandFactory commandFactory)
         {
             var capturingPubSub = new CapturingPubSubService();
@@ -252,6 +300,34 @@ namespace Game.Api.Tests.Unit
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
+        /// <summary>An in-memory queue whose every dequeue throws, to drive the processor's consecutive-
+        /// failure ceiling. Counts the attempts so a test can assert it gave up rather than hot-spinning.</summary>
+        private sealed class AlwaysThrowingQueue(Exception toThrow) : IPubSubQueue
+        {
+            public int Attempts { get; private set; }
+
+            public Task<T?> GetNextAsync<T>()
+            {
+                Attempts++;
+                throw toThrow;
+            }
+
+            public Task<string?> GetNextAsync() => throw new NotSupportedException();
+            public Task<string?> ReserveNextAsync() => throw new NotSupportedException();
+            public Task AcknowledgeAsync(string value) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
+            public Task<long> GetLengthAsync() => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public string? GetNext() => throw new NotSupportedException();
+            public T? GetNext<T>() => throw new NotSupportedException();
+            public void AddToQueue(string value) => throw new NotSupportedException();
+            public void AddToQueue<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+        }
+
         private sealed class CapturingPubSubService : IPubSubService
         {
             public Func<IPubSubQueue, Task>? CapturedProcessor { get; private set; }
@@ -344,6 +420,23 @@ namespace Game.Api.Tests.Unit
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+        }
+
+        /// <summary>A pub/sub whose <c>Subscribe</c> succeeds but <c>UnSubscribe</c> throws, to drive the
+        /// guarded-teardown path where the presence-key release must still run after an unsubscribe fault.</summary>
+        private sealed class ThrowingUnsubscribePubSubService(Exception toThrow) : IPubSubService
+        {
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task UnSubscribe(string channel, string id) => throw toThrow;
+
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task UnSubscribe(string channel) => throw new NotSupportedException();
             public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
 

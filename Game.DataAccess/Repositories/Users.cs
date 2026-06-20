@@ -23,6 +23,7 @@ namespace Game.DataAccess.Repositories
                 PassHash = u.PassHash,
                 Roles = u.Roles.Select(r => r.Name).ToList(),
                 PlayerIds = u.Players.Select(p => p.Id).ToList(),
+                IsBanned = u.BannedAt != null,
             };
 
         private static readonly Expression<Func<UserEntity, AdminUser>> ToAdminUser =
@@ -193,13 +194,13 @@ namespace Game.DataAccess.Repositories
             await _context.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
 
-            // Gather the facts under the lock — "other admins" counts only active (non-archived) accounts,
-            // matching login's notion of a usable account — then let the domain policy make the decision.
-            var otherAdminsRemain = await _context.Users.AnyAsync(u =>
-                u.Id != user.Id && u.ArchivedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
+            // Gather the surviving-admin fact under the lock, then let the domain policy decide. A removal
+            // that strands the system with only banned admins is as much a lockout as one that leaves none,
+            // so the count uses the same usable-admin definition as the archive/ban guard.
+            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id);
 
             var protection = AdminLockoutPolicy.CheckRoleChange(
-                actingUserId, user.Id, targetHasAdminRole, requestedRolesIncludeAdmin, otherAdminsRemain);
+                actingUserId, user.Id, targetHasAdminRole, requestedRolesIncludeAdmin, otherUsableAdminsRemain);
             switch (protection)
             {
                 case RoleChangeProtection.SelfAdminRemoval:
@@ -283,11 +284,10 @@ namespace Game.DataAccess.Repositories
             await _context.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
 
-            // Gather the surviving-admin fact under the lock. A "usable" admin can still log in to recover the
-            // instance, so it must be neither archived nor banned — both archiving and banning the target take
-            // it out of that pool, so the policy must reject the action that would empty it.
-            var otherUsableAdminsRemain = await _context.Users.AnyAsync(u =>
-                u.Id != user.Id && u.ArchivedAt == null && u.BannedAt == null && u.Roles.Any(r => r.Id == adminRoleId));
+            // Gather the surviving-admin fact under the lock, then let the domain policy decide. Both
+            // archiving and banning the target take it out of the usable-admin pool, so the policy must
+            // reject the action that would empty it.
+            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id);
 
             var protection = AdminLockoutPolicy.CheckUserAction(
                 actingUserId, user.Id, targetHasAdminRole: true, otherUsableAdminsRemain);
@@ -303,6 +303,22 @@ namespace Game.DataAccess.Repositories
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return UserActionStatus.Success;
+        }
+
+        /// <summary>
+        /// Whether any usable admin other than <paramref name="excludingUserId"/> remains. A usable admin
+        /// can still log in to recover the instance, so it must be neither archived nor banned. Shared by
+        /// both admin-lockout guards (role removal and archive/ban) so they enforce one definition of the
+        /// surviving-admin pool. Call within the Admin-role lock so the read is serialized with the mutation.
+        /// </summary>
+        private Task<bool> OtherUsableAdminsRemainAsync(int excludingUserId)
+        {
+            const int adminRoleId = (int)ERole.Admin;
+            return _context.Users.AnyAsync(u =>
+                u.Id != excludingUserId
+                && u.ArchivedAt == null
+                && u.BannedAt == null
+                && u.Roles.Any(r => r.Id == adminRoleId));
         }
 
         private IQueryable<UserEntity> FilteredUsers(string? search, int? roleId, bool? archived)
