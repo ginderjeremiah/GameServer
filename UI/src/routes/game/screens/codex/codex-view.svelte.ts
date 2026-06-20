@@ -61,7 +61,7 @@ export interface EnemyRowVM {
 	level: number;
 	zoneCount: number;
 	skillCount: number;
-	/** Pre-lowercased search haystack: name + kind + spawn-zone names. */
+	/** Pre-lowercased search haystack: name + kind + zone names (spawn zones, or a boss's encounter zone). */
 	searchText: string;
 	selected: boolean;
 }
@@ -180,7 +180,11 @@ export class CodexView {
 		return this.filteredEnemies
 			.map((e) => {
 				const range = levelRange(e, zones);
-				const zoneNames = e.spawns.map((sp) => zones[sp.zoneId]?.name ?? '');
+				// Bosses don't populate `spawns`; resolve their encounter zone the same way the dossier
+				// does so a boss is findable by that zone name. Normal enemies use their spawn zones.
+				const zoneNames = e.isBoss
+					? [zones.find((z) => z?.bossEnemyId === e.id)?.name ?? '']
+					: e.spawns.map((sp) => zones[sp.zoneId]?.name ?? '');
 				return {
 					id: e.id,
 					name: e.name,
@@ -358,10 +362,6 @@ export class CodexView {
 
 	setFilter(filter: EnemyFilter): void {
 		this.filter = filter;
-	}
-
-	setSort(sort: EnemySort): void {
-		this.sort = sort;
 	}
 
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */

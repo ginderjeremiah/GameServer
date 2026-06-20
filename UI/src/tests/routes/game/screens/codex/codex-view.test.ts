@@ -139,10 +139,18 @@ describe('CodexView enemy search', () => {
 		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
 	});
 
-	it('matches by spawn-zone name', () => {
+	it('matches by zone name (spawn zones + a boss encounter zone)', () => {
 		const view = new CodexView();
-		view.search = 'emberreach'; // only Dust Skitterer spawns there
-		expect(view.enemyRows.map((r) => r.id)).toEqual([0]);
+		// Dust Skitterer spawns in Emberreach; Cinder Tyrant's boss encounter is in Emberreach too.
+		view.search = 'emberreach';
+		expect(view.enemyRows.map((r) => r.id)).toEqual([0, 2]);
+	});
+
+	it('matches a boss by its encounter-zone name', () => {
+		const view = new CodexView();
+		view.setFilter('boss');
+		view.search = 'emberreach'; // Cinder Tyrant's encounter zone (it has no spawns)
+		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
 	});
 
 	it('matches the boss kind', () => {
@@ -198,7 +206,7 @@ describe('CodexView enemy sort', () => {
 
 	it('sorts alphabetically by name', () => {
 		const view = new CodexView();
-		view.setSort('name');
+		view.sort = 'name';
 		// Bog Lurker, Cinder Tyrant, Dust Skitterer.
 		expect(view.enemyRows.map((r) => r.id)).toEqual([1, 2, 0]);
 	});
