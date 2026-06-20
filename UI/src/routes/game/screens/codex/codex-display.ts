@@ -1,11 +1,12 @@
 /* Presentation helpers + shared string-literal types for the Codex screen. Colours reference the
    themeable `var(--…)` tokens rather than hard-coding hex (per the theming rule), so the screen
-   restyles with the theme. Kept dependency-light (no store, no reactive state) so the view-model and
-   its tests import the types/formatters without a cycle. */
+   restyles with the theme. Kept store-free (no reactive state) so the view-model and its tests import
+   the types/formatters without a cycle. */
 
+import { formatNum } from '$lib/common';
 import type { LevelRange } from './enemy-level';
 
-/** Top-level Codex tab. Enemies + Zones are built; `skills` shows a placeholder. */
+/** Top-level Codex tab — Enemies, Zones and Skills are all built. */
 export type CodexTab = 'enemies' | 'zones' | 'skills';
 /** Enemy dossier sub-tab. `challenges` only appears when the enemy has related challenges. */
 export type EnemySubTab = 'attributes' | 'statistics' | 'skills' | 'spawns' | 'challenges';
@@ -77,6 +78,11 @@ export function formatCooldown(ms: number): string {
 		return '—';
 	}
 	return ms % 1000 === 0 ? `${ms / 1000}s` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** A skill's base damage for display: the formatted number, or `—` for a utility (zero-damage) skill. */
+export function formatBaseDamage(baseDamage: number): string {
+	return baseDamage > 0 ? formatNum(baseDamage) : '—';
 }
 
 /* ── enemy-table search + sort (pure, unit-tested directly) ────────────────── */
