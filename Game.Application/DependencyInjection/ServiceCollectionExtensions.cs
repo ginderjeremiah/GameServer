@@ -22,6 +22,12 @@ namespace Game.Application.DependencyInjection
                 .AddSingleton<NewPlayerFactory>()
                 // Stateless (parameters come from injected options), so a single shared instance.
                 .AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>()
+                // Per-account login backoff: a stateless policy (shared) plus a scoped guard over the
+                // scoped Redis-backed store. The system clock is injected (TimeProvider) so the time-based
+                // backoff math stays deterministically testable.
+                .AddSingleton(TimeProvider.System)
+                .AddSingleton<LoginBackoffPolicy>()
+                .AddScoped<LoginBackoffGuard>()
                 .AddScoped<AccountService>()
                 .AddScoped<BattleService>()
                 .AddScoped<LoginTrackingService>()

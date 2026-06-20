@@ -1,11 +1,15 @@
 <!-- Spawns sub-tab: the zones this enemy spawns in (with its share of each zone's spawn table), or a
-     single "Encounter" row for a boss. Rows are display-only for now — they'll deep-link into the
-     Codex Zones tab once it's built (follow-up). -->
+     single "Encounter" row for a boss. Each row cross-links into that zone's dossier. -->
 <div class="spawns">
 	<div class="label">{view.spawnHeading}</div>
 	<div class="list">
 		{#each view.spawns as spawn (spawn.zoneId)}
-			<div class="spawn">
+			<button
+				type="button"
+				class="spawn"
+				data-testid="codex-enemy-spawn-{spawn.zoneId}"
+				onclick={() => view.openZone(spawn.zoneId)}
+			>
 				<div class="top">
 					<span class="zone">{spawn.zoneName}</span>
 					<span class="share">{spawn.share}%</span>
@@ -14,7 +18,7 @@
 					<span class="bar-wrap"><Bar value={spawn.share} presentational /></span>
 					<span class="weight">{spawn.weightLabel}</span>
 				</div>
-			</div>
+			</button>
 		{/each}
 	</div>
 </div>
@@ -44,6 +48,23 @@ let { view }: Props = $props();
 	display: flex;
 	flex-direction: column;
 	gap: 11px;
+}
+
+.spawn {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	padding: 4px;
+	margin: -4px;
+	cursor: pointer;
+	font-family: var(--sans);
+
+	&:hover {
+		background: color-mix(in srgb, var(--white) 4%, transparent);
+	}
 }
 
 .top {

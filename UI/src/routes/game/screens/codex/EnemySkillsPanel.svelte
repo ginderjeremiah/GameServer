@@ -1,16 +1,20 @@
-<!-- Skills sub-tab: the enemy's skill pool. Rows are display-only for now — they'll deep-link into
-     the Codex Skills tab once it's built (follow-up). -->
+<!-- Skills sub-tab: the enemy's skill pool. Each row cross-links into that skill's dossier. -->
 <div class="skills">
-	<div class="label">Skill pool · {view.skillRows.length}</div>
+	<div class="label">Skill pool · {view.enemySkillRows.length}</div>
 	<div class="list">
-		{#each view.skillRows as skill (skill.id)}
-			<div class="skill">
+		{#each view.enemySkillRows as skill (skill.id)}
+			<button
+				type="button"
+				class="skill"
+				data-testid="codex-enemy-skill-{skill.id}"
+				onclick={() => view.openSkill(skill.id)}
+			>
 				<span class="mark"></span>
 				<div class="text">
 					<div class="name">{skill.name}</div>
 					<div class="meta">{skill.meta}</div>
 				</div>
-			</div>
+			</button>
 		{/each}
 	</div>
 </div>
@@ -45,10 +49,18 @@ let { view }: Props = $props();
 	display: flex;
 	align-items: center;
 	gap: 11px;
+	width: 100%;
+	text-align: left;
 	background: var(--panel);
 	border: 1px solid var(--border-subtle);
 	border-radius: 5px;
 	padding: 9px 11px;
+	cursor: pointer;
+	font-family: var(--sans);
+
+	&:hover {
+		background: color-mix(in srgb, var(--attr-intellect) 8%, var(--panel));
+	}
 }
 
 .mark {

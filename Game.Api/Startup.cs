@@ -92,6 +92,20 @@ namespace Game.Api
             // defaults so an unconfigured deployment is still protected (#950).
             builder.Services.AddAuthRateLimiter();
 
+            // Per-account exponential login backoff layered on top of the IP limiter: defence-in-depth against
+            // a slow, distributed credential guess on one account that stays under any single IP's rate limit.
+            // Config-bound with safe defaults (like the IP limiter) and validated as sane on start so a
+            // misconfiguration fails fast rather than silently disabling or inverting the guard (#1010).
+            builder.Services.AddOptions<LoginBackoffOptions>()
+                .BindConfiguration(LoginBackoffOptions.SectionName)
+                .Validate(
+                    options => options.FailureThreshold >= 0
+                        && options.BaseDelaySeconds > 0
+                        && options.MaxDelaySeconds >= options.BaseDelaySeconds
+                        && options.FailureWindowSeconds > 0,
+                    "LoginBackoff requires FailureThreshold >= 0, 0 < BaseDelaySeconds <= MaxDelaySeconds, and FailureWindowSeconds > 0")
+                .ValidateOnStart();
+
             ConfigureAuth(builder);
 
             // Add services to the container.

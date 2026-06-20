@@ -1,6 +1,7 @@
 using Game.Abstractions.Auth;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
+using Game.Application.Auth;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
 
@@ -17,6 +18,7 @@ namespace Game.Application.Services
         IRefreshTokenStore refreshTokenStore,
         IAccessTokenService accessTokenService,
         IPasswordHasher passwordHasher,
+        LoginBackoffGuard backoffGuard,
         NewPlayerFactory newPlayerFactory,
         ILogger<AccountService> logger)
     {
@@ -25,6 +27,7 @@ namespace Game.Application.Services
         private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
         private readonly IAccessTokenService _accessTokenService = accessTokenService;
         private readonly IPasswordHasher _passwordHasher = passwordHasher;
+        private readonly LoginBackoffGuard _backoffGuard = backoffGuard;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
         private readonly ILogger<AccountService> _logger = logger;
 
@@ -61,17 +64,33 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<AccountLoginResult> Login(string username, string password)
         {
+            // Defence-in-depth on top of the per-IP rate limiter: if too many consecutive failures have
+            // accrued for this account, reject before any database hit or PBKDF2 work. Keyed per account so a
+            // slow distributed guess is slowed regardless of source IP; it is a bounded backoff (never a hard
+            // lockout), so an attacker who knows a username can only briefly slow the owner, not lock them out.
+            var activeBackoff = await _backoffGuard.GetActiveBackoff(username);
+            if (activeBackoff is TimeSpan retryAfter)
+            {
+                return AccountLoginResult.BackedOff(retryAfter);
+            }
+
             var account = await _users.GetUser(username);
             if (account is null)
             {
+                await _backoffGuard.RegisterFailure(username);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
             var verification = _passwordHasher.Verify(password, account.PassHash);
             if (verification == PasswordVerificationResult.Failed)
             {
+                await _backoffGuard.RegisterFailure(username);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
+
+            // Credentials verified — the attempt is not a brute-force guess, so reset the failure streak
+            // before any later (ban / no-player) rejection, which is not a credential failure.
+            await _backoffGuard.Reset(username);
 
             // Reject a banned account only after its credentials check out, so an anonymous probe can't
             // enumerate ban status — only the account owner learns they are banned. This is also the first

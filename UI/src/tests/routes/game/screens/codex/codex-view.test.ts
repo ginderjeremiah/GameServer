@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EChallengeType, EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
+import {
+	EAttribute,
+	EChallengeType,
+	EEntityType,
+	EModifierType,
+	ESkillEffectTarget,
+	EStatisticType,
+	type IPlayerStatistic
+} from '$lib/api';
 import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 
 // CodexView reads reference data + challenge progress + per-zone clears from the stores, and reuses
@@ -88,8 +96,57 @@ function seed(): void {
 		{ id: 2, name: 'Cinder Tyrant', isBoss: true, attributeDistribution: dist(), skillPool: [0, 1], spawns: [] }
 	];
 	staticData.skills = [
-		{ id: 0, name: 'Cleave', baseDamage: 14, cooldownMs: 1800, damageMultipliers: [], effects: [] },
-		{ id: 1, name: 'War Cry', baseDamage: 0, cooldownMs: 6000, damageMultipliers: [], effects: [] }
+		// Cleave: a Strength-scaling attack used by two enemies (one a boss).
+		{
+			id: 0,
+			name: 'Cleave',
+			description: 'A wide sweeping strike.',
+			baseDamage: 14,
+			cooldownMs: 1800,
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
+			effects: []
+		},
+		// War Cry: a utility buff/debuff with no base damage, used by every enemy.
+		{
+			id: 1,
+			name: 'War Cry',
+			description: 'A rallying shout.',
+			baseDamage: 0,
+			cooldownMs: 6000,
+			damageMultipliers: [],
+			effects: [
+				{
+					id: 0,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 5000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				},
+				{
+					id: 1,
+					target: ESkillEffectTarget.Opponent,
+					attributeId: EAttribute.Defense,
+					modifierTypeId: EModifierType.Multiplicative,
+					amount: 0.5,
+					durationMs: 4000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				}
+			]
+		},
+		// Focus: a player-only skill (no enemy uses it) — the catalogue still lists it.
+		{
+			id: 2,
+			name: 'Focus',
+			description: 'Center your mind.',
+			baseDamage: 0,
+			cooldownMs: 0,
+			damageMultipliers: [],
+			effects: []
+		}
 	];
 	staticData.challenges = [
 		{
@@ -114,13 +171,18 @@ function seed(): void {
 		{ id: EChallengeType.BossesDefeated, goalComparison: 1, name: 'Bosses Defeated' }
 	];
 	staticData.statisticTypes = SERVER_STAT_TYPES;
-	staticData.attributes = [];
+	staticData.attributes = [
+		{ id: EAttribute.Strength, name: 'Strength', code: 'STR', isHarmful: false },
+		{ id: EAttribute.Defense, name: 'Defense', code: '', isHarmful: false }
+	];
 	playerChallenges.all = [{ challengeId: 0, progress: 62, completed: false }];
 }
 
 const STATS: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 100 },
-	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 }
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 },
+	{ statisticTypeId: EStatisticType.ZonesCleared, entityId: 1, value: 3 },
+	{ statisticTypeId: EStatisticType.DamageDealt, entityId: 0, value: 4500 }
 ];
 
 beforeEach(() => {
@@ -137,7 +199,7 @@ describe('CodexView tabs', () => {
 		expect(tabs.map((t) => [t.key, t.count])).toEqual([
 			['enemies', 3],
 			['zones', 3],
-			['skills', 2]
+			['skills', 3]
 		]);
 	});
 });
@@ -309,7 +371,7 @@ describe('CodexView dossier projections', () => {
 	it('lists the enemy’s skill pool with base/cooldown meta', () => {
 		const view = new CodexView();
 		view.selectEnemy(0);
-		expect(view.skillRows).toEqual([
+		expect(view.enemySkillRows).toEqual([
 			{ id: 0, name: 'Cleave', meta: 'base 14 · 1.8s cd' },
 			{ id: 1, name: 'War Cry', meta: 'utility · 6s cd' }
 		]);
@@ -416,6 +478,16 @@ describe('CodexView zone dossier', () => {
 		expect(view.selectedZoneStatus).toBe('unlocked');
 		expect(view.zoneUnlock?.sealed).toBe(false);
 	});
+
+	it('reuses the statistics query for the player’s per-zone record', () => {
+		const view = new CodexView();
+		view.stats = STATS;
+		view.selectZone(1); // Ashfen Marsh — 3 clears recorded
+		expect(view.zoneStatistics.find((s) => s.label === 'Zones Cleared')?.value).toBe('3');
+		// A zone with no recorded statistics yields an empty record.
+		view.selectZone(2);
+		expect(view.zoneStatistics).toEqual([]);
+	});
 });
 
 describe('CodexView zone → enemy cross-link', () => {
@@ -427,6 +499,137 @@ describe('CodexView zone → enemy cross-link', () => {
 		expect(view.selectedEnemyId).toBe(2);
 		expect(view.sub).toBe('attributes'); // selectEnemy resets the sub-tab
 		expect(view.level).toBe(10); // boss fixed level
+	});
+});
+
+describe('CodexView enemy → zone cross-link', () => {
+	it('openZone switches to the Zones tab and selects the zone', () => {
+		const view = new CodexView();
+		view.selectEnemy(0); // a normal enemy with spawn zones
+		view.openZone(1);
+		expect(view.tab).toBe('zones');
+		expect(view.selectedZoneId).toBe(1);
+		expect(view.selectedZone?.id).toBe(1);
+	});
+});
+
+describe('CodexView enemy → skill cross-link', () => {
+	it('openSkill switches to the Skills tab and selects the skill', () => {
+		const view = new CodexView();
+		view.selectEnemy(0); // skill pool [0, 1]
+		view.openSkill(1);
+		expect(view.tab).toBe('skills');
+		expect(view.selectedSkillId).toBe(1);
+		expect(view.selectedSkill?.id).toBe(1);
+	});
+});
+
+describe('CodexView skill table', () => {
+	it('lists every skill in catalogue order with base/cooldown/used-by projections', () => {
+		const rows = new CodexView().skillRows;
+		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
+		// Cleave is a 14-dmg attack used by Dust Skitterer + the boss; War Cry is utility used by all
+		// three; Focus is player-only (used by none) and still appears.
+		expect(rows.find((r) => r.id === 0)).toMatchObject({
+			name: 'Cleave',
+			baseDamageLabel: '14',
+			cooldownLabel: '1.8s',
+			usedByCount: 2
+		});
+		expect(rows.find((r) => r.id === 1)).toMatchObject({ baseDamageLabel: '—', cooldownLabel: '6s', usedByCount: 3 });
+		expect(rows.find((r) => r.id === 2)).toMatchObject({ name: 'Focus', cooldownLabel: '—', usedByCount: 0 });
+	});
+
+	it('marks the selected skill', () => {
+		const view = new CodexView();
+		view.selectSkill(1);
+		expect(view.skillRows.find((r) => r.selected)?.id).toBe(1);
+	});
+});
+
+describe('CodexView skill dossier', () => {
+	it('defaults the selection to the head of the catalogue', () => {
+		expect(new CodexView().selectedSkill?.id).toBe(0);
+	});
+
+	it('selectSkill changes the inspected skill', () => {
+		const view = new CodexView();
+		view.selectSkill(2);
+		expect(view.selectedSkill?.id).toBe(2);
+	});
+
+	it('projects the damage-scaling attributes tinted by their accent', () => {
+		const view = new CodexView();
+		view.selectSkill(0); // Cleave scales ×1.5 Strength
+		expect(view.skillScaling).toEqual([
+			{
+				attributeId: EAttribute.Strength,
+				name: 'Strength',
+				code: 'STR',
+				multiplierLabel: '×1.5',
+				color: 'var(--attr-strength)'
+			}
+		]);
+		// War Cry has no damage scaling.
+		view.selectSkill(1);
+		expect(view.skillScaling).toEqual([]);
+	});
+
+	it('describes effects via the shared helper, classifying buff vs debuff', () => {
+		const view = new CodexView();
+		view.selectSkill(1); // War Cry: +15 STR (self, buff) and ×0.5 Defense (enemy, debuff)
+		expect(view.skillEffects).toEqual([
+			{
+				id: 0,
+				magnitude: '+15',
+				attributeName: 'Strength',
+				targetLabel: 'self',
+				duration: '5s',
+				color: 'var(--effect-buff)'
+			},
+			{
+				id: 1,
+				magnitude: '×0.5',
+				attributeName: 'Defense',
+				targetLabel: 'enemy',
+				duration: '4s',
+				color: 'var(--effect-debuff)'
+			}
+		]);
+		// Cleave applies no effects.
+		view.selectSkill(0);
+		expect(view.skillEffects).toEqual([]);
+	});
+
+	it('lists the enemies that use the skill, flagging bosses, and is empty for a player-only skill', () => {
+		const view = new CodexView();
+		view.selectSkill(0); // Cleave — Dust Skitterer (normal) + Cinder Tyrant (boss)
+		expect(view.skillUsedBy).toEqual([
+			{ enemyId: 0, name: 'Dust Skitterer', isBoss: false, accent: 'var(--enemy-accent)' },
+			{ enemyId: 2, name: 'Cinder Tyrant', isBoss: true, accent: 'var(--boss-accent)' }
+		]);
+		view.selectSkill(2); // Focus — player-only
+		expect(view.skillUsedBy).toEqual([]);
+	});
+
+	it('reuses the statistics query for the player’s per-skill record', () => {
+		const view = new CodexView();
+		view.stats = STATS;
+		view.selectSkill(0); // Cleave — 4,500 damage dealt recorded
+		expect(view.skillStatistics.find((s) => s.label === 'Damage Dealt')?.value).toBe('4,500');
+		// A skill with no recorded statistics yields an empty record.
+		view.selectSkill(2);
+		expect(view.skillStatistics).toEqual([]);
+	});
+});
+
+describe('CodexView skill → enemy cross-link', () => {
+	it('openEnemy from a used-by pill switches to the Enemies tab and selects the enemy', () => {
+		const view = new CodexView();
+		view.selectTab('skills');
+		view.openEnemy(2);
+		expect(view.tab).toBe('enemies');
+		expect(view.selectedEnemyId).toBe(2);
 	});
 });
 
@@ -443,5 +646,11 @@ describe('CodexView nav payload', () => {
 		const view = new CodexView({ tab: 'zones', zoneId: 2 });
 		expect(view.tab).toBe('zones');
 		expect(view.selectedZoneId).toBe(2);
+	});
+
+	it('seeds the tab + skill from a deep-link payload', () => {
+		const view = new CodexView({ tab: 'skills', skillId: 2 });
+		expect(view.tab).toBe('skills');
+		expect(view.selectedSkillId).toBe(2);
 	});
 });

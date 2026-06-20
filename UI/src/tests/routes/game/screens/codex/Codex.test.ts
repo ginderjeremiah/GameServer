@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, EChallengeType, EEntityType, EStatisticType } from '$lib/api';
+import { EAttribute, EChallengeType, EEntityType, EModifierType, ESkillEffectTarget, EStatisticType } from '$lib/api';
 import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 
 // Codex fetches the player's statistics + challenges over the socket and resolves reference data
@@ -35,7 +35,11 @@ const dist = () => [
 
 const STATS = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 100 },
-	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 }
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 },
+	// Per-zone (Emberreach) and per-skill (Cleave) records — the head of each rail/table by default,
+	// so they back the "Your record" section in the zone/skill dossiers.
+	{ statisticTypeId: EStatisticType.ZonesCleared, entityId: 0, value: 3 },
+	{ statisticTypeId: EStatisticType.DamageDealt, entityId: 0, value: 4500 }
 ];
 const PLAYER_CHALLENGES = [{ challengeId: 0, progress: 62, completed: false }];
 
@@ -67,8 +71,35 @@ function seedStaticData(): void {
 		{ id: 2, name: 'Cinder Tyrant', isBoss: true, attributeDistribution: dist(), skillPool: [0, 1], spawns: [] }
 	];
 	staticData.skills = [
-		{ id: 0, name: 'Cleave', baseDamage: 14, cooldownMs: 1800, damageMultipliers: [], effects: [] },
-		{ id: 1, name: 'War Cry', baseDamage: 0, cooldownMs: 6000, damageMultipliers: [], effects: [] }
+		{
+			id: 0,
+			name: 'Cleave',
+			description: 'A wide sweeping strike.',
+			baseDamage: 14,
+			cooldownMs: 1800,
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
+			effects: []
+		},
+		{
+			id: 1,
+			name: 'War Cry',
+			description: 'A rallying shout.',
+			baseDamage: 0,
+			cooldownMs: 6000,
+			damageMultipliers: [],
+			effects: [
+				{
+					id: 0,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 5000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				}
+			]
+		}
 	];
 	staticData.challenges = [
 		{
@@ -167,6 +198,24 @@ describe('Codex screen', () => {
 		expect(screen.getByText('62/100')).toBeTruthy();
 	});
 
+	it('cross-links an enemy spawn row into the zone dossier', async () => {
+		render(Codex);
+		// Dust Skitterer's Spawns sub-tab → Emberreach (zone 0).
+		await fireEvent.click(screen.getByTestId('codex-subtab-spawns'));
+		await fireEvent.click(screen.getByTestId('codex-enemy-spawn-0'));
+		// Lands on the Zones tab with Emberreach's dossier open.
+		expect(screen.getByTestId('codex-zone-dossier').textContent).toContain('Emberreach');
+	});
+
+	it('cross-links an enemy skill row into the skill dossier', async () => {
+		render(Codex);
+		// Dust Skitterer's Skills sub-tab → Cleave (skill 0).
+		await fireEvent.click(screen.getByTestId('codex-subtab-skills'));
+		await fireEvent.click(screen.getByTestId('codex-enemy-skill-0'));
+		// Lands on the Skills tab with Cleave's dossier open.
+		expect(screen.getByTestId('codex-skill-dossier').textContent).toContain('Cleave');
+	});
+
 	it('renders the Zones tab as a progression rail + dossier with a boss card and spawn table', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
@@ -180,6 +229,14 @@ describe('Codex screen', () => {
 		// Emberreach's authored boss + its spawn table.
 		expect(screen.getByTestId('codex-zone-boss').textContent).toContain('Cinder Tyrant');
 		expect(screen.getByTestId('codex-zone-spawn-0').textContent).toContain('Dust Skitterer');
+	});
+
+	it('renders the player’s per-zone record in the zone dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		// Emberreach (head of the rail) has a recorded clear → its "Your record" section renders.
+		expect(await screen.findByTestId('codex-zone-stats')).toBeTruthy();
+		expect(screen.getByText('Zones Cleared')).toBeTruthy();
 	});
 
 	it('cross-links a zone boss card into the enemy dossier', async () => {
@@ -197,10 +254,36 @@ describe('Codex screen', () => {
 		expect(screen.getByTestId('codex-dossier').textContent).toContain('Dust Skitterer');
 	});
 
-	it('shows a placeholder for the not-yet-built Skills tab', async () => {
+	it('renders the Skills tab as a skill table + dossier with scaling and a used-by cross-link', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
-		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Skills');
+		// A row per skill, and the head skill's dossier (Cleave) by default.
+		expect(screen.getByTestId('codex-skill-rows')).toBeTruthy();
+		expect(screen.getByTestId('codex-skill-0')).toBeTruthy();
+		expect(screen.getByTestId('codex-skill-1')).toBeTruthy();
+		const dossier = screen.getByTestId('codex-skill-dossier');
+		expect(dossier.textContent).toContain('Cleave');
+		expect(dossier.textContent).toContain('×1.5'); // Strength scaling chip
+		// Cleave is used by the boss → its used-by pill cross-links into the enemy dossier.
+		await fireEvent.click(screen.getByTestId('codex-skill-usedby-2'));
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
+	});
+
+	it('renders the player’s per-skill record in the skill dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
+		// Cleave (head of the table) has recorded damage → its "Your record" section renders.
+		expect(await screen.findByTestId('codex-skill-stats')).toBeTruthy();
+		expect(screen.getByText('Damage Dealt')).toBeTruthy();
+	});
+
+	it('shows a skill’s authored effects in its dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
+		await fireEvent.click(screen.getByTestId('codex-skill-1')); // War Cry — a utility buff
+		const dossier = screen.getByTestId('codex-skill-dossier');
+		expect(dossier.textContent).toContain('+15');
+		expect(dossier.textContent).toContain('Strength');
 	});
 
 	it('surfaces a load error in the statistics sub-tab', async () => {

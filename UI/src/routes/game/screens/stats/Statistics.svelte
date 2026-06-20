@@ -1,7 +1,6 @@
-<!-- Statistics screen — the player's tracked statistics, with a top-level
-     By statistic / By entity toggle. The two views cross-link: clicking an
-     entity in a stat card pivots to its dossier; clicking a stat in a dossier
-     jumps back to its category.
+<!-- Statistics screen — the player's tracked statistics, grouped "by statistic".
+     Clicking an entity row in a stat card deep-links into that entity's Codex
+     dossier, where the per-entity statistics live now.
 
      Values come from the GetPlayerStatistics socket command; the statistic-type
      catalogue and the entity reference lists come from the in-memory staticData. A brand-new
@@ -24,12 +23,7 @@
 		{:else if !view.loading && view.data.isEmpty}
 			<StatsEmpty />
 		{:else}
-			<ViewToggle mode={view.mode} onChange={(m) => view.setMode(m)} />
-			{#if view.mode === 'stat'}
-				<ByStatisticView {view} />
-			{:else}
-				<ByEntityView {view} />
-			{/if}
+			<ByStatisticView {view} />
 		{/if}
 	</div>
 
@@ -42,9 +36,7 @@
 import { onMount } from 'svelte';
 import { Loading } from '$components';
 import { statistics, toastError } from '$stores';
-import ViewToggle from './ViewToggle.svelte';
 import ByStatisticView from './ByStatisticView.svelte';
-import ByEntityView from './ByEntityView.svelte';
 import StatsEmpty from './StatsEmpty.svelte';
 import { StatisticsView } from './statistics-view.svelte';
 

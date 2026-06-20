@@ -21,6 +21,8 @@
         /// <summary>The caller is not authenticated — maps to 401 Unauthorized.</summary>
         Unauthorized = 1,
         /// <summary>The requested resource does not exist — maps to 404 Not Found.</summary>
-        NotFound = 2
+        NotFound = 2,
+        /// <summary>The caller is being throttled/backed off — maps to 429 Too Many Requests.</summary>
+        TooManyRequests = 3
     }
 }

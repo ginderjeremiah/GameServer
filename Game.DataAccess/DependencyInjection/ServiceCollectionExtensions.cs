@@ -97,6 +97,7 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IZoneEntityCache>(sp => sp.GetRequiredService<Zones>())
                 .AddScoped<ISessionStore, SessionStore>()
                 .AddScoped<IRefreshTokenStore, RefreshTokenStore>()
+                .AddScoped<ILoginBackoffStore, LoginBackoffStore>()
                 .AddScoped<IUsers, Users>()
                 .AddScoped<IUserLogins, UserLogins>()
                 .AddScoped<IRoles, Roles>()

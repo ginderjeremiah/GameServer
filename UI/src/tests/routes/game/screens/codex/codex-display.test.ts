@@ -5,6 +5,7 @@ import {
 	enemyAccent,
 	enemyKindLabel,
 	formatBand,
+	formatBaseDamage,
 	formatCooldown,
 	matchesEnemySearch,
 	sortEnemyRows,
@@ -42,6 +43,17 @@ describe('formatCooldown', () => {
 	it('renders sub-second precision to one decimal', () => {
 		expect(formatCooldown(1800)).toBe('1.8s');
 		expect(formatCooldown(900)).toBe('0.9s');
+	});
+});
+
+describe('formatBaseDamage', () => {
+	it('renders a utility (zero-damage) skill as a dash', () => {
+		expect(formatBaseDamage(0)).toBe('—');
+	});
+
+	it('renders a damaging skill as the formatted number', () => {
+		expect(formatBaseDamage(14)).toBe('14');
+		expect(formatBaseDamage(1200)).toBe('1200');
 	});
 });
 

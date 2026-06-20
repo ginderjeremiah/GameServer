@@ -1,36 +1,43 @@
-<!-- Statistics sub-tab: the player's tracked record against this enemy — every statistic that
-     references it, reusing the Statistics screen's per-entity query. Runtime progress, not part of
-     the enemy's reference data. -->
+<!-- "Your record" section: the player's tracked statistics against the selected entity — every
+     statistic that references it, reusing the Statistics screen's per-entity query. Runtime progress,
+     not part of the entity's reference data. Shared by the enemy, zone and skill dossiers. -->
 <div class="statistics">
 	<div class="label">Your record</div>
 
-	{#if view.statsLoading}
+	{#if loading}
 		<div class="note">Loading your record…</div>
-	{:else if view.statsError}
+	{:else if error}
 		<div class="note">Your statistics could not be loaded.</div>
-	{:else if view.statistics.length === 0}
-		<div class="note">No battles recorded against this enemy yet.</div>
+	{:else if stats.length === 0}
+		<div class="note">{emptyMessage}</div>
 	{:else}
-		<div class="grid" data-testid="codex-enemy-stats">
-			{#each view.statistics as stat (stat.label)}
+		<div class="grid" data-testid={testid}>
+			{#each stats as stat (stat.label)}
 				<div class="card">
 					<div class="card-label">{stat.label}</div>
 					<div class="card-val">{stat.value}</div>
 				</div>
 			{/each}
 		</div>
-		<div class="caption">Tracked from your battles — runtime progress, not part of the enemy's reference data.</div>
+		<div class="caption">Tracked from your battles — runtime progress, not part of the reference data.</div>
 	{/if}
 </div>
 
 <script lang="ts">
-import type { CodexView } from './codex-view.svelte';
+import type { EntityStatVM } from './codex-view.svelte';
 
 interface Props {
-	view: CodexView;
+	/** The statistics referencing this entity (label + formatted value). */
+	stats: EntityStatVM[];
+	loading: boolean;
+	error: boolean;
+	/** Message shown when the player has no recorded statistics for this entity yet. */
+	emptyMessage: string;
+	/** Stable hook for tests to target this entity kind's grid. */
+	testid: string;
 }
 
-let { view }: Props = $props();
+let { stats, loading, error, emptyMessage, testid }: Props = $props();
 </script>
 
 <style lang="scss">

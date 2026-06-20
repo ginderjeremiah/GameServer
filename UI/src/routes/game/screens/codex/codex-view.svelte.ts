@@ -1,25 +1,47 @@
-/* Codex screen — a read-only reference glossary of the game's enemies, zones and skills. The Enemies
-   and Zones tabs are built; Skills shows a "coming soon" placeholder (filed as a follow-up).
+/* Codex screen — a read-only reference glossary of the game's enemies, zones and skills.
 
    The Enemies tab is a master/detail: a filterable enemy table beside a dossier with Attributes
    (live level-scaled stats + a "show scaling" breakdown), Statistics (the player's per-enemy record),
-   Skills, Spawns and Challenges sub-tabs. The Zones tab is a progression rail (a status dot per zone:
+   Skills, Spawns and Challenges sub-tabs — the Skills/Spawns rows cross-link into the Skills/Zones
+   tabs. The Zones tab is a progression rail (a status dot per zone:
    cleared / unlocked / locked) beside a zone dossier — level band, spawn pool, boss card, spawn table
-   and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The data is
-   all live reference/runtime data — the screen reuses the real `BattleAttributes` enemy build for stat
-   scaling (`$lib/common/enemy-attributes`), the Statistics screen's per-entity query
-   (`StatisticsData.statsForEntity`), per-zone clears (`statistics.isZoneCleared`) and the challenge
-   progress store — rather than hard-coding any of it. Per-entity statistics live here now; the
-   Statistics screen deep-links an enemy into this dossier instead of rendering its own.
+   and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The Skills
+   tab is a master/detail skill catalogue: a skill table (base damage / cooldown / used-by count)
+   beside a dossier — base damage, cooldown, the attributes it scales with, its authored effects (via
+   the shared `$lib/common/skill-effect-display` helper) and the enemies that use it, which cross-link
+   into the enemy dossier. The data is all live reference/runtime data — the screen reuses the real
+   `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`), the Statistics
+   screen's per-entity query (`StatisticsData.statsForEntity`), per-zone clears
+   (`statistics.isZoneCleared`) and the challenge progress store — rather than hard-coding any of it.
+   Per-entity statistics live here now — every dossier (enemy, zone and skill) shows a "your record"
+   section, and the Statistics screen deep-links an entity into the matching dossier instead of
+   rendering its own in-place one.
 
    The view-model only wires reactive state to the pure helpers; the projection maths live in
    `enemy-level` and the shared `$lib/common/enemy-attributes` (unit-tested directly). */
 
-import { EEntityType, type IEnemy, type IPlayerStatistic, type IZone } from '$lib/api';
-import { type EnemyAttributes, challengeTypeColor, challengeTypeName, enemyAttributesAtLevel } from '$lib/common';
+import { EEntityType, type IEnemy, type IPlayerStatistic, type ISkill, type IZone } from '$lib/api';
+import {
+	type EnemyAttributes,
+	attributeCode,
+	attributeColor,
+	attributeIsHarmful,
+	attributeName,
+	challengeTypeColor,
+	challengeTypeName,
+	describeEffect,
+	effectDirectionColor,
+	enemyAttributesAtLevel,
+	formatNum
+} from '$lib/common';
 import { playerChallenges, staticData, statistics } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
-import { StatisticsData, buildStatEntities, buildStatTypes } from '../stats/statistics-view.svelte';
+import {
+	type StatEntityKind,
+	StatisticsData,
+	buildStatEntities,
+	buildStatTypes
+} from '../stats/statistics-view.svelte';
 import {
 	type CodexTab,
 	type EnemyFilter,
@@ -30,6 +52,7 @@ import {
 	enemyAccent,
 	enemyKindLabel,
 	formatBand,
+	formatBaseDamage,
 	formatCooldown,
 	matchesEnemySearch,
 	resolveZoneStatus,
@@ -44,6 +67,7 @@ export interface CodexNavPayload {
 	tab?: CodexTab;
 	enemyId?: number;
 	zoneId?: number;
+	skillId?: number;
 	sub?: EnemySubTab;
 }
 
@@ -89,11 +113,11 @@ export interface EnemySpawnVM {
 	weightLabel: string;
 }
 
-export interface EnemyStatVM {
+/** A single per-entity statistic row shown in a dossier's "Your record" section
+ *  (shared by the enemy, zone and skill dossiers). */
+export interface EntityStatVM {
 	label: string;
 	value: string;
-	rank: number;
-	of: number;
 }
 
 export interface EnemyChallengeVM {
@@ -136,6 +160,47 @@ export interface ZoneUnlockVM {
 	sealed: boolean;
 }
 
+export interface SkillRowVM {
+	id: number;
+	name: string;
+	/** Base damage, or `—` for a utility skill. */
+	baseDamageLabel: string;
+	/** Cooldown, or `—` for an instant/utility skill. */
+	cooldownLabel: string;
+	/** How many (non-retired) enemies have this skill in their pool. */
+	usedByCount: number;
+	selected: boolean;
+}
+
+export interface SkillScalingVM {
+	attributeId: number;
+	name: string;
+	code: string;
+	/** Magnitude badge, e.g. `×1.5`. */
+	multiplierLabel: string;
+	color: string;
+}
+
+export interface SkillEffectVM {
+	id: number;
+	/** Signed/`×` magnitude badge, e.g. `+15` or `×0.5`. */
+	magnitude: string;
+	attributeName: string;
+	/** `self` / `enemy`, the side the effect lands on. */
+	targetLabel: string;
+	/** Duration in seconds, e.g. `5s`. */
+	duration: string;
+	/** Themed buff/debuff accent for the magnitude. */
+	color: string;
+}
+
+export interface SkillUserVM {
+	enemyId: number;
+	name: string;
+	isBoss: boolean;
+	accent: string;
+}
+
 const SUB_TAB_DEFS: SubTabVM[] = [
 	{ key: 'attributes', label: 'Attributes' },
 	{ key: 'statistics', label: 'Statistics' },
@@ -153,6 +218,9 @@ const liveEnemies = (enemies: IEnemy[] | undefined): IEnemy[] => (enemies ?? [])
 const liveZones = (zones: IZone[] | undefined): IZone[] =>
 	(zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order);
 
+/** Live (non-retired) skills in catalogue order. */
+const liveSkills = (skills: ISkill[] | undefined): ISkill[] => (skills ?? []).filter((s) => !s.retiredAt);
+
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class CodexView {
@@ -162,6 +230,8 @@ export class CodexView {
 	selectedEnemyId = $state<number>(-1);
 	/** Inspected zone id (falls back to the head of the rail when unresolved). */
 	selectedZoneId = $state<number>(-1);
+	/** Inspected skill id (falls back to the head of the catalogue when unresolved). */
+	selectedSkillId = $state<number>(-1);
 	/** Active dossier sub-tab. */
 	sub = $state<EnemySubTab>('attributes');
 	/** Level the Attributes sub-tab scales the selected enemy to. */
@@ -199,6 +269,11 @@ export class CodexView {
 		if (initialZone) {
 			this.selectedZoneId = initialZone.id;
 		}
+		// …and the skill table (the deep-link target, else the head of the catalogue).
+		const initialSkill = this.resolveSkill(payload?.skillId ?? -1);
+		if (initialSkill) {
+			this.selectedSkillId = initialSkill.id;
+		}
 	}
 
 	/* ── catalogue ───────────────────────────────────────────────────────────── */
@@ -214,7 +289,7 @@ export class CodexView {
 		const counts: Record<CodexTab, number> = {
 			enemies: this.enemies.length,
 			zones: this.zones.length,
-			skills: (staticData.skills ?? []).filter((s) => !s.retiredAt).length
+			skills: this.skillsCatalogue.length
 		};
 		return CODEX_TABS.map((key) => ({
 			key,
@@ -288,7 +363,7 @@ export class CodexView {
 	/** Bar denominator for the primary stat bars (the leading value, floored at 1). */
 	readonly maxPrimary = $derived(Math.max(1, ...this.attributes.primary.map((p) => p.value)));
 
-	readonly skillRows = $derived.by<EnemySkillVM[]>(() => {
+	readonly enemySkillRows = $derived.by<EnemySkillVM[]>(() => {
 		const e = this.selectedEnemy;
 		const skills = staticData.skills ?? [];
 		if (!e) {
@@ -342,18 +417,9 @@ export class CodexView {
 	);
 
 	/** Every statistic that references the selected enemy (the dossier's "your record"). */
-	readonly statistics = $derived.by<EnemyStatVM[]>(() => {
-		const e = this.selectedEnemy;
-		if (!e) {
-			return [];
-		}
-		return this.statData.statsForEntity('enemy', e.id).map((info) => ({
-			label: info.stat.name,
-			value: fmtValue(info.value, info.stat.unit),
-			rank: info.rank,
-			of: info.of
-		}));
-	});
+	readonly statistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedEnemy ? this.statVMsFor('enemy', this.selectedEnemy.id) : []
+	);
 
 	/** Challenges scoped to the selected enemy, with progress from the shared challenge store. */
 	readonly challenges = $derived.by<EnemyChallengeVM[]>(() => {
@@ -475,6 +541,96 @@ export class CodexView {
 		};
 	});
 
+	/** Every statistic that references the selected zone (the zone dossier's "your record"). */
+	readonly zoneStatistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedZone ? this.statVMsFor('zone', this.selectedZone.id) : []
+	);
+
+	/* ── skills catalogue (the reference skill table) ────────────────────────────── */
+
+	readonly skillsCatalogue = $derived(liveSkills(staticData.skills));
+
+	/** Skill table rows: name, base damage, cooldown and how many enemies use the skill. */
+	readonly skillRows = $derived.by<SkillRowVM[]>(() => {
+		const enemies = this.enemies;
+		return this.skillsCatalogue.map((sk) => ({
+			id: sk.id,
+			name: sk.name,
+			baseDamageLabel: formatBaseDamage(sk.baseDamage),
+			cooldownLabel: formatCooldown(sk.cooldownMs),
+			usedByCount: enemies.filter((e) => e.skillPool.includes(sk.id)).length,
+			selected: sk.id === this.selectedSkillId
+		}));
+	});
+
+	/* ── selected skill + dossier ─────────────────────────────────────────────────── */
+
+	/** The inspected skill, falling back to the head of the catalogue. */
+	readonly selectedSkill = $derived<ISkill | undefined>(
+		this.skillsCatalogue.find((s) => s.id === this.selectedSkillId) ?? this.skillsCatalogue[0]
+	);
+
+	/** The attributes the selected skill's damage scales with, each tinted by its attribute accent. */
+	readonly skillScaling = $derived.by<SkillScalingVM[]>(() => {
+		const sk = this.selectedSkill;
+		if (!sk) {
+			return [];
+		}
+		return sk.damageMultipliers.map((m) => ({
+			attributeId: m.attributeId,
+			name: attributeName(m.attributeId, staticData.attributes),
+			code: attributeCode(m.attributeId, staticData.attributes),
+			multiplierLabel: `×${formatNum(m.multiplier)}`,
+			color: attributeColor(m.attributeId)
+		}));
+	});
+
+	/** The selected skill's authored effects, described via the shared helper so the wording and the
+	 *  buff/debuff direction match every other surface that shows an effect. */
+	readonly skillEffects = $derived.by<SkillEffectVM[]>(() => {
+		const sk = this.selectedSkill;
+		if (!sk) {
+			return [];
+		}
+		return sk.effects.map((effect) => {
+			const desc = describeEffect(
+				effect,
+				attributeName(effect.attributeId, staticData.attributes),
+				attributeIsHarmful(effect.attributeId, staticData.attributes)
+			);
+			return {
+				id: effect.id,
+				magnitude: desc.magnitude,
+				attributeName: desc.attributeName,
+				targetLabel: desc.targetLabel,
+				duration: desc.duration,
+				color: effectDirectionColor(desc.direction)
+			};
+		});
+	});
+
+	/** The (non-retired) enemies whose skill pool includes the selected skill — pills that cross-link
+	 *  into the enemy dossier. Empty for a player-only skill. */
+	readonly skillUsedBy = $derived.by<SkillUserVM[]>(() => {
+		const sk = this.selectedSkill;
+		if (!sk) {
+			return [];
+		}
+		return this.enemies
+			.filter((e) => e.skillPool.includes(sk.id))
+			.map((e) => ({
+				enemyId: e.id,
+				name: e.name,
+				isBoss: e.isBoss,
+				accent: enemyAccent(e.isBoss)
+			}));
+	});
+
+	/** Every statistic that references the selected skill (the skill dossier's "your record"). */
+	readonly skillStatistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedSkill ? this.statVMsFor('skill', this.selectedSkill.id) : []
+	);
+
 	/* ── handlers ──────────────────────────────────────────────────────────────── */
 
 	selectTab(tab: CodexTab): void {
@@ -508,13 +664,37 @@ export class CodexView {
 		this.selectedZoneId = id;
 	}
 
-	/** Cross-link: jump to an enemy's dossier from the Zones tab (boss card / spawn row). */
+	selectSkill(id: number): void {
+		this.selectedSkillId = id;
+	}
+
+	/** Cross-link: jump to an enemy's dossier from the Zones / Skills tab (boss card, spawn / used-by row). */
 	openEnemy(id: number): void {
 		this.tab = 'enemies';
 		this.selectEnemy(id);
 	}
 
+	/** Cross-link: jump to a zone's dossier from the enemy dossier's Spawns rows. */
+	openZone(id: number): void {
+		this.tab = 'zones';
+		this.selectZone(id);
+	}
+
+	/** Cross-link: jump to a skill's dossier from the enemy dossier's Skills rows. */
+	openSkill(id: number): void {
+		this.tab = 'skills';
+		this.selectSkill(id);
+	}
+
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */
+
+	/** Project the statistics referencing an entity into dossier "your record" rows. */
+	private statVMsFor(kind: StatEntityKind, id: number): EntityStatVM[] {
+		return this.statData.statsForEntity(kind, id).map((info) => ({
+			label: info.stat.name,
+			value: fmtValue(info.value, info.stat.unit)
+		}));
+	}
 
 	/** Resolve an enemy id against the catalogue, falling back to the head of the list. */
 	private resolveEnemy(id: number): IEnemy | undefined {
@@ -526,6 +706,12 @@ export class CodexView {
 	private resolveZone(id: number): IZone | undefined {
 		const zones = liveZones(staticData.zones);
 		return zones.find((z) => z.id === id) ?? zones[0];
+	}
+
+	/** Resolve a skill id against the catalogue, falling back to the head. */
+	private resolveSkill(id: number): ISkill | undefined {
+		const skills = liveSkills(staticData.skills);
+		return skills.find((s) => s.id === id) ?? skills[0];
 	}
 
 	/** A zone is locked when it carries an unlock gate the player hasn't completed yet. */
