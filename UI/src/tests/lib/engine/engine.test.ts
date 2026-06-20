@@ -12,12 +12,22 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 // Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
-const { staticDataStub, statisticsStub, playerChallengesStub, resetLogs } = vi.hoisted(() => ({
-	staticDataStub: { loaded: true },
-	statisticsStub: { load: vi.fn(), reset: vi.fn() },
-	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
-	resetLogs: vi.fn()
-}));
+const { staticDataStub, statisticsStub, playerChallengesStub, resetLogs, toastSuccess, navigation } = vi.hoisted(
+	() => ({
+		staticDataStub: { loaded: true } as {
+			loaded: boolean;
+			challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
+			items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
+			itemMods?: unknown[];
+			skills?: unknown[];
+		},
+		statisticsStub: { load: vi.fn(), reset: vi.fn() },
+		playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
+		resetLogs: vi.fn(),
+		toastSuccess: vi.fn(),
+		navigation: { requestScreen: vi.fn() }
+	})
+);
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
 	return {
@@ -25,7 +35,9 @@ vi.mock('$stores', async () => {
 		staticData: staticDataStub,
 		statistics: statisticsStub,
 		playerChallenges: playerChallengesStub,
-		resetLogs
+		resetLogs,
+		toastSuccess,
+		navigation
 	};
 });
 
@@ -111,7 +123,7 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
-import type { IApiSocketResponse } from '$lib/api';
+import { EItemCategory, ERarity, type IApiSocketResponse } from '$lib/api';
 
 /** Builds a ChallengeCompleted push response with the given reward ids (defaults: no rewards). */
 const challengeCompletedResponse = (
@@ -123,6 +135,10 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	clearModals();
 	staticDataStub.loaded = true;
+	staticDataStub.challenges = undefined;
+	staticDataStub.items = undefined;
+	staticDataStub.itemMods = undefined;
+	staticDataStub.skills = undefined;
 });
 
 afterEach(() => {
@@ -264,6 +280,46 @@ describe('handleChallengeCompleted', () => {
 
 		expect(playerChallengesStub.markCompleted).not.toHaveBeenCalled();
 		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
+	});
+
+	it('surfaces a success toast announcing the completed challenge', () => {
+		staticDataStub.challenges = [];
+		staticDataStub.challenges[7] = { id: 7, name: 'First Blood' };
+
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7 }));
+
+		expect(toastSuccess).toHaveBeenCalledWith('Challenge complete: First Blood', expect.anything());
+	});
+
+	it('names the unlocked reward in the toast', () => {
+		staticDataStub.challenges = [];
+		staticDataStub.challenges[7] = { id: 7, name: 'First Blood', rewardItemId: 3 };
+		staticDataStub.items = [];
+		staticDataStub.items[3] = { id: 3, name: 'Iron Helm', rarityId: ERarity.Rare, itemCategoryId: EItemCategory.Helm };
+
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardItemId: 3 }));
+
+		expect(toastSuccess).toHaveBeenCalledWith(
+			'Challenge complete: First Blood — unlocked Iron Helm',
+			expect.anything()
+		);
+	});
+
+	it('does not toast when the completed challenge is missing from static data', () => {
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7 }));
+
+		expect(toastSuccess).not.toHaveBeenCalled();
+	});
+
+	it('the toast View action opens the Challenges screen', () => {
+		staticDataStub.challenges = [];
+		staticDataStub.challenges[7] = { id: 7, name: 'First Blood' };
+
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7 }));
+
+		const options = toastSuccess.mock.calls[0][1] as { action: { onClick: () => void } };
+		options.action.onClick();
+		expect(navigation.requestScreen).toHaveBeenCalledWith('challenges');
 	});
 });
 

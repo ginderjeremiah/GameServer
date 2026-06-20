@@ -107,3 +107,15 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 	}
 	return null;
 }
+
+/**
+ * The player-facing message announcing a completed challenge and what it unlocked, used by the
+ * completion success-toast. The reward (item / mod / skill) is named when present so the player sees
+ * their gain at a glance; a challenge carrying no direct reward just announces the completion.
+ */
+export function challengeCompletedMessage(challengeName: string, reward: UnlockReward | null): string {
+	if (reward) {
+		return `Challenge complete: ${challengeName} — unlocked ${reward.name}`;
+	}
+	return `Challenge complete: ${challengeName}`;
+}
