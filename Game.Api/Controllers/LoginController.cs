@@ -3,9 +3,11 @@ using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
+using Game.Api.RateLimiting;
 using Game.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Game.Api.Controllers
 {
@@ -27,6 +29,7 @@ namespace Game.Api.Controllers
         private readonly PlayerService _playerService = playerService;
 
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost("/api/[controller]")]
         public async Task<ApiResponse<LoginResult>> Login([FromBody] LoginCredentials creds)
         {
@@ -48,6 +51,7 @@ namespace Game.Api.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse<AuthTokens>> Refresh([FromBody] RefreshRequest request)
         {
@@ -58,6 +62,7 @@ namespace Game.Api.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {

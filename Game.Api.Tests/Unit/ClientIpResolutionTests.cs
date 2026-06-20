@@ -1,4 +1,4 @@
-using Game.Api.Middleware;
+using Game.Api.Http;
 using Microsoft.AspNetCore.Http;
 using System.Net;
 using Xunit;
@@ -6,11 +6,12 @@ using Xunit;
 namespace Game.Api.Tests.Unit
 {
     /// <summary>
-    /// Covers <see cref="LoginTrackingMiddleware.ResolveIpAddress"/>: it reads the transport remote address
-    /// (corrected by the forwarded-headers middleware only for trusted proxies), never trusts a raw
-    /// <c>X-Forwarded-For</c> header itself, and falls back to "unknown" when there is no remote address.
+    /// Covers <see cref="ClientIp.Resolve"/>: it reads the transport remote address (corrected by the
+    /// forwarded-headers middleware only for trusted proxies), never trusts a raw <c>X-Forwarded-For</c>
+    /// header itself, and falls back to "unknown" when there is no remote address. This is the shared
+    /// resolution behind both login-IP tracking and the auth rate-limiter partition key.
     /// </summary>
-    public class LoginTrackingIpResolutionTests
+    public class ClientIpResolutionTests
     {
         private static HttpContext ContextWith(string? forwardedFor, IPAddress? remoteIp)
         {
@@ -28,7 +29,7 @@ namespace Game.Api.Tests.Unit
         {
             var context = ContextWith(forwardedFor: null, IPAddress.Parse("198.51.100.7"));
 
-            Assert.Equal("198.51.100.7", LoginTrackingMiddleware.ResolveIpAddress(context));
+            Assert.Equal("198.51.100.7", ClientIp.Resolve(context));
         }
 
         [Fact]
@@ -38,7 +39,7 @@ namespace Game.Api.Tests.Unit
             // forwarded-headers middleware (for a trusted proxy) may rewrite RemoteIpAddress.
             var context = ContextWith("203.0.113.5", IPAddress.Parse("198.51.100.7"));
 
-            Assert.Equal("198.51.100.7", LoginTrackingMiddleware.ResolveIpAddress(context));
+            Assert.Equal("198.51.100.7", ClientIp.Resolve(context));
         }
 
         [Fact]
@@ -46,7 +47,7 @@ namespace Game.Api.Tests.Unit
         {
             var context = ContextWith(forwardedFor: null, remoteIp: null);
 
-            Assert.Equal("unknown", LoginTrackingMiddleware.ResolveIpAddress(context));
+            Assert.Equal("unknown", ClientIp.Resolve(context));
         }
     }
 }

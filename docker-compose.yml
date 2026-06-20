@@ -65,6 +65,11 @@ services:
       # 4173). Outside Development the API has no built-in default and validates this at startup, so
       # the dockerized e2e stack must supply it or the API aborts on boot.
       Cors__AllowedOrigins__0: "http://localhost:4173"
+      # Effectively disable the auth rate limiter for e2e: the whole Playwright suite logs in through
+      # the Vite proxy from one source IP (localhost), so every auth request shares a single partition
+      # and the production-default 10/min limit would 429 the parallel login-heavy tests. Mirrors the
+      # high limit the integration-test factory sets for the same reason.
+      RateLimiting__Auth__PermitLimit: "100000"
       # Secrets required at startup. These are throwaway values for CI / e2e only.
       HashPepper: docker-compose-e2e-pepper
       Jwt__SigningKey: docker-compose-e2e-signing-key-at-least-32-bytes-long

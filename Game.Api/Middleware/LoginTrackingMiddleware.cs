@@ -27,7 +27,7 @@ namespace Game.Api.Middleware
                     var hints = ClientHints.FromHeaders(context.Request.Headers);
                     await trackingService.RecordConnection(
                         sessionService.UserId,
-                        ResolveIpAddress(context),
+                        ClientIp.Resolve(context),
                         fingerprint,
                         hints.UserAgent,
                         hints.SecChUa,
@@ -42,16 +42,6 @@ namespace Game.Api.Middleware
             }
 
             await _next(context);
-        }
-
-        /// <summary>
-        /// Resolves the originating client IP from the transport remote address. The forwarded-headers
-        /// middleware corrects this to the real client only when the request arrives through a configured
-        /// trusted proxy, so a spoofed <c>X-Forwarded-For</c> from a direct client is never honoured (#910).
-        /// </summary>
-        internal static string ResolveIpAddress(HttpContext context)
-        {
-            return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         }
     }
 

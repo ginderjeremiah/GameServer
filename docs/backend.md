@@ -147,6 +147,10 @@ Account creation and the login/refresh/logout flows are orchestrated by `Account
 
 At most one active account may hold a given username, enforced by a **partial unique index** (`Username WHERE ArchivedAt IS NULL`) so two concurrent creations can't both slip past the up-front availability check and insert duplicate active rows. The filter excludes archived users, preserving username reuse after archival. Account creation therefore commits its own insert in the data tier (rather than deferring to the per-request unit of work) so the index's unique-violation surfaces as a clean "username taken" result instead of a 500 raised after the action returns.
 
+### Auth endpoint rate limiting
+
+The anonymous auth endpoints (login, refresh, account creation) are throttled by a **per-client-IP fixed-window** rate limiter (ASP.NET Core's built-in `AddRateLimiter`), blunting credential stuffing, refresh-token brute force, and the PBKDF2 resource-exhaustion vector. The three endpoints share one `"auth"` policy, so the limit is a **combined per-IP budget** an attacker can't multiply across endpoints. The partition key is the client IP resolved the same trusted-proxy way as login tracking (`ClientIp.Resolve`), so a spoofed `X-Forwarded-For` can't shard a caller across partitions. A throttled request returns the standard `{ errorMessage }` envelope (429) with a `Retry-After` header. Unlike the CORS origins, the limits carry **safe positive defaults** so an unconfigured deployment is still protected — config only tunes them — and are validated as positive on start so an accidental zero fails fast rather than silently disabling the guard.
+
 ## CORS allowed origins (deployment config)
 
 The browser CORS policy's allowed origins are **configuration-bound, not hardcoded** — they are deployment-specific. The list supports multiple origins and is validated at startup (must be non-empty), so a misconfigured environment fails fast rather than silently rejecting every browser request. The local dev origin ships in the Development config.

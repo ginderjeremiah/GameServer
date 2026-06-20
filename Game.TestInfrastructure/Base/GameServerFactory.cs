@@ -42,6 +42,10 @@ namespace Game.TestInfrastructure.Base
                     ["Jwt:Issuer"] = Game.Api.Constants.SERVER_PRINCIPAL,
                     ["Jwt:Audience"] = Game.Api.Constants.SERVER_PRINCIPAL,
                     ["Cors:AllowedOrigins:0"] = "http://localhost:5174",
+                    // Effectively disable the auth rate limiter for the shared integration suite; the
+                    // dedicated rate-limit tests override this with a small limit to exercise throttling.
+                    ["RateLimiting:Auth:PermitLimit"] = "100000",
+                    ["RateLimiting:Auth:WindowSeconds"] = "60",
                     ["DataAccessOptions:DatabaseSystem"] = "1",
                     ["DataAccessOptions:EnableSensitiveLogging"] = "true",
                     ["DataAccessOptions:CacheSystem"] = "0",
