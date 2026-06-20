@@ -490,6 +490,28 @@ describe('CodexView zone → enemy cross-link', () => {
 	});
 });
 
+describe('CodexView enemy → zone cross-link', () => {
+	it('openZone switches to the Zones tab and selects the zone', () => {
+		const view = new CodexView();
+		view.selectEnemy(0); // a normal enemy with spawn zones
+		view.openZone(1);
+		expect(view.tab).toBe('zones');
+		expect(view.selectedZoneId).toBe(1);
+		expect(view.selectedZone?.id).toBe(1);
+	});
+});
+
+describe('CodexView enemy → skill cross-link', () => {
+	it('openSkill switches to the Skills tab and selects the skill', () => {
+		const view = new CodexView();
+		view.selectEnemy(0); // skill pool [0, 1]
+		view.openSkill(1);
+		expect(view.tab).toBe('skills');
+		expect(view.selectedSkillId).toBe(1);
+		expect(view.selectedSkill?.id).toBe(1);
+	});
+});
+
 describe('CodexView skill table', () => {
 	it('lists every skill in catalogue order with base/cooldown/used-by projections', () => {
 		const rows = new CodexView().skillRows;
