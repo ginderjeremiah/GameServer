@@ -11,6 +11,12 @@
         public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default);
         public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default);
         public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Sets <paramref name="key"/> to <paramref name="value"/> and returns the previous value (null if the
+        /// key was unset). The value is required (non-null): unlike <see cref="Set(string, string?,
+        /// CancellationToken)"/> there is no null-means-delete path here — the underlying single-round-trip
+        /// GETSET rejects a null value rather than deleting the key.
+        /// </summary>
         public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default);
         public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default);
         /// <summary>
@@ -21,9 +27,18 @@
         /// single operation, so a fault between the two can never leave the key lingering without a TTL.
         /// </summary>
         public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default);
-        public Task Set(string key, string value, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Sets <paramref name="key"/> to <paramref name="value"/>. A null <paramref name="value"/> deletes the
+        /// key — the null-means-delete semantic the generic overload relies on.
+        /// </summary>
+        public Task Set(string key, string? value, CancellationToken cancellationToken = default);
         public Task Set<T>(string key, T value, CancellationToken cancellationToken = default);
-        public Task Set(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Sets <paramref name="key"/> to <paramref name="value"/> with <paramref name="expiry"/> as its TTL.
+        /// A null <paramref name="value"/> deletes the key — the null-means-delete semantic the generic overload
+        /// relies on.
+        /// </summary>
+        public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default);
         public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default);
         /// <summary>Resets the time-to-live on an existing key. A no-op if the key does not exist.</summary>
         public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
@@ -33,9 +48,19 @@
         /// without paying a round-trip.
         /// </summary>
         public void ExpireAndForget(string key, TimeSpan expiry);
-        public void SetAndForget(string key, string value);
+        /// <summary>
+        /// Sets <paramref name="key"/> to <paramref name="value"/> without awaiting the result
+        /// (fire-and-forget). A null <paramref name="value"/> deletes the key — the null-means-delete semantic
+        /// the generic overload relies on.
+        /// </summary>
+        public void SetAndForget(string key, string? value);
         public void SetAndForget<T>(string key, T value);
-        public void SetAndForget(string key, string value, TimeSpan expiry);
+        /// <summary>
+        /// Sets <paramref name="key"/> to <paramref name="value"/> with <paramref name="expiry"/> as its TTL
+        /// without awaiting the result (fire-and-forget). A null <paramref name="value"/> deletes the key — the
+        /// null-means-delete semantic the generic overload relies on.
+        /// </summary>
+        public void SetAndForget(string key, string? value, TimeSpan expiry);
         public void SetAndForget<T>(string key, T value, TimeSpan expiry);
         public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default);
         public Task Delete(string key, CancellationToken cancellationToken = default);
