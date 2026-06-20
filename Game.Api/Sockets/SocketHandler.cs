@@ -46,7 +46,11 @@ namespace Game.Api.Sockets
         /// <summary>How often the inactivity watchdog re-checks the last-activity timestamp.</summary>
         private static readonly TimeSpan InactivityPollInterval = TimeSpan.FromSeconds(10);
 
-        private DateTime _lastResponse = DateTime.UtcNow;
+        // Written by the read loop and read by the inactivity loop on separate threads, so it is accessed via
+        // Interlocked to give the cross-thread happens-before edge a plain DateTime field would lack — a
+        // DateTime is a 16-byte struct that isn't even guaranteed to be read atomically (a torn read is
+        // possible). Stored as ticks because Interlocked operates on a long.
+        private long _lastResponseTicks = DateTime.UtcNow.Ticks;
 
         // The read and inactivity loops, tracked (rather than pure fire-and-forget) so a host shutdown can
         // await their completion within a bounded drain window — see SocketConnectionRegistry.
@@ -116,12 +120,7 @@ namespace Game.Api.Sockets
             if (outcome is SocketCommandOutcome.Faulted)
             {
                 _logger.LogError(fault, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
-                await _context.SendData(new ApiSocketResponse
-                {
-                    Id = commandInfo.Id,
-                    Name = commandInfo.Name,
-                    Error = "Internal Server Error"
-                });
+                await SendErrorAsync(commandInfo, "Internal Server Error");
             }
         }
 
@@ -183,12 +182,7 @@ namespace Game.Api.Sockets
                     // but its now-late response is dropped: RunCommand never sends — this method owns the single
                     // send — so the client never receives a second response for the same id.
                     _logger.LogWarning("Socket command timed out after {Timeout} and was abandoned: {CommandInfo} on socket: {Id}", _commandTimeout, commandInfo, Id);
-                    await _context.SendData(new ApiSocketResponse
-                    {
-                        Id = commandInfo.Id,
-                        Name = commandInfo.Name,
-                        Error = "Command timed out."
-                    });
+                    await SendErrorAsync(commandInfo, "Command timed out.");
                     ReleaseCommandLockWhenSettled(commandTask, cts, commandInfo);
                     lockHandedOff = true;
                     return (SocketCommandOutcome.TimedOut, null);
@@ -261,7 +255,7 @@ namespace Game.Api.Sockets
         {
             try
             {
-                while (DateTime.UtcNow - _lastResponse < InactivityTimeout && _context.State is Open)
+                while (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResponseTicks) < InactivityTimeout.Ticks && _context.State is Open)
                 {
                     await Task.Delay(InactivityPollInterval, hostStopping);
                 }
@@ -289,7 +283,7 @@ namespace Game.Api.Sockets
                     if (!string.IsNullOrWhiteSpace(message))
                     {
                         _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Message}", PlayerId, Id, message);
-                        _lastResponse = DateTime.UtcNow;
+                        Interlocked.Exchange(ref _lastResponseTicks, DateTime.UtcNow.Ticks);
                         // Any inbound message (heartbeat ping or command) marks the connection live — keep its
                         // presence key from expiring on the same signal the inactivity check uses above.
                         await _onActivity();
@@ -304,15 +298,27 @@ namespace Game.Api.Sockets
                 }
                 catch (Exception ex)
                 {
-                    if (_context.State is Open) // Only log if the socket is still open, otherwise it's expected that exceptions may occur
+                    // A thrown receive is terminal: the socket can't be read from again, so stop reading
+                    // rather than looping. Most receive failures abort the socket (state leaves Open and the
+                    // do…while would exit anyway), but a failure that does NOT transition WebSocketState (e.g.
+                    // an OOM/decoding error while assembling the message) would otherwise leave the loop a
+                    // tight CPU spin that also floods the log — and the inactivity watchdog can't help because
+                    // _lastResponseTicks only advances on a successful read. Only log while still open, since a
+                    // receive throwing on an already-closing socket is expected.
+                    if (_context.State is Open)
                     {
-                        _logger.LogError(ex, "An error occurred while reading a socket message.");
+                        _logger.LogError(ex, "An error occurred while reading a socket message; closing the socket.");
                     }
+
+                    break;
                 }
             }
             while (_context.State is Open);
 
-            if (_context.State is CloseReceived)
+            // Complete the closing handshake for a client-initiated close, and close a socket the read loop is
+            // abandoning while still open (the terminal-fault break above) so teardown completes instead of
+            // leaving a half-open socket. Close is a no-op on an already-closed/aborted socket.
+            if (_context.State is Open or CloseReceived)
             {
                 await _context.Close(ESocketCloseReason.Finished);
             }
@@ -342,11 +348,7 @@ namespace Game.Api.Sockets
                         // it with a structured error instead of letting the null reach the command lookup — which
                         // would throw an unobserved exception and leave the client hanging on its request id.
                         _logger.LogWarning("Received socket command frame with no name: {Message} on socket: {Id}", message, Id);
-                        await _context.SendData(new ApiSocketResponse
-                        {
-                            Id = commandInfo.Id,
-                            Error = "Malformed command."
-                        });
+                        await SendErrorAsync(commandInfo, "Malformed command.");
                         return;
                     }
 
@@ -355,12 +357,7 @@ namespace Game.Api.Sockets
                         // Server-initiated commands (e.g. ChallengeCompleted, SocketReplaced) are only valid
                         // when dispatched via the backplane; a client sending one is rejected, not executed.
                         _logger.LogWarning("Client attempted to invoke server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
-                        await _context.SendData(new ApiSocketResponse
-                        {
-                            Id = commandInfo.Id,
-                            Name = commandInfo.Name,
-                            Error = "Command cannot be invoked by the client."
-                        });
+                        await SendErrorAsync(commandInfo, "Command cannot be invoked by the client.");
                         return;
                     }
 
@@ -371,6 +368,21 @@ namespace Game.Api.Sockets
             {
                 _logger.LogWarning("Failed to deserialize socket command: {Message}", message);
             }
+        }
+
+        /// <summary>
+        /// Sends an error response frame for a command, echoing its id and name so the client can correlate the
+        /// failure with the request it is awaiting. The single place the error-frame shape is built, so every
+        /// failure path (fault, timeout, malformed/rejected frame) emits a consistent envelope.
+        /// </summary>
+        private Task SendErrorAsync(SocketCommandInfo commandInfo, string error)
+        {
+            return _context.SendData(new ApiSocketResponse
+            {
+                Id = commandInfo.Id,
+                Name = commandInfo.Name,
+                Error = error
+            });
         }
     }
 }

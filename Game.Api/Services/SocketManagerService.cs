@@ -268,7 +268,14 @@ namespace Game.Api.Services
             {
                 // Dispatched directly (not re-queued over pub/sub) since the failing socket is right here;
                 // ExecuteServerCommand runs it under the same command lock and owns the send to the client.
-                await socket.ExecuteServerCommand(new ServerCommandFailedInfo(commandInfo.Name));
+                // Capture the outcome: if the notice itself doesn't get through (e.g. the socket just closed),
+                // the client never gets the re-sync cue for a gating command like ChallengeCompleted and would
+                // diverge silently — so surface it for an operator rather than ignoring the result.
+                var noticeOutcome = await socket.ExecuteServerCommand(new ServerCommandFailedInfo(commandInfo.Name));
+                if (noticeOutcome is not SocketCommandOutcome.Succeeded)
+                {
+                    _logger.LogWarning("The re-sync notice for a failed server command did not complete (outcome: {Outcome}); the client may not have received the re-sync cue for {Command} on socket: {Id}.", noticeOutcome, commandInfo.Name, socket.Id);
+                }
             }
 
             _logger.LogWarning("Dead-lettered a failing server-initiated command and notified the client: {CommandInfo} on socket: {Id}", commandInfo, socket.Id);
