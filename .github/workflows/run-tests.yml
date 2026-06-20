@@ -62,7 +62,10 @@ jobs:
             - 'UI/**'
             - '.github/workflows/**'
 
-  test-backend:
+  # Non-test backend verifications (codegen drift + formatter), split out of test-backend so that
+  # job is left with just build + tests/coverage (its longest path). Both checks need the build, so
+  # this job builds independently and runs in parallel with test-backend rather than chaining off it.
+  verify-backend:
     needs: [detect-changes]
     # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
     if: |
@@ -73,8 +76,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Install .NET Core
       uses: actions/setup-dotnet@v5
@@ -106,6 +107,66 @@ jobs:
       # --no-restore reuses the restore/build from "Build solution" above; without it dotnet format
       # triggers its own implicit restore + MSBuild evaluation (mirrors the codegen/coverage steps).
       run: dotnet format --verify-no-changes --no-restore
+
+  # Non-test frontend verification (ESLint + svelte-check, both via `npm run lint`), split out of
+  # test-frontend so that job is left with just the unit-test + coverage run. Runs in parallel.
+  verify-frontend:
+    needs: [detect-changes]
+    # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.frontend == 'true')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: UI
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Set up Node
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: UI/.nvmrc
+        cache: npm
+        cache-dependency-path: UI/package-lock.json
+
+    - name: Install node modules
+      run: npm ci
+
+    - name: Run lint (ESLint + svelte-check)
+      run: npm run lint
+
+  test-backend:
+    needs: [detect-changes]
+    # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET Core
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v5
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+
+    - name: Build solution
+      run: dotnet build
 
     - name: Execute tests with coverage gate
       # build/coverage.ps1 restores the coverage tools, collects one merged Cobertura across the whole
@@ -160,9 +221,6 @@ jobs:
       # .nvmrc (see "Set up Node"); keep local dev on that same version (`nvm use`) or the lock can
       # drift — the optional WASM-runtime deps are recorded differently across npm versions.
       run: npm ci
-
-    - name: Run ESLint
-      run: npm run lint
 
     - name: Run unit tests
       run: npm run test:unit:ci
@@ -296,7 +354,7 @@ jobs:
     # skipped (path-filtered out); fails if any job failed or was cancelled, including
     # detect-changes itself (a change-detection failure should block the PR, not silently skip tests).
     if: always()
-    needs: [detect-changes, test-backend, test-frontend, test-e2e]
+    needs: [detect-changes, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
     runs-on: ubuntu-latest
     steps:
     - name: Verify all jobs passed or were skipped
