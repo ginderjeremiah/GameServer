@@ -18,14 +18,9 @@ namespace Game.Application.Events
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
-            // Progress is loaded per battle (a cache-first, typically warm Redis read) rather than co-located
-            // in memory with the player for the connection's lifetime. That is deliberate: progress is a
-            // separate write-behind aggregate under its own key precisely to keep it off the player blob, which
-            // is re-serialized in full on every save and would otherwise grow with the stat set (see
-            // docs/backend-persistence.md). Co-locating it would either fold it back into that blob (the bloat
-            // the split avoids) or require a connection-scoped holder reachable from this application-layer
-            // handler — which only sees the player aggregate, not the presentation-layer session — so the
-            // per-battle load is accepted over inverting that dependency to save one warm cache read.
+            // Progress is loaded per battle (a cache-first, typically warm read) rather than co-located in
+            // memory with the player — a deliberate trade-off of the separate write-behind key. See
+            // docs/backend-persistence.md (write-behind player cache) for why co-location is rejected.
             var progress = await _progressRepo.Load(domainEvent.Player, cancellationToken);
 
             var touchedStatistics = progress.RecordBattleCompleted(
