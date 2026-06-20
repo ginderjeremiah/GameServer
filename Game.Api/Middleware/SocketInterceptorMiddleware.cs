@@ -19,11 +19,16 @@ namespace Game.Api.Middleware
             }
             else if (!sessionService.Authenticated)
             {
+                // The socket isn't upgraded yet, so a body can still be written: return the project's
+                // { errorMessage } envelope rather than a bare status code.
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(ApiResponse.Error("Authentication is required to open a socket connection."), context.RequestAborted);
             }
             else if (!context.WebSockets.IsWebSocketRequest)
             {
+                // As above, a body is still writable before the (here, absent) upgrade.
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(ApiResponse.Error("The /socket endpoint requires a WebSocket upgrade request."), context.RequestAborted);
             }
             else if (!await TryLoadPlayer(sessionService, sessionInitializer, scopeFactory, context.RequestAborted))
             {

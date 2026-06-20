@@ -1,4 +1,5 @@
 using Game.Api;
+using Game.Api.Models.Common;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -77,6 +78,35 @@ namespace Game.Api.Tests.Integration
 
             await Assert.ThrowsAnyAsync<Exception>(
                 () => wsClient.ConnectAsync(new Uri("ws://localhost/socket"), CancellationToken));
+        }
+
+        [Fact]
+        public async Task Socket_Unauthenticated_ReturnsErrorEnvelope()
+        {
+            // A plain HTTP request to /socket with no token short-circuits to 401 before any upgrade, so the
+            // body carries the project's { errorMessage } envelope rather than being empty.
+            var response = await Client.GetAsync("/socket", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(body);
+            Assert.False(string.IsNullOrWhiteSpace(body.ErrorMessage));
+        }
+
+        [Fact]
+        public async Task Socket_AuthenticatedButNotWebSocketUpgrade_ReturnsErrorEnvelope()
+        {
+            // An authenticated but non-upgrade request to /socket short-circuits to 400 before any upgrade, so
+            // the body carries the { errorMessage } envelope rather than being empty.
+            var (userId, playerId) = await SeedAsync();
+            var authedClient = CreateAuthenticatedClient(userId, playerId);
+
+            var response = await authedClient.GetAsync("/socket", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(body);
+            Assert.False(string.IsNullOrWhiteSpace(body.ErrorMessage));
         }
 
         [Fact]
