@@ -30,11 +30,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 .Where(pa => pa.PlayerId == evt.PlayerId)
                 .ToListAsync();
 
-            // Group-by-first rather than ToDictionary: the (player, attribute) primary key makes a duplicate
-            // impossible, but taking the first per key keeps a stray duplicate row from throwing here.
-            var rowsByAttributeId = currentRows
-                .GroupBy(pa => pa.AttributeId)
-                .ToDictionary(g => g.Key, g => g.First());
+            // The (player, attribute) primary key makes a duplicate impossible; ToFirstByKey still defends
+            // against a stray duplicate row throwing here (see InsertIfMissingAsync's sibling helper).
+            var rowsByAttributeId = currentRows.ToFirstByKey(pa => pa.AttributeId);
 
             foreach (var alloc in evt.Allocations)
             {

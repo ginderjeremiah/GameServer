@@ -44,12 +44,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                         && typeIds.Contains(ps.StatisticTypeId)
                         && entityIds.Contains(ps.EntityId))
                     .ToListAsync();
-                // Group-by-first rather than ToDictionary: the unique index makes a duplicate (type, entity)
-                // impossible, but taking the first per key keeps a stray duplicate row from throwing here and
-                // permanently poisoning this player's progress stream.
-                var byKey = existing
-                    .GroupBy(ps => (ps.StatisticTypeId, ps.EntityId))
-                    .ToDictionary(g => g.Key, g => g.First());
+                // The unique index makes a duplicate (type, entity) impossible; ToFirstByKey still defends
+                // against a stray duplicate row throwing here and poisoning this player's progress stream.
+                var byKey = existing.ToFirstByKey(ps => (ps.StatisticTypeId, ps.EntityId));
 
                 foreach (var stat in evt.Statistics)
                 {
@@ -76,12 +73,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 var existing = await context.PlayerChallenges
                     .Where(pc => pc.PlayerId == evt.PlayerId && challengeIds.Contains(pc.ChallengeId))
                     .ToListAsync();
-                // Group-by-first for the same reason as the statistics lookup above: the (player, challenge)
-                // primary key makes a duplicate impossible, but defending the grouping keeps a stray duplicate
-                // from throwing and poisoning the stream.
-                var byId = existing
-                    .GroupBy(pc => pc.ChallengeId)
-                    .ToDictionary(g => g.Key, g => g.First());
+                // Same defensive grouping as the statistics lookup above: the (player, challenge) primary key
+                // makes a duplicate impossible, but ToFirstByKey keeps a stray duplicate from poisoning it.
+                var byId = existing.ToFirstByKey(pc => pc.ChallengeId);
 
                 foreach (var challenge in evt.Challenges)
                 {
