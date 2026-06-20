@@ -44,7 +44,9 @@ namespace Game.DataAccess.Repositories.Admin
                     Description = item.Description,
                     IconPath = item.IconPath,
                     RetiredAt = item.RetiredAt,
-                }));
+                }),
+                key: item => item.Id,
+                resourceName: "skill");
         }
 
         public AdminSaveResult SetMultipliers(AddEditAttributesData data)
@@ -57,7 +59,7 @@ namespace Game.DataAccess.Repositories.Admin
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Skill
             // back-reference would drag the whole graph into the change tracker).
-            AttributeChangeSetProcessor.Apply(data.Changes, skill.SkillDamageMultipliers,
+            return AttributeChangeSetProcessor.Apply(data.Changes, skill.SkillDamageMultipliers,
                 existingKey: att => att.AttributeId,
                 toEntity: attribute => new Entities.SkillDamageMultiplier
                 {
@@ -65,9 +67,8 @@ namespace Game.DataAccess.Repositories.Admin
                     AttributeId = (int)attribute.AttributeId,
                     Multiplier = attribute.Amount,
                 },
-                _entityStore);
-
-            return AdminSaveResult.Success;
+                _entityStore,
+                resourceName: "skill damage multiplier");
         }
 
         public AdminSaveResult SetEffects(SetSkillEffectsData data)
@@ -124,7 +125,9 @@ namespace Game.DataAccess.Repositories.Admin
                             Id = effect.Id,
                         });
                     }
-                });
+                },
+                key: effect => effect.Id,
+                resourceName: "skill effect");
         }
     }
 }

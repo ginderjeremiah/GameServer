@@ -44,7 +44,9 @@ namespace Game.DataAccess.Repositories.Admin
                     ItemModTypeId = (int)item.ItemModTypeId,
                     RarityId = (int)item.RarityId,
                     RetiredAt = item.RetiredAt,
-                }));
+                }),
+                key: item => item.Id,
+                resourceName: "item mod");
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)
@@ -57,7 +59,7 @@ namespace Game.DataAccess.Repositories.Admin
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded ItemMod
             // back-reference would drag the whole graph into the change tracker).
-            AttributeChangeSetProcessor.Apply(data.Changes, itemMod.ItemModAttributes,
+            return AttributeChangeSetProcessor.Apply(data.Changes, itemMod.ItemModAttributes,
                 existingKey: att => att.AttributeId,
                 toEntity: attribute => new Entities.ItemModAttribute
                 {
@@ -65,9 +67,8 @@ namespace Game.DataAccess.Repositories.Admin
                     AttributeId = (int)attribute.AttributeId,
                     Amount = attribute.Amount,
                 },
-                _entityStore);
-
-            return AdminSaveResult.Success;
+                _entityStore,
+                resourceName: "item mod attribute");
         }
 
         public async Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default)
