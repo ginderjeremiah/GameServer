@@ -206,11 +206,12 @@ describe('StatisticsData.isEmpty', () => {
 });
 
 describe('StatisticsView navigation', () => {
-	it('initialises to the by-statistic view on the first enemy', () => {
+	it('initialises to the by-statistic view, defaulting the by-entity kind to zone', () => {
 		const view = seededView();
 		expect(view.mode).toBe('stat');
 		expect(view.statCat).toBe('combat');
-		expect(view.entKind).toBe('enemy');
+		// Enemies open in the Codex now, so the in-place by-entity view defaults to a kind it can show.
+		expect(view.entKind).toBe('zone');
 		expect(view.entId).toBe(0);
 	});
 
@@ -228,6 +229,14 @@ describe('StatisticsView navigation', () => {
 		expect(view.entKind).toBe('skill');
 		expect(view.entId).toBe(0);
 		expect(view.query).toBe('');
+	});
+
+	it('switchKind to enemy opens the Codex instead of an in-place dossier', () => {
+		const view = seededView();
+		view.switchKind('enemy');
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies' });
+		// The in-place kind is left as-is (no enemy dossier).
+		expect(view.entKind).toBe('zone');
 	});
 
 	it('goEntity pivots into an entity dossier', () => {
@@ -265,6 +274,7 @@ describe('StatisticsView navigation', () => {
 
 	it('filters entities by the search query', () => {
 		const view = seededView();
+		view.entKind = 'enemy';
 		view.setQuery('gob');
 		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
 	});
@@ -281,6 +291,7 @@ describe('StatisticsView navigation', () => {
 
 	it('falls back to the unfiltered list head (not the search box) when entId is unresolved', () => {
 		const view = seededView();
+		view.entKind = 'enemy';
 		view.mode = 'entity';
 		// An entId that resolves to no concrete entity for the kind (e.g. initial
 		// state or a kind-switch landing on a missing id).

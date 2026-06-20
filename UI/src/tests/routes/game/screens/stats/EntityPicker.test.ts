@@ -30,9 +30,17 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+// The picker renders whatever kind the view is on. Enemies no longer have an in-place default
+// (they open the Codex), so the enemy-kind cases set the kind directly rather than via switchKind.
+function enemyView(): StatisticsView {
+	const view = new StatisticsView();
+	view.entKind = 'enemy';
+	return view;
+}
+
 describe('EntityPicker', () => {
 	it('lists the entities of the active kind and tags a boss enemy', () => {
-		render(EntityPicker, { props: { view: new StatisticsView() } });
+		render(EntityPicker, { props: { view: enemyView() } });
 
 		expect(screen.getByText('Cave Bat')).toBeTruthy();
 		expect(screen.getByText('Goblin')).toBeTruthy();
@@ -41,7 +49,7 @@ describe('EntityPicker', () => {
 	});
 
 	it('filters the list by the search query', async () => {
-		render(EntityPicker, { props: { view: new StatisticsView() } });
+		render(EntityPicker, { props: { view: enemyView() } });
 
 		await fireEvent.input(screen.getByLabelText('Search enemies'), { target: { value: 'gob' } });
 
@@ -50,7 +58,7 @@ describe('EntityPicker', () => {
 	});
 
 	it('shows an empty state when nothing matches', async () => {
-		render(EntityPicker, { props: { view: new StatisticsView() } });
+		render(EntityPicker, { props: { view: enemyView() } });
 
 		await fireEvent.input(screen.getByLabelText('Search enemies'), { target: { value: 'zzzzz' } });
 
@@ -58,7 +66,7 @@ describe('EntityPicker', () => {
 	});
 
 	it('deep-links an enemy to the Codex dossier instead of selecting it in place', async () => {
-		const view = new StatisticsView();
+		const view = enemyView();
 		render(EntityPicker, { props: { view } });
 
 		await fireEvent.click(screen.getByTestId('entity-1'));

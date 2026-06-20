@@ -324,8 +324,9 @@ export class StatisticsView {
 	mode = $state<ViewMode>('stat');
 	/** Active category tab in the "by statistic" view (or `all`). */
 	statCat = $state<StatCategory | 'all'>('combat');
-	/** Active entity-kind tab in the "by entity" view. */
-	entKind = $state<StatEntityKind>('enemy');
+	/** Active entity-kind tab in the "by entity" view. Defaults to a kind with an in-place dossier
+	 *  (zone) — the enemy kind now opens the Codex instead (see {@link switchKind}). */
+	entKind = $state<StatEntityKind>('zone');
 	/** Selected entity id in the "by entity" view. */
 	entId = $state<number>(0);
 	/** Entity-picker search query. */
@@ -376,8 +377,15 @@ export class StatisticsView {
 		this.query = query;
 	}
 
-	/** Switch entity kind, resetting the selection + search to that kind. */
+	/** Switch entity kind, resetting the selection + search to that kind. The Enemy kind opens the
+	 *  Codex instead — enemy reference data and per-entity stats live there now, so an in-place enemy
+	 *  dossier would be a dead-end (every enemy click deep-links to the Codex). Zones/skills stay in
+	 *  place until the Codex gains those tabs (#999). */
 	switchKind(kind: StatEntityKind): void {
+		if (kind === 'enemy') {
+			navigation.requestScreen('codex', { tab: 'enemies' } satisfies CodexNavPayload);
+			return;
+		}
 		this.entKind = kind;
 		this.entId = this.data.entityList(kind)[0]?.id ?? 0;
 		this.query = '';
