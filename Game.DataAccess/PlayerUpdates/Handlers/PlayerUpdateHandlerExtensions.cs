@@ -18,6 +18,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
         /// so the unique-violation catch absorbs that race as a benign no-op — the table's unique key already
         /// holds the row. Re-applying therefore always converges to a single row.
         /// </summary>
+        /// <remarks>
+        /// Takes no <c>CancellationToken</c> by design — see <see cref="IPlayerUpdateHandler{TEvent}"/> (#1029).
+        /// </remarks>
         public static async Task InsertIfMissingAsync<TEntity>(
             this GameContext context,
             Expression<Func<TEntity, bool>> existsPredicate,
