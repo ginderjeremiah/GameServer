@@ -96,6 +96,18 @@ describe('RenderEngine', () => {
 			expect(renderUpdates[0][1]).toBe(40); // 2000 − 1960
 		});
 
+		it('floors logicalDelta at 0 when the logical clock runs ahead of the render clock', () => {
+			// The logical engine's tab-background catch-up branch advances logicEngine.time by the discarded
+			// excess, which can momentarily push it past the render clock. A negative logicalDelta would drive
+			// the render-only charge/effect interpolation backwards for a frame, so it is clamped to ≥ 0.
+			performanceNow = 1000;
+			logicEngineStub.time = 1080; // logical clock 80ms ahead of the render clock
+			engine.start();
+
+			expect(renderUpdates[0][1]).toBe(0);
+			expect(engine.logicalDelta).toBe(0);
+		});
+
 		it('updates the time property to the current performance timestamp each frame', () => {
 			performanceNow = 500;
 			engine.start();

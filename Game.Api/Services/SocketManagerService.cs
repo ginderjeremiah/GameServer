@@ -48,11 +48,6 @@ namespace Game.Api.Services
             var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId, SocketPresenceTtl);
             try
             {
-                if (oldSocketId is not null)
-                {
-                    await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
-                }
-
                 await RegisterSocketCommandListener(socketHandler);
                 // Register before starting the loops so the registry tracks the socket — and threads its
                 // shutdown tokens into Listen — for a graceful drain on host shutdown (#526). Awaited because
@@ -64,8 +59,25 @@ namespace Game.Api.Services
                 // A step after the presence-key write failed, so the key now points at a socket whose drain
                 // loops never started — a "registered but dead" presence that would block the player and never
                 // drain. Undo the partial registration before propagating.
-                await RollbackRegistration(socketContext);
+                await TeardownSocketRegistration(socketContext, "rolling back a failed registration");
                 throw;
+            }
+
+            // Signal the replaced connection to close only now that the new socket is fully established.
+            // Emitting it before the registration above would, on a transient fault there (which rolls the new
+            // registration back), leave the player with a closing old connection and no working new one. This
+            // is best-effort: a failure here just leaves the old socket to its own inactivity teardown rather
+            // than tearing down the live new connection over a notification the old socket no longer needs.
+            if (oldSocketId is not null)
+            {
+                try
+                {
+                    await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to notify replaced socket {OldSocketId} for player {PlayerId}; it will be cleaned up by its own inactivity teardown.", oldSocketId, playerId);
+                }
             }
 
             _logger.LogDebug("Initiated socket for player: ({Id}), with Id: {SocketId}", playerId, socketContext.SocketId);
@@ -73,12 +85,15 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Undoes a partially-completed <see cref="RegisterSocket"/> after the presence key was written but a
-        /// later step threw: drop our presence claim (only if it is still ours) and tear down any subscription
-        /// and registry tracking. Each step is best-effort and guarded so a cleanup fault can't mask the
-        /// original registration exception that is about to propagate.
+        /// Best-effort teardown of a socket's registration — used both for a clean disconnect
+        /// (<see cref="UnRegisterSocket"/>) and to roll back a partially-completed <see cref="RegisterSocket"/>.
+        /// Drops registry tracking, unsubscribes the command listener, and releases the presence claim (only
+        /// if it is still ours). Each awaited step is guarded so a fault in one can't skip the others — most
+        /// importantly the presence-key release, which a ghost session would otherwise survive on until its
+        /// TTL — and so a cleanup fault on the rollback path can't mask the registration exception about to
+        /// propagate. <paramref name="reason"/> labels the teardown in the failure logs.
         /// </summary>
-        private async Task RollbackRegistration(SocketContext context)
+        private async Task TeardownSocketRegistration(SocketContext context, string reason)
         {
             _socketRegistry.Unregister(context.SocketId);
             try
@@ -87,18 +102,18 @@ namespace Game.Api.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to unsubscribe socket {SocketId} while rolling back a failed registration.", context.SocketId);
+                _logger.LogError(ex, "Failed to unsubscribe socket {SocketId} while {Reason}.", context.SocketId, reason);
             }
 
             try
             {
                 // Compare-and-delete so we only release the key while it is still ours — a newer connection may
-                // have taken it over between our write and this rollback, and that key must be left intact.
+                // have taken it over, and that key must be left intact.
                 await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to release the presence key for socket {SocketId} while rolling back a failed registration.", context.SocketId);
+                _logger.LogError(ex, "Failed to release the presence key for socket {SocketId} while {Reason}.", context.SocketId, reason);
             }
         }
 
@@ -123,11 +138,12 @@ namespace Game.Api.Services
             await _cache.Expire(CurrentSocketKey(playerId), SocketPresenceTtl);
         }
 
-        public async Task UnRegisterSocket(SocketContext context)
+        public Task UnRegisterSocket(SocketContext context)
         {
-            _socketRegistry.Unregister(context.SocketId);
-            await UnRegisterSocketCommandListener(context.SocketId);
-            await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
+            // A clean disconnect shares the same guarded best-effort steps as a registration rollback: if the
+            // unsubscribe throws, the presence-key release must still run so the key can't survive its full
+            // TTL reporting a ghost session that makes HasActiveSocket lie until it expires.
+            return TeardownSocketRegistration(context, "tearing down the socket");
         }
 
         public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
@@ -161,10 +177,22 @@ namespace Game.Api.Services
             await _pubSub.Subscribe(channel, queueName, async args => await processor(args.queue), handler.Id);
         }
 
+        /// <summary>
+        /// The number of consecutive dequeue failures after which the command processor abandons its drain
+        /// loop rather than hot-spinning. A sustained fault (Redis unreachable, or a throw before the pop)
+        /// would otherwise tight-loop hammering Redis and the log for the life of the connection; the socket
+        /// re-establishes its subscription on reconnect.
+        /// </summary>
+        internal const int MaxConsecutiveDequeueFailures = 5;
+
+        /// <summary>Base backoff between consecutive dequeue failures, scaled by the failure streak.</summary>
+        private static readonly TimeSpan DequeueFailureBackoff = TimeSpan.FromMilliseconds(100);
+
         private Func<IPubSubQueue, Task> GetSocketCommandProcessor(SocketHandler socket)
         {
             return async (queue) =>
             {
+                var consecutiveFailures = 0;
                 while (true)
                 {
                     SocketCommandInfo? nextCommandInfo;
@@ -180,8 +208,21 @@ namespace Game.Api.Services
                         // GetNextAsync before deserialization throws, so skipping it advances the queue; a
                         // transient blip is retried on the next pass.
                         _logger.LogError(ex, "An error occurred while dequeuing a socket command on socket: {Id}, playerId: {PlayerId}.", socket.Id, socket.PlayerId);
+
+                        // Bound a persistent fault: a hot retry loop would hammer Redis and the log for the
+                        // life of the connection. Back off (scaled by the streak) and give up past a ceiling —
+                        // the socket re-establishes its subscription on reconnect.
+                        if (++consecutiveFailures >= MaxConsecutiveDequeueFailures)
+                        {
+                            _logger.LogError("Abandoning the command processor for socket: {Id}, playerId: {PlayerId} after {FailureCount} consecutive dequeue failures; it will re-establish on reconnect.", socket.Id, socket.PlayerId, consecutiveFailures);
+                            break;
+                        }
+
+                        await Task.Delay(DequeueFailureBackoff * consecutiveFailures);
                         continue;
                     }
+
+                    consecutiveFailures = 0;
 
                     if (nextCommandInfo is null)
                     {

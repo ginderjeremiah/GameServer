@@ -4,8 +4,8 @@
     {
         public string? GetNext();
         public T? GetNext<T>();
-        public Task<string?> GetNextAsync();
-        public Task<T?> GetNextAsync<T>();
+        public Task<string?> GetNextAsync(CancellationToken cancellationToken = default);
+        public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Atomically moves the next item from the head of this queue onto a side processing list and returns it
@@ -14,43 +14,43 @@
         /// Acknowledge it with <see cref="AcknowledgeAsync"/> once it has been durably applied, and recover items
         /// orphaned by a crashed run with <see cref="ReclaimProcessingAsync"/>.
         /// </summary>
-        public Task<string?> ReserveNextAsync();
+        public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Removes an item reserved by <see cref="ReserveNextAsync"/> from the processing list once it has been
         /// durably applied (the acknowledgement). Acknowledging an item already gone (e.g. one another run has
         /// reclaimed) is a no-op.
         /// </summary>
-        public Task AcknowledgeAsync(string value);
+        public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Moves every item left on the processing list — orphaned when a previous run crashed between reserving
         /// and acknowledging — back onto the head of this queue in their original order, so they are re-processed
         /// rather than stranded. Returns the number of items reclaimed.
         /// </summary>
-        public Task<long> ReclaimProcessingAsync();
+        public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default);
 
         /// <summary>The current number of items waiting on this queue (e.g. to surface dead-letter-queue depth).</summary>
-        public Task<long> GetLengthAsync();
+        public Task<long> GetLengthAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns up to <paramref name="count"/> items from the head of the queue (oldest first) WITHOUT
         /// removing them — a non-destructive read. Lets a dead-letter queue be inspected without the
         /// at-most-once exposure a destructive pop would reintroduce. A non-positive count returns an empty list.
         /// </summary>
-        public Task<IReadOnlyList<string>> PeekAsync(long count);
+        public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Removes a single occurrence of <paramref name="value"/> from this queue, returning true when one
         /// was removed. Used to acknowledge a dead-letter entry off the queue once it has been re-enqueued
         /// for replay; a no-op (false) when no matching entry remains.
         /// </summary>
-        public Task<bool> RemoveAsync(string value);
+        public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default);
 
         public void AddToQueue(string value);
         public void AddToQueue<T>(T value);
-        public Task AddToQueueAsync(string value);
-        public Task AddToQueueAsync<T>(T value);
+        public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default);
+        public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Pushes multiple values onto the queue in a single round-trip (one multi-value LPUSH),
@@ -58,6 +58,6 @@
         /// Named distinctly from <see cref="AddToQueueAsync{T}(T)"/> so passing a concrete
         /// collection (e.g. <c>string[]</c>) can't bind to the single-value generic overload instead.
         /// </summary>
-        public Task AddRangeToQueueAsync(IEnumerable<string> values);
+        public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default);
     }
 }

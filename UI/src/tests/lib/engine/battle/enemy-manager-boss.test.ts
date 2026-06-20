@@ -404,6 +404,32 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
+	it('abandons the auto-fight re-challenge when a retreat lands during the victory overlay', async () => {
+		// The third resolveBossVictory await boundary: a retreat that lands while the handler is parked on the
+		// Zone-Cleared overlay delay (auto-fight on) must abandon at the overlay's bossLoopActive re-check
+		// rather than re-challenging the boss over the new idle fight.
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		// Gate the (only) overlay delay so a retreat can interleave while the victory handler is parked on it.
+		let releaseOverlay!: () => void;
+		vi.mocked(delay).mockReturnValueOnce(new Promise<void>((resolve) => (releaseOverlay = resolve)));
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // claim + zone clear settle; the handler parks on the overlay delay
+		const challengeCallsBefore = send.mock.calls.filter((c: unknown[]) => c[0] === 'ChallengeBoss').length;
+
+		const retreated = manager.retreatFromBoss();
+		releaseOverlay();
+		await Promise.all([handled, retreated]);
+
+		// The retreat transitioned to the idle loop; the parked victory resolution bailed instead of issuing
+		// another ChallengeBoss, and the idle enemy stands.
+		expect(manager.mode).toBe('idle');
+		expect(send.mock.calls.filter((c: unknown[]) => c[0] === 'ChallengeBoss').length).toBe(challengeCallsBefore);
+		expect(manager.bossOutcome).toBeUndefined();
+		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
 	it('on a boss loss: records it, turns auto-fight off, and returns to the idle loop honoring the cooldown', async () => {
 		await manager.challengeBoss();
 		manager.setAutoFight(true);

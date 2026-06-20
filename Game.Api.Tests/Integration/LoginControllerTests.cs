@@ -123,6 +123,39 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Login_BannedUser_ReturnsErrorAndEstablishesNoSession()
+        {
+            // A banned account with otherwise-correct credentials is rejected in the auth path: no tokens
+            // are issued and no session is established.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "bannedlogin", "bannedpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            user.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var creds = new { Username = "bannedlogin", Password = "bannedpass" };
+
+            // Act
+            var response = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+
+            // Assert — the login is rejected with a structured error and no body data.
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+            Assert.Null(result.Data);
+
+            // No session is established for the rejected login.
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            Assert.Null(await sessionStore.GetSession(user.Id));
+        }
+
+        [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
             // Arrange — CreateAccount inserts PlayerSkills with SkillId 0, 1, 2

@@ -786,6 +786,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StopAsync_WedgedReserveDuringDrain_UnwindsPromptlyViaThreadedToken()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+
+            // The reserve wedges (a stand-in for a stuck Redis round-trip) and only unwinds if the synchronizer
+            // threads a cancelable token into it — exactly the refinement this exercises. The drain timeout is
+            // generous so a prompt unwind is provably the threaded token at work, not the bounded give-up firing.
+            var wedgedQueue = new WedgedReserveQueue();
+            var pubsub = new SingleQueuePubSubService(wedgedQueue);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(30));
+
+            // The startup drain reserves once and then parks inside the wedged reserve, holding the drain gate.
+            var startTask = synchronizer.StartAsync(CancellationToken.None);
+            await wedgedQueue.ReserveReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(startTask.IsCompleted);
+
+            // Stopping cancels the token threaded into the reserve, so the wedged round-trip unwinds at once rather
+            // than blocking until the drain timeout; the OCE is treated as a clean stop, never surfaced as an error.
+            var stopTask = synchronizer.StopAsync(CancellationToken.None);
+            await Task.WhenAll(startTask.WaitAsync(TimeSpan.FromSeconds(5)), stopTask.WaitAsync(TimeSpan.FromSeconds(5)));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("did not complete"));
+        }
+
+        [Fact]
         public async Task StartAsync_SubscribeThrows_PropagatesException()
         {
             using var scope = CreateScope();
@@ -1078,9 +1105,9 @@ namespace Game.Application.Tests.DataAccess
                 return value;
             }
 
-            public Task<string?> GetNextAsync() => Task.FromResult(GetNext());
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult(GetNext());
 
-            public Task<string?> ReserveNextAsync()
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
             {
                 if (_items.First is null)
                 {
@@ -1093,13 +1120,13 @@ namespace Game.Application.Tests.DataAccess
                 return Task.FromResult(value);
             }
 
-            public Task AcknowledgeAsync(string value)
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
             {
                 _processing.Remove(value);
                 return Task.CompletedTask;
             }
 
-            public Task<long> ReclaimProcessingAsync()
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default)
             {
                 long reclaimed = 0;
                 while (_processing.Last is not null)
@@ -1112,9 +1139,9 @@ namespace Game.Application.Tests.DataAccess
                 return Task.FromResult(reclaimed);
             }
 
-            public Task<long> GetLengthAsync() => Task.FromResult((long)_items.Count);
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
 
-            public Task<IReadOnlyList<string>> PeekAsync(long count)
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
             {
                 IReadOnlyList<string> head = count <= 0
                     ? []
@@ -1122,7 +1149,7 @@ namespace Game.Application.Tests.DataAccess
                 return Task.FromResult(head);
             }
 
-            public Task<bool> RemoveAsync(string value)
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default)
             {
                 var node = _items.Find(value);
                 if (node is null)
@@ -1135,13 +1162,13 @@ namespace Game.Application.Tests.DataAccess
             }
 
             public void AddToQueue(string value) => _items.AddLast(value);
-            public Task AddToQueueAsync(string value)
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)
             {
                 _items.AddLast(value);
                 return Task.CompletedTask;
             }
 
-            public Task AddRangeToQueueAsync(IEnumerable<string> values)
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default)
             {
                 foreach (var value in values)
                 {
@@ -1152,9 +1179,9 @@ namespace Game.Application.Tests.DataAccess
 
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
             public T? GetNext<T>() => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -1179,7 +1206,7 @@ namespace Game.Application.Tests.DataAccess
                 _items = new Queue<string?>(items);
             }
 
-            public async Task<string?> ReserveNextAsync()
+            public async Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
             {
                 var active = Interlocked.Increment(ref _activeReserves);
                 lock (_gate)
@@ -1208,7 +1235,7 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
-            public Task AcknowledgeAsync(string value)
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
             {
                 lock (_gate)
                 {
@@ -1217,7 +1244,7 @@ namespace Game.Application.Tests.DataAccess
                 return Task.CompletedTask;
             }
 
-            public Task<long> GetLengthAsync()
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default)
             {
                 lock (_gate)
                 {
@@ -1226,7 +1253,7 @@ namespace Game.Application.Tests.DataAccess
             }
 
             // The drained-queue assertion uses GetNextAsync to confirm nothing is left waiting.
-            public Task<string?> GetNextAsync()
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
                 lock (_gate)
                 {
@@ -1234,17 +1261,17 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
-            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
-            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
-            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
-            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
-            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -1363,7 +1390,7 @@ namespace Game.Application.Tests.DataAccess
                 _items = new Queue<string>(items);
             }
 
-            public Task<string?> ReserveNextAsync()
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
             {
                 if (_items.Count == 0)
                 {
@@ -1376,7 +1403,7 @@ namespace Game.Application.Tests.DataAccess
                 return Task.FromResult<string?>(value);
             }
 
-            public async Task AcknowledgeAsync(string value)
+            public async Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
             {
                 if (_firstAcknowledge)
                 {
@@ -1388,20 +1415,54 @@ namespace Game.Application.Tests.DataAccess
                 _processing.Remove(value);
             }
 
-            public Task<long> ReclaimProcessingAsync() => Task.FromResult(0L);
-            public Task<long> GetLengthAsync() => Task.FromResult((long)_items.Count);
-            public Task<string?> GetNextAsync() => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
 
-            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
-            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
-            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
-            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubQueue"/> whose <see cref="ReserveNextAsync"/> parks indefinitely — a stand-in for a
+        /// wedged Redis round-trip — and only unwinds when the cancellation token threaded into it is cancelled. It
+        /// signals <see cref="ReserveReached"/> once parked so a test can confirm the drain is genuinely blocked
+        /// inside the reserve before triggering a stop.
+        /// </summary>
+        private sealed class WedgedReserveQueue : IPubSubQueue
+        {
+            public TaskCompletionSource ReserveReached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public async Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
+            {
+                ReserveReached.TrySetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                return null;
+            }
+
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public string? GetNext() => throw new NotSupportedException();
+            public void AddToQueue(string value) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public T? GetNext<T>() => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void AddToQueue<T>(T value) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
