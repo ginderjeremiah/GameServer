@@ -1189,6 +1189,49 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_CurrentZoneOnlySpawnEnemyRetired_RelocatesToNearestViableZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var activeEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Active");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, activeEnemy.Id, skill.Id);
+
+            // strippedZone is live, but its only assigned enemy has been retired — a retired enemy is filtered
+            // out of the spawn tables, so the zone has no spawnable enemies. This is the exact #1051 trigger
+            // (an admin retired every active enemy of a live zone); the runtime safety net must relocate rather
+            // than throw on GetRandomEnemy.
+            var retiredEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Retired Foe");
+            retiredEnemy.RetiredAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var viableZone = await TestDataSeeder.CreateZoneAsync(context, "Viable", order: 0);
+            var strippedZone = await TestDataSeeder.CreateZoneAsync(context, "Stripped", order: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, viableZone.Id, activeEnemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, strippedZone.Id, retiredEnemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: strippedZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: strippedZone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(viableZone.Id, player.CurrentZoneId);
+            Assert.Equal(viableZone.Id, state.BattleZoneId);
+        }
+
+        [Fact]
         public async Task StartBossBattle_RetiredZone_ReturnsNullAndStartsNoBattle()
         {
             using var scope = CreateScope();

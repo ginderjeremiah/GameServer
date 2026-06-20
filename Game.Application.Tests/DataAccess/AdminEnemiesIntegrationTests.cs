@@ -349,5 +349,238 @@ namespace Game.Application.Tests.DataAccess
             Assert.False(result.Succeeded);
             Assert.Equal("Enemy not found.", result.ErrorMessage);
         }
+
+        [Fact]
+        public async Task SaveEnemies_RetiringLastActiveEnemyOfLiveZone_ReturnsFailure()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Lone Goblin");
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest");
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Retiring the only spawn enemy of a live zone would drop that zone from the spawn tables and
+            // throw at the next idle encounter, so it must be rejected at save time.
+            var changes = new[] { RetireEnemyChange(enemyId, "Lone Goblin") };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SaveEnemies(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Retiring 'Lone Goblin' would leave live zone 'Forest' with no spawnable enemies. "
+                    + "Retire the zone first, or keep at least one active enemy spawning in it.",
+                result.ErrorMessage);
+
+            // The rejection is up front, before anything is staged: committing the unit of work persists no
+            // retirement, so the enemy stays in circulation.
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await assertContext.Enemies.SingleAsync(e => e.Id == enemyId, CancellationToken);
+            Assert.Null(persisted.RetiredAt);
+        }
+
+        [Fact]
+        public async Task SaveEnemies_RetiringLastEnemyAfterZoneRetired_Succeeds()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Lone Goblin");
+                // The zone is already retired (out of circulation), so its occupants are relocated by the
+                // runtime safety net — retiring its last enemy is allowed.
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest", retiredAt: DateTime.UtcNow);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new[] { RetireEnemyChange(enemyId, "Lone Goblin") };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SaveEnemies(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await assertContext.Enemies.SingleAsync(e => e.Id == enemyId, CancellationToken);
+            Assert.NotNull(persisted.RetiredAt);
+        }
+
+        [Fact]
+        public async Task SaveEnemies_RetiringEnemyWhenZoneKeepsAnotherActiveEnemy_Succeeds()
+        {
+            int retiredEnemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var toRetire = await TestDataSeeder.CreateEnemyAsync(context, "First Goblin");
+                var survivor = await TestDataSeeder.CreateEnemyAsync(context, "Second Goblin");
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest");
+                // Both enemies spawn in the live zone, so retiring one still leaves a spawnable enemy.
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, toRetire.Id);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, survivor.Id);
+                retiredEnemyId = toRetire.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new[] { RetireEnemyChange(retiredEnemyId, "First Goblin") };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SaveEnemies(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await assertContext.Enemies.SingleAsync(e => e.Id == retiredEnemyId, CancellationToken);
+            Assert.NotNull(persisted.RetiredAt);
+        }
+
+        [Fact]
+        public async Task SaveEnemies_RetiringEnemyWithNoZoneSpawns_Succeeds()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // An enemy assigned to no zone cannot strand a zone, so the guard does not apply.
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Unassigned Goblin");
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new[] { RetireEnemyChange(enemyId, "Unassigned Goblin") };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SaveEnemies(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await assertContext.Enemies.SingleAsync(e => e.Id == enemyId, CancellationToken);
+            Assert.NotNull(persisted.RetiredAt);
+        }
+
+        [Fact]
+        public async Task SaveEnemies_RetiringLastActiveEnemyWhileReinstatingSibling_Succeeds()
+        {
+            int retiredId, reinstatedId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var toRetire = await TestDataSeeder.CreateEnemyAsync(context, "Active Goblin");
+                var toReinstate = await TestDataSeeder.CreateEnemyAsync(context, "Dormant Goblin");
+                // The sibling starts retired (out of the spawn table), so the live zone's only active spawner
+                // is the one this save retires — but the same batch reinstates the sibling.
+                toReinstate.RetiredAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest");
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, toRetire.Id);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, toReinstate.Id);
+                retiredId = toRetire.Id;
+                reinstatedId = toReinstate.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Post-save the zone keeps a spawnable enemy (the reinstated sibling), so the batch is allowed even
+            // though, taken alone, retiring the only currently-active spawner would strand the zone.
+            var changes = new[]
+            {
+                EnemyEditChange(retiredId, "Active Goblin", DateTime.UtcNow),
+                EnemyEditChange(reinstatedId, "Dormant Goblin", retiredAt: null),
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SaveEnemies(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var retired = await assertContext.Enemies.SingleAsync(e => e.Id == retiredId, CancellationToken);
+            var reinstated = await assertContext.Enemies.SingleAsync(e => e.Id == reinstatedId, CancellationToken);
+            Assert.NotNull(retired.RetiredAt);
+            Assert.Null(reinstated.RetiredAt);
+        }
+
+        [Fact]
+        public async Task SaveEnemies_BatchRetiringAllActiveEnemiesOfLiveZone_ReturnsFailure()
+        {
+            int firstId, secondId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var first = await TestDataSeeder.CreateEnemyAsync(context, "First Goblin");
+                var second = await TestDataSeeder.CreateEnemyAsync(context, "Second Goblin");
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest");
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, first.Id);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, second.Id);
+                firstId = first.Id;
+                secondId = second.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Neither enemy is individually the last active spawner, but retiring both in one batch empties the
+            // live zone — the post-save projection catches it and rejects the batch once.
+            var changes = new[]
+            {
+                EnemyEditChange(firstId, "First Goblin", DateTime.UtcNow),
+                EnemyEditChange(secondId, "Second Goblin", DateTime.UtcNow),
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SaveEnemies(changes);
+
+            Assert.False(result.Succeeded);
+            // Both stranded enemies are named (order follows the zone's spawn-table membership, which is not
+            // guaranteed), and the zone and remedy are spelled out.
+            Assert.NotNull(result.ErrorMessage);
+            Assert.Contains("'First Goblin'", result.ErrorMessage);
+            Assert.Contains("'Second Goblin'", result.ErrorMessage);
+            Assert.Contains("would leave live zone 'Forest' with no spawnable enemies", result.ErrorMessage);
+        }
+
+        // An Edit change that sets the enemy's retirement to <paramref name="retiredAt"/> (a timestamp retires,
+        // null reinstates). Mirrors the whole-record edit the admin Workbench sends — identity plus the flag,
+        // with empty related collections.
+        private static Change<Contracts.Enemy> EnemyEditChange(int enemyId, string name, DateTime? retiredAt) => new()
+        {
+            ChangeType = EChangeType.Edit,
+            Item = new Contracts.Enemy
+            {
+                Id = enemyId,
+                Name = name,
+                IsBoss = false,
+                RetiredAt = retiredAt,
+                AttributeDistribution = [],
+                SkillPool = [],
+                Spawns = [],
+            },
+        };
+
+        // An Edit change that retires the enemy (stamps RetiredAt).
+        private static Change<Contracts.Enemy> RetireEnemyChange(int enemyId, string name) =>
+            EnemyEditChange(enemyId, name, DateTime.UtcNow);
     }
 }
