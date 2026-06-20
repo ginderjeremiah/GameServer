@@ -60,32 +60,86 @@ namespace Game.DataAccess
 
         private async Task ReloadAllAsync(CancellationToken cancellationToken)
         {
+            var pending = caches.ToList();
             for (var attempt = 1; attempt <= policy.MaxAttempts; attempt++)
             {
-                try
+                // Retry only the holders that haven't succeeded yet: each reload is a build-then-swap that
+                // leaves the prior snapshot in place on failure, so re-reloading a succeeded holder is wasted work.
+                var failure = await ReloadConcurrentlyAsync(pending, cancellationToken);
+                if (failure is null)
                 {
-                    foreach (var cache in caches)
-                    {
-                        await cache.ReloadAsync(cancellationToken);
-                    }
-
                     return;
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+
+                pending = failure.StillPending;
+                if (attempt < policy.MaxAttempts)
                 {
-                    throw;
-                }
-                catch (Exception ex) when (attempt < policy.MaxAttempts)
-                {
-                    logger.LogWarning(ex, "Background reference-cache reload failed on attempt {Attempt} of {MaxAttempts}; retrying.", attempt, policy.MaxAttempts);
+                    logger.LogWarning(failure.Error, "Background reference-cache reload failed on attempt {Attempt} of {MaxAttempts}; retrying.", attempt, policy.MaxAttempts);
                     await Task.Delay(policy.DelayAfterAttempt(attempt), cancellationToken);
                 }
-                catch (Exception ex)
+                else
                 {
                     // Readers keep serving the previous snapshots; the next notification triggers a fresh sweep.
-                    logger.LogError(ex, "Background reference-cache reload failed after {MaxAttempts} attempts; keeping the current snapshots.", policy.MaxAttempts);
+                    logger.LogError(failure.Error, "Background reference-cache reload failed after {MaxAttempts} attempts; keeping the current snapshots.", policy.MaxAttempts);
                 }
             }
         }
+
+        /// <summary>
+        /// Reloads every still-pending holder concurrently — matching the request-time AdminCacheReloadFilter:
+        /// each rebuilds its snapshot on its own scoped context and swaps it atomically, and no holder depends
+        /// on another's reload order, so a serial pass only adds latency and could leave some sets fresh and
+        /// some stale if one query failed mid-list. Awaits every reload before inspecting results so one
+        /// failure doesn't abandon the others mid-flight, returns <c>null</c> on full success, and rethrows
+        /// promptly on cancellation so the loop unwinds.
+        /// </summary>
+        private static async Task<ReloadFailure?> ReloadConcurrentlyAsync(
+            List<IReloadableReferenceCache> pending,
+            CancellationToken cancellationToken)
+        {
+            // Start every reload, capturing a holder that throws synchronously as a faulted task so it lines up
+            // with the others by index and is retried like any async failure (rather than escaping the await).
+            var reloads = pending.Select(cache => StartReload(cache, cancellationToken)).ToList();
+            try
+            {
+                await Task.WhenAll(reloads);
+                return null;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error)
+            {
+                // Keep the holders whose reload didn't succeed; the succeeded ones drop out so a retry skips
+                // them. Task.WhenAll surfaces only the first fault, which is enough to log the failure cause.
+                var stillPending = new List<IReloadableReferenceCache>();
+                for (var i = 0; i < pending.Count; i++)
+                {
+                    if (!reloads[i].IsCompletedSuccessfully)
+                    {
+                        stillPending.Add(pending[i]);
+                    }
+                }
+
+                return new ReloadFailure(stillPending, error);
+            }
+        }
+
+        /// <summary>Invokes a reload, turning a synchronous throw into a faulted task so the caller can await it uniformly.</summary>
+        private static Task StartReload(IReloadableReferenceCache cache, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return cache.ReloadAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException(ex);
+            }
+        }
+
+        /// <summary>A failed concurrent sweep: the holders still needing a reload and the fault to log.</summary>
+        private sealed record ReloadFailure(List<IReloadableReferenceCache> StillPending, Exception Error);
     }
 }

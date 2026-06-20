@@ -65,6 +65,47 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task RunAsync_Sweep_ReloadsAllHoldersConcurrently()
+        {
+            // Each holder blocks until every holder has entered its reload: a serial sweep would deadlock here
+            // (the second holder never enters until the first returns) and the gate would time out, so the
+            // gate opening proves the reloads ran concurrently rather than back-to-back.
+            var gate = new ConcurrentEntryGate(participants: 3);
+            var holders = new[] { new GatedCache(gate), new GatedCache(gate), new GatedCache(gate) };
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 1, baseDelay: TimeSpan.Zero);
+            await using var harness = new Harness(policy, holders);
+
+            harness.Reloader.NotifyChanged();
+
+            await WaitUntilAsync(() => holders.All(h => h.CompletedReloads == 1), "every holder to reload concurrently");
+        }
+
+        [Fact]
+        public async Task RunAsync_FailureMidSweep_RetriesOnlyTheFailedHolderAndSkipsSucceededOnes()
+        {
+            // The middle holder fails its first attempt; the others succeed. The retry must re-run only the
+            // failed holder, never the already-succeeded ones (re-reloading a succeeded build-then-swap is
+            // wasted work).
+            var first = new RecordingCache();
+            var failing = new RecordingCache { FailFirstAttempts = 1 };
+            var last = new RecordingCache();
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 3, baseDelay: TimeSpan.Zero);
+            await using var harness = new Harness(policy, first, failing, last);
+
+            harness.Reloader.NotifyChanged();
+
+            await WaitUntilAsync(() => failing.CompletedReloads == 1, "the failed holder to succeed on retry");
+            // The succeeded holders ran exactly once; only the failed holder was attempted again.
+            Assert.Equal(1, first.Attempts);
+            Assert.Equal(1, last.Attempts);
+            Assert.Equal(2, failing.Attempts);
+            Assert.Equal(1, first.CompletedReloads);
+            Assert.Equal(1, last.CompletedReloads);
+            Assert.Single(harness.Logs.Entries, e => e.Level == LogLevel.Warning);
+            Assert.DoesNotContain(harness.Logs.Entries, e => e.Level == LogLevel.Error);
+        }
+
+        [Fact]
         public async Task RunAsync_TransientFailure_RetriesAndCompletesTheSweep()
         {
             var cache = new RecordingCache { FailFirstAttempts = 1 };
@@ -203,6 +244,40 @@ namespace Game.Application.Tests.DataAccess
 
                 Interlocked.Increment(ref _completedReloads);
                 return Task.CompletedTask;
+            }
+        }
+
+        /// <summary>
+        /// Releases all participants only once every one of them has entered its reload, so a sweep completes
+        /// iff the reloads ran concurrently — a serial sweep would deadlock waiting for a peer that never starts.
+        /// </summary>
+        private sealed class ConcurrentEntryGate(int participants)
+        {
+            private readonly TaskCompletionSource _allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private int _entered;
+
+            public Task SignalEnteredAndWaitAsync()
+            {
+                if (Interlocked.Increment(ref _entered) == participants)
+                {
+                    _allEntered.TrySetResult();
+                }
+
+                return _allEntered.Task;
+            }
+        }
+
+        /// <summary>A reload that blocks at a shared gate until every gated holder has entered concurrently.</summary>
+        private sealed class GatedCache(ConcurrentEntryGate gate) : IReloadableReferenceCache
+        {
+            private int _completedReloads;
+
+            public int CompletedReloads => Volatile.Read(ref _completedReloads);
+
+            public async Task ReloadAsync(CancellationToken cancellationToken = default)
+            {
+                await gate.SignalEnteredAndWaitAsync();
+                Interlocked.Increment(ref _completedReloads);
             }
         }
 
