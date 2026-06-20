@@ -9,7 +9,7 @@ import {
 	type ISkill,
 	type IZone
 } from '$lib/api';
-import { resolveUnlockReward, zonesUnlockedBy } from '$lib/common';
+import { challengeCompletedMessage, resolveUnlockReward, zonesUnlockedBy, type UnlockReward } from '$lib/common';
 
 const zone = (id: number, order: number, name: string, unlockChallengeId?: number, retiredAt?: string): IZone =>
 	({
@@ -90,5 +90,18 @@ describe('resolveUnlockReward', () => {
 	it('prefers an item over a mod/skill when more than one reward field is set', () => {
 		const reward = resolveUnlockReward(challenge({ rewardItemId: 3, rewardItemModId: 4, rewardSkillId: 5 }), refs);
 		expect(reward?.kind).toBe('item');
+	});
+});
+
+describe('challengeCompletedMessage', () => {
+	it('names the challenge and the reward it unlocked', () => {
+		const reward = { name: 'Iron Helm' } as UnlockReward;
+		expect(challengeCompletedMessage('First Blood', reward)).toBe(
+			'Challenge complete: First Blood — unlocked Iron Helm'
+		);
+	});
+
+	it('announces the completion alone when the challenge grants no reward', () => {
+		expect(challengeCompletedMessage('First Blood', null)).toBe('Challenge complete: First Blood');
 	});
 });

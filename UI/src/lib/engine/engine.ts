@@ -2,12 +2,20 @@ import { onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { BattleEngine } from './battle/battle-engine';
-import { statify, type Action } from '$lib/common';
+import { statify, type Action, resolveUnlockReward, challengeCompletedMessage } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
-import { staticData, statistics, playerChallenges, acknowledgeModal, resetLogs } from '$stores';
+import {
+	staticData,
+	statistics,
+	playerChallenges,
+	acknowledgeModal,
+	resetLogs,
+	toastSuccess,
+	navigation
+} from '$stores';
 import { apiSocket, type IApiSocketResponse } from '$lib/api';
 import { playerManager } from './player/player-manager';
 
@@ -61,9 +69,9 @@ export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCo
 
 /**
  * Applies a completed-challenge push from the server: marks the challenge complete (so completion-gated
- * UI like zone navigation and the reward reveal update without a refetch) and unlocks each reward it
- * carries so the player can use it immediately — equip the item/mod, select the skill — instead of only
- * after a page refresh.
+ * UI like zone navigation and the reward reveal update without a refetch), unlocks each reward it carries
+ * so the player can use it immediately — equip the item/mod, select the skill — instead of only after a
+ * page refresh, and surfaces a success toast announcing the completion and what it unlocked.
  */
 export const handleChallengeCompleted = (response: IApiSocketResponse<'ChallengeCompleted'>) => {
 	const data = response.data;
@@ -87,6 +95,29 @@ export const handleChallengeCompleted = (response: IApiSocketResponse<'Challenge
 	if (data.rewardSkillId != null) {
 		playerManager.addUnlockedSkill(data.rewardSkillId);
 	}
+
+	notifyChallengeCompleted(data.challengeId);
+};
+
+/**
+ * Surfaces a success toast naming the completed challenge and the reward it unlocked, so the player is
+ * told even when the challenge finished on another screen mid-idle. A cross-screen toast is used over the
+ * arena-anchored Zone-Cleared overlay since challenges complete during the continuously-running battle
+ * regardless of the active screen. The "View" action opens the Challenges screen to inspect the reward.
+ */
+const notifyChallengeCompleted = (challengeId: number) => {
+	const challenge = staticData.challenges?.[challengeId];
+	if (!challenge) {
+		return;
+	}
+	const reward = resolveUnlockReward(challenge, {
+		items: staticData.items,
+		itemMods: staticData.itemMods,
+		skills: staticData.skills
+	});
+	toastSuccess(challengeCompletedMessage(challenge.name, reward), {
+		action: { label: 'View', onClick: () => navigation.requestScreen('challenges') }
+	});
 };
 
 // Use goto() not location.href — a reload re-runs the boot gate and bounces an authenticated client back into the game.
