@@ -49,22 +49,6 @@ namespace Game.Infrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
-        public async Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default)
-        {
-            // Read-and-set is a write (it stores the new value), so it routes through ObserveWrite too. The value
-            // is required (non-null): the underlying GETSET has no null-means-delete path — it rejects a null
-            // value — so unlike Set/SetAndForget this overload matches ICacheService's non-null contract (#1015).
-            return await ObserveWrite(Redis.StringGetSetAsync(key, value), cancellationToken);
-        }
-
-        public async Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default)
-        {
-            // Unlike Set<T>/SetAndForget<T>, a null T is unsupported here: the non-null GetSet rejects null
-            // (no null-means-delete path), so a null would serialize to "null" rather than delete the key.
-            var val = await GetSet(key, value.Serialize(), cancellationToken);
-            return val.Deserialize<T>();
-        }
-
         public async Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
             // The value is required (non-null) so the Lua SET below never receives a nil ARGV and errors
@@ -77,16 +61,6 @@ namespace Game.Infrastructure.Cache.Redis
                 "local old = redis.call('get', KEYS[1]); redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]); return old",
                 [key], [(RedisValue)value, (RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
             return (string?)result;
-        }
-
-        public async Task Set(string key, string? value, CancellationToken cancellationToken = default)
-        {
-            await StringSetAsync(key, value, cancellationToken: cancellationToken);
-        }
-
-        public async Task Set<T>(string key, T value, CancellationToken cancellationToken = default)
-        {
-            await Set(key, value?.Serialize(), cancellationToken);
         }
 
         public async Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default)
@@ -109,19 +83,9 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.KeyExpire(key, expiry, CommandFlags.FireAndForget);
         }
 
-        public void SetAndForget(string key, string? value)
-        {
-            StringSet(key, value, flags: CommandFlags.FireAndForget);
-        }
-
-        public void SetAndForget<T>(string key, T value)
-        {
-            SetAndForget(key, value?.Serialize());
-        }
-
         public void SetAndForget(string key, string? value, TimeSpan expiry)
         {
-            StringSet(key, value, expiry: expiry, flags: CommandFlags.FireAndForget);
+            Redis.StringSet(key, value, expiry: expiry, flags: CommandFlags.FireAndForget);
         }
 
         public void SetAndForget<T>(string key, T value, TimeSpan expiry)
@@ -147,11 +111,6 @@ namespace Game.Infrastructure.Cache.Redis
         public void DeleteAndForget(string key)
         {
             Redis.KeyDelete(key, CommandFlags.FireAndForget);
-        }
-
-        private void StringSet(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always)
-        {
-            Redis.StringSet(key, value, expiry: expiry, flags: flags, when: when);
         }
 
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
