@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, EChallengeType, EEntityType, EStatisticType } from '$lib/api';
+import { EAttribute, EChallengeType, EEntityType, EModifierType, ESkillEffectTarget, EStatisticType } from '$lib/api';
 import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 
 // Codex fetches the player's statistics + challenges over the socket and resolves reference data
@@ -67,8 +67,35 @@ function seedStaticData(): void {
 		{ id: 2, name: 'Cinder Tyrant', isBoss: true, attributeDistribution: dist(), skillPool: [0, 1], spawns: [] }
 	];
 	staticData.skills = [
-		{ id: 0, name: 'Cleave', baseDamage: 14, cooldownMs: 1800, damageMultipliers: [], effects: [] },
-		{ id: 1, name: 'War Cry', baseDamage: 0, cooldownMs: 6000, damageMultipliers: [], effects: [] }
+		{
+			id: 0,
+			name: 'Cleave',
+			description: 'A wide sweeping strike.',
+			baseDamage: 14,
+			cooldownMs: 1800,
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
+			effects: []
+		},
+		{
+			id: 1,
+			name: 'War Cry',
+			description: 'A rallying shout.',
+			baseDamage: 0,
+			cooldownMs: 6000,
+			damageMultipliers: [],
+			effects: [
+				{
+					id: 0,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 5000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				}
+			]
+		}
 	];
 	staticData.challenges = [
 		{
@@ -197,10 +224,28 @@ describe('Codex screen', () => {
 		expect(screen.getByTestId('codex-dossier').textContent).toContain('Dust Skitterer');
 	});
 
-	it('shows a placeholder for the not-yet-built Skills tab', async () => {
+	it('renders the Skills tab as a skill table + dossier with scaling and a used-by cross-link', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
-		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Skills');
+		// A row per skill, and the head skill's dossier (Cleave) by default.
+		expect(screen.getByTestId('codex-skill-rows')).toBeTruthy();
+		expect(screen.getByTestId('codex-skill-0')).toBeTruthy();
+		expect(screen.getByTestId('codex-skill-1')).toBeTruthy();
+		const dossier = screen.getByTestId('codex-skill-dossier');
+		expect(dossier.textContent).toContain('Cleave');
+		expect(dossier.textContent).toContain('×1.5'); // Strength scaling chip
+		// Cleave is used by the boss → its used-by pill cross-links into the enemy dossier.
+		await fireEvent.click(screen.getByTestId('codex-skill-usedby-2'));
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
+	});
+
+	it('shows a skill’s authored effects in its dossier', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
+		await fireEvent.click(screen.getByTestId('codex-skill-1')); // War Cry — a utility buff
+		const dossier = screen.getByTestId('codex-skill-dossier');
+		expect(dossier.textContent).toContain('+15');
+		expect(dossier.textContent).toContain('Strength');
 	});
 
 	it('surfaces a load error in the statistics sub-tab', async () => {

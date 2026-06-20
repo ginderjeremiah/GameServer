@@ -1,7 +1,7 @@
-<!-- Codex screen — a read-only reference glossary (bestiary / atlas / skill catalogue). The Enemies
-     and Zones tabs are built; Skills is a placeholder. Per-entity player statistics live in the enemy
-     dossier here, and the Statistics screen deep-links an enemy into it via the navigation store.
-     Ported from the `Glossary.dc.html` Claude Design handoff onto live reference/runtime data. -->
+<!-- Codex screen — a read-only reference glossary (bestiary / atlas / skill catalogue). The Enemies,
+     Zones and Skills tabs are all built. Per-entity player statistics live in the enemy dossier here,
+     and the Statistics screen deep-links an enemy into it via the navigation store. Ported from the
+     `Glossary.dc.html` Claude Design handoff onto live reference/runtime data. -->
 <div class="codex" data-testid="codex-screen">
 	<div class="header">
 		<span class="diamond" aria-hidden="true"></span>
@@ -16,7 +16,7 @@
 		{:else if view.tab === 'zones'}
 			<ZonesTab {view} />
 		{:else}
-			<ComingSoonPanel label="Skills" accent="var(--attr-intellect)" />
+			<SkillsTab {view} />
 		{/if}
 	</div>
 </div>
@@ -26,9 +26,9 @@ import { onMount } from 'svelte';
 import { navigation, playerChallenges, statistics } from '$stores';
 import { CodexView, type CodexNavPayload } from './codex-view.svelte';
 import CodexTabBar from './CodexTabBar.svelte';
-import ComingSoonPanel from './ComingSoonPanel.svelte';
 import EnemiesTab from './EnemiesTab.svelte';
 import ZonesTab from './ZonesTab.svelte';
+import SkillsTab from './SkillsTab.svelte';
 
 // Consume any deep-link payload (e.g. an enemy handed over from the Statistics screen) once.
 const view = new CodexView(navigation.consumePayload<CodexNavPayload>());

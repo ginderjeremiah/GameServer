@@ -1,9 +1,9 @@
-<!-- Skills sub-tab: the enemy's skill pool. Rows are display-only for now — they'll deep-link into
-     the Codex Skills tab once it's built (follow-up). -->
+<!-- Skills sub-tab: the enemy's skill pool. Rows are display-only for now — wiring them to deep-link
+     into the Codex Skills tab is tracked as a follow-up. -->
 <div class="skills">
-	<div class="label">Skill pool · {view.skillRows.length}</div>
+	<div class="label">Skill pool · {view.enemySkillRows.length}</div>
 	<div class="list">
-		{#each view.skillRows as skill (skill.id)}
+		{#each view.enemySkillRows as skill (skill.id)}
 			<div class="skill">
 				<span class="mark"></span>
 				<div class="text">
