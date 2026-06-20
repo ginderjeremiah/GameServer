@@ -92,24 +92,26 @@ namespace Game.Infrastructure.PubSub.Redis
             return ObserveWrite(_redis.ListRemoveAsync(ProcessingQueueName, value, 1), cancellationToken);
         }
 
+        // Drains the whole processing list back onto this queue's head in one server-side round-trip: LMOVE
+        // tail->head per item (matching ListSide.Right->Left) until the processing list is empty, returning the
+        // count moved. A single Lua script replaces the previous O(N) sequential ListMove round-trips on the
+        // crash-recovery path (#954); it is atomic, so readers never see a half-reclaimed state, and on a bounded
+        // in-flight processing list the script stays short.
+        private const string ReclaimScript =
+            "local n = 0 " +
+            "while redis.call('lmove', KEYS[1], KEYS[2], 'RIGHT', 'LEFT') do n = n + 1 end " +
+            "return n";
+
         public async Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default)
         {
-            // Move each orphaned item from the processing list back onto this queue's head, tail-first, so their
-            // original head-to-tail order is preserved (the oldest ends up at the head, ahead of newer items).
-            long reclaimed = 0;
-            while (true)
-            {
-                // Check the budget each pass so a stop requested mid-boot unwinds a long reclaim promptly rather
-                // than only after the whole processing list has been moved.
-                cancellationToken.ThrowIfCancellationRequested();
-                var moved = await ObserveWrite(_redis.ListMoveAsync(ProcessingQueueName, QueueName, ListSide.Right, ListSide.Left), cancellationToken);
-                if (!moved.HasValue)
-                {
-                    break;
-                }
+            // The script runs atomically server-side and cannot be interrupted mid-loop, so honour an
+            // already-cancelled budget up front (a requested stop must not start a reclaim) rather than per pass.
+            cancellationToken.ThrowIfCancellationRequested();
 
-                reclaimed++;
-            }
+            var result = await ObserveWrite(
+                _redis.ScriptEvaluateAsync(ReclaimScript, [ProcessingQueueName, QueueName]),
+                cancellationToken);
+            var reclaimed = (long)result;
 
             if (reclaimed > 0)
             {

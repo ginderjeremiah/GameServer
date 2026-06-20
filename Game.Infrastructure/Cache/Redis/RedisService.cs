@@ -8,13 +8,15 @@ namespace Game.Infrastructure.Cache.Redis
 {
     internal class RedisService : ICacheService
     {
-        private ConnectionMultiplexer Multiplexer { get; }
         private readonly ILogger<RedisService> _logger;
-        public IDatabase Redis => Multiplexer.GetDatabase();
 
-        public RedisService(ConnectionMultiplexer multiplexer, ILogger<RedisService> logger)
+        // The multiplexer is fixed for the instance lifetime, so the database handle it hands out is resolved once
+        // in the ctor rather than per call on the hot cache get/set paths (#954).
+        public IDatabase Redis { get; }
+
+        public RedisService(IConnectionMultiplexer multiplexer, ILogger<RedisService> logger)
         {
-            Multiplexer = multiplexer;
+            Redis = multiplexer.GetDatabase();
             _logger = logger;
         }
 
@@ -59,8 +61,11 @@ namespace Game.Infrastructure.Cache.Redis
             return val.Deserialize<T>();
         }
 
-        public async Task<string?> GetSet(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default)
+        public async Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
+            // The value is required (non-null) so the Lua SET below never receives a nil ARGV and errors
+            // server-side: writing a TTL implies writing a value, so unlike the other setters this overload has
+            // no null-means-delete path. The signature now matches ICacheService's non-null contract (#954).
             // Read-old-then-write in one Lua script (atomic, mirroring CompareAndDelete) so the value and its
             // TTL land together — a separate StringGetSet + KeyExpire would leave the key without an expiry if
             // the process faulted between the two calls.

@@ -26,8 +26,13 @@
         /// </summary>
         public Task Wake(string channel);
         public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null);
-        public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null);
-        public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null);
+
+        // The worker-backed overloads require a non-null id: each spins up a BackgroundWorker (holding an OS wait
+        // handle) that can only be disposed via UnSubscribe(channel, id), so an id-less worker subscription could
+        // never be torn down and would leak its handle (#954). The plain-action overload above creates no worker,
+        // so its id stays optional.
+        public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id);
+        public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id);
         public Task UnSubscribe(string channel);
         public Task UnSubscribe(string channel, string id);
 

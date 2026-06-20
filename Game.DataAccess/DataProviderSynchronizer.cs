@@ -29,6 +29,11 @@ namespace Game.DataAccess
         private readonly CancellationTokenSource _stopping = new();
         private bool _disposed;
 
+        // Identifies this instance's worker subscription so StopAsync can tear it down (disposing the worker's OS
+        // wait handle) rather than leaving it to leak — the worker-backed Subscribe overloads now require an id
+        // for exactly this reason (#954), mirroring ReferenceCacheSynchronizer's id-scoped subscription.
+        private string InstanceId { get; } = Guid.NewGuid().ToString();
+
         // Serializes queue drains so at most one runs at a time. The pub/sub background worker re-arms its wait
         // independently of callback completion, so a second wake arriving mid-drain can dispatch a second
         // ProcessQueue on another thread-pool thread; both then pop from the same queue via atomic LPOP and can
@@ -112,6 +117,11 @@ namespace Game.DataAccess
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            // Remove this instance's worker subscription first so no further wakes arrive mid-drain, disposing the
+            // worker's OS wait handle (id-scoped, so it tears down only this handler) — the teardown the leaked
+            // id-less subscription could never reach (#954).
+            await _pubsub.UnSubscribe(Constants.PUBSUB_PLAYER_CHANNEL, InstanceId);
+
             // Signal the in-flight drain (startup or a pub/sub wake) to stop reserving new items and unwind at
             // a clean item boundary, then wait for it to release the gate so an in-progress apply finishes
             // cleanly rather than being cut off. The wait is bounded so a stuck drain can't hold up host
@@ -134,7 +144,8 @@ namespace Game.DataAccess
             await _pubsub.Subscribe(
                 Constants.PUBSUB_PLAYER_CHANNEL,
                 Constants.PUBSUB_PLAYER_QUEUE,
-                async args => await ProcessQueue(args.queue, _stopping.Token));
+                async args => await ProcessQueue(args.queue, _stopping.Token),
+                InstanceId);
         }
 
         internal async Task ProcessQueue(IPubSubQueue queue, CancellationToken cancellationToken = default)

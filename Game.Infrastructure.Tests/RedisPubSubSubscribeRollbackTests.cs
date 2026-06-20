@@ -48,6 +48,21 @@ namespace Game.Infrastructure.Tests
                 service.Subscribe("rollback-channel", (Action<(string message, string channel)>)(_ => { }), id));
         }
 
+        // The worker-backed overloads require a non-null id (a worker tracked under no id could never be disposed
+        // via UnSubscribe and would leak its OS wait handle, #954). A null id is rejected up front — before the
+        // worker is even created, so the misuse can't leak it — and the connection is never touched.
+        [Fact]
+        public async Task Subscribe_WorkerOverloads_NullId_ThrowAndNeverConnect()
+        {
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(DeadEndpoint);
+            var service = new RedisPubSubService(multiplexer, NullLoggerFactory.Instance);
+
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
+                service.Subscribe("channel", "queue", (Action<(IPubSubQueue queue, string channel)>)(_ => { }), null!));
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
+                service.Subscribe("channel", "queue", (Func<(IPubSubQueue queue, string channel), Task>)(_ => Task.CompletedTask), null!));
+        }
+
         // Subscribes the same id twice against a failing connection. Both attempts must fail at SubscribeAsync
         // (RedisConnectionException); a second attempt failing at the registry (InvalidOperationException) would
         // mean the first failure wedged the id — the leak this rolls back.

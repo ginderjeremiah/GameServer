@@ -1318,8 +1318,8 @@ namespace Game.Application.Tests.DataAccess
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Wake(string channel) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
             public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
@@ -1339,8 +1339,8 @@ namespace Game.Application.Tests.DataAccess
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => inner.PublishBatch(channel, queueName, queueData, cancellationToken);
             public Task Wake(string channel) => inner.Wake(channel);
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
             public Task UnSubscribe(string channel) => inner.UnSubscribe(channel);
             public Task UnSubscribe(string channel, string id) => inner.UnSubscribe(channel, id);
             public IPubSubQueue GetQueue(string queueName) => inner.GetQueue(queueName);
@@ -1362,8 +1362,8 @@ namespace Game.Application.Tests.DataAccess
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Wake(string channel) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
             public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
         }

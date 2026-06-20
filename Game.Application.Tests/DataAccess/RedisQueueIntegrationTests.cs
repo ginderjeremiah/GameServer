@@ -129,6 +129,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ReclaimProcessingAsync_DrainsTheWholeProcessingListInOneCall_PreservingOrder()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            // Reserve several items without acknowledging them, modelling a run that crashed with a backlog in
+            // flight, so the single-round-trip Lua reclaim must move more than one item and keep their order.
+            var items = Enumerable.Range(0, 8).Select(i => $"item-{i}").ToArray();
+            await queue.AddRangeToQueueAsync(items);
+            foreach (var item in items)
+            {
+                Assert.Equal(item, await queue.ReserveNextAsync());
+            }
+
+            Assert.Equal(items.Length, await queue.ReclaimProcessingAsync());
+
+            // All reclaimed items return at the head in their original order, and a second reclaim finds nothing.
+            foreach (var item in items)
+            {
+                Assert.Equal(item, await queue.GetNextAsync());
+            }
+            Assert.Null(await queue.GetNextAsync());
+            Assert.Equal(0, await queue.ReclaimProcessingAsync());
+        }
+
+        [Fact]
         public async Task PeekAsync_ReturnsHeadItemsOldestFirst_WithoutRemovingThem()
         {
             using var scope = CreateScope();
