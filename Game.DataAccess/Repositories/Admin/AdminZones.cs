@@ -26,19 +26,14 @@ namespace Game.DataAccess.Repositories.Admin
         public AdminSaveResult SaveZones(IReadOnlyList<Change<Contracts.Zone>> changes)
         {
             // A zone's dedicated boss must reference an existing enemy flagged IsBoss, and its unlock gate
-            // must reference an existing challenge. An edit must also target an existing zone — a missing id
-            // is a not-found rejection, not an EF 0-row update that throws. Validate the whole change set up
-            // front so an invalid reference rejects the batch rather than partially applying.
+            // must reference an existing challenge. Validate these record-set-specific references on every
+            // Add/Edit up front so an invalid reference rejects the batch rather than partially applying.
+            // (Edit-existence of the zone itself is the processor's shared editExists guard below.)
             foreach (var change in changes)
             {
                 if (change.ChangeType == EChangeType.Delete)
                 {
                     continue;
-                }
-
-                if (change.ChangeType == EChangeType.Edit && _zones.LookupZone(change.Item.Id) is null)
-                {
-                    return AdminSaveResult.NotFound("Zone");
                 }
 
                 if (change.Item.BossEnemyId is int bossEnemyId
@@ -82,7 +77,10 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
-                resourceName: "zone");
+                resourceName: "zone",
+                // An edit must target an existing zone; a missing id is a not-found rejection (matching the
+                // relationship setters), validated up front by the processor before anything is staged.
+                editExists: item => _zones.LookupZone(item.Id) is not null);
         }
 
         public AdminSaveResult SetEnemies(SetZoneEnemiesData data)

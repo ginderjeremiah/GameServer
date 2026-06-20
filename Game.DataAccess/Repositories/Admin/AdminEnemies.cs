@@ -18,14 +18,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
         {
-            // An edit must target an existing enemy; a missing id is a not-found rejection (matching the
-            // relationship setters), not an EF 0-row update that throws. Validate the whole batch up front
-            // so the commit filter doesn't persist the rest of the batch alongside an invalid edit.
-            if (changes.Any(c => c.ChangeType == EChangeType.Edit && _enemies.GetEnemy(c.Item.Id) is null))
-            {
-                return AdminSaveResult.NotFound("Enemy");
-            }
-
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Enemy
                 {
@@ -40,7 +32,10 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
-                resourceName: "enemy");
+                resourceName: "enemy",
+                // An edit must target an existing enemy; a missing id is a not-found rejection (matching the
+                // relationship setters), validated up front by the processor before anything is staged.
+                editExists: item => _enemies.GetEnemy(item.Id) is not null);
         }
 
         public AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data)

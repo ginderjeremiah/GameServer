@@ -19,14 +19,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
         {
-            // An edit must target an existing item; a missing id is a not-found rejection (matching the
-            // relationship setters), not a silent success. Validate the whole batch up front so the
-            // commit filter doesn't persist the rest of the batch alongside an invalid edit.
-            if (changes.Any(c => c.ChangeType == EChangeType.Edit && _items.LookupItem(c.Item.Id) is null))
-            {
-                return AdminSaveResult.NotFound("Item");
-            }
-
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Item
                 {
@@ -49,7 +41,10 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
-                resourceName: "item");
+                resourceName: "item",
+                // An edit must target an existing item; a missing id is a not-found rejection (matching the
+                // relationship setters), validated up front by the processor before anything is staged.
+                editExists: item => _items.LookupItem(item.Id) is not null);
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)

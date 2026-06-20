@@ -26,6 +26,16 @@ namespace Game.DataAccess.Repositories.Admin
     /// an opaque 500.
     /// </para>
     /// <para>
+    /// When <paramref name="editExists"/> is supplied the batch is rejected up front if any <see cref="EChangeType.Edit"/>
+    /// targets a record the predicate reports absent — a missing identity is a not-found rejection (matching the
+    /// relationship setters), not an EF 0-row UPDATE that throws. Validating before staging keeps the commit filter
+    /// from persisting the rest of an accepted batch alongside an invalid edit. The predicate is the only part that
+    /// varies per record set (a cache lookup, or the zero-based-id bounds check), so folding the loop here means a
+    /// new identity-level write path can't silently omit it — the gap that motivated this consolidation. Adds aren't
+    /// checked: an Add creates a new identity, and any owner/FK reference it carries is a record-set-specific concern
+    /// the caller still validates (e.g. a zone's boss/unlock references).
+    /// </para>
+    /// <para>
     /// When <paramref name="key"/> is supplied the batch is rejected up front if it names the same value-tracked
     /// key more than once — mirroring <see cref="ChildCollectionReconciler"/>. Two Edits (or an Edit and a
     /// Delete) of the same key map to two Update/Delete ops on distinct CLR instances sharing that key, which EF
@@ -42,8 +52,18 @@ namespace Game.DataAccess.Repositories.Admin
             Action<T> edit,
             Action<T>? delete = null,
             Func<T, object>? key = null,
-            string? resourceName = null) where T : IModel
+            string? resourceName = null,
+            Func<T, bool>? editExists = null) where T : IModel
         {
+            // An Edit must target an existing record; reject up front so the rest of the batch isn't staged
+            // alongside an invalid edit. Checked before the duplicate guard to preserve the per-repo precedence
+            // (existence was validated before staging, ahead of the in-Apply dedup).
+            if (editExists is not null
+                && changes.Any(c => c.ChangeType == EChangeType.Edit && !editExists(c.Item)))
+            {
+                return AdminSaveResult.NotFound(NotFoundResource<T>(resourceName));
+            }
+
             // Only Edit/Delete are value-tracked (Adds get a store-generated key), so they alone can collide.
             if (key is not null
                 && HasDuplicateKey(changes, c => c.ChangeType != EChangeType.Add, key))
@@ -103,5 +123,16 @@ namespace Game.DataAccess.Repositories.Admin
         public static AdminSaveResult DuplicateFailure<T>(string? resourceName) =>
             AdminSaveResult.Failure(
                 $"The submitted {resourceName ?? typeof(T).Name} change set contains duplicate entries.");
+
+        /// <summary>
+        /// The not-found resource label, capitalized for the "{Resource} not found." copy. The shared
+        /// <paramref name="resourceName"/> reads lowercase mid-sentence in the duplicate-entry message but must
+        /// start the not-found sentence, so its first letter is upper-cased here (e.g. <c>"item mod"</c> → <c>"Item mod"</c>).
+        /// </summary>
+        private static string NotFoundResource<T>(string? resourceName)
+        {
+            var name = resourceName ?? typeof(T).Name;
+            return name.Length == 0 ? name : char.ToUpperInvariant(name[0]) + name[1..];
+        }
     }
 }
