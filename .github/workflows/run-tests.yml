@@ -51,6 +51,7 @@ jobs:
             - 'Game.Infrastructure.Tests/**'
             - 'Game.TestInfrastructure/**'
             - 'Game.sln'
+            - 'build/**'
             - 'docker-compose.yml'
             - 'docker-compose.local.yml'
             - 'Game.Api/Dockerfile'
