@@ -3,11 +3,14 @@ using Game.Api.Models.Common;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
+using System.Text.Json;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -48,6 +51,18 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
             return seeded;
+        }
+
+        /// <summary>
+        /// Seeds a user with no player, so an authenticated handshake for it resolves no player to load.
+        /// Returns the userId (for WebSocket auth).
+        /// </summary>
+        private async Task<int> SeedUserWithoutPlayerAsync(string username = "socketnoplayer", string password = "socketpass")
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, username, password);
+            return user.Id;
         }
 
         /// <summary>Reads the live TTL on the player's socket-presence key directly from Redis.</summary>
@@ -105,6 +120,35 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(body);
+            Assert.False(string.IsNullOrWhiteSpace(body.ErrorMessage));
+        }
+
+        [Fact]
+        public async Task Socket_AuthenticatedButPlayerNotLoadable_ReturnsErrorEnvelope()
+        {
+            // The player-load short-circuit sits after the WebSocket-upgrade check, so — unlike the 401/400
+            // cases — it can't be reached with a plain GET (that stops at the 400 branch). The request is
+            // driven through the pipeline presenting as a WebSocket upgrade (a stubbed feature), but the
+            // socket is never accepted: the authenticated user has no player, so the handshake loads none and
+            // short-circuits to 404 with the { errorMessage } envelope still written to the (un-upgraded) body.
+            var userId = await SeedUserWithoutPlayerAsync();
+            var token = TestAuthHelper.CreateAccessToken(userId);
+
+            var context = await Factory.Server.SendAsync(ctx =>
+            {
+                ctx.Request.Method = HttpMethods.Get;
+                ctx.Request.Path = "/socket";
+                ctx.Request.QueryString = new QueryString($"?access_token={token}");
+                ctx.Features.Set<IHttpWebSocketFeature>(new StubWebSocketFeature());
+            }, CancellationToken);
+
+            Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+            // The response body stream isn't seekable, so deserialize straight from its start.
+            var body = await JsonSerializer.DeserializeAsync<ApiResponse>(
+                context.Response.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                CancellationToken);
             Assert.NotNull(body);
             Assert.False(string.IsNullOrWhiteSpace(body.ErrorMessage));
         }
@@ -168,6 +212,19 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(refreshed);
             Assert.True(decayed < initial, $"Expected the TTL to decay below {initial} but it was {decayed}.");
             Assert.True(refreshed > decayed, $"Expected activity to refresh the TTL above {decayed} but it was {refreshed}.");
+        }
+
+        /// <summary>
+        /// Presents a request to the pipeline as a WebSocket upgrade so the interceptor reaches its
+        /// post-upgrade checks, without ever completing a handshake. <see cref="AcceptAsync"/> is never
+        /// invoked by tests that short-circuit before the upgrade, so it deliberately throws.
+        /// </summary>
+        private sealed class StubWebSocketFeature : IHttpWebSocketFeature
+        {
+            public bool IsWebSocketRequest => true;
+
+            public Task<WebSocket> AcceptAsync(WebSocketAcceptContext context) =>
+                throw new InvalidOperationException("The stub WebSocket feature never accepts a connection.");
         }
     }
 }
