@@ -14,17 +14,81 @@ using Entities = Game.Infrastructure.Entities;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Exercises the three <see cref="IAdminEnemies"/> relationship setters end-to-end through the entity
-    /// store and unit of work. Each reconciles a child collection against the full desired set the admin
-    /// submits — the delete/update/insert logic extracted into <c>ChildCollectionReconciler</c>. Seeding,
-    /// the admin write, and the assertion each use a separate DI scope so the write runs against an empty
-    /// change tracker, mirroring the per-request scope of a real admin call.
+    /// Exercises <see cref="IAdminEnemies"/> end-to-end through the entity store and unit of work: the
+    /// enemy change-set edit path plus the three relationship setters. Each setter reconciles a child
+    /// collection against the full desired set the admin submits — the delete/update/insert logic extracted
+    /// into <c>ChildCollectionReconciler</c>. The edit path also pins the zero-based-identity save fixup for
+    /// record 0 (Id == 0, the identity seed). Seeding, the admin write, and the assertion each use a separate
+    /// DI scope so the write runs against an empty change tracker, mirroring the per-request scope of a real
+    /// admin call.
     /// </summary>
     [Collection("Integration")]
     public class AdminEnemiesIntegrationTests : ApplicationIntegrationTestBase
     {
         public AdminEnemiesIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
+
+        [Fact]
+        public async Task SaveEnemies_EditsRecordZero_UpdatesTheCorrectRow()
+        {
+            // Record 0 is the identity seed of the zero-based Enemy set, so its Id == default(int). EF can read
+            // that as an unset store-generated value; the zero-based-identity save fixup (GameContext, #1003)
+            // guards against EF assigning the edit a temporary key that would target the wrong row. The DB is
+            // truncated with RESTART IDENTITY before each test, so the first seeded enemy lands at Id 0 and the
+            // second at Id 1 — editing 0 must change row 0 only and leave row 1 untouched.
+            int recordZeroId, neighborId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var recordZero = await TestDataSeeder.CreateEnemyAsync(context, "Original Zero");
+                var neighbor = await TestDataSeeder.CreateEnemyAsync(context, "Neighbor One");
+                recordZeroId = recordZero.Id;
+                neighborId = neighbor.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            Assert.Equal(0, recordZeroId);
+            Assert.Equal(1, neighborId);
+
+            var changes = new List<Change<Contracts.Enemy>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Enemy
+                    {
+                        Id = recordZeroId,
+                        Name = "Edited Zero",
+                        IsBoss = true,
+                        AttributeDistribution = [],
+                        SkillPool = [],
+                        Spawns = [],
+                    },
+                },
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SaveEnemies(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+
+                var edited = await context.Enemies.SingleAsync(e => e.Id == recordZeroId, CancellationToken);
+                Assert.Equal("Edited Zero", edited.Name);
+                Assert.True(edited.IsBoss);
+
+                // The neighbor proves the UPDATE was scoped to record 0, not broadened to every row by a
+                // mis-resolved (temporary / default) key.
+                var neighbor = await context.Enemies.SingleAsync(e => e.Id == neighborId, CancellationToken);
+                Assert.Equal("Neighbor One", neighbor.Name);
+                Assert.False(neighbor.IsBoss);
+            }
+        }
 
         [Fact]
         public async Task SetAttributeDistributions_DeletesUpdatesAndInsertsAgainstDesiredSet()
