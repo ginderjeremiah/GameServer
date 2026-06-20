@@ -137,10 +137,32 @@ const tip = createAttributeTooltip(() => tooltip);
 let shownKey = $state<string>();
 const shownGroup = $derived(shownKey != null ? effectGroups.find((g) => g.key === shownKey) : undefined);
 
-// The skill an active effect came from: its `sourceId` is the authored skill-effect id, so find the
-// skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown skill.
-const sourceSkillName = (sourceId: number): string | undefined =>
-	staticData.skills?.find((skill) => skill?.effects.some((e) => e.id === sourceId))?.name;
+// The skill an active effect came from: its `sourceId` is the authored skill-effect id, so look up
+// the skill that owns it. Display-only (never touches battle math); undefined for a retired/unknown
+// skill. Skill→effect ownership is static reference data, so the effectId→name index is memoised off
+// the `staticData.skills` reference and rebuilt only when that catalogue changes — rather than
+// rescanning every skill's effects per call (this resolves inside the per-frame `shownEffectContext`).
+let skillNameByEffectIdCache: { skills: unknown; map: Map<number, string> } | undefined;
+const skillNameByEffectId = (): Map<number, string> => {
+	const skills = staticData.skills;
+	if (!skillNameByEffectIdCache || skillNameByEffectIdCache.skills !== skills) {
+		// A plain memo cache, not reactive state — it never drives rendering, so SvelteMap is unwanted.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const map = new Map<number, string>();
+		for (const skill of skills ?? []) {
+			if (!skill) {
+				continue;
+			}
+			for (const effect of skill.effects) {
+				map.set(effect.id, skill.name);
+			}
+		}
+		skillNameByEffectIdCache = { skills, map };
+	}
+	return skillNameByEffectIdCache.map;
+};
+
+const sourceSkillName = (sourceId: number): string | undefined => skillNameByEffectId().get(sourceId);
 
 // Live effect context for the panel: reads renderRemainingMs so the countdown pill depletes smoothly. A
 // single application names its source in the header; a stack names each application's source per row.

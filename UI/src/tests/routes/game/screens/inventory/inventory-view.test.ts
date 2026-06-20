@@ -16,6 +16,7 @@ const {
 	removeMod,
 	toastError,
 	unlockedMods,
+	unlockedItems,
 	sampleItems,
 	sampleSlots,
 	sampleStats,
@@ -28,6 +29,9 @@ const {
 	removeMod: vi.fn(),
 	toastError: vi.fn(),
 	unlockedMods: new Set<number>(),
+	// The manager's itemId-keyed Map that selection/drag now resolve through (kept in sync with
+	// sampleItems in beforeEach), mirroring InventoryManager.unlockedItems.
+	unlockedItems: new Map<number, Item>(),
 	sampleItems: [] as Item[],
 	sampleSlots: new Array(6).fill(undefined) as (Item | undefined)[],
 	sampleStats: [] as IBattlerAttribute[],
@@ -55,6 +59,7 @@ vi.mock('$lib/engine', () => ({
 		get equipmentStats() {
 			return sampleStats;
 		},
+		unlockedItems,
 		unlockedMods,
 		equipItem,
 		unequipItem,
@@ -96,6 +101,7 @@ beforeEach(() => {
 	setFavorite.mockClear();
 	toastError.mockClear();
 	unlockedMods.clear();
+	unlockedItems.clear();
 	staticData.itemMods = [];
 	sampleSlots.fill(undefined);
 	sampleStats.length = 0;
@@ -105,6 +111,10 @@ beforeEach(() => {
 		makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary),
 		makeItem(3, 'Mid Ring', EItemCategory.Accessory, ERarity.Common)
 	);
+	// Mirror the manager's itemId-keyed Map so selection/drag resolution matches the list contents.
+	for (const item of sampleItems) {
+		unlockedItems.set(item.itemId, item);
+	}
 });
 
 describe('item-category display helpers', () => {

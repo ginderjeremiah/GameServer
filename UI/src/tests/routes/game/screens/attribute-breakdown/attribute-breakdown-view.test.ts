@@ -17,6 +17,7 @@ vi.mock('$stores', () => ({ staticData }));
 
 import { attributeName } from '$lib/common';
 import {
+	ATTRIBUTE_TYPE_GROUPS,
 	AttributeBreakdownView,
 	buildGroups,
 	buildPlayerModifiers,
@@ -297,5 +298,17 @@ describe('formatting + labels', () => {
 		expect(
 			modifierLabel({ source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance } as never)
 		).toBe('Endurance');
+	});
+});
+
+describe('ATTRIBUTE_TYPE_GROUPS taxonomy coverage', () => {
+	// KindTag resolves its label from these groups; an unmapped EAttributeType would render a blank
+	// pill, so every enum value must have a group. This fails loud if a future type is added without one.
+	it('maps every EAttributeType value to a display group', () => {
+		const mapped = new Set(ATTRIBUTE_TYPE_GROUPS.map((g) => g.type));
+		const values = Object.values(EAttributeType).filter((v): v is EAttributeType => typeof v === 'number');
+		for (const value of values) {
+			expect(mapped.has(value)).toBe(true);
+		}
 	});
 });
