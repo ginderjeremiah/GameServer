@@ -161,6 +161,35 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ReadReserveReclaimOps_WhenTokenAlreadyCancelled_ThrowOperationCanceled()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            // Seed an item so the ops have real work to do rather than short-circuiting on an empty queue.
+            await queue.AddToQueueAsync("seed");
+
+            // The read/reserve/reclaim ops now honour the per-command budget cooperatively (RedisCommandBudget):
+            // an already-cancelled token unwinds the op up front rather than running the Redis round-trip, the
+            // same prompt-cancellation contract the cache reads already satisfy (#558).
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.ReserveNextAsync(AlreadyCancelled()));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.ReclaimProcessingAsync(AlreadyCancelled()));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.GetLengthAsync(AlreadyCancelled()));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.PeekAsync(1, AlreadyCancelled()));
+
+            // None of the throwing ops consumed the seeded item — a cancelled budget leaves the queue untouched.
+            Assert.Equal("seed", await queue.GetNextAsync());
+        }
+
+        private static CancellationToken AlreadyCancelled()
+        {
+            var cts = new CancellationTokenSource();
+            cts.Cancel();
+            return cts.Token;
+        }
+
+        [Fact]
         public async Task RemoveAsync_RemovesASingleOccurrence_AndReportsWhetherOneWasRemoved()
         {
             using var scope = CreateScope();

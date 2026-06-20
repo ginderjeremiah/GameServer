@@ -64,39 +64,50 @@ namespace Game.DataAccess
             var queue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
 
             // A stop requested mid-boot (host shutdown during a large reclaim/drain) must unwind the startup
-            // work too, so honor both the host's startup token and our own stopping signal. The queue ops
-            // themselves aren't cancelable, so the token is checked at each boundary between them.
+            // work too, so honor both the host's startup token and our own stopping signal. It is threaded into
+            // the reclaim/reserve queue ops (which honor it cooperatively) so a wedged Redis round-trip unwinds
+            // promptly, and is still checked at each boundary between ops.
             using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
             var startupToken = startupCts.Token;
-            if (startupToken.IsCancellationRequested)
-            {
-                return;
-            }
 
-            // Recover any items a previous run reserved but never acknowledged — it crashed (deploy, scale-down,
-            // kill) mid-apply — before draining, so an event in flight when that run died is re-applied rather
-            // than lost (#769). The reclaim is safe to run while other instances drain because the handlers are
-            // idempotent, so at worst a still-live item is applied twice; cross-instance same-player ordering is
-            // already only best-effort, so the reclaim introduces no new reordering hazard.
-            var reclaimed = await queue.ReclaimProcessingAsync();
-            if (reclaimed > 0)
+            try
             {
-                _logger.LogInformation("Reclaimed {Count} in-flight player update(s) orphaned by a previous run on queue '{Queue}'.", reclaimed, Constants.PUBSUB_PLAYER_QUEUE);
-            }
+                if (startupToken.IsCancellationRequested)
+                {
+                    return;
+                }
 
-            if (startupToken.IsCancellationRequested)
+                // Recover any items a previous run reserved but never acknowledged — it crashed (deploy, scale-down,
+                // kill) mid-apply — before draining, so an event in flight when that run died is re-applied rather
+                // than lost (#769). The reclaim is safe to run while other instances drain because the handlers are
+                // idempotent, so at worst a still-live item is applied twice; cross-instance same-player ordering is
+                // already only best-effort, so the reclaim introduces no new reordering hazard.
+                var reclaimed = await queue.ReclaimProcessingAsync(startupToken);
+                if (reclaimed > 0)
+                {
+                    _logger.LogInformation("Reclaimed {Count} in-flight player update(s) orphaned by a previous run on queue '{Queue}'.", reclaimed, Constants.PUBSUB_PLAYER_QUEUE);
+                }
+
+                if (startupToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
+                // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
+                // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
+                // for the next publish to trigger a drain, stranding it at the tail when no further save follows.
+                // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
+                // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
+                // (the reserve/acknowledge read is idempotent, so a concurrent first wake can never double-apply) (#560).
+                await ProcessQueue(queue, startupToken);
+            }
+            catch (OperationCanceledException) when (startupToken.IsCancellationRequested)
             {
-                return;
+                // A stop requested mid-boot unwinds a wedged reclaim/reserve promptly via the now-cancelable queue
+                // ops; a clean unwind, not a startup failure. Anything left is reclaimed and drained on the next
+                // startup, so nothing is lost.
             }
-
-            // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
-            // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
-            // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
-            // for the next publish to trigger a drain, stranding it at the tail when no further save follows.
-            // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
-            // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
-            // (the reserve/acknowledge read is idempotent, so a concurrent first wake can never double-apply) (#560).
-            await ProcessQueue(queue, startupToken);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -149,6 +160,13 @@ namespace Game.DataAccess
                         await DrainQueueAsync(queue, cancellationToken);
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // A stop requested mid-drain unwinds a wedged reserve promptly via the now-cancelable read;
+                    // this is the same clean stop as the boundary check (anything left is reclaimed and re-applied
+                    // on the next startup), so it is swallowed rather than surfaced as an error by the pub/sub
+                    // worker loop, which would otherwise log every escaping exception.
+                }
                 finally
                 {
                     _drainGate.Release();
@@ -163,12 +181,14 @@ namespace Game.DataAccess
             // Reserve each item (move it to the processing list) instead of destructively popping it, and only
             // acknowledge (remove it) once ProcessMessage has durably applied or dead-lettered it. A crash
             // anywhere in between leaves the item on the processing list to be reclaimed on next startup rather
-            // than lost (#769). At-least-once is safe because the handlers are idempotent. Stopping is checked
-            // between items so a shutdown ends at a clean boundary — the just-acknowledged item is durable and
-            // anything still queued is reclaimed on the next startup.
+            // than lost (#769). At-least-once is safe because the handlers are idempotent. Stopping is both
+            // checked between items and threaded into the reserve, so a shutdown ends at a clean boundary while a
+            // wedged reserve still unwinds promptly. Once an item is reserved it is processed and acknowledged
+            // without the token so the in-flight apply finishes cleanly — the just-acknowledged item is durable
+            // and anything still queued is reclaimed on the next startup.
             while (!cancellationToken.IsCancellationRequested)
             {
-                var next = await queue.ReserveNextAsync();
+                var next = await queue.ReserveNextAsync(cancellationToken);
                 if (next is null)
                 {
                     break;

@@ -218,7 +218,7 @@ namespace Game.Api.Tests.Unit
         {
             private readonly Queue<FakeQueueStep> _steps = new(steps);
 
-            public Task<T?> GetNextAsync<T>()
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default)
             {
                 if (_steps.TryDequeue(out var next))
                 {
@@ -236,20 +236,20 @@ namespace Game.Api.Tests.Unit
                 return Task.FromResult<T?>(default);
             }
 
-            public Task<string?> GetNextAsync() => throw new NotSupportedException();
-            public Task<string?> ReserveNextAsync() => throw new NotSupportedException();
-            public Task AcknowledgeAsync(string value) => throw new NotSupportedException();
-            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
-            public Task<long> GetLengthAsync() => throw new NotSupportedException();
-            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
-            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public string? GetNext() => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
-            public Task AddToQueueAsync(string value) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
-            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         private sealed class CapturingPubSubService : IPubSubService
@@ -282,7 +282,7 @@ namespace Game.Api.Tests.Unit
         {
             public List<string> Added { get; } = [];
 
-            public Task AddToQueueAsync(string value)
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)
             {
                 Added.Add(value);
                 return Task.CompletedTask;
@@ -290,18 +290,18 @@ namespace Game.Api.Tests.Unit
 
             public string? GetNext() => throw new NotSupportedException();
             public T? GetNext<T>() => throw new NotSupportedException();
-            public Task<string?> GetNextAsync() => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>() => throw new NotSupportedException();
-            public Task<string?> ReserveNextAsync() => throw new NotSupportedException();
-            public Task AcknowledgeAsync(string value) => throw new NotSupportedException();
-            public Task<long> ReclaimProcessingAsync() => throw new NotSupportedException();
-            public Task<long> GetLengthAsync() => throw new NotSupportedException();
-            public Task<IReadOnlyList<string>> PeekAsync(long count) => throw new NotSupportedException();
-            public Task<bool> RemoveAsync(string value) => throw new NotSupportedException();
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
             public void AddToQueue<T>(T value) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value) => throw new NotSupportedException();
-            public Task AddRangeToQueueAsync(IEnumerable<string> values) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         // RegisterSocket only claims the presence key via the atomic GetSet-with-expiry; everything else is unused here.

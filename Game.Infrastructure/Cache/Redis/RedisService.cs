@@ -1,5 +1,6 @@
 using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Game.Infrastructure.Redis;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -17,25 +18,15 @@ namespace Game.Infrastructure.Cache.Redis
             _logger = logger;
         }
 
-        // StackExchange.Redis exposes no CancellationToken on its database operations, so the token is honoured
-        // only partially: WaitAsync makes the *await* unwind promptly when the budget is cancelled (releasing the
-        // per-socket command lock without waiting out the dependency's own 5s timeout — #558), while the
-        // underlying command keeps running to completion in the background. WaitAsync(CancellationToken.None) is a
-        // zero-overhead no-op (it returns the same task), so the default-token callers pay nothing.
-        //
-        // For write operations the abandoned command's eventual fault would otherwise go unobserved — a silently
-        // failed write with no signal — so every mutating call (including the read-modify-write GetSet/GetDelete)
-        // routes through ObserveWrite, which attaches a fault-logging continuation when (and only when) the await
-        // is cancelled. Pure reads (Get) are exempt: a post-cancellation fault there loses only an unobserved
-        // read, not a write.
+        // StackExchange.Redis exposes no CancellationToken on its database operations, so each async op honours the
+        // per-command budget cooperatively via RedisCommandBudget (#558): pure reads (Get) take the read path,
+        // while every mutating call — including the read-modify-write GetSet/GetDelete — routes through ObserveWrite
+        // so a post-cancellation fault on the abandoned write is logged rather than silently lost.
+        private const string WriteFaultMessage = "A Redis write faulted after its command budget was cancelled; the write may not have been applied.";
 
         public async Task<string?> Get(string key, CancellationToken cancellationToken = default)
         {
-            // Honour an already-cancelled budget before issuing the read: WaitAsync alone is racy because it
-            // returns the inner task unchanged when that task is already complete (it checks IsCompleted before
-            // the token), so a command that finished first would silently swallow the cancellation.
-            cancellationToken.ThrowIfCancellationRequested();
-            return await Redis.StringGetAsync(key).WaitAsync(cancellationToken);
+            return await RedisCommandBudget.Read(Redis.StringGetAsync(key), cancellationToken);
         }
 
         public async Task<T?> Get<T>(string key, CancellationToken cancellationToken = default)
@@ -159,26 +150,11 @@ namespace Game.Infrastructure.Cache.Redis
             await ObserveWrite(Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when), cancellationToken);
         }
 
-        // Awaits a write command under the cancellation budget. On a non-cancelled await a fault surfaces here
-        // directly; on cancellation the await unwinds but the underlying command keeps running (StackExchange.Redis
-        // can't cancel it), so a fault-logging continuation is attached to the abandoned task before rethrowing —
-        // the write may have silently failed, and the next save self-heals the value but would otherwise leave no
-        // signal. ExecuteSynchronously + OnlyOnFaulted keeps it allocation-light and silent on success.
-        private async Task<T> ObserveWrite<T>(Task<T> command, CancellationToken cancellationToken)
+        // Awaits a write command under the cancellation budget, attaching a fault-logging continuation so an
+        // abandoned write that later faults — a silently failed write with no other signal — is surfaced not lost.
+        private Task<T> ObserveWrite<T>(Task<T> command, CancellationToken cancellationToken)
         {
-            try
-            {
-                return await command.WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                _ = command.ContinueWith(
-                    faulted => _logger.LogError(faulted.Exception, "A Redis write faulted after its command budget was cancelled; the write may not have been applied."),
-                    CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-                throw;
-            }
+            return RedisCommandBudget.Write(command, cancellationToken, _logger, WriteFaultMessage);
         }
     }
 }
