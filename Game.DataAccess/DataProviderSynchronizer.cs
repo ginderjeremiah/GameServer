@@ -286,6 +286,14 @@ namespace Game.DataAccess
                     return;
                 }
             }
+
+            // Defensive terminal guard: every attempt above either returns (success or dead-letter) or, on the
+            // final attempt, falls into the retries-exhausted catch which dead-letters and returns — so with at
+            // least one attempt (RetryPolicy enforces MaxAttempts >= 1) control never reaches here. Dead-letter
+            // rather than fall through anyway, so a future change to the attempt bounds can never silently turn
+            // this terminal path into a dropped player write (#937).
+            _logger.LogError("Player data event '{EventType}' from queue '{Queue}' reached the end of the retry loop without a terminal action; dead-lettering defensively. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, message);
+            await deadLetterQueue.AddToQueueAsync(message);
         }
 
         // Applies a single dequeued event to the database. A fresh scope per call (and per retry attempt)

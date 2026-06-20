@@ -21,9 +21,11 @@ namespace Game.Api.Services
         /// <summary>
         /// Ensures the authenticated user's player session is loaded for this request: a cache read, and —
         /// when the token is valid but the cached session is gone (Redis flush, sliding-TTL lapse, or never
-        /// established on this instance) — a rehydration from the user's player binding that re-caches the
-        /// session, the same way login does. Idempotent: a no-op once a player session is present. A user
-        /// with no resolvable player is left without one (the caller surfaces that as a graceful error).
+        /// established on this instance) — an in-memory rehydration of the user's player binding (re-derived
+        /// the same way login does). The rehydration does not write the session cache; those writes belong on
+        /// the socket (see <see cref="SessionService.RehydrateSession"/>). Idempotent: a no-op once a player
+        /// session is present. A user with no resolvable player is left without one (the caller surfaces that
+        /// as a graceful error).
         /// </summary>
         public async Task EnsureSessionLoaded(CancellationToken cancellationToken = default)
         {

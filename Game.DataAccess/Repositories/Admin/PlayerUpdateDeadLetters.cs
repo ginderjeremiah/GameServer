@@ -73,7 +73,7 @@ namespace Game.DataAccess.Repositories.Admin
             {
                 // Wake the synchronizer so it drains the re-enqueued items promptly rather than waiting for
                 // the next player save. Fire-and-forget: the data is already durably enqueued (#552).
-                await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, "");
+                await _pubsub.Wake(Constants.PUBSUB_PLAYER_CHANNEL);
             }
 
             var remaining = await deadLetterQueue.GetLengthAsync();

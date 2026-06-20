@@ -36,6 +36,15 @@ namespace Game.Infrastructure.PubSub.Redis
             await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget).WaitAsync(cancellationToken);
         }
 
+        // A bare channel wake: a fire-and-forget empty publish that only nudges the consumer to drain its queue.
+        // The durable enqueue happens elsewhere (or has already happened); Redis pub/sub is at-most-once so this is
+        // only a hint, and the consumer drains the whole queue on its next wake regardless, so it needs no
+        // cancellation token (#552). A dedicated method keeps the wake from being confused with a queue enqueue.
+        public Task Wake(string channel)
+        {
+            return Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
+        }
+
         public IPubSubQueue GetQueue(string queueName)
         {
             return new RedisQueue(Redis, queueName, _loggerFactory.CreateLogger<RedisQueue>());
@@ -45,12 +54,11 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             var queue = GetQueue(queueName);
             // The queue write is the durable part and stays awaited under the cancellation budget (the queue op
-            // honours it cooperatively and logs an abandoned-write fault). The channel publish is only a wake
-            // signal for the queue consumer, and Redis pub/sub is already at-most-once (awaiting it confirms
-            // the command was sent, not that any subscriber received it), so it is fire-and-forget: the data
-            // is safely enqueued regardless, and the consumer drains the whole queue on its next wake (#552).
+            // honours it cooperatively and logs an abandoned-write fault); the channel wake is only a
+            // fire-and-forget signal for the consumer (the data is safely enqueued regardless, and the consumer
+            // drains the whole queue on its next wake) (#552).
             await queue.AddToQueueAsync(queueData, cancellationToken);
-            await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
+            await Wake(channel);
         }
 
         public async Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default)
@@ -67,12 +75,12 @@ namespace Game.Infrastructure.PubSub.Redis
             }
 
             // One multi-value LPUSH carries the whole batch durably (under the cancellation budget the queue op
-            // honours cooperatively); the single wake publish is fire-and-forget for the same reason as the
-            // per-event Publish above — the data is already enqueued and the consumer drains the whole queue on
-            // its next wake (#559).
+            // honours cooperatively); the single wake is fire-and-forget for the same reason as the per-event
+            // Publish above — the data is already enqueued and the consumer drains the whole queue on its next
+            // wake (#559).
             var queue = GetQueue(queueName);
             await queue.AddRangeToQueueAsync(values, cancellationToken);
-            await Redis.PublishAsync(RedisChannel.Literal(channel), "", CommandFlags.FireAndForget);
+            await Wake(channel);
         }
 
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)

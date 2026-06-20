@@ -275,8 +275,9 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.ErrorMessage);
             Assert.Equal(player.Name, result.Data.Name);
 
-            // The rehydrated session is written back so subsequent requests hit the cache rather than re-querying.
-            await AssertSessionRehydratedAsync(user.Id, player.Id);
+            // Rehydration is in-memory only: the request resolves the player without ever writing the session
+            // cache, since player-state writes belong on the socket, not this concurrent HTTP path (#937).
+            await AssertSessionNotEstablishedAsync(user.Id);
             client.Dispose();
         }
 
@@ -285,7 +286,7 @@ namespace Game.Api.Tests.Integration
         {
             // The pre-game active-session takeover warning is the user-visible breakage from #693: an evicted
             // session must rehydrate and report the (absent) active socket, not "not logged in".
-            var (client, user, player) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
+            var (client, user, _) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
 
             var response = await client.GetAsync("/api/Login/ActiveSession", CancellationToken);
 
@@ -295,7 +296,8 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.ErrorMessage);
             Assert.False(result.Data.Active);
 
-            await AssertSessionRehydratedAsync(user.Id, player.Id);
+            // Rehydration is in-memory only — the presence check resolves the player without writing the cache (#937).
+            await AssertSessionNotEstablishedAsync(user.Id);
             client.Dispose();
         }
 
@@ -313,12 +315,8 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            // Give any (erroneous) fire-and-forget rehydration write a window to land, then confirm the
-            // session was never established — the cache stays empty for this user.
-            await Task.Delay(250, CancellationToken);
-            using var scope = CreateScope();
-            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            Assert.Null(await sessionStore.GetSession(user.Id));
+            // Confirm the session was never established — the cache stays empty for this user.
+            await AssertSessionNotEstablishedAsync(user.Id);
             client.Dispose();
         }
 
@@ -346,25 +344,15 @@ namespace Game.Api.Tests.Integration
             return (client, user, player);
         }
 
-        // Polls the session store (the rehydration write is fire-and-forget) until the session is present.
-        private async Task AssertSessionRehydratedAsync(int userId, int expectedPlayerId)
+        // Confirms a session was never written to the cache: rehydration (and any non-session endpoint) resolves
+        // the player in memory only, so we give any erroneous fire-and-forget write a window to land, then assert
+        // the key stays absent for this user.
+        private async Task AssertSessionNotEstablishedAsync(int userId)
         {
+            await Task.Delay(250, CancellationToken);
             using var scope = CreateScope();
             var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                var session = await sessionStore.GetSession(userId);
-                if (session is not null)
-                {
-                    Assert.Equal(expectedPlayerId, session.PlayerId);
-                    return;
-                }
-
-                await Task.Delay(25, CancellationToken);
-            }
-
-            Assert.Fail("The evicted session was not rehydrated into the cache.");
+            Assert.Null(await sessionStore.GetSession(userId));
         }
 
         [Fact]

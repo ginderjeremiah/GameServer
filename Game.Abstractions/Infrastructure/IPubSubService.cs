@@ -16,6 +16,15 @@
         /// on <paramref name="channel"/>, instead of one round-trip per item. A no-op when the batch is empty.
         /// </summary>
         public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Sends a bare wake on <paramref name="channel"/>: a fire-and-forget empty publish that only nudges the
+        /// channel's consumer to drain its queue, carrying no message of its own. Kept distinct from the
+        /// <c>Publish</c> overloads so a wake can never be confused with — or a future edit silently turn it into —
+        /// a queue enqueue. Takes no cancellation token: the wake is fire-and-forget (Redis pub/sub is at-most-once
+        /// and the consumer drains the whole queue on its next wake), so there is nothing to unwind.
+        /// </summary>
+        public Task Wake(string channel);
         public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null);
         public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null);
         public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null);
