@@ -405,20 +405,14 @@ namespace Game.Api.Tests.Unit
         {
             public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
-            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Set(string key, string? value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Set<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
-            public void SetAndForget(string key, string? value) => throw new NotSupportedException();
-            public void SetAndForget<T>(string key, T value) => throw new NotSupportedException();
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
             public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -481,20 +475,14 @@ namespace Game.Api.Tests.Unit
                 return Task.CompletedTask;
             }
 
-            public Task<string?> GetSet(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetSet<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Set(string key, string? value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Set<T>(string key, T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
-            public void SetAndForget(string key, string? value) => throw new NotSupportedException();
-            public void SetAndForget<T>(string key, T value) => throw new NotSupportedException();
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
             public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
