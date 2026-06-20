@@ -1,7 +1,5 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
-using Game.Core.Players;
-using Game.Core.Players.Inventories;
 using Game.Core.Skills;
 using static Game.Core.EAttribute;
 
@@ -35,11 +33,6 @@ namespace Game.Core.Battle
         public int Level { get; private set; }
 
         public bool IsDead => CurrentHealth <= 0;
-
-        public Battler(Player player)
-            : this(player.GetAttributes(), player.SelectedSkills, player.Level)
-        {
-        }
 
         public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level)
         {

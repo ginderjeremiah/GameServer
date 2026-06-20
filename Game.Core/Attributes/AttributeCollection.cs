@@ -118,12 +118,12 @@ namespace Game.Core.Attributes
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
                 var sourceNode = GetOrCreateNode((int)modifier.DerivedSource);
-                if (node.DerivedNodes.Contains(sourceNode))
+                if (node.DerivedNodes?.Contains(sourceNode) == true)
                 {
                     throw new AttributeCircularDerivedModifierException(modifier);
                 }
 
-                sourceNode.DerivedNodes.Add(node);
+                sourceNode.GetOrCreateDerivedNodes().Add(node);
             }
         }
 
@@ -149,8 +149,9 @@ namespace Game.Core.Attributes
                 }
             }
 
-            // The source node exists because removing a Derived modifier implies it was hooked here.
-            GetOrCreateNode((int)derivedSource).DerivedNodes.Remove(node);
+            // The source node's set exists because removing a Derived modifier implies it was hooked here;
+            // the null-conditional keeps the unhook a safe no-op even if it somehow was not.
+            GetOrCreateNode((int)derivedSource).DerivedNodes?.Remove(node);
         }
 
         private void AddStaticModifiers()

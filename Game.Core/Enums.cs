@@ -59,39 +59,44 @@ namespace Game.Core
         DropBonus = 9,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A derived game attribute. Represents a % change to deal increased damage with an attack.
+        /// A derived game attribute. A decimal probability (0.05 = 5%) that an attack lands a critical hit,
+        /// compared directly against the battle RNG draw. Sourced from Dexterity/Luck (player-only).
         /// </summary>
         CriticalChance = 10,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A derived game attribute. Represents an additive % increase in the amount of damage dealt when a critical hit occurs.
+        /// A derived game attribute. A base-≥1 multiplier (base 1.5) read directly: on a critical hit the raw
+        /// damage is multiplied by it before Defense is subtracted, so it can punch through Defense.
         /// </summary>
         CriticalDamage = 11,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A derived game attribute. Represents a % change to ignore all damage from an incoming attack.
+        /// A derived game attribute. A decimal probability (0.05 = 5%) to fully ignore an incoming attack,
+        /// compared directly against the battle RNG draw. Sourced from Agility (player-only).
         /// </summary>
         DodgeChance = 12,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A derived game attribute. Represents a % change to ignore part of the damage from an incoming attack.
+        /// A derived game attribute. A decimal probability (0.05 = 5%) to block part of an incoming attack,
+        /// compared directly against the battle RNG draw. Sourced from Endurance (player-only).
         /// </summary>
         BlockChance = 13,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A derived game attribute. Represents a flat reduction for damage received when a block occurs.
+        /// A derived game attribute. A flat reduction (base 2) applied alongside Defense when an incoming
+        /// attack is blocked.
         /// </summary>
         BlockReduction = 14,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A per-second attribute representing the amount of damage taken each second from
-        /// damage-over-time effects. Consumed by the DoT/HoT simulator phase (#334).
+        /// A per-second attribute representing the amount of damage taken each second from damage-over-time
+        /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (bypasses Defense).
         /// </summary>
         DamageTakenPerSecond = 15,
 
         /// <summary>
-        /// CURRENTLY UNUSED. A per-second attribute representing the amount of health restored each second from
-        /// heal-over-time effects. Consumed by the DoT/HoT simulator phase (#334).
+        /// A per-second attribute representing the amount of health restored each second from heal-over-time
+        /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (capped at MaxHealth).
         /// </summary>
         HealthRegenPerSecond = 16
     }

@@ -664,7 +664,7 @@ namespace Game.Core.Tests.Battle
                 strength: 10, endurance: 15,
                 skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]);
 
-            var sim = new BattleSimulator(new Battler(player), enemy, ParitySeed);
+            var sim = new BattleSimulator(BattlerFactory.FromPlayer(player), enemy, ParitySeed);
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
@@ -755,7 +755,7 @@ namespace Game.Core.Tests.Battle
             List<Skill>? skills = null,
             (EAttribute Attribute, double Amount)[]? extra = null)
         {
-            return new Battler(MakePlayer(strength, endurance, agility, dexterity, skills, extra));
+            return BattlerFactory.FromPlayer(MakePlayer(strength, endurance, agility, dexterity, skills, extra));
         }
 
         private static Player MakePlayer(
@@ -834,7 +834,7 @@ namespace Game.Core.Tests.Battle
                 player.TryApplyMod(item.Id, mods[index].Id, index, mods[index]);
             }
 
-            return new Battler(player);
+            return BattlerFactory.FromPlayer(player);
         }
 
         private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier> attributes) => new()

@@ -198,7 +198,7 @@ namespace Game.Core.Tests.Battle
                 .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
                 .ToList();
             var player = new PlayerBuilder().WithStatAllocations(statAllocations).Build();
-            return new Battler(player);
+            return BattlerFactory.FromPlayer(player);
         }
     }
 }
