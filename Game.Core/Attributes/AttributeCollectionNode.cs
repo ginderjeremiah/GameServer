@@ -18,7 +18,12 @@ namespace Game.Core.Attributes
         // means "no stored modifiers". The read and remove paths treat null as the empty set.
         public SortedLinkedList<AttributeModifier>? Modifiers { get; private set; }
         public double? CachedValue { get; private set; }
-        public HashSet<AttributeCollectionNode> DerivedNodes { get; } = [];
+
+        // Allocated lazily on the first derived link (see GetOrCreateDerivedNodes), mirroring Modifiers. A
+        // node that nothing derives from — e.g. the player-only crit/dodge/block attributes an enemy battler
+        // reads as zero on every DamageTarget call — never allocates the set. The cascade and unhook paths
+        // treat null as the empty set.
+        public HashSet<AttributeCollectionNode>? DerivedNodes { get; private set; }
 
         // Returns the modifier list, allocating it on first use. Only the add path calls this; the
         // read and remove paths leave the list null when no modifier was ever stored.
@@ -27,9 +32,21 @@ namespace Game.Core.Attributes
             return Modifiers ??= new(TypeComparer);
         }
 
+        // Returns the derived-node set, allocating it on first use. Only the derived-link add path calls
+        // this; the cascade and unhook paths leave the set null when no link was ever created.
+        public HashSet<AttributeCollectionNode> GetOrCreateDerivedNodes()
+        {
+            return DerivedNodes ??= [];
+        }
+
         public void SetCachedValue(double? value)
         {
             CachedValue = value;
+            if (DerivedNodes is null)
+            {
+                return;
+            }
+
             foreach (var derivedNode in DerivedNodes)
             {
                 if (derivedNode.CachedValue is not null)

@@ -123,7 +123,7 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Dexterity, Amount = 0 },
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
-            var attacker = new Battler(new PlayerBuilder()
+            var attacker = BattlerFactory.FromPlayer(new PlayerBuilder()
                 .WithStatAllocations(statAllocations)
                 .WithStatPointsGained(52)
                 .WithStatPointsUsed(52)
@@ -268,7 +268,7 @@ namespace Game.Core.Tests.Battle
                 .WithStatPointsGained(50)
                 .WithStatPointsUsed(50)
                 .Build();
-            return new Battler(player);
+            return BattlerFactory.FromPlayer(player);
         }
 
         private static Battler MakeBattlerWith(params (EAttribute Attribute, double Amount)[] attributes)
@@ -277,7 +277,7 @@ namespace Game.Core.Tests.Battle
                 .Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount })
                 .ToList();
             var player = new PlayerBuilder().WithStatAllocations(statAllocations).Build();
-            return new Battler(player);
+            return BattlerFactory.FromPlayer(player);
         }
     }
 }

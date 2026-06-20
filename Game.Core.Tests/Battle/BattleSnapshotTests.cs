@@ -234,7 +234,7 @@ namespace Game.Core.Tests.Battle
         private static void AssertBattlerParity(Player player,
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
         {
-            var liveBattler = new Battler(player);
+            var liveBattler = BattlerFactory.FromPlayer(player);
             var snapshotBattler = BattleSnapshot.FromPlayer(player)
                 .ToBattler(resolveItem, resolveMod, resolveSkill);
 
