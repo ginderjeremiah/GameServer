@@ -171,6 +171,28 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 7840),
 
+                // Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is
+                // built from a FRACTIONAL per-level AttributeDistribution (BaseAmount 0 + 2.5/level at level 3
+                // → Strength 7.5) rather than an integer BaseAmount at level 1 — the production path
+                // EnemyInstance.FromSource serializes the resulting double to the client, which re-derives it.
+                // Strength feeds only MaxHealth here: 50 + 5×7.5 = 87.5, a fractional max with a TIGHT kill margin.
+                //   Player: skill baseDamage 31, no multiplier, cooldown 400 → 31−2 Def = 29/hit every 10 ticks.
+                //   Enemy:  MaxHealth 87.5, Def 2, no skills (the player never dies).
+                //   Cumulative 29,58,87 (the 87.5 survives the 87), 116 → dies on hit 4 at tick 160 → 1600ms. Had
+                //   the .5 been lost to a float roundtrip (MaxHealth 87) the enemy would die a hit earlier at 1200.
+                ["fractionalEnemyDistribution"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 31, cooldownMs: 400)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0,
+                        skills: [],
+                        level: 3,
+                        perLevelDistributions: [(EAttribute.Strength, 0m, 2.5m)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
                 // A self Strength buff: the hit that CARRIES the effect uses the pre-effect attributes, and
                 // only subsequent hits see the boost (which also raises damage via the Strength→damage path)
                 // — and re-applying it every fire now STACKS (each fire adds another +10), so the buff
@@ -381,6 +403,29 @@ namespace Game.Core.Tests.Battle
                     ExpectedTotalMs: 3000,
                     MaxMs: 3000),
 
+                // Effect apply → expire → re-apply (#941): a periodic poison whose duration (80ms = 2 ticks) is
+                // shorter than its skill's cooldown (120ms = 3 ticks), so each application fully LAPSES for a
+                // tick before the skill fires again and re-applies — the cycle where the backend's absolute
+                // ExpiresAtMs clock and the frontend's decrementing remainingMs are most likely to drift by a
+                // tick. (Distinct from the refresh-while-active stacking and single-shot expiry rows.)
+                //   Player: skill baseDamage 0, cooldown 120, Opponent +250 DamageTakenPerSecond for 80ms → 10/tick.
+                //     Fires at ticks 120,240,360; each application deals DoT on its 2 active ticks, then lapses one.
+                //   Enemy:  MaxHealth 50, no skills.
+                //   Active ticks 120,160 (50→30), lapse 200, re-apply 240,280 (30→10), lapse 320, re-apply 360
+                //   (→0): dies at tick 360 → 360ms. (A non-lapsing constant 10/tick from tick 120 would kill at 280.)
+                ["effectExpiresThenReapplies"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 120,
+                                effects: [MakeEffect(210, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, 80)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 360),
+
                 // DoT stacking: a poison re-applied every tick STACKS (each application adds another
                 // DamageTakenPerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
                 // (cooldown 40) applies Opponent +25 DamageTakenPerSecond each tick; at tick n the enemy
@@ -525,6 +570,26 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
+
+                // Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance
+                // is a real 0.5 fraction, so whether each player fire crits depends on the actual Mulberry32 [0,1)
+                // draw — validating that a fractional chance compared against a real draw lands identically on both
+                // ports (not just the draw ordering/math). With ParitySeed the first six crit draws are
+                // crit,crit,no,no,crit,crit.
+                //   Player: skill baseDamage 12, cooldown 400 (one crit draw per fire, every 10 ticks); CriticalDamage
+                //     base 1.5 + 0.5 = 2.0 → a crit deals 12×2−2 = 22, a non-crit 12−2 = 10.
+                //   Enemy:  Str 10 → MaxHealth 100, Def 2, no skills (no enemy draws, so the stream is crit draws only).
+                //   Hits 22,22,10,10,22 (cum 86) then the 6th draw's crit (+22 → 108 ≥ 100) kills on fire 6 → 2400ms.
+                //   The 6th hit being a crit is decisive: a non-crit there (+10 → 96) would push the kill to fire 7.
+                ["fractionalCritChance"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400)],
+                        extra: [(EAttribute.CriticalChance, 0.5), (EAttribute.CriticalDamage, 0.5)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
@@ -606,6 +671,22 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(32, player.GetAttributeValue(EAttribute.Defense));
             Assert.Equal(1.10, player.GetAttributeValue(EAttribute.CooldownRecovery), 10);
             Assert.Equal(1.10, player.GetCooldownMultiplier(), 10);
+        }
+
+        /// <summary>
+        /// Pins the fractional enemy attributes for the <c>fractionalEnemyDistribution</c> scenario so a
+        /// divergence in the decimal→double per-level distribution (or the wire roundtrip the client mirrors)
+        /// is reported directly rather than only surfacing as a different battle outcome. Mirrors the frontend
+        /// "derives the fractionalEnemyDistribution enemy MaxHealth" expectation.
+        /// </summary>
+        [Fact]
+        public void Parity_FractionalEnemyDistribution_DerivesFractionalMaxHealth()
+        {
+            var enemy = Scenarios["fractionalEnemyDistribution"].Enemy();
+
+            // Strength 0 (base) + (0 + 2.5 × level 3) per-level distribution = 7.5 → MaxHealth 50 + 5×7.5 = 87.5.
+            Assert.Equal(7.5, enemy.GetAttributeValue(EAttribute.Strength));
+            Assert.Equal(87.5, enemy.GetAttributeValue(EAttribute.MaxHealth));
         }
 
         private static Skill MakeSkill(
@@ -795,7 +876,9 @@ namespace Game.Core.Tests.Battle
         private static Battler MakeEnemy(
             double strength, double endurance,
             List<Skill>? skills = null,
-            (EAttribute Attribute, double Amount)[]? extra = null)
+            (EAttribute Attribute, double Amount)[]? extra = null,
+            int level = 1,
+            (EAttribute Attribute, decimal BaseAmount, decimal AmountPerLevel)[]? perLevelDistributions = null)
         {
             var defaultSkills = skills ?? [];
 
@@ -820,12 +903,28 @@ namespace Game.Core.Tests.Battle
                 }
             }
 
+            // Fractional per-level distributions (#941): exercise the AmountPerLevel × level path of
+            // AttributeDistribution.GetDistributionModifier — every other scenario uses an integer BaseAmount
+            // at level 1, so this is the only place the decimal→double per-level derivation is covered.
+            if (perLevelDistributions is not null)
+            {
+                foreach (var (attribute, baseAmount, amountPerLevel) in perLevelDistributions)
+                {
+                    distributions.Add(new AttributeDistribution
+                    {
+                        AttributeId = attribute,
+                        BaseAmount = baseAmount,
+                        AmountPerLevel = amountPerLevel,
+                    });
+                }
+            }
+
             var enemy = new Enemy
             {
                 Id = 1,
                 Name = "Test Enemy",
                 IsBoss = false,
-                Level = 1,
+                Level = level,
                 AttributeDistributions = distributions,
                 AvailableSkills = defaultSkills,
             };

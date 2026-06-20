@@ -248,6 +248,21 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 7840 }
 	},
 
+	// Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is a FRACTIONAL
+	// value (Strength 7.5, produced on the backend by a 2.5/level distribution at level 3 and serialized to the
+	// client, which re-derives MaxHealth from it). Strength feeds only MaxHealth: 50 + 5×7.5 = 87.5, a fractional
+	// max with a TIGHT kill margin. Mirrors the backend `fractionalEnemyDistribution` scenario.
+	//   Player: skill baseDamage 31, no multiplier, cooldown 400 → 31−2 Def = 29/hit every 10 ticks.
+	//   Enemy:  MaxHealth 87.5, Def 2, no skills.
+	//   Cumulative 29,58,87 (the 87.5 survives the 87), 116 → dies on hit 4 at tick 160 → 1600ms. Had the .5 been
+	//   lost to a float roundtrip (MaxHealth 87) the enemy would die a hit earlier at 1200.
+	{
+		name: 'fractionalEnemyDistribution',
+		player: () => makeBattler([], [makeSkill(31, 400)]),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 7.5 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
 	// A self Strength buff: the carrying hit uses the pre-effect attributes and only subsequent hits see
 	// the boost (which also raises damage via the Strength→damage path); re-applying it each fire now STACKS
 	// (each fire adds another +10). Mirrors the backend `selfStrengthBuffStacksEachFire` scenario.
@@ -530,6 +545,41 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: 3000 }
 	},
 
+	// Effect apply → expire → re-apply (#941): a periodic poison whose duration (80ms = 2 ticks) is shorter than
+	// its skill's cooldown (120ms = 3 ticks), so each application fully LAPSES for a tick before re-applying — the
+	// cycle where the frontend's decrementing remainingMs and the backend's absolute ExpiresAtMs clock are most
+	// likely to drift by a tick. Mirrors the backend `effectExpiresThenReapplies` scenario.
+	//   Player: skill baseDamage 0, cooldown 120, Opponent +250 DamageTakenPerSecond for 80ms → 10/tick. Fires at
+	//     ticks 120,240,360. Enemy: MaxHealth 50, no skills.
+	//   Active 120,160 (50→30), lapse 200, re-apply 240,280 (30→10), lapse 320, re-apply 360 (→0): dies at 360ms.
+	//   (A non-lapsing constant 10/tick from tick 120 would kill at 280.)
+	{
+		name: 'effectExpiresThenReapplies',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeSkill(
+						0,
+						120,
+						[],
+						[
+							makeEffect(
+								210,
+								ESkillEffectTarget.Opponent,
+								EAttribute.DamageTakenPerSecond,
+								EModifierType.Additive,
+								250,
+								80
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([], []),
+		expected: { victory: true, playerDied: false, totalMs: 360 }
+	},
+
 	// DoT stacking: a poison re-applied every tick STACKS (each application adds another
 	// DamageTakenPerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
 	// (cooldown 40) applies Opponent +25 DamageTakenPerSecond each tick; at tick n the enemy carries n
@@ -695,6 +745,27 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(20, 400)]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance is a
+	// real 0.5 fraction, so whether each player fire crits depends on the actual Mulberry32 [0,1) draw. With
+	// PARITY_SEED the first six crit draws are crit,crit,no,no,crit,crit. Mirrors the backend `fractionalCritChance`.
+	//   Player: skill baseDamage 12, cooldown 400 (one crit draw per fire); CriticalDamage base 1.5 + 0.5 = 2.0 →
+	//     a crit deals 12×2−2 = 22, a non-crit 12−2 = 10. Enemy: Str 10 → MaxHealth 100, Def 2, no skills.
+	//   Hits 22,22,10,10,22 (cum 86) then the 6th draw's crit (+22 → 108 ≥ 100) kills on fire 6 → 2400ms; a
+	//   non-crit there (96) would push the kill to fire 7.
+	{
+		name: 'fractionalCritChance',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.CriticalChance, amount: 0.5 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[makeSkill(12, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
 	}
 ];
 
@@ -747,6 +818,22 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.Defense)).toBe(32);
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.1, 10);
 		expect(player.cdMultiplier).toBeCloseTo(1.1, 10);
+	});
+
+	it('derives the fractionalEnemyDistribution enemy MaxHealth to the expected fractional value', () => {
+		// Pins the fractional enemy stat down so a divergence in the fractional value (the backend's
+		// decimal→double per-level distribution, or the wire roundtrip this side mirrors) is reported
+		// directly rather than only as a different outcome. Mirrors
+		// BattleSimulatorParityTests.Parity_FractionalEnemyDistribution_DerivesFractionalMaxHealth.
+		const scenario = scenarios.find((s) => s.name === 'fractionalEnemyDistribution');
+		if (!scenario) {
+			throw new Error('fractionalEnemyDistribution scenario is missing from the matrix');
+		}
+		const enemy = scenario.enemy();
+
+		// Strength 7.5 (the backend's 2.5/level distribution at level 3) → MaxHealth 50 + 5×7.5 = 87.5.
+		expect(enemy.attributes.getValue(EAttribute.Strength)).toBe(7.5);
+		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(87.5);
 	});
 
 	it('ends sooner if the player double-counts derived stats (the historical bug)', () => {
