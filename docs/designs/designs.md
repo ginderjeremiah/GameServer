@@ -25,20 +25,21 @@ Each screen folder contains the HTML entry-point prototype(s), the JSX component
 
 ## Game
 
-| Folder                             | Screens                                                    | Chat                                                    |
-| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| [login](./game/login/)             | Login / account-creation form                              | `chat.md`                                               |
-| [loading](./game/loading/)         | Loading screen                                             | `chat.md`                                               |
-| [game-screen](./game/game-screen/) | Main game layout (collapsible sidebar nav)                 | `chat.md`                                               |
+| Folder                             | Screens                                                    | Chat                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| [login](./game/login/)             | Login / account-creation form                              | `chat.md`                                                                                                                |
+| [loading](./game/loading/)         | Loading screen                                             | `chat.md`                                                                                                                |
+| [game-screen](./game/game-screen/) | Main game layout (collapsible sidebar nav)                 | `chat.md`                                                                                                                |
 | [fight](./game/fight/)             | Fight screen layout, combat-feedback enhancements          | `chat-original.md` (initial), `chat.md` (boss redesign), `chat-enhancements.md` (XP bar, floating numbers, battle timer) |
-| [inventory](./game/inventory/)     | Inventory screen (drag-drop, item mods)                    | `chat.md`                                               |
-| [challenge](./game/challenge/)     | Challenge screen v1/v2/v3 + redesign                       | `chat.md` (original), `chat-redesign.md`                |
-| [attributes](./game/attributes/)   | Attribute page, breakdown, build, stats-attributes sidebar | — (see stats/chat.md)                                   |
-| [stats](./game/stats/)             | Statistics page and sidebar panels                         | `chat.md` (also covers attributes)                      |
-| [skills](./game/skills/)           | Skills Inspector wireframes and themed pass                | `chat.md`                                               |
-| [options](./game/options/)         | Options / settings screen                                  | `chat.md`                                               |
-| [log-panel](./game/log-panel/)     | Battle log panel                                           | `chat-1.md` (initial), `chat-2.md` (refinement)         |
-| [toast-modal](./game/toast-modal/) | Toast & modal notification system                          | `chat.md`                                               |
-| [tooltips](./game/tooltips/)       | Tooltip components                                         | `chat.md`                                               |
-| [card-game](./game/card-game/)     | Card minigame (Loom) wireframes and themed passes          | `chat.md`                                               |
-| [shared](./game/shared/)           | Cross-screen prototype utilities (not screen-specific)     | —                                                       |
+| [inventory](./game/inventory/)     | Inventory screen (drag-drop, item mods)                    | `chat.md`                                                                                                                |
+| [challenge](./game/challenge/)     | Challenge screen v1/v2/v3 + redesign                       | `chat.md` (original), `chat-redesign.md`                                                                                 |
+| [attributes](./game/attributes/)   | Attribute page, breakdown, build, stats-attributes sidebar | — (see stats/chat.md)                                                                                                    |
+| [stats](./game/stats/)             | Statistics page and sidebar panels                         | `chat.md` (also covers attributes)                                                                                       |
+| [skills](./game/skills/)           | Skills Inspector wireframes and themed pass                | `chat.md`                                                                                                                |
+| [options](./game/options/)         | Options / settings screen                                  | `chat.md`                                                                                                                |
+| [log-panel](./game/log-panel/)     | Battle log panel                                           | `chat-1.md` (initial), `chat-2.md` (refinement)                                                                          |
+| [toast-modal](./game/toast-modal/) | Toast & modal notification system                          | `chat.md`                                                                                                                |
+| [tooltips](./game/tooltips/)       | Tooltip components                                         | `chat.md`                                                                                                                |
+| [card-game](./game/card-game/)     | Card minigame (Loom) wireframes and themed passes          | `chat.md`                                                                                                                |
+| [shared](./game/shared/)           | Cross-screen prototype utilities (not screen-specific)     | —                                                                                                                        |
+| [codex](./game/codex)              | Codex page and relevant tab designs                        | —                                                                                                                        |

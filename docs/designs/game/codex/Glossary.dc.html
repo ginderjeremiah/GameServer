@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #0f1014; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  input[type=range].gl-range { -webkit-appearance: none; appearance: none; height: 3px; border-radius: 3px; background: rgba(255,255,255,.14); outline: none; }
+  input[type=range].gl-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #e08778; cursor: pointer; box-shadow: 0 0 8px rgba(224,135,120,.6); border: 2px solid #0f1014; }
+  input[type=range].gl-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #e08778; cursor: pointer; border: 2px solid #0f1014; }
+</style>
+</helmet>
+
+<div style="height:100vh; display:flex; flex-direction:column; background:linear-gradient(180deg,#16171e 0%,#0f1014 64%); color:#f0f0f0; font-family:Geist, system-ui, sans-serif; overflow:hidden;">
+
+  <!-- ===== Header ===== -->
+  <div style="display:flex; align-items:center; gap:12px; padding:24px 30px 16px; flex:none;">
+    <span style="width:10px; height:10px; transform:rotate(45deg); background:#a1c2f7; box-shadow:0 0 8px rgba(161,194,247,.6); flex:none;"></span>
+    <div style="font-size:28px; font-weight:400; letter-spacing:-0.4px; line-height:1;">Codex</div>
+  </div>
+
+  <!-- ===== Tab bar ===== -->
+  <div style="display:flex; gap:6px; border-bottom:1px solid rgba(255,255,255,.08); padding:0 30px; flex:none;">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+      <button type="button" onClick="{{ t.onSelect }}" style="position:relative; background:transparent; border:none; cursor:pointer; padding:4px 14px 12px; display:flex; align-items:center; gap:8px;">
+        <span style="width:8px; height:8px; transform:rotate(45deg); background:{{ t.dotColor }}; flex:none;"></span>
+        <span style="font-family:Geist, sans-serif; font-size:13.5px; font-weight:{{ t.weight }}; color:{{ t.labelColor }};">{{ t.label }}</span>
+        <span style="font-family:'Geist Mono', monospace; font-size:9.5px; color:{{ t.countColor }}; border:1px solid {{ t.countBorder }}; border-radius:8px; padding:0 6px; line-height:15px;">{{ t.count }}</span>
+        <span style="position:absolute; left:0; right:0; bottom:-1px; height:2px; border-radius:2px; background:{{ t.underline }};"></span>
+      </button>
+    </sc-for>
+  </div>
+
+  <!-- ===== Content ===== -->
+  <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+
+    <!-- ========== ENEMIES TAB ========== -->
+    <sc-if value="{{ isEnemies }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1; min-height:0; display:flex;">
+
+      <!-- left: toolbar + table -->
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; padding:14px 0 14px 30px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding-right:22px;">
+          <div style="display:flex; align-items:center; gap:8px; background:#16171e; border:1px solid rgba(255,255,255,.14); border-radius:3px; padding:6px 11px; width:190px;">
+            <span style="color:rgba(240,240,240,.4); font-size:12px;">⌕</span>
+            <span style="font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.4); letter-spacing:.5px;">search {{ enemyTotal }} enemies</span>
+          </div>
+          <div style="display:flex; gap:5px;">
+            <sc-for list="{{ filterChips }}" as="f" hint-placeholder-count="3">
+              <button type="button" onClick="{{ f.onSelect }}" style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:{{ f.bg }}; color:{{ f.color }}; border:1px solid {{ f.border }}; border-radius:10px; padding:4px 11px; cursor:pointer;">{{ f.label }}</button>
+            </sc-for>
+          </div>
+          <span style="flex:1;"></span>
+          <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:rgba(240,240,240,.4);">{{ shownCount }} shown · sort: level ▾</span>
+        </div>
+        <!-- table head -->
+        <div style="display:flex; align-items:center; font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(240,240,240,.4); padding:0 14px 8px; border-bottom:1px solid rgba(255,255,255,.08); margin-right:14px;">
+          <span style="flex:2.4;">Name</span>
+          <span style="flex:1; text-align:right;">Level</span>
+          <span style="flex:.9; text-align:right;">Zones</span>
+          <span style="flex:.9; text-align:right;">Skills</span>
+        </div>
+        <!-- rows -->
+        <div style="flex:1; min-height:0; overflow-y:auto; padding-right:6px;">
+          <sc-for list="{{ enemyRows }}" as="e" hint-placeholder-count="12">
+            <button type="button" onClick="{{ e.onSelect }}" style="width:100%; text-align:left; display:flex; align-items:center; padding:9px 14px; border:none; border-left:2px solid {{ e.selBar }}; border-bottom:1px solid rgba(255,255,255,.05); background:{{ e.rowBg }}; cursor:pointer; font-family:Geist, sans-serif;">
+              <span style="flex:2.4; display:flex; align-items:center; gap:11px; min-width:0;">
+                <span style="width:9px; height:9px; flex:none; {{ e.markStyle }}"></span>
+                <span style="font-size:13.5px; color:{{ e.nameColor }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:{{ e.nameWeight }};">{{ e.name }}</span>
+                <sc-if value="{{ e.isBoss }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Geist Mono', monospace; font-size:7.5px; letter-spacing:1px; color:#e8c878; border:1px solid rgba(232,200,120,.4); border-radius:3px; padding:1px 4px; flex:none;">BOSS</span></sc-if>
+              </span>
+              <span style="flex:1; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.7);">{{ e.band }}</span>
+              <span style="flex:.9; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.5);">{{ e.zoneCount }}</span>
+              <span style="flex:.9; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.5);">{{ e.skillCount }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- right: enemy dossier -->
+      <div style="width:380px; flex:none; background:#13141a; border-left:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column;">
+        <div style="border-left:3px solid {{ sel.accent }}; padding:18px 20px 14px; flex:none;">
+          <div style="display:flex; align-items:center; gap:9px; margin-bottom:6px;">
+            <span style="width:6px; height:6px; transform:rotate(45deg); background:{{ sel.accent }}; flex:none;"></span>
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:{{ sel.accent }};">{{ sel.kindLabel }}</span>
+          </div>
+          <div style="font-size:21px; font-weight:500; letter-spacing:-0.3px; line-height:1.05;">{{ sel.name }}</div>
+        </div>
+
+        <!-- sub tabs -->
+        <div style="display:flex; gap:2px; padding:0 18px; border-bottom:1px solid rgba(255,255,255,.08); flex:none;">
+          <sc-for list="{{ subTabs }}" as="s" hint-placeholder-count="4">
+            <button type="button" onClick="{{ s.onSelect }}" style="position:relative; background:transparent; border:none; cursor:pointer; padding:3px 7px 10px; font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:1px; text-transform:uppercase; color:{{ s.color }};">
+              {{ s.label }}
+              <span style="position:absolute; left:0; right:0; bottom:-1px; height:2px; background:{{ s.underline }};"></span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="flex:1; min-height:0; overflow-y:auto; padding:16px 20px 20px;">
+
+          <!-- ATTRIBUTES -->
+          <sc-if value="{{ showAttributes }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:11px;">
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4);">Attribute distribution</span>
+            <button type="button" onClick="{{ toggleAdvanced }}" style="background:{{ advBg }}; border:1px solid {{ advBorder }}; border-radius:10px; padding:2px 9px; cursor:pointer;">
+              <span style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1px; text-transform:uppercase; color:{{ advColor }};">Show scaling</span>
+            </button>
+          </div>
+          <!-- level control -->
+          <sc-if value="{{ sel.hasRange }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+              <span style="font-family:'Geist Mono', monospace; font-size:9px; color:rgba(240,240,240,.4);">LVL</span>
+              <input type="range" class="gl-range" min="{{ sel.minLevel }}" max="{{ sel.maxLevel }}" value="{{ level }}" onInput="{{ setLevel }}" style="flex:1;" />
+              <span style="font-family:'Geist Mono', monospace; font-size:13px; color:#e08778; font-weight:500; width:26px; text-align:right;">{{ level }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sel.fixedLevel }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; font-family:'Geist Mono', monospace; font-size:9px; color:rgba(240,240,240,.4);">
+              <span>FIXED ENCOUNTER</span><span style="height:1px; flex:1; background:rgba(255,255,255,.08);"></span><span style="color:#e8c878; font-size:11px;">LVL {{ level }}</span>
+            </div>
+          </sc-if>
+          <!-- primary bars -->
+          <sc-for list="{{ primaryStats }}" as="s" hint-placeholder-count="6">
+            <div style="margin-bottom:9px;">
+              <div style="display:flex; align-items:center; gap:9px;">
+                <span style="font-family:'Geist Mono', monospace; font-size:9.5px; width:30px; color:rgba(240,240,240,.55);">{{ s.code }}</span>
+                <span style="flex:1; height:8px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden;"><span style="display:block; height:8px; border-radius:3px; width:{{ s.barW }}; background:{{ s.color }};"></span></span>
+                <span style="font-family:'Geist Mono', monospace; font-size:11.5px; width:34px; text-align:right; color:#f0f0f0; font-weight:500;">{{ s.val }}</span>
+              </div>
+              <sc-if value="{{ advanced }}" hint-placeholder-val="{{ false }}">
+                <div style="font-family:'Geist Mono', monospace; font-size:8.5px; color:rgba(240,240,240,.4); padding-left:39px; margin-top:2px;">{{ s.base }} base + {{ s.per }}/lvl × {{ level }}</div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <!-- secondary attributes -->
+          <div style="display:flex; gap:10px; margin-top:14px; padding-top:13px; border-top:1px solid rgba(255,255,255,.08);">
+            <sc-for list="{{ secondaryStats }}" as="s" hint-placeholder-count="2">
+              <div style="flex:1; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+                <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1px; text-transform:uppercase; color:rgba(240,240,240,.4);">{{ s.code }}</div>
+                <div style="font-family:'Geist Mono', monospace; font-size:17px; color:{{ s.valColor }}; font-weight:500; margin-top:2px;">{{ s.val }}</div>
+                <sc-if value="{{ advanced }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Geist Mono', monospace; font-size:8px; color:rgba(240,240,240,.4); margin-top:2px;">+{{ s.per }}/lvl</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <!-- STATISTICS -->
+          <sc-if value="{{ showStatistics }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:11px;">Your record</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:9px;">
+            <sc-for list="{{ enemyStatistics }}" as="st" hint-placeholder-count="8">
+              <div style="background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+                <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1px; text-transform:uppercase; color:rgba(240,240,240,.4);">{{ st.label }}</div>
+                <div style="font-family:'Geist Mono', monospace; font-size:16px; color:{{ st.color }}; font-weight:500; margin-top:3px;">{{ st.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:11px; color:rgba(240,240,240,.4); font-style:italic; line-height:1.45; margin-top:12px;">Tracked from your battles — runtime progress, not part of the enemy's reference data.</div>
+          </sc-if>
+
+          <!-- SKILLS -->
+          <sc-if value="{{ showEnemySkills }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Skill pool · {{ enemySkillCount }}</div>
+          <div style="display:flex; flex-direction:column; gap:7px;">
+            <sc-for list="{{ enemySkills }}" as="sk" hint-placeholder-count="4">
+              <button type="button" onClick="{{ sk.onOpen }}" style="text-align:left; display:flex; align-items:center; gap:11px; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:5px; padding:9px 11px; cursor:pointer;">
+                <span style="width:5px; height:5px; transform:rotate(45deg); background:#c4b6ec; flex:none;"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:12.5px; color:#f0f0f0;">{{ sk.name }}</div>
+                  <div style="font-family:'Geist Mono', monospace; font-size:8.5px; color:rgba(240,240,240,.4); margin-top:1px;">{{ sk.meta }}</div>
+                </div>
+                <span style="font-family:'Geist Mono', monospace; font-size:9px; color:rgba(240,240,240,.35);">›</span>
+              </button>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <!-- SPAWNS -->
+          <sc-if value="{{ showEnemySpawns }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">{{ spawnHeading }}</div>
+          <div style="display:flex; flex-direction:column; gap:11px;">
+            <sc-for list="{{ enemySpawns }}" as="sp" hint-placeholder-count="3">
+              <button type="button" onClick="{{ sp.onOpen }}" style="width:100%; text-align:left; border:none; background:transparent; cursor:pointer; padding:0; display:block;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+                  <span style="font-size:12.5px; color:#f0f0f0;">{{ sp.zone }} <span style="color:rgba(240,240,240,.3); font-size:10px;">›</span></span>
+                  <span style="font-family:'Geist Mono', monospace; font-size:10px; color:#c0d8ff;">{{ sp.share }}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="flex:1; height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden;"><span style="display:block; height:6px; border-radius:3px; width:{{ sp.share }}; background:#a1c2f7;"></span></span>
+                  <span style="font-family:'Geist Mono', monospace; font-size:8.5px; color:rgba(240,240,240,.4); white-space:nowrap;">{{ sp.weight }}</span>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <!-- CHALLENGES -->
+          <sc-if value="{{ showEnemyChallenges }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Related challenges · {{ enemyChallengeCount }}</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <sc-for list="{{ enemyChallenges }}" as="c" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:10px; background:#16171e; border:1px solid rgba(255,255,255,.08); border-left:2px solid {{ c.accent }}; border-radius:4px; padding:9px 11px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:12.5px; color:#f0f0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ c.name }}</div>
+                  <div style="font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:.8px; text-transform:uppercase; color:{{ c.accent }}; margin-top:2px;">{{ c.type }}</div>
+                </div>
+                <span style="font-family:'Geist Mono', monospace; font-size:11px; color:{{ c.progColor }};">{{ c.prog }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ========== ZONES TAB ========== -->
+    <sc-if value="{{ isZones }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1; min-height:0; display:flex;">
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; padding:16px 22px 16px 30px;">
+        <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:12px;">World progression · {{ zoneTotal }} zones</div>
+        <div style="flex:1; min-height:0; overflow-y:auto; position:relative; padding-left:6px;">
+          <div style="position:absolute; left:13px; top:6px; bottom:6px; width:2px; background:repeating-linear-gradient(rgba(255,255,255,.14) 0 4px, transparent 4px 9px);"></div>
+          <sc-for list="{{ zoneList }}" as="z" hint-placeholder-count="6">
+            <button type="button" onClick="{{ z.onSelect }}" style="position:relative; width:100%; text-align:left; display:flex; align-items:center; gap:14px; padding:11px 14px 11px 0; border:none; background:transparent; cursor:pointer; font-family:Geist, sans-serif;">
+              <span style="width:15px; height:15px; border-radius:50%; background:{{ z.dotColor }}; border:3px solid #0f1014; box-shadow:0 0 0 1.5px {{ z.dotColor }}; flex:none; z-index:1;"></span>
+              <span style="flex:1; min-width:0; display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:5px; border-left:2px solid {{ z.selBar }}; background:{{ z.rowBg }};">
+                <span style="font-size:14.5px; color:{{ z.nameColor }}; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><sc-if value="{{ z.locked }}" hint-placeholder-val="{{ false }}"><span style="opacity:.6;">🔒 </span></sc-if>{{ z.name }}</span>
+                <span style="font-family:'Geist Mono', monospace; font-size:9.5px; color:rgba(240,240,240,.55);">{{ z.band }}</span>
+                <span style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1px; text-transform:uppercase; color:{{ z.dotColor }}; border:1px solid {{ z.dotColor }}; border-radius:9px; padding:2px 8px;">{{ z.statusLabel }}</span>
+              </span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="width:380px; flex:none; background:#13141a; border-left:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column;">
+        <div style="border-left:3px solid {{ zoneView.accent }}; padding:18px 20px 14px; flex:none;">
+          <div style="display:flex; align-items:center; gap:9px; margin-bottom:6px;">
+            <span style="width:6px; height:6px; transform:rotate(45deg); background:{{ zoneView.accent }}; flex:none;"></span>
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:{{ zoneView.accent }};">{{ zoneView.statusLabel }} zone</span>
+          </div>
+          <div style="font-size:21px; font-weight:500; letter-spacing:-0.3px; line-height:1.05;">{{ zoneView.name }}</div>
+          <div style="font-size:12px; color:rgba(240,240,240,.55); line-height:1.5; margin-top:6px;">{{ zoneView.lore }}</div>
+        </div>
+        <div style="flex:1; min-height:0; overflow-y:auto; padding:16px 20px 20px;">
+          <div style="display:flex; gap:10px; margin-bottom:18px;">
+            <div style="flex:1; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+              <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4);">LEVEL RANGE</div>
+              <div style="font-family:'Geist Mono', monospace; font-size:15px; color:#f0f0f0; font-weight:500; margin-top:3px;">{{ zoneView.band }}</div>
+            </div>
+            <div style="flex:1; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+              <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4);">SPAWN POOL</div>
+              <div style="font-family:'Geist Mono', monospace; font-size:15px; color:#a1c2f7; font-weight:500; margin-top:3px;">{{ zoneView.spawnCount }}</div>
+            </div>
+          </div>
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:9px;">Zone boss</div>
+          <sc-if value="{{ zoneView.hasBoss }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ zoneView.onOpenBoss }}" style="width:100%; text-align:left; display:flex; align-items:center; gap:13px; background:linear-gradient(180deg,rgba(232,200,120,.10),rgba(232,200,120,.02)); border:1px solid rgba(232,200,120,.35); border-radius:6px; padding:13px 15px; margin-bottom:18px; cursor:pointer;">
+            <span style="width:11px; height:11px; transform:rotate(45deg); background:#e8c878; flex:none; box-shadow:0 0 10px rgba(232,200,120,.6);"></span>
+            <div style="flex:1;">
+              <div style="font-size:15px; font-weight:600; color:#f0f0f0;">{{ zoneView.boss }}</div>
+              <div style="font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:1px; text-transform:uppercase; color:#e8c878; margin-top:2px;">Boss · Level {{ zoneView.bossLevel }}</div>
+            </div>
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; color:rgba(240,240,240,.4);">view ›</span>
+          </button>
+          </sc-if>
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Spawn table</div>
+          <div style="display:flex; flex-direction:column; gap:9px; margin-bottom:18px;">
+            <sc-for list="{{ zoneSpawns }}" as="sp" hint-placeholder-count="3">
+              <button type="button" onClick="{{ sp.onOpen }}" style="width:100%; text-align:left; border:none; background:transparent; cursor:pointer; padding:0;">
+                <div style="display:flex; align-items:center; gap:9px; margin-bottom:5px;">
+                  <span style="width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3); flex:none;"></span>
+                  <span style="font-size:12.5px; color:#f0f0f0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ sp.name }}</span>
+                  <span style="font-family:'Geist Mono', monospace; font-size:10px; color:#c0d8ff; width:36px; text-align:right;">{{ sp.share }}</span>
+                </div>
+                <span style="display:block; height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden;"><span style="display:block; height:5px; border-radius:3px; width:{{ sp.share }}; background:#a1c2f7;"></span></span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:9px;">Unlock condition</div>
+          <div style="display:flex; align-items:center; gap:10px; background:#16171e; border:1px dashed rgba(255,255,255,.18); border-radius:5px; padding:11px 13px;">
+            <span style="width:7px; height:7px; transform:rotate(45deg); background:{{ zoneView.unlockColor }}; flex:none;"></span>
+            <span style="font-size:12.5px; color:rgba(240,240,240,.78);">{{ zoneView.unlock }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ========== SKILLS TAB ========== -->
+    <sc-if value="{{ isSkills }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1; min-height:0; display:flex;">
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; padding:14px 0 14px 30px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding-right:22px;">
+          <div style="display:flex; align-items:center; gap:8px; background:#16171e; border:1px solid rgba(255,255,255,.14); border-radius:3px; padding:6px 11px; width:190px;">
+            <span style="color:rgba(240,240,240,.4); font-size:12px;">⌕</span>
+            <span style="font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.4); letter-spacing:.5px;">search {{ skillTotal }} skills</span>
+          </div>
+          <span style="flex:1;"></span>
+          <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; color:rgba(240,240,240,.4);">sort: name ▾</span>
+        </div>
+        <div style="display:flex; align-items:center; font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(240,240,240,.4); padding:0 14px 8px; border-bottom:1px solid rgba(255,255,255,.08); margin-right:14px;">
+          <span style="flex:2.2;">Name</span>
+          <span style="flex:1; text-align:right;">Base dmg</span>
+          <span style="flex:1; text-align:right;">Cooldown</span>
+          <span style="flex:1.1; text-align:right;">Used by</span>
+        </div>
+        <div style="flex:1; min-height:0; overflow-y:auto; padding-right:6px;">
+          <sc-for list="{{ skillRows }}" as="s" hint-placeholder-count="12">
+            <button type="button" onClick="{{ s.onSelect }}" style="width:100%; text-align:left; display:flex; align-items:center; padding:9px 14px; border:none; border-left:2px solid {{ s.selBar }}; border-bottom:1px solid rgba(255,255,255,.05); background:{{ s.rowBg }}; cursor:pointer; font-family:Geist, sans-serif;">
+              <span style="flex:2.2; display:flex; align-items:center; gap:11px; min-width:0;">
+                <span style="width:6px; height:6px; transform:rotate(45deg); background:#c4b6ec; flex:none;"></span>
+                <span style="font-size:13.5px; color:{{ s.nameColor }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:{{ s.nameWeight }};">{{ s.name }}</span>
+              </span>
+              <span style="flex:1; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:{{ s.dmgColor }};">{{ s.baseDmg }}</span>
+              <span style="flex:1; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.55);">{{ s.cd }}</span>
+              <span style="flex:1.1; text-align:right; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(240,240,240,.5);">{{ s.users }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="width:380px; flex:none; background:#13141a; border-left:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column;">
+        <div style="border-left:3px solid #c4b6ec; padding:18px 20px 14px; flex:none;">
+          <div style="display:flex; align-items:center; gap:9px; margin-bottom:6px;">
+            <span style="width:6px; height:6px; transform:rotate(45deg); background:#c4b6ec; flex:none;"></span>
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:#c4b6ec;">Skill</span>
+          </div>
+          <div style="font-size:21px; font-weight:500; letter-spacing:-0.3px; line-height:1.05;">{{ skillSel.name }}</div>
+          <div style="font-size:12px; color:rgba(240,240,240,.55); line-height:1.5; margin-top:6px;">{{ skillSel.description }}</div>
+        </div>
+        <div style="flex:1; min-height:0; overflow-y:auto; padding:16px 20px 20px;">
+          <div style="display:flex; gap:10px; margin-bottom:18px;">
+            <div style="flex:1; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+              <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4);">BASE DAMAGE</div>
+              <div style="font-family:'Geist Mono', monospace; font-size:17px; color:{{ skillSel.dmgColor }}; font-weight:500; margin-top:2px;">{{ skillSel.baseDmg }}</div>
+            </div>
+            <div style="flex:1; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:9px 11px;">
+              <div style="font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4);">COOLDOWN</div>
+              <div style="font-family:'Geist Mono', monospace; font-size:17px; color:#f0f0f0; font-weight:500; margin-top:2px;">{{ skillSel.cd }}</div>
+            </div>
+          </div>
+          <sc-if value="{{ skillSel.hasMult }}" hint-placeholder-val="{{ true }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Scales with</div>
+          <div style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px;">
+            <sc-for list="{{ skillSel.mults }}" as="m" hint-placeholder-count="2">
+              <span style="display:flex; align-items:center; gap:7px; background:#16171e; border:1px solid rgba(255,255,255,.08); border-radius:11px; padding:4px 11px;">
+                <span style="width:5px; height:5px; transform:rotate(45deg); background:{{ m.color }}; flex:none;"></span>
+                <span style="font-family:'Geist Mono', monospace; font-size:10px; color:rgba(240,240,240,.78);">{{ m.code }}</span>
+                <span style="font-family:'Geist Mono', monospace; font-size:10px; color:{{ m.color }};">{{ m.mult }}</span>
+              </span>
+            </sc-for>
+          </div>
+          </sc-if>
+          <sc-if value="{{ skillSel.hasEffects }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Effects</div>
+          <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:18px;">
+            <sc-for list="{{ skillSel.effects }}" as="ef" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:10px; background:#16171e; border:1px solid rgba(255,255,255,.08); border-left:2px solid {{ ef.accent }}; border-radius:4px; padding:9px 11px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:12.5px; color:#f0f0f0;">{{ ef.label }}</div>
+                  <div style="font-family:'Geist Mono', monospace; font-size:8.5px; letter-spacing:.6px; text-transform:uppercase; color:{{ ef.accent }}; margin-top:2px;">{{ ef.target }}{{ ef.dur }}</div>
+                </div>
+                <span style="font-family:'Geist Mono', monospace; font-size:12px; color:{{ ef.accent }};">{{ ef.amount }}</span>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+          <div style="font-family:'Geist Mono', monospace; font-size:9px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4); margin-bottom:10px;">Used by · {{ skillSel.userCount }}</div>
+          <sc-if value="{{ skillSel.hasUsers }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <sc-for list="{{ skillSel.users }}" as="u" hint-placeholder-count="3">
+              <button type="button" onClick="{{ u.onOpen }}" style="display:flex; align-items:center; gap:7px; background:#16171e; border:1px solid rgba(255,255,255,.14); border-radius:11px; padding:3px 11px; cursor:pointer;">
+                <span style="width:5px; height:5px; flex:none; {{ u.markStyle }}"></span>
+                <span style="font-family:Geist, sans-serif; font-size:11.5px; color:rgba(240,240,240,.78);">{{ u.name }}</span>
+              </button>
+            </sc-for>
+          </div>
+          </sc-if>
+          <sc-if value="{{ skillSel.noUsers }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12px; color:rgba(240,240,240,.4); font-style:italic;">No enemy uses this skill.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1180, &quot;height&quot;: 720 }
+}">
+class Component extends DCLogic {
+  state = { tab: 'enemies', enemyId: 3, sub: 'attributes', level: 18, advanced: false, filter: 'all', zoneId: 1, skillId: 1 };
+
+  // EAttribute meta (ids match enums.ts). Primary 0-5 carry the themed --attr-* hues; 6/7 are real secondary attributes.
+  ATTRS = {
+    0: { code: 'STR', color: '#e8b6a6', primary: true },
+    1: { code: 'END', color: '#bde0b4', primary: true },
+    2: { code: 'INT', color: '#c4b6ec', primary: true },
+    3: { code: 'AGI', color: '#a1c2f7', primary: true },
+    4: { code: 'DEX', color: '#f0d28a', primary: true },
+    5: { code: 'LCK', color: '#8fded0', primary: true },
+    6: { code: 'Max Health', color: '#bde0b4', primary: false },
+    7: { code: 'Defense', color: '#a1c2f7', primary: false },
+    8: { code: 'Cooldown Recovery', color: '#a1c2f7', primary: false },
+    10: { code: 'Critical Chance', color: '#a1c2f7', primary: false },
+    11: { code: 'Critical Damage', color: '#a1c2f7', primary: false },
+    12: { code: 'Dodge Chance', color: '#a1c2f7', primary: false },
+    13: { code: 'Block Chance', color: '#a1c2f7', primary: false },
+    14: { code: 'Block Reduction', color: '#a1c2f7', primary: false },
+    15: { code: 'Damage Taken / s', color: '#e08778', primary: false },
+    16: { code: 'Health Regen / s', color: '#bde0b4', primary: false }
+  };
+  attrMeta(id) { return this.ATTRS[id] || { code: 'Attr ' + id, color: 'rgba(240,240,240,.55)', primary: false }; }
+
+  // Internal generation profiles — produce an IAttributeDistribution-shaped result. The profile name is
+  // never displayed (the game has no enemy "class"); only the resulting [base, perLevel] numbers are.
+  PROF = {
+    brute:  { 0:[16,1.5], 1:[14,1.2], 2:[3,0.2], 3:[7,0.7], 4:[6,0.6], 5:[3,0.2], 6:[60,14], 7:[8,1.0] },
+    caster: { 0:[6,0.5], 1:[8,0.8], 2:[16,1.6], 3:[7,0.7], 4:[5,0.5], 5:[4,0.3], 6:[44,10], 7:[5,0.6] },
+    skirm:  { 0:[9,0.9], 1:[9,0.8], 2:[5,0.4], 3:[15,1.4], 4:[13,1.3], 5:[6,0.5], 6:[48,11], 7:[6,0.7] },
+    swarm:  { 0:[5,0.5], 1:[6,0.5], 2:[2,0.2], 3:[10,0.9], 4:[7,0.6], 5:[5,0.5], 6:[30,7], 7:[4,0.4] },
+    warden: { 0:[13,1.1], 1:[18,1.7], 2:[8,0.6], 3:[8,0.7], 4:[7,0.6], 5:[5,0.4], 6:[75,18], 7:[12,1.5] }
+  };
+
+  // ISkill-shaped catalogue. effects: {t:ESkillEffectTarget(1 self/2 opp), a:EAttribute, m:EModifierType(1 add/2 mult), amt, dur(ms)}
+  SKILLS = [
+    { id: 1,  name: 'Cleave',     base: 14, cd: 1800, desc: 'A heavy horizontal arc that strikes the foe in front.', mult: [[0,1.2]], fx: [] },
+    { id: 2,  name: 'Rend',       base: 9,  cd: 1200, desc: 'A tearing strike that leaves the wound bleeding.', mult: [[0,0.8],[4,0.4]], fx: [{ t:2, a:15, m:1, amt:3, dur:4000 }] },
+    { id: 3,  name: 'War Cry',    base: 0,  cd: 6000, desc: 'A bellow that hardens the caster for a short time.', mult: [], fx: [{ t:1, a:0, m:1, amt:6, dur:5000 }] },
+    { id: 4,  name: 'Ember Bolt', base: 16, cd: 1500, desc: 'A bolt of cinder-fire flung at range.', mult: [[2,1.4]], fx: [] },
+    { id: 5,  name: 'Hex',        base: 6,  cd: 3000, desc: 'A curse that softens the target\u2019s guard.', mult: [[2,0.6]], fx: [{ t:2, a:7, m:1, amt:-4, dur:4000 }] },
+    { id: 6,  name: 'Drain',      base: 10, cd: 2500, desc: 'Siphons vitality, healing the caster over time.', mult: [[2,1.0]], fx: [{ t:1, a:16, m:1, amt:2, dur:3000 }] },
+    { id: 7,  name: 'Flurry',     base: 7,  cd: 900,  desc: 'A rapid sequence of light strikes.', mult: [[3,1.0],[4,0.5]], fx: [] },
+    { id: 8,  name: 'Lunge',      base: 12, cd: 2000, desc: 'A committed forward thrust that closes distance.', mult: [[3,0.9]], fx: [] },
+    { id: 9,  name: 'Bulwark',    base: 0,  cd: 5000, desc: 'Raises a guard, sharply increasing Defense briefly.', mult: [], fx: [{ t:1, a:7, m:1, amt:8, dur:4000 }] },
+    { id: 10, name: 'Smite',      base: 18, cd: 2600, desc: 'A consecrated blow blending might and will.', mult: [[0,1.0],[2,0.6]], fx: [] },
+    { id: 11, name: 'Reckoning',  base: 26, cd: 8000, desc: 'A devastating finisher that lands hardest on the wounded.', mult: [[0,1.3]], fx: [] },
+    { id: 12, name: 'Skitter',    base: 4,  cd: 700,  desc: 'A frantic gnawing rush from the swarm.', mult: [[3,0.8]], fx: [] }
+  ];
+
+  // IEnemy-shaped. prof drives the distribution; spawns: [zoneId, weight]. Bosses have no random spawns.
+  ENEMIES = [
+    { id:0,  name:'Dust Skitterer',  isBoss:false, prof:'swarm',  skills:[12,7],      spawns:[[0,60],[1,20]] },
+    { id:1,  name:'Cinder Whelp',    isBoss:false, prof:'brute',  skills:[1,2],       spawns:[[0,45],[1,15]] },
+    { id:2,  name:'Cinder Tyrant',   isBoss:true,  prof:'brute',  skills:[1,10,3,11], spawns:[] },
+    { id:3,  name:'Bog Lurker',      isBoss:false, prof:'skirm',  skills:[2,8,7],     spawns:[[1,40],[2,18]] },
+    { id:4,  name:'Ashfen Marauder', isBoss:false, prof:'brute',  skills:[1,2,3],     spawns:[[1,35],[2,28],[0,10]] },
+    { id:5,  name:'Hollow Acolyte',  isBoss:false, prof:'caster', skills:[4,5,6],     spawns:[[2,30],[3,18]] },
+    { id:6,  name:'Cinder Wight',    isBoss:false, prof:'caster', skills:[4,5],       spawns:[[1,15],[2,25]] },
+    { id:7,  name:'Gravebound Knight',isBoss:true, prof:'warden', skills:[10,9,3,11], spawns:[] },
+    { id:8,  name:'Tide Reaver',     isBoss:false, prof:'skirm',  skills:[7,8,2],     spawns:[[2,38],[3,20]] },
+    { id:9,  name:'Tideborne Maw',   isBoss:true,  prof:'skirm',  skills:[8,7,5,11],  spawns:[] },
+    { id:10, name:'Pale Stalker',    isBoss:false, prof:'skirm',  skills:[8,7,2],     spawns:[[3,30],[4,16]] },
+    { id:11, name:'Bonechoir Adept', isBoss:false, prof:'caster', skills:[4,6,5],     spawns:[[3,24],[4,20]] },
+    { id:12, name:'Keep Sentinel',   isBoss:false, prof:'warden', skills:[9,10,3],    spawns:[[3,32]] },
+    { id:13, name:'Hollow Sovereign',isBoss:true,  prof:'caster', skills:[10,5,9,11], spawns:[] },
+    { id:14, name:'Emberhorn',       isBoss:true,  prof:'brute',  skills:[1,10,3,11], spawns:[] },
+    { id:15, name:'Ash Revenant',    isBoss:false, prof:'warden', skills:[9,10,2],    spawns:[[4,28],[5,15]] },
+    { id:16, name:'Vault Wraith',    isBoss:false, prof:'caster', skills:[4,5,6],     spawns:[[5,32]] },
+    { id:17, name:'Pale Colossus',   isBoss:false, prof:'brute',  skills:[1,10,9],    spawns:[[5,20]] },
+    { id:18, name:'Null Warden',     isBoss:true,  prof:'warden', skills:[10,9,5,11], spawns:[] }
+  ];
+
+  // IZone-shaped. bossEnemyId optional; unlockChallengeId modeled as readable text + status (player progress).
+  ZONES = [
+    { id:0, name:'Emberreach',      levelMin:1,  levelMax:10, bossEnemyId:2,  bossLevel:10, status:'cleared', unlock:'Starting zone', lore:'Sun-scorched flats where the first embers fell.' },
+    { id:1, name:'Ashfen Marsh',    levelMin:11, levelMax:22, bossEnemyId:7,  bossLevel:22, status:'active',  unlock:'Clear Emberreach', lore:'A drowned bog of cinders and slow rot.' },
+    { id:2, name:'Sunken Causeway', levelMin:18, levelMax:28, bossEnemyId:9,  bossLevel:28, status:'active',  unlock:'Clear Ashfen Marsh', lore:'A flooded road strung between two dead cities.' },
+    { id:3, name:'Gravebound Keep', levelMin:26, levelMax:36, bossEnemyId:13, bossLevel:36, status:'locked',  unlock:'Clear Sunken Causeway', lore:'Ramparts held by something that will not stay dead.' },
+    { id:4, name:'Ashen Spire',     levelMin:34, levelMax:46, bossEnemyId:14, bossLevel:46, status:'locked',  unlock:'Clear Gravebound Keep', lore:'A tower of glass and ash, always burning.' },
+    { id:5, name:'The Pale Vault',  levelMin:44, levelMax:60, bossEnemyId:18, bossLevel:60, status:'locked',  unlock:'Clear Ashen Spire', lore:'Where light is rationed and silence is law.' }
+  ];
+
+  // IChallenge-shaped (subset). entityType 1=Enemy 2=Zone; challengeTypeId per EChallengeType.
+  CHAL_TYPE = { 1:{label:'Enemies killed',c:'#df8470'}, 2:{label:'Bosses defeated',c:'#d9a441'}, 3:{label:'Zones cleared',c:'#8bb060'}, 6:{label:'Damage dealt',c:'#cf7a9e'}, 7:{label:'Battles won',c:'#5fae9a'}, 8:{label:'Skills used',c:'#5aa6bd'} };
+  CHALLENGES = [
+    { name:'Cull the Marauders', type:1, ent:1, target:4,  goal:100, prog:62 },
+    { name:'Skitterers Unending', type:1, ent:1, target:0,  goal:250, prog:182 },
+    { name:'The Knight Falls',    type:2, ent:1, target:7,  goal:1,   prog:0 },
+    { name:'No-Hit: The Knight',  type:7, ent:1, target:7,  goal:1,   prog:0 },
+    { name:'Emberhorn Slain',     type:2, ent:1, target:14, goal:1,   prog:0 },
+    { name:'Warden of the Vault', type:2, ent:1, target:18, goal:1,   prog:0 },
+    { name:'Wraithbane',          type:1, ent:1, target:16, goal:50,  prog:4 },
+    { name:'Drain the Marsh',     type:3, ent:2, target:1,  goal:1,   prog:0 }
+  ];
+
+  ENEMY_LEVEL_CAP = 60;
+
+  // ---- handlers ----
+  selTab = (t) => () => this.setState({ tab: t });
+  selSub = (s) => () => this.setState({ sub: s });
+  selFilter = (f) => () => this.setState({ filter: f });
+  setLevel = (e) => this.setState({ level: +e.target.value });
+  toggleAdvanced = () => this.setState((s) => ({ advanced: !s.advanced }));
+  selZone = (id) => () => this.setState({ zoneId: id });
+  selSkill = (id) => () => this.setState({ skillId: id });
+  openSkill = (id) => () => this.setState({ tab: 'skills', skillId: id });
+  openZone = (id) => () => this.setState({ tab: 'zones', zoneId: id });
+  openEnemy = (id) => () => {
+    const r = this.levelRange(this.ENEMIES[id]);
+    this.setState({ tab: 'enemies', enemyId: id, sub: 'attributes', level: r.fixed ? r.min : Math.round((r.min + r.max) / 2) });
+  };
+
+  levelRange(e) {
+    if (e.isBoss) {
+      const z = this.ZONES.find((zz) => zz.bossEnemyId === e.id);
+      const lvl = z ? z.bossLevel : 1;
+      return { min: lvl, max: lvl, fixed: true };
+    }
+    const zs = e.spawns.map(([zid]) => this.ZONES[zid]);
+    return { min: Math.min(...zs.map((z) => z.levelMin)), max: Math.max(...zs.map((z) => z.levelMax)), fixed: false };
+  }
+  zoneTotalWeight(zid) {
+    return this.ENEMIES.reduce((sum, e) => sum + (e.spawns.find(([z]) => z === zid)?.[1] || 0), 0);
+  }
+  enemyMark(e) {
+    return e.isBoss
+      ? 'transform:rotate(45deg); background:#e8c878; box-shadow:0 0 6px rgba(232,200,120,.5);'
+      : 'border-radius:50%; background:rgba(255,255,255,.28);';
+  }
+  fmtCd(ms) { return ms === 0 ? '—' : (ms % 1000 === 0 ? (ms / 1000) + 's' : (ms / 1000).toFixed(1) + 's'); }
+  attrCode(id) { return this.attrMeta(id).code; }
+  // Player-tracked statistics vs an enemy (EStatisticType). Runtime progress — deterministically mocked per enemy id.
+  enemyStatistics(e) {
+    const id = e.id, fmt = (n) => Math.round(n).toLocaleString('en-US');
+    const time = (s) => (s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's');
+    const encountered = e.isBoss ? (3 + (id * 7) % 9) : (60 + (id * 37) % 360);
+    const defeated = e.isBoss ? (id % 3) : Math.round(encountered * (0.62 + ((id * 5) % 30) / 100));
+    const lost = (id * 3) % (e.isBoss ? 6 : 4);
+    const dmgDealt = encountered * (260 + (id * 53) % 220) + 140;
+    const dmgTaken = encountered * (70 + (id * 17) % 90) + 60;
+    const highest = 180 + (id * 47) % 640;
+    const fvSec = e.isBoss ? (38 + (id * 7) % 70) : (6 + (id * 5) % 16);
+    return [
+      { label: 'Encountered',  value: fmt(encountered) },
+      { label: e.isBoss ? 'Times defeated' : 'Defeated', value: fmt(defeated), color: '#bde0b4' },
+      { label: 'Battles won',  value: fmt(defeated) },
+      { label: 'Battles lost', value: fmt(lost) },
+      { label: 'Damage dealt', value: fmt(dmgDealt) },
+      { label: 'Damage taken', value: fmt(dmgTaken), color: '#e08778' },
+      { label: 'Highest hit',  value: fmt(highest) },
+      { label: 'Fastest win',  value: defeated > 0 ? time(fvSec) : '—' }
+    ];
+  }
+
+  renderVals() {
+    const S = this.state;
+
+    // ----- tabs -----
+    const tabDefs = [
+      { key: 'enemies', label: 'Enemies', count: this.ENEMIES.length, dot: '#e08778' },
+      { key: 'zones',   label: 'Zones',   count: this.ZONES.length,   dot: '#a1c2f7' },
+      { key: 'skills',  label: 'Skills',  count: this.SKILLS.length,  dot: '#c4b6ec' }
+    ];
+    const tabs = tabDefs.map((t) => {
+      const on = t.key === S.tab;
+      return {
+        label: t.label, count: t.count, onSelect: this.selTab(t.key),
+        dotColor: on ? t.dot : 'rgba(240,240,240,.28)',
+        labelColor: on ? '#f0f0f0' : 'rgba(240,240,240,.55)',
+        weight: on ? 600 : 400, underline: on ? t.dot : 'transparent',
+        countColor: on ? t.dot : 'rgba(240,240,240,.4)',
+        countBorder: on ? 'color-mix(in srgb,' + t.dot + ' 45%, transparent)' : 'rgba(255,255,255,.14)'
+      };
+    });
+
+    // ----- enemy table -----
+    const filtered = this.ENEMIES.filter((e) => S.filter === 'all' || (S.filter === 'boss' ? e.isBoss : !e.isBoss));
+    const enemyRows = filtered.map((e) => {
+      const isSel = e.id === S.enemyId;
+      const r = this.levelRange(e);
+      return {
+        name: e.name, isBoss: e.isBoss,
+        band: r.fixed ? ('L' + r.min) : (r.min + '–' + r.max),
+        zoneCount: e.isBoss ? '1' : String(e.spawns.length),
+        skillCount: String(e.skills.length),
+        markStyle: this.enemyMark(e),
+        nameColor: isSel ? '#ffffff' : '#f0f0f0', nameWeight: isSel ? 600 : 400,
+        rowBg: isSel ? 'rgba(224,135,120,.10)' : 'transparent',
+        selBar: isSel ? '#e08778' : 'transparent',
+        onSelect: this.openEnemy(e.id)
+      };
+    });
+
+    // ----- selected enemy dossier -----
+    const e = this.ENEMIES[S.enemyId];
+    const r = this.levelRange(e);
+    const accent = e.isBoss ? '#e8c878' : '#e08778';
+    const prof = this.PROF[e.prof];
+    const dist = Object.keys(prof).map((k) => {
+      const id = +k, [base, per] = prof[id];
+      return { id, code: this.ATTRS[id].code, color: this.ATTRS[id].color, primary: this.ATTRS[id].primary, base, per, val: Math.round(base + per * S.level) };
+    });
+    const primary = dist.filter((d) => d.primary);
+    const maxPrim = Math.max(...primary.map((d) => d.val), 1);
+    const primaryStats = primary.map((d) => ({ ...d, barW: Math.max(4, (d.val / maxPrim) * 100).toFixed(1) + '%' }));
+    const secondaryStats = dist.filter((d) => !d.primary).map((d) => ({ ...d, valColor: d.id === 6 ? '#bde0b4' : '#f0f0f0' }));
+
+    const enemySkills = e.skills.map((sid) => {
+      const sk = this.SKILLS.find((x) => x.id === sid);
+      const dmg = sk.base > 0 ? ('base ' + sk.base) : 'utility';
+      return { name: sk.name, meta: dmg + ' · ' + this.fmtCd(sk.cd) + ' cd', onOpen: this.openSkill(sid) };
+    });
+
+    let enemySpawns, spawnHeading, enemyZoneChips;
+    if (e.isBoss) {
+      const z = this.ZONES.find((zz) => zz.bossEnemyId === e.id);
+      spawnHeading = 'Encounter';
+      enemySpawns = z ? [{ zone: z.name, share: '100%', weight: 'boss fight', onOpen: this.openZone(z.id) }] : [];
+      enemyZoneChips = z ? [z.name] : [];
+    } else {
+      spawnHeading = 'Spawns in ' + e.spawns.length + (e.spawns.length === 1 ? ' zone' : ' zones');
+      enemySpawns = e.spawns.map(([zid, w]) => {
+        const total = this.zoneTotalWeight(zid) || 1;
+        return { zone: this.ZONES[zid].name, share: Math.round((w / total) * 100) + '%', weight: 'weight ' + w, onOpen: this.openZone(zid) };
+      }).sort((a, b) => parseInt(b.share) - parseInt(a.share));
+      enemyZoneChips = enemySpawns.map((s) => s.zone);
+    }
+
+    const enemyChallenges = this.CHALLENGES.filter((c) => c.ent === 1 && c.target === e.id).map((c) => {
+      const m = this.CHAL_TYPE[c.type], done = c.prog >= c.goal;
+      return { name: c.name, type: m.label, accent: m.c, prog: c.goal === 1 ? (done ? 'done' : 'sealed') : (c.prog + '/' + c.goal), progColor: done ? '#bde0b4' : 'rgba(240,240,240,.78)' };
+    });
+
+    const subDefs = [{ k:'attributes', l:'Attributes' }, { k:'statistics', l:'Statistics' }, { k:'skills', l:'Skills' }, { k:'spawns', l:'Spawns' }];
+    if (enemyChallenges.length > 0) subDefs.push({ k:'challenges', l:'Challenges' });
+    const enemyStatistics = this.enemyStatistics(e).map((st) => ({ ...st, color: st.color || '#f0f0f0' }));
+    const subTabs = subDefs.map((s) => { const on = s.k === S.sub; return { label: s.l, onSelect: this.selSub(s.k), color: on ? '#f0f0f0' : 'rgba(240,240,240,.4)', underline: on ? accent : 'transparent' }; });
+
+    const fdefs = [{ k:'all', l:'All' }, { k:'normal', l:'Normal' }, { k:'boss', l:'Boss' }];
+    const filterChips = fdefs.map((f) => { const on = f.k === S.filter; return { label: f.l, onSelect: this.selFilter(f.k), bg: on ? '#f0f0f0' : 'transparent', color: on ? '#111' : 'rgba(240,240,240,.55)', border: on ? '#f0f0f0' : 'rgba(255,255,255,.14)' }; });
+
+    // ----- zones -----
+    const statusMeta = { cleared:{c:'#bde0b4',label:'Cleared'}, active:{c:'#a1c2f7',label:'Active'}, locked:{c:'rgba(240,240,240,.4)',label:'Locked'} };
+    const zoneList = this.ZONES.map((z) => {
+      const on = z.id === S.zoneId, sm = statusMeta[z.status];
+      return { name: z.name, band: 'Lv ' + z.levelMin + '–' + z.levelMax, statusLabel: sm.label, dotColor: sm.c, locked: z.status === 'locked',
+        nameColor: z.status === 'locked' ? 'rgba(240,240,240,.5)' : (on ? '#ffffff' : '#f0f0f0'),
+        rowBg: on ? 'rgba(161,194,247,.10)' : 'transparent', selBar: on ? '#a1c2f7' : 'transparent', onSelect: this.selZone(z.id) };
+    });
+    const z = this.ZONES[S.zoneId], zsm = statusMeta[z.status];
+    const zoneSpawns = this.ENEMIES.filter((x) => x.spawns.some(([zid]) => zid === z.id)).map((x) => {
+      const w = x.spawns.find(([zid]) => zid === z.id)[1], total = this.zoneTotalWeight(z.id) || 1;
+      return { name: x.name, share: Math.round((w / total) * 100) + '%', onOpen: this.openEnemy(x.id), _w: w };
+    }).sort((a, b) => b._w - a._w);
+    const bossEnemy = z.bossEnemyId != null ? this.ENEMIES.find((x) => x.id === z.bossEnemyId) : null;
+    const zoneView = {
+      name: z.name, band: 'Lv ' + z.levelMin + '–' + z.levelMax, lore: z.lore, accent: zsm.c, statusLabel: zsm.label,
+      spawnCount: zoneSpawns.length, hasBoss: !!bossEnemy, boss: bossEnemy ? bossEnemy.name : '', bossLevel: z.bossLevel,
+      onOpenBoss: bossEnemy ? this.openEnemy(bossEnemy.id) : (() => {}),
+      unlock: z.unlock, unlockColor: z.status === 'locked' ? '#f0d28a' : '#8bb060'
+    };
+
+    // ----- skills -----
+    const skillRows = this.SKILLS.map((sk) => {
+      const isSel = sk.id === S.skillId, users = this.ENEMIES.filter((en) => en.skills.includes(sk.id));
+      return { name: sk.name, baseDmg: sk.base > 0 ? String(sk.base) : '—', dmgColor: sk.base > 0 ? '#f0f0f0' : 'rgba(240,240,240,.35)',
+        cd: this.fmtCd(sk.cd), users: users.length + (users.length === 1 ? ' enemy' : ' enemies'),
+        nameColor: isSel ? '#ffffff' : '#f0f0f0', nameWeight: isSel ? 600 : 400,
+        rowBg: isSel ? 'rgba(196,182,236,.12)' : 'transparent', selBar: isSel ? '#c4b6ec' : 'transparent', onSelect: this.selSkill(sk.id) };
+    });
+    const sk = this.SKILLS.find((x) => x.id === S.skillId) || this.SKILLS[0];
+    const skUsers = this.ENEMIES.filter((en) => en.skills.includes(sk.id));
+    const tgtName = { 1: 'Self', 2: 'Opponent' };
+    const skillSel = {
+      name: sk.name, description: sk.desc, baseDmg: sk.base > 0 ? String(sk.base) : '—', dmgColor: sk.base > 0 ? '#f0f0f0' : 'rgba(240,240,240,.4)', cd: this.fmtCd(sk.cd),
+      hasMult: sk.mult.length > 0, mults: sk.mult.map(([aid, m]) => ({ code: this.attrCode(aid), color: this.attrMeta(aid).color, mult: '×' + m })),
+      hasEffects: sk.fx.length > 0,
+      effects: sk.fx.map((f) => {
+        const buff = f.amt >= 0, harmfulAttr = f.a === 15; // DamageTakenPerSecond rising is harmful
+        const good = harmfulAttr ? !buff : buff;
+        const sign = f.amt >= 0 ? '+' : '−';
+        const isMult = f.m === 2;
+        return { label: this.attrMeta(f.a).code, target: tgtName[f.t], dur: f.dur ? (' · ' + (f.dur / 1000) + 's') : '',
+          amount: sign + Math.abs(f.amt) + (isMult ? '×' : ''), accent: good ? '#bde0b4' : '#e08778' };
+      }),
+      hasUsers: skUsers.length > 0, noUsers: skUsers.length === 0, userCount: skUsers.length,
+      users: skUsers.map((u) => ({ name: u.name, markStyle: this.enemyMark(u), onOpen: this.openEnemy(u.id) }))
+    };
+
+    return {
+      tabs,
+      isEnemies: S.tab === 'enemies', isZones: S.tab === 'zones', isSkills: S.tab === 'skills',
+      enemyTotal: this.ENEMIES.length, zoneTotal: this.ZONES.length, skillTotal: this.SKILLS.length,
+      // enemy
+      enemyRows, filterChips, shownCount: filtered.length,
+      sel: { name: e.name, accent, kindLabel: e.isBoss ? 'Boss' : 'Enemy', band: r.fixed ? ('Level ' + r.min) : ('Lv ' + r.min + '–' + r.max),
+             hasRange: !r.fixed, fixedLevel: r.fixed, minLevel: r.min, maxLevel: r.max },
+      subTabs,
+      showAttributes: S.sub === 'attributes', showStatistics: S.sub === 'statistics', showEnemySkills: S.sub === 'skills', showEnemySpawns: S.sub === 'spawns', showEnemyChallenges: S.sub === 'challenges' && enemyChallenges.length > 0,
+      enemyStatistics,
+      level: S.level, setLevel: this.setLevel,
+      advanced: S.advanced, toggleAdvanced: this.toggleAdvanced,
+      advBg: S.advanced ? 'rgba(161,194,247,.16)' : 'transparent', advBorder: S.advanced ? 'color-mix(in srgb,#a1c2f7 50%,transparent)' : 'rgba(255,255,255,.14)', advColor: S.advanced ? '#a1c2f7' : 'rgba(240,240,240,.4)',
+      primaryStats, secondaryStats,
+      enemySkills, enemySkillCount: e.skills.length,
+      enemySpawns, spawnHeading,
+      enemyChallenges, enemyChallengeCount: enemyChallenges.length,
+      // zones
+      zoneList, zoneView, zoneSpawns,
+      // skills
+      skillRows, skillSel
+    };
+  }
+}
+</script>
+</body>
+</html>
