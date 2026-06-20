@@ -532,6 +532,19 @@ describe('ApiSocket', () => {
 
 			await expect(promise).rejects.toThrow('Server boom');
 		});
+
+		it('throws when a non-error response carries no data', async () => {
+			const promise = fetchSocketData('GetZones');
+			await flushMicrotasks();
+			const ws = lastWs();
+			const sent = JSON.parse(ws.send.mock.calls[0][0]);
+
+			// A reply with neither an error nor a payload is a protocol violation; surface it as a throw
+			// rather than handing back undefined as if it were valid data.
+			receive(ws, JSON.stringify({ id: sent.id, name: 'GetZones' }));
+
+			await expect(promise).rejects.toThrow('The server returned no data.');
+		});
 	});
 
 	describe('socket error propagation', () => {

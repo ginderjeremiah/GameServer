@@ -38,9 +38,9 @@ export class ApiSocketRequest<T extends ApiSocketCommand | void = void> {
 	 *  drops before the server answered. Mirrors the shape of a server-reported error so callers handle it
 	 *  through the same `response.error` path they already use, rather than a separate reject channel. */
 	public settleWithError(error: string) {
-		// An error response carries no `data` (matching how the server signals errors), so the cast bridges
-		// the type's non-optional `data` field that callers already guard with optional chaining.
-		this.promiseResolver({ id: this.id, name: this.commandName, error } as IApiSocketResponse<T>);
+		// An error response carries no `data`, matching how the server signals errors so callers fall
+		// through the same `response.error` guard rather than reading a partial payload.
+		this.promiseResolver({ id: this.id, name: this.commandName, error });
 	}
 
 	public async getResponse() {

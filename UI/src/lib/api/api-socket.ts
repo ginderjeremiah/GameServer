@@ -48,7 +48,9 @@ export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 	id: string;
 	name: T;
 	error?: string;
-	data: T extends ApiSocketCommand ? ApiSocketResponseTypes[T] : never;
+	// Optional because every failure (server error, dropped connection, timeout) resolves with an
+	// `error` and no `data`; the type then forces callers to guard `error`/optional-chain `data`.
+	data?: T extends ApiSocketCommand ? ApiSocketResponseTypes[T] : never;
 }
 
 let socket: WebSocket;
@@ -417,8 +419,10 @@ export async function fetchSocketData<T extends ApiSocketCommandNoRequest>(
 	command: T
 ): Promise<ApiSocketResponseTypes[T]> {
 	const response = await apiSocket.sendSocketCommand(command);
-	if (response.error) {
-		throw new Error(response.error);
+	// A failure resolves with an `error` and no `data`; a successful reply always carries data, so a
+	// missing payload on a non-error response is itself a protocol error worth surfacing as a throw.
+	if (response.error || response.data === undefined) {
+		throw new Error(response.error ?? 'The server returned no data.');
 	}
 	return response.data;
 }
