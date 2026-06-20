@@ -25,6 +25,14 @@ namespace Game.DataAccess.Repositories.Admin
     /// to a 400) rather than thrown — leaving the batch atomic and surfacing an actionable message instead of
     /// an opaque 500.
     /// </para>
+    /// <para>
+    /// When <paramref name="key"/> is supplied the batch is rejected up front if it names the same value-tracked
+    /// key more than once — mirroring <see cref="ChildCollectionReconciler"/>. Two Edits (or an Edit and a
+    /// Delete) of the same key map to two Update/Delete ops on distinct CLR instances sharing that key, which EF
+    /// double-tracks and rejects mid-batch as an opaque 500. Adds are excluded from this guard: an insert's wire
+    /// key is a store-generated sentinel (every new row's id resolves on commit), so two Adds never collide on it
+    /// and deduping them would falsely reject distinct new records.
+    /// </para>
     /// </remarks>
     internal static class ChangeSetProcessor
     {
@@ -32,8 +40,17 @@ namespace Game.DataAccess.Repositories.Admin
             IEnumerable<Change<T>> changes,
             Action<T> add,
             Action<T> edit,
-            Action<T>? delete = null) where T : IModel
+            Action<T>? delete = null,
+            Func<T, object>? key = null,
+            string? resourceName = null) where T : IModel
         {
+            // Only Edit/Delete are value-tracked (Adds get a store-generated key), so they alone can collide.
+            if (key is not null
+                && HasDuplicateKey(changes, c => c.ChangeType != EChangeType.Add, key))
+            {
+                return DuplicateFailure<T>(resourceName);
+            }
+
             foreach (var change in changes.OrderByDescending(c => c.ChangeType))
             {
                 switch (change.ChangeType)
@@ -59,5 +76,32 @@ namespace Game.DataAccess.Repositories.Admin
 
             return AdminSaveResult.Success;
         }
+
+        /// <summary>
+        /// True when the <paramref name="participates"/> subset of <paramref name="changes"/> names the same
+        /// key (per <paramref name="key"/>) more than once. Shared by the change-set processors so the
+        /// "a key must not be named twice in one batch" guard lives in one place.
+        /// </summary>
+        public static bool HasDuplicateKey<T>(
+            IEnumerable<Change<T>> changes,
+            Func<Change<T>, bool> participates,
+            Func<T, object> key) where T : IModel
+        {
+            var seen = new HashSet<object>();
+            foreach (var change in changes)
+            {
+                if (participates(change) && !seen.Add(key(change.Item)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>The unified duplicate-key rejection message, shared by every change-set processor.</summary>
+        public static AdminSaveResult DuplicateFailure<T>(string? resourceName) =>
+            AdminSaveResult.Failure(
+                $"The submitted {resourceName ?? typeof(T).Name} change set contains duplicate entries.");
     }
 }

@@ -199,5 +199,46 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(50m, attribute.Amount);
             }
         }
+
+        [Fact]
+        public async Task SetAttributes_DuplicateKeyInBatch_ReturnsFailureWithoutThrowing()
+        {
+            int itemId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var item = await TestDataSeeder.CreateItemAsync(context);
+                itemId = item.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Two Adds of the same attribute would double-track the composite key and surface as an opaque EF
+            // 500 mid-batch; the processor must reject the malformed batch up front as a graceful failure.
+            var data = new AddEditAttributesData
+            {
+                Id = itemId,
+                Changes =
+                [
+                    new Change<Contracts.BattlerAttribute>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.BattlerAttribute { AttributeId = EAttribute.Agility, Amount = 1m },
+                    },
+                    new Change<Contracts.BattlerAttribute>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.BattlerAttribute { AttributeId = EAttribute.Agility, Amount = 2m },
+                    },
+                ],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var result = admin.SetAttributes(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted item attribute change set contains duplicate entries.", result.ErrorMessage);
+        }
     }
 }

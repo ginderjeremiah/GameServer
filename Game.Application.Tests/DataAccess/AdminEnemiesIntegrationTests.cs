@@ -207,6 +207,46 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveEnemies_DuplicateEditKeysInBatch_ReturnsFailureWithoutThrowing()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Two Edits of the same id would double-track the entity and surface as an opaque EF 500 mid-batch;
+            // the identity-level change-set processor must reject the malformed batch up front as a graceful
+            // failure (the same standard the reconciler already holds).
+            Contracts.Enemy EnemyEdit(string name) => new()
+            {
+                Id = enemyId,
+                Name = name,
+                IsBoss = false,
+                AttributeDistribution = [],
+                SkillPool = [],
+                Spawns = [],
+            };
+
+            var changes = new[]
+            {
+                new Change<Contracts.Enemy> { ChangeType = EChangeType.Edit, Item = EnemyEdit("First") },
+                new Change<Contracts.Enemy> { ChangeType = EChangeType.Edit, Item = EnemyEdit("Second") },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SaveEnemies(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted enemy change set contains duplicate entries.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetAttributeDistributions_UnknownEnemy_ReturnsNotFound()
         {
             using var scope = CreateScope();

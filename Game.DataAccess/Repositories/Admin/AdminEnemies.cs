@@ -38,7 +38,9 @@ namespace Game.DataAccess.Repositories.Admin
                     Name = item.Name,
                     IsBoss = item.IsBoss,
                     RetiredAt = item.RetiredAt,
-                }));
+                }),
+                key: item => item.Id,
+                resourceName: "enemy");
         }
 
         public AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data)

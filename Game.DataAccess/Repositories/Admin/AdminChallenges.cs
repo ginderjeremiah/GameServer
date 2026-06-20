@@ -54,7 +54,9 @@ namespace Game.DataAccess.Repositories.Admin
                     RewardItemModId = item.RewardItemModId,
                     RewardSkillId = item.RewardSkillId,
                     RetiredAt = item.RetiredAt,
-                }));
+                }),
+                key: item => item.Id,
+                resourceName: "challenge");
         }
     }
 }

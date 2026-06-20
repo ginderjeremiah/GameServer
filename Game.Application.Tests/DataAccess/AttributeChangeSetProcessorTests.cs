@@ -1,6 +1,7 @@
 using Game.Abstractions;
 using Game.Abstractions.Contracts;
 using Game.Abstractions.Contracts.Admin;
+using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
 using Game.DataAccess.Repositories.Admin;
 using Xunit;
@@ -19,15 +20,16 @@ namespace Game.Application.Tests.DataAccess
             Item = new BattlerAttribute { AttributeId = attribute, Amount = amount },
         };
 
-        private static void Apply(
+        private static AdminSaveResult Apply(
             IReadOnlyList<Change<BattlerAttribute>> changes,
             IReadOnlyCollection<TestEntity> existing,
             RecordingEntityStore store)
         {
-            AttributeChangeSetProcessor.Apply(changes, existing,
+            return AttributeChangeSetProcessor.Apply(changes, existing,
                 existingKey: e => e.AttributeId,
                 toEntity: a => new TestEntity((int)a.AttributeId, a.Amount),
-                store);
+                store,
+                resourceName: "test attribute");
         }
 
         [Fact]
@@ -62,21 +64,93 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void Apply_DuplicateAddInSameBatch_InsertsOnceThenUpdates()
+        public void Apply_DuplicateAddInSameBatch_RejectsGracefullyWithoutApplying()
         {
-            // Two Adds of the same key in one batch must not both insert (which would duplicate-key at
-            // commit): the first inserts, the second sees the now-present key and updates.
+            // An attribute key is meaningful for an Add (a composite-PK insert), so two Adds of the same
+            // key would double-track the row and EF rejects mid-batch as an opaque 500. The malformed batch
+            // is rejected up front as a graceful business failure before anything is staged.
             var store = new RecordingEntityStore();
 
-            Apply(
+            var result = Apply(
             [
                 Change(EChangeType.Add, EAttribute.Strength, 5m),
                 Change(EChangeType.Add, EAttribute.Strength, 7m),
             ], existing: [], store);
 
-            Assert.Equal(5m, Assert.IsType<TestEntity>(Assert.Single(store.Inserted)).Amount);
-            Assert.Equal(7m, Assert.IsType<TestEntity>(Assert.Single(store.Updated)).Amount);
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted test attribute change set contains duplicate entries.", result.ErrorMessage);
+            Assert.Empty(store.Inserted);
+            Assert.Empty(store.Updated);
             Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public void Apply_DuplicateEditInSameBatch_RejectsGracefullyWithoutApplying()
+        {
+            // Two Edits of the same existing key both pass the membership guard and double-track the row.
+            var store = new RecordingEntityStore();
+            var existing = new[] { new TestEntity((int)EAttribute.Strength, 1m) };
+
+            var result = Apply(
+            [
+                Change(EChangeType.Edit, EAttribute.Strength, 5m),
+                Change(EChangeType.Edit, EAttribute.Strength, 7m),
+            ], existing, store);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted test attribute change set contains duplicate entries.", result.ErrorMessage);
+            Assert.Empty(store.Updated);
+        }
+
+        [Fact]
+        public void Apply_DuplicateDeleteInSameBatch_RejectsGracefullyWithoutApplying()
+        {
+            var store = new RecordingEntityStore();
+            var existing = new[] { new TestEntity((int)EAttribute.Strength, 1m) };
+
+            var result = Apply(
+            [
+                Change(EChangeType.Delete, EAttribute.Strength, 0m),
+                Change(EChangeType.Delete, EAttribute.Strength, 0m),
+            ], existing, store);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted test attribute change set contains duplicate entries.", result.ErrorMessage);
+            Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public void Apply_SameKeyAcrossDifferentChangeTypes_RejectsGracefullyWithoutApplying()
+        {
+            // An Edit and a Delete naming the same key map to two ops on distinct instances sharing that key.
+            var store = new RecordingEntityStore();
+            var existing = new[] { new TestEntity((int)EAttribute.Strength, 1m) };
+
+            var result = Apply(
+            [
+                Change(EChangeType.Edit, EAttribute.Strength, 5m),
+                Change(EChangeType.Delete, EAttribute.Strength, 0m),
+            ], existing, store);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("The submitted test attribute change set contains duplicate entries.", result.ErrorMessage);
+            Assert.Empty(store.Updated);
+            Assert.Empty(store.Deleted);
+        }
+
+        [Fact]
+        public void Apply_DistinctKeys_Succeeds()
+        {
+            var store = new RecordingEntityStore();
+
+            var result = Apply(
+            [
+                Change(EChangeType.Add, EAttribute.Strength, 5m),
+                Change(EChangeType.Add, EAttribute.Agility, 7m),
+            ], existing: [], store);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(2, store.Inserted.Count);
         }
 
         [Fact]

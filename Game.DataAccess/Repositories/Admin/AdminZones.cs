@@ -80,7 +80,9 @@ namespace Game.DataAccess.Repositories.Admin
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
                     RetiredAt = item.RetiredAt,
-                }));
+                }),
+                key: item => item.Id,
+                resourceName: "zone");
         }
 
         public AdminSaveResult SetEnemies(SetZoneEnemiesData data)

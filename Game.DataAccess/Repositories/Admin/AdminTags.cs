@@ -14,9 +14,10 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveTags(IReadOnlyList<Change<Contracts.Tag>> changes)
         {
-            // Tags carry their own identity and have no owner to miss, and they support a real delete, so a
-            // tag write never rejects — the processor returns the unified success result every admin write
-            // reports through.
+            // Tags carry their own identity and have no owner to miss, but they support a real delete, so a
+            // duplicate Edit/Delete of one tag would double-track it in EF — reject such a malformed batch up
+            // front as a graceful business failure rather than 500-ing (Add ids are store-generated sentinels,
+            // so they are excluded from the guard). An otherwise well-formed tag write never rejects.
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Tag
                 {
@@ -29,7 +30,9 @@ namespace Game.DataAccess.Repositories.Admin
                     Name = item.Name,
                     TagCategoryId = item.TagCategoryId,
                 }),
-                delete: item => _entityStore.DeleteByKey<Entities.Tag>(item.Id));
+                delete: item => _entityStore.DeleteByKey<Entities.Tag>(item.Id),
+                key: item => item.Id,
+                resourceName: "tag");
         }
     }
 }
