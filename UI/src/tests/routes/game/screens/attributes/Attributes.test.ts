@@ -7,7 +7,10 @@ const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hois
 	mockPlayerManager: {
 		attributes: [] as IBattlerAttribute[],
 		statPointsGained: 0,
-		statPointsUsed: 0
+		statPointsUsed: 0,
+		level: 0,
+		exp: 0,
+		nextLevelThreshold: 0
 	},
 	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
@@ -50,6 +53,9 @@ beforeEach(() => {
 	];
 	mockPlayerManager.statPointsGained = 8;
 	mockPlayerManager.statPointsUsed = 0;
+	mockPlayerManager.level = 7;
+	mockPlayerManager.exp = 280;
+	mockPlayerManager.nextLevelThreshold = 700;
 	// The radar reads prefers-reduced-motion to decide whether to animate; force
 	// the snap path so no rAF runs during the test.
 	window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
@@ -65,6 +71,23 @@ describe('Attributes screen', () => {
 		// 8 unspent points available, none pending.
 		expect(screen.getByText('8')).toBeTruthy();
 		expect(screen.getByText('No changes')).toBeTruthy();
+	});
+
+	it('shows the player level and XP progress toward the next level', () => {
+		const { getByTestId, container } = render(Attributes);
+
+		const xpBar = getByTestId('attributes-xp-bar');
+		expect(xpBar.getAttribute('role')).toBe('progressbar');
+		expect(xpBar.getAttribute('aria-valuenow')).toBe('280');
+		expect(xpBar.getAttribute('aria-valuemax')).toBe('700');
+		// 280 / 700 = 40%.
+		expect((xpBar.querySelector('.xp-fill') as HTMLElement).getAttribute('style')).toContain('width: 40%');
+
+		// The visible level and current/total XP readout beside the bar.
+		const meter = container.querySelector('.level-meter') as HTMLElement;
+		expect(meter.querySelector('.label')?.textContent).toContain('7');
+		expect(meter.querySelector('.value')?.textContent).toContain('280');
+		expect(meter.querySelector('.value')?.textContent).toContain('700');
 	});
 
 	it('spends a point when an attribute stepper is clicked', async () => {

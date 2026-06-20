@@ -10,7 +10,10 @@
 
 	<!-- budget -->
 	<div class="budget-row">
-		<BudgetMeter remaining={view.remaining} budget={view.budget} />
+		<div class="meters">
+			<BudgetMeter remaining={view.remaining} budget={view.budget} />
+			<LevelMeter />
+		</div>
 		<span class="hint">
 			{view.mode === 'theory' ? 'Marginal yield shown per attribute' : 'Drag an axis or use − / + to spend'}
 		</span>
@@ -68,6 +71,7 @@ import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import ModeToggle from './ModeToggle.svelte';
 import BudgetMeter from './BudgetMeter.svelte';
+import LevelMeter from './LevelMeter.svelte';
 import AttributesRadar from './AttributesRadar.svelte';
 import GuidedRow from './GuidedRow.svelte';
 import TheoryRow from './TheoryRow.svelte';
@@ -127,6 +131,14 @@ onDestroy(() => view.dispose());
 	gap: 20px;
 	padding: 0 28px 16px;
 	flex-shrink: 0;
+}
+
+// The points budget and the level/XP progress sit together as one progression dashboard.
+.meters {
+	display: flex;
+	align-items: flex-end;
+	gap: 32px;
+	min-width: 0;
 }
 
 .hint {
