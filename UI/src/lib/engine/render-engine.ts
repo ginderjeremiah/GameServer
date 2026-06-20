@@ -38,7 +38,11 @@ export class RenderEngine {
 		const newTime = performance.now();
 		const delta = newTime - this.time;
 		this.time = newTime;
-		this.logicalDelta = newTime - logicEngine.time;
+		// Floor at 0: the logical engine's tab-background catch-up branch advances logicEngine.time by the
+		// discarded excess, which can momentarily push it past the render clock. A negative logicalDelta
+		// would drive the render-only charge/effect interpolation backwards for a frame (purely cosmetic —
+		// logical state and battle parity are unaffected).
+		this.logicalDelta = Math.max(0, newTime - logicEngine.time);
 		notifyRenderUpdate(delta, this.logicalDelta);
 	};
 }

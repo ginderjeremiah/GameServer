@@ -171,7 +171,14 @@ export class Battler {
 
 	/** Advances every active effect by `timeDelta`, removing any whose duration has elapsed (its modifier
 	 *  is removed and the totals recomputed). Called at the start of each tick before any skill fires, so
-	 *  an effect influences exactly `durationMs / tickSize` ticks counting the one it was applied on. */
+	 *  an effect influences exactly `durationMs / tickSize` ticks counting the one it was applied on.
+	 *
+	 *  Parity note: this decrements `remainingMs` per tick where the backend (`Battler.AdvanceEffects`)
+	 *  instead keys expiry to an absolute `_elapsedMs` clock. The two are **value-equal only under the
+	 *  current fixed tick size** — they are not algebraically identical under any future variable-tick or
+	 *  fractional-accumulation change, so they must stay in lockstep (or the FE be converted to the
+	 *  backend's absolute-expiry model). The mirrored parity matrix covers the apply→expire→re-apply
+	 *  cycle where the two bookkeeping models are most likely to drift by a tick. */
 	public advanceEffects(timeDelta: number) {
 		if (this.activeEffects.length === 0) {
 			return;
