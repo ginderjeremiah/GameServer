@@ -493,6 +493,60 @@ namespace Game.Application.Tests.DataAccess
             Assert.True(row.Favorite);
         }
 
+        [Fact]
+        public async Task PlayerCoreUpdated_AppliedTwice_ConvergesToLatestValuesWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var zoneId = await SeedZoneAsync();
+
+            // Update-only against the always-present Players row: re-applying with higher absolute values
+            // updates the row in place rather than duplicating, so the core fields converge to the latest.
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.Players.AsNoTracking()
+                .Where(p => p.Id == playerId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(9, row.Level);
+            Assert.Equal(250, row.Exp);
+            Assert.Equal(zoneId, row.CurrentZoneId);
+            Assert.Equal(160, row.StatPointsGained);
+            Assert.Equal(140, row.StatPointsUsed);
+        }
+
+        [Fact]
+        public async Task ModRemoved_AppliedTwice_DeletesTheSlotsModAndIsIdempotent()
+        {
+            var (playerId, itemId, slotId, modId) = await SeedAppliedModFixtureAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.ApplyModToItemAsync(context, playerId, itemId, slotId, modId);
+            }
+
+            // The first apply deletes the slot's mod; the second is a benign no-op against the now-missing
+            // row rather than throwing, so a re-delivered event converges to the same empty slot.
+            var evt = new ModRemovedEvent(playerId, itemId, slotId);
+            await ApplyAsync(evt);
+            await ApplyAsync(evt);
+
+            Assert.Equal(0, await CountAsync(c => c.AppliedMods.CountAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId, CancellationToken)));
+        }
+
+        [Fact]
+        public async Task ModRemoved_RowMissing_IsNoOp()
+        {
+            // No AppliedMod row exists for the slot (e.g. the remove reordered ahead of the apply, or a
+            // re-delivery after the row is already gone): the delete must match zero rows without throwing.
+            var (playerId, itemId, slotId, _) = await SeedAppliedModFixtureAsync();
+
+            await ApplyAsync(new ModRemovedEvent(playerId, itemId, slotId));
+
+            Assert.Equal(0, await CountAsync(c => c.AppliedMods.CountAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId, CancellationToken)));
+        }
+
         private static AttributeAllocationsChangedEvent MakeAttributeEvent(int playerId, double intellect, double strength) => new(
             playerId,
             [
@@ -616,6 +670,13 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             return (await TestDataSeeder.CreateItemModAsync(context)).Id;
+        }
+
+        private async Task<int> SeedZoneAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateZoneAsync(context)).Id;
         }
     }
 }
