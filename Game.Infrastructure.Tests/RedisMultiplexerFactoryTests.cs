@@ -100,5 +100,45 @@ namespace Game.Infrastructure.Tests
             Assert.Equal(1, created);
             Assert.All(results, value => Assert.Same(results[0], value));
         }
+
+        [Fact]
+        public async Task DisposeAllAsync_DisposesEveryEntry_AndClearsTheCache()
+        {
+            var cache = new Dictionary<string, FakeAsyncDisposable>();
+            var syncRoot = new object();
+            var first = new FakeAsyncDisposable();
+            var second = new FakeAsyncDisposable();
+            cache["cache:6379"] = first;
+            cache["pubsub:6380"] = second;
+
+            await RedisMultiplexerFactory.DisposeAllAsync(cache, syncRoot);
+
+            // Every cached connection is disposed and the cache is emptied so a later request reconnects fresh —
+            // the graceful-shutdown teardown the hosted service drives.
+            Assert.Equal(1, first.DisposeCount);
+            Assert.Equal(1, second.DisposeCount);
+            Assert.Empty(cache);
+        }
+
+        [Fact]
+        public async Task DisposeAllAsync_EmptyCache_IsANoOp()
+        {
+            var cache = new Dictionary<string, FakeAsyncDisposable>();
+
+            await RedisMultiplexerFactory.DisposeAllAsync(cache, new object());
+
+            Assert.Empty(cache);
+        }
+
+        private sealed class FakeAsyncDisposable : IAsyncDisposable
+        {
+            public int DisposeCount { get; private set; }
+
+            public ValueTask DisposeAsync()
+            {
+                DisposeCount++;
+                return ValueTask.CompletedTask;
+            }
+        }
     }
 }

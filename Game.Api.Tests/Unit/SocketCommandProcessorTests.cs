@@ -354,13 +354,13 @@ namespace Game.Api.Tests.Unit
             // The dead-letter queue the escalation writes a faulted server command to (the only GetQueue use).
             public RecordingQueue DeadLetterQueue { get; } = new();
 
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id)
             {
                 CapturedProcessor = queue => action((queue, channel));
                 return Task.CompletedTask;
             }
 
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -430,9 +430,9 @@ namespace Game.Api.Tests.Unit
         /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path.</summary>
         private sealed class ThrowingSubscribePubSubService(Exception toThrow) : IPubSubService
         {
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => throw toThrow;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw toThrow;
 
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
             public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -448,10 +448,10 @@ namespace Game.Api.Tests.Unit
         /// guarded-teardown path where the presence-key release must still run after an unsubscribe fault.</summary>
         private sealed class ThrowingUnsubscribePubSubService(Exception toThrow) : IPubSubService
         {
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null) => Task.CompletedTask;
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => throw toThrow;
 
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null) => throw new NotSupportedException();
+            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
             public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();

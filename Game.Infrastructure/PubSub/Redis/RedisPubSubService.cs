@@ -14,16 +14,18 @@ namespace Game.Infrastructure.PubSub.Redis
     {
         private static readonly ConcurrentDictionary<string, (Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
 
-        private readonly ConnectionMultiplexer _multiplexer;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<RedisPubSubService> _logger;
 
-        public IDatabase Redis => _multiplexer.GetDatabase();
-        public ISubscriber Subscriber => _multiplexer.GetSubscriber();
+        // The multiplexer is fixed for the instance lifetime, so the database/subscriber handles it hands out are
+        // resolved once in the ctor rather than per call on the hot publish/subscribe paths (#954).
+        public IDatabase Redis { get; }
+        public ISubscriber Subscriber { get; }
 
-        public RedisPubSubService(ConnectionMultiplexer multiplexer, ILoggerFactory loggerFactory)
+        public RedisPubSubService(IConnectionMultiplexer multiplexer, ILoggerFactory loggerFactory)
         {
-            _multiplexer = multiplexer;
+            Redis = multiplexer.GetDatabase();
+            Subscriber = multiplexer.GetSubscriber();
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<RedisPubSubService>();
         }
@@ -112,8 +114,10 @@ namespace Game.Infrastructure.PubSub.Redis
             }
         }
 
-        public async Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string? id = null)
+        public async Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id)
         {
+            // Validate the id before creating the worker so a misuse can't leak the worker's wait handle (#954).
+            ArgumentNullException.ThrowIfNull(id);
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}' with queue '{QueueName}'.", channel, queueName);
             var queue = GetQueue(queueName);
             var worker = new BackgroundWorker(_loggerFactory.CreateLogger<BackgroundWorker>(), () => action((queue, channel)))
@@ -124,8 +128,10 @@ namespace Game.Infrastructure.PubSub.Redis
             await SubscribeWithWorker(channel, worker, id);
         }
 
-        public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string? id = null)
+        public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id)
         {
+            // Validate the id before creating the worker so a misuse can't leak the worker's wait handle (#954).
+            ArgumentNullException.ThrowIfNull(id);
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}' with queue '{QueueName}'.", channel, queueName);
             var queue = GetQueue(queueName);
             var worker = new BackgroundWorker(_loggerFactory.CreateLogger<BackgroundWorker>(), async () => await action((queue, channel)))
@@ -139,9 +145,11 @@ namespace Game.Infrastructure.PubSub.Redis
         // Registers a queue worker's handle and subscribes it, keeping the two atomic: a SubscribeAsync failure
         // rolls back the partial registration (removes the id and disposes the worker) so a transient Redis error
         // can't wedge the id permanently with "a handle already exists" while nothing is actually subscribed (#655).
-        private async Task SubscribeWithWorker(string channel, BackgroundWorker worker, string? id)
+        // The id is required: a worker tracked under no id could never be disposed via UnSubscribe and would leak
+        // its OS wait handle (#954).
+        private async Task SubscribeWithWorker(string channel, BackgroundWorker worker, string id)
         {
-            if (id is not null && !_handles.TryAdd(id, (handle, worker)))
+            if (!_handles.TryAdd(id, (handle, worker)))
             {
                 worker.Dispose();
                 throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
@@ -153,10 +161,7 @@ namespace Game.Infrastructure.PubSub.Redis
             }
             catch
             {
-                if (id is not null)
-                {
-                    _handles.TryRemove(id, out _);
-                }
+                _handles.TryRemove(id, out _);
                 worker.Dispose();
                 throw;
             }

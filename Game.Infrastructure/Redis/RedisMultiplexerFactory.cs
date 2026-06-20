@@ -12,13 +12,13 @@ namespace Game.Infrastructure.Redis
         // whenever their connection strings match, and two getters racing on first startup resolve to the same
         // instance instead of each opening their own (#696). The whole get-or-add runs under the lock, so a
         // partially-constructed multiplexer is never published to another thread.
-        private static readonly Dictionary<string, ConnectionMultiplexer> _multiplexers = new();
+        private static readonly Dictionary<string, IConnectionMultiplexer> _multiplexers = new();
         private static readonly object _lock = new();
 
         // Minimum size to grow the thread pool to before connecting (see ConnectMultiplexer).
         private const int MinThreadPoolThreads = 32;
 
-        public static ConnectionMultiplexer GetMultiplexer(ICacheOptions config)
+        public static IConnectionMultiplexer GetMultiplexer(ICacheOptions config)
         {
             if (config.CacheConnectionString is null)
             {
@@ -28,7 +28,7 @@ namespace Game.Infrastructure.Redis
             return GetOrConnect(config.CacheConnectionString);
         }
 
-        public static ConnectionMultiplexer GetMultiplexer(IPubSubOptions config)
+        public static IConnectionMultiplexer GetMultiplexer(IPubSubOptions config)
         {
             if (config.PubSubConnectionString is null)
             {
@@ -38,9 +38,42 @@ namespace Game.Infrastructure.Redis
             return GetOrConnect(config.PubSubConnectionString);
         }
 
-        private static ConnectionMultiplexer GetOrConnect(string connectionString)
+        private static IConnectionMultiplexer GetOrConnect(string connectionString)
         {
             return GetOrAdd(_multiplexers, _lock, connectionString, ConnectMultiplexer);
+        }
+
+        /// <summary>
+        /// Closes and disposes every cached multiplexer, clearing the cache so a later request reconnects fresh.
+        /// Called from the host's graceful-shutdown hook (<see cref="RedisConnectionLifetime"/>) so the process-
+        /// lifetime connections are torn down cleanly on stop rather than left to be force-killed (#954). Each
+        /// connection is closed independently so one faulting close still lets the rest tear down.
+        /// </summary>
+        public static Task DisposeAllAsync()
+        {
+            return DisposeAllAsync(_multiplexers, _lock);
+        }
+
+        /// <summary>
+        /// Locked drain-and-dispose of a multiplexer cache: snapshots the values under <paramref name="syncRoot"/>,
+        /// clears the cache, then disposes each entry. Generic and seam-extracted so the dispose/clear semantics
+        /// are unit-testable with a fake disposable, mirroring how <see cref="GetOrAdd{T}"/> is tested without a
+        /// live connection (#954).
+        /// </summary>
+        internal static async Task DisposeAllAsync<T>(Dictionary<string, T> cache, object syncRoot)
+            where T : IAsyncDisposable
+        {
+            List<T> toDispose;
+            lock (syncRoot)
+            {
+                toDispose = [.. cache.Values];
+                cache.Clear();
+            }
+
+            foreach (var disposable in toDispose)
+            {
+                await disposable.DisposeAsync();
+            }
         }
 
         /// <summary>

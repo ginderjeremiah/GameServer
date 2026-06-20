@@ -4,6 +4,13 @@ namespace Game.DataAccess
     /// Base shape for an exponential-backoff retry policy: an operation is attempted up to
     /// <see cref="MaxAttempts"/> times, waiting <see cref="BaseDelay"/> after the first failed attempt and
     /// doubling the wait after each subsequent one, capped at <see cref="MaxDelay"/>.
+    /// <para>
+    /// A zero <see cref="BaseDelay"/> is allowed and means <em>immediate</em> retry (every
+    /// <see cref="DelayAfterAttempt"/> returns <see cref="TimeSpan.Zero"/>): the retries are still bounded by
+    /// <see cref="MaxAttempts"/>, so this is a finite back-to-back retry rather than an unbounded busy loop. It
+    /// exists so tests can drive the retry path without real waits; production policies configure a positive
+    /// base delay for genuine backoff.
+    /// </para>
     /// </summary>
     internal abstract record RetryPolicy
     {
