@@ -432,7 +432,100 @@ namespace Game.Application.Tests.Services
             Assert.Null(loggedOutUserId);
         }
 
-        private static AccountService CreateAccountService(IServiceProvider provider, int iterations = 1000)
+        [Fact]
+        public async Task Login_ConsecutiveFailuresPastThreshold_BacksOffWithRetryAfter()
+        {
+            using var scope = CreateScope();
+            var options = new LoginBackoffOptions { FailureThreshold = 2, BaseDelaySeconds = 1, MaxDelaySeconds = 4, FailureWindowSeconds = 60 };
+            var clock = new MutableTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            var accountService = CreateAccountService(scope.ServiceProvider, backoffOptions: options, timeProvider: clock);
+
+            // The first threshold+1 failures run the credential check (rejected as invalid, not backed off):
+            // the (threshold+1)th failure is the one that first arms the lock.
+            for (var i = 0; i < options.FailureThreshold + 1; i++)
+            {
+                var attempt = await accountService.Login("backoffghost", "wrong");
+                Assert.Equal(LoginStatus.InvalidCredentials, attempt.Status);
+            }
+
+            // The next attempt is now within the backoff window and is rejected before the credential check.
+            var backedOff = await accountService.Login("backoffghost", "wrong");
+
+            Assert.Equal(LoginStatus.TooManyAttempts, backedOff.Status);
+            Assert.NotNull(backedOff.RetryAfter);
+            Assert.True(backedOff.RetryAfter > TimeSpan.Zero);
+        }
+
+        [Fact]
+        public async Task Login_AfterBackoffWindowElapses_IsAllowedAgain()
+        {
+            using var scope = CreateScope();
+            var options = new LoginBackoffOptions { FailureThreshold = 2, BaseDelaySeconds = 1, MaxDelaySeconds = 4, FailureWindowSeconds = 60 };
+            var clock = new MutableTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            var accountService = CreateAccountService(scope.ServiceProvider, backoffOptions: options, timeProvider: clock);
+
+            // Drive the account into an active backoff window.
+            for (var i = 0; i < options.FailureThreshold + 1; i++)
+            {
+                await accountService.Login("backoffelapse", "wrong");
+            }
+            var backedOff = await accountService.Login("backoffelapse", "wrong");
+            Assert.Equal(LoginStatus.TooManyAttempts, backedOff.Status);
+
+            // Past the cap the lock has expired, so the owner is allowed to try again — proving this is a
+            // bounded slowdown, not a hard lockout an attacker who knows the username could hold open forever.
+            clock.Advance(TimeSpan.FromSeconds(options.MaxDelaySeconds + 1));
+            var afterWindow = await accountService.Login("backoffelapse", "wrong");
+
+            Assert.Equal(LoginStatus.InvalidCredentials, afterWindow.Status);
+        }
+
+        [Fact]
+        public async Task Login_SuccessfulLogin_ResetsFailureStreak()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "backoffreset", "correctpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var options = new LoginBackoffOptions { FailureThreshold = 2, BaseDelaySeconds = 1, MaxDelaySeconds = 4, FailureWindowSeconds = 60 };
+            var clock = new MutableTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            var accountService = CreateAccountService(scope.ServiceProvider, backoffOptions: options, timeProvider: clock);
+
+            // Accrue failures up to the threshold (no lock yet), then a correct login clears the streak.
+            for (var i = 0; i < options.FailureThreshold; i++)
+            {
+                Assert.Equal(LoginStatus.InvalidCredentials, (await accountService.Login("backoffreset", "wrong")).Status);
+            }
+            Assert.True((await accountService.Login("backoffreset", "correctpass")).Success);
+
+            // The streak restarted from zero, so the same number of fresh failures stays under the threshold
+            // and is not backed off — had the prior failures persisted, the second of these would be locked.
+            for (var i = 0; i < options.FailureThreshold; i++)
+            {
+                Assert.Equal(LoginStatus.InvalidCredentials, (await accountService.Login("backoffreset", "wrong")).Status);
+            }
+        }
+
+        /// <summary>A test clock whose "now" only advances when explicitly told to, so the time-based backoff
+        /// window can be driven deterministically without real waits.</summary>
+        private sealed class MutableTimeProvider(DateTimeOffset start) : TimeProvider
+        {
+            private DateTimeOffset _now = start;
+
+            public override DateTimeOffset GetUtcNow() => _now;
+
+            public void Advance(TimeSpan by) => _now += by;
+        }
+
+        private static AccountService CreateAccountService(
+            IServiceProvider provider,
+            int iterations = 1000,
+            LoginBackoffOptions? backoffOptions = null,
+            TimeProvider? timeProvider = null)
         {
             // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
             // so seeded credentials verify exactly as they would in production. A higher iteration count
@@ -443,12 +536,21 @@ namespace Game.Application.Tests.Services
                 Iterations = iterations,
             }));
 
+            // The backoff guard runs over the real Redis-backed store; a tight options set plus a controllable
+            // clock can be supplied to exercise the backoff deterministically. The default options' threshold
+            // (5) keeps the single-attempt login tests above unaffected.
+            var backoffGuard = new LoginBackoffGuard(
+                provider.GetRequiredService<ILoginBackoffStore>(),
+                new LoginBackoffPolicy(Options.Create(backoffOptions ?? new LoginBackoffOptions())),
+                timeProvider ?? TimeProvider.System);
+
             return new AccountService(
                 provider.GetRequiredService<IUsers>(),
                 provider.GetRequiredService<IPlayerRepository>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
                 new StubAccessTokenService(),
                 hasher,
+                backoffGuard,
                 new NewPlayerFactory(),
                 NullLogger<AccountService>.Instance);
         }

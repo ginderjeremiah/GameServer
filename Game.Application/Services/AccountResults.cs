@@ -22,6 +22,12 @@ namespace Game.Application.Services
         Banned,
         NoPlayer,
         PlayerDataNotFound,
+        /// <summary>
+        /// The account is in an exponential-backoff window after too many consecutive failed attempts; the
+        /// attempt was rejected without verifying credentials. <see cref="AccountLoginResult.RetryAfter"/>
+        /// carries how long to wait.
+        /// </summary>
+        TooManyAttempts,
     }
 
     /// <summary>
@@ -31,9 +37,10 @@ namespace Game.Application.Services
 
     /// <summary>
     /// Result of <see cref="AccountService.Login"/>: a status plus, on success, the issued tokens, the
-    /// loaded player aggregate, and the authenticated user id (needed to establish the session).
+    /// loaded player aggregate, and the authenticated user id (needed to establish the session). On a
+    /// <see cref="LoginStatus.TooManyAttempts"/> rejection it carries the remaining backoff wait.
     /// </summary>
-    public record AccountLoginResult(LoginStatus Status, AuthTokenPair? Tokens, Player? Player, int UserId)
+    public record AccountLoginResult(LoginStatus Status, AuthTokenPair? Tokens, Player? Player, int UserId, TimeSpan? RetryAfter = null)
     {
         [MemberNotNullWhen(true, nameof(Tokens), nameof(Player))]
         public bool Success => Status == LoginStatus.Success;
@@ -41,6 +48,11 @@ namespace Game.Application.Services
         public static AccountLoginResult Failed(LoginStatus status)
         {
             return new AccountLoginResult(status, null, null, 0);
+        }
+
+        public static AccountLoginResult BackedOff(TimeSpan retryAfter)
+        {
+            return new AccountLoginResult(LoginStatus.TooManyAttempts, null, null, 0, retryAfter);
         }
 
         public static AccountLoginResult Succeeded(AuthTokenPair tokens, Player player, int userId)
