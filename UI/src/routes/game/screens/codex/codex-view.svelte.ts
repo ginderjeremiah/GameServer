@@ -20,12 +20,15 @@ import { StatisticsData, buildStatEntities, buildStatTypes } from '../stats/stat
 import {
 	type CodexTab,
 	type EnemyFilter,
+	type EnemySort,
 	type EnemySubTab,
 	CODEX_TABS,
 	enemyAccent,
 	enemyKindLabel,
 	formatBand,
 	formatCooldown,
+	matchesEnemySearch,
+	sortEnemyRows,
 	tabAccent,
 	tabLabel
 } from './codex-display';
@@ -54,8 +57,12 @@ export interface EnemyRowVM {
 	name: string;
 	isBoss: boolean;
 	band: string;
+	/** Numeric sort key for the level metric (the band's low end). */
+	level: number;
 	zoneCount: number;
 	skillCount: number;
+	/** Pre-lowercased search haystack: name + kind + spawn-zone names. */
+	searchText: string;
 	selected: boolean;
 }
 
@@ -115,6 +122,10 @@ export class CodexView {
 	scaling = $state<boolean>(false);
 	/** Enemy-table filter chip. */
 	filter = $state<EnemyFilter>('all');
+	/** Enemy-table search query (matched against name, kind and spawn zones). */
+	search = $state('');
+	/** Enemy-table sort metric. */
+	sort = $state<EnemySort>('level');
 
 	/** The player's statistic values (fetched on mount via the shared statistics store). */
 	stats = $state<IPlayerStatistic[]>([]);
@@ -162,29 +173,44 @@ export class CodexView {
 		}));
 	});
 
-	/** Enemy table rows for the active filter. */
+	/** Enemy table rows for the active filter, narrowed by the search query and ordered by the
+	 *  active sort. The search/sort maths are the pure helpers in `codex-display`. */
 	readonly enemyRows = $derived.by<EnemyRowVM[]>(() => {
 		const zones = staticData.zones ?? [];
-		return this.filteredEnemies.map((e) => ({
-			id: e.id,
-			name: e.name,
-			isBoss: e.isBoss,
-			band: formatBand(levelRange(e, zones)),
-			zoneCount: e.isBoss ? 1 : e.spawns.length,
-			skillCount: e.skillPool.length,
-			selected: e.id === this.selectedEnemyId
-		}));
+		return this.filteredEnemies
+			.map((e) => {
+				const range = levelRange(e, zones);
+				const zoneNames = e.spawns.map((sp) => zones[sp.zoneId]?.name ?? '');
+				return {
+					id: e.id,
+					name: e.name,
+					isBoss: e.isBoss,
+					band: formatBand(range),
+					level: range.min,
+					zoneCount: e.isBoss ? 1 : e.spawns.length,
+					skillCount: e.skillPool.length,
+					searchText: [e.name, enemyKindLabel(e.isBoss), ...zoneNames].join(' ').toLowerCase(),
+					selected: e.id === this.selectedEnemyId
+				};
+			})
+			.filter((row) => matchesEnemySearch(row, this.search))
+			.sort(sortEnemyRows(this.sort));
 	});
 
-	/** Number of enemies shown under the active filter (the "N shown" readout). */
-	readonly shownCount = $derived(this.filteredEnemies.length);
+	/** Number of enemies shown under the active filter + search (the "N shown" readout). */
+	readonly shownCount = $derived(this.enemyRows.length);
 
 	/* ── selected enemy + dossier ──────────────────────────────────────────────── */
 
-	/** The inspected enemy, falling back to the head of the (filtered, then full) list. */
-	readonly selectedEnemy = $derived.by<IEnemy | undefined>(
-		() => this.enemies.find((e) => e.id === this.selectedEnemyId) ?? this.filteredEnemies[0] ?? this.enemies[0]
-	);
+	/** The inspected enemy, falling back to the head of the visible rows, then the full list. */
+	readonly selectedEnemy = $derived.by<IEnemy | undefined>(() => {
+		const explicit = this.enemies.find((e) => e.id === this.selectedEnemyId);
+		if (explicit) {
+			return explicit;
+		}
+		const firstVisible = this.enemyRows[0];
+		return (firstVisible && this.enemies.find((e) => e.id === firstVisible.id)) ?? this.enemies[0];
+	});
 
 	readonly range = $derived.by<LevelRange | undefined>(() => {
 		const e = this.selectedEnemy;
@@ -332,6 +358,10 @@ export class CodexView {
 
 	setFilter(filter: EnemyFilter): void {
 		this.filter = filter;
+	}
+
+	setSort(sort: EnemySort): void {
+		this.sort = sort;
 	}
 
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */

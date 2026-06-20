@@ -1,12 +1,19 @@
-<!-- The Enemies tab: a toolbar (search + Normal/Boss filter) over the enemy table on the left, and
-     the selected enemy's dossier on the right. Search and sort are display-only in this slice. -->
+<!-- The Enemies tab: a toolbar (search + Normal/Boss filter + sort) over the enemy table on the left,
+     and the selected enemy's dossier on the right. -->
 <div class="enemies">
 	<div class="list-col">
 		<div class="toolbar">
-			<div class="search" aria-hidden="true">
-				<span class="search-icon">⌕</span>
-				<span class="search-text">search {view.enemies.length} enemies</span>
-			</div>
+			<label class="search">
+				<span class="search-icon" aria-hidden="true">⌕</span>
+				<input
+					class="search-input"
+					type="search"
+					placeholder="search {view.enemies.length} enemies"
+					aria-label="Search enemies"
+					data-testid="codex-search"
+					bind:value={view.search}
+				/>
+			</label>
 			<div class="chips">
 				{#each ENEMY_FILTERS as chip (chip.key)}
 					<button
@@ -21,7 +28,15 @@
 				{/each}
 			</div>
 			<span class="spacer"></span>
-			<span class="count">{view.shownCount} shown · sort: level ▾</span>
+			<span class="count">{view.shownCount} shown</span>
+			<label class="sort">
+				<span class="sort-label">sort:</span>
+				<select class="sort-select" aria-label="Sort enemies" data-testid="codex-sort" bind:value={view.sort}>
+					{#each ENEMY_SORTS as option (option.key)}
+						<option value={option.key}>{option.label}</option>
+					{/each}
+				</select>
+			</label>
 		</div>
 
 		<EnemyTable {view} />
@@ -32,7 +47,7 @@
 
 <script lang="ts">
 import type { CodexView } from './codex-view.svelte';
-import { ENEMY_FILTERS } from './codex-display';
+import { ENEMY_FILTERS, ENEMY_SORTS } from './codex-display';
 import EnemyTable from './EnemyTable.svelte';
 import EnemyDossier from './EnemyDossier.svelte';
 
@@ -80,16 +95,28 @@ let { view }: Props = $props();
 .search-icon {
 	color: var(--text-muted);
 	font-size: 12px;
+	flex: none;
 }
 
-.search-text {
+.search-input {
+	flex: 1;
+	min-width: 0;
+	background: transparent;
+	border: none;
+	outline: none;
+	color: var(--text-primary);
 	font-family: var(--mono);
 	font-size: 10.5px;
-	color: var(--text-muted);
 	letter-spacing: 0.5px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+
+	&::placeholder {
+		color: var(--text-muted);
+	}
+
+	// Hide the native search clear affordance to keep the mono toolbar look consistent.
+	&::-webkit-search-cancel-button {
+		appearance: none;
+	}
 }
 
 .chips {
@@ -127,5 +154,38 @@ let { view }: Props = $props();
 	text-transform: uppercase;
 	color: var(--text-muted);
 	white-space: nowrap;
+}
+
+.sort {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.sort-label {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.sort-select {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	background: transparent;
+	border: 1px solid var(--border-light);
+	border-radius: 3px;
+	padding: 3px 6px;
+	cursor: pointer;
+
+	// The dropdown surface is themed; native option chrome stays the system default.
+	option {
+		background: var(--panel);
+		color: var(--text-primary);
+	}
 }
 </style>
