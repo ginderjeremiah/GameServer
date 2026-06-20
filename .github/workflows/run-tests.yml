@@ -101,11 +101,13 @@ jobs:
       # forgets to regenerate fails here instead of landing stale client types. The codegen command
       # short-circuits before host construction (no Postgres/Redis/DI), so it's safe in CI; reuse the
       # binaries from "Build solution" (--no-build --no-restore), mirroring the test step below.
-      # The diff spans the whole worktree (not just types/) so a future writer emitting anywhere else
-      # can't silently escape the check; the writers OrderBy their inputs, so the output is stable.
+      # Stage everything (git add -A) then diff the index so the check spans the whole worktree (not
+      # just types/) AND catches brand-new untracked files a future writer might emit; .gitignore keeps
+      # bin/obj out, and the writers OrderBy their inputs so the output is stable.
       run: |
         dotnet run --project Game.Api --no-build --no-restore -- codegen
-        git diff --exit-code
+        git add -A
+        git diff --cached --exit-code
 
     - name: Run formatter (verify only)
       # --no-restore reuses the restore/build from "Build solution" above; without it dotnet format
