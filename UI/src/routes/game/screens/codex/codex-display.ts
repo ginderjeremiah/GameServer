@@ -11,6 +11,8 @@ export type CodexTab = 'enemies' | 'zones' | 'skills';
 export type EnemySubTab = 'attributes' | 'statistics' | 'skills' | 'spawns' | 'challenges';
 /** Enemy-table filter chip. */
 export type EnemyFilter = 'all' | 'normal' | 'boss';
+/** Enemy-table sort metric. */
+export type EnemySort = 'level' | 'name';
 
 export const CODEX_TABS: CodexTab[] = ['enemies', 'zones', 'skills'];
 
@@ -19,6 +21,20 @@ export const ENEMY_FILTERS: { key: EnemyFilter; label: string }[] = [
 	{ key: 'normal', label: 'Normal' },
 	{ key: 'boss', label: 'Boss' }
 ];
+
+export const ENEMY_SORTS: { key: EnemySort; label: string }[] = [
+	{ key: 'level', label: 'Level' },
+	{ key: 'name', label: 'Name' }
+];
+
+/** The minimum shape the pure search/sort helpers need from an enemy row. */
+export interface EnemySearchSortFields {
+	name: string;
+	/** Numeric sort key for the level metric (the band's low end). */
+	level: number;
+	/** Pre-lowercased haystack: the enemy name, its kind, and the zones it appears in. */
+	searchText: string;
+}
 
 /** Accent hue per top-level tab — the section's themed colour (enemy / zone / skill). */
 export const tabAccent = (tab: CodexTab): string =>
@@ -41,4 +57,25 @@ export function formatCooldown(ms: number): string {
 		return '—';
 	}
 	return ms % 1000 === 0 ? `${ms / 1000}s` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/* ── enemy-table search + sort (pure, unit-tested directly) ────────────────── */
+
+/** Does an enemy row match the search query? An empty/whitespace query matches everything; otherwise
+ *  the (already-lowercased) query must be a substring of the row's haystack (name + kind + zones). */
+export function matchesEnemySearch(row: EnemySearchSortFields, query: string): boolean {
+	const term = query.trim().toLowerCase();
+	return term === '' || row.searchText.includes(term);
+}
+
+/** Comparator over enemy rows for the given sort metric. Level sorts ascending (low bands first),
+ *  name sorts alphabetically; both fall back to name so the order is stable on ties. */
+export function sortEnemyRows(sort: EnemySort): (a: EnemySearchSortFields, b: EnemySearchSortFields) => number {
+	switch (sort) {
+		case 'name':
+			return (a, b) => a.name.localeCompare(b.name);
+		case 'level':
+		default:
+			return (a, b) => a.level - b.level || a.name.localeCompare(b.name);
+	}
 }

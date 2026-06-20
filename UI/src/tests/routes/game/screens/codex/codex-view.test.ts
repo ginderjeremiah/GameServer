@@ -118,6 +118,98 @@ describe('CodexView enemy rows', () => {
 		view.setFilter('normal');
 		expect(view.enemyRows.map((r) => r.id)).toEqual([0, 1]);
 	});
+
+	it('exposes the level sort key + search haystack on each row', () => {
+		const rows = new CodexView().enemyRows;
+		// Dust Skitterer spans 1–22 (low end 1); the haystack carries name, kind and spawn zones.
+		const skitterer = rows.find((r) => r.id === 0);
+		expect(skitterer?.level).toBe(1);
+		expect(skitterer?.searchText).toContain('dust skitterer');
+		expect(skitterer?.searchText).toContain('enemy');
+		expect(skitterer?.searchText).toContain('emberreach');
+		// Cinder Tyrant is a boss fixed at level 10.
+		expect(rows.find((r) => r.id === 2)).toMatchObject({ level: 10 });
+	});
+});
+
+describe('CodexView enemy search', () => {
+	it('matches by name, case-insensitively', () => {
+		const view = new CodexView();
+		view.search = 'BOG';
+		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
+	});
+
+	it('matches by zone name (spawn zones + a boss encounter zone)', () => {
+		const view = new CodexView();
+		// Dust Skitterer spawns in Emberreach; Cinder Tyrant's boss encounter is in Emberreach too.
+		view.search = 'emberreach';
+		expect(view.enemyRows.map((r) => r.id)).toEqual([0, 2]);
+	});
+
+	it('matches a boss by its encounter-zone name', () => {
+		const view = new CodexView();
+		view.setFilter('boss');
+		view.search = 'emberreach'; // Cinder Tyrant's encounter zone (it has no spawns)
+		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
+	});
+
+	it('matches the boss kind', () => {
+		const view = new CodexView();
+		view.search = 'boss';
+		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
+	});
+
+	it('shows everything for an empty query', () => {
+		const view = new CodexView();
+		view.search = '   ';
+		expect(view.enemyRows).toHaveLength(3);
+	});
+
+	it('shows nothing when the query matches no enemy', () => {
+		const view = new CodexView();
+		view.search = 'griffin';
+		expect(view.enemyRows).toHaveLength(0);
+		expect(view.shownCount).toBe(0);
+	});
+
+	it('reflects the search in the shown count and combines with the filter', () => {
+		const view = new CodexView();
+		view.setFilter('normal');
+		view.search = 'lurker';
+		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
+		expect(view.shownCount).toBe(1);
+	});
+
+	it('keeps an explicitly selected enemy in the dossier even when the search excludes it', () => {
+		// Mirrors the filter behavior: a deliberate selection stays resolvable so the dossier
+		// doesn't jump out from under the player when they type a query.
+		const view = new CodexView();
+		view.selectEnemy(0); // explicitly inspecting Dust Skitterer
+		view.search = 'bog'; // the table shows only Bog Lurker…
+		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
+		expect(view.selectedEnemy?.id).toBe(0); // …but the dossier holds the selection
+	});
+
+	it('falls back the dossier to the first visible row when nothing is explicitly selected', () => {
+		const view = new CodexView();
+		view.selectedEnemyId = -1; // no resolvable selection
+		view.search = 'bog'; // only Bog Lurker is visible
+		expect(view.selectedEnemy?.id).toBe(1);
+	});
+});
+
+describe('CodexView enemy sort', () => {
+	it('defaults to ascending level (boss fixed level ranks among normals)', () => {
+		// Dust Skitterer (1) < Cinder Tyrant (boss, 10) < Bog Lurker (11).
+		expect(new CodexView().enemyRows.map((r) => r.id)).toEqual([0, 2, 1]);
+	});
+
+	it('sorts alphabetically by name', () => {
+		const view = new CodexView();
+		view.sort = 'name';
+		// Bog Lurker, Cinder Tyrant, Dust Skitterer.
+		expect(view.enemyRows.map((r) => r.id)).toEqual([1, 2, 0]);
+	});
 });
 
 describe('CodexView selection', () => {
