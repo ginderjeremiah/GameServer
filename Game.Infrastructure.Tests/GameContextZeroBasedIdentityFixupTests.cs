@@ -78,11 +78,12 @@ namespace Game.Infrastructure.Tests
         {
             using var context = CreateContext();
 
-            // Editing the first record of a zero-based set (Id == 0, the identity seed). When EF reads 0 as an
-            // unset store-generated value it marks the key temporary in the save pipeline, and the PK branch
-            // forces the real 0 back (end-to-end coverage is in the admin integration tests). When the key is a
-            // concrete value the branch is a no-op — verified here, since forcing a non-temporary key would
-            // throw "part of a key ... cannot be modified".
+            // Editing the first record of a zero-based set (Id == 0, the identity seed) the way the admin path
+            // does: a fresh entity marked Modified. In EF Core 10 (#1003) this leaves the key NON-temporary
+            // (verified below), so the PK branch's ForceZero is a no-op and the literal 0 is preserved — the
+            // record-0 edit still targets the correct row. End-to-end coverage is in the admin integration tests
+            // (AdminEnemiesIntegrationTests.SaveEnemies_EditsRecordZero_UpdatesTheCorrectRow); the PK branch is
+            // retained as a defensive guard rather than because it fires here.
             var enemy = new Enemy { Id = 0, Name = "First enemy" };
             context.Entry(enemy).State = EntityState.Modified;
 

@@ -585,8 +585,17 @@ namespace Game.Infrastructure.Database
                     continue;
                 }
 
-                // PK branch: a Modified record whose Id is the seed 0. (An Added row is left alone so its real
-                // id is still store-generated.)
+                // PK branch: a non-Added record whose Id is the seed 0 — ForceZero restores the literal 0 should
+                // EF have assigned its key a temporary value (reading 0 as an unset store-generated key). Kept as a
+                // DEFENSIVE guard, not because we observe it fire (#1003): editing record 0 the way the admin path
+                // does — a fresh entity marked Modified via EntityStore.Update — leaves the key NON-temporary, so
+                // ForceZero no-ops. EF Core 10 also forbids the very precondition this branch would correct: a key
+                // cannot be temporary while the entry is Modified/Deleted/Unchanged — both setting IsTemporary on
+                // such a key and transitioning a temporary-keyed entry out of Added throw, before the save runs. So
+                // the branch is currently unreachable and the guard is a no-op either way; it is retained
+                // deliberately (against older/future EF semantics or an unforeseen attach path) so a record-0 edit
+                // can never silently UPDATE the wrong row. Pinned by AdminEnemiesIntegrationTests
+                // .SaveEnemies_EditsRecordZero_UpdatesTheCorrectRow.
                 if (fixup.KeyProperty is not null
                     && entry.State is not EntityState.Added
                     && entry.Entity is IZeroBasedIdentityEntity { Id: 0 })
