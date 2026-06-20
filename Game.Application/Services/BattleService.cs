@@ -165,7 +165,7 @@ namespace Game.Application.Services
                 return null;
             }
 
-            var rewards = RecordVictory(player, enemy, result, state);
+            var rewards = RecordVictory(player, enemy, result, state, now);
 
             state.SetCooldown(claimedTimestamp + PostBattleCooldown);
             state.ClearBattle();
@@ -194,9 +194,10 @@ namespace Game.Application.Services
                 return false;
             }
 
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+            var now = DateTime.UtcNow;
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
 
-            state.SetCooldown(DateTime.UtcNow + PostBattleCooldown);
+            state.SetCooldown(now + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
@@ -206,7 +207,8 @@ namespace Game.Application.Services
 
         private async Task AbandonBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
-            var elapsedMs = (int)(DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
+            var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
 
             // Clamp the anti-cheat replay window to the battle's maximum duration. A battle never runs past
             // DefaultMaxBattleMs on the client — it ends as a draw at the cap — so the replay must not either:
@@ -227,11 +229,11 @@ namespace Game.Application.Services
                 // The enemy died within the elapsed wall-clock time, so this abandon resolved as a real
                 // victory. Pay it out exactly like EndBattleVictory (exp + win/clear/challenge credit)
                 // rather than booking the win while silently withholding the earned exp (#206).
-                RecordVictory(player, enemy, result, state);
+                RecordVictory(player, enemy, result, state, now);
             }
             else
             {
-                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
             }
 
             state.ClearBattle();
@@ -251,7 +253,7 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
         // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
-        private DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state)
+        private DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
         {
             // Measure the player's power for the reward from the same frozen snapshot the battle was simulated
             // against, not the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps)
@@ -267,7 +269,7 @@ namespace Game.Application.Services
             var rewards = new DefeatRewards(snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod), enemy);
 
             player.GrantExp(rewards.ExpReward);
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp);
 
             return rewards;
         }

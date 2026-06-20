@@ -679,7 +679,7 @@ namespace Game.Core.Tests.Players
             var stats = new BattleStats { PlayerDamageDealt = 42.0 };
             var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 3200, Stats: stats);
 
-            player.RecordBattleCompleted(enemy, result, isBossBattle: true, zoneId: 7);
+            player.RecordBattleCompleted(enemy, result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow);
 
             var evt = player.DomainEvents.OfType<BattleCompletedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -691,6 +691,37 @@ namespace Game.Core.Tests.Players
             Assert.Equal(stats, evt.Stats);
             Assert.True(evt.IsBossBattle);
             Assert.Equal(7, evt.ZoneId);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_StampsLastActivityAndRaisesCoreUpdated()
+        {
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+            var timestamp = new DateTime(2026, 6, 20, 12, 0, 0, DateTimeKind.Utc);
+
+            player.RecordBattleCompleted(enemy, result, isBossBattle: false, zoneId: 3, timestamp: timestamp);
+
+            Assert.Equal(timestamp, player.LastActivity);
+            var coreUpdated = player.DomainEvents.OfType<PlayerCoreUpdatedEvent>().SingleOrDefault();
+            Assert.NotNull(coreUpdated);
+            Assert.Equal(timestamp, coreUpdated.LastActivity);
+        }
+
+        // ── StampActivity ────────────────────────────────────────────────────
+
+        [Fact]
+        public void StampActivity_SetsLastActivityAndRaisesCoreUpdatedCarryingIt()
+        {
+            var player = MakePlayer();
+            var timestamp = new DateTime(2026, 6, 20, 15, 30, 0, DateTimeKind.Utc);
+
+            player.StampActivity(timestamp);
+
+            Assert.Equal(timestamp, player.LastActivity);
+            var evt = Assert.IsType<PlayerCoreUpdatedEvent>(Assert.Single(player.DomainEvents));
+            Assert.Equal(timestamp, evt.LastActivity);
         }
 
         // ── ClearEvents ──────────────────────────────────────────────────────

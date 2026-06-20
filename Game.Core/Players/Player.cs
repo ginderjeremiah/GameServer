@@ -20,6 +20,14 @@ namespace Game.Core.Players
         public required int Level { get; set; }
         public required int Exp { get; set; }
         public required int CurrentZoneId { get; set; }
+
+        /// <summary>
+        /// When the player was last active, the anchor the offline-rewards flow reads to compute away time
+        /// (<c>now − LastActivity</c>) server-side. Stamped on battle completion (the "last enemy defeated"
+        /// anchor) via <see cref="StampActivity"/> so it is current at any disconnect.
+        /// </summary>
+        public required DateTime LastActivity { get; set; }
+
         public required PlayerStatPoints StatPoints { get; set; }
         public required Inventory Inventory { get; set; }
         public required List<Skill> SelectedSkills { get; set; }
@@ -264,10 +272,24 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId)
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp)
         {
             RaiseEvent(new BattleCompletedEvent(
                 this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId));
+            StampActivity(timestamp);
+        }
+
+        /// <summary>
+        /// Records that the player was active at <paramref name="timestamp"/>, advancing the away-time anchor
+        /// the offline-rewards flow reads. Stamped on every battle completion (so a loss — which raises no other
+        /// core update — still persists the anchor) and reset to "now" when offline progress is claimed at login,
+        /// so the next away period starts fresh and a re-claim is a no-op. Raises a
+        /// <see cref="PlayerCoreUpdatedEvent"/> so the change rides the existing write-behind save.
+        /// </summary>
+        public void StampActivity(DateTime timestamp)
+        {
+            LastActivity = timestamp;
+            RaiseCoreUpdated();
         }
 
         public IEnumerable<AttributeModifier> GetAllModifiers()
@@ -285,7 +307,7 @@ namespace Game.Core.Players
         {
             RaiseEvent(new PlayerCoreUpdatedEvent(
                 Id, Level, Exp, CurrentZoneId,
-                StatPoints.StatPointsGained, StatPoints.StatPointsUsed));
+                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity));
         }
     }
 }

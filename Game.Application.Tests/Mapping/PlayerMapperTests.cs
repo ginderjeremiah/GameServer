@@ -114,6 +114,7 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(1, player.Id);
             Assert.Equal("Hero", player.Name);
             Assert.Equal(3, player.Level);
+            Assert.Equal(MappedLastActivity, player.LastActivity);
             Assert.Contains(100, player.Inventory.UnlockedMods);
             Assert.Contains(101, player.Inventory.UnlockedMods);
             var strength = player.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Strength);
@@ -174,6 +175,8 @@ namespace Game.Application.Tests.Mapping
             Assert.NotNull(ex.InnerException);
         }
 
+        private static readonly DateTime MappedLastActivity = new(2026, 6, 20, 10, 0, 0, DateTimeKind.Utc);
+
         private static EntityPlayer BuildPlayer(
             List<EntityPlayerSkill>? skills = null,
             List<EntityUnlockedItem>? unlockedItems = null,
@@ -189,6 +192,7 @@ namespace Game.Application.Tests.Mapping
                 CurrentZoneId = 0,
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
+                LastActivity = MappedLastActivity,
                 PlayerSkills = skills ?? [],
                 UnlockedItems = unlockedItems ?? [],
                 AppliedMods = appliedMods ?? [],
