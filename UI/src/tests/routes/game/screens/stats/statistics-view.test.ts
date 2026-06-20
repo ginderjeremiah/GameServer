@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
 
-// StatisticsView reads the statistic-type catalogue + entity lists from the
-// in-memory staticData store, so it is mocked here.
-const { staticData } = vi.hoisted(() => ({
+// StatisticsView reads the statistic-type catalogue + entity lists from the in-memory staticData
+// store, and deep-links enemies into the Codex via the navigation store — both mocked here.
+const { staticData, navigation } = vi.hoisted(() => ({
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any
+	staticData: {} as any,
+	navigation: { requestScreen: vi.fn() }
 }));
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, navigation }));
 
 import {
 	buildStatTypes,
@@ -61,6 +62,7 @@ function seededView(): StatisticsView {
 
 beforeEach(() => {
 	seedStaticData();
+	navigation.requestScreen.mockClear();
 });
 
 describe('buildStatTypes', () => {
@@ -204,11 +206,12 @@ describe('StatisticsData.isEmpty', () => {
 });
 
 describe('StatisticsView navigation', () => {
-	it('initialises to the by-statistic view on the first enemy', () => {
+	it('initialises to the by-statistic view, defaulting the by-entity kind to zone', () => {
 		const view = seededView();
 		expect(view.mode).toBe('stat');
 		expect(view.statCat).toBe('combat');
-		expect(view.entKind).toBe('enemy');
+		// Enemies open in the Codex now, so the in-place by-entity view defaults to a kind it can show.
+		expect(view.entKind).toBe('zone');
 		expect(view.entId).toBe(0);
 	});
 
@@ -228,6 +231,14 @@ describe('StatisticsView navigation', () => {
 		expect(view.query).toBe('');
 	});
 
+	it('switchKind to enemy opens the Codex instead of an in-place dossier', () => {
+		const view = seededView();
+		view.switchKind('enemy');
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies' });
+		// The in-place kind is left as-is (no enemy dossier).
+		expect(view.entKind).toBe('zone');
+	});
+
 	it('goEntity pivots into an entity dossier', () => {
 		const view = seededView();
 		view.goEntity('enemy', 1);
@@ -244,8 +255,26 @@ describe('StatisticsView navigation', () => {
 		expect(view.statCat).toBe('exploration');
 	});
 
+	it('openEntity deep-links an enemy into the Codex (per-entity stats live there)', () => {
+		const view = seededView();
+		view.openEntity('enemy', 1);
+		expect(navigation.requestScreen).toHaveBeenCalledWith('codex', { tab: 'enemies', enemyId: 1, sub: 'statistics' });
+		// The in-place dossier is left untouched for the enemy.
+		expect(view.mode).toBe('stat');
+	});
+
+	it('openEntity opens a zone/skill in place (no Codex tab for them yet)', () => {
+		const view = seededView();
+		view.openEntity('zone', 0);
+		expect(navigation.requestScreen).not.toHaveBeenCalled();
+		expect(view.mode).toBe('entity');
+		expect(view.entKind).toBe('zone');
+		expect(view.entId).toBe(0);
+	});
+
 	it('filters entities by the search query', () => {
 		const view = seededView();
+		view.entKind = 'enemy';
 		view.setQuery('gob');
 		expect(view.filteredEntities.map((e) => e.id)).toEqual([1]);
 	});
@@ -262,6 +291,7 @@ describe('StatisticsView navigation', () => {
 
 	it('falls back to the unfiltered list head (not the search box) when entId is unresolved', () => {
 		const view = seededView();
+		view.entKind = 'enemy';
 		view.mode = 'entity';
 		// An entId that resolves to no concrete entity for the kind (e.g. initial
 		// state or a kind-switch landing on a missing id).

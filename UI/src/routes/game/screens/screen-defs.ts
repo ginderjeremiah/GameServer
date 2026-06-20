@@ -8,6 +8,7 @@ import Skills from './skills/Skills.svelte';
 import Attributes from './attributes/Attributes.svelte';
 import AttributeBreakdown from './attribute-breakdown/AttributeBreakdown.svelte';
 import Statistics from './stats/Statistics.svelte';
+import Codex from './codex/Codex.svelte';
 import Options from './options/Options.svelte';
 
 /** A navigable game screen shown in the sidebar. */
@@ -49,6 +50,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 		component: AttributeBreakdown
 	},
 	{ key: 'stats', label: 'Stats', group: 'character', built: true, component: Statistics },
+	{ key: 'codex', label: 'Codex', group: 'character', built: true, component: Codex },
 	{ key: 'options', label: 'Options', group: 'settings', built: true, component: Options },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
