@@ -37,7 +37,7 @@ namespace Game.DataAccess.Repositories.Admin
     internal static class ChangeSetProcessor
     {
         public static AdminSaveResult Apply<T>(
-            IEnumerable<Change<T>> changes,
+            IReadOnlyCollection<Change<T>> changes,
             Action<T> add,
             Action<T> edit,
             Action<T>? delete = null,
