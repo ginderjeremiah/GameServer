@@ -28,6 +28,13 @@ The codegen also emits a small amount of **static domain data** that the fronten
 
 Because all of this lands under `UI/src/lib/api/types`, the existing CI codegen-drift check already guards it: a retune of a coefficient (or an enum value) that isn't regenerated fails the `git diff`, so the cross-implementation parity no longer rests on a human keeping the two files in step.
 
+## CI job split: verifications run apart from tests
+
+The `run-tests.yml` workflow keeps the **non-test verifications in their own jobs**, separate from the heavy test jobs: `verify-backend` runs the TypeScript codegen-drift check and `dotnet format --verify-no-changes`, and `verify-frontend` runs `npm run lint` (ESLint + `svelte-check`). This leaves `test-backend` on just build + tests/coverage (its longest path) and `test-frontend` on `npm ci` + the unit-test/coverage run, with the verifications running in parallel rather than in series ahead of the tests.
+
+- **`verify-backend` builds the solution again** (the codegen and formatter both need the binaries) rather than chaining off `test-backend`. This is the same free-CI-minutes-for-shorter-critical-path trade-off the parallel `test-e2e` build makes, and serves #943's goal of shortening the longest job.
+- Both verify jobs reuse the per-area `detect-changes` gating, so a frontend-only PR still won't spin up .NET (and vice-versa), and `all-checks-passed` lists them in `needs` so they stay blocking for branch protection.
+
 ## Shared domain-object test builders
 
 Domain aggregates like `Player` have many `required` members, so tests previously hand-rolled the full object graph in every file that needed one — adding a member meant editing every copy. Shared **fluent builders** (e.g. `PlayerBuilder`) now own that construction with sensible defaults, so a test specifies only the fields it cares about and adding a required member is a one-line change in the builder.
