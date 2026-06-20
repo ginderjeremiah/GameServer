@@ -1,3 +1,4 @@
+using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Application.Services;
 
@@ -26,9 +27,13 @@ namespace Game.Api.Middleware
             }
             else if (!await TryLoadPlayer(sessionService, sessionInitializer, scopeFactory, context.RequestAborted))
             {
-                // An authenticated session whose player can't be loaded can't play, so fail before
-                // upgrading the socket rather than erroring on the first command.
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                // An authenticated session whose player can't be loaded can't play, so fail before upgrading
+                // the socket rather than erroring on the first command. The socket isn't upgraded yet, so a
+                // body can still be written: return the project's { errorMessage } envelope (a 404 — the
+                // player resource is absent, not a server fault; a genuine load error throws and is shaped by
+                // ExceptionHandlingMiddleware) rather than a bare 500.
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                await context.Response.WriteAsJsonAsync(ApiResponse.Error("Player could not be loaded."), context.RequestAborted);
             }
             else
             {

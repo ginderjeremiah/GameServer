@@ -83,6 +83,25 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Processor_ResyncNoticeAlsoFails_WarnsThatTheClientMayHaveMissedTheCue()
+        {
+            // The original push faults and is escalated; if the ServerCommandFailed re-sync notice itself does
+            // not get through (here it also faults), the client never receives the re-sync cue for a gating
+            // command and would diverge silently — so the lost cue is surfaced at warning (#953), not ignored.
+            var commands = new CapturingCommandFactory(throwOn: name =>
+                name is "ChallengeCompleted" or "ServerCommandFailed" ? new InvalidOperationException("boom") : null);
+            var (processor, _) = BuildProcessor(commands);
+
+            var queue = new FakeQueue(new SocketCommandInfo("ChallengeCompleted") { Id = "push-1" });
+
+            await processor(queue);
+
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning
+                && e.Message.Contains("may not have received the re-sync cue")
+                && e.Message.Contains("ChallengeCompleted"));
+        }
+
+        [Fact]
         public async Task Processor_DequeueFaultThenValidCommand_QueueKeepsDrainingAndProcessorDoesNotThrow()
         {
             var commands = new CapturingCommandFactory(throwOn: _ => null);
