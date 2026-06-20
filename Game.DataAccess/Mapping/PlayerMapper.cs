@@ -81,7 +81,7 @@ namespace Game.DataAccess.Mapping
             var unlockedItems = new List<UnlockedItemSlot>();
             foreach (var ui in entity.UnlockedItems)
             {
-                var coreItem = items.GetItem(ui.ItemId);
+                var coreItem = ResolveOrThrow(items.GetItem, ui.ItemId, entity.Id, "item");
                 var appliedMods = new List<AppliedModSlot>();
 
                 if (appliedModsByItem.TryGetValue(ui.ItemId, out var mods))
@@ -92,7 +92,7 @@ namespace Game.DataAccess.Mapping
                         {
                             ItemModId = am.ItemModId,
                             ItemModSlotId = am.ItemModSlotId,
-                            ItemMod = itemMods.GetItemMod(am.ItemModId),
+                            ItemMod = ResolveOrThrow(itemMods.GetItemMod, am.ItemModId, entity.Id, "item mod"),
                         });
                     }
                 }
@@ -126,7 +126,7 @@ namespace Game.DataAccess.Mapping
 
             // Map player skills, resolving each skill from the cached catalog by id
             var skillsById = entity.PlayerSkills
-                .ToDictionary(ps => ps.SkillId, ps => skills.GetSkill(ps.SkillId));
+                .ToDictionary(ps => ps.SkillId, ps => ResolveOrThrow(skills.GetSkill, ps.SkillId, entity.Id, "skill"));
 
             var playerSkills = skillsById.Values.ToList();
 
@@ -166,6 +166,26 @@ namespace Game.DataAccess.Mapping
                 SelectedSkills = selectedSkills,
                 LogPreferences = logPreferences,
             };
+        }
+
+        /// <summary>
+        /// Resolves an owned reference (item / item mod / skill) against its catalog, rethrowing a catalog miss as a
+        /// loud, diagnosable <see cref="OrphanedReferenceException"/> that names the player, catalog, and missing
+        /// id. We never silently drop the player-owned row; instead the aggregate fails loudly so a content-data
+        /// mistake (a removed referenced id) is obvious from logs rather than surfacing as an opaque load failure.
+        /// </summary>
+        private static T ResolveOrThrow<T>(Func<int, T> resolve, int referenceId, int playerId, string catalogName)
+        {
+            try
+            {
+                return resolve(referenceId);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                // Only a catalog miss (GetById's documented out-of-range contract) is an orphaned reference;
+                // any other failure propagates unwrapped so the orphaned-reference diagnosis stays truthful.
+                throw new OrphanedReferenceException(playerId, catalogName, referenceId, ex);
+            }
         }
     }
 }
