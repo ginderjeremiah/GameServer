@@ -110,6 +110,51 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditEnemies_RetireLastActiveEnemyOfLiveZone_IsRejectedAndLeavesEnemyActive()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Lone Goblin");
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Forest");
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // Retiring the last active spawn of a live zone would strand it (no spawnable enemies → the next
+            // idle encounter throws), so the backend rejects it at save time as a graceful 400 and nothing is
+            // committed — the enemy stays in circulation. Retire the zone first, then its enemies.
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        enemy.Id,
+                        enemy.Name,
+                        IsBoss = false,
+                        RetiredAt = DateTime.UtcNow,
+                        AttributeDistribution = Array.Empty<object>(),
+                        SkillPool = Array.Empty<int>(),
+                        Spawns = Array.Empty<object>()
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditEnemies", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal(
+                "Retiring 'Lone Goblin' would leave live zone 'Forest' with no spawnable enemies. "
+                    + "Retire the zone first, or keep at least one active enemy spawning in it.",
+                result.ErrorMessage);
+            var saved = Assert.Single(GetEnemies(), e => e.Id == enemy.Id);
+            Assert.Null(saved.RetiredAt);
+        }
+
+        [Fact]
         public async Task AddEditEnemies_DeleteEnemy_IsRejectedAndLeavesRecordIntact()
         {
             using var scope = CreateScope();
