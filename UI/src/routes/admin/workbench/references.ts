@@ -157,5 +157,10 @@ const joinClauses = (clauses: string[]): string => {
  */
 export function formatReferenceBody(entityKey: string, name: string, groups: ReferenceGroup[]): string {
 	const list = joinClauses(groups.map((g) => clauseFor(entityKey, g)));
-	return `${name} is ${list}. Retiring takes it out of circulation for new content, though existing references still resolve by id.`;
+	// A strong reference (the gate-lockout case) has a real consequence for new players that
+	// "the id still resolves" doesn't soften, so close by pointing at the fix rather than reassuring.
+	const closing = groups.some((g) => g.strong)
+		? 'Existing references still resolve by id, but re-point the affected records first if that consequence is unintended.'
+		: 'Retiring takes it out of circulation for new content, though existing references still resolve by id.';
+	return `${name} is ${list}. ${closing}`;
 }

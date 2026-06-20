@@ -200,6 +200,18 @@ describe('formatReferenceBody', () => {
 		);
 	});
 
+	it('closes a strong reference by pointing at the fix instead of the generic reassurance', () => {
+		const strong: ReferenceGroup[] = [{ kind: 'unlockGate', names: ['Frost Cavern'], strong: true }];
+		const normal: ReferenceGroup[] = [{ kind: 'challengeReward', names: ['First Steps'] }];
+		expect(formatReferenceBody('challenges', 'First Steps', strong)).toContain(
+			're-point the affected records first if that consequence is unintended'
+		);
+		expect(formatReferenceBody('challenges', 'First Steps', strong)).not.toContain(
+			'out of circulation for new content'
+		);
+		expect(formatReferenceBody('items', 'Iron Helm', normal)).toContain('out of circulation for new content');
+	});
+
 	it('caps long name lists with a "+N more" tail', () => {
 		const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 		const body = formatReferenceBody('zones', 'Verdant Hollow', [{ kind: 'spawnedBy', names }]);
