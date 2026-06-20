@@ -91,7 +91,9 @@ jobs:
           nuget-${{ runner.os }}-
 
     - name: Build solution
-      run: dotnet build
+      # -warnaserror promotes analyzer/nullable warnings to errors so a warned-but-compiling
+      # regression (the repo relies on nullable-reference analysis) fails CI here.
+      run: dotnet build -warnaserror
 
     - name: Verify TypeScript codegen is up to date
       # The generated frontend API client (UI/src/lib/api/types) must stay byte-identical to what the
@@ -99,9 +101,11 @@ jobs:
       # forgets to regenerate fails here instead of landing stale client types. The codegen command
       # short-circuits before host construction (no Postgres/Redis/DI), so it's safe in CI; reuse the
       # binaries from "Build solution" (--no-build --no-restore), mirroring the test step below.
+      # The diff spans the whole worktree (not just types/) so a future writer emitting anywhere else
+      # can't silently escape the check; the writers OrderBy their inputs, so the output is stable.
       run: |
         dotnet run --project Game.Api --no-build --no-restore -- codegen
-        git diff --exit-code -- UI/src/lib/api/types
+        git diff --exit-code
 
     - name: Run formatter (verify only)
       # --no-restore reuses the restore/build from "Build solution" above; without it dotnet format
@@ -166,7 +170,9 @@ jobs:
           nuget-${{ runner.os }}-
 
     - name: Build solution
-      run: dotnet build
+      # -warnaserror promotes analyzer/nullable warnings to errors so a warned-but-compiling
+      # regression (the repo relies on nullable-reference analysis) fails CI here.
+      run: dotnet build -warnaserror
 
     - name: Execute tests with coverage gate
       # build/coverage.ps1 restores the coverage tools, collects one merged Cobertura across the whole
