@@ -115,7 +115,7 @@ foreach ($name in $gatedNsNames) {
     $rows.Add([pscustomobject]@{ Assembly = $name; Line = '--'; Branch = '--'; Floor = "L$($entry.line)"; Status = 'MISSING' })
     continue
   }
-  $lineOk = $null -ne $ns.LinePct -and $ns.LinePct -ge $entry.line
+  $lineOk = $ns.LinePct -ge $entry.line
   $branchOk = $true
   if ($null -ne $entry.branch -and $null -ne $ns.BranchPct) {
     $branchOk = $ns.BranchPct -ge $entry.branch
@@ -136,7 +136,8 @@ foreach ($a in $summary.coverage.assemblies) {
 
 Write-Host ""
 $sorted = $rows | Sort-Object @{ Expression = { if ($_.Floor -eq 'measure-only') { 1 } else { 0 } } }, Assembly
-($sorted | Format-Table -AutoSize | Out-String).TrimEnd() | Write-Host
+# Pin a width so the table still renders under a width-0 / non-TTY host (otherwise Out-String wraps to nothing).
+($sorted | Format-Table -AutoSize | Out-String -Width 200).TrimEnd() | Write-Host
 Write-Host ""
 
 if ($failures.Count -gt 0) {
