@@ -15,8 +15,10 @@ namespace Game.Application.Tests.DataAccess
     /// <summary>
     /// Exercises <see cref="IAdminZones.SetEnemies"/> end-to-end through the entity store and unit of work:
     /// it reconciles a zone's enemy spawns against the full desired set (the delete/update/insert logic
-    /// extracted into <c>ChildCollectionReconciler</c>). Seeding, the admin write, and the assertion each
-    /// use a separate DI scope so the write runs against an empty change tracker, as a real admin call does.
+    /// extracted into <c>ChildCollectionReconciler</c>), plus the <see cref="IAdminZones.SaveZones"/>
+    /// edit-existence rejection (now the change-set processor's shared guard). Seeding, the admin write, and
+    /// the assertion each use a separate DI scope so the write runs against an empty change tracker, as a real
+    /// admin call does.
     /// </summary>
     [Collection("Integration")]
     public class AdminZonesIntegrationTests : ApplicationIntegrationTestBase
@@ -119,6 +121,27 @@ namespace Game.Application.Tests.DataAccess
             var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
 
             var result = admin.SetEnemies(new SetZoneEnemiesData { ZoneId = 99999, ZoneEnemies = [] });
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Zone not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveZones_EditUnknownZone_ReturnsNotFound()
+        {
+            // An Edit of a non-existent zone (no boss/unlock references, so the FK pre-pass passes) must be
+            // rejected by the processor's shared edit-existence guard rather than reaching a 0-row UPDATE.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Zone { Id = 99999, Name = "Ghost", Description = "" },
+                },
+            ]);
 
             Assert.False(result.Succeeded);
             Assert.Equal("Zone not found.", result.ErrorMessage);

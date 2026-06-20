@@ -259,6 +259,107 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void Apply_EditOfMissingRecord_ReturnsNotFoundWithoutApplying()
+        {
+            // An Edit whose record the existence predicate reports absent is a not-found rejection, validated
+            // up front so the sibling Add/Edit in the batch are never staged (keeps the batch atomic).
+            var added = new List<string>();
+            var edited = new List<string>();
+
+            var result = ChangeSetProcessor.Apply(
+            [
+                Change(EChangeType.Add, "new"),
+                Change(EChangeType.Edit, "missing"),
+            ],
+                add: item => added.Add(item.Tag),
+                edit: item => edited.Add(item.Tag),
+                resourceName: "widget",
+                editExists: item => item.Tag != "missing");
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Widget not found.", result.ErrorMessage);
+            Assert.Empty(added);
+            Assert.Empty(edited);
+        }
+
+        [Fact]
+        public void Apply_EditOfExistingRecord_AppliesNormally()
+        {
+            var edited = new List<string>();
+
+            var result = ChangeSetProcessor.Apply(
+            [
+                Change(EChangeType.Edit, "present"),
+            ],
+                add: _ => { },
+                edit: item => edited.Add(item.Tag),
+                resourceName: "widget",
+                editExists: _ => true);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(["present"], edited);
+        }
+
+        [Fact]
+        public void Apply_EditExistsGuard_OnlyValidatesEdits()
+        {
+            // An Add creates a new identity, so the existence predicate must not gate it — only Edits are
+            // checked. Here every record "fails" existence, yet the Add still applies.
+            var added = new List<string>();
+
+            var result = ChangeSetProcessor.Apply(
+            [
+                Change(EChangeType.Add, "brand-new"),
+            ],
+                add: item => added.Add(item.Tag),
+                edit: _ => { },
+                resourceName: "widget",
+                editExists: _ => false);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(["brand-new"], added);
+        }
+
+        [Fact]
+        public void Apply_NoEditExistsPredicate_SkipsExistenceCheck()
+        {
+            // Without the predicate the guard is off and an Edit applies as-is (the relationship setters that
+            // guard membership their own way pass no predicate).
+            var edited = new List<string>();
+
+            var result = ChangeSetProcessor.Apply(
+            [
+                Change(EChangeType.Edit, "e"),
+            ],
+                add: _ => { },
+                edit: item => edited.Add(item.Tag));
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(["e"], edited);
+        }
+
+        [Fact]
+        public void Apply_MissingEditAndDuplicateKey_NotFoundTakesPrecedence()
+        {
+            // The existence guard runs before the duplicate guard, preserving the per-repo precedence
+            // (existence was validated before the in-Apply dedup). A batch that is both missing and
+            // duplicated surfaces the not-found rejection.
+            var result = ChangeSetProcessor.Apply(
+            [
+                Change(EChangeType.Edit, "missing"),
+                Change(EChangeType.Edit, "missing"),
+            ],
+                add: _ => { },
+                edit: _ => { },
+                key: item => item.Tag,
+                resourceName: "widget",
+                editExists: _ => false);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Widget not found.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void Apply_NoKeySelector_DoesNotDedup()
         {
             // With no key selector supplied the guard is off and every change applies as-is.

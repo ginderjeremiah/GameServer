@@ -18,14 +18,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveSkills(IReadOnlyList<Change<Contracts.Skill>> changes)
         {
-            // An edit must target an existing skill; a missing id is a not-found rejection (matching the
-            // relationship setters), not an EF 0-row update that throws. Validate the whole batch up front
-            // so the commit filter doesn't persist the rest of the batch alongside an invalid edit.
-            if (changes.Any(c => c.ChangeType == EChangeType.Edit && _skills.LookupSkill(c.Item.Id) is null))
-            {
-                return AdminSaveResult.NotFound("Skill");
-            }
-
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Skill
                 {
@@ -46,7 +38,10 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
-                resourceName: "skill");
+                resourceName: "skill",
+                // An edit must target an existing skill; a missing id is a not-found rejection (matching the
+                // relationship setters), validated up front by the processor before anything is staged.
+                editExists: item => _skills.LookupSkill(item.Id) is not null);
         }
 
         public AdminSaveResult SetMultipliers(AddEditAttributesData data)

@@ -19,17 +19,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveChallenges(IReadOnlyList<Change<Contracts.Challenge>> changes)
         {
-            // An edit must target an existing challenge; a missing id is a not-found rejection (matching the
-            // relationship setters), not an EF 0-row update that throws. Challenges are zero-based-id
-            // reference data, so a valid id is an in-range index. Validate the whole batch up front so the
-            // commit filter doesn't persist the rest of the batch alongside an invalid edit.
-            var challengeCount = _challenges.All().Count;
-            if (changes.Any(c => c.ChangeType == EChangeType.Edit
-                && (c.Item.Id < 0 || c.Item.Id >= challengeCount)))
-            {
-                return AdminSaveResult.NotFound("Challenge");
-            }
-
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Challenge
                 {
@@ -56,7 +45,11 @@ namespace Game.DataAccess.Repositories.Admin
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
-                resourceName: "challenge");
+                resourceName: "challenge",
+                // An edit must target an existing challenge; a missing id is a not-found rejection (matching the
+                // relationship setters), not an EF 0-row update that throws. Challenges are zero-based-id
+                // reference data, so existence is the shared in-range index check.
+                editExists: item => _challenges.ValidateChallengeId(item.Id));
         }
     }
 }
