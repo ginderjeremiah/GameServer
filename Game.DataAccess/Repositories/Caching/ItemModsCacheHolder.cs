@@ -32,6 +32,8 @@ namespace Game.DataAccess.Repositories.Caching
                 .OrderBy(im => im.Id)
                 .ToListAsync(cancellationToken);
 
+            entities.AssertZeroBasedContiguity("ItemMods");
+
             return new ItemModSnapshot(entities, entities.Select(ItemMapper.ModToCore).ToList());
         }
     }

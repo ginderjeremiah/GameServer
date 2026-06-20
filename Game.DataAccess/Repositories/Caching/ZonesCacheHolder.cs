@@ -11,11 +11,15 @@ namespace Game.DataAccess.Repositories.Caching
     {
         protected override async Task<IReadOnlyList<Zone>> BuildSnapshotAsync(GameContext context, CancellationToken cancellationToken)
         {
-            return await context.Zones
+            var zones = await context.Zones
                 .AsNoTracking()
                 .Include(z => z.ZoneEnemies)
                 .OrderBy(z => z.Id)
                 .ToListAsync(cancellationToken);
+
+            zones.AssertZeroBasedContiguity("Zones");
+
+            return zones;
         }
     }
 }

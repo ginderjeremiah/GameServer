@@ -33,6 +33,8 @@ namespace Game.DataAccess.Repositories.Caching
                 .OrderBy(s => s.Id)
                 .ToListAsync(cancellationToken);
 
+            entities.AssertZeroBasedContiguity("Skills");
+
             return new SkillSnapshot(entities, entities.Select(SkillMapper.ToCore).ToList());
         }
     }

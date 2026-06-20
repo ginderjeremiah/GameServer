@@ -46,6 +46,8 @@ namespace Game.DataAccess.Repositories.Caching
                 })
                 .ToListAsync(cancellationToken);
 
+            challenges.AssertZeroBasedContiguity(challenge => challenge.Id, "Challenges");
+
             return new ChallengeSnapshot(challenges, new ChallengeIndex(challenges));
         }
     }
