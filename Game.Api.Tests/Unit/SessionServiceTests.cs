@@ -74,13 +74,30 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void RehydrateSession_EstablishesAndPersistsSession()
+        public void RehydrateSession_EstablishesSessionInMemoryWithoutWritingTheCache()
         {
+            // Rehydration runs on the concurrent HTTP path, so it re-binds the player in memory only and must
+            // not write the session cache — those writes belong on the socket's write-behind path (#937).
             var store = new FakeSessionStore();
             var session = new SessionService(store);
             session.SetAuthenticatedUser(5);
 
             session.RehydrateSession(7);
+
+            Assert.True(session.HasPlayerSession);
+            Assert.Equal(7, session.SelectedPlayerId);
+            Assert.Empty(store.Updates);
+        }
+
+        [Fact]
+        public void CreateSession_PrimesTheCache()
+        {
+            // Login establishes the binding before any socket exists, so it does prime the cache (the one HTTP
+            // path that legitimately writes the session, at the start of the session lifecycle).
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+
+            session.CreateSession(userId: 5, playerId: 7);
 
             Assert.True(session.HasPlayerSession);
             Assert.Equal(7, session.SelectedPlayerId);

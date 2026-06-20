@@ -96,30 +96,27 @@ namespace Game.Api.Services
         public void CreateSession(int userId, int playerId)
         {
             UserId = userId;
-            EstablishSession(playerId);
+            // Login establishes the binding before any socket exists, so it primes the session cache here; the
+            // subsequent Status/socket reads then hit the cache instead of rehydrating.
+            PlayerState = new PlayerState { PlayerId = playerId };
+            _sessionStore.Update(PlayerState, UserId);
         }
 
         /// <summary>
-        /// Re-establishes a session for the already-authenticated user after its volatile cache entry was
-        /// evicted (Redis flush, TTL lapse, or a session never established on this instance), binding it to
-        /// the player resolved from the database and re-caching it so subsequent requests hit the cache.
+        /// Re-binds the already-authenticated user to its player <em>in memory only</em> after a session-cache
+        /// miss (Redis flush, sliding-TTL lapse, or a session never established on this instance). It deliberately
+        /// does not write the session cache: that write would land on the concurrent HTTP path, and player-state
+        /// writes belong on the socket where they serialize with the battle loop (see docs/backend.md → HTTP vs
+        /// WebSocket). The cache is (re)populated by the socket's write-behind path; until then the binding is
+        /// simply re-derived per request, which is cheap on the auth flow this runs on.
         /// </summary>
         public void RehydrateSession(int playerId)
         {
-            EstablishSession(playerId);
+            PlayerState = new PlayerState { PlayerId = playerId };
         }
 
         public void SavePlayerState()
         {
-            _sessionStore.Update(PlayerState, UserId);
-        }
-
-        // Binds the current (authenticated) user to a fresh PlayerState for the given player and caches it.
-        // Shared by the login (CreateSession) and rehydration (RehydrateSession) paths, which differ only in
-        // whether UserId was already set from the token.
-        private void EstablishSession(int playerId)
-        {
-            PlayerState = new PlayerState { PlayerId = playerId };
             _sessionStore.Update(PlayerState, UserId);
         }
     }
