@@ -11,6 +11,12 @@ namespace Game.Api.Sockets.Commands
     /// <typeparam name="TModel">The API model type returned in the collection.</typeparam>
     public abstract class AbstractReferenceDataCommand<TModel> : AbstractSocketCommandWithResponseData<IEnumerable<TModel>>, IReferenceDataCommand
     {
+        // GetReferenceData projects the whole set fresh (e.g. the repo re-maps its cached entities to
+        // contracts). That is a cold path, not a per-connect cost: the loading screen issues
+        // GetReferenceDataVersions first and only fetches a set whose version it doesn't already have cached,
+        // so a full read happens on a content change (or a first/cleared cache), not on every connect. The
+        // per-connect cost is the version hash, which is already memoized per snapshot (ComputeVersion) — so
+        // projecting the set once per snapshot here would optimize a path that isn't hot.
         public override Task<ApiSocketResponse<IEnumerable<TModel>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             return Task.FromResult(Success(GetReferenceData()));

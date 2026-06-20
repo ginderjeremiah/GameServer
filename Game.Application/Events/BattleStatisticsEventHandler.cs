@@ -18,6 +18,9 @@ namespace Game.Application.Events
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
+            // Progress is loaded per battle (a cache-first, typically warm read) rather than co-located in
+            // memory with the player — a deliberate trade-off of the separate write-behind key. See
+            // docs/backend-persistence.md (write-behind player cache) for why co-location is rejected.
             var progress = await _progressRepo.Load(domainEvent.Player, cancellationToken);
 
             var touchedStatistics = progress.RecordBattleCompleted(

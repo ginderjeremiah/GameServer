@@ -1,6 +1,9 @@
+using System.Collections.Concurrent;
 using Game.Infrastructure.Entities;
 using Game.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Attribute = Game.Infrastructure.Entities.Attribute;
 
 namespace Game.Infrastructure.Database
@@ -550,39 +553,105 @@ namespace Game.Infrastructure.Database
 
         public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
+            ApplyZeroBasedIdentityFixups();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        // Zero-based-identity tables (see IZeroBasedIdentityEntity) seed their Id at 0, so the first row's Id
+        // — and any non-nullable int FK referencing it — equals default(int). EF reads that as an unset
+        // store-generated value and assigns a temporary key, which would target the wrong row on an UPDATE of
+        // record 0 or write a placeholder FK on an INSERT referencing record 0. The fixup forces the literal 0
+        // back before the save commits.
+        //
+        // Which property on a given entity type is such a PK or FK is fixed by the model, so it is derived once
+        // per model and cached rather than re-walked from metadata on every save — this runs on the hot
+        // write-behind path, where a save touches 1–2 rows per battle tick per connected player.
+        private static readonly ConcurrentDictionary<IModel, IReadOnlyDictionary<IEntityType, ZeroBasedFixup>> ZeroBasedFixupsByModel = new();
+
+        internal sealed record ZeroBasedFixup(string? KeyProperty, IReadOnlyList<string> ForeignKeyProperties);
+
+        internal void ApplyZeroBasedIdentityFixups()
+        {
+            var fixups = ZeroBasedFixupsByModel.GetOrAdd(Model, BuildZeroBasedFixups);
+            if (fixups.Count == 0)
+            {
+                return;
+            }
+
             foreach (var entry in ChangeTracker.Entries())
             {
-                // Materialize once so the PK and FK branches share a single pre-mutation snapshot;
-                // the PK branch clears IsTemporary, which the deferred predicate would otherwise re-filter on.
-                var tempProps = entry.Properties.Where(p => p.IsTemporary).ToList();
-                if (entry.State is not EntityState.Added)
+                if (!fixups.TryGetValue(entry.Metadata, out var fixup))
                 {
-                    var idProp = tempProps.FirstOrDefault(p => p.Metadata.IsPrimaryKey());
-                    if (idProp is not null && entry.Entity is IZeroBasedIdentityEntity zbe && zbe.Id == 0)
+                    continue;
+                }
+
+                // PK branch: a Modified record whose Id is the seed 0. (An Added row is left alone so its real
+                // id is still store-generated.)
+                if (fixup.KeyProperty is not null
+                    && entry.State is not EntityState.Added
+                    && entry.Entity is IZeroBasedIdentityEntity { Id: 0 })
+                {
+                    ForceZero(entry.Property(fixup.KeyProperty));
+                }
+
+                // FK branch: a non-nullable int FK pointing at record 0 of a zero-based principal.
+                foreach (var foreignKeyProperty in fixup.ForeignKeyProperties)
+                {
+                    ForceZero(entry.Property(foreignKeyProperty));
+                }
+            }
+        }
+
+        // Replaces the temporary key EF assigned (treating the seed value 0 as an unset store-generated key)
+        // with the literal 0. A no-op when the property was not marked temporary.
+        private static void ForceZero(PropertyEntry property)
+        {
+            if (property.IsTemporary)
+            {
+                property.IsTemporary = false;
+                property.CurrentValue = 0;
+            }
+        }
+
+        // Derives, per entity type, the zero-based-identity PK and the non-nullable int FKs that reference a
+        // zero-based-identity principal. Only entity types with at least one such property are kept, so the
+        // per-save loop skips everything else outright.
+        internal static IReadOnlyDictionary<IEntityType, ZeroBasedFixup> BuildZeroBasedFixups(IModel model)
+        {
+            var fixups = new Dictionary<IEntityType, ZeroBasedFixup>();
+            foreach (var entityType in model.GetEntityTypes())
+            {
+                string? keyProperty = null;
+                if (entityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
+                {
+                    keyProperty = entityType.FindPrimaryKey()?.Properties
+                        .FirstOrDefault(p => p.Name == nameof(IZeroBasedIdentityEntity.Id))?.Name;
+                }
+
+                var foreignKeyProperties = new List<string>();
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType != typeof(int) || !property.IsForeignKey())
                     {
-                        idProp.IsTemporary = false;
-                        idProp.CurrentValue = 0;
+                        continue;
+                    }
+
+                    var containingForeignKey = property.GetContainingForeignKeys()
+                        .FirstOrDefault(fk => fk.DeclaringEntityType == property.DeclaringType);
+                    if (containingForeignKey is not null
+                        && containingForeignKey.PrincipalEntityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
+                    {
+                        foreignKeyProperties.Add(property.Name);
                     }
                 }
 
-                var fkProps = tempProps.Where(p => p.Metadata.IsForeignKey() && p.Metadata.ClrType == typeof(int)).ToList();
-                if (fkProps.Count != 0)
+                if (keyProperty is not null || foreignKeyProperties.Count > 0)
                 {
-                    foreach (var fkProp in fkProps)
-                    {
-                        var navigation = fkProp.Metadata.GetContainingForeignKeys()
-                            .FirstOrDefault(fk => fk.DeclaringEntityType == fkProp.Metadata.DeclaringType);
-
-                        if (navigation is not null && navigation.PrincipalEntityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
-                        {
-                            fkProp.IsTemporary = false;
-                            fkProp.CurrentValue = 0;
-                        }
-                    }
+                    fixups[entityType] = new ZeroBasedFixup(keyProperty, foreignKeyProperties);
                 }
             }
 
-            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            return fixups;
         }
 
         public override int SaveChanges()
