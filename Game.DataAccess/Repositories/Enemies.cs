@@ -43,6 +43,11 @@ namespace Game.DataAccess.Repositories
             return snapshot.Templates[GetRandomEnemyId(snapshot, zoneId)].ToEnemy(level);
         }
 
+        public bool HasSpawnableEnemies(int zoneId)
+        {
+            return Snapshot.ZoneEnemyTables.ContainsKey(zoneId);
+        }
+
         // Resolves a random enemy id from the requested zone's spawn table against the captured snapshot,
         // validating the zone and that it has a spawn table. Shared by the entity and domain random reads so
         // both apply the same zone checks and read a single consistent snapshot.

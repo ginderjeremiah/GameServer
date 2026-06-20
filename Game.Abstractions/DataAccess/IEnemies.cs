@@ -14,6 +14,10 @@ namespace Game.Abstractions.DataAccess
         /// <inheritdoc cref="GetDomainEnemy"/>
         public CoreEnemy GetRandomDomainEnemy(int zoneId, int level);
 
+        /// <summary>Whether the zone has a non-empty random spawn table — i.e. an idle encounter can be
+        /// rolled there. False for an unknown zone id or a zone every spawn enemy of which is retired.</summary>
+        public bool HasSpawnableEnemies(int zoneId);
+
         /// <inheritdoc cref="IItems.VersionKey"/>
         public object VersionKey { get; }
     }

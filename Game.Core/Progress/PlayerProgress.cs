@@ -129,6 +129,15 @@ namespace Game.Core.Progress
                     continue;
                 }
 
+                // A retired challenge is out of circulation: a player who has not already completed it (the
+                // guard above) can no longer progress toward or complete it. Retirement never revokes an
+                // existing completion's reward — it only stops new completions, matching the retired-enemy
+                // precedent (a retired enemy drops out of random spawns).
+                if (challenge.RetiredAt is not null)
+                {
+                    continue;
+                }
+
                 // Evaluate a newly-relevant challenge against a working row without committing it yet: a
                 // challenge that becomes relevant but gains no progress this battle must not persist an
                 // information-free (zero-progress, incomplete) row, which would bloat the write-behind and

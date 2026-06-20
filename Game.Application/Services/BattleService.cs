@@ -47,20 +47,25 @@ namespace Game.Application.Services
                 await AbandonBattle(player, state, cancellationToken);
             }
 
-            // A real zone change is gated on the target being unlocked (anti-cheat). A legitimate client
-            // never navigates into a locked zone — the UI gates it — so a locked target is ignored and the
-            // battle simply proceeds in the player's current zone. Same-zone re-requests skip the check (and
-            // the redundant save) entirely.
+            // A real zone change is gated on the target being unlocked and in circulation (anti-cheat). A
+            // legitimate client never navigates into a locked or retired zone — the UI gates both — so such a
+            // target is ignored and the battle simply proceeds in the player's current zone. Same-zone
+            // re-requests skip the check (and the redundant save) entirely.
             if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
             {
                 var targetZone = _zones.GetDomainZone(newZoneId.Value);
-                if (await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
+                if (!_zones.IsZoneRetired(newZoneId.Value) && await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
                 {
                     player.ChangeZone(newZoneId.Value);
                     zoneId = newZoneId.Value;
                     await _playerRepo.SavePlayer(player, cancellationToken);
                 }
             }
+
+            // Lazy relocation: if the resolved zone is no longer viable (it was retired, or every enemy
+            // assigned to it has been retired), move the player to the nearest viable zone so the idle loop
+            // never stalls on a non-navigable zone or throws spawning from an empty table.
+            zoneId = await EnsureViableZone(player, zoneId, cancellationToken);
 
             var zone = _zones.GetDomainZone(zoneId);
 
@@ -102,9 +107,10 @@ namespace Game.Application.Services
                 return null;
             }
 
-            // Anti-cheat: a locked zone's boss cannot be challenged. A legitimate client can never be in a
-            // locked zone to begin with, so this only blocks tampered requests.
-            if (!await IsZoneUnlocked(player.Id, zone, cancellationToken))
+            // Anti-cheat / out of circulation: a locked or retired zone's boss cannot be challenged. A
+            // legitimate client can never be in a locked or retired zone to begin with (the idle loop
+            // relocates out of a retired one), so this only blocks tampered requests.
+            if (_zones.IsZoneRetired(zoneId) || !await IsZoneUnlocked(player.Id, zone, cancellationToken))
             {
                 return null;
             }
@@ -264,6 +270,46 @@ namespace Game.Application.Services
             player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId);
 
             return rewards;
+        }
+
+        // Whether a zone is viable for the idle loop: in circulation (not retired) and carrying at least one
+        // spawnable enemy. The two facts live in separate caches (zone retirement vs the enemy spawn tables),
+        // so they are combined here rather than on either lean domain model. The id is range-checked first so
+        // a stale/out-of-range CurrentZoneId reads as non-viable (and triggers relocation) instead of throwing.
+        private bool IsZoneViable(int zoneId)
+        {
+            return _zones.ValidateZoneId(zoneId)
+                && !_zones.IsZoneRetired(zoneId)
+                && _enemies.HasSpawnableEnemies(zoneId);
+        }
+
+        // Relocates the player when their resolved zone is no longer viable, returning the zone the battle
+        // should run in. "Nearest" is the lowest-Order zone the player has unlocked that is viable, falling
+        // back to the starting zone. A no-op (no save) when the current zone is already viable, so the idle
+        // hot path pays only the cheap viability check; the completion lookup and scan run only on a relocate.
+        private async Task<int> EnsureViableZone(Player player, int zoneId, CancellationToken cancellationToken)
+        {
+            // An out-of-range zone id is corruption/tampering, not a relocation case: leave it for the
+            // downstream GetDomainZone to surface loudly (fail-fast) rather than silently relocating.
+            if (!_zones.ValidateZoneId(zoneId) || IsZoneViable(zoneId))
+            {
+                return zoneId;
+            }
+
+            var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(player.Id, cancellationToken);
+            var destination = _zones.All()
+                .OrderBy(zone => zone.Order)
+                .FirstOrDefault(zone =>
+                    IsZoneViable(zone.Id) && _zones.GetDomainZone(zone.Id).IsUnlocked(completedChallengeIds));
+            var newZoneId = destination?.Id ?? NewPlayerFactory.StartingZoneId;
+
+            if (newZoneId != player.CurrentZoneId)
+            {
+                player.ChangeZone(newZoneId);
+                await _playerRepo.SavePlayer(player, cancellationToken);
+            }
+
+            return newZoneId;
         }
 
         // Whether a zone is unlocked for the player. An ungated zone is always open and pays no read cost;

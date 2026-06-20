@@ -166,5 +166,33 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(7, domainEnemy.Level);
             Assert.Contains(domainEnemy.AvailableSkills, s => s.Id == skill.Id);
         }
+
+        [Fact]
+        public async Task HasSpawnableEnemies_TrueOnlyForZonesWithANonRetiredSpawnTable()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var active = await TestDataSeeder.CreateEnemyAsync(context, "Active");
+            var retired = await TestDataSeeder.CreateEnemyAsync(context, "Retired");
+
+            var populatedZone = await TestDataSeeder.CreateZoneAsync(context, "Populated", order: 0);
+            var emptyZone = await TestDataSeeder.CreateZoneAsync(context, "Empty", order: 1);
+            var retiredOnlyZone = await TestDataSeeder.CreateZoneAsync(context, "RetiredOnly", order: 2);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, populatedZone.Id, active.Id);
+            // retiredOnlyZone's only spawn enemy is retired, so it drops out of the spawn table.
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, retiredOnlyZone.Id, retired.Id);
+            retired.RetiredAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+
+            Assert.True(enemies.HasSpawnableEnemies(populatedZone.Id));
+            Assert.False(enemies.HasSpawnableEnemies(emptyZone.Id));
+            Assert.False(enemies.HasSpawnableEnemies(retiredOnlyZone.Id));
+            // An unknown zone id has no spawn table either.
+            Assert.False(enemies.HasSpawnableEnemies(99999));
+        }
     }
 }

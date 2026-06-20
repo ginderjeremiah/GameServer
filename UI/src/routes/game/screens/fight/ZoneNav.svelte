@@ -61,7 +61,7 @@ import {
 	type TooltipComponent
 } from '$stores';
 import { playerManager } from '$lib/engine';
-import { isZoneUnlocked, zonesByOrder } from '$lib/common';
+import { isZoneUnlocked, navigableZones } from '$lib/common';
 import { ChallengeTooltip } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import LockGlyph from './LockGlyph.svelte';
@@ -98,7 +98,9 @@ const hideLock = () => {
 	challengeId = undefined;
 };
 
-const orderedZones = $derived(zonesByOrder(staticData.zones ?? []));
+// Retired zones are out of circulation: exclude them so they're never the current zone or a
+// navigable neighbour (the backend relocates a player who is somehow still in one).
+const orderedZones = $derived(navigableZones(staticData.zones ?? []));
 const currentIndex = $derived(orderedZones.findIndex((z) => z.id === playerManager.currentZone));
 // Fall back to the first ordered zone when the current zone is unknown (e.g. before data loads).
 const resolvedIndex = $derived(currentIndex >= 0 ? currentIndex : 0);

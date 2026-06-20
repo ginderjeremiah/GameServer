@@ -41,7 +41,10 @@ namespace Game.Api.Sockets.Commands
 
             return Success(new NewEnemyModel
             {
-                EnemyInstance = EnemyInstance.FromSource(result)
+                EnemyInstance = EnemyInstance.FromSource(result),
+                // The authoritative zone after any lazy relocation, so the client follows a server-side move
+                // out of a now-unplayable zone instead of repeatedly requesting the stale one.
+                ZoneId = player.CurrentZoneId,
             });
         }
     }

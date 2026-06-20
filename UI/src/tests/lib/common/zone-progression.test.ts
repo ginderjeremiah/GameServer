@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { IZone } from '$lib/api';
-import { isZoneUnlocked, nextZoneByOrder, zonesByOrder } from '$lib/common/zone-progression';
+import { isZoneUnlocked, navigableZones, nextZoneByOrder, zonesByOrder } from '$lib/common/zone-progression';
 
-const zone = (id: number, order: number, unlockChallengeId?: number): IZone => ({
+const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?: string): IZone => ({
 	id,
 	name: `Zone ${id}`,
 	description: '',
@@ -10,7 +10,8 @@ const zone = (id: number, order: number, unlockChallengeId?: number): IZone => (
 	levelMin: 1,
 	levelMax: 10,
 	bossLevel: 1,
-	unlockChallengeId
+	unlockChallengeId,
+	retiredAt
 });
 
 describe('zonesByOrder', () => {
@@ -21,6 +22,22 @@ describe('zonesByOrder', () => {
 		expect(sorted.map((z) => z.id)).toEqual([10, 20, 30]);
 		// Defensive copy: the original array is untouched.
 		expect(input.map((z) => z.id)).toEqual([30, 10, 20]);
+	});
+});
+
+describe('navigableZones', () => {
+	it('orders by authored order and excludes retired zones (skipped, not walls)', () => {
+		const input = [zone(30, 3), zone(10, 1), zone(20, 2, undefined, '2026-01-01T00:00:00Z')];
+		const result = navigableZones(input);
+
+		// The retired middle zone (id 20) is dropped, so 10 and 30 stay reachable across it.
+		expect(result.map((z) => z.id)).toEqual([10, 30]);
+		// Defensive copy: the original array is untouched.
+		expect(input.map((z) => z.id)).toEqual([30, 10, 20]);
+	});
+
+	it('keeps all zones when none are retired', () => {
+		expect(navigableZones([zone(20, 2), zone(10, 1)]).map((z) => z.id)).toEqual([10, 20]);
 	});
 });
 

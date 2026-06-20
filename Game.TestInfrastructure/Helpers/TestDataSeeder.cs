@@ -206,7 +206,8 @@ namespace Game.TestInfrastructure.Helpers
             int order = 0,
             int? bossEnemyId = null,
             int bossLevel = 1,
-            int? unlockChallengeId = null)
+            int? unlockChallengeId = null,
+            DateTime? retiredAt = null)
         {
             var zone = new Zone
             {
@@ -218,6 +219,7 @@ namespace Game.TestInfrastructure.Helpers
                 BossEnemyId = bossEnemyId,
                 BossLevel = bossLevel,
                 UnlockChallengeId = unlockChallengeId,
+                RetiredAt = retiredAt,
             };
 
             context.Zones.Add(zone);
@@ -327,7 +329,8 @@ namespace Game.TestInfrastructure.Helpers
             int? targetEntityId = null,
             int? rewardItemId = null,
             int? rewardItemModId = null,
-            int? rewardSkillId = null)
+            int? rewardSkillId = null,
+            DateTime? retiredAt = null)
         {
             var challenge = new Challenge
             {
@@ -339,6 +342,7 @@ namespace Game.TestInfrastructure.Helpers
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
                 RewardSkillId = rewardSkillId,
+                RetiredAt = retiredAt,
             };
 
             context.Challenges.Add(challenge);
