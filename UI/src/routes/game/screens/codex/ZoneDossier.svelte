@@ -72,6 +72,16 @@
 					</div>
 				{/if}
 			</div>
+
+			<div class="section">
+				<StatisticsPanel
+					stats={view.zoneStatistics}
+					loading={view.statsLoading}
+					error={view.statsError}
+					emptyMessage="No statistics recorded for this zone yet."
+					testid="codex-zone-stats"
+				/>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -80,6 +90,7 @@
 import type { CodexView } from './codex-view.svelte';
 import { ZONE_STATUS_LABELS, zoneStatusColor } from './codex-display';
 import ZoneSpawnPanel from './ZoneSpawnPanel.svelte';
+import StatisticsPanel from './StatisticsPanel.svelte';
 
 interface Props {
 	view: CodexView;

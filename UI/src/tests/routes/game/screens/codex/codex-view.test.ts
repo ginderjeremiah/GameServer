@@ -180,7 +180,9 @@ function seed(): void {
 
 const STATS: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 100 },
-	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 }
+	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 1, value: 20 },
+	{ statisticTypeId: EStatisticType.ZonesCleared, entityId: 1, value: 3 },
+	{ statisticTypeId: EStatisticType.DamageDealt, entityId: 0, value: 4500 }
 ];
 
 beforeEach(() => {
@@ -476,6 +478,16 @@ describe('CodexView zone dossier', () => {
 		expect(view.selectedZoneStatus).toBe('unlocked');
 		expect(view.zoneUnlock?.sealed).toBe(false);
 	});
+
+	it('reuses the statistics query for the player’s per-zone record', () => {
+		const view = new CodexView();
+		view.stats = STATS;
+		view.selectZone(1); // Ashfen Marsh — 3 clears recorded
+		expect(view.zoneStatistics.find((s) => s.label === 'Zones Cleared')?.value).toBe('3');
+		// A zone with no recorded statistics yields an empty record.
+		view.selectZone(2);
+		expect(view.zoneStatistics).toEqual([]);
+	});
 });
 
 describe('CodexView zone → enemy cross-link', () => {
@@ -598,6 +610,16 @@ describe('CodexView skill dossier', () => {
 		]);
 		view.selectSkill(2); // Focus — player-only
 		expect(view.skillUsedBy).toEqual([]);
+	});
+
+	it('reuses the statistics query for the player’s per-skill record', () => {
+		const view = new CodexView();
+		view.stats = STATS;
+		view.selectSkill(0); // Cleave — 4,500 damage dealt recorded
+		expect(view.skillStatistics.find((s) => s.label === 'Damage Dealt')?.value).toBe('4,500');
+		// A skill with no recorded statistics yields an empty record.
+		view.selectSkill(2);
+		expect(view.skillStatistics).toEqual([]);
 	});
 });
 

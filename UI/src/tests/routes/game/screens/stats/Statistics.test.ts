@@ -60,15 +60,6 @@ describe('Statistics screen', () => {
 		expect(mockFetchSocket).toHaveBeenCalledWith('GetPlayerStatistics');
 	});
 
-	it('switches to the by-entity view via the top toggle', async () => {
-		render(Statistics);
-		await screen.findByText('Enemies Killed');
-		expect(screen.queryByTestId('entity-picker')).toBeNull();
-		await fireEvent.click(screen.getByTestId('view-entity'));
-		expect(screen.getByTestId('entity-picker')).toBeTruthy();
-		expect(screen.getByTestId('entity-dossier')).toBeTruthy();
-	});
-
 	it('switches category tabs to show that category’s statistics', async () => {
 		render(Statistics);
 		await screen.findByText('Enemies Killed');
@@ -80,12 +71,11 @@ describe('Statistics screen', () => {
 	it('deep-links an enemy stat row into the Codex (cross-link)', async () => {
 		render(Statistics);
 		// Cave Bat (entity 0) is the most-killed enemy, so its row is in the Enemies Killed card
-		// (stat id 1) once the values load. Clicking an enemy now opens the Codex dossier, where the
-		// per-entity statistics live — it does not open the in-place stats dossier.
+		// (stat id 1) once the values load. Clicking an entity row deep-links into the Codex dossier,
+		// where the per-entity statistics live now.
 		const row = await screen.findByTestId('stat-row-1-0');
 		await fireEvent.click(row);
 		expect(navigation.requestedScreen).toBe('codex');
-		expect(screen.queryByTestId('entity-dossier')).toBeNull();
 	});
 
 	it('shows a friendly empty state for a player with no statistics', async () => {

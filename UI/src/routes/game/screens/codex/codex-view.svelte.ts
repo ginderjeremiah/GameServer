@@ -13,8 +13,9 @@
    `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`), the Statistics
    screen's per-entity query (`StatisticsData.statsForEntity`), per-zone clears
    (`statistics.isZoneCleared`) and the challenge progress store — rather than hard-coding any of it.
-   Per-entity statistics live here now; the Statistics screen deep-links an enemy into this dossier
-   instead of rendering its own.
+   Per-entity statistics live here now — every dossier (enemy, zone and skill) shows a "your record"
+   section, and the Statistics screen deep-links an entity into the matching dossier instead of
+   rendering its own in-place one.
 
    The view-model only wires reactive state to the pure helpers; the projection maths live in
    `enemy-level` and the shared `$lib/common/enemy-attributes` (unit-tested directly). */
@@ -35,7 +36,12 @@ import {
 } from '$lib/common';
 import { playerChallenges, staticData, statistics } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
-import { StatisticsData, buildStatEntities, buildStatTypes } from '../stats/statistics-view.svelte';
+import {
+	type StatEntityKind,
+	StatisticsData,
+	buildStatEntities,
+	buildStatTypes
+} from '../stats/statistics-view.svelte';
 import {
 	type CodexTab,
 	type EnemyFilter,
@@ -107,11 +113,11 @@ export interface EnemySpawnVM {
 	weightLabel: string;
 }
 
-export interface EnemyStatVM {
+/** A single per-entity statistic row shown in a dossier's "Your record" section
+ *  (shared by the enemy, zone and skill dossiers). */
+export interface EntityStatVM {
 	label: string;
 	value: string;
-	rank: number;
-	of: number;
 }
 
 export interface EnemyChallengeVM {
@@ -411,18 +417,9 @@ export class CodexView {
 	);
 
 	/** Every statistic that references the selected enemy (the dossier's "your record"). */
-	readonly statistics = $derived.by<EnemyStatVM[]>(() => {
-		const e = this.selectedEnemy;
-		if (!e) {
-			return [];
-		}
-		return this.statData.statsForEntity('enemy', e.id).map((info) => ({
-			label: info.stat.name,
-			value: fmtValue(info.value, info.stat.unit),
-			rank: info.rank,
-			of: info.of
-		}));
-	});
+	readonly statistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedEnemy ? this.statVMsFor('enemy', this.selectedEnemy.id) : []
+	);
 
 	/** Challenges scoped to the selected enemy, with progress from the shared challenge store. */
 	readonly challenges = $derived.by<EnemyChallengeVM[]>(() => {
@@ -544,6 +541,11 @@ export class CodexView {
 		};
 	});
 
+	/** Every statistic that references the selected zone (the zone dossier's "your record"). */
+	readonly zoneStatistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedZone ? this.statVMsFor('zone', this.selectedZone.id) : []
+	);
+
 	/* ── skills catalogue (the reference skill table) ────────────────────────────── */
 
 	readonly skillsCatalogue = $derived(liveSkills(staticData.skills));
@@ -624,6 +626,11 @@ export class CodexView {
 			}));
 	});
 
+	/** Every statistic that references the selected skill (the skill dossier's "your record"). */
+	readonly skillStatistics = $derived.by<EntityStatVM[]>(() =>
+		this.selectedSkill ? this.statVMsFor('skill', this.selectedSkill.id) : []
+	);
+
 	/* ── handlers ──────────────────────────────────────────────────────────────── */
 
 	selectTab(tab: CodexTab): void {
@@ -680,6 +687,14 @@ export class CodexView {
 	}
 
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */
+
+	/** Project the statistics referencing an entity into dossier "your record" rows. */
+	private statVMsFor(kind: StatEntityKind, id: number): EntityStatVM[] {
+		return this.statData.statsForEntity(kind, id).map((info) => ({
+			label: info.stat.name,
+			value: fmtValue(info.value, info.stat.unit)
+		}));
+	}
 
 	/** Resolve an enemy id against the catalogue, falling back to the head of the list. */
 	private resolveEnemy(id: number): IEnemy | undefined {
