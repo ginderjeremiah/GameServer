@@ -70,37 +70,43 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Unlocks an item for the player and raises an <see cref="ItemUnlockedEvent"/>.
+        /// Unlocks an item for the player and raises an <see cref="ItemUnlockedEvent"/> only when the item
+        /// was newly unlocked — re-granting an already-owned item is a no-op (no redundant write-behind or
+        /// client "unlocked!" notification).
         /// </summary>
         public void UnlockItem(Item item)
         {
-            Inventory.UnlockItem(item);
-            RaiseEvent(new ItemUnlockedEvent(Id, item.Id));
+            if (Inventory.UnlockItem(item))
+            {
+                RaiseEvent(new ItemUnlockedEvent(Id, item.Id));
+            }
         }
 
         /// <summary>
-        /// Unlocks a modifier for the player and raises a <see cref="ModUnlockedEvent"/>.
+        /// Unlocks a modifier for the player and raises a <see cref="ModUnlockedEvent"/> only when the
+        /// modifier was newly unlocked — re-granting an already-owned modifier is a no-op.
         /// </summary>
         public void UnlockMod(int itemModId)
         {
-            Inventory.UnlockMod(itemModId);
-            RaiseEvent(new ModUnlockedEvent(Id, itemModId));
+            if (Inventory.UnlockMod(itemModId))
+            {
+                RaiseEvent(new ModUnlockedEvent(Id, itemModId));
+            }
         }
 
         /// <summary>
-        /// Unlocks a skill for the player and raises a <see cref="SkillUnlockedEvent"/>. The skill is
-        /// added to <see cref="Skills"/> unselected — earning a skill does not equip it (the player
-        /// chooses their loadout via the selection flow). Mirrors <see cref="UnlockItem"/>: the in-memory
-        /// set is de-duplicated and the event is raised for the idempotent write-behind insert to apply.
+        /// Unlocks a skill for the player and raises a <see cref="SkillUnlockedEvent"/> only when the skill
+        /// was newly unlocked. The skill is added to <see cref="Skills"/> unselected — earning a skill does
+        /// not equip it (the player chooses their loadout via the selection flow). Mirrors
+        /// <see cref="UnlockItem"/>: re-granting an already-owned skill is a no-op.
         /// </summary>
         public void UnlockSkill(Skill skill)
         {
             if (!Skills.Any(s => s.Id == skill.Id))
             {
                 Skills.Add(skill);
+                RaiseEvent(new SkillUnlockedEvent(Id, skill.Id));
             }
-
-            RaiseEvent(new SkillUnlockedEvent(Id, skill.Id));
         }
 
         /// <summary>

@@ -81,12 +81,13 @@ namespace Game.Application.Services
                 return AccountLoginResult.Failed(LoginStatus.Banned);
             }
 
-            if (account.PlayerIds.Count == 0)
+            var selectedPlayerId = SelectPlayerId(account.PlayerIds);
+            if (selectedPlayerId is null)
             {
                 return AccountLoginResult.Failed(LoginStatus.NoPlayer);
             }
 
-            var player = await _playerRepo.GetPlayer(account.PlayerIds[0]);
+            var player = await _playerRepo.GetPlayer(selectedPlayerId.Value);
             if (player is null)
             {
                 return AccountLoginResult.Failed(LoginStatus.PlayerDataNotFound);
@@ -122,6 +123,17 @@ namespace Game.Application.Services
         public async Task<int?> ResolveSelectedPlayerId(int userId)
         {
             var playerIds = await _users.GetPlayerIds(userId);
+            return SelectPlayerId(playerIds);
+        }
+
+        /// <summary>
+        /// Selects which player an account's session binds to. The game is single-player per account today,
+        /// so this is always the first (and only) player; centralizing it here keeps the login and
+        /// session-rehydration paths from diverging and gives a future player-selection mechanism a single
+        /// seam to grow from. Returns <see langword="null"/> when the account has no player.
+        /// </summary>
+        private static int? SelectPlayerId(IReadOnlyList<int> playerIds)
+        {
             return playerIds.Count > 0 ? playerIds[0] : null;
         }
 

@@ -23,14 +23,17 @@ namespace Game.Core.Players.Inventories
         public EItemCategory ItemCategory => GetItemCategory(Value);
 
         /// <summary>
-        /// The item ID of the equipped item, or null when the slot is empty.
-        /// </summary>
-        public int? ItemId { get; set; }
-
-        /// <summary>
-        /// The item that is currently equipped in this slot.
+        /// The item that is currently equipped in this slot, or null when the slot is empty. The single
+        /// source of truth for what the slot holds; <see cref="ItemId"/> is derived from it so the two can
+        /// never desync.
         /// </summary>
         public Item? Item { get; set; }
+
+        /// <summary>
+        /// The item ID of the equipped item, or null when the slot is empty. Derived from
+        /// <see cref="Item"/> rather than stored independently.
+        /// </summary>
+        public int? ItemId => Item?.Id;
 
         /// <summary>
         /// Creates a new equipment slot based on the given enum value.
@@ -46,7 +49,6 @@ namespace Game.Core.Players.Inventories
         /// </summary>
         public void Set(Item item)
         {
-            ItemId = item.Id;
             Item = item;
         }
 
@@ -55,7 +57,6 @@ namespace Game.Core.Players.Inventories
         /// </summary>
         public void Clear()
         {
-            ItemId = null;
             Item = null;
         }
 

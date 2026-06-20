@@ -33,6 +33,16 @@ namespace Game.Core.Tests.Players
             Assert.Single(inventory.UnlockedItems);
         }
 
+        [Fact]
+        public void UnlockItem_ReportsWhetherItWasNewlyUnlocked()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(42);
+
+            Assert.True(inventory.UnlockItem(item));
+            Assert.False(inventory.UnlockItem(item));
+        }
+
         // ── UnlockMod ───────────────────────────────────────────────────────
 
         [Fact]
@@ -54,6 +64,15 @@ namespace Game.Core.Tests.Players
             inventory.UnlockMod(7);
 
             Assert.Single(inventory.UnlockedMods);
+        }
+
+        [Fact]
+        public void UnlockMod_ReportsWhetherItWasNewlyUnlocked()
+        {
+            var inventory = new Inventory();
+
+            Assert.True(inventory.UnlockMod(7));
+            Assert.False(inventory.UnlockMod(7));
         }
 
         // ── TryEquipItem ────────────────────────────────────────────────────
@@ -604,6 +623,30 @@ namespace Game.Core.Tests.Players
             Assert.Equal(10, Assert.Single(slot.AppliedMods).ItemModId);
             // The rebuilt index is live, so a lookup-driven operation against the restored item resolves it.
             Assert.True(restored.TryEquipItem(3, EEquipmentSlot.AccessorySlot));
+        }
+
+        // ── Slot ItemId is derived from Item (single source of truth) ────────
+
+        [Fact]
+        public void EquipmentSlot_ItemId_IsDerivedFromItem()
+        {
+            // ItemId can never desync from Item: it is computed from it rather than stored independently.
+            var slot = new EquipmentSlot(EEquipmentSlot.WeaponSlot);
+            Assert.Null(slot.ItemId);
+
+            slot.Set(MakeItem(7, EItemCategory.Weapon));
+            Assert.Equal(7, slot.ItemId);
+
+            slot.Clear();
+            Assert.Null(slot.ItemId);
+        }
+
+        [Fact]
+        public void UnlockedItemSlot_ItemId_IsDerivedFromItem()
+        {
+            var slot = new UnlockedItemSlot { Item = MakeItem(9), AppliedMods = [] };
+
+            Assert.Equal(9, slot.ItemId);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

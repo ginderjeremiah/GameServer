@@ -235,6 +235,25 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_BossVictoryInAlreadyClearedZone_DoesNotRecountGlobalZonesCleared()
+        {
+            // First-clear is gated on the per-zone row's presence (the documented invariant), not a magic 0.
+            // An aggregate loaded with the zone already cleared must not re-bump the global counter on a
+            // re-farm — exercising the load-then-mutate path the in-session re-farm test doesn't.
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.ZonesCleared, null, 1m),
+                Stat(EStatisticType.ZonesCleared, 2, 1m),
+            ]);
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: true, zoneId: 2);
+
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.ZonesCleared, 2));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_PlayerDied_IncrementsPlayerDeaths()
         {
             var progress = MakeProgress();
@@ -612,6 +631,22 @@ namespace Game.Core.Tests.Progress
 
             Assert.Single(completed);
             Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
+        }
+
+        [Fact]
+        public void EvaluateChallenges_NewlyRelevantChallengeWithNoProgress_PersistsNoInfoFreeRow()
+        {
+            // A challenge that becomes relevant but gains no progress this battle must not commit an
+            // information-free (zero-progress, incomplete) row: it stays out of both the write-behind
+            // persist set and the cached snapshot exposed via ChallengeProgress.
+            var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5);
+            var progress = MakeProgress(); // no EnemiesKilled statistic recorded yet
+
+            var completed = progress.EvaluateChallenges([challenge]);
+
+            Assert.Empty(completed);
+            Assert.Empty(progress.DirtyChallenges);
+            Assert.Empty(progress.ChallengeProgress);
         }
 
         [Fact]

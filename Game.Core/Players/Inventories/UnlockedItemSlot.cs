@@ -7,8 +7,12 @@ namespace Game.Core.Players.Inventories
     /// </summary>
     public class UnlockedItemSlot
     {
-        public required int ItemId { get; set; }
+        /// <summary>The unlocked item. The single source of truth; <see cref="ItemId"/> derives from it.</summary>
         public required Item Item { get; set; }
+
+        /// <summary>The id of the unlocked <see cref="Item"/>, derived rather than stored independently.</summary>
+        public int ItemId => Item.Id;
+
         public required List<AppliedModSlot> AppliedMods { get; set; }
 
         /// <summary>Whether the player has favorited this item.</summary>
