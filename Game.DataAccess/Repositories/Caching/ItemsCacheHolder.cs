@@ -34,6 +34,8 @@ namespace Game.DataAccess.Repositories.Caching
                 .OrderBy(i => i.Id)
                 .ToListAsync(cancellationToken);
 
+            entities.AssertZeroBasedContiguity("Items");
+
             return new ItemSnapshot(entities, entities.Select(ItemMapper.ToCore).ToList());
         }
     }

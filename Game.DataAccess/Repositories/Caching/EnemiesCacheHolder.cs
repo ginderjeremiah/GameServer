@@ -52,6 +52,12 @@ namespace Game.DataAccess.Repositories.Caching
                 .OrderBy(s => s.Id)
                 .ToListAsync(cancellationToken);
 
+            // Both lists are indexed by zero-based id: the templates align with the enemy list by index, and
+            // EnemyMapper.ToTemplate resolves an enemy's skills via allSkills[SkillId] — so a gap in either
+            // would silently mis-resolve. Assert before building so a bad reload fails the build-then-swap.
+            enemies.AssertZeroBasedContiguity("Enemies");
+            skills.AssertZeroBasedContiguity("Skills");
+
             var templates = enemies.Select(enemy => EnemyMapper.ToTemplate(enemy, skills)).ToList();
 
             return new EnemySnapshot(enemies, templates, BuildZoneEnemyTables(enemies));

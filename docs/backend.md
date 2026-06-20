@@ -47,7 +47,7 @@ Reference data is either **intrinsic** or **static**:
 
 The caches are immutable snapshots **loaded eagerly at startup** (a database problem surfaces as a boot failure, not a first-request failure) and refreshed by build-then-swap (see [Reference-data cache reload](#reference-data-cache-reload-build-then-swap)). There is no lazy-fill path.
 
-> **Contiguity is guaranteed by retirement, not convention.** Because lookups index by id, a hard delete of a non-terminal record would open a permanent gap that silently mis-resolves every lookup above it. Top-level reference records are therefore **retired, not deleted** (see below).
+> **Contiguity is guaranteed by retirement, not convention.** Because lookups index by id, a hard delete of a non-terminal record would open a permanent gap that silently mis-resolves every lookup above it. Top-level reference records are therefore **retired, not deleted** (see below). As a backstop against the one remaining way a gap could appear (a seed/migration mistake), each snapshot **asserts `Id == index` as it is built** and throws otherwise, so a corrupt set fails the build-then-swap (keeping the prior good snapshot, or surfacing as a boot failure on the startup load) rather than serving silently mis-resolved data.
 
 ### Retiring reference data (content lifecycle)
 

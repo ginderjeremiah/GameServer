@@ -1,4 +1,5 @@
 using Game.DataAccess.Repositories;
+using Game.Infrastructure.Entities;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -66,6 +67,64 @@ namespace Game.Application.Tests.DataAccess
             IReadOnlyList<string> empty = [];
 
             Assert.Throws<ArgumentOutOfRangeException>(() => empty.GetById(0, "thing"));
+        }
+
+        [Fact]
+        public void AssertZeroBasedContiguity_ContiguousIds_DoesNotThrow()
+        {
+            IReadOnlyList<Record> contiguous = [new(0), new(1), new(2)];
+
+            contiguous.AssertZeroBasedContiguity(r => r.Id, "things");
+        }
+
+        [Fact]
+        public void AssertZeroBasedContiguity_EmptySnapshot_DoesNotThrow()
+        {
+            IReadOnlyList<Record> empty = [];
+
+            empty.AssertZeroBasedContiguity(r => r.Id, "things");
+        }
+
+        [Fact]
+        public void AssertZeroBasedContiguity_DoesNotStartAtZero_Throws()
+        {
+            // Sorted by id but seeded from 1 — a gap at index 0 that OrderBy can't catch.
+            IReadOnlyList<Record> offByOne = [new(1), new(2), new(3)];
+
+            var ex = Assert.Throws<InvalidOperationException>(() => offByOne.AssertZeroBasedContiguity(r => r.Id, "widgets"));
+            Assert.Contains("widgets", ex.Message);
+            Assert.Contains("index 0", ex.Message);
+            Assert.Contains("Id 1", ex.Message);
+        }
+
+        [Fact]
+        public void AssertZeroBasedContiguity_GapInMiddle_ThrowsAtFirstMismatch()
+        {
+            // Sorted, contiguous through index 1, then missing id 2 — the record at index 2 has Id 3.
+            IReadOnlyList<Record> gap = [new(0), new(1), new(3), new(4)];
+
+            var ex = Assert.Throws<InvalidOperationException>(() => gap.AssertZeroBasedContiguity(r => r.Id, "widgets"));
+            Assert.Contains("index 2", ex.Message);
+            Assert.Contains("Id 3", ex.Message);
+        }
+
+        [Fact]
+        public void AssertZeroBasedContiguity_EntityOverload_ReadsIdOffTheContract()
+        {
+            // The entity overload reads Id off IZeroBasedIdentityEntity; a covariant entity list is accepted.
+            IReadOnlyList<FakeEntity> contiguous = [new() { Id = 0 }, new() { Id = 1 }];
+            contiguous.AssertZeroBasedContiguity("fakes");
+
+            IReadOnlyList<FakeEntity> gap = [new() { Id = 0 }, new() { Id = 2 }];
+            var ex = Assert.Throws<InvalidOperationException>(() => gap.AssertZeroBasedContiguity("fakes"));
+            Assert.Contains("index 1", ex.Message);
+        }
+
+        private sealed record Record(int Id);
+
+        private sealed class FakeEntity : IZeroBasedIdentityEntity
+        {
+            public int Id { get; set; }
         }
     }
 }
