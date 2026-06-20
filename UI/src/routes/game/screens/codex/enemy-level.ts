@@ -40,3 +40,24 @@ export function zoneTotalWeight(zoneId: number, enemies: IEnemy[]): number {
 export function spawnShare(weight: number, total: number): number {
 	return total > 0 ? Math.round((weight / total) * 100) : 0;
 }
+
+export interface ZoneSpawn {
+	enemyId: number;
+	/** The enemy's authored spawn weight in this zone. */
+	weight: number;
+	/** Its share of the zone's spawn table as a 0–100 percentage. */
+	share: number;
+}
+
+/** The enemies that spawn in a zone, each with its share of the zone's spawn table, ordered by share
+ *  descending. Shares use the same `zoneTotalWeight` denominator the enemy dossier's spawn rows use,
+ *  so the Zones tab and the enemy Spawns sub-tab agree on the percentages. */
+export function zoneSpawns(zoneId: number, enemies: IEnemy[]): ZoneSpawn[] {
+	const total = zoneTotalWeight(zoneId, enemies);
+	return enemies
+		.flatMap((e) => {
+			const spawn = e.spawns.find((s) => s.zoneId === zoneId);
+			return spawn ? [{ enemyId: e.id, weight: spawn.weight, share: spawnShare(spawn.weight, total) }] : [];
+		})
+		.sort((a, b) => b.share - a.share);
+}

@@ -167,12 +167,23 @@ describe('Codex screen', () => {
 		expect(screen.getByText('62/100')).toBeTruthy();
 	});
 
-	it('shows a placeholder for the not-yet-built Zones and Skills tabs', async () => {
+	it('renders the Zones rail + dossier and a placeholder for the not-yet-built Skills tab', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
-		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Zones');
+		// The progression rail lists every zone; the dossier shows the head zone (Emberreach) with its boss.
+		expect(screen.getByTestId('codex-zone-0')).toBeTruthy();
+		expect(screen.getByTestId('codex-zone-dossier').textContent).toContain('Emberreach');
+		expect(screen.getByTestId('codex-zone-boss').textContent).toContain('Cinder Tyrant');
 		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
 		expect(screen.getByTestId('codex-coming-soon').textContent).toContain('Skills');
+	});
+
+	it('cross-links a zone boss into the enemy dossier on the Enemies tab', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		await fireEvent.click(screen.getByTestId('codex-zone-boss'));
+		// Lands on the Enemies tab dossier for the zone's boss.
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
 	});
 
 	it('surfaces a load error in the statistics sub-tab', async () => {

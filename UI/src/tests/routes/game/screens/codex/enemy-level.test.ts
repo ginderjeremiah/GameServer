@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { IEnemy, IZone } from '$lib/api';
-import { levelRange, spawnShare, zoneTotalWeight } from '$routes/game/screens/codex/enemy-level';
+import { levelRange, spawnShare, zoneSpawns, zoneTotalWeight } from '$routes/game/screens/codex/enemy-level';
 
 const zones = [
 	{ id: 0, name: 'Emberreach', order: 1, levelMin: 1, levelMax: 10, bossEnemyId: 2, bossLevel: 10 },
@@ -69,5 +69,31 @@ describe('spawnShare', () => {
 
 	it('guards a zero total', () => {
 		expect(spawnShare(10, 0)).toBe(0);
+	});
+});
+
+describe('zoneSpawns', () => {
+	const enemies = [
+		enemy({
+			id: 0,
+			spawns: [
+				{ zoneId: 1, weight: 20 },
+				{ zoneId: 2, weight: 60 }
+			]
+		}),
+		enemy({ id: 1, spawns: [{ zoneId: 1, weight: 40 }] }),
+		enemy({ id: 2, isBoss: true, spawns: [] })
+	];
+
+	it('lists a zone’s spawners with shares, ordered by share descending', () => {
+		// Zone 1 total weight 60 → Bog (40) 67%, Dust (20) 33%.
+		expect(zoneSpawns(1, enemies)).toEqual([
+			{ enemyId: 1, weight: 40, share: 67 },
+			{ enemyId: 0, weight: 20, share: 33 }
+		]);
+	});
+
+	it('returns an empty list for a zone nothing spawns in', () => {
+		expect(zoneSpawns(0, enemies)).toEqual([]);
 	});
 });

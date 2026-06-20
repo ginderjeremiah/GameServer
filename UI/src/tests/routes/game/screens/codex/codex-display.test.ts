@@ -8,7 +8,9 @@ import {
 	formatCooldown,
 	matchesEnemySearch,
 	sortEnemyRows,
-	tabAccent
+	tabAccent,
+	zoneStatusColor,
+	zoneStatusLabel
 } from '$routes/game/screens/codex/codex-display';
 
 /* A search/sort row with sensible defaults so each test only states what matters. The `searchText`
@@ -60,6 +62,20 @@ describe('accents + labels', () => {
 		expect(tabAccent('enemies')).toBe('var(--enemy-accent)');
 		expect(tabAccent('zones')).toBe('var(--accent)');
 		expect(tabAccent('skills')).toBe('var(--attr-intellect)');
+	});
+});
+
+describe('zone status', () => {
+	it('tints each status by intent', () => {
+		expect(zoneStatusColor('cleared')).toBe('var(--success)');
+		expect(zoneStatusColor('unlocked')).toBe('var(--accent)');
+		expect(zoneStatusColor('locked')).toBe('var(--text-muted)');
+	});
+
+	it('labels each status', () => {
+		expect(zoneStatusLabel('cleared')).toBe('Cleared');
+		expect(zoneStatusLabel('unlocked')).toBe('Unlocked');
+		expect(zoneStatusLabel('locked')).toBe('Locked');
 	});
 });
 

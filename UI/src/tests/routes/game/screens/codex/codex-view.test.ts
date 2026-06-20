@@ -302,4 +302,77 @@ describe('CodexView nav payload', () => {
 		expect(view.sub).toBe('statistics');
 		expect(view.level).toBe(10); // boss fixed level
 	});
+
+	it('seeds the zone tab + zone from a deep-link payload', () => {
+		const view = new CodexView({ tab: 'zones', zoneId: 2 });
+		expect(view.tab).toBe('zones');
+		expect(view.selectedZoneId).toBe(2);
+	});
+});
+
+describe('CodexView zone rail', () => {
+	it('lists non-retired zones in authored order with level band + spawn-pool count', () => {
+		const view = new CodexView();
+		// Dust Skitterer spawns in zones 0 + 1; Bog Lurker in zone 1; nothing in zone 2.
+		expect(view.zoneRows.map((z) => [z.id, z.band, z.spawnCount])).toEqual([
+			[0, '1–10', 1],
+			[1, '11–22', 2],
+			[2, '18–28', 0]
+		]);
+	});
+
+	it('marks an ungated zone unlocked, and cleared once its ZonesCleared stat is set', () => {
+		const view = new CodexView();
+		view.stats = [{ statisticTypeId: EStatisticType.ZonesCleared, entityId: 0, value: 1 }];
+		expect(view.zoneRows.find((z) => z.id === 0)?.status).toBe('cleared');
+		expect(view.zoneRows.find((z) => z.id === 1)?.status).toBe('unlocked');
+	});
+
+	it('locks a zone whose gating challenge is incomplete, unlocking it once completed', () => {
+		staticData.zones[2].unlockChallengeId = 1; // gate zone 2 on challenge 1
+		expect(new CodexView().zoneRows.find((z) => z.id === 2)?.status).toBe('locked');
+		playerChallenges.all = [{ challengeId: 1, progress: 1, completed: true }];
+		expect(new CodexView().zoneRows.find((z) => z.id === 2)?.status).toBe('unlocked');
+	});
+});
+
+describe('CodexView zone dossier', () => {
+	it('falls back to the head of the rail and exposes the band + boss card', () => {
+		const view = new CodexView();
+		expect(view.selectedZone?.id).toBe(0);
+		expect(view.selectedZoneBand).toBe('1–10');
+		expect(view.zoneBoss).toEqual({ id: 2, name: 'Cinder Tyrant', level: 10 });
+	});
+
+	it('has no boss card for a bossless zone', () => {
+		const view = new CodexView();
+		view.selectZone(1);
+		expect(view.zoneBoss).toBeUndefined();
+	});
+
+	it('builds the spawn table ordered by share, resolving enemy names', () => {
+		const view = new CodexView();
+		view.selectZone(1); // Dust Skitterer (20) + Bog Lurker (40) → total 60
+		expect(view.zoneSpawnRows).toEqual([
+			expect.objectContaining({ enemyId: 1, enemyName: 'Bog Lurker', share: 67 }),
+			expect.objectContaining({ enemyId: 0, enemyName: 'Dust Skitterer', share: 33 })
+		]);
+	});
+
+	it('reports the unlock gate (open by default, sealed name while locked)', () => {
+		expect(new CodexView().zoneUnlock).toEqual({ gated: false, challengeName: '', locked: false });
+		staticData.zones[0].unlockChallengeId = 1; // gate zone 0 on the (incomplete) challenge 1
+		const gated = new CodexView();
+		gated.selectZone(0);
+		expect(gated.zoneUnlock).toEqual({ gated: true, challengeName: 'The Tyrant Falls', locked: true });
+	});
+
+	it('cross-links a zone boss/spawn into the enemy dossier on the Enemies tab', () => {
+		const view = new CodexView();
+		view.selectTab('zones');
+		view.openEnemy(2);
+		expect(view.tab).toBe('enemies');
+		expect(view.selectedEnemy?.id).toBe(2);
+		expect(view.sub).toBe('attributes');
+	});
 });

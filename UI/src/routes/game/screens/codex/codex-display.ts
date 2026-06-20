@@ -5,8 +5,10 @@
 
 import type { LevelRange } from './enemy-level';
 
-/** Top-level Codex tab. Only `enemies` is built today; `zones`/`skills` show a placeholder. */
+/** Top-level Codex tab. `enemies`/`zones` are built; `skills` shows a placeholder. */
 export type CodexTab = 'enemies' | 'zones' | 'skills';
+/** A zone's progression status in the Codex rail. */
+export type ZoneStatus = 'cleared' | 'unlocked' | 'locked';
 /** Enemy dossier sub-tab. `challenges` only appears when the enemy has related challenges. */
 export type EnemySubTab = 'attributes' | 'statistics' | 'skills' | 'spawns' | 'challenges';
 /** Enemy-table filter chip. */
@@ -47,6 +49,15 @@ export const tabLabel = (tab: CodexTab): string => tab[0].toUpperCase() + tab.sl
 export const enemyAccent = (isBoss: boolean): string => (isBoss ? 'var(--boss-accent)' : 'var(--enemy-accent)');
 
 export const enemyKindLabel = (isBoss: boolean): string => (isBoss ? 'Boss' : 'Enemy');
+
+/** Status accent for a zone in the rail: a cleared zone reads in success green, an open-but-uncleared
+ *  zone in the zone accent, a locked zone muted. */
+export const zoneStatusColor = (status: ZoneStatus): string =>
+	status === 'cleared' ? 'var(--success)' : status === 'unlocked' ? 'var(--accent)' : 'var(--text-muted)';
+
+/** Title-cased status label for the zone rail / dossier. */
+export const zoneStatusLabel = (status: ZoneStatus): string =>
+	status === 'cleared' ? 'Cleared' : status === 'unlocked' ? 'Unlocked' : 'Locked';
 
 /** A compact level band: `L18` for a fixed boss encounter, `18–28` for a ranged spawn. */
 export const formatBand = (range: LevelRange): string => (range.fixed ? `L${range.min}` : `${range.min}–${range.max}`);
