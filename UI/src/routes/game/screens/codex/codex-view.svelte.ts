@@ -2,7 +2,8 @@
 
    The Enemies tab is a master/detail: a filterable enemy table beside a dossier with Attributes
    (live level-scaled stats + a "show scaling" breakdown), Statistics (the player's per-enemy record),
-   Skills, Spawns and Challenges sub-tabs. The Zones tab is a progression rail (a status dot per zone:
+   Skills, Spawns and Challenges sub-tabs — the Skills/Spawns rows cross-link into the Skills/Zones
+   tabs. The Zones tab is a progression rail (a status dot per zone:
    cleared / unlocked / locked) beside a zone dossier — level band, spawn pool, boss card, spawn table
    and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The Skills
    tab is a master/detail skill catalogue: a skill table (base damage / cooldown / used-by count)
@@ -664,6 +665,18 @@ export class CodexView {
 	openEnemy(id: number): void {
 		this.tab = 'enemies';
 		this.selectEnemy(id);
+	}
+
+	/** Cross-link: jump to a zone's dossier from the enemy dossier's Spawns rows. */
+	openZone(id: number): void {
+		this.tab = 'zones';
+		this.selectZone(id);
+	}
+
+	/** Cross-link: jump to a skill's dossier from the enemy dossier's Skills rows. */
+	openSkill(id: number): void {
+		this.tab = 'skills';
+		this.selectSkill(id);
 	}
 
 	/* ── helpers (store reads, kept off the reactive graph for the constructor) ──── */

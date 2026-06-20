@@ -194,6 +194,24 @@ describe('Codex screen', () => {
 		expect(screen.getByText('62/100')).toBeTruthy();
 	});
 
+	it('cross-links an enemy spawn row into the zone dossier', async () => {
+		render(Codex);
+		// Dust Skitterer's Spawns sub-tab → Emberreach (zone 0).
+		await fireEvent.click(screen.getByTestId('codex-subtab-spawns'));
+		await fireEvent.click(screen.getByTestId('codex-enemy-spawn-0'));
+		// Lands on the Zones tab with Emberreach's dossier open.
+		expect(screen.getByTestId('codex-zone-dossier').textContent).toContain('Emberreach');
+	});
+
+	it('cross-links an enemy skill row into the skill dossier', async () => {
+		render(Codex);
+		// Dust Skitterer's Skills sub-tab → Cleave (skill 0).
+		await fireEvent.click(screen.getByTestId('codex-subtab-skills'));
+		await fireEvent.click(screen.getByTestId('codex-enemy-skill-0'));
+		// Lands on the Skills tab with Cleave's dossier open.
+		expect(screen.getByTestId('codex-skill-dossier').textContent).toContain('Cleave');
+	});
+
 	it('renders the Zones tab as a progression rail + dossier with a boss card and spawn table', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
