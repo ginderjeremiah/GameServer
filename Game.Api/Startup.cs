@@ -7,6 +7,7 @@ using Game.Api.Events;
 using Game.Api.Filters;
 using Game.Api.Forwarding;
 using Game.Api.Middleware;
+using Game.Api.RateLimiting;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
 using Game.Application.Auth;
@@ -85,6 +86,11 @@ namespace Game.Api
                 .BindConfiguration(ForwardedHeadersConfig.SectionName);
             builder.Services.AddOptions<ForwardedHeadersOptions>()
                 .Configure<IOptions<ForwardedHeadersConfig>>((options, config) => config.Value.Apply(options));
+
+            // Throttle the anonymous auth endpoints per client IP to blunt credential stuffing, refresh-token
+            // brute force, and the PBKDF2 resource-exhaustion vector. Limits are config-bound with safe
+            // defaults so an unconfigured deployment is still protected (#950).
+            builder.Services.AddAuthRateLimiter();
 
             ConfigureAuth(builder);
 
@@ -188,6 +194,10 @@ namespace Game.Api
                     .AllowAnyMethod()
                     .AllowCredentials();
             });
+
+            // After CORS so a throttled browser request still carries the CORS headers needed to read the
+            // 429 envelope, and after forwarded-headers (above) so the partition keys off the real client IP.
+            app.UseRateLimiter();
 
             app.UseAuthentication();
             app.UseSessionLoader();
