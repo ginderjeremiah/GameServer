@@ -3,6 +3,7 @@ using Game.Api.Services;
 using Game.Api.Sockets.Commands;
 using Game.Application;
 using Game.Core;
+using System.Diagnostics;
 using System.Text.Json;
 using static System.Net.WebSockets.WebSocketState;
 
@@ -133,6 +134,7 @@ namespace Game.Api.Sockets
         /// </summary>
         internal async Task<SocketCommandOutcome> ExecuteServerCommand(SocketCommandInfo commandInfo)
         {
+            var now = Stopwatch.GetTimestamp();
             _logger.LogTrace("Executing server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             var (outcome, fault) = await RunCommandUnderLock(commandInfo);
             if (outcome is SocketCommandOutcome.Faulted)
@@ -155,6 +157,7 @@ namespace Game.Api.Sockets
         /// </summary>
         private async Task<(SocketCommandOutcome Outcome, Exception? Fault)> RunCommandUnderLock(SocketCommandInfo commandInfo)
         {
+            var startTimestamp = Stopwatch.GetTimestamp();
             await _commandLock.WaitAsync();
 
             // Cancels at the budget, both signalling cancellation-aware commands to unwind cooperatively and
@@ -208,6 +211,8 @@ namespace Game.Api.Sockets
             }
             finally
             {
+                var elapsedTime = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+                _logger.LogTrace("Socket command {CommandInfoName} executed in {ElapsedTime}ms.", commandInfo.Name, elapsedTime);
                 if (!lockHandedOff)
                 {
                     cts.Dispose();
