@@ -11,7 +11,7 @@ vi.stubGlobal('window', {
 	requestAnimationFrame: vi.fn()
 });
 
-import { LogicalEngine, onLogicalUpdate, tickSize } from '$lib/engine/logical-engine';
+import { LogicalEngine, onLogicalUpdate, onIdleTimeLost, tickSize } from '$lib/engine/logical-engine';
 
 describe('LogicalEngine', () => {
 	let engine: LogicalEngine;
@@ -122,5 +122,33 @@ describe('LogicalEngine', () => {
 		expect(engine.time).toBe(1000);
 
 		nowSpy.mockRestore();
+	});
+
+	it('reports the discarded idle time via onIdleTimeLost when the catch-up cap clips a long stall', () => {
+		let now = 0;
+		const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now);
+		const lost: number[] = [];
+		const unhook = onIdleTimeLost((ms: number) => lost.push(ms), false);
+
+		engine.start(); // lastTime = 0
+		now = 1000; // a 1000ms stall before the next poll
+		vi.advanceTimersByTime(10); // one poll sees a 1000ms delta → discards 1000 − tickSizeX5
+
+		expect(lost).toEqual([1000 - tickSize * 5]);
+
+		unhook();
+		nowSpy.mockRestore();
+	});
+
+	it('does not report idle time lost when polls stay within the catch-up cap', () => {
+		const lost: number[] = [];
+		const unhook = onIdleTimeLost((ms: number) => lost.push(ms), false);
+
+		engine.start();
+		vi.advanceTimersByTime(tickSize * 3);
+
+		expect(lost).toEqual([]);
+
+		unhook();
 	});
 });
