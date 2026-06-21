@@ -123,18 +123,23 @@ describe('ActiveEffectChips', () => {
 		expect(queryByTestId('chip-count')).toBeNull();
 	});
 
-	it('breaks down each stacked application in the tooltip alongside the total', async () => {
+	it('breaks the stack down by source in the tooltip alongside the total', async () => {
+		// Two applications from the SAME source fold into one breakdown row (aggregated by source) while the
+		// count label still reports both applications.
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5, durationMs: 1000 }));
 		const { container, getByTestId } = render(ActiveEffectChips, { props: { battler } });
 
 		await fireEvent.mouseEnter(container.querySelector('.effect-chip') as HTMLElement);
 
-		// The headline magnitude is the combined total, and the breakdown lists each application.
+		// The headline magnitude is the combined total, and the breakdown rolls the repeats up to one source.
 		expect(getByTestId('attr-tip-effect').textContent).toContain('+10');
 		const stacks = getByTestId('attr-tip-stacks');
 		expect(stacks.textContent).toContain('2 applications');
-		expect(stacks.querySelectorAll('.at-effect-stack-row')).toHaveLength(2);
+		const rows = stacks.querySelectorAll('.at-effect-stack-row');
+		expect(rows).toHaveLength(1);
+		expect(rows[0].textContent).toContain('+10');
+		expect(rows[0].textContent).toContain('Battle Cry');
 	});
 
 	it('sweeps the radial overlay from the render-interpolated remaining duration', () => {

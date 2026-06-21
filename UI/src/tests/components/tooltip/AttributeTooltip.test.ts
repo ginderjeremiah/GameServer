@@ -67,6 +67,7 @@ describe('AttributeTooltip', () => {
 				effect: {
 					modifierType: EModifierType.Additive,
 					amount: 5,
+					count: 1,
 					durationMs: 1000,
 					remainingMs: 1000,
 					sourceName: 'Battle Cry'
@@ -86,33 +87,33 @@ describe('AttributeTooltip', () => {
 		expect((container.querySelector('.at-effect-source-name') as HTMLElement).textContent).toBe('Battle Cry');
 	});
 
-	it('breaks down stacked applications and shows the combined total in the chip context', () => {
+	it('breaks the stack down by source and shows the combined total in the chip context', () => {
 		staticData.attributes = [STRENGTH];
 		const { getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Strength,
 				effect: {
 					modifierType: EModifierType.Additive,
-					amount: 20, // combined total of the three applications (5 + 10 + 5)
+					amount: 20, // combined total of the three applications (two Battle Cry + one War Drum)
+					count: 3,
 					durationMs: 1000,
 					remainingMs: 1000,
-					applications: [
-						{ amount: 5, sourceName: 'Battle Cry' },
-						{ amount: 10, sourceName: 'War Drum' },
-						{ amount: 5, sourceName: 'Battle Cry' }
+					sources: [
+						{ amount: 10, sourceName: 'Battle Cry', count: 2 },
+						{ amount: 10, sourceName: 'War Drum', count: 1 }
 					]
 				}
 			}
 		});
 
-		// Headline shows the combined total; the breakdown lists each application's own amount + source (the
-		// stack shares one expiry, shown by the header pill rather than per row).
+		// Headline shows the combined total and the count label every application; the breakdown rolls the
+		// applications up to one row per contributing source (the stack shares one expiry, shown by the pill).
 		expect(getByTestId('attr-tip-effect').textContent).toContain('+20');
 		const stacks = getByTestId('attr-tip-stacks');
 		expect(stacks.textContent).toContain('3 applications');
 		const rows = stacks.querySelectorAll('.at-effect-stack-row');
-		expect(rows).toHaveLength(3);
-		expect(rows[0].textContent).toContain('+5');
+		expect(rows).toHaveLength(2);
+		expect(rows[0].textContent).toContain('+10');
 		expect(rows[0].textContent).toContain('Battle Cry');
 		expect(rows[1].textContent).toContain('+10');
 		expect(rows[1].textContent).toContain('War Drum');
@@ -123,7 +124,7 @@ describe('AttributeTooltip', () => {
 		const { getByTestId, container } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Defense,
-				effect: { modifierType: EModifierType.Additive, amount: -5, durationMs: 2000, remainingMs: 1000 }
+				effect: { modifierType: EModifierType.Additive, amount: -5, count: 1, durationMs: 2000, remainingMs: 1000 }
 			}
 		});
 		const effect = getByTestId('attr-tip-effect');
@@ -139,7 +140,7 @@ describe('AttributeTooltip', () => {
 		const { getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.DamageTakenPerSecond,
-				effect: { modifierType: EModifierType.Additive, amount: 3, durationMs: 5000, remainingMs: 5000 }
+				effect: { modifierType: EModifierType.Additive, amount: 3, count: 1, durationMs: 5000, remainingMs: 5000 }
 			}
 		});
 		// DamageTakenPerSecond is harmful, so a positive amount is a debuff despite raising the value.
@@ -151,7 +152,7 @@ describe('AttributeTooltip', () => {
 		const { container, getByTestId } = render(AttributeTooltip, {
 			props: {
 				attributeId: EAttribute.Strength,
-				effect: { modifierType: EModifierType.Additive, amount: 5, durationMs: 1000 }
+				effect: { modifierType: EModifierType.Additive, amount: 5, count: 1, durationMs: 1000 }
 			}
 		});
 		// The effect summary still renders, but with no live timer there is no pill, and with no

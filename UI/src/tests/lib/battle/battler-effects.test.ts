@@ -265,32 +265,48 @@ describe('Battler skill-effect bookkeeping', () => {
 
 		expect(battler.activeEffects).toHaveLength(1);
 		expect(battler.activeEffects[0]).toEqual({
-			applicationId: 0,
-			sourceId: 7,
 			attribute: EAttribute.Defense,
 			modifierType: EModifierType.Additive,
-			amount: 4,
+			totalAmount: 4,
+			count: 1,
 			durationMs: 1000,
 			remainingMs: 1000,
-			renderRemainingMs: 1000
+			renderRemainingMs: 1000,
+			sources: [{ sourceId: 7, amount: 4, count: 1 }]
 		});
 	});
 
-	it('adds a second view when the same effect is applied again (stacking), resetting the shared remaining', () => {
+	it('folds a repeat application into the one view (stacking), resetting the shared remaining', () => {
 		const battler = makeBattler();
 		const e = effect(1, EAttribute.Strength, EModifierType.Additive, 5, 200);
 
 		battler.applyEffect(e);
-		battler.advanceEffects(40); // first application remaining 200 → 160
+		battler.advanceEffects(40); // remaining 200 → 160
 		expect(battler.activeEffects[0].remainingMs).toBe(160);
 
-		battler.applyEffect(e); // stacks a second application and resets the shared remaining to full
-		expect(battler.activeEffects).toHaveLength(2);
-		expect(battler.activeEffects[1].remainingMs).toBe(200);
-		expect(battler.activeEffects[1].renderRemainingMs).toBe(200);
-		// Same-attribute applications share one expiry, so the first is reset back to full alongside the new one.
+		battler.applyEffect(e); // folds a second application into the same view and resets the shared remaining
+		expect(battler.activeEffects).toHaveLength(1);
+		expect(battler.activeEffects[0].count).toBe(2);
+		expect(battler.activeEffects[0].totalAmount).toBe(10); // 5 + 5
 		expect(battler.activeEffects[0].remainingMs).toBe(200);
 		expect(battler.activeEffects[0].renderRemainingMs).toBe(200);
+		// The two applications come from one source, so the per-source breakdown aggregates rather than grows.
+		expect(battler.activeEffects[0].sources).toEqual([{ sourceId: 1, amount: 10, count: 2 }]);
+	});
+
+	it('folds different source effects on one attribute+type into one view with a per-source breakdown', () => {
+		const battler = makeBattler();
+
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5));
+		battler.applyEffect(effect(2, EAttribute.Strength, EModifierType.Additive, 3));
+
+		expect(battler.activeEffects).toHaveLength(1);
+		expect(battler.activeEffects[0].count).toBe(2);
+		expect(battler.activeEffects[0].totalAmount).toBe(8); // 5 + 3
+		expect(battler.activeEffects[0].sources).toEqual([
+			{ sourceId: 1, amount: 5, count: 1 },
+			{ sourceId: 2, amount: 3, count: 1 }
+		]);
 	});
 
 	it('drops the view when its effect expires and clears all views on reset', () => {
@@ -415,7 +431,7 @@ describe('Skill effect attribute scaling', () => {
 		skillWith(poison(10, 0.5), caster).applyEffects(foe, (_effect, _target, amount) => applied.push(amount));
 
 		// The chip view and the log both surface the scaled magnitude, not the authored base.
-		expect(foe.activeEffects[0].amount).toBe(20);
+		expect(foe.activeEffects[0].totalAmount).toBe(20);
 		expect(applied).toEqual([20]);
 	});
 });

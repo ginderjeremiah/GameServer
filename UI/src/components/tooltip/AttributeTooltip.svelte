@@ -35,21 +35,21 @@
 			<div class="at-effect" data-testid="attr-tip-effect">
 				<span class="at-effect-mag" style:color={effectDetail.color}>{effectDetail.magnitude}</span>
 				<span class="at-effect-dir" style:color={effectDetail.color}>{effectDetail.label}</span>
-				{#if effectDetail.applications}
+				{#if effectDetail.sources}
 					<span class="at-effect-total-label">total</span>
 				{/if}
 			</div>
-			{#if effectDetail.applications}
-				<!-- The effect is stacked (one shared expiry, shown in the header pill): list each
-				     application's individual amount and the skill it came from. -->
+			{#if effectDetail.sources}
+				<!-- The effect is stacked (one shared expiry, shown in the header pill): break the stack down
+				     by contributing source skill, each row its folded amount and name. -->
 				<div class="at-effect-stacks" data-testid="attr-tip-stacks">
-					<span class="at-effect-stacks-label">{effectDetail.applications.length} applications</span>
+					<span class="at-effect-stacks-label">{effectDetail.count} applications</span>
 					<ul class="at-effect-stack-list">
-						{#each effectDetail.applications as app, index (index)}
+						{#each effectDetail.sources as source, index (index)}
 							<li class="at-effect-stack-row">
-								<span class="at-effect-stack-mag" style:color={effectDetail.color}>{app.magnitude}</span>
-								{#if app.sourceName}
-									<span class="at-effect-stack-source">{app.sourceName}</span>
+								<span class="at-effect-stack-mag" style:color={effectDetail.color}>{source.magnitude}</span>
+								{#if source.sourceName}
+									<span class="at-effect-stack-source">{source.sourceName}</span>
 								{/if}
 							</li>
 						{/each}
@@ -125,22 +125,20 @@ const effectDetail = $derived.by(() => {
 			text: `${(remainingMs / 1000).toFixed(1)}s`
 		};
 	}
-	// When more than one application is active the effect is stacked: break down each application's
-	// individual amount and source (they share one expiry, shown by the header pill), while the headline
-	// magnitude stays the combined total.
-	const applications =
-		effect.applications && effect.applications.length > 1
-			? effect.applications.map((app) => ({
-					magnitude: formatEffectMagnitude(effect.modifierType, app.amount),
-					sourceName: app.sourceName
-				}))
-			: undefined;
+	// When more than one application is active the effect is stacked: break it down by contributing source
+	// skill (each source's folded amount; they share one expiry, shown by the header pill), while the
+	// headline magnitude stays the combined total.
+	const sources = effect.sources?.map((source) => ({
+		magnitude: formatEffectMagnitude(effect.modifierType, source.amount),
+		sourceName: source.sourceName
+	}));
 	return {
 		label: direction === 'buff' ? 'Buff' : 'Debuff',
 		color: effectDirectionColor(direction),
 		magnitude: formatEffectMagnitude(effect.modifierType, effect.amount),
 		sourceName: effect.sourceName,
-		applications,
+		count: effect.count,
+		sources,
 		pill
 	};
 });

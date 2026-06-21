@@ -7,12 +7,16 @@ import {
 	type TooltipComponent
 } from '$stores/tooltip.svelte';
 
-/** One active application within a stacked effect, for the tooltip's per-source breakdown. */
-export interface AttributeEffectApplication {
-	/** This application's own magnitude — applications can differ when caster-scaling shifts between fires. */
+/** One contributing source skill within a stacked effect, for the tooltip's per-source breakdown.
+ *  Applications are aggregated by source (not listed individually) so the breakdown stays bounded by the
+ *  distinct skills feeding the stack rather than its unbounded depth. */
+export interface AttributeEffectSource {
+	/** This source's folded magnitude (additive amounts summed, multiplicative factors compounded). */
 	amount: number;
-	/** Display name of the skill that applied this application, when it can be resolved. */
+	/** Display name of the skill that applied it, when it can be resolved. */
 	sourceName?: string;
+	/** How many applications from this source are folded in. */
+	count: number;
 }
 
 /**
@@ -21,14 +25,16 @@ export interface AttributeEffectApplication {
  * combined magnitude (via the shared `skill-effect-display` helpers) and — from the live `remainingMs`
  * / `durationMs` — a depleting countdown pill. All applications on an attribute share one expiry, so
  * the pill is the whole stack's single countdown; when more than one application is active the panel
- * also breaks down the individual applications (their amounts and sources). Omitted on the non-combat
- * attribute surfaces (breakdown rail, point-buy steppers, skill scaling chips), which show only the
- * attribute.
+ * also breaks the stack down by contributing source skill (each source's folded amount). Omitted on the
+ * non-combat attribute surfaces (breakdown rail, point-buy steppers, skill scaling chips), which show
+ * only the attribute.
  */
 export interface AttributeEffectContext {
 	modifierType: EModifierType;
 	/** Combined magnitude of all active applications (additive summed, multiplicative compounded). */
 	amount: number;
+	/** Total number of folded applications, driving the "N applications" label. */
+	count: number;
 	durationMs: number;
 	/** Live shared remaining time of the stack, driving the header countdown pill. Omit for a
 	 *  non-timed/static context. */
@@ -36,8 +42,8 @@ export interface AttributeEffectContext {
 	/** Display name of the single source skill — set only when exactly one application is active (the
 	 *  multi-application case names each source per breakdown row instead). */
 	sourceName?: string;
-	/** Each active application, shown as a per-source breakdown when more than one is stacked. */
-	applications?: AttributeEffectApplication[];
+	/** Per-source breakdown, shown when more than one application is stacked. */
+	sources?: AttributeEffectSource[];
 }
 
 /**

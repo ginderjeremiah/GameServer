@@ -137,7 +137,9 @@ describe('battleStep', () => {
 			battleStep(player, enemy, 40, noRng(), log);
 			expect(log.appliedEffects).toHaveLength(1);
 			expect(log.appliedEffects[0].onPlayer).toBe(true);
-			expect(player.activeEffects).toHaveLength(2); // two applications now stacked on the player
+			// The two applications fold into one view (one combined modifier) with a stack count of 2.
+			expect(player.activeEffects).toHaveLength(1);
+			expect(player.activeEffects[0].count).toBe(2);
 		});
 
 		it('reports per-tick DoT on one side and HoT on the other', () => {

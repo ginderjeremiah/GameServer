@@ -13,27 +13,62 @@ interface BattlerData {
 	name: string;
 }
 
-/** A single timed skill-effect application active on a battler, as the UI renders it (the active-effect
- *  chips). Each application is its own entry — re-applying an effect stacks a new one (the magnitudes
- *  sum) — so it carries a per-battler unique {@link applicationId} (to match its modifier on expiry and
- *  key it stably in the chips) alongside the authored effect's id, the attribute/modifier it shifts, and
- *  its full/remaining durations. All applications on the same attribute share one expiry, so their
- *  {@link remainingMs} move together (re-applying any of them resets them all — see
+/** One contributing skill-effect source folded into an {@link ActiveEffectView}, for the chip tooltip's
+ *  per-source breakdown. Stacking is unbounded, so applications are aggregated by their authored effect
+ *  id rather than kept individually — the count stays bounded by the distinct sources, not the stack depth. */
+export interface ActiveEffectSource {
+	/** The authored skill-effect id (the chips resolve it to a skill name for the tooltip). */
+	sourceId: number;
+	/** This source's folded contribution (additive amounts summed, multiplicative factors compounded). */
+	amount: number;
+	/** How many applications from this source are folded in. */
+	count: number;
+}
+
+/** The active timed effects on one (attribute, modifier type), as the UI renders it (one active-effect
+ *  chip). Effects STACK, but every application on an attribute shares one expiry and folds into a single
+ *  combined modifier, so the view is an aggregate — not one entry per application — keeping it (and the
+ *  per-tick bookkeeping behind it) bounded no matter how deep a buff re-applies. {@link totalAmount} is
+ *  the combined magnitude, {@link count} the number of folded applications (the chip's count badge), and
+ *  {@link sources} the per-source breakdown for the tooltip. All views on the same attribute share one
+ *  expiry, so their {@link remainingMs} move together (re-applying any of them resets them all — see
  *  {@link Battler.applyEffect}). {@link renderRemainingMs} is a render-only copy interpolated between
- *  ticks for a smooth countdown — the chip analogue of {@link Skill.renderChargeTime}. The modifier
- *  instance itself is kept off this view (in {@link Battler.effectModifiers}) so the view can be a
+ *  ticks for a smooth countdown — the chip analogue of {@link Skill.renderChargeTime}. The combined
+ *  modifier instances are kept off this view (in {@link Battler.effectModifiers}) so the view can be a
  *  reactive `statify` projection without a reactive proxy breaking the reference identity
  *  {@link BattleAttributes.removeModifier} matches on. */
 export interface ActiveEffectView {
-	applicationId: number;
-	sourceId: number;
 	attribute: EAttribute;
 	modifierType: EModifierType;
-	amount: number;
+	totalAmount: number;
+	count: number;
 	durationMs: number;
 	remainingMs: number;
 	renderRemainingMs: number;
+	sources: ActiveEffectSource[];
 }
+
+/** Keys a combined effect modifier (for swap-on-apply and remove-on-expiry) by the attribute + modifier
+ *  type it folds — the granularity at which stacked applications collapse into one modifier. */
+const effectModifierKey = (attribute: EAttribute, type: EModifierType): string => `${attribute}:${type}`;
+
+/** Folds one application's magnitude into the per-source breakdown for an {@link ActiveEffectView},
+ *  aggregating by the authored effect id (additive amounts summed, multiplicative factors compounded) so
+ *  the tooltip lists one row per source skill rather than one per unbounded application. */
+const foldSourceContribution = (
+	sources: ActiveEffectSource[],
+	sourceId: number,
+	amount: number,
+	isMultiplicative: boolean
+): void => {
+	const source = sources.find((s) => s.sourceId === sourceId);
+	if (source) {
+		source.amount = isMultiplicative ? source.amount * amount : source.amount + amount;
+		source.count++;
+	} else {
+		sources.push({ sourceId, amount, count: 1 });
+	}
+};
 
 let battlerId = 0;
 
@@ -46,22 +81,19 @@ export class Battler {
 	public skills: (Skill | undefined)[] = [];
 	public isDead = true;
 
-	/** The timed skill effects currently on this battler, as a reactive (`statify`) projection the
-	 *  active-effect chips render. Display-only data: it never carries a modifier reference, so making
-	 *  it reactive is safe (see {@link ActiveEffectView}). */
+	/** The active timed effects on this battler, folded to one {@link ActiveEffectView} per (attribute,
+	 *  modifier type), as a reactive (`statify`) projection the active-effect chips render. Display-only
+	 *  data: it never carries a modifier reference, so making it reactive is safe (see
+	 *  {@link ActiveEffectView}). */
 	public activeEffects: ActiveEffectView[] = [];
 
-	/** The modifier each active effect application added to the attribute set, keyed by the application's
-	 *  unique id (not the authored effect id — applications stack, so an effect id maps to many).
-	 *  A private (`#`) field so `statify` leaves it — and the modifier references it holds —
+	/** The single combined modifier each active (attribute, modifier type) added to the attribute set,
+	 *  keyed by {@link effectModifierKey}. Applications stack into this one modifier rather than each
+	 *  adding their own, so a persistently re-applied buff stays O(1) instead of growing one modifier per
+	 *  fire. A private (`#`) field so `statify` leaves it — and the modifier references it holds —
 	 *  non-reactive, keeping the reference identity {@link BattleAttributes.removeModifier} matches on
 	 *  intact (a reactive array would deep-proxy its elements). */
-	#effectModifiers = new Map<number, AttributeModifier>();
-
-	/** Monotonic per-battler counter handing each effect application a unique {@link
-	 *  ActiveEffectView.applicationId}, so stacked applications of the same effect stay individually
-	 *  addressable for expiry and chip keying. */
-	#nextApplicationId = 0;
+	#effectModifiers = new Map<string, AttributeModifier>();
 
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
 	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
@@ -145,43 +177,67 @@ export class Battler {
 	/** Applies a timed skill `effect` to this battler, using the already-resolved `amount` as its
 	 *  magnitude — the caster-attribute scaling is computed by {@link Skill.applyEffects} before this is
 	 *  reached, so `amount` defaults to the unscaled authored amount only for the direct (test) callers
-	 *  that don't scale. Each application adds its own modifier, so the magnitudes SUM (additive amounts
-	 *  add, multiplicative factors compound). All active applications on the SAME attribute share a single
-	 *  expiry: re-applying any effect on that attribute resets every active application of it to this
-	 *  application's duration, so the whole stack expires together with no independent per-portion
-	 *  expirations (#992 / #740). A new modifier may shift MaxHealth, so the health is re-clamped. */
+	 *  that don't scale. Each application STACKS: its magnitude folds into the attribute's single combined
+	 *  modifier for the effect's type (additive amounts add, multiplicative factors compound). All active
+	 *  applications on the SAME attribute share a single expiry: re-applying any effect on that attribute
+	 *  resets the whole stack to this application's duration, so it expires together with no independent
+	 *  per-portion expirations (#992 / #740). A new modifier may shift MaxHealth, so the health is
+	 *  re-clamped. */
 	public applyEffect(effect: ISkillEffect, amount: number = effect.amount): void {
-		const applicationId = this.#nextApplicationId++;
+		const isMultiplicative = effect.modifierTypeId === EModifierType.Multiplicative;
+		let view = this.activeEffects.find(
+			(v) => v.attribute === effect.attributeId && v.modifierType === effect.modifierTypeId
+		);
+
+		// Fold the application into the combined magnitude for this (attribute, type).
+		const combinedAmount = view ? (isMultiplicative ? view.totalAmount * amount : view.totalAmount + amount) : amount;
+
+		// Swap the single combined modifier in the attribute set (remove the old, add the new) so it holds at
+		// most one effect modifier per (attribute, type) regardless of stack depth — mirroring the backend.
+		const key = effectModifierKey(effect.attributeId, effect.modifierTypeId);
+		const existing = this.#effectModifiers.get(key);
+		if (existing) {
+			this.attributes.removeModifier(existing);
+		}
 		const modifier: AttributeModifier = {
 			attribute: effect.attributeId,
-			amount,
+			amount: combinedAmount,
 			type: effect.modifierTypeId,
 			source: EAttributeModifierSource.SkillEffect
 		};
 		this.attributes.addModifier(modifier);
-		this.#effectModifiers.set(applicationId, modifier);
+		this.#effectModifiers.set(key, modifier);
+
+		if (view) {
+			view.totalAmount = combinedAmount;
+			view.count++;
+			view.durationMs = effect.durationMs;
+			foldSourceContribution(view.sources, effect.id, amount, isMultiplicative);
+		} else {
+			view = {
+				attribute: effect.attributeId,
+				modifierType: effect.modifierTypeId,
+				totalAmount: combinedAmount,
+				count: 1,
+				durationMs: effect.durationMs,
+				remainingMs: effect.durationMs,
+				renderRemainingMs: effect.durationMs,
+				sources: [{ sourceId: effect.id, amount, count: 1 }]
+			};
+			this.activeEffects.push(view);
+		}
 
 		// Re-applying any effect on this attribute resets the whole stack's shared remaining to the new
-		// application's duration (it may extend a longer-lived application or cut a shorter one short).
-		// The backend mirror keys this off an absolute ExpiresAtMs clock; under the fixed tick size the two
-		// expire on the same tick (see advanceEffects).
-		for (const active of this.activeEffects) {
-			if (active.attribute === effect.attributeId) {
-				active.remainingMs = effect.durationMs;
-				active.renderRemainingMs = effect.durationMs;
+		// application's duration (it may extend a longer-lived application or cut a shorter one short). The
+		// backend mirror keys this off an absolute ExpiresAtMs clock; under the fixed tick size the two expire
+		// on the same tick (see advanceEffects).
+		for (const v of this.activeEffects) {
+			if (v.attribute === effect.attributeId) {
+				v.remainingMs = effect.durationMs;
+				v.renderRemainingMs = effect.durationMs;
 			}
 		}
 
-		this.activeEffects.push({
-			applicationId,
-			sourceId: effect.id,
-			attribute: effect.attributeId,
-			modifierType: effect.modifierTypeId,
-			amount,
-			durationMs: effect.durationMs,
-			remainingMs: effect.durationMs,
-			renderRemainingMs: effect.durationMs
-		});
 		this.clampHealthToMaxHealth();
 	}
 
@@ -202,13 +258,14 @@ export class Battler {
 
 		let removedAny = false;
 		for (let i = this.activeEffects.length - 1; i >= 0; i--) {
-			const active = this.activeEffects[i];
-			active.remainingMs -= timeDelta;
-			if (active.remainingMs <= 0) {
-				const modifier = this.#effectModifiers.get(active.applicationId);
+			const view = this.activeEffects[i];
+			view.remainingMs -= timeDelta;
+			if (view.remainingMs <= 0) {
+				const key = effectModifierKey(view.attribute, view.modifierType);
+				const modifier = this.#effectModifiers.get(key);
 				if (modifier) {
 					this.attributes.removeModifier(modifier);
-					this.#effectModifiers.delete(active.applicationId);
+					this.#effectModifiers.delete(key);
 				}
 				this.activeEffects.splice(i, 1);
 				removedAny = true;
