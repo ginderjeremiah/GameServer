@@ -150,7 +150,13 @@ export class Battler {
 	}
 
 	/** Applies one tick of damage-over-time from DamageTakenPerSecond (authored per second, scaled to
-	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt. */
+	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt.
+	 *
+	 *  Intentionally NOT floored at zero, unlike {@link takeDamage}: that floor exists only so Defense
+	 *  mitigation can't drive net damage below zero and turn a hit into a heal. DoT has no mitigation step, so a
+	 *  tick is negative only if a negative DamageTakenPerSecond is deliberately authored — and a floor wouldn't
+	 *  prevent that, just silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime}
+	 *  channel instead. */
 	public applyDamageOverTime(timeDelta: number) {
 		const damage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
 		this.currentHealth -= damage;

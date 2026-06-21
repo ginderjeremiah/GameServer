@@ -71,6 +71,7 @@ Damage-over-time and heal-over-time are just effects on two **per-second** attri
 - **Per-second units.** The phase applies `value × 40 / 1000` per 40ms tick.
 - **Enemy resolves first.** The enemy's DoT/HoT is applied before the player's, so an enemy DoT kill awards victory before the player's DoT lands — a same-tick mutual DoT kill favours the player (mirroring the skill-exchange order).
 - **Damage before heal, death between.** For each battler `DamageTakenPerSecond` applies first (**bypassing Defense**) and death is checked, then `HealthRegenPerSecond` heals (capped at MaxHealth) — so a lethal DoT tick kills even when the same tick's heal would have saved the battler.
+- **DoT is not floored at zero.** Normal damage floors so Defense mitigation can't turn a hit into a heal, but DoT bypasses mitigation, so a tick is only negative if a negative `DamageTakenPerSecond` is deliberately authored — a floor wouldn't prevent that, only mask it. Authored healing belongs in the capped `HealthRegenPerSecond` channel instead.
 - **Statistics.** DoT dealt to the enemy counts toward `DamageDealt` (but not the highest-single-attack or per-skill totals — per-skill DoT attribution is deferred); DoT taken by the player counts toward `DamageTaken`; the player's post-cap healing feeds the `DamageHealed` statistic.
 
 Effects are deterministic in this version (they always apply when the skill fires — no proc chance), and durations are time-based. Authoring effects on skills is done through the admin Workbench's skill editor.

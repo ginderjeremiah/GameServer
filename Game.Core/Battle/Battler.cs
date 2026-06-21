@@ -85,6 +85,13 @@ namespace Game.Core.Battle
         /// scaled to <paramref name="ms"/>). Unlike <see cref="TakeDamage"/> it <b>bypasses Defense</b>, and
         /// returns the damage dealt so the caller can attribute it to the battle statistics.
         /// </summary>
+        /// <remarks>
+        /// Intentionally <b>not</b> floored at zero, unlike <see cref="TakeDamage"/>. That floor exists only so
+        /// Defense mitigation can't drive net damage below zero and turn a hit into a heal; DoT has no mitigation
+        /// step, so a tick is negative only if a negative <see cref="DamageTakenPerSecond"/> is deliberately
+        /// authored — and a floor wouldn't prevent that, it would just silently rewrite the authored value to
+        /// zero. Authored healing belongs in the capped <see cref="ApplyHealOverTime"/> channel instead.
+        /// </remarks>
         public double ApplyDamageOverTime(int ms)
         {
             var damage = _attributes[DamageTakenPerSecond] * ms / 1000.0;
