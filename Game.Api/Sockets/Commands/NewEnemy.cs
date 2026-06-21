@@ -32,7 +32,7 @@ namespace Game.Api.Sockets.Commands
 
             var player = context.Session.Player;
 
-            var result = await _battleService.StartBattle(player, state, player.CurrentZoneId, Parameters.NewZoneId, cancellationToken);
+            var result = await _battleService.StartBattle(player, state, player.CurrentZoneId, Parameters.NewZoneId, cancellationToken: cancellationToken);
 
             context.Session.SavePlayerState();
 

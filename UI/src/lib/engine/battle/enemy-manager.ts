@@ -1,7 +1,7 @@
 import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
 import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOrder } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
-import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
+import { battleEngine, BattleStage, onBattleStageChanged, playerManager, type PlayerBattleState } from '../';
 import { logMessage } from '../log';
 
 const newEnemyLoadedHook = createHook<[IEnemyInstance]>();
@@ -28,6 +28,27 @@ const BOSS_VICTORY_OVERLAY_MS = 2600;
  * paused). Per the boss design they never run simultaneously.
  */
 export type FightMode = 'idle' | 'boss';
+
+/** The data a battle-end (DefeatEnemy / BattleLost) response carries: the post-battle cooldown plus the
+ *  optional server-prefetched next idle battle bundled to hide its fetch latency under the cooldown. */
+interface BattleEndResult {
+	cooldown: number;
+	nextEnemy?: IEnemyInstance;
+	nextZoneId?: number;
+}
+
+/** A server-prefetched next idle battle, held across the post-battle cooldown so the loop can begin it
+ *  without a separate NewEnemy round-trip. It is used only if still valid when the cooldown elapses — same
+ *  zone and unchanged player battle-state ({@link EnemyManager.preparedStillValid}); otherwise the loop
+ *  falls back to a fresh fetch. */
+interface PreparedBattle {
+	enemy: IEnemyInstance;
+	/** The zone the server spawned the prefetched enemy in (authoritative after any relocation). */
+	zoneId: number;
+	/** The player's battle-relevant inputs when the battle was prepared, so a build change during the
+	 *  cooldown can be detected and the now-divergent prefetch discarded (parity). */
+	playerState: PlayerBattleState;
+}
 
 export class EnemyManager {
 	public currentEnemy: IEnemyInstance | undefined;
@@ -369,8 +390,12 @@ export class EnemyManager {
 	}
 
 	private async watchIdleStage(stage: BattleStage) {
+		let prepared: PreparedBattle | undefined;
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
-			const cooldown = await this.claimVictory();
+			const { cooldown, nextEnemy, nextZoneId } = await this.claimVictory();
+			// Capture the server-prefetched next battle (with the current player state) before waiting out the
+			// cooldown, so a build change during the cooldown can be detected when deciding whether to use it.
+			prepared = this.capturePreparedBattle(nextEnemy, nextZoneId);
 			if (cooldown > 0) {
 				await battleEngine.startLoading(cooldown);
 			}
@@ -392,8 +417,62 @@ export class EnemyManager {
 			stage === BattleStage.Drawn ||
 			stage === BattleStage.Idle
 		) {
+			await this.spawnNextIdleEnemy(prepared);
+		}
+	}
+
+	/**
+	 * Spawns the next idle enemy once a battle-end cooldown elapses: presents the server-prefetched battle
+	 * when it is still valid (no NewEnemy round-trip — its latency was hidden under the cooldown), otherwise
+	 * fetches a fresh one. Shared by the idle-victory and boss-loss paths.
+	 */
+	private async spawnNextIdleEnemy(prepared?: PreparedBattle): Promise<void> {
+		if (prepared && this.preparedStillValid(prepared)) {
+			this.presentPreparedBattle(prepared);
+		} else {
 			await this.getNewEnemy();
 		}
+	}
+
+	/**
+	 * Builds a {@link PreparedBattle} from a battle-end response's bundled next enemy, capturing the player's
+	 * battle-state now so a later change can be detected. Returns undefined when the server bundled no next
+	 * enemy (then {@link spawnNextIdleEnemy} falls back to a normal fetch).
+	 */
+	private capturePreparedBattle(enemy?: IEnemyInstance, zoneId?: number): PreparedBattle | undefined {
+		if (!enemy) {
+			return undefined;
+		}
+		return {
+			enemy,
+			zoneId: zoneId ?? playerManager.currentZone,
+			playerState: battleEngine.capturePlayerBattleState()
+		};
+	}
+
+	/**
+	 * Whether a prefetched battle can still be used: the player has not navigated to a different zone, and
+	 * their battle-relevant state is unchanged since it was prepared. A zone change means the prefetched
+	 * enemy is for the wrong zone (and the server must be told the new one); a state change would make the
+	 * prefetch's frozen server snapshot diverge from what the frontend now derives (a false-rejection
+	 * hazard). Either case falls back to a fresh post-cooldown fetch.
+	 */
+	private preparedStillValid(prepared: PreparedBattle): boolean {
+		return prepared.zoneId === playerManager.currentZone && battleEngine.playerBattleStateMatches(prepared.playerState);
+	}
+
+	/**
+	 * Presents a prefetched battle as the live enemy (no round-trip). Re-checks the stop / transition guard
+	 * first because this path bypasses {@link getNewEnemy}'s fetch-generation guard: a stop or a
+	 * challenge/retreat that landed during the cooldown owns the next fight, so a stale prefetched idle enemy
+	 * must not clobber it.
+	 */
+	private presentPreparedBattle(prepared: PreparedBattle) {
+		if (!this.started || this.transitioning || this.mode !== 'idle') {
+			return;
+		}
+		this.currentEnemy = prepared.enemy;
+		notifyNewEnemyLoaded(this.currentEnemy);
 	}
 
 	private async watchBossStage(stage: BattleStage) {
@@ -464,14 +543,16 @@ export class EnemyManager {
 			logMessage(ELogType.Debug, 'There was an error recording the boss loss: ' + lostResponse.error);
 		}
 		this.returnToIdle();
-		// An error response carries no `data` (e.g. a transient socket failure), so guard the
-		// dereference the same way `getNewEnemy` does — otherwise a failed BattleLost would throw
-		// before `getNewEnemy` runs and strand the player with no new enemy after a boss loss.
+		// Capture the server-prefetched next idle battle (with the current player state) before the cooldown,
+		// so a build change during the cooldown can be detected. An error response carries no `data` (e.g. a
+		// transient socket failure), so guard the dereferences the same way `getNewEnemy` does — otherwise a
+		// failed BattleLost would throw before the next enemy spawns and strand the player after a boss loss.
+		const prepared = this.capturePreparedBattle(lostResponse.data?.nextEnemy, lostResponse.data?.nextZoneId);
 		const cooldown = lostResponse.data?.cooldown ?? 0;
 		if (cooldown > 0) {
 			await battleEngine.startLoading(cooldown);
 		}
-		await this.getNewEnemy();
+		await this.spawnNextIdleEnemy(prepared);
 	}
 
 	/** Resolve a dedicated-boss fight that reached the 2-minute time limit. A timeout is a draw, not a
@@ -485,9 +566,10 @@ export class EnemyManager {
 
 	/**
 	 * Reports the current enemy's defeat to the server and grants the earned exp. Shared by the idle
-	 * and boss victory paths so the two cannot drift. Returns the post-victory cooldown (ms).
+	 * and boss victory paths so the two cannot drift. Returns the post-victory cooldown (ms) and, for an
+	 * idle victory, the server-prefetched next battle bundled with the response (absent for a boss victory).
 	 */
-	private async claimVictory(): Promise<number> {
+	private async claimVictory(): Promise<BattleEndResult> {
 		// Resolve the enemy's name up front (guarding a missing/retired id), but only log the defeat
 		// after a successful DefeatEnemy so a failed command can't show "X was defeated!" with no rewards.
 		const enemyId = this.currentEnemy?.id;
@@ -508,6 +590,10 @@ export class EnemyManager {
 		}
 		// Guard `data` for a possible error response (absent `data`), now that this is the shared
 		// victory path for both the idle and boss loops.
-		return defeatResponse.data?.cooldown ?? 0;
+		return {
+			cooldown: defeatResponse.data?.cooldown ?? 0,
+			nextEnemy: defeatResponse.data?.nextEnemy,
+			nextZoneId: defeatResponse.data?.nextZoneId
+		};
 	}
 }

@@ -62,7 +62,7 @@ namespace Game.Application.Services
         // duration) and the loss path to the moment of the loss, but the duration is identical.
         private static readonly TimeSpan PostBattleCooldown = TimeSpan.FromSeconds(5);
 
-        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, CancellationToken cancellationToken = default)
+        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, CancellationToken cancellationToken = default)
         {
             if (state.HasActiveBattle)
             {
@@ -91,7 +91,11 @@ namespace Game.Application.Services
 
             var zone = _zones.GetDomainZone(zoneId);
 
-            var now = DateTime.UtcNow;
+            // Anchor the battle's start to the scheduled time when prefetching the next idle battle during
+            // the post-battle cooldown (its deterministic expiry); otherwise to now. Anchoring a prefetched
+            // battle to its scheduled start — not now — keeps the elapsed-time victory check and the
+            // following cooldown correct (see PrepareNextIdleBattle).
+            var battleStartTime = scheduledStartTime ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBattleEnemy(
@@ -101,13 +105,30 @@ namespace Game.Application.Services
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var snapshot = BattleSnapshot.FromPlayer(player);
 
-            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: false);
+            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, battleStartTime, snapshot, zone.Id, isBossBattle: false);
 
             return new BattleStartResult
             {
                 Enemy = enemy,
                 Seed = seed,
             };
+        }
+
+        /// <summary>
+        /// Prefetches the next idle battle for the bundled idle-loop flow: starts a fresh idle encounter in
+        /// the player's current zone, anchoring its <see cref="PlayerState.BattleStartTime"/> to the scheduled
+        /// post-battle cooldown expiry (<see cref="PlayerState.EnemyCooldown"/>) rather than now. The cooldown
+        /// is deterministic, so the next fight begins exactly when it elapses; anchoring the start to that
+        /// scheduled time (a) keeps the elapsed-time victory check correct — network latency only ever delays
+        /// the claim past the scheduled completion — and (b) keeps the <em>following</em> cooldown correctly
+        /// sized: anchoring to now would back-date the start by the whole cooldown and shrink (or zero) it.
+        /// The result rides the battle-end response so the client can begin the next fight the instant the
+        /// cooldown elapses, without a separate <c>NewEnemy</c> round-trip. Call only after the battle-end
+        /// method has set the cooldown and cleared the resolved battle.
+        /// </summary>
+        public Task<BattleStartResult> PrepareNextIdleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            return StartBattle(player, state, player.CurrentZoneId, scheduledStartTime: state.EnemyCooldown, cancellationToken: cancellationToken);
         }
 
         /// <summary>

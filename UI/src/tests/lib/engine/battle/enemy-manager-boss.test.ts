@@ -12,7 +12,11 @@ const h = vi.hoisted(() => ({
 		stage: 1, // Active: start() then does not kick off an initial idle getNewEnemy
 		timeElapsed: 8880, // the simulated battle duration claimVictory reports as clientTotalMs
 		startLoading: vi.fn(() => Promise.resolve()),
-		pause: vi.fn()
+		pause: vi.fn(),
+		// The idle loop captures the player's battle-state at a battle's end and compares it after the
+		// cooldown to decide whether a server-bundled next battle is still parity-safe to present.
+		capturePlayerBattleState: vi.fn(() => ({ token: 'state' })),
+		playerBattleStateMatches: vi.fn(() => true)
 	},
 	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5, Drawn: 6 },
 	playerManager: { currentZone: 3, grantExp: vi.fn() },
@@ -50,6 +54,9 @@ vi.mock('$lib/common', async (importOriginal) => ({
 
 const bossInstance: IEnemyInstance = { id: 0, level: 18, seed: 1, selectedSkills: [], attributes: [] };
 const normalInstance: IEnemyInstance = { id: 0, level: 9, seed: 2, selectedSkills: [], attributes: [] };
+// The next idle enemy the server bundles with a victory / boss-loss response so the client can begin it
+// without a separate NewEnemy round-trip (distinct from the fetched normalInstance so the two are told apart).
+const preparedInstance: IEnemyInstance = { id: 0, level: 12, seed: 7, selectedSkills: [], attributes: [] };
 
 const resp = <T extends 'ChallengeBoss' | 'DefeatEnemy' | 'BattleLost' | 'NewEnemy'>(
 	name: T,
@@ -64,6 +71,16 @@ const defeatResponse = resp('DefeatEnemy', {
 });
 const lostResponse = resp('BattleLost', { cooldown: 5000 });
 const newEnemyResponse = resp('NewEnemy', { enemyInstance: normalInstance });
+// Battle-end responses that bundle the prefetched next idle battle (the server-bundled flow, #1092).
+const bundledDefeatResponse = (cooldown: number) =>
+	resp('DefeatEnemy', {
+		cooldown,
+		rewards: { expReward: 50, newLevel: 1, newExp: 50, statPointsGained: 0, statPointsUsed: 0 },
+		nextEnemy: preparedInstance,
+		nextZoneId: 3
+	});
+const bundledLostResponse = (cooldown: number) =>
+	resp('BattleLost', { cooldown, nextEnemy: preparedInstance, nextZoneId: 3 });
 
 /** Routes each socket command to its scenario response by name. */
 const routeByName = () =>
@@ -89,7 +106,11 @@ describe('EnemyManager boss mode', () => {
 		manager = new EnemyManager();
 		vi.mocked(logMessage).mockClear();
 		h.battleEngine.startLoading.mockClear();
+		h.battleEngine.startLoading.mockReturnValue(Promise.resolve());
 		h.battleEngine.pause.mockClear();
+		h.battleEngine.capturePlayerBattleState.mockClear();
+		h.battleEngine.playerBattleStateMatches.mockReset();
+		h.battleEngine.playerBattleStateMatches.mockReturnValue(true);
 		h.playerManager.grantExp.mockClear();
 		h.statistics.markZoneCleared.mockClear();
 		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
@@ -877,5 +898,115 @@ describe('EnemyManager boss mode', () => {
 
 		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
 		expect(logMessage).not.toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.anything());
+	});
+
+	// --- Server-bundled next battle (#1092): hide the NewEnemy fetch latency under the cooldown ---
+
+	it('presents the server-bundled next idle enemy after a victory, with no NewEnemy round-trip', async () => {
+		await manager.getNewEnemy(); // load an idle enemy first (mode idle)
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy' ? Promise.resolve(bundledDefeatResponse(3000)) : Promise.resolve(newEnemyResponse)
+		);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		// The cooldown is still served, but the next enemy was bundled — so no separate NewEnemy request.
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(3000);
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+		expect(manager.currentEnemy).toEqual(preparedInstance);
+		expect(loaded).toEqual([preparedInstance]);
+	});
+
+	it('falls back to a fresh fetch when the player changes zone during the post-victory cooldown', async () => {
+		await manager.getNewEnemy();
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy' ? Promise.resolve(bundledDefeatResponse(3000)) : Promise.resolve(newEnemyResponse)
+		);
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // parked on the gated cooldown
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(3000);
+
+		// Navigate to a different zone during the cooldown, then let it elapse.
+		h.playerManager.currentZone = 7;
+		send.mockClear();
+		releaseCooldown();
+		await handled;
+
+		// The bundled enemy was for zone 3; the player is now in zone 7, so it is discarded and a fresh enemy
+		// is fetched for (and the server told about) the new zone.
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 7 });
+		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
+	it('falls back to a fresh fetch when the player changes their build during the post-victory cooldown', async () => {
+		await manager.getNewEnemy();
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy' ? Promise.resolve(bundledDefeatResponse(3000)) : Promise.resolve(newEnemyResponse)
+		);
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush();
+
+		// A gear/stat/loadout change during the cooldown makes the prefetch's frozen server snapshot diverge
+		// from what the frontend would now derive — the loop must re-fetch for a fresh, matching snapshot.
+		h.battleEngine.playerBattleStateMatches.mockReturnValue(false);
+		send.mockClear();
+		releaseCooldown();
+		await handled;
+
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
+	it('presents the server-bundled next idle enemy after a boss loss, with no NewEnemy round-trip', async () => {
+		await manager.challengeBoss();
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+		send.mockImplementation((name: string) =>
+			name === 'BattleLost' ? Promise.resolve(bundledLostResponse(5000)) : Promise.resolve(newEnemyResponse)
+		);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Defeated);
+
+		expect(send).toHaveBeenCalledWith('BattleLost');
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(5000);
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+		expect(manager.currentEnemy).toEqual(preparedInstance);
+		expect(loaded).toEqual([preparedInstance]);
+		expect(manager.mode).toBe('idle');
+	});
+
+	it('does not spawn the bundled idle enemy when a boss challenge lands during the post-victory cooldown', async () => {
+		// The bundled-present path bypasses getNewEnemy's fetch-generation guard, so it must re-check the
+		// transition guard itself: a boss challenge during the cooldown owns the next fight.
+		await manager.getNewEnemy();
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy' ? Promise.resolve(bundledDefeatResponse(3000)) : Promise.resolve(newEnemyResponse)
+		);
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // parked on the gated cooldown
+
+		// Simulate a boss handoff during the cooldown, then release it.
+		manager.mode = 'boss';
+		releaseCooldown();
+		await handled;
+
+		// The bundled idle enemy was not presented over the boss fight.
+		expect(manager.currentEnemy).not.toEqual(preparedInstance);
 	});
 });

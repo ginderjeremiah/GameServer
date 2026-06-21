@@ -374,6 +374,52 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task PrepareNextIdleBattle_AnchorsBattleStartToScheduledCooldownExpiry()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            // Backdate so the victory resolves and anchors a cooldown.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var victory = await battleService.EndBattleVictory(player, state);
+            Assert.NotNull(victory);
+
+            // The post-battle cooldown is the deterministic scheduled start of the next fight.
+            var scheduledStart = state.EnemyCooldown;
+
+            var next = await battleService.PrepareNextIdleBattle(player, state);
+
+            Assert.NotNull(next);
+            Assert.NotNull(next.Enemy);
+            Assert.True(state.HasActiveBattle);
+            Assert.False(state.IsBossBattle);
+            // The prefetched battle's start is anchored to the scheduled cooldown expiry — NOT to now — so the
+            // next victory's elapsed-time check passes (latency only delays the claim) and the FOLLOWING
+            // cooldown stays correctly sized (anchoring to now would back-date the start and shrink it).
+            Assert.Equal(scheduledStart, state.BattleStartTime);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_Success_PersistsPlayerToCache()
         {
             using var scope = CreateScope();

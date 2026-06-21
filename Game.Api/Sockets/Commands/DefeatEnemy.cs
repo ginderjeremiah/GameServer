@@ -30,12 +30,28 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
+            // Capture before EndBattleVictory clears the battle: only idle victories bundle the next battle.
+            // The boss-victory path paces itself (the Zone-Cleared overlay, then re-challenge or hand back to
+            // idle), so prefetching an idle battle there would be wasted and immediately abandoned.
+            var wasBossBattle = state.IsBossBattle;
+
             var rewards = await _battleService.EndBattleVictory(player, state, Parameters.ClientTotalMs, cancellationToken);
 
             if (rewards is not null)
             {
                 _logger.LogDebug("DefeatEnemy: player {PlayerId} defeated enemy (exp: {Exp})",
                     player.Id, rewards.ExpReward);
+
+                // Prefetch and bundle the next idle battle so the client can begin it the instant the
+                // post-battle cooldown elapses, hiding the NewEnemy round-trip under the cooldown.
+                EnemyInstance? nextEnemy = null;
+                int? nextZoneId = null;
+                if (!wasBossBattle)
+                {
+                    var next = await _battleService.PrepareNextIdleBattle(player, state, cancellationToken);
+                    nextEnemy = EnemyInstance.FromSource(next);
+                    nextZoneId = player.CurrentZoneId;
+                }
 
                 context.Session.SavePlayerState();
 
@@ -44,6 +60,8 @@ namespace Game.Api.Sockets.Commands
                 {
                     Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
                     Rewards = new DefeatRewards(rewards),
+                    NextEnemy = nextEnemy,
+                    NextZoneId = nextZoneId,
                 });
             }
             else

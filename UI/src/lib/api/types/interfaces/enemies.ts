@@ -5,6 +5,8 @@ import type { IBattlerAttribute } from '../';
 
 export interface IBattleLostResponse {
 	cooldown: number;
+	nextEnemy?: IEnemyInstance;
+	nextZoneId?: number;
 }
 
 export interface IChallengeBossRequest {
@@ -18,6 +20,8 @@ export interface IDefeatEnemyRequest {
 export interface IDefeatEnemyResponse {
 	cooldown: number;
 	rewards?: IDefeatRewards;
+	nextEnemy?: IEnemyInstance;
+	nextZoneId?: number;
 }
 
 export interface IDefeatRewards {

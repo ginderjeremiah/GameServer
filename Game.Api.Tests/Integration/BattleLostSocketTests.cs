@@ -125,6 +125,10 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.True(response.Data.Cooldown >= 0);
+            // A boss loss returns to the idle farm, so the next idle battle is bundled with the loss response
+            // — letting the client begin it without a separate NewEnemy round-trip after the cooldown (#1092).
+            Assert.NotNull(response.Data.NextEnemy);
+            Assert.NotNull(response.Data.NextZoneId);
         }
     }
 }
