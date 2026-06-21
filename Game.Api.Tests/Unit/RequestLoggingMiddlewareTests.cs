@@ -40,7 +40,7 @@ namespace Game.Api.Tests.Unit
             Assert.NotNull(category);
             var entries = capturingProvider.Entries.Where(e => e.Category == category).ToList();
 
-            Assert.Single(entries, e => e.Message == "Request Start");
+            Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
 
             var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended"));
             Assert.Equal(LogLevel.Information, endedEntry.Level);

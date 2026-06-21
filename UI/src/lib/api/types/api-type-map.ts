@@ -8,6 +8,7 @@ import type {
 	IAuthTokens,
 	IChallenge,
 	IChange,
+	ICreatePlayerRequest,
 	IDeadLetterInspection,
 	IDeadLetterReplayResult,
 	IDeviceInfoRequest,
@@ -18,6 +19,7 @@ import type {
 	ILoginCredentials,
 	ILoginResult,
 	IPlayerData,
+	IPlayerSummary,
 	IRefreshRequest,
 	IReplayDeadLettersData,
 	IRole,
@@ -66,6 +68,7 @@ export type ApiResponseTypes = {
 	'Login': ILoginResult;
 	'Login/ActiveSession': IActiveSessionResult;
 	'Login/CreateAccount': undefined;
+	'Login/CreatePlayer': IPlayerSummary;
 	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
@@ -102,6 +105,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ILoginCredentials;
+	'Login/CreatePlayer': ICreatePlayerRequest;
 	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;

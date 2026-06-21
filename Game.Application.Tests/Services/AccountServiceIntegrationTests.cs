@@ -418,6 +418,148 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task CreatePlayer_ValidName_CreatesCharacterAttachedToAccount()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // The starter skills 0/1/2 must exist for the new player's player-skill FK.
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "creator", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // A surrounding-whitespace name is normalized (trimmed) before persistence.
+            var result = await accountService.CreatePlayer(user.Id, "  Aragorn  ");
+
+            Assert.True(result.Success);
+            Assert.Equal("Aragorn", result.Player.Name);
+            Assert.Equal(NewPlayerFactory.StartingZoneId, result.Player.CurrentZoneId);
+
+            // The character is attached to the account and built from the new-player blueprint (starter skills).
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var created = await verifyContext.Players
+                .FirstOrDefaultAsync(p => p.Id == result.Player.Id, CancellationToken);
+            Assert.NotNull(created);
+            Assert.Equal(user.Id, created.UserId);
+            Assert.Equal("Aragorn", created.Name);
+            Assert.Equal(1, created.Level);
+
+            var skills = await verifyContext.Set<PlayerSkill>()
+                .Where(skill => skill.PlayerId == created.Id)
+                .Select(skill => skill.SkillId)
+                .OrderBy(id => id)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(new[] { 0, 1, 2 }, skills);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AdditionalCharacter_DoesNotDisturbExistingOnes()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "secondchar", "pass");
+            var existing = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "First");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.CreatePlayer(user.Id, "Second");
+
+            Assert.True(result.Success);
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var names = await verifyContext.Players
+                .Where(p => p.UserId == user.Id)
+                .Select(p => p.Name)
+                .OrderBy(name => name)
+                .ToListAsync(CancellationToken);
+            Assert.Equal(new[] { "First", "Second" }, names);
+            Assert.NotEqual(existing.Id, result.Player.Id);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("waaaaaaaaaaaaaaaaaaaaytoolong")]
+        public async Task CreatePlayer_InvalidName_IsRejectedAndCreatesNothing(string name)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "badnamer", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.CreatePlayer(user.Id, name);
+
+            Assert.False(result.Success);
+            Assert.Equal(CreatePlayerStatus.InvalidName, result.Status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AtCap_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "capped", "pass");
+            await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Only");
+
+            // A cap of 1 with one existing character means the next creation is over the cap.
+            var accountService = CreateAccountService(scope.ServiceProvider, maxPlayersPerAccount: 1);
+
+            var result = await accountService.CreatePlayer(user.Id, "TooMany");
+
+            Assert.False(result.Success);
+            Assert.Equal(CreatePlayerStatus.CapReached, result.Status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(1, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+        }
+
+        [Fact]
+        public async Task CreatePlayer_ConcurrentAtCapBoundary_NeverExceedsTheCap()
+        {
+            using (var seedScope = CreateScope())
+            {
+                var seedContext = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill0");
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill1");
+                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill2");
+            }
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "racechars", "pass");
+            await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Existing");
+
+            // Two concurrent creations race the cap of 2 (one slot left). The data tier serializes the count
+            // check with the insert under the user-row lock, so exactly one wins and the cap is never exceeded.
+            async Task<AccountCreatePlayerResult> Attempt(string name)
+            {
+                using var attemptScope = CreateScope();
+                return await CreateAccountService(attemptScope.ServiceProvider, maxPlayersPerAccount: 2).CreatePlayer(user.Id, name);
+            }
+
+            var results = await Task.WhenAll(Attempt("RaceA"), Attempt("RaceB"));
+
+            Assert.Equal(1, results.Count(r => r.Success));
+            Assert.Equal(1, results.Count(r => r.Status == CreatePlayerStatus.CapReached));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(2, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+        }
+
+        [Fact]
         public async Task Refresh_ValidToken_RotatesToNewPair()
         {
             using var scope = CreateScope();
@@ -586,7 +728,8 @@ namespace Game.Application.Tests.Services
             IServiceProvider provider,
             int iterations = 1000,
             LoginBackoffOptions? backoffOptions = null,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            int maxPlayersPerAccount = 6)
         {
             // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
             // so seeded credentials verify exactly as they would in production. A higher iteration count
@@ -613,6 +756,7 @@ namespace Game.Application.Tests.Services
                 hasher,
                 backoffGuard,
                 new NewPlayerFactory(),
+                Options.Create(new PlayerCreationOptions { MaxPlayersPerAccount = maxPlayersPerAccount }),
                 NullLogger<AccountService>.Instance);
         }
 

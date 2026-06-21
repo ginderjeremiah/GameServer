@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Api.Http;
@@ -8,6 +9,7 @@ using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Headers;
@@ -290,6 +292,99 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
             Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.BadRequest));
             Assert.DoesNotContain(responses, response => response.StatusCode == HttpStatusCode.InternalServerError);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AuthenticatedValidName_CreatesCharacterAndReturnsSummary()
+        {
+            // The new-player blueprint inserts PlayerSkills with SkillId 0, 1, 2.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "creatorctrl", "pass");
+
+            var client = Factory.CreateClient();
+            // A pre-selection token (no player bound) — the realistic state on the character-select screen.
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Gandalf" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Null(result.ErrorMessage);
+            Assert.Equal("Gandalf", result.Data.Name);
+
+            // The character is persisted and attached to the account.
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var created = await verifyContext.Players.FirstOrDefaultAsync(p => p.Id == result.Data.Id, CancellationToken);
+            Assert.NotNull(created);
+            Assert.Equal(user.Id, created.UserId);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task CreatePlayer_Unauthenticated_Returns401()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Nobody" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_InvalidName_Returns400AndCreatesNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "badnamectrl", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            // A name past the 20-char limit is rejected with a structured error, not a 500.
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer",
+                new { Name = "this-name-is-way-too-long-to-be-valid" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
+            Assert.Null(result.Data);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AtConfiguredCap_Returns400()
+        {
+            // Verifies the configured default cap (6) is wired end-to-end: an account already holding the cap
+            // is refused another character.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "cappedctrl", "pass");
+            for (var i = 0; i < 6; i++)
+            {
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: $"Char{i}");
+            }
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "OneTooMany" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(6, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+            client.Dispose();
         }
 
         [Fact]

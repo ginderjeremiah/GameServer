@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
@@ -5,6 +6,7 @@ using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Api.RateLimiting;
 using Game.Application.Services;
+using Game.Core.Players;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -87,6 +89,29 @@ namespace Game.Api.Controllers
                 Tokens = ToAuthTokens(result.Tokens),
                 Player = PlayerData.FromPlayer(result.Player),
             });
+        }
+
+        /// <summary>
+        /// Creates an additional character on the authenticated account. Validates the name and enforces the
+        /// per-account character cap server-side (anti-cheat). Runs over HTTP as part of the pre-game
+        /// character-select flow — no session binding is established, so the caller's selected character is
+        /// unchanged. Returns the new character's summary so the client can add it to the select list.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse<PlayerSummary>> CreatePlayer([FromBody] CreatePlayerRequest request)
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name);
+            if (!result.Success)
+            {
+                return ApiResponse.Error(CreatePlayerErrorMessage(result.Status), CreatePlayerErrorCategory(result.Status));
+            }
+
+            return ApiResponse.Success(result.Player);
         }
 
         [AllowAnonymous]
@@ -231,6 +256,30 @@ namespace Game.Api.Controllers
                 // A legit client never selects an unowned character; treat tampering as a plain bad request.
                 SelectPlayerStatus.NotOwned => ApiErrorCategory.BadRequest,
                 SelectPlayerStatus.PlayerDataNotFound => ApiErrorCategory.NotFound,
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static string CreatePlayerErrorMessage(CreatePlayerStatus status)
+        {
+            return status switch
+            {
+                CreatePlayerStatus.InvalidName =>
+                    $"Character names must be {PlayerName.MinLength}-{PlayerName.MaxLength} characters and contain no control characters.",
+                CreatePlayerStatus.CapReached => "You have reached the maximum number of characters for this account.",
+                CreatePlayerStatus.UserNotFound => "Account not found",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static ApiErrorCategory CreatePlayerErrorCategory(CreatePlayerStatus status)
+        {
+            return status switch
+            {
+                // Both an invalid name and exceeding the cap are client-side validation/business failures.
+                CreatePlayerStatus.InvalidName => ApiErrorCategory.BadRequest,
+                CreatePlayerStatus.CapReached => ApiErrorCategory.BadRequest,
+                CreatePlayerStatus.UserNotFound => ApiErrorCategory.NotFound,
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }
