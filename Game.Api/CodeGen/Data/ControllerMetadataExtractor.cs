@@ -50,7 +50,7 @@ namespace Game.Api.CodeGen.Data
 
             const string apiPrefix = "api/";
             route = route.TrimStart('/');
-            if (route.StartsWith(apiPrefix))
+            if (route.StartsWith(apiPrefix, StringComparison.Ordinal))
             {
                 route = route[apiPrefix.Length..];
             }
@@ -58,6 +58,8 @@ namespace Game.Api.CodeGen.Data
             return new EndpointMetadata(endpoint)
             {
                 Endpoint = route,
+                // Every action in this codebase carries an explicit HTTP-method attribute; an
+                // unannotated action falls back to GET (the client emits a GET request).
                 IsGet = methodAtt?.HttpMethods?.Contains("GET") ?? true
             };
         }
