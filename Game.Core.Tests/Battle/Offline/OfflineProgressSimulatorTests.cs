@@ -453,19 +453,22 @@ namespace Game.Core.Tests.Battle.Offline
         };
 
         private static BattleSnapshot PlayerSnapshot(
-            double strength = 0, double endurance = 0, double dexterity = 0, double luck = 0) => new()
+            double strength = 0, double endurance = 0, double dexterity = 0, double luck = 0)
         {
-            Level = 1,
-            StatAllocations =
-            [
-                new StatAllocation { Attribute = Strength, Amount = strength },
-                new StatAllocation { Attribute = Endurance, Amount = endurance },
-                new StatAllocation { Attribute = Dexterity, Amount = dexterity },
-                new StatAllocation { Attribute = Luck, Amount = luck },
-            ],
-            EquippedItems = [],
-            SkillIds = [0],
-        };
+            return new()
+            {
+                Level = 1,
+                StatAllocations =
+                [
+                    new StatAllocation { Attribute = Strength, Amount = strength },
+                    new StatAllocation { Attribute = Endurance, Amount = endurance },
+                    new StatAllocation { Attribute = Dexterity, Amount = dexterity },
+                    new StatAllocation { Attribute = Luck, Amount = luck },
+                ],
+                EquippedItems = [],
+                SkillIds = [0],
+            };
+        }
 
         private static Enemy WeakEnemy(int level, int skillCount = 1) =>
             MakeEnemy(level, strength: 5, endurance: 5, skillCount: skillCount);
