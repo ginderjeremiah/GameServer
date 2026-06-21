@@ -230,6 +230,138 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SwitchPlayer_Unauthenticated_Returns401()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/SwitchPlayer",
+                new { PlayerId = 1, RefreshToken = "irrelevant" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_TargetOfAnotherAccount_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var owner = await TestDataSeeder.CreateUserAsync(context, "switchowner", "pass");
+            var ownerPlayer = await TestDataSeeder.CreatePlayerAsync(context, owner.Id);
+            var attacker = await TestDataSeeder.CreateUserAsync(context, "switchattacker", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var attackerPlayer = await TestDataSeeder.CreatePlayerAsync(context, attacker.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, attackerPlayer.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchattacker", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, attackerPlayer.Id);
+
+            // Switching to a character of another account is rejected (anti-cheat) before binding it.
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SwitchPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = ownerPlayer.Id, select.Tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            var response = await Client.SendAsync(request, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
+            Assert.Null(result.Data);
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_FromOneCharacterToAnother_CreditsDepartedAndBindsTarget()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A winning idle scenario so the departed character actually earns over its credited away window:
+            // the player one-shots a fixed-power enemy in a single-zone loop.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchuser", "pass");
+            var departed = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha", zoneId: zone.Id);
+            var target = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta", zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, departed.Id, playerSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, target.Id, playerSkill.Id);
+
+            // Back-date the departed character's activity so the switch credits a real away window.
+            var departedLevelBefore = departed.Level;
+            departed.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchuser", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, departed.Id);
+
+            var switched = await SwitchPlayerAsync(select.Tokens, target.Id);
+
+            // The response binds the target character and rotates the token.
+            Assert.Equal(target.Id, switched.Player.Id);
+            Assert.Equal("Beta", switched.Player.Name);
+            Assert.NotEqual(select.Tokens.RefreshToken, switched.Tokens.RefreshToken);
+
+            // The cached session is now bound to the target character.
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var session = await sessionStore.GetSession(user.Id);
+            Assert.NotNull(session);
+            Assert.Equal(target.Id, session.PlayerId);
+
+            // The departed character was credited for its away window — it gained levels from the simulated
+            // victories (write-behind, so poll the persisted aggregate until the credit lands).
+            await AssertPlayerLeveledAboveAsync(departed.Id, departedLevelBefore);
+
+            // The rotated access token authenticates Status and resolves the target character from its claim.
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", switched.Tokens.AccessToken);
+            var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+            var status = await statusResponse.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.Equal(target.Id, status?.Data?.Id);
+        }
+
+        // Switches the bound character through the real SwitchPlayer endpoint and returns the deserialized
+        // result (rotated tokens plus the loaded target player).
+        private async Task<SelectPlayerResult> SwitchPlayerAsync(AuthTokens tokens, int playerId)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SwitchPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = playerId, tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+            var response = await Client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            return result.Data;
+        }
+
+        // The credited save is write-behind (fire-and-forget cache write), so poll the persisted aggregate
+        // until the departed character's level reflects the simulated away window.
+        private async Task AssertPlayerLeveledAboveAsync(int playerId, int levelBefore)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                var persisted = await GetPersistedPlayerAsync(playerId);
+                if (persisted.Level > levelBefore)
+                {
+                    return;
+                }
+
+                await Task.Delay(25, CancellationToken);
+            }
+
+            Assert.Fail("The departed character was not credited (its level did not advance) after the switch.");
+        }
+
+        [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
             // Arrange — CreateAccount inserts PlayerSkills with SkillId 0, 1, 2
