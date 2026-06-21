@@ -83,11 +83,15 @@ namespace Game.Core.Battle
         /// <summary>
         /// Applies one tick of damage-over-time from <see cref="DamageTakenPerSecond"/> (authored per second,
         /// scaled to <paramref name="ms"/>). Unlike <see cref="TakeDamage"/> it <b>bypasses Defense</b>, and
-        /// returns the damage dealt so the caller can attribute it to the battle statistics.
+        /// returns the damage dealt so the caller can attribute it to the battle statistics. Floored at zero
+        /// (like <see cref="TakeDamage"/>) so a negative <see cref="DamageTakenPerSecond"/> can't heal past the
+        /// <see cref="MaxHealth"/> cap or book negative statistics — a heal must go through the capped
+        /// <see cref="ApplyHealOverTime"/> channel instead.
         /// </summary>
         public double ApplyDamageOverTime(int ms)
         {
             var damage = _attributes[DamageTakenPerSecond] * ms / 1000.0;
+            damage = damage > 0 ? damage : 0;
             CurrentHealth -= damage;
             return damage;
         }
