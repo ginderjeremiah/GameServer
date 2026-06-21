@@ -54,6 +54,16 @@ export function cooldownMultiplier(attributes: BattleAttributes): number {
 	return attributes.getValue(EAttribute.CooldownRecovery);
 }
 
+/** The long-run average damage multiplier from critical hits: a crit (probability `critChance`, a
+ *  [0,1] value) multiplies raw damage by `critDamage` (a base-≥1 multiplier), so over many fires the
+ *  expected raw damage is `raw × (1 + critChance × (critDamage − 1))`. A `critChance` of 0 (or a
+ *  `critDamage` of 1) leaves it at 1. This is a DISPLAY-ONLY helper for the skill tooltip's expected
+ *  damage; the live simulation rolls each crit individually (see `battleStep`), so it has no backend
+ *  mirror and is outside the battle-parity contract. */
+export function expectedCritMultiplier(critChance: number, critDamage: number): number {
+	return 1 + critChance * (critDamage - 1);
+}
+
 /** A skill effect's magnitude after caster-attribute scaling: the authored amount plus the caster's
  *  scaling-attribute value times the per-point coefficient (`scalingAmount`). A `scalingAmount` of 0
  *  leaves the authored amount unchanged. The `attributes` are the CASTER's, mirroring how a damage

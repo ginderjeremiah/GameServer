@@ -73,7 +73,41 @@ describe('SkillTooltip', () => {
 		expect(list.textContent).toContain('10');
 		expect(list.textContent).toContain('+40');
 		expect(list.textContent).toContain('-5');
+		// No crit row when the battler has no crit chance (the default fixture owner).
+		expect(list.textContent).not.toContain('Critical');
 		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('45');
+	});
+
+	it('folds the expected crit contribution into the breakdown and total', () => {
+		staticData.attributes = [
+			makeAttribute(EAttribute.Strength, 'Strength'),
+			makeAttribute(EAttribute.CriticalChance, 'Critical Chance', { isPercentage: true })
+		];
+		// Crit chance 50%, crit damage ×2 → expected multiplier 1 + 0.5·(2−1) = 1.5.
+		const critOwner = makeBattler({
+			attributes: [
+				{ attributeId: EAttribute.Strength, amount: 20 },
+				{ attributeId: EAttribute.CooldownRecovery, amount: 1 },
+				{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
+				{ attributeId: EAttribute.CriticalDamage, amount: 2 }
+			]
+		});
+		const skill = makeSkill(critOwner, {
+			name: 'Cleave',
+			baseDamage: 10,
+			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }],
+			cooldownMs: 1000
+		});
+		const { container } = render(SkillTooltip, { props: { skill } });
+
+		const list = container.querySelector('.tt-dmg-list') as HTMLElement;
+		// raw = base 10 + STR(20)×2 = 50; crit adds 50 × 0.5·(2−1) = +25; enemy defense −5.
+		expect(list.textContent).toContain('Critical');
+		expect(list.textContent).toContain('50%'); // crit chance
+		expect(list.textContent).toContain('×2'); // crit damage multiplier
+		expect(list.textContent).toContain('+25'); // expected crit bonus
+		// total = 50 + 25 − 5 = 70
+		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('70');
 	});
 
 	it('omits the enemy-defense row and uses raw damage when there is no opponent', () => {

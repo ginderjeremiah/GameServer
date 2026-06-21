@@ -6,6 +6,7 @@ import {
 	applyDefense,
 	calculateSkillDamage,
 	cooldownMultiplier,
+	expectedCritMultiplier,
 	skillContributions
 } from '$lib/battle/battle-formulas';
 
@@ -173,6 +174,25 @@ describe('battle-formulas', () => {
 
 		it('slows cooldowns for a CooldownRecovery below 1', () => {
 			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 0.5]]))).toBeCloseTo(0.5, 10);
+		});
+	});
+
+	describe('expectedCritMultiplier', () => {
+		it('is 1 when crit chance is 0', () => {
+			expect(expectedCritMultiplier(0, 1.5)).toBe(1);
+		});
+
+		it('is 1 when crit damage is a 1x multiplier (a crit adds nothing)', () => {
+			expect(expectedCritMultiplier(0.5, 1)).toBe(1);
+		});
+
+		it('blends the crit and non-crit damage by chance', () => {
+			// 5% chance to deal 1.5x → expected 1 + 0.05 * 0.5 = 1.025
+			expect(expectedCritMultiplier(0.05, 1.5)).toBeCloseTo(1.025, 10);
+		});
+
+		it('equals the crit multiplier at a guaranteed crit', () => {
+			expect(expectedCritMultiplier(1, 2)).toBe(2);
 		});
 	});
 });
