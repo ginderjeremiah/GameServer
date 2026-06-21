@@ -363,6 +363,7 @@ namespace Game.Application.Tests.Services
 
             var accountService = CreateAccountService(scope.ServiceProvider);
             var login = await accountService.Login("selectuser", "pass");
+            Assert.True(login.Success);
 
             var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
 
@@ -389,6 +390,7 @@ namespace Game.Application.Tests.Services
 
             var accountService = CreateAccountService(scope.ServiceProvider);
             var login = await accountService.Login("attacker", "pass");
+            Assert.True(login.Success);
 
             // Selecting a player the caller does not own is an anti-cheat rejection.
             var result = await accountService.SelectPlayer(attacker.Id, ownerPlayer.Id, login.Tokens.RefreshToken);
