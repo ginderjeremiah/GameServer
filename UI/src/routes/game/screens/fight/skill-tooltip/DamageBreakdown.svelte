@@ -13,6 +13,18 @@
 			<span class="tt-dmg-value positive">+{formatNum(mult.value)}</span>
 		</div>
 	{/each}
+	{#if crit}
+		<div class="tt-dmg-row">
+			<span class="tt-dmg-label">
+				<AttributeIcon id={EAttribute.CriticalChance} size={13} />
+				Critical
+				<span class="tt-mult-dim">{crit.chance} · ×{formatNum(crit.damage)}</span>
+			</span>
+			<span class="tt-dmg-value" class:positive={crit.bonus >= 0} class:negative={crit.bonus < 0}>
+				{crit.bonus >= 0 ? '+' : '−'}{formatNum(Math.abs(crit.bonus))}
+			</span>
+		</div>
+	{/if}
 	{#if enemyDefense !== undefined}
 		<div class="tt-dmg-row">
 			<span class="tt-dmg-label">Enemy defense</span>
@@ -27,7 +39,7 @@
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
-import type { EAttribute } from '$lib/api';
+import { EAttribute } from '$lib/api';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 
 interface DamageMultiplier {
@@ -41,15 +53,27 @@ interface DamageMultiplier {
 	value: number;
 }
 
+/** The expected contribution from critical hits, folded into the total before defense. */
+interface CritContribution {
+	/** Pre-formatted crit chance (e.g. `5%`). */
+	chance: string;
+	/** Crit damage as a direct multiplier (e.g. 1.5). */
+	damage: number;
+	/** The expected damage bonus over many fires (`raw × chance × (damage − 1)`). */
+	bonus: number;
+}
+
 interface Props {
 	base: number;
 	multipliers: DamageMultiplier[];
+	/** The expected crit contribution, or undefined when no crit can occur (0 chance). */
+	crit: CritContribution | undefined;
 	/** Enemy defense subtracted from the total, or undefined when there is no opponent. */
 	enemyDefense: number | undefined;
 	total: number;
 }
 
-const { base, multipliers, enemyDefense, total }: Props = $props();
+const { base, multipliers, crit, enemyDefense, total }: Props = $props();
 </script>
 
 <style lang="scss">

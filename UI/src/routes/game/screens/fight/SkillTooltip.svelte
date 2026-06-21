@@ -8,7 +8,13 @@
 	{/snippet}
 
 	<TooltipSection label="Damage breakdown">
-		<DamageBreakdown base={baseDamage} {multipliers} enemyDefense={opponent ? enemyDefense : undefined} {total} />
+		<DamageBreakdown
+			base={baseDamage}
+			{multipliers}
+			{crit}
+			enemyDefense={opponent ? enemyDefense : undefined}
+			{total}
+		/>
 	</TooltipSection>
 
 	<TooltipSection label="Tempo" last={effectLines.length === 0}>
@@ -24,8 +30,8 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { applyDefense, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
-import { attributeIsHarmful, attributeName, describeEffect } from '$lib/common';
+import { applyDefense, expectedCritMultiplier, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
+import { attributeIsHarmful, attributeName, describeEffect, formatAttributeValue } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -61,7 +67,24 @@ const multipliers = $derived(
 );
 const totalDamage = $derived(skill?.calculateDamage() ?? 0);
 const enemyDefense = $derived(opponent?.attributes.getValue(EAttribute.Defense) ?? 0);
-const total = $derived(applyDefense(totalDamage, enemyDefense));
+
+// Crit folds into the shown damage as its long-run average: the expected multiplier scales the raw
+// damage BEFORE Defense (mirroring the battle, where a crit punches through Defense), then Defense is
+// subtracted once. Display-only — the live battle rolls each crit individually.
+const critChance = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalChance) ?? 0);
+const critDamage = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalDamage) ?? 0);
+const critBonus = $derived(totalDamage * (expectedCritMultiplier(critChance, critDamage) - 1));
+// Surface the crit row only when a crit can occur — a 0 chance contributes nothing.
+const crit = $derived(
+	critChance > 0
+		? {
+				chance: formatAttributeValue(critChance, EAttribute.CriticalChance, staticData.attributes),
+				damage: critDamage,
+				bonus: critBonus
+			}
+		: undefined
+);
+const total = $derived(applyDefense(totalDamage + critBonus, enemyDefense));
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
 const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
 const remainingCd = $derived(Math.max(adjustedCd - (skill?.renderChargeTime ?? 0) / 1000 / cdMultiplier, 0));
