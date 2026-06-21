@@ -317,8 +317,10 @@ namespace Game.Application.Services
             var statPointsBefore = player.StatPoints.StatPointsGained;
             var completedChallenges = await ApplyOfflineRewards(player, result, cancellationToken);
 
-            // Re-anchor and persist the player (exp/levels/unlocks) once. The single core-updated event raised
-            // here carries the final absolute state, so it persists the batched exp and levels too.
+            // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
+            // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
+            // Both are absolute write-behind writes (the final state persists regardless), and two is still
+            // nowhere near the per-victory flood decision 6 avoids.
             player.StampActivity(now);
             await _playerRepo.SavePlayer(player, cancellationToken);
 
@@ -413,14 +415,21 @@ namespace Game.Application.Services
             var progress = await _progressRepo.Load(player, cancellationToken);
 
             var victoryExpRewards = new List<int>();
-            IReadOnlyCollection<(EStatisticType Type, int? EntityId)> touchedStatistics = [];
+            // Union the statistic rows touched across every battle, so the end-of-window challenge evaluation
+            // sees every moved statistic. RecordBattleCompleted currently returns the progress aggregate's
+            // cumulative dirty set (it is loaded once for the whole window), but unioning each call's result
+            // explicitly keeps this correct even if that method were ever changed to return only the per-battle
+            // delta — a mixed-outcome window can touch a tracked statistic in a non-final battle (e.g. a kill
+            // challenge crossed by early wins before a closing loss), and the union captures it regardless.
+            var touchedStatistics = new HashSet<(EStatisticType Type, int? EntityId)>();
             foreach (var battle in result.Battles)
             {
-                // RecordBattleCompleted accumulates each battle's stat deltas into the single progress aggregate
-                // and returns the cumulative set of touched rows, so the final call carries the whole window.
-                touchedStatistics = progress.RecordBattleCompleted(
+                foreach (var key in progress.RecordBattleCompleted(
                     battle.Enemy, battle.Result.Victory, battle.Result.PlayerDied, battle.Result.TotalMs,
-                    battle.Result.Stats, result.IsBossBattle, result.ZoneId);
+                    battle.Result.Stats, result.IsBossBattle, result.ZoneId))
+                {
+                    touchedStatistics.Add(key);
+                }
 
                 if (battle.Result.Victory)
                 {

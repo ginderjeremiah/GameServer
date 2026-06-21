@@ -136,6 +136,60 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_MixedWinLossWindow_CompletesAWinTrackingChallengeCrossedByEarlyWins()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A zone with two deterministic spawns: a weak enemy the player one-shots (a win) and a deadly,
+            // high-HP enemy that survives the player's hit and one-shots them back (a loss). Random spawning
+            // mixes the two across the window, so a kill-tracking statistic is touched only in the win battles —
+            // exercising the consolidation's reliance on the union of every battle's touched stats rather than
+            // just the final battle's (which may be a loss).
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var winEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Weakling",
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var winEnemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, winEnemy.Id, winEnemySkill.Id);
+            // Huge Endurance: too much HP to be one-shot and enough Defense to shrug off the player's hit.
+            var lossEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Juggernaut",
+                strengthBase: 1m, strengthPerLevel: 0m, enduranceBase: 100_000m, endurancePerLevel: 0m);
+            var lossEnemySkill = await TestDataSeeder.CreateSkillAsync(context, "Obliterate", baseDamage: 100_000m, cooldownMs: 500);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, lossEnemy.Id, lossEnemySkill.Id);
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, winEnemy.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, lossEnemy.Id);
+
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            // A kill-count challenge a single win satisfies, rewarding an item.
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 1m, rewardItemId: item.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, playerEntity.Id);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            // The window genuinely mixed wins and losses.
+            Assert.True(summary.BattlesWon > 0, "Expected at least one win in the mixed window.");
+            Assert.True(summary.BattlesLost > 0, "Expected at least one loss in the mixed window.");
+            // The kill challenge — touched only in win battles — still completes and unlocks its reward,
+            // regardless of whether the window's final battle was a win or a loss.
+            Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
+            Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(playerEntity.Id));
+            Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == item.Id);
+        }
+
+        [Fact]
         public async Task SimulateOfflineProgress_StaleInFlightBattle_IsResolvedBeforeSimulating()
         {
             using var scope = CreateScope();
