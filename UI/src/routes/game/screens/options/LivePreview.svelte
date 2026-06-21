@@ -77,7 +77,7 @@ function makeEvent(): LogMessage {
 	// to the first sample so a future WEIGHTS/SAMPLES mismatch degrades instead of crashing.
 	const sample = SAMPLES.find((s) => s.logType === logType) ?? SAMPLES[0];
 	const message = sample.messages[Math.floor(Math.random() * sample.messages.length)];
-	return { id: nextId++, logType: sample.logType, message };
+	return { id: nextId++, logType: sample.logType, message, timestamp: Date.now() };
 }
 
 // Stored oldest → newest; rendered newest-first to mirror the real LogPanel.

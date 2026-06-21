@@ -14,6 +14,8 @@ export interface LogMessage {
 	id: number;
 	logType: ELogType;
 	message: string;
+	/** Epoch-ms wall-clock time the event was logged, so the panel shows when it actually happened. */
+	timestamp: number;
 	/** Optional outcome for `Damage` entries; absent for every other channel. */
 	outcome?: LogOutcome;
 }

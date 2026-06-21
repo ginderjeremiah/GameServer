@@ -15,7 +15,7 @@ export const addLog = (logType: ELogType, message: string, outcome?: LogOutcome)
 	if (logsData.length >= maxLogEntries) {
 		logsData.pop();
 	}
-	logsData.unshift({ id: ++lastId, logType, message, outcome });
+	logsData.unshift({ id: ++lastId, logType, message, timestamp: Date.now(), outcome });
 };
 
 /** Clear the combat log and its id counter (e.g. on logout / session replacement) so the
