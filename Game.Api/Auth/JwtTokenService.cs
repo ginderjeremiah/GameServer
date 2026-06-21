@@ -21,6 +21,13 @@ namespace Game.Api.Auth
         /// </summary>
         public const string RoleClaimType = "role";
 
+        /// <summary>
+        /// The claim type carrying the selected player id once a player has been chosen (the
+        /// selected-player anchor). Read back by <c>SessionLoaderMiddleware</c> to bind the request to its
+        /// player without a database lookup. Absent on a token issued before player selection.
+        /// </summary>
+        public const string PlayerIdClaimType = "player_id";
+
         private readonly JwtOptions _options;
         private readonly SymmetricSecurityKey _signingKey;
         // JsonWebTokenHandler is thread-safe and caches signing material internally, so a single
@@ -33,7 +40,7 @@ namespace Game.Api.Auth
             _signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         }
 
-        public string CreateAccessToken(int userId, IReadOnlyList<string> roles)
+        public string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null)
         {
             var now = DateTime.UtcNow;
             var claims = new List<Claim>
@@ -42,6 +49,10 @@ namespace Game.Api.Auth
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
             claims.AddRange(roles.Select(role => new Claim(RoleClaimType, role)));
+            if (playerId is int selectedPlayerId)
+            {
+                claims.Add(new Claim(PlayerIdClaimType, selectedPlayerId.ToString()));
+            }
 
             var descriptor = new SecurityTokenDescriptor
             {

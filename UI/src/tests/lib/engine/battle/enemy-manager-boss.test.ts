@@ -650,25 +650,75 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.autoFight).toBe(false);
 	});
 
-	it('syncs boss mode to the backend when auto-fight is toggled on', () => {
+	it('does not persist boss mode when auto-fight is pre-armed while idle-farming', () => {
+		// Option A (#1067): toggling auto-fight on from the boss trigger while still idle-farming is intent,
+		// not engagement — it must NOT persist boss, or the offline sim would resume a never-challenged player
+		// as a boss-farmer. The live flag flips, but the persisted mode stays idle.
+		manager.setAutoFight(true);
+		expect(manager.autoFight).toBe(true);
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', true);
+	});
+
+	it('persists boss mode when auto-fight is toggled on while engaged in the boss loop', async () => {
 		// Mirroring the live auto-fight state to the durable player so the offline sim resumes the boss loop.
 		// The boss is always the current zone's boss, so only the enabled flag is sent (no zone).
+		await manager.challengeBoss();
+		send.mockClear();
+
 		manager.setAutoFight(true);
+
 		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', true);
 	});
 
-	it('syncs idle mode to the backend when auto-fight is toggled off', () => {
+	it('persists idle mode when auto-fight is toggled off while engaged in the boss loop', async () => {
+		// The one-off-mid-farm handoff: turning auto-fight off during an active boss fight means the next
+		// victory hands back to idle, so the persisted mode must flip to idle even though mode is still 'boss'.
+		// Directly exercises the mode gate (a fresh-idle toggle-off would read false regardless of the gate).
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		manager.setAutoFight(false);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('persists boss mode when a pre-armed auto-fight player then challenges', async () => {
+		// The pre-arm becomes real boss-farming the moment the player actually challenges: challengeBoss
+		// re-syncs and persists boss even though the toggle itself (while idle) did not.
+		manager.setAutoFight(true);
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', true);
+
+		await manager.challengeBoss();
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', true);
+	});
+
+	it('persists idle mode to the backend when auto-fight is toggled off', () => {
 		manager.setAutoFight(false);
 		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
 	});
 
 	it('syncs idle mode when retreating from the boss (returnToIdle)', async () => {
+		// Boss-farming (persisted boss), then retreat back to idle ⇒ the persisted mode flips to idle.
 		await manager.challengeBoss();
+		manager.setAutoFight(true);
 		send.mockClear();
 
 		await manager.retreatFromBoss();
 
 		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('does not re-sync idle mode when the persisted mode is already idle (dedup)', async () => {
+		// Every returnToIdle path fires a sync, but with no boss ever persisted the redundant idle syncs are
+		// deduped: a retreat from a one-off (auto-fight-off) challenge must not re-emit an idle command.
+		await manager.challengeBoss();
+		send.mockClear();
+
+		await manager.retreatFromBoss();
+
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', expect.anything());
 	});
 
 	it('syncs idle mode on a boss loss (returnToIdle)', async () => {

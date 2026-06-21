@@ -22,7 +22,7 @@ namespace Game.Api.Tests.Integration
         public LoginControllerTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task Login_ValidCredentials_ReturnsPlayerDataAndTokens()
+        public async Task Login_ValidCredentials_ReturnsPlayerSummariesAndTokens()
         {
             // Arrange
             using var scope = CreateScope();
@@ -46,7 +46,10 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
             Assert.NotNull(result.Data);
-            Assert.Equal(player.Name, result.Data.Player.Name);
+            // Login lists the account's characters (no player is bound until SelectPlayer).
+            var summary = Assert.Single(result.Data.PlayerSummaries);
+            Assert.Equal(player.Id, summary.Id);
+            Assert.Equal(player.Name, summary.Name);
 
             // Both tokens are issued in the response body (no auth cookie).
             Assert.False(response.Headers.Contains("Set-Cookie"));
@@ -153,6 +156,75 @@ namespace Game.Api.Tests.Integration
             // No session is established for the rejected login.
             var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
             Assert.Null(await sessionStore.GetSession(user.Id));
+        }
+
+        [Fact]
+        public async Task SelectPlayer_OwnedCharacter_BindsSessionAndRotatesTokenIntoGameReadyState()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "selectuser", "selectpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("selectuser", "selectpass");
+            var summary = Assert.Single(login.PlayerSummaries);
+
+            // Selecting binds the session and returns the loaded player plus a rotated, game-ready token.
+            var select = await SelectPlayerAsync(login.Tokens, summary.Id);
+            Assert.Equal(player.Id, select.Player.Id);
+            Assert.Equal(player.Name, select.Player.Name);
+            Assert.NotEqual(login.Tokens.RefreshToken, select.Tokens.RefreshToken);
+
+            // The cached session is now established for the selected character.
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var session = await sessionStore.GetSession(user.Id);
+            Assert.NotNull(session);
+            Assert.Equal(player.Id, session.PlayerId);
+
+            // The rotated access token authenticates Status and resolves the selected player from its claim.
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+            var status = await statusResponse.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.Equal(player.Id, status?.Data?.Id);
+        }
+
+        [Fact]
+        public async Task SelectPlayer_CharacterOfAnotherAccount_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var owner = await TestDataSeeder.CreateUserAsync(context, "owneracct", "pass");
+            var ownerPlayer = await TestDataSeeder.CreatePlayerAsync(context, owner.Id);
+            await TestDataSeeder.CreateUserAsync(context, "attackeracct", "pass");
+
+            var login = await LoginAsync("attackeracct", "pass");
+
+            // The attacker selects a player they do not own — rejected before any binding.
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SelectPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = ownerPlayer.Id, login.Tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", login.Tokens.AccessToken);
+            var response = await Client.SendAsync(request, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
+            Assert.Null(result.Data);
+        }
+
+        [Fact]
+        public async Task SelectPlayer_Unauthenticated_Returns401()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/SelectPlayer",
+                new { PlayerId = 1, RefreshToken = "irrelevant" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
         [Fact]
@@ -340,7 +412,9 @@ namespace Game.Api.Tests.Integration
             Assert.Null(await sessionStore.GetSession(user.Id));
 
             var client = Factory.CreateClient();
-            TestAuthHelper.AddAuthHeader(client, user.Id);
+            // A post-selection token (carrying the selected-player claim) with no cached session — the
+            // "valid token, evicted/absent session" state that must rehydrate from the claim.
+            TestAuthHelper.AddAuthHeader(client, user.Id, player.Id);
             return (client, user, player);
         }
 
@@ -430,11 +504,13 @@ namespace Game.Api.Tests.Integration
             // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
             await ReloadReferenceCachesAsync();
 
+            // Select a character so the refreshed token carries the selected player (and Status can load it).
             var login = await LoginAsync("refreshuser", "refreshpass");
+            var select = await SelectPlayerAsync(login.Tokens, player.Id);
 
             // Act — exchange the refresh token for a new pair.
             var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
-                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+                new { select.Tokens.RefreshToken }, CancellationToken);
 
             // Assert — a fresh, rotated pair is returned.
             Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
@@ -442,9 +518,9 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(refreshed?.Data);
             Assert.False(string.IsNullOrEmpty(refreshed.Data.AccessToken));
             Assert.False(string.IsNullOrEmpty(refreshed.Data.RefreshToken));
-            Assert.NotEqual(login.Tokens.RefreshToken, refreshed.Data.RefreshToken);
+            Assert.NotEqual(select.Tokens.RefreshToken, refreshed.Data.RefreshToken);
 
-            // The new access token authenticates a protected endpoint.
+            // The new access token authenticates a protected endpoint and keeps the selected player bound.
             using var authClient = Factory.CreateClient();
             authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", refreshed.Data.AccessToken);
             var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
@@ -506,11 +582,11 @@ namespace Game.Api.Tests.Integration
             // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
             await ReloadReferenceCachesAsync();
 
-            var (authClient, login) = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
+            var (authClient, tokens) = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
 
             // Act
             var response = await authClient.PostAsJsonAsync("/api/Login/Logout",
-                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+                new { tokens.RefreshToken }, CancellationToken);
 
             // Assert — logout succeeds, the session is cleared, and the refresh token is revoked.
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -524,7 +600,7 @@ namespace Game.Api.Tests.Integration
 
             // The revoked refresh token can no longer be exchanged for new tokens.
             var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
-                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+                new { tokens.RefreshToken }, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
             authClient.Dispose();
         }
@@ -543,14 +619,15 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
             await ReloadReferenceCachesAsync();
 
-            // Logging in establishes the cached session; the refresh token outlives the access token.
+            // Selecting a character establishes the cached session; the refresh token outlives the access token.
             var login = await LoginAsync("expiredlogout", "logoutpass");
+            var select = await SelectPlayerAsync(login.Tokens, player.Id);
             await AssertSessionPresentAsync(user.Id);
 
             // Act — log out over the unauthenticated client (no bearer token, mimicking the expired access
             // token) carrying only the still-valid refresh token.
             var response = await Client.PostAsJsonAsync("/api/Login/Logout",
-                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+                new { select.Tokens.RefreshToken }, CancellationToken);
 
             // Assert — logout succeeds and the session is evicted despite the absent access token.
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -558,7 +635,7 @@ namespace Game.Api.Tests.Integration
 
             // The consumed refresh token can no longer be exchanged for new tokens.
             var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
-                new { RefreshToken = login.Tokens.RefreshToken }, CancellationToken);
+                new { select.Tokens.RefreshToken }, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
         }
 

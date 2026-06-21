@@ -15,6 +15,7 @@ export interface IPlayerSummary {
 	id: number;
 	name: string;
 	level: number;
+	currentZoneId: number;
 	lastActivity: string;
 }
 

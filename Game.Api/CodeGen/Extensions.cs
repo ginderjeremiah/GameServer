@@ -88,9 +88,17 @@ namespace Game.Api.CodeGen
             return type.IsClass && !type.IsGenericParameter && type != typeof(string);
         }
 
+        // Structs intended to be mirrored to TypeScript as interfaces. This is an explicit allow-list,
+        // not a deny-list: an unlisted struct (Guid, TimeSpan, DateTimeOffset, DateOnly, …) has no
+        // TypeScript mapping, so it must fall through to GetTypeText's throw and surface at generation
+        // time rather than silently emit a reference to an interface that is never generated. A
+        // deny-list would let any not-yet-excluded BCL struct slip through that safety net. DateTime and
+        // decimal are mapped to primitives directly in GetTypeText, so they never reach here.
+        private static readonly HashSet<Type> MirroredStructs = [];
+
         private static bool IsStructThatNeedsInterface(Type type)
         {
-            return type.IsValueType && !type.IsPrimitive && type != typeof(DateTime) && type != typeof(decimal);
+            return type.IsValueType && MirroredStructs.Contains(type);
         }
     }
 }

@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Core.Players;
 using System.Diagnostics.CodeAnalysis;
 
@@ -14,14 +15,14 @@ namespace Game.Application.Services
 
     /// <summary>
     /// Outcome classification of a login attempt, so the caller can surface the appropriate message.
+    /// Login only verifies credentials and lists the account's characters; loading and binding a player
+    /// happens on the subsequent <see cref="AccountService.SelectPlayer"/> step.
     /// </summary>
     public enum LoginStatus
     {
         Success,
         InvalidCredentials,
         Banned,
-        NoPlayer,
-        PlayerDataNotFound,
         /// <summary>
         /// The account is in an exponential-backoff window after too many consecutive failed attempts; the
         /// attempt was rejected without verifying credentials. <see cref="AccountLoginResult.RetryAfter"/>
@@ -31,18 +32,38 @@ namespace Game.Application.Services
     }
 
     /// <summary>
+    /// Outcome classification of a player-selection attempt, so the caller can surface the appropriate
+    /// message.
+    /// </summary>
+    public enum SelectPlayerStatus
+    {
+        Success,
+        /// <summary>The supplied refresh token was missing, expired, already consumed, or not the caller's.</summary>
+        InvalidToken,
+        /// <summary>The selected player does not belong to the authenticated account (anti-cheat).</summary>
+        NotOwned,
+        /// <summary>The player belongs to the account but its aggregate could not be loaded.</summary>
+        PlayerDataNotFound,
+    }
+
+    /// <summary>
     /// A signed access token paired with the opaque refresh token used to mint the next pair.
     /// </summary>
     public record AuthTokenPair(string AccessToken, string RefreshToken);
 
     /// <summary>
-    /// Result of <see cref="AccountService.Login"/>: a status plus, on success, the issued tokens, the
-    /// loaded player aggregate, and the authenticated user id (needed to establish the session). On a
-    /// <see cref="LoginStatus.TooManyAttempts"/> rejection it carries the remaining backoff wait.
+    /// Result of <see cref="AccountService.Login"/>: a status plus, on success, the issued (pre-selection)
+    /// tokens, the account's player summaries (for the character-select step), and the authenticated user
+    /// id. On a <see cref="LoginStatus.TooManyAttempts"/> rejection it carries the remaining backoff wait.
     /// </summary>
-    public record AccountLoginResult(LoginStatus Status, AuthTokenPair? Tokens, Player? Player, int UserId, TimeSpan? RetryAfter = null)
+    public record AccountLoginResult(
+        LoginStatus Status,
+        AuthTokenPair? Tokens,
+        IReadOnlyList<PlayerSummary>? PlayerSummaries,
+        int UserId,
+        TimeSpan? RetryAfter = null)
     {
-        [MemberNotNullWhen(true, nameof(Tokens), nameof(Player))]
+        [MemberNotNullWhen(true, nameof(Tokens), nameof(PlayerSummaries))]
         public bool Success => Status == LoginStatus.Success;
 
         public static AccountLoginResult Failed(LoginStatus status)
@@ -55,9 +76,29 @@ namespace Game.Application.Services
             return new AccountLoginResult(LoginStatus.TooManyAttempts, null, null, 0, retryAfter);
         }
 
-        public static AccountLoginResult Succeeded(AuthTokenPair tokens, Player player, int userId)
+        public static AccountLoginResult Succeeded(AuthTokenPair tokens, IReadOnlyList<PlayerSummary> playerSummaries, int userId)
         {
-            return new AccountLoginResult(LoginStatus.Success, tokens, player, userId);
+            return new AccountLoginResult(LoginStatus.Success, tokens, playerSummaries, userId);
+        }
+    }
+
+    /// <summary>
+    /// Result of <see cref="AccountService.SelectPlayer"/>: a status plus, on success, the rotated token
+    /// pair (now carrying the selected player id) and the loaded player aggregate to enter the game with.
+    /// </summary>
+    public record AccountSelectPlayerResult(SelectPlayerStatus Status, AuthTokenPair? Tokens, Player? Player)
+    {
+        [MemberNotNullWhen(true, nameof(Tokens), nameof(Player))]
+        public bool Success => Status == SelectPlayerStatus.Success;
+
+        public static AccountSelectPlayerResult Failed(SelectPlayerStatus status)
+        {
+            return new AccountSelectPlayerResult(status, null, null);
+        }
+
+        public static AccountSelectPlayerResult Succeeded(AuthTokenPair tokens, Player player)
+        {
+            return new AccountSelectPlayerResult(SelectPlayerStatus.Success, tokens, player);
         }
     }
 }

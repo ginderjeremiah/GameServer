@@ -9,8 +9,8 @@ namespace Game.Application.Auth
     /// an exponentially growing window (doubling from the base delay up to a low cap). This is always a
     /// slowdown, never a hard lockout — a legitimate user is delayed by at most the cap — so an attacker who
     /// knows a username cannot lock the owner out, only briefly slow them. The logic is pure (the current
-    /// instant is supplied by the caller), so it is unit-tested in isolation; the surrounding
-    /// read-modify-write against Redis lives in <see cref="LoginBackoffGuard"/>.
+    /// instant is supplied by the caller), so it is unit-tested in isolation; the surrounding compare-and-set
+    /// retry against Redis lives in <see cref="LoginBackoffGuard"/>.
     /// </summary>
     public class LoginBackoffPolicy(IOptions<LoginBackoffOptions> options)
     {

@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Core;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -28,9 +29,13 @@ namespace Game.DataAccess.Repositories
             return _cache.Get<LoginBackoffState>(Key(username), cancellationToken);
         }
 
-        public Task Set(string username, LoginBackoffState state, TimeSpan retention, CancellationToken cancellationToken = default)
+        public Task<bool> TryUpdate(string username, LoginBackoffState? expected, LoginBackoffState next, TimeSpan retention, CancellationToken cancellationToken = default)
         {
-            return _cache.Set(Key(username), state, retention, cancellationToken);
+            // The compare-and-set runs server-side so concurrent failures can't lose an increment. The expected
+            // state is re-serialised with the same serializer that wrote it (a deterministic round-trip for this
+            // record), so the comparison matches the exact stored payload; a null expected asserts the key is
+            // still absent (the first failure of a streak).
+            return _cache.CompareAndSet(Key(username), expected?.Serialize(), next.Serialize(), retention, cancellationToken);
         }
 
         public Task Clear(string username, CancellationToken cancellationToken = default)

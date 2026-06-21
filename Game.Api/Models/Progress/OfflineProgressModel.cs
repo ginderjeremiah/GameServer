@@ -1,0 +1,51 @@
+using Game.Application.Services;
+
+namespace Game.Api.Models.Progress
+{
+    /// <summary>
+    /// The welcome-back summary returned by <c>GetOfflineProgress</c>: what the player's idle loop earned while
+    /// they were away. The client gate renders it (away duration, loop mode, battle tally, exp/levels/stat
+    /// points, and the challenges completed with what they unlocked), then re-syncs authoritative state on
+    /// entering the game. An empty summary (<see cref="HasProgress"/> false) skips the gate.
+    /// </summary>
+    public class OfflineProgressModel : IModelFromSource<OfflineProgressModel, OfflineProgressSummary>
+    {
+        public long AwayMs { get; set; }
+        public bool AutoChallengeBoss { get; set; }
+        public int ZoneId { get; set; }
+        public int BattlesWon { get; set; }
+        public int BattlesLost { get; set; }
+        public int BattlesDrawn { get; set; }
+        public long TotalExp { get; set; }
+        public int LevelsGained { get; set; }
+        public int StatPointsGained { get; set; }
+        public bool HasProgress { get; set; }
+        public required List<ChallengeCompletedModel> CompletedChallenges { get; set; }
+
+        public static OfflineProgressModel FromSource(OfflineProgressSummary source)
+        {
+            return new OfflineProgressModel
+            {
+                AwayMs = source.AwayMs,
+                AutoChallengeBoss = source.AutoChallengeBoss,
+                ZoneId = source.ZoneId,
+                BattlesWon = source.BattlesWon,
+                BattlesLost = source.BattlesLost,
+                BattlesDrawn = source.BattlesDrawn,
+                TotalExp = source.TotalExp,
+                LevelsGained = source.LevelsGained,
+                StatPointsGained = source.StatPointsGained,
+                HasProgress = source.HasProgress,
+                CompletedChallenges = source.CompletedChallenges
+                    .Select(c => new ChallengeCompletedModel
+                    {
+                        ChallengeId = c.ChallengeId,
+                        RewardItemId = c.RewardItemId,
+                        RewardItemModId = c.RewardItemModId,
+                        RewardSkillId = c.RewardSkillId,
+                    })
+                    .ToList(),
+            };
+        }
+    }
+}

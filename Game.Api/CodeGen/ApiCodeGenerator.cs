@@ -21,7 +21,7 @@ namespace Game.Api.CodeGen
         public void GenerateCode(Assembly assembly, CodeGenOptions options)
         {
             var start = Stopwatch.GetTimestamp();
-            _logger.LogDebug($"Beginning code generation.");
+            _logger.LogDebug("Beginning code generation.");
 
             var controllerTypes = assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(ControllerBase)));
             var endpointMetadata = controllerTypes.SelectMany(c => new ControllerMetadataExtractor(c).Endpoints).ToList();

@@ -11,6 +11,12 @@ const logicalUpdateHook = createHook<[number]>();
 const notifyLogicalUpdate = logicalUpdateHook.notify;
 export const onLogicalUpdate = logicalUpdateHook.onNotified;
 
+// Fires with the ms of idle time the catch-up cap discarded on an over-budget poll (e.g. a
+// backgrounded, throttled tab). Consumed by the background-throttle notice, not the battle loop.
+const idleTimeLostHook = createHook<[number]>();
+const notifyIdleTimeLost = idleTimeLostHook.notify;
+export const onIdleTimeLost = idleTimeLostHook.onNotified;
+
 export class LogicalEngine {
 	public time = 0;
 	public tickRate = 0;
@@ -53,8 +59,10 @@ export class LogicalEngine {
 
 	private update(timeDelta: number) {
 		if (timeDelta > tickSizeX5) {
-			this.time += timeDelta - tickSizeX5;
+			const lostTime = timeDelta - tickSizeX5;
+			this.time += lostTime;
 			timeDelta = tickSizeX5;
+			notifyIdleTimeLost(lostTime);
 		}
 
 		this.timeBank += timeDelta;

@@ -85,6 +85,38 @@ namespace Game.Core.Players
         /// </summary>
         public void GrantExp(int amount)
         {
+            ApplyExp(amount);
+            RaiseCoreUpdated();
+        }
+
+        /// <summary>
+        /// Awards experience for a batch of offline victories in one pass. Each reward is applied through the
+        /// same per-grant clamp and level-up loop as <see cref="GrantExp"/> — so no single victory's reward is
+        /// truncated by the clamp and levels accrue correctly as exp builds — but only a single
+        /// <see cref="PlayerCoreUpdatedEvent"/> is raised at the end rather than one per victory. An offline
+        /// window can span thousands of victories, and the write-behind persists the final absolute core state
+        /// regardless, so one core update is both correct and far cheaper than flooding the queue with one per
+        /// kill (spike #879 decision 6). Per-level <see cref="PlayerLeveledUpEvent"/>s are still raised (they
+        /// are in-process only, with no persistence handler, so the burst is harmless).
+        /// </summary>
+        public void GrantOfflineExp(IEnumerable<int> victoryExpRewards)
+        {
+            foreach (var reward in victoryExpRewards)
+            {
+                ApplyExp(reward);
+            }
+
+            RaiseCoreUpdated();
+        }
+
+        /// <summary>
+        /// Applies a single experience grant: clamps it to <c>[0, MaxExpPerGrant]</c> and runs the level-up
+        /// loop, raising one <see cref="PlayerLeveledUpEvent"/> per level gained. Shared by the live
+        /// <see cref="GrantExp"/> (one grant, one core update) and the batched <see cref="GrantOfflineExp"/>
+        /// (many grants, one core update) so the clamp and level-up arithmetic cannot drift between the two.
+        /// </summary>
+        private void ApplyExp(int amount)
+        {
             Exp += Math.Clamp(amount, 0, ServerGameConstants.MaxExpPerGrant);
             // Guard the threshold against a non-positive level so a pre-initialized Level of 0 can't make
             // the threshold 0 and spin the loop.
@@ -95,8 +127,6 @@ namespace Game.Core.Players
                 StatPoints.StatPointsGained += GameConstants.StatPointsPerLevel;
                 RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
             }
-
-            RaiseCoreUpdated();
         }
 
         /// <summary>
@@ -141,12 +171,20 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Completes a challenge for the player: unlocks each reward the challenge carries (item, mod,
-        /// and/or skill — any of which may be absent) and raises a single <see cref="ChallengeCompletedEvent"/>
-        /// describing the completion and what it unlocked. Consolidates the per-challenge reward
-        /// orchestration in the domain so the application layer only has to resolve the reward reference
-        /// data and hand it over.
+        /// and/or skill — any of which may be absent) and, when <paramref name="notify"/> is <c>true</c>,
+        /// raises a single <see cref="ChallengeCompletedEvent"/> describing the completion and what it
+        /// unlocked. Consolidates the per-challenge reward orchestration in the domain so the application
+        /// layer only has to resolve the reward reference data and hand it over.
+        /// <para>
+        /// <paramref name="notify"/> is the live client-push toggle. The live battle-completion path notifies
+        /// (the push makes a just-unlocked reward usable without a refresh); the offline-rewards batch passes
+        /// <c>false</c> to suppress the per-challenge push (spike #879 decision 7) — the welcome-back summary
+        /// is the notification, and the client re-syncs its authoritative state on leaving the gate. The
+        /// reward unlocks still raise their own (persistence-only) events either way, so the completion is
+        /// durably recorded regardless of <paramref name="notify"/>.
+        /// </para>
         /// </summary>
-        public void CompleteChallenge(int challengeId, Item? rewardItem, int? rewardItemModId, Skill? rewardSkill)
+        public void CompleteChallenge(int challengeId, Item? rewardItem, int? rewardItemModId, Skill? rewardSkill, bool notify = true)
         {
             if (rewardItem is not null)
             {
@@ -161,8 +199,11 @@ namespace Game.Core.Players
                 UnlockSkill(rewardSkill);
             }
 
-            RaiseEvent(new ChallengeCompletedEvent(
-                Id, challengeId, rewardItem?.Id, rewardItemModId, rewardSkill?.Id));
+            if (notify)
+            {
+                RaiseEvent(new ChallengeCompletedEvent(
+                    Id, challengeId, rewardItem?.Id, rewardItemModId, rewardSkill?.Id));
+            }
         }
 
         /// <summary>

@@ -15,6 +15,9 @@ export class RenderEngine {
 
 	public start() {
 		if (!this.running) {
+			// Re-seed the clock so the first frame's delta is ~one frame, not the entire wall-clock gap
+			// the engine was stopped (mirrors LogicalEngine.start, which resets its clock to avoid this).
+			this.time = performance.now();
 			this.running = true;
 			this.renderLoop();
 		}

@@ -39,12 +39,16 @@ namespace Game.Api.CodeGen.Writers
                 .Where(d => d.NeedsInterface)
                 .DistinctBy(CodeGenTypeFormatter.GetImportText);
 
+            // Materialized once: the grouping is enumerated by the foreach below and again by
+            // GetExportsText, and re-running the lazy chain would repeat the reflection-heavy
+            // SelectMany(GetAllUsedDescriptors) + DistinctBy walk on each pass.
             var interfaceDataGroups = allDescriptors.Select(d => new InterfaceDescriptorData
             {
                 Descriptor = d,
                 FilePath = d.IsEnum ? enumPath : $"{interfacesFolder}/{d.LastNamespacePart}.ts"
             })
-            .GroupBy(data => data.FilePath);
+            .GroupBy(data => data.FilePath)
+            .ToList();
 
             foreach (var group in interfaceDataGroups)
             {

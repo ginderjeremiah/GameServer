@@ -49,11 +49,40 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error(LoginErrorMessage(result.Status));
             }
 
-            // Session identity is a request-scoped presentation concern, so it is wired here rather than
-            // in the application service.
-            _sessionService.CreateSession(result.UserId, result.Player.Id);
-
+            // No session binding here: login only lists the account's characters. The session is established
+            // (and the token rotated to carry the chosen player) on the follow-up SelectPlayer call.
             return ApiResponse.Success(new LoginResult
+            {
+                Tokens = ToAuthTokens(result.Tokens),
+                PlayerSummaries = result.PlayerSummaries.ToList(),
+            });
+        }
+
+        /// <summary>
+        /// Selects which of the authenticated account's characters to enter as. Validates ownership
+        /// (anti-cheat), binds the session, and rotates the token pair to carry the chosen player so every
+        /// later request (and the socket handshake) resolves it from the token. The active-session takeover
+        /// check is made by the client after this step, since it is a per-player presence check.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse<SelectPlayerResult>> SelectPlayer([FromBody] SelectPlayerRequest request)
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken);
+            if (!result.Success)
+            {
+                return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
+            }
+
+            // Establish the session binding now that a character is chosen — a request-scoped presentation
+            // concern, mirroring how login used to bind. The token returned already carries the player.
+            _sessionService.CreateSession(_sessionService.UserId, result.Player.Id);
+
+            return ApiResponse.Success(new SelectPlayerResult
             {
                 Tokens = ToAuthTokens(result.Tokens),
                 Player = PlayerData.FromPlayer(result.Player),
@@ -177,9 +206,31 @@ namespace Game.Api.Controllers
             {
                 LoginStatus.InvalidCredentials => "Invalid username or password",
                 LoginStatus.Banned => "This account has been banned.",
-                LoginStatus.NoPlayer => "User has no player characters",
-                LoginStatus.PlayerDataNotFound => "Player data not found",
                 LoginStatus.TooManyAttempts => "Too many failed login attempts. Please wait a moment and try again.",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static string SelectPlayerErrorMessage(SelectPlayerStatus status)
+        {
+            return status switch
+            {
+                SelectPlayerStatus.InvalidToken => "Your session is no longer valid. Please log in again.",
+                SelectPlayerStatus.NotOwned => "That character does not belong to your account.",
+                SelectPlayerStatus.PlayerDataNotFound => "Player data not found",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static ApiErrorCategory SelectPlayerErrorCategory(SelectPlayerStatus status)
+        {
+            return status switch
+            {
+                // An invalid/foreign refresh token means the caller must re-authenticate.
+                SelectPlayerStatus.InvalidToken => ApiErrorCategory.Unauthorized,
+                // A legit client never selects an unowned character; treat tampering as a plain bad request.
+                SelectPlayerStatus.NotOwned => ApiErrorCategory.BadRequest,
+                SelectPlayerStatus.PlayerDataNotFound => ApiErrorCategory.NotFound,
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

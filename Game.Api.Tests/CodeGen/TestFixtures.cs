@@ -92,6 +92,17 @@ namespace Game.Api.Tests.CodeGen
         public char CharValue { get; set; }
     }
 
+    // A model whose property types are non-primitive BCL structs (Guid, TimeSpan, DateTimeOffset) with
+    // no TypeScript mapping. NeedsInterface must reject them so GetTypeText throws rather than emitting a
+    // nonsense IGuid/ITimeSpan/IDateTimeOffset interface — the safety net #1081 restored via the
+    // mirrored-struct allow-list.
+    public class ModelWithUnmappedStruct : IModel
+    {
+        public Guid GuidValue { get; set; }
+        public TimeSpan TimeSpanValue { get; set; }
+        public DateTimeOffset DateTimeOffsetValue { get; set; }
+    }
+
     public class NestedModel : IModel
     {
         public SimpleModel Child { get; set; } = new();

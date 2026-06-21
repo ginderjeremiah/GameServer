@@ -11,6 +11,7 @@ vi.mock('$lib/engine/log', () => ({
 }));
 
 const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
+	id: 1,
 	name: 'TestPlayer',
 	level: 5,
 	exp: 200,

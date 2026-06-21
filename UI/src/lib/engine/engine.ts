@@ -5,6 +5,7 @@ import { BattleEngine } from './battle/battle-engine';
 import { statify, type Action, resolveUnlockReward, challengeCompletedMessage } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
+import { BackgroundThrottleMonitor } from './background-throttle-notice';
 import { InventoryManager } from './player/inventory-manager';
 import { EnemyManager } from './battle/enemy-manager';
 import {
@@ -25,6 +26,9 @@ export const enemyManager = statify(new EnemyManager());
 export const logicEngine = statify(new LogicalEngine());
 export const renderEngine = statify(new RenderEngine());
 export const battleEngine = statify(new BattleEngine());
+
+// No reactive state to expose — it only fires a toast — so it isn't statified.
+const backgroundThrottleMonitor = new BackgroundThrottleMonitor();
 
 export const SESSION_REPLACED_TITLE = 'Session Replaced';
 export const SESSION_REPLACED_BODY =
@@ -133,6 +137,7 @@ export const handleSocketReplaced = async () => {
 
 const stopGame = () => {
 	logicEngine.stop();
+	backgroundThrottleMonitor.stop();
 	renderEngine.stop();
 	enemyManager.stop();
 	battleEngine.stop();
@@ -150,8 +155,10 @@ const stopGame = () => {
 
 const startLogicEngine = () => {
 	logicEngine.start();
+	backgroundThrottleMonitor.start();
 	onDestroy(() => {
 		logicEngine.stop();
+		backgroundThrottleMonitor.stop();
 	});
 };
 

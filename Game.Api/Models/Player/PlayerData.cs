@@ -6,6 +6,7 @@ namespace Game.Api.Models.Player
 {
     public class PlayerData : IModel
     {
+        public int Id { get; set; }
         public required string Name { get; set; }
         public int Level { get; set; }
         public int Exp { get; set; }
@@ -33,6 +34,7 @@ namespace Game.Api.Models.Player
 
             return new PlayerData
             {
+                Id = player.Id,
                 Name = player.Name,
                 Level = player.Level,
                 Exp = player.Exp,

@@ -78,7 +78,8 @@ vi.mock('$lib/engine/logical-engine', () => ({
 	LogicalEngine: class {
 		start = vi.fn();
 		stop = vi.fn();
-	}
+	},
+	onIdleTimeLost: vi.fn(() => vi.fn())
 }));
 vi.mock('$lib/engine/render-engine', () => ({
 	RenderEngine: class {

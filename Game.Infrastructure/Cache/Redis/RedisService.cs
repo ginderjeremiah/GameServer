@@ -103,6 +103,23 @@ namespace Game.Infrastructure.Cache.Redis
             await ObserveWrite(Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]), cancellationToken);
         }
 
+        public async Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            // Compare-and-set in one Lua script (mirroring CompareAndDelete) so the read and the conditional
+            // write are atomic — the read-modify-write a caller layers on top can therefore never lose an update.
+            // A null expected asserts the key is still absent; otherwise the swap applies only if the stored
+            // value is unchanged. The TTL is written alongside the value so the key never lingers without one.
+            var expiryMs = (long)expiry.TotalMilliseconds;
+            var result = expectedValue is null
+                ? await ObserveWrite(Redis.ScriptEvaluateAsync(
+                    "if redis.call('exists', KEYS[1]) == 1 then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1",
+                    [key], [(RedisValue)newValue, (RedisValue)expiryMs]), cancellationToken)
+                : await ObserveWrite(Redis.ScriptEvaluateAsync(
+                    "if redis.call('get', KEYS[1]) ~= ARGV[3] then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1",
+                    [key], [(RedisValue)newValue, (RedisValue)expiryMs, (RedisValue)expectedValue]), cancellationToken);
+            return (long)result == 1;
+        }
+
         public async Task Delete(string key, CancellationToken cancellationToken = default)
         {
             await ObserveWrite(Redis.KeyDeleteAsync(key), cancellationToken);
