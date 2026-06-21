@@ -44,7 +44,7 @@
 								<WorkbenchIcon kind="check" size={11} sw={1.7} />Reinstate
 							</button>
 						{:else}
-							<button type="button" class="hdr-action danger" onclick={() => store.setRetired(record.id, true)}>
+							<button type="button" class="hdr-action danger" onclick={() => onRetire(record)}>
 								<WorkbenchIcon kind="archive" size={11} />Retire
 							</button>
 						{/if}
@@ -129,9 +129,11 @@
 {/if}
 
 <script lang="ts">
+import { dangerModal, staticData } from '$stores';
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
+import { computeReferences, formatReferenceBody } from '../references';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
@@ -148,6 +150,31 @@ interface Props {
 }
 
 const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
+
+/**
+ * Retire a saved reference record, first surfacing what currently references it. The referenced-by
+ * surface is computed from the cached reference sets (no backend round-trip); an unreferenced record
+ * retires without an extra prompt. Advisory only — confirming proceeds, and the record stays
+ * resolvable by id either way (see references.ts).
+ */
+const onRetire = async (rec: Identified) => {
+	const groups = computeReferences(entity.key, rec.id, {
+		enemies: staticData.enemies ?? [],
+		zones: staticData.zones ?? [],
+		challenges: staticData.challenges ?? []
+	});
+	if (groups.length > 0) {
+		const confirmed = await dangerModal({
+			title: `Retire ${entity.singular}?`,
+			body: formatReferenceBody(entity.key, rec.name || entity.blankName, groups),
+			confirmLabel: 'Retire anyway'
+		});
+		if (!confirmed) {
+			return;
+		}
+	}
+	store.setRetired(rec.id, true);
+};
 
 const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): boolean => {
 	if (!record || !baseline) {

@@ -1,20 +1,22 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 
-vi.mock('$stores', () => ({
+// Hoisted so individual tests can seed the cached reference sets and assert the retire confirm flow.
+const { staticData, dangerModal } = vi.hoisted(() => ({
 	staticData: {
-		zones: [],
-		enemies: [],
-		items: [],
-		skills: [],
-		itemMods: [],
-		attributes: [],
-		challenges: [],
-		challengeTypes: [],
-		statisticTypes: []
+		zones: [] as unknown[],
+		enemies: [] as unknown[],
+		items: [] as unknown[],
+		skills: [] as unknown[],
+		itemMods: [] as unknown[],
+		attributes: [] as unknown[],
+		challenges: [] as unknown[],
+		challengeTypes: [] as unknown[],
+		statisticTypes: [] as unknown[]
 	},
-	toastError: vi.fn()
+	dangerModal: vi.fn()
 }));
+vi.mock('$stores', () => ({ staticData, toastError: vi.fn(), dangerModal }));
 
 import WorkbenchDetail from '$routes/admin/workbench/components/WorkbenchDetail.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
@@ -24,9 +26,9 @@ interface Row extends Identified {
 	value: number;
 }
 
-const makeConfig = (retireable = false): EntityConfig<Identified> =>
+const makeConfig = (retireable = false, key = 'rows'): EntityConfig<Identified> =>
 	({
-		key: 'rows',
+		key,
 		label: 'Skills',
 		singular: 'Skill',
 		glyph: 'box',
@@ -53,6 +55,12 @@ const makeConfig = (retireable = false): EntityConfig<Identified> =>
 
 const seed: Row[] = [{ id: 1, name: 'Fireball', value: 50 }];
 
+beforeEach(() => {
+	staticData.zones = [];
+	staticData.enemies = [];
+	staticData.challenges = [];
+	dangerModal.mockReset();
+});
 afterEach(cleanup);
 
 describe('WorkbenchDetail — empty state', () => {
@@ -228,5 +236,66 @@ describe('WorkbenchDetail — retire lifecycle', () => {
 		expect(screen.queryByText('Retire')).toBeNull();
 		await fireEvent.click(screen.getByText('Remove'));
 		expect(s.items.find((r) => r.id === newId)).toBeUndefined();
+	});
+});
+
+describe('WorkbenchDetail — retire confirm dialog', () => {
+	const renderEnemy = (s: EntityStore<Identified>, rec: Identified) =>
+		render(WorkbenchDetail, {
+			props: {
+				entity: makeConfig(true, 'enemies'),
+				store: s,
+				record: rec,
+				baseline: s.baselineOf(rec.id),
+				tab: 'identity',
+				onTab: vi.fn(),
+				onNew: vi.fn()
+			}
+		});
+
+	it('opens a confirm dialog enumerating references and retires only on confirm', async () => {
+		// Seed the record as the authored boss of a zone so it has an inbound reference.
+		staticData.zones = [{ id: 0, name: 'Frost Cavern', bossEnemyId: 1 }];
+		dangerModal.mockResolvedValue(true);
+
+		const s = new EntityStore(makeConfig(true, 'enemies'), seed);
+		const rec = s.items[0];
+		renderEnemy(s, rec);
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const body = dangerModal.mock.calls[0][0].body as string;
+		expect(body).toContain('Frost Cavern');
+		await waitFor(() => expect(s.isRetired(s.items.find((r) => r.id === rec.id)!)).toBe(true));
+	});
+
+	it('does not retire when the confirm dialog is cancelled', async () => {
+		staticData.zones = [{ id: 0, name: 'Frost Cavern', bossEnemyId: 1 }];
+		dangerModal.mockResolvedValue(false);
+
+		const s = new EntityStore(makeConfig(true, 'enemies'), seed);
+		const rec = s.items[0];
+		renderEnemy(s, rec);
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const updated = s.items.find((r) => r.id === rec.id)!;
+		expect(s.isRetired(updated)).toBe(false);
+		expect(s.status(updated)).toBe('clean');
+	});
+
+	it('retires an unreferenced record without prompting', async () => {
+		dangerModal.mockResolvedValue(true);
+
+		const s = new EntityStore(makeConfig(true, 'enemies'), seed);
+		const rec = s.items[0];
+		renderEnemy(s, rec);
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).not.toHaveBeenCalled();
+		expect(s.isRetired(s.items.find((r) => r.id === rec.id)!)).toBe(true);
 	});
 });
