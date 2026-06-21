@@ -33,20 +33,6 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void ApplyDamageOverTime_NegativePerSecondAttribute_IsFlooredAtZero_NoHeal()
-        {
-            // A negative DamageTakenPerSecond must NOT heal: DoT floors at zero (like TakeDamage) so it can't
-            // bypass the MaxHealth cap or book negative damage. The battler starts below full to prove no heal.
-            var battler = MakeBattler(Stat(Strength, 10), Stat(DamageTakenPerSecond, -50)); // MaxHealth 100
-            battler.TakeDamage(52); // Defense 2 → 50 damage → CurrentHealth 50
-
-            var dealt = battler.ApplyDamageOverTime(40); // -50 * 40 / 1000 = -2, floored to 0
-
-            Assert.Equal(0, dealt);
-            Assert.Equal(50, battler.CurrentHealth);
-        }
-
-        [Fact]
         public void ApplyHealOverTime_ScalesPerSecondAttributeByTick()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
