@@ -1,0 +1,93 @@
+using Game.Core.Attributes;
+using Game.Core.Enemies;
+
+namespace Game.Core.Battle.Offline
+{
+    /// <summary>
+    /// Replays a player's missed idle/boss battles over an away period and returns the accumulated results.
+    /// A pure domain service: it reuses <see cref="BattleFactory"/>, <see cref="BattleSnapshot"/> and
+    /// <see cref="BattleSimulator"/> and resolves catalog data through caller-supplied funcs, so it touches
+    /// no persistence or application layer (applying the rewards is the orchestration sub-issue's job).
+    /// <para>
+    /// Full simulation is exact and cheap because offline battles are <em>stationary</em> (spike #879): a
+    /// player's combat power and reward distribution never change while away, and the post-battle cooldown
+    /// throttles the battle count, so the whole away period is replayed battle-by-battle rather than sampled.
+    /// </para>
+    /// </summary>
+    public class OfflineProgressSimulator(BattleFactory battleFactory)
+    {
+        private readonly BattleFactory _battleFactory = battleFactory;
+
+        /// <summary>
+        /// Loops the mode's battle type for the whole away budget — building a fresh enemy and a fresh battle
+        /// each iteration, consuming <c>battle duration + cooldown</c> from the budget per battle — until the
+        /// budget (clamped to the cap) is exhausted. Wins, losses, and draws all continue to the next battle.
+        /// Observes <paramref name="cancellationToken"/> so a long run unwinds promptly rather than risking the
+        /// command timeout.
+        /// </summary>
+        public OfflineProgressResult Simulate(OfflineSimulationParameters parameters, CancellationToken cancellationToken = default)
+        {
+            var outcomes = new List<OfflineBattleOutcome>();
+
+            // Clamp the away budget to the cap (away > cap clamps to cap). A non-positive budget produces an
+            // empty result without simulating anything — the whole away period is skipped.
+            var remainingMs = Math.Min(parameters.AwayBudgetMs, parameters.CapMs);
+
+            // The player's power is stationary offline, so the modifier set that measures each victory's exp
+            // reward never changes — materialize it once and reuse it for every battle's DefeatRewards.
+            var playerModifiers = parameters.Snapshot
+                .GetModifiers(parameters.ResolveItem, parameters.ResolveMod)
+                .ToList();
+
+            while (remainingMs > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var enemy = BuildEnemy(parameters);
+                var result = SimulateBattle(parameters, enemy);
+
+                // Exp is earned only on a victory, measured from the stationary snapshot like the live path.
+                var expReward = result.Victory ? new DefeatRewards(playerModifiers, enemy).ExpReward : 0;
+                outcomes.Add(new OfflineBattleOutcome(enemy, result, expReward));
+
+                // Each battle consumes its own duration plus the post-battle cooldown gap before the next.
+                // Battle duration is always at least one tick, so the budget strictly decreases and the loop
+                // terminates even with a zero cooldown.
+                remainingMs -= result.TotalMs + parameters.CooldownMs;
+            }
+
+            return new OfflineProgressResult(parameters.Mode, parameters.Zone.Id, outcomes);
+        }
+
+        /// <summary>
+        /// Builds the enemy for the next battle according to the loop mode: a random idle encounter in the
+        /// zone, or the zone's deterministic dedicated boss. Mirrors the live battle-start factory calls so
+        /// the enemy is built identically to an online battle.
+        /// </summary>
+        private Enemy BuildEnemy(OfflineSimulationParameters parameters)
+        {
+            return parameters.Mode switch
+            {
+                OfflineLoopMode.Idle => _battleFactory.CreateBattleEnemy(parameters.Zone, parameters.ResolveEnemy),
+                OfflineLoopMode.Boss => _battleFactory.CreateBossEnemy(parameters.Zone, parameters.ResolveEnemy),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(parameters), parameters.Mode, $"Unhandled offline loop mode {parameters.Mode}."),
+            };
+        }
+
+        /// <summary>
+        /// Runs one battle with a fresh seed. Both battlers are rebuilt per battle because the simulation
+        /// mutates battler health/effects (a battler is single-use); rebuilding the player from the stationary
+        /// snapshot mirrors the live replay path.
+        /// </summary>
+        private static BattleResult SimulateBattle(OfflineSimulationParameters parameters, Enemy enemy)
+        {
+            var playerBattler = parameters.Snapshot.ToBattler(
+                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill);
+            var enemyBattler = new Battler(
+                new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
+
+            return new BattleSimulator(playerBattler, enemyBattler, parameters.SeedSource()).Simulate();
+        }
+    }
+}

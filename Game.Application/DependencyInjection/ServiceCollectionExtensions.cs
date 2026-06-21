@@ -4,6 +4,7 @@ using Game.Application.Events;
 using Game.Application.Services;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
+using Game.Core.Battle.Offline;
 using Game.Core.Events;
 using Game.Core.Players;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,10 +17,11 @@ namespace Game.Application.DependencyInjection
         {
             RegisterDomainEventHandlers();
             return services
-                // BattleFactory and NewPlayerFactory are stateless domain services with no
-                // dependencies, so they are shared.
+                // BattleFactory, NewPlayerFactory and OfflineProgressSimulator are stateless domain
+                // services with no out-of-process dependencies, so they are shared.
                 .AddSingleton<BattleFactory>()
                 .AddSingleton<NewPlayerFactory>()
+                .AddSingleton<OfflineProgressSimulator>()
                 // Stateless (parameters come from injected options), so a single shared instance.
                 .AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>()
                 // Per-account login backoff: a stateless policy (shared) plus a scoped guard over the

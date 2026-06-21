@@ -1,0 +1,549 @@
+using Game.Core.Attributes;
+using Game.Core.Battle;
+using Game.Core.Battle.Offline;
+using Game.Core.Enemies;
+using Game.Core.Items;
+using Game.Core.Players;
+using Game.Core.Skills;
+using Game.Core.Zones;
+using Xunit;
+using static Game.Core.EAttribute;
+
+namespace Game.Core.Tests.Battle.Offline
+{
+    /// <summary>
+    /// Heavy unit coverage for the core offline simulation engine (#1041). Battles are made deterministic by
+    /// fixing the enemy, the zone level range, and the per-battle seed, so the budget accounting and reward
+    /// accumulation can be asserted exactly. A few scenarios deliberately vary the seed to exercise a mixed
+    /// run of wins/losses/draws.
+    /// </summary>
+    public class OfflineProgressSimulatorTests
+    {
+        private const int CooldownMs = 5000;
+        private const long TenHoursMs = 10L * 60 * 60 * 1000;
+
+        private readonly OfflineProgressSimulator _simulator = new(new BattleFactory());
+
+        // ── Empty / whole-skip ───────────────────────────────────────────────
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(-60_000)]
+        public void Simulate_NonPositiveBudget_ProducesEmptyWholeSkipResult(long awayMs)
+        {
+            // A non-positive away budget is the engine's "whole-skip": nothing is simulated and the result is
+            // empty, which the orchestration's no-progress short-circuit relies on.
+            var result = _simulator.Simulate(IdleParameters(awayMs, StrongPlayerWinScenario()));
+
+            Assert.Empty(result.Battles);
+            Assert.Equal(0, result.BattlesSimulated);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.Losses);
+            Assert.Equal(0, result.Draws);
+            Assert.Equal(0, result.TotalExp);
+            Assert.Empty(result.EnemyKillCounts);
+        }
+
+        [Fact]
+        public void Simulate_ZeroCap_ProducesEmptyResultEvenWithLongAwayTime()
+        {
+            // The cap clamps the budget; a zero cap leaves no budget regardless of how long the player was away.
+            var parameters = With(IdleParameters(TenHoursMs, StrongPlayerWinScenario()), capMs: 0);
+            var result = _simulator.Simulate(parameters);
+
+            Assert.Empty(result.Battles);
+        }
+
+        // ── Idle loop & budget accounting ────────────────────────────────────
+
+        [Fact]
+        public void Simulate_IdleLoop_RunsUntilBudgetExhausted_AccountingDurationPlusCooldown()
+        {
+            var scenario = StrongPlayerWinScenario();
+            // A single deterministic battle (fixed enemy + fixed seed) tells us the exact per-battle duration.
+            var battleMs = SingleBattleDurationMs(scenario);
+            var stepMs = battleMs + CooldownMs;
+            var awayMs = (stepMs * 4) + 1; // 4 full steps plus a sliver → a 5th battle starts
+
+            var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
+
+            // Every battle is identical, so each consumes the same duration.
+            Assert.All(result.Battles, battle => Assert.Equal(battleMs, battle.Result.TotalMs));
+
+            // The loop keeps fighting while any budget remains, consuming duration + cooldown per battle, and
+            // stops once the budget is exhausted: the run is the fewest battles whose total cost covers the
+            // budget (the last battle overshoots by at most one step).
+            var count = result.BattlesSimulated;
+            Assert.True((count - 1L) * stepMs < awayMs, "The run stopped before the budget was exhausted.");
+            Assert.True(count * stepMs >= awayMs, "The run continued past an already-exhausted budget.");
+            Assert.Equal(5, count);
+        }
+
+        [Fact]
+        public void Simulate_AwayBudgetBelowOneStep_RunsExactlyOneBattle()
+        {
+            var scenario = StrongPlayerWinScenario();
+
+            // Any positive budget fights at least one battle; the battle (plus cooldown) then exhausts it.
+            var result = _simulator.Simulate(IdleParameters(awayMs: 1, scenario));
+
+            Assert.Single(result.Battles);
+        }
+
+        [Fact]
+        public void Simulate_IdleLoop_RollsEncounterLevelWithinZoneRange()
+        {
+            // Resolve the enemy at whatever level the idle loop rolls, recording the levels seen. The engine
+            // must drive the random idle encounter (BattleFactory.CreateBattleEnemy) within the zone's range.
+            var levels = new HashSet<int>();
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 3, levelMax: 6),
+                // A strong player wins each battle quickly, so the run packs in many fast battles.
+                Snapshot = PlayerSnapshot(strength: 100, endurance: 100),
+                ResolveEnemy = level =>
+                {
+                    levels.Add(level);
+                    return WeakEnemy(level);
+                },
+            };
+
+            // Plenty of battles to exercise the whole range.
+            _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs));
+
+            Assert.All(levels, level => Assert.InRange(level, 3, 6));
+            // The range has four levels; over thousands of battles every one should appear.
+            Assert.Equal(4, levels.Count);
+        }
+
+        // ── Cap vs budget boundary ───────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_AwayExceedsCap_ClampsToCap()
+        {
+            var scenario = StrongPlayerWinScenario();
+            var battleMs = SingleBattleDurationMs(scenario);
+            var stepMs = battleMs + CooldownMs;
+            var capMs = stepMs * 3;
+
+            // Away far exceeds the cap, so the run is bounded by the cap, not the away time.
+            var clamped = _simulator.Simulate(With(IdleParameters(TenHoursMs, scenario), capMs: capMs));
+            // A run with away == cap is the reference: clamping must reproduce it exactly.
+            var atCap = _simulator.Simulate(With(IdleParameters(capMs, scenario), capMs: capMs));
+
+            Assert.Equal(3, clamped.BattlesSimulated);
+            Assert.Equal(atCap.BattlesSimulated, clamped.BattlesSimulated);
+        }
+
+        // ── Boss loop ────────────────────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_BossLoop_BuildsDeterministicBossEachBattle()
+        {
+            // Boss mode must fight the zone's dedicated boss at its fixed level with the full authored loadout,
+            // every battle — not a random idle encounter.
+            var resolvedLevels = new List<int>();
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 7, bossLevel: 12),
+                ResolveEnemy = level =>
+                {
+                    resolvedLevels.Add(level);
+                    return WeakEnemy(level, skillCount: 3);
+                },
+            };
+
+            var result = _simulator.Simulate(BossParameters(TenHoursMs, scenario, capMs: TenHoursMs));
+
+            Assert.NotEmpty(result.Battles);
+            Assert.All(resolvedLevels, level => Assert.Equal(12, level)); // always the fixed boss level
+            // The full authored loadout (no 4-skill cap) is brought into each boss battle.
+            Assert.All(result.Battles, battle => Assert.Equal(3, battle.Enemy.BattleSkills.Count));
+            Assert.Equal(OfflineLoopMode.Boss, result.Mode);
+            Assert.True(result.IsBossBattle);
+        }
+
+        [Fact]
+        public void Simulate_BossLoop_ContinuesThroughLosses()
+        {
+            // A player guaranteed to die must not stop the loop — offline boss farming keeps going through
+            // losses (decision 3), unlike the present-player loop that drops to idle.
+            var result = _simulator.Simulate(BossParameters(ManyStepsBudget(), AlwaysLoseBossScenario()));
+
+            Assert.True(result.BattlesSimulated > 1, "The boss loop stopped after a single loss.");
+            Assert.Equal(result.BattlesSimulated, result.Losses);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.Draws);
+        }
+
+        [Fact]
+        public void Simulate_BossLoop_VariedSeeds_ProducesMixedOutcomesMatchingDirectSimulation()
+        {
+            // A balanced boss fight whose outcome turns on the player's crit rolls: a fresh seed each battle
+            // varies the result. Drive a fixed seed sequence so the run is deterministic, and verify each
+            // battle matches an independent direct simulation of the same seed (proving fresh-seed-per-battle
+            // and that every outcome type is carried through).
+            var scenario = CoinFlipBossScenario();
+            // A generous seed pool (larger than any battle count this budget can produce) keyed by index, so
+            // every battle draws a distinct, known seed and the source never overruns.
+            var seeds = Enumerable.Range(0, 1024).Select(i => (uint)i).ToArray();
+            var seedIndex = 0;
+            var parameters = BossParameters(ManyStepsBudget(15), scenario) with
+            {
+                SeedSource = () => seeds[seedIndex++],
+            };
+
+            var result = _simulator.Simulate(parameters);
+
+            Assert.True(result.BattlesSimulated > 1);
+            Assert.Equal(result.BattlesSimulated, result.Wins + result.Losses + result.Draws);
+
+            // The run is a genuine mix, not a single repeated outcome.
+            var distinctOutcomeKinds = new[] { result.Wins, result.Losses, result.Draws }.Count(c => c > 0);
+            Assert.True(distinctOutcomeKinds >= 2,
+                $"Expected a mix of outcomes but got {result.Wins} wins / {result.Losses} losses / {result.Draws} draws.");
+
+            // Each simulated battle reproduces a direct BattleSimulator run of the same seed, in order —
+            // proving a fresh seed is consumed per battle and the loop carries every outcome type through.
+            for (var i = 0; i < result.BattlesSimulated; i++)
+            {
+                var expected = DirectBossSimulation(scenario, seeds[i]);
+                var actual = result.Battles[i].Result;
+                Assert.Equal(expected.Victory, actual.Victory);
+                Assert.Equal(expected.PlayerDied, actual.PlayerDied);
+                Assert.Equal(expected.TotalMs, actual.TotalMs);
+            }
+        }
+
+        // ── All-draw (zero rewards) ──────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_AllDrawZone_ProducesBattlesButZeroRewards()
+        {
+            // Neither side can damage the other, so every battle runs to the cap as a draw — the most work for
+            // no reward. The result has battles but no wins, no exp, no kills (the no-progress short-circuit).
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), StalemateScenario()));
+
+            Assert.True(result.BattlesSimulated > 1);
+            Assert.Equal(result.BattlesSimulated, result.Draws);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.Losses);
+            Assert.Equal(0, result.TotalExp);
+            Assert.Empty(result.EnemyKillCounts);
+            Assert.All(result.Battles, battle =>
+            {
+                Assert.False(battle.Result.Victory);
+                Assert.False(battle.Result.PlayerDied);
+                Assert.Equal(0, battle.ExpReward);
+            });
+        }
+
+        [Fact]
+        public void Simulate_AllDrawBoss_ProducesZeroRewards()
+        {
+            var scenario = StalemateScenario(bossEnemyId: 7, bossLevel: 3);
+
+            var result = _simulator.Simulate(BossParameters(ManyStepsBudget(), scenario));
+
+            Assert.True(result.BattlesSimulated > 1);
+            Assert.Equal(result.BattlesSimulated, result.Draws);
+            Assert.Equal(0, result.TotalExp);
+        }
+
+        // ── Reward accumulation ──────────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_Wins_TotalExpEqualsSumOfPerVictoryRewards()
+        {
+            var scenario = StrongPlayerWinScenario();
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            Assert.True(result.Wins > 1);
+            Assert.Equal(result.BattlesSimulated, result.Wins); // the strong player wins every battle
+            var summed = result.Battles.Where(b => b.Result.Victory).Sum(b => (long)b.ExpReward);
+            Assert.Equal(summed, result.TotalExp);
+        }
+
+        [Fact]
+        public void Simulate_PerVictoryExp_MatchesDefeatRewardsFromSnapshot()
+        {
+            var scenario = StrongPlayerWinScenario();
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            // Each victory's exp is exactly what DefeatRewards computes from the same snapshot/enemy — the
+            // reward is consistent with the battle it was earned in.
+            var playerModifiers = scenario.Snapshot
+                .GetModifiers(scenario.ResolveItem, scenario.ResolveMod)
+                .ToList();
+            Assert.All(result.Battles, battle =>
+            {
+                var expected = new DefeatRewards(playerModifiers, battle.Enemy).ExpReward;
+                Assert.Equal(expected, battle.ExpReward);
+            });
+        }
+
+        [Fact]
+        public void Simulate_Wins_RecordsPerEnemyKillCounts()
+        {
+            var scenario = StrongPlayerWinScenario(); // a single enemy id (1) won every time
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            var kill = Assert.Single(result.EnemyKillCounts);
+            Assert.Equal(EnemyId, kill.Key);
+            Assert.Equal(result.Wins, kill.Value);
+        }
+
+        // ── Cancellation ─────────────────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_CancellationRequested_Throws()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                _simulator.Simulate(IdleParameters(TenHoursMs, StrongPlayerWinScenario()), cts.Token));
+        }
+
+        // ── Result metadata ──────────────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_ResultCarriesModeAndZone()
+        {
+            var scenario = StrongPlayerWinScenario();
+            scenario.Zone = MakeZone(levelMin: 1, levelMax: 1, id: 42);
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            Assert.Equal(OfflineLoopMode.Idle, result.Mode);
+            Assert.False(result.IsBossBattle);
+            Assert.Equal(42, result.ZoneId);
+        }
+
+        // ── Scenario plumbing ────────────────────────────────────────────────
+
+        private const int EnemyId = 1;
+
+        /// <summary>A self-contained battle scenario: the zone, the player snapshot, and the resolvers.</summary>
+        private sealed class Scenario
+        {
+            public required Zone Zone { get; set; }
+            public BattleSnapshot Snapshot { get; init; } = EmptySnapshot();
+            public required Func<int, Enemy> ResolveEnemy { get; init; }
+            public Func<int, Item> ResolveItem { get; init; } = ThrowItem;
+            public Func<int, ItemMod> ResolveMod { get; init; } = ThrowMod;
+            public Func<int, Skill> ResolveSkill { get; init; } = id => PlayerAttackSkill();
+        }
+
+        private static OfflineSimulationParameters IdleParameters(long awayMs, Scenario scenario, long capMs = TenHoursMs) =>
+            new()
+            {
+                Snapshot = scenario.Snapshot,
+                Mode = OfflineLoopMode.Idle,
+                Zone = scenario.Zone,
+                AwayBudgetMs = awayMs,
+                CapMs = capMs,
+                CooldownMs = CooldownMs,
+                ResolveEnemy = scenario.ResolveEnemy,
+                ResolveItem = scenario.ResolveItem,
+                ResolveMod = scenario.ResolveMod,
+                ResolveSkill = scenario.ResolveSkill,
+                SeedSource = () => 0,
+            };
+
+        private static OfflineSimulationParameters BossParameters(long awayMs, Scenario scenario, long capMs = TenHoursMs) =>
+            IdleParameters(awayMs, scenario, capMs) with { Mode = OfflineLoopMode.Boss };
+
+        private static OfflineSimulationParameters With(OfflineSimulationParameters parameters, long capMs) =>
+            parameters with { CapMs = capMs };
+
+        // A budget comfortably larger than several battle steps, so a run produces many battles.
+        private static long ManyStepsBudget(int steps = 20) =>
+            steps * (GameConstants.DefaultMaxBattleMs + CooldownMs);
+
+        /// <summary>Runs a single deterministic battle (fixed enemy + fixed seed) to read its exact duration.</summary>
+        private static int SingleBattleDurationMs(Scenario scenario)
+        {
+            var enemy = new BattleFactory().CreateBattleEnemy(scenario.Zone, scenario.ResolveEnemy);
+            return DirectSimulation(scenario, enemy, seed: 0).TotalMs;
+        }
+
+        private static BattleResult DirectBossSimulation(Scenario scenario, uint seed)
+        {
+            var enemy = new BattleFactory().CreateBossEnemy(scenario.Zone, scenario.ResolveEnemy);
+            return DirectSimulation(scenario, enemy, seed);
+        }
+
+        private static BattleResult DirectSimulation(Scenario scenario, Enemy enemy, uint seed)
+        {
+            var playerBattler = scenario.Snapshot.ToBattler(scenario.ResolveItem, scenario.ResolveMod, scenario.ResolveSkill);
+            var enemyBattler = new Battler(
+                new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
+            return new BattleSimulator(playerBattler, enemyBattler, seed).Simulate();
+        }
+
+        // ── Scenario presets ─────────────────────────────────────────────────
+
+        private static Scenario StrongPlayerWinScenario() => new()
+        {
+            Zone = MakeZone(levelMin: 1, levelMax: 1),
+            Snapshot = PlayerSnapshot(strength: 100, endurance: 100),
+            ResolveEnemy = level => WeakEnemy(level),
+        };
+
+        private static Scenario AlwaysLoseBossScenario() => new()
+        {
+            Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 7, bossLevel: 1),
+            Snapshot = PlayerSnapshot(strength: 1, endurance: 1),
+            ResolveEnemy = level => StrongEnemy(level),
+        };
+
+        private static Scenario StalemateScenario(int? bossEnemyId = null, int bossLevel = 1) => new()
+        {
+            // Both sides have huge Endurance (so MaxHealth/Defense clamp every hit to zero) and so neither can
+            // damage the other — every battle runs to the cap as a draw.
+            Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: bossEnemyId, bossLevel: bossLevel),
+            Snapshot = PlayerSnapshot(strength: 1, endurance: 1000),
+            ResolveEnemy = level => MakeEnemy(level, strength: 1, endurance: 1000, skillCount: 1),
+        };
+
+        /// <summary>
+        /// A boss fight balanced so the player's crit rolls decide it. The boss's Defense (sourced from
+        /// Agility, so its health stays low) fully absorbs a normal player hit but not a crit, which punches
+        /// through (crit multiplies before Defense). The player's long skill cooldown limits it to a handful
+        /// of fires across the battle cap, so whether enough of them crit — varying with each battle's fresh
+        /// seed — flips the outcome between a win and a draw. The boss deals no damage through the player's
+        /// Defense, so the player never dies (the loop's continue-through-losses behaviour is pinned
+        /// separately by <see cref="AlwaysLoseBossScenario"/>).
+        /// </summary>
+        private static Scenario CoinFlipBossScenario() => new()
+        {
+            Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 7, bossLevel: 1),
+            // Dexterity/Luck drive a ~30% crit chance and a 1.75x crit multiplier.
+            Snapshot = PlayerSnapshot(strength: 50, endurance: 10, dexterity: 100, luck: 100),
+            // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
+            // swings battle to battle.
+            ResolveSkill = _ => SlowHeavySkill(),
+            // Defense from Agility (62), low MaxHealth (50): a normal 60 hit is absorbed, a 105 crit deals 43,
+            // so two crits win. Endurance/Strength left at 0 so health doesn't balloon.
+            ResolveEnemy = level => CoinFlipBoss(level),
+        };
+
+        // ── Builders ─────────────────────────────────────────────────────────
+
+        private static Zone MakeZone(int levelMin, int levelMax, int? bossEnemyId = null, int bossLevel = 1, int id = 1) => new()
+        {
+            Id = id,
+            LevelMin = levelMin,
+            LevelMax = levelMax,
+            BossEnemyId = bossEnemyId,
+            BossLevel = bossLevel,
+            UnlockChallengeId = null,
+        };
+
+        private static BattleSnapshot EmptySnapshot() => new()
+        {
+            Level = 1,
+            StatAllocations = [],
+            EquippedItems = [],
+            SkillIds = [0],
+        };
+
+        private static BattleSnapshot PlayerSnapshot(
+            double strength = 0, double endurance = 0, double dexterity = 0, double luck = 0) => new()
+        {
+            Level = 1,
+            StatAllocations =
+            [
+                new StatAllocation { Attribute = Strength, Amount = strength },
+                new StatAllocation { Attribute = Endurance, Amount = endurance },
+                new StatAllocation { Attribute = Dexterity, Amount = dexterity },
+                new StatAllocation { Attribute = Luck, Amount = luck },
+            ],
+            EquippedItems = [],
+            SkillIds = [0],
+        };
+
+        private static Enemy WeakEnemy(int level, int skillCount = 1) =>
+            MakeEnemy(level, strength: 5, endurance: 5, skillCount: skillCount);
+
+        private static Enemy StrongEnemy(int level, int skillCount = 1) =>
+            MakeEnemy(level, strength: 200, endurance: 200, skillCount: skillCount);
+
+        private static Enemy MakeEnemy(int level, double strength, double endurance, int skillCount)
+        {
+            var skills = Enumerable.Range(0, skillCount).Select(EnemyAttackSkill).ToList();
+            return new Enemy
+            {
+                Id = EnemyId,
+                Name = "Test Enemy",
+                IsBoss = false,
+                Level = level,
+                AttributeDistributions =
+                [
+                    new AttributeDistribution { AttributeId = Strength, BaseAmount = (decimal)strength, AmountPerLevel = 0 },
+                    new AttributeDistribution { AttributeId = Endurance, BaseAmount = (decimal)endurance, AmountPerLevel = 0 },
+                ],
+                AvailableSkills = skills,
+            };
+        }
+
+        private static Skill PlayerAttackSkill() => new()
+        {
+            Id = 0,
+            Name = "Attack",
+            Description = string.Empty,
+            CooldownMs = 1000,
+            BaseDamage = 10,
+            DamageMultipliers = [new DamageMultiplier { Attribute = Strength, Amount = 1.0 }],
+            Effects = [],
+        };
+
+        // A high-cooldown variant of the player's attack: it fires only a few times across the battle cap,
+        // so the count of crits among those fires (and thus the outcome) swings with each battle's seed.
+        private static Skill SlowHeavySkill() => new()
+        {
+            Id = 0,
+            Name = "Heavy Strike",
+            Description = string.Empty,
+            CooldownMs = 30_000,
+            BaseDamage = 10,
+            DamageMultipliers = [new DamageMultiplier { Attribute = Strength, Amount = 1.0 }],
+            Effects = [],
+        };
+
+        // The coin-flip boss: Defense (62) comes from Agility so its MaxHealth stays at the 50 base. A normal
+        // 60 player hit is fully absorbed; a 105 crit punches through for 43, so two crits are needed to win.
+        private static Enemy CoinFlipBoss(int level) => new()
+        {
+            Id = EnemyId,
+            Name = "Coin-Flip Boss",
+            IsBoss = true,
+            Level = level,
+            AttributeDistributions =
+            [
+                new AttributeDistribution { AttributeId = Agility, BaseAmount = 120, AmountPerLevel = 0 },
+            ],
+            AvailableSkills = [EnemyAttackSkill(0)],
+        };
+
+        private static Skill EnemyAttackSkill(int id) => new()
+        {
+            Id = id,
+            Name = $"Scratch {id}",
+            Description = string.Empty,
+            CooldownMs = 1500,
+            BaseDamage = 5,
+            DamageMultipliers = [],
+            Effects = [],
+        };
+
+        private static readonly Func<int, Item> ThrowItem =
+            id => throw new InvalidOperationException($"Unexpected item resolve for {id}");
+        private static readonly Func<int, ItemMod> ThrowMod =
+            id => throw new InvalidOperationException($"Unexpected mod resolve for {id}");
+    }
+}
