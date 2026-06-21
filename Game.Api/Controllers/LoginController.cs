@@ -110,8 +110,10 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
-            // Validate the switch target up front (read-only, no token rotation) so a rejected switch never
-            // credits or mutates the departed character. SelectPlayer below re-validates as the authority.
+            // Validate the switch target up front (read-only, no token rotation) so an unowned switch never
+            // credits or mutates the departed character. SelectPlayer below re-validates and may also fail on an
+            // invalid refresh token, in which case the departed character has been credited and re-anchored (benign:
+            // the progress is legitimate and re-anchoring makes a retry near-idempotent).
             if (!await _accountService.OwnsPlayer(_sessionService.UserId, request.PlayerId))
             {
                 return ApiResponse.Error(SelectPlayerErrorMessage(SelectPlayerStatus.NotOwned), SelectPlayerErrorCategory(SelectPlayerStatus.NotOwned));

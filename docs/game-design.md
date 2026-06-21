@@ -147,7 +147,7 @@ When a player returns after being away, they are credited for the progress their
 
 ## Multiple characters per account
 
-An account can own several characters, but **only one is live at a time** (spike [#922](./spikes/922-multiple-players-per-account.md)). Switching to another character is **lossless**: the character being left behind is credited for all its elapsed idle time via the same offline-rewards simulator (with the 5-minute floor dropped, since a deliberate switch should lose nothing), and the entered character runs its own welcome-back catch-up. A parked character therefore loses no progress while you play another — one-at-a-time is outcome-equivalent to running them in parallel, just without rendering two battles on screen at once.
+An account can own several characters, but **only one is live at a time** (spike [#922](./spikes/922-multiple-players-per-account.md)). Switching to another character is **lossless** (up to the offline simulation cap): the character being left behind is credited for all its elapsed idle time via the same offline-rewards simulator (with the 5-minute floor dropped, since a deliberate switch should lose nothing), and the entered character runs its own welcome-back catch-up. A parked character therefore loses no progress while you play another — one-at-a-time is outcome-equivalent to running them in parallel (within the 10-hour maximum offline window), just without rendering two battles on screen at once.
 
 # Logs
 
