@@ -20,6 +20,24 @@ export type BootRedirect = 'game' | 'loading' | 'login' | null;
 const BOOT_ONLY_ROUTES = new Set(['/', '/select', '/loading']);
 
 /**
+ * Routes reachable while authenticated but before a player aggregate is loaded into memory: the login
+ * form and the character-select screen (where a character is chosen but not yet bound/loaded). Distinct
+ * from {@link BOOT_ONLY_ROUTES}, which includes `/loading` — by the time the player reaches loading a
+ * character has been selected and `playerManager` initialized.
+ */
+const PRE_PLAYER_ROUTES = new Set(['/', '/select']);
+
+/**
+ * The post-boot safety net's decision: once the boot gate has resolved, an in-memory player is required
+ * on every route except the pre-player auth routes, so losing it (e.g. an auth teardown that cleared the
+ * session) returns the user to login. Arriving at `/` or `/select` without a loaded player is expected —
+ * the player isn't loaded until a character is selected — so those must not be bounced.
+ */
+export function shouldReturnToLogin(hasPlayer: boolean, pathname: string): boolean {
+	return !hasPlayer && !PRE_PLAYER_ROUTES.has(pathname);
+}
+
+/**
  * Decides where the boot gate should navigate after `resumeSession`, given the resolved destination
  * and the path the load happened on. Returns `null` to stay on the current path.
  *

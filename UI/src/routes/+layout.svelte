@@ -18,7 +18,7 @@ import { TooltipBase, ToastContainer, ModalHost } from '$components';
 import { getTokens, onSocketError } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';
-import { bootRedirect } from '$lib/engine/boot-redirect';
+import { bootRedirect, shouldReturnToLogin } from '$lib/engine/boot-redirect';
 import { toastError } from '$stores';
 import BootSplash from './BootSplash.svelte';
 import '$styles/common.scss';
@@ -79,12 +79,14 @@ onMount(async () => {
 });
 
 // Safety net once booted: if the in-memory player state is lost (e.g. an auth failure tore it down)
-// while on a protected route, return to login. Inert during boot and on the login route itself.
-// `redirecting` latches the in-flight navigation so a reactive re-run (a tracked dep changing before
-// `pathname` settles) can't fire a redundant second goto; it clears once the navigation completes.
+// while on a protected route, return to login. Inert during boot and on the pre-player auth routes
+// (login + character-select), where arriving without a loaded player is expected — the player isn't
+// loaded until a character is selected. `redirecting` latches the in-flight navigation so a reactive
+// re-run (a tracked dep changing before `pathname` settles) can't fire a redundant second goto; it
+// clears once the navigation completes.
 let redirecting = false;
 $effect(() => {
-	if (booted && !playerManager.name && page.url.pathname !== '/' && !redirecting) {
+	if (booted && !redirecting && shouldReturnToLogin(!!playerManager.name, page.url.pathname)) {
 		redirecting = true;
 		goto(resolve('/')).finally(() => {
 			redirecting = false;

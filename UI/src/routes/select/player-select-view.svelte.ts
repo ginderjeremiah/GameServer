@@ -61,10 +61,12 @@ export class PlayerSelectView {
 
 	/**
 	 * Enters the game as the chosen character: binds + loads it, then runs the per-player takeover
-	 * check before handing off to the world. A failed bind surfaces an error and re-enables the UI;
-	 * a declined takeover simply aborts (leaving the freshly-bound session for the user to retry or
-	 * pick another character). On success the busy state is held so the controls stay disabled
-	 * through the navigation `enterWorld` performs.
+	 * check before handing off to the world. A failed bind surfaces an error and re-enables the UI.
+	 * On a declined takeover this view-model just aborts and clears the busy state; what the user sees
+	 * then is up to the injected `confirmTakeover` — the production `confirmSessionTakeover` logs the
+	 * freshly-issued session out (a full-page redirect to login), so a decline returns to login rather
+	 * than resting on the select screen. On success the busy state is held so the controls stay
+	 * disabled through the navigation `enterWorld` performs.
 	 */
 	async select(playerId: number): Promise<void> {
 		if (this.busy) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bootRedirect } from '$lib/engine/boot-redirect';
+import { bootRedirect, shouldReturnToLogin } from '$lib/engine/boot-redirect';
 
 describe('bootRedirect', () => {
 	it('keeps a fully-restored session on the in-app route it loaded on', () => {
@@ -26,5 +26,26 @@ describe('bootRedirect', () => {
 		expect(bootRedirect('login', '/select')).toBe('login');
 		expect(bootRedirect('login', '/loading')).toBe('login');
 		expect(bootRedirect('login', '/')).toBeNull();
+	});
+});
+
+describe('shouldReturnToLogin', () => {
+	it('does not bounce the pre-player auth routes when no player is loaded', () => {
+		// The select screen is reached after login but before a character is selected/loaded, so the
+		// post-boot safety net must not redirect it back to login for a missing player (the bug that
+		// broke the whole login flow).
+		expect(shouldReturnToLogin(false, '/')).toBe(false);
+		expect(shouldReturnToLogin(false, '/select')).toBe(false);
+	});
+
+	it('returns to login when a loaded player is lost on a protected route', () => {
+		expect(shouldReturnToLogin(false, '/game')).toBe(true);
+		expect(shouldReturnToLogin(false, '/admin')).toBe(true);
+		expect(shouldReturnToLogin(false, '/loading')).toBe(true);
+	});
+
+	it('stays put on any route while a player is loaded', () => {
+		expect(shouldReturnToLogin(true, '/game')).toBe(false);
+		expect(shouldReturnToLogin(true, '/select')).toBe(false);
 	});
 });

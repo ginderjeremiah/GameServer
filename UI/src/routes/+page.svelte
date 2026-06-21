@@ -200,6 +200,8 @@ const handleSubmit = async () => {
 			serverError = 'This account has no characters.';
 			return;
 		}
+		// Surface the brief "signing in" success status while the navigation to the character-select
+		// screen settles; `submitting` stays true so the form holds disabled through the transition.
 		success = true;
 		playerSelectHandoff.set(summaries);
 		goto(resolve('/select'));
