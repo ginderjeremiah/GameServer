@@ -19,9 +19,9 @@ export interface ChallengeRefs extends RewardRefs {
 }
 
 /**
- * Human-readable away duration from milliseconds, showing the two most significant non-zero units
- * (e.g. `3h 12m`, `2d 4h`, `45m`). The window is floored to whole minutes — sub-minute away times never
- * reach the gate (the backend's 5-minute floor), so seconds are not surfaced.
+ * Human-readable away duration from milliseconds, showing the two most significant units (e.g. `3h 12m`,
+ * `2d 4h`, `1h 0m`), with a single-unit `Xm` floor under an hour. The window is floored to whole minutes —
+ * sub-minute away times never reach the gate (the backend's 5-minute floor), so seconds are not surfaced.
  */
 export function formatAwayDuration(awayMs: number): string {
 	const totalMinutes = Math.max(0, Math.floor(awayMs / 60_000));

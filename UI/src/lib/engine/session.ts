@@ -32,12 +32,13 @@ export async function resumeSession(): Promise<ResumeDestination> {
 }
 
 /**
- * Restores the player from the active session via Login/Status. Returns false when no usable session
- * is available (no/expired session, or the request failed), so the caller falls back to the login
- * screen. The request layer silently refreshes the access token and, on an unrecoverable auth failure,
- * clears the stored tokens and returns to login on its own.
+ * Fetches the authoritative player aggregate via Login/Status and (re)initializes the player manager.
+ * Returns true when a usable session was loaded, false on no/expired session (non-200) or a failed/
+ * unparseable request. The shared core of the boot-time {@link restorePlayer} and the mid-session
+ * {@link refreshPlayer}. The request layer silently refreshes the access token and, on an unrecoverable
+ * auth failure, clears the stored tokens and returns to login on its own.
  */
-async function restorePlayer(): Promise<boolean> {
+async function loadPlayer(): Promise<boolean> {
 	try {
 		const response = await new ApiRequest('Login/Status').get();
 		if (response.status !== 200) {
@@ -45,13 +46,24 @@ async function restorePlayer(): Promise<boolean> {
 		}
 
 		playerManager.initialize(response.data);
-		// Fire-and-forget: refresh this device's capabilities on a resumed session too.
-		void reportDeviceInfo();
 		return true;
 	} catch {
-		// Network error / unparseable response — treat the session as unrestorable.
+		// Network error / unparseable response — treat the load as unsuccessful.
 		return false;
 	}
+}
+
+/**
+ * Restores the player from the active session on boot. Returns false when no usable session is available,
+ * so the caller falls back to the login screen.
+ */
+async function restorePlayer(): Promise<boolean> {
+	const restored = await loadPlayer();
+	if (restored) {
+		// Fire-and-forget: refresh this device's capabilities on a resumed session too.
+		void reportDeviceInfo();
+	}
+	return restored;
 }
 
 /**
@@ -61,12 +73,5 @@ async function restorePlayer(): Promise<boolean> {
  * failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.
  */
 export async function refreshPlayer(): Promise<void> {
-	try {
-		const response = await new ApiRequest('Login/Status').get();
-		if (response.status === 200) {
-			playerManager.initialize(response.data);
-		}
-	} catch {
-		// Swallow — the gate proceeds on the existing player; the next natural reload reconciles.
-	}
+	await loadPlayer();
 }
