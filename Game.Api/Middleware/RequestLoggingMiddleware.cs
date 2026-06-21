@@ -24,7 +24,7 @@ namespace Game.Api.Middleware
 
             var stopwatch = Stopwatch.StartNew();
             using var scope = _logger.BeginScope(loggingContext);
-            _logger.LogInformation("Request Start");
+            _logger.LogInformation("Request Start {Path}", context.Request.Path.Value);
 
             // Emit the end event from a finally so the status/duration are logged even when the
             // pipeline throws — the failing request is the one most worth diagnosing.
