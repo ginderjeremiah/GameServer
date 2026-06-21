@@ -53,3 +53,20 @@ async function restorePlayer(): Promise<boolean> {
 		return false;
 	}
 }
+
+/**
+ * Re-pulls the authoritative player aggregate (Login/Status) and re-initializes the player manager.
+ * Used by the welcome-back gate to refresh the offline-reward-updated state — level, exp, stat points,
+ * unlocked skills, inventory — before the game engine builds the live battler from it. Best-effort: a
+ * failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.
+ */
+export async function refreshPlayer(): Promise<void> {
+	try {
+		const response = await new ApiRequest('Login/Status').get();
+		if (response.status === 200) {
+			playerManager.initialize(response.data);
+		}
+	} catch {
+		// Swallow — the gate proceeds on the existing player; the next natural reload reconciles.
+	}
+}
