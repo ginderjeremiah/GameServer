@@ -150,9 +150,12 @@ export class Battler {
 	}
 
 	/** Applies one tick of damage-over-time from DamageTakenPerSecond (authored per second, scaled to
-	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt. */
+	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt. Floored at zero
+	 *  (like {@link takeDamage}) so a negative DamageTakenPerSecond can't heal past the MaxHealth cap — a heal
+	 *  must go through the capped {@link applyHealOverTime} channel instead. */
 	public applyDamageOverTime(timeDelta: number) {
-		const damage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
+		const rawDamage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
+		const damage = rawDamage > 0 ? rawDamage : 0;
 		this.currentHealth -= damage;
 		this.isDead = this.currentHealth <= 0;
 		return damage;
