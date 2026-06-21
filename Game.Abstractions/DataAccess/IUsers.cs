@@ -39,6 +39,40 @@ namespace Game.Abstractions.DataAccess
         LastAdmin,
     }
 
+    /// <summary>
+    /// Outcome of a <see cref="IUsers.CreatePlayer"/> attempt, so the caller can surface the appropriate
+    /// message. The per-account character cap is enforced in the data tier under a row lock so it holds
+    /// against concurrent creations. (Distinct from the application layer's <c>CreatePlayerStatus</c>,
+    /// which also reports name-validation failures decided before persistence.)
+    /// </summary>
+    public enum CreatePlayerOutcome
+    {
+        Success,
+
+        /// <summary>The account already holds the maximum number of characters.</summary>
+        CapReached,
+
+        /// <summary>No active (non-archived) account matched the supplied id.</summary>
+        UserNotFound,
+    }
+
+    /// <summary>
+    /// Result of <see cref="IUsers.CreatePlayer"/>: an outcome plus, on success, the summary of the newly
+    /// created character (so the caller can return it without a second read).
+    /// </summary>
+    public record CreatePlayerResult(CreatePlayerOutcome Outcome, PlayerSummary? Player)
+    {
+        public static CreatePlayerResult Created(PlayerSummary player)
+        {
+            return new CreatePlayerResult(CreatePlayerOutcome.Success, player);
+        }
+
+        public static CreatePlayerResult Failed(CreatePlayerOutcome outcome)
+        {
+            return new CreatePlayerResult(outcome, null);
+        }
+    }
+
     public interface IUsers
     {
         /// <summary>
@@ -50,6 +84,16 @@ namespace Game.Abstractions.DataAccess
         /// username was claimed by a concurrently-created active account, <see langword="true"/> otherwise.
         /// </summary>
         Task<bool> CreateAccount(NewAccount account, NewPlayer player);
+
+        /// <summary>
+        /// Creates an additional character on an existing account from the <paramref name="player"/>
+        /// blueprint, enforcing the per-account cap (<paramref name="maxPlayersPerAccount"/>) as anti-cheat.
+        /// The count check and insert run under a lock on the owning user row and commit in-tier, so two
+        /// concurrent creations for the same account can't both slip past the cap. Returns
+        /// <see cref="CreatePlayerStatus.CapReached"/> when the account is already at the cap and
+        /// <see cref="CreatePlayerStatus.UserNotFound"/> when no active account matches.
+        /// </summary>
+        Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount);
 
         /// <summary>
         /// Loads the credentials of the non-archived account with the given username — the data the login

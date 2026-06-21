@@ -12,6 +12,10 @@ export interface IAuthTokens {
 	refreshToken: string;
 }
 
+export interface ICreatePlayerRequest {
+	name: string;
+}
+
 export interface IDeviceInfoRequest {
 	deviceMemory?: number;
 	hardwareConcurrency?: number;

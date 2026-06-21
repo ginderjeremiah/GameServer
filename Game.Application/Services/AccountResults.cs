@@ -47,6 +47,25 @@ namespace Game.Application.Services
     }
 
     /// <summary>
+    /// Outcome classification of a character-creation attempt, so the caller can surface the appropriate
+    /// message. <see cref="InvalidName"/> is decided in the application layer (name validation); the rest
+    /// map from the data tier's cap/ownership enforcement.
+    /// </summary>
+    public enum CreatePlayerStatus
+    {
+        Success,
+
+        /// <summary>The supplied name failed validation (blank, too long, or control characters).</summary>
+        InvalidName,
+
+        /// <summary>The account already holds the maximum number of characters.</summary>
+        CapReached,
+
+        /// <summary>No active account matched the authenticated caller.</summary>
+        UserNotFound,
+    }
+
+    /// <summary>
     /// A signed access token paired with the opaque refresh token used to mint the next pair.
     /// </summary>
     public record AuthTokenPair(string AccessToken, string RefreshToken);
@@ -99,6 +118,26 @@ namespace Game.Application.Services
         public static AccountSelectPlayerResult Succeeded(AuthTokenPair tokens, Player player)
         {
             return new AccountSelectPlayerResult(SelectPlayerStatus.Success, tokens, player);
+        }
+    }
+
+    /// <summary>
+    /// Result of <see cref="AccountService.CreatePlayer"/>: a status plus, on success, the summary of the
+    /// newly created character so the caller can present it (e.g. add it to the select list).
+    /// </summary>
+    public record AccountCreatePlayerResult(CreatePlayerStatus Status, PlayerSummary? Player)
+    {
+        [MemberNotNullWhen(true, nameof(Player))]
+        public bool Success => Status == CreatePlayerStatus.Success;
+
+        public static AccountCreatePlayerResult Succeeded(PlayerSummary player)
+        {
+            return new AccountCreatePlayerResult(CreatePlayerStatus.Success, player);
+        }
+
+        public static AccountCreatePlayerResult Failed(CreatePlayerStatus status)
+        {
+            return new AccountCreatePlayerResult(status, null);
         }
     }
 }

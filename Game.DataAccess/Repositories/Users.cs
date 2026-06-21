@@ -86,6 +86,49 @@ namespace Game.DataAccess.Repositories
             }
         }
 
+        public async Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            // Lock the owning user row so the cap check and the insert it gates can't be split by a
+            // concurrent CreatePlayer for the same account — without it two parallel requests could both
+            // observe an under-cap count and both insert, exceeding the cap the check exists to enforce.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"Users\" WHERE \"Id\" = {userId} FOR UPDATE");
+
+            // Resolve the (tracked) user under the lock; an archived account no longer owns characters, so
+            // it can't create one. Loading the user also supplies the navigation the mapper links the new
+            // player to, mirroring the account-creation path.
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.ArchivedAt == null);
+            if (user is null)
+            {
+                return CreatePlayerResult.Failed(CreatePlayerOutcome.UserNotFound);
+            }
+
+            var playerCount = await _context.Players.CountAsync(p => p.UserId == userId);
+            if (playerCount >= maxPlayersPerAccount)
+            {
+                return CreatePlayerResult.Failed(CreatePlayerOutcome.CapReached);
+            }
+
+            var entity = PlayerMapper.ToEntity(player, user);
+            _context.Players.Add(entity);
+
+            // Commit in-tier (like CreateAccount) so the insert is serialized with the cap check under the
+            // same lock, rather than deferring to the per-request unit of work that runs after the lock drops.
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return CreatePlayerResult.Created(new PlayerSummary
+            {
+                Id = entity.Id,
+                Name = entity.Name,
+                Level = entity.Level,
+                CurrentZoneId = entity.CurrentZoneId,
+                LastActivity = entity.LastActivity,
+            });
+        }
+
         public Task<AccountCredentials?> GetUser(string username)
         {
             return _context.Users
