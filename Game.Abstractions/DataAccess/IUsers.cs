@@ -90,8 +90,8 @@ namespace Game.Abstractions.DataAccess
         /// blueprint, enforcing the per-account cap (<paramref name="maxPlayersPerAccount"/>) as anti-cheat.
         /// The count check and insert run under a lock on the owning user row and commit in-tier, so two
         /// concurrent creations for the same account can't both slip past the cap. Returns
-        /// <see cref="CreatePlayerStatus.CapReached"/> when the account is already at the cap and
-        /// <see cref="CreatePlayerStatus.UserNotFound"/> when no active account matches.
+        /// <see cref="CreatePlayerOutcome.CapReached"/> when the account is already at the cap and
+        /// <see cref="CreatePlayerOutcome.UserNotFound"/> when no active account matches.
         /// </summary>
         Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount);
 

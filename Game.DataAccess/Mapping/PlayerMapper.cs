@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
@@ -58,6 +59,23 @@ namespace Game.DataAccess.Mapping
                 }).ToList();
 
             return player;
+        }
+
+        /// <summary>
+        /// Projects a materialized player entity to a lightweight <see cref="PlayerSummary"/>. The
+        /// EF-translated <c>Select</c> projections in the Users repository (which must stay expressions for
+        /// SQL translation) mirror these same fields — keep them in step.
+        /// </summary>
+        public static PlayerSummary ToSummary(EntityPlayer entity)
+        {
+            return new PlayerSummary
+            {
+                Id = entity.Id,
+                Name = entity.Name,
+                Level = entity.Level,
+                CurrentZoneId = entity.CurrentZoneId,
+                LastActivity = entity.LastActivity,
+            };
         }
 
         /// <summary>

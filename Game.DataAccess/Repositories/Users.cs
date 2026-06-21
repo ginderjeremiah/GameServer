@@ -114,19 +114,25 @@ namespace Game.DataAccess.Repositories
             var entity = PlayerMapper.ToEntity(player, user);
             _context.Players.Add(entity);
 
-            // Commit in-tier (like CreateAccount) so the insert is serialized with the cap check under the
-            // same lock, rather than deferring to the per-request unit of work that runs after the lock drops.
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return CreatePlayerResult.Created(new PlayerSummary
+            try
             {
-                Id = entity.Id,
-                Name = entity.Name,
-                Level = entity.Level,
-                CurrentZoneId = entity.CurrentZoneId,
-                LastActivity = entity.LastActivity,
-            });
+                // Commit in-tier (like CreateAccount) so the insert is serialized with the cap check under
+                // the same lock, rather than deferring to the per-request unit of work that runs after the
+                // lock drops.
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                // A player insert has no expected unique-violation path, but an unexpected save failure rolls
+                // back the transaction while leaving the Added entity tracked — clear it (mirroring
+                // CreateAccount) so the unit-of-work commit filter doesn't re-attempt the insert outside this
+                // method's lock after the action returns.
+                _context.ChangeTracker.Clear();
+                throw;
+            }
+
+            return CreatePlayerResult.Created(PlayerMapper.ToSummary(entity));
         }
 
         public Task<AccountCredentials?> GetUser(string username)
