@@ -22,7 +22,8 @@ namespace Game.Api.Controllers
         AccountService accountService,
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
-        PlayerService playerService) : ControllerBase
+        PlayerService playerService,
+        BattleService battleService) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly SessionInitializer _sessionInitializer = sessionInitializer;
@@ -30,6 +31,7 @@ namespace Game.Api.Controllers
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
+        private readonly BattleService _battleService = battleService;
 
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
@@ -89,6 +91,74 @@ namespace Game.Api.Controllers
                 Tokens = ToAuthTokens(result.Tokens),
                 Player = PlayerData.FromPlayer(result.Player),
             });
+        }
+
+        /// <summary>
+        /// Switches the authenticated account's live character without re-logging in (spike #922). Credits the
+        /// departed character — the one the caller's token currently binds — for any elapsed idle time via the
+        /// offline-rewards simulator, resolving its in-flight battle and dropping the login-time 5-minute floor
+        /// so a deliberate switch loses no progress, then binds and loads the newly selected character through
+        /// the same path as <see cref="SelectPlayer"/> (validating ownership and rotating the token). The client
+        /// must tear down its game socket before calling this, since the departed-character credit runs over
+        /// HTTP, off that character's battle loop.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            // Validate the switch target up front (read-only, no token rotation) so a rejected switch never
+            // credits or mutates the departed character. SelectPlayer below re-validates as the authority.
+            if (!await _accountService.OwnsPlayer(_sessionService.UserId, request.PlayerId))
+            {
+                return ApiResponse.Error(SelectPlayerErrorMessage(SelectPlayerStatus.NotOwned), SelectPlayerErrorCategory(SelectPlayerStatus.NotOwned));
+            }
+
+            // Settle the departed character before binding the new one, so its idle progress and in-flight
+            // battle are credited rather than discarded when the session is rebound below.
+            await CreditDepartedCharacter(request.PlayerId, HttpContext.RequestAborted);
+
+            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken);
+            if (!result.Success)
+            {
+                return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
+            }
+
+            _sessionService.CreateSession(_sessionService.UserId, result.Player.Id);
+
+            return ApiResponse.Success(new SelectPlayerResult
+            {
+                Tokens = ToAuthTokens(result.Tokens),
+                Player = PlayerData.FromPlayer(result.Player),
+            });
+        }
+
+        /// <summary>
+        /// Credits the character the caller is switching away from (the token's currently-selected player) for
+        /// any elapsed idle time, resolving its in-flight battle. A no-op when there is no departed character to
+        /// settle — a pre-selection token (no bound player) or a switch to the same character — or when that
+        /// character's aggregate can no longer be loaded.
+        /// </summary>
+        private async Task CreditDepartedCharacter(int targetPlayerId, CancellationToken cancellationToken)
+        {
+            if (_sessionService.TokenSelectedPlayerId is not int departedPlayerId || departedPlayerId == targetPlayerId)
+            {
+                return;
+            }
+
+            // Bind the departed character's in-flight session state (from the token claim) so the simulator can
+            // resolve any stale battle, then load its aggregate to apply the credited rewards to.
+            await _sessionInitializer.EnsureSessionLoaded(cancellationToken);
+            var departed = await _playerService.LoadPlayer(departedPlayerId, cancellationToken);
+            if (departed is null)
+            {
+                return;
+            }
+
+            await _battleService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
         }
 
         /// <summary>

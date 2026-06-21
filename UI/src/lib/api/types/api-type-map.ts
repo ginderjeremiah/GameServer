@@ -74,6 +74,7 @@ export type ApiResponseTypes = {
 	'Login/Refresh': IAuthTokens;
 	'Login/SelectPlayer': ISelectPlayerResult;
 	'Login/Status': IPlayerData;
+	'Login/SwitchPlayer': ISelectPlayerResult;
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
 };
@@ -110,6 +111,7 @@ export type ApiRequestTypes = {
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;
 	'Login/SelectPlayer': ISelectPlayerRequest;
+	'Login/SwitchPlayer': ISelectPlayerRequest;
 };
 
 export type ApiEndpoint = keyof ApiResponseTypes;

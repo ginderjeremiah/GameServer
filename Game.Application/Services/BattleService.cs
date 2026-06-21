@@ -329,7 +329,30 @@ namespace Game.Application.Services
         /// statistics/challenges, re-anchors <c>LastActivity</c>, and persists once.
         /// </para>
         /// </summary>
-        public async Task<OfflineProgressSummary> SimulateOfflineProgress(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        public Task<OfflineProgressSummary> SimulateOfflineProgress(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            return SimulateProgress(player, state, MinimumOfflineAway, cancellationToken);
+        }
+
+        /// <summary>
+        /// Credits a character being switched away from in a deliberate in-game character switch (spike #922):
+        /// the same elapsed-time replay as <see cref="SimulateOfflineProgress"/> but with the
+        /// <see cref="MinimumOfflineAway"/> floor dropped, so any elapsed time since the departed character's
+        /// <see cref="Player.LastActivity"/> is credited (the 5-minute floor is a login-time concern). Resolves
+        /// the in-flight battle, applies the rewards, re-anchors <c>LastActivity</c>, and persists — so the
+        /// departed character loses no idle progress when the player switches to another of their characters.
+        /// The caller must invoke this off the departed character's battle loop (its socket torn down first),
+        /// so the player-state write cannot race a live battle-completion command.
+        /// </summary>
+        public Task<OfflineProgressSummary> SimulateSwitchProgress(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            return SimulateProgress(player, state, TimeSpan.Zero, cancellationToken);
+        }
+
+        // Shared elapsed-time replay for both the login welcome-back path and the deliberate-switch credit. The
+        // only difference is the away floor: the login path skips a sub-5-minute return, while a switch credits
+        // any elapsed time (minimumAway == zero), so the two cannot otherwise drift.
+        private async Task<OfflineProgressSummary> SimulateProgress(Player player, PlayerState state, TimeSpan minimumAway, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
             var awayMs = (long)(now - player.LastActivity).TotalMilliseconds;
@@ -339,7 +362,7 @@ namespace Game.Application.Services
             // starts fresh and an immediate re-claim is a no-op) and return an empty summary. Any stale
             // in-flight battle is left for the idle loop's first StartBattle to abandon, exactly as on a normal
             // reconnect — there is no away window to simulate, so settling it here would change nothing.
-            if (awayMs < MinimumOfflineAway.TotalMilliseconds)
+            if (awayMs < minimumAway.TotalMilliseconds)
             {
                 player.StampActivity(now);
                 await _playerRepo.SavePlayer(player, cancellationToken);

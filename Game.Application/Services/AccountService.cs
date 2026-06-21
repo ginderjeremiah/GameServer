@@ -165,6 +165,18 @@ namespace Game.Application.Services
         }
 
         /// <summary>
+        /// Whether the given player belongs to the account — a read-only ownership check that consumes no
+        /// token. Used to gate a character switch's departed-character credit on a valid target before the
+        /// authoritative (token-rotating) <see cref="SelectPlayer"/> runs, so a rejected switch never mutates
+        /// the departed character.
+        /// </summary>
+        public async Task<bool> OwnsPlayer(int userId, int playerId)
+        {
+            var playerIds = await _users.GetPlayerIds(userId);
+            return playerIds.Contains(playerId);
+        }
+
+        /// <summary>
         /// Creates an additional character on the authenticated account from a user-supplied name. The name
         /// is validated and normalized here (a domain rule), then the new-player blueprint is built by
         /// <see cref="NewPlayerFactory"/> and persisted by the Identity context, which enforces the
