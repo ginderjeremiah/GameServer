@@ -72,6 +72,10 @@ export class EnemyManager {
 	/** Resolver that short-circuits an in-flight retry backoff so a stop / superseding transition need
 	 *  not wait out the full delay before the loop re-checks whether it should still be running. */
 	private cancelBackoff?: () => void;
+	/** The last `AutoChallengeBoss` value synced to the backend, so {@link syncAutoChallengeBoss} drops
+	 *  redundant re-syncs (e.g. a returnToIdle when the persisted mode is already idle). `undefined` until
+	 *  the first sync, so the first authoritative state is always sent. */
+	private lastSyncedAutoChallengeBoss?: boolean;
 
 	public start() {
 		if (!this.started) {
@@ -248,6 +252,10 @@ export class EnemyManager {
 			if (result.data?.enemyInstance) {
 				this.currentEnemy = result.data.enemyInstance;
 				notifyNewEnemyLoaded(this.currentEnemy);
+				// Now genuinely in the boss loop, so persist boss mode iff auto-fight is armed — a pre-armed
+				// toggle (set while still idle-farming) only becomes real boss-farming here. A one-off challenge
+				// (auto-fight off) stays idle-persisted: a single victory hands straight back to the idle loop.
+				this.syncAutoChallengeBoss(this.autoFight);
 			} else {
 				if (result.error) {
 					logMessage(ELogType.Debug, 'There was an error challenging the boss: ' + result.error);
@@ -288,11 +296,11 @@ export class EnemyManager {
 	/** Toggle auto-fight: when on, a boss victory immediately re-challenges the boss. */
 	public setAutoFight(on: boolean) {
 		this.autoFight = on;
-		// Persist the player's auto-fight intent (#1040's "mirror the live autoFight state" semantic). Note
-		// auto-fight can be pre-armed from BossTrigger while the loop is still idle, so this persists boss
-		// mode on intent rather than active engagement; whether to gate on mode==='boss' is tracked in #1067
-		// (must be settled before the offline-sim consumer in #1041/#1042 reads the field).
-		this.syncAutoChallengeBoss(on);
+		// Persist boss mode only when the loop is *actually* boss-farming: auto-fight on AND already engaged in
+		// the boss loop. Auto-fight can be pre-armed from BossTrigger while the loop is still idle-farming —
+		// that is intent, not engagement, and must not persist boss (the offline sim would otherwise resume a
+		// never-challenged player as a boss-farmer). challengeBoss() re-syncs once a pre-armed player engages.
+		this.syncAutoChallengeBoss(on && this.mode === 'boss');
 	}
 
 	private returnToIdle(sync = true) {
@@ -314,8 +322,17 @@ export class EnemyManager {
 	 * player's `CurrentZoneId`. Fire-and-forget — anti-cheat validation is the server's, and a transient
 	 * failure only leaves the persisted mode briefly stale, corrected by the next sync or the backend's
 	 * boss-loss/draw backstop.
+	 *
+	 * Deduped against the last value actually sent so redundant transitions — e.g. every returnToIdle path
+	 * firing when the persisted mode is already idle — don't emit a no-op socket command. The live `autoFight`
+	 * starts false each session even when the persisted mode is boss; reconciling that stale-initial state on
+	 * login is the welcome-back gate's job (#1043).
 	 */
 	private syncAutoChallengeBoss(enabled: boolean) {
+		if (enabled === this.lastSyncedAutoChallengeBoss) {
+			return;
+		}
+		this.lastSyncedAutoChallengeBoss = enabled;
 		void apiSocket.sendSocketCommand('SetAutoChallengeBoss', enabled);
 	}
 
