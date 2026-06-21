@@ -83,10 +83,12 @@ export function logKind(log: LogMessage): LogKind {
 	}
 }
 
-/** Treats the monotonically-increasing log id as an elapsed-time clock. */
-export function formatLogTime(id: number): string {
-	const totalSeconds = Math.floor(id / 60);
-	const minutes = Math.floor(totalSeconds / 60);
-	const seconds = totalSeconds % 60;
-	return `${String(minutes % 100).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+/** Formats an entry's wall-clock timestamp (epoch ms) as local 24-hour HH:MM:SS, so the panel
+ *  shows the actual time each event occurred. */
+export function formatLogTime(timestamp: number): string {
+	const date = new Date(timestamp);
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	const seconds = String(date.getSeconds()).padStart(2, '0');
+	return `${hours}:${minutes}:${seconds}`;
 }

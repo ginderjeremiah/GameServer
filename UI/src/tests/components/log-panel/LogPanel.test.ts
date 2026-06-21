@@ -30,8 +30,8 @@ describe('LogPanel', () => {
 
 	it('renders log messages and the event count', () => {
 		// Stored newest-first (unshift), so id 2 is the newest entry.
-		logData.unshift({ id: 1, logType: ELogType.Damage, message: 'You used Cleave and dealt 10 damage!' });
-		logData.unshift({ id: 2, logType: ELogType.ItemFound, message: 'Unlocked: Iron Helm!' });
+		logData.unshift({ id: 1, logType: ELogType.Damage, message: 'You used Cleave and dealt 10 damage!', timestamp: 0 });
+		logData.unshift({ id: 2, logType: ELogType.ItemFound, message: 'Unlocked: Iron Helm!', timestamp: 0 });
 
 		render(LogPanel);
 		const panel = screen.getByTestId('log-panel');
@@ -41,7 +41,12 @@ describe('LogPanel', () => {
 	});
 
 	it('renders a skill-effect message with its dedicated glyph', () => {
-		logData.unshift({ id: 3, logType: ELogType.SkillEffect, message: 'You are empowered: +15 Strength for 5s' });
+		logData.unshift({
+			id: 3,
+			logType: ELogType.SkillEffect,
+			message: 'You are empowered: +15 Strength for 5s',
+			timestamp: 0
+		});
 
 		render(LogPanel);
 		expect(screen.getByTestId('log-panel').textContent).toContain('You are empowered: +15 Strength for 5s');

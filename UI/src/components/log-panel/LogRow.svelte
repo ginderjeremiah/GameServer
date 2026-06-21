@@ -10,7 +10,7 @@
 	style:box-shadow={isLatest ? `inset 2px 0 0 ${kind.color}` : undefined}
 	style:--row-height="{rowHeight}px"
 >
-	<span class="row-time" class:latest={isLatest}>{formatLogTime(log.id)}</span>
+	<span class="row-time" class:latest={isLatest}>{formatLogTime(log.timestamp)}</span>
 
 	<div
 		class="row-chip"
@@ -63,7 +63,7 @@ const rowOpacity = $derived(isLatest ? 1 : Math.max(0.4, 0.9 - index * 0.1));
 	font-family: var(--mono);
 	font-size: 10.5px;
 	letter-spacing: 0.4px;
-	min-width: 38px;
+	min-width: 54px;
 	color: var(--text-muted);
 
 	&.latest {

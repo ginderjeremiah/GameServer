@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ELogType } from '$lib/api';
 import { logs, addLog, resetLogs } from '$stores/logs.svelte';
 
 describe('logs store', () => {
 	beforeEach(() => {
 		resetLogs();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	it('prepends new entries newest-first', () => {
@@ -20,6 +24,15 @@ describe('logs store', () => {
 
 		// Newest-first, so index 0 (the latest) holds the higher id.
 		expect(logs()[0].id).toBeGreaterThan(logs()[1].id);
+	});
+
+	it('stamps each entry with the wall-clock time it was logged', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-06-21T14:32:07.000Z'));
+
+		addLog(ELogType.Exp, 'Timed');
+
+		expect(logs()[0].timestamp).toBe(Date.now());
 	});
 
 	it('caps the list at 40 entries, dropping the oldest', () => {

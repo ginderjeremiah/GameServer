@@ -3,10 +3,10 @@ import { ELogType } from '$lib/api';
 import type { LogOutcome } from '$lib/engine/log';
 import { logKind, formatLogTime, logColors } from '../../../components/log-panel/log-kind';
 
-type LogMessage = { id: number; logType: ELogType; message: string; outcome?: LogOutcome };
+type LogMessage = { id: number; logType: ELogType; message: string; timestamp: number; outcome?: LogOutcome };
 
 function makeLog(logType: ELogType, message: string, outcome?: LogOutcome): LogMessage {
-	return { id: 1, logType, message, outcome };
+	return { id: 1, logType, message, timestamp: 0, outcome };
 }
 
 describe('logKind', () => {
@@ -139,40 +139,23 @@ describe('logKind', () => {
 });
 
 describe('formatLogTime', () => {
-	it('formats id 0 as 00:00', () => {
-		expect(formatLogTime(0)).toBe('00:00');
+	// Construct each instant from local-time components and read it back with the same local
+	// getters, so the assertions are independent of the runner's timezone.
+	const at = (h: number, m: number, s: number) => new Date(2026, 5, 21, h, m, s).getTime();
+
+	it('formats an afternoon timestamp as local 24-hour HH:MM:SS', () => {
+		expect(formatLogTime(at(14, 32, 7))).toBe('14:32:07');
 	});
 
-	it('ids below 60 still show 00:00 (sub-second resolution rounds down)', () => {
-		expect(formatLogTime(30)).toBe('00:00');
-		expect(formatLogTime(59)).toBe('00:00');
+	it('pads single-digit hours, minutes, and seconds with a leading zero', () => {
+		expect(formatLogTime(at(3, 5, 9))).toBe('03:05:09');
 	});
 
-	it('formats exactly one second', () => {
-		expect(formatLogTime(60)).toBe('00:01');
+	it('formats midnight as 00:00:00', () => {
+		expect(formatLogTime(at(0, 0, 0))).toBe('00:00:00');
 	});
 
-	it('formats one minute boundary', () => {
-		expect(formatLogTime(3600)).toBe('01:00');
-	});
-
-	it('formats a value with both minutes and seconds', () => {
-		// 90 seconds = 1 min 30 sec → id = 90 * 60 = 5400
-		expect(formatLogTime(5400)).toBe('01:30');
-	});
-
-	it('pads single-digit minutes and seconds with a leading zero', () => {
-		// 5 min 9 sec → id = 309 * 60 = 18540
-		expect(formatLogTime(18540)).toBe('05:09');
-	});
-
-	it('wraps minutes at 100 (minutes % 100)', () => {
-		// 100 minutes → id = 6000 * 60 = 360000
-		expect(formatLogTime(360000)).toBe('00:00');
-	});
-
-	it('handles large ids correctly', () => {
-		// 99 min 59 sec → id = (99*60 + 59) * 60 = 359940
-		expect(formatLogTime(359940)).toBe('99:59');
+	it('formats the last second of the day', () => {
+		expect(formatLogTime(at(23, 59, 59))).toBe('23:59:59');
 	});
 });
