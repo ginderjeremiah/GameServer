@@ -610,10 +610,13 @@ namespace Game.Application.Services
             }
 
             var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(player.Id, cancellationToken);
+            // Filter to viable candidates before ordering, then resolve each domain zone once (lazily, so the
+            // resolve stops at the first unlocked match) rather than re-resolving it inside the predicate.
             var destination = _zones.All()
+                .Where(zone => IsZoneViable(zone.Id))
                 .OrderBy(zone => zone.Order)
-                .FirstOrDefault(zone =>
-                    IsZoneViable(zone.Id) && _zones.GetDomainZone(zone.Id).IsUnlocked(completedChallengeIds));
+                .Select(zone => _zones.GetDomainZone(zone.Id))
+                .FirstOrDefault(zone => zone.IsUnlocked(completedChallengeIds));
             var newZoneId = destination?.Id ?? NewPlayerFactory.StartingZoneId;
 
             if (newZoneId != player.CurrentZoneId)

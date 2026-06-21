@@ -89,6 +89,35 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void EveryChallengeTypeMapsToItsIntendedGoalComparison()
+        {
+            // The two tests above pin the derivation rule (AtMost iff Min-aggregated), but that rule is
+            // self-referential: it can't catch a future Min-backed statistic whose challenge should still
+            // accumulate "at least". This pins the concrete intended direction per type, so adding a new
+            // challenge type (or flipping a backing statistic to Min) forces a deliberate decision here
+            // rather than silently inheriting an AtMost goal.
+            var expected = new Dictionary<EChallengeType, EChallengeGoalComparison>
+            {
+                [EChallengeType.EnemiesKilled] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.BossesDefeated] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.ZonesCleared] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.LevelReached] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.TimeTrial] = EChallengeGoalComparison.AtMost,
+                [EChallengeType.DamageDealt] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.BattlesWon] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.SkillsUsed] = EChallengeGoalComparison.AtLeast,
+            };
+
+            // A newly-added challenge type must declare its intended direction above before this passes.
+            Assert.Equal(Enum.GetValues<EChallengeType>().ToHashSet(), expected.Keys.ToHashSet());
+
+            foreach (var (type, comparison) in expected)
+            {
+                Assert.Equal(comparison, new ChallengeType(type).GoalComparison);
+            }
+        }
+
+        [Fact]
         public void Name_IsHumanReadableWithSpaces()
         {
             var challengeType = new ChallengeType(EChallengeType.EnemiesKilled);

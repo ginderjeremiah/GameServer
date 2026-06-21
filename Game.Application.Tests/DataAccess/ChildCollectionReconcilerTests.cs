@@ -67,7 +67,7 @@ namespace Game.Application.Tests.DataAccess
             var result = Reconcile(existing, desired, recorder);
 
             Assert.False(result.Succeeded);
-            Assert.Equal("The submitted child set contains duplicate entries.", result.ErrorMessage);
+            Assert.Equal("The submitted child change set contains duplicate entries.", result.ErrorMessage);
             Assert.Empty(recorder.Deleted);
             Assert.Empty(recorder.Updated);
             Assert.Empty(recorder.Inserted);
