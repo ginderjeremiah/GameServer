@@ -61,6 +61,9 @@ describe('BackgroundThrottleMonitor', () => {
 	afterEach(() => {
 		monitor.stop();
 		vi.unstubAllGlobals();
+		// vi.unstubAllGlobals doesn't undo a defineProperty, so drop our own-property override of
+		// document.hidden and let it fall back to the jsdom prototype getter.
+		delete (document as unknown as Record<string, unknown>).hidden;
 	});
 
 	const lose = (ms: number) => h.state.idleTimeLostCb?.(ms);
@@ -81,6 +84,25 @@ describe('BackgroundThrottleMonitor', () => {
 		goHidden();
 		lose(10_000);
 		goVisible();
+
+		expect(h.toastWarning).not.toHaveBeenCalled();
+	});
+
+	it('credits a frozen tab whose loss arrives only as the post-resume catch-up poll', () => {
+		monitor.start();
+		goHidden(); // frozen: no timers fire while hidden, so nothing accumulates
+		goVisible(); // resume flips document.hidden before the catch-up poll
+		lose(70_000); // the single catch-up poll, fired with document.hidden already false
+
+		expect(h.toastWarning).toHaveBeenCalledTimes(1);
+	});
+
+	it('credits only the first post-resume event, then treats later loss as a foreground stall', () => {
+		monitor.start();
+		goHidden();
+		goVisible();
+		lose(100); // the post-resume catch-up poll — consumes the one-shot credit (below threshold)
+		lose(70_000); // a genuine later foreground stall — ignored
 
 		expect(h.toastWarning).not.toHaveBeenCalled();
 	});

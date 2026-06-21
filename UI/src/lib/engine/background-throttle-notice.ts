@@ -8,7 +8,7 @@ import type { Action } from '$lib/common';
 // has silently cost the player more than this much idle progress, nudge them — once, ever — to
 // allowlist the game as always-active so the foreground rate keeps running while the tab is hidden.
 const LOST_TIME_NOTICE_THRESHOLD_MS = 60_000;
-const NOTICE_SHOWN_KEY = 'gs:bgThrottleNoticeShown';
+const NOTICE_SHOWN_KEY = 'gameserver.bgThrottleNoticeShown';
 
 const BASE_MESSAGE = 'Idle progress pauses while this tab runs in the background.';
 
@@ -43,6 +43,7 @@ export const backgroundThrottleGuidance = (): string => {
 export class BackgroundThrottleMonitor {
 	private unhookIdleTimeLost?: Action;
 	private lostWhileHiddenMs = 0;
+	private resumeCatchUpPending = false;
 	private running = false;
 
 	public start() {
@@ -51,6 +52,7 @@ export class BackgroundThrottleMonitor {
 		}
 		this.running = true;
 		this.lostWhileHiddenMs = 0;
+		this.resumeCatchUpPending = false;
 		this.unhookIdleTimeLost = onIdleTimeLost((lostMs) => this.recordLostTime(lostMs));
 		document.addEventListener('visibilitychange', this.handleVisibilityChange);
 	}
@@ -61,31 +63,49 @@ export class BackgroundThrottleMonitor {
 		}
 		this.running = false;
 		this.lostWhileHiddenMs = 0;
+		this.resumeCatchUpPending = false;
 		this.unhookIdleTimeLost?.();
 		this.unhookIdleTimeLost = undefined;
 		document.removeEventListener('visibilitychange', this.handleVisibilityChange);
 	}
 
-	// Only count time discarded while the tab is hidden: the catch-up cap can also clip a foreground
-	// main-thread stall, but the backgrounding case is the one this notice addresses.
 	private recordLostTime(lostMs: number) {
+		// A throttled tab keeps firing (slowed) timers while hidden, so it accumulates here directly.
 		if (document.hidden) {
 			this.lostWhileHiddenMs += lostMs;
+			return;
 		}
+		// A frozen/discarded tab (Memory Saver — the audience this notice targets) runs no timers
+		// while hidden; its single catch-up poll fires just after the resume `visibilitychange`, with
+		// `document.hidden` already false. Credit that first post-resume event to the hidden period
+		// that just ended rather than dropping it as a foreground stall.
+		if (this.resumeCatchUpPending) {
+			this.resumeCatchUpPending = false;
+			this.lostWhileHiddenMs += lostMs;
+			this.evaluate();
+		}
+		// Otherwise it's a genuine foreground stall the catch-up cap clipped — ignore it.
 	}
 
 	private handleVisibilityChange = () => {
 		if (document.hidden) {
 			// Entering a new hidden period — measure it on its own.
 			this.lostWhileHiddenMs = 0;
+			this.resumeCatchUpPending = false;
 			return;
 		}
-		// Back in the foreground: if the hidden period cost a meaningful amount of idle progress, nudge.
+		// Back in the foreground. A throttled tab has already accumulated its loss (evaluate it now);
+		// a frozen tab's loss arrives as the next catch-up poll, so arm the one-shot resume credit.
+		this.resumeCatchUpPending = true;
+		this.evaluate();
+	};
+
+	// Nudges once if the hidden period cost a meaningful amount of idle progress.
+	private evaluate() {
 		if (this.lostWhileHiddenMs >= LOST_TIME_NOTICE_THRESHOLD_MS) {
 			this.maybeShowNotice();
 		}
-		this.lostWhileHiddenMs = 0;
-	};
+	}
 
 	private maybeShowNotice() {
 		const storage = safeLocalStorage();
