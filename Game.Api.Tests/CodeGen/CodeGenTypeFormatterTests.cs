@@ -304,6 +304,32 @@ namespace Game.Api.Tests.CodeGen
             var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
             Assert.Contains("Char", ex.Message);
         }
+
+        [Fact]
+        public void GetTypeText_UnmappedGuid_Throws()
+        {
+            // Guid is a non-primitive struct with no TypeScript mapping. Before #1081 NeedsInterface let it
+            // through and the formatter emitted a nonsense IGuid; it must now throw at generation time.
+            var descriptor = GetPropertyDescriptor<ModelWithUnmappedStruct>("GuidValue");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("Guid", ex.Message);
+        }
+
+        [Fact]
+        public void GetTypeText_UnmappedTimeSpan_Throws()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithUnmappedStruct>("TimeSpanValue");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("TimeSpan", ex.Message);
+        }
+
+        [Fact]
+        public void GetTypeText_UnmappedDateTimeOffset_Throws()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithUnmappedStruct>("DateTimeOffsetValue");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("DateTimeOffset", ex.Message);
+        }
     }
 
     public class GenericHolder

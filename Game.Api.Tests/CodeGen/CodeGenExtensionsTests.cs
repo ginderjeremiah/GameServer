@@ -131,6 +131,32 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void NeedsInterface_Guid_ReturnsFalse()
+        {
+            // Guid is a non-primitive struct with no TypeScript mapping; it must not generate an interface.
+            Assert.False(typeof(Guid).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_TimeSpan_ReturnsFalse()
+        {
+            Assert.False(typeof(TimeSpan).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_DateTimeOffset_ReturnsFalse()
+        {
+            Assert.False(typeof(DateTimeOffset).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_ListOfGuid_ReturnsFalse()
+        {
+            // The element type is the unmapped struct, so the enumerable must not generate an interface.
+            Assert.False(typeof(List<Guid>).NeedsInterface());
+        }
+
+        [Fact]
         public void NeedsInterface_ListOfClass_ReturnsTrue()
         {
             // For enumerables, checks the generic argument
