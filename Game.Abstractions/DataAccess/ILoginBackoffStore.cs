@@ -33,6 +33,13 @@ namespace Game.Abstractions.DataAccess
     /// The tracked consecutive-failure state for an account: how many failures have accrued in the current
     /// window and the instant before which the next attempt is rejected (equal to the failure instant while
     /// still under the free-attempt threshold, i.e. no active lock).
+    /// <para>
+    /// Its JSON serialization must stay a deterministic, idempotent round-trip (<c>Serialize(Deserialize(x))
+    /// == Serialize(x)</c>): the store's compare-and-set (<see cref="TryUpdate"/>) matches the stored payload
+    /// by re-serialising the expected state. Adding a field with a culture-sensitive or non-idempotent
+    /// converter would break that match and turn the guard's retry into a spin, so keep this record
+    /// plainly serializable.
+    /// </para>
     /// </summary>
     public record LoginBackoffState(int FailureCount, DateTimeOffset LockedUntil);
 }
