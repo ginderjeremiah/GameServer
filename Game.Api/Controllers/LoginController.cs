@@ -270,6 +270,23 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
+        /// Lists the authenticated account's characters. The login flow gets these from <see cref="Login"/>'s
+        /// response, but the in-game character switcher runs inside an authenticated session with no login
+        /// handoff to draw on, so it re-fetches the current list here before a switch.
+        /// </summary>
+        [HttpGet]
+        public async Task<ApiEnumerableResponse<PlayerSummary>> Players()
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            var players = await _accountService.GetPlayers(_sessionService.UserId);
+            return ApiResponse.Success(players);
+        }
+
+        /// <summary>
         /// Records the device capabilities the frontend reports once after login, enriching the device
         /// identified by the fingerprint header of this request. Requires authentication so it can only be
         /// sent by a logged-in client. Returns an error when the request carries no device fingerprint.

@@ -418,6 +418,39 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task GetPlayers_ReturnsAllOfTheAccountsCharacters()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "switcher", "pass");
+            var first = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var second = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var players = await accountService.GetPlayers(user.Id);
+
+            Assert.Equal(new[] { first.Id, second.Id }.OrderBy(id => id), players.Select(p => p.Id).OrderBy(id => id));
+        }
+
+        [Fact]
+        public async Task GetPlayers_OtherAccountsPlayers_AreNotReturned()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "owner", "pass");
+            var mine = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var other = await TestDataSeeder.CreateUserAsync(context, "stranger", "pass");
+            await TestDataSeeder.CreatePlayerAsync(context, other.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var players = await accountService.GetPlayers(user.Id);
+
+            Assert.Equal(new[] { mine.Id }, players.Select(p => p.Id));
+        }
+
+        [Fact]
         public async Task CreatePlayer_ValidName_CreatesCharacterAttachedToAccount()
         {
             using var scope = CreateScope();

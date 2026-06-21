@@ -34,6 +34,9 @@
 		<circle cx="8" cy="8" r="5.5" />
 		<path d="M6.3 6.3c0-1 .8-1.8 1.7-1.8s1.7.8 1.7 1.7c0 1.4-1.7 1.3-1.7 3" stroke-linecap="round" />
 		<circle cx="8" cy="11.5" r="0.5" fill={color} stroke="none" />
+	{:else if kind === 'switch'}
+		<path d="M3 5.5h8.5M9 3l2.5 2.5L9 8" stroke-linecap="round" stroke-linejoin="round" />
+		<path d="M13 10.5H4.5M7 8l-2.5 2.5L7 13" stroke-linecap="round" stroke-linejoin="round" />
 	{:else if kind === 'quit'}
 		<path
 			d="M6 2.5H3a1 1 0 00-1 1v9a1 1 0 001 1h3M9.5 5L12.5 8l-3 3M5 8h7.5"
