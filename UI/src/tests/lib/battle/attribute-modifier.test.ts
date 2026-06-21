@@ -173,4 +173,11 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 	it('declares every static modifier as additive (the engine base/derived layer)', () => {
 		expect(STATIC_ATTRIBUTE_MODIFIERS.every((m) => m.type === EModifierType.Additive)).toBe(true);
 	});
+
+	it('freezes the table and its entries so the battler-shared template cannot be mutated', () => {
+		// Every BattleAttributes spreads these shared object references into its own modifier list, so a
+		// mutation here would corrupt every battler at once — the freeze makes that impossible at runtime.
+		expect(Object.isFrozen(STATIC_ATTRIBUTE_MODIFIERS)).toBe(true);
+		expect(STATIC_ATTRIBUTE_MODIFIERS.every((m) => Object.isFrozen(m))).toBe(true);
+	});
 });
