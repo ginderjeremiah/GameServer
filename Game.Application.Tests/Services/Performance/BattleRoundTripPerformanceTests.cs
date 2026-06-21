@@ -69,7 +69,7 @@ namespace Game.Application.Tests.Services.Performance
             for (var i = 0; i < WarmupIterations; i++)
             {
                 var warmup = await StartFreshBattleAsync(fixture);
-                await warmup.BattleService.EndBattleVictory(warmup.Player, warmup.State, DateTime.UtcNow);
+                await warmup.BattleService.EndBattleVictory(warmup.Player, warmup.State);
                 await warmup.UnitOfWork.CommitAsync();
                 warmup.Scope.Dispose();
             }
@@ -79,7 +79,7 @@ namespace Game.Application.Tests.Services.Performance
                 var op = await StartFreshBattleAsync(fixture);
                 Settle();
 
-                var endMs = await TimeAsync(() => op.BattleService.EndBattleVictory(op.Player, op.State, DateTime.UtcNow));
+                var endMs = await TimeAsync(() => op.BattleService.EndBattleVictory(op.Player, op.State));
                 var commitMs = await TimeAsync(() => op.UnitOfWork.CommitAsync());
 
                 endStats.Add(endMs);
@@ -238,7 +238,7 @@ namespace Game.Application.Tests.Services.Performance
             await battleService.StartBattle(player, state, fixture.ZoneId);
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var probe = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            var probe = await battleService.EndBattleVictory(player, state);
             Assert.NotNull(probe); // the scenario must be a victory, or measured ops would do different work
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
 
@@ -256,7 +256,7 @@ namespace Game.Application.Tests.Services.Performance
 
             var state = new PlayerState();
             await battleService.StartBattle(player, state, fixture.ZoneId);
-            // Backdate so the claimed victory timestamp is valid (earliestDefeat well before now).
+            // Backdate so the battle's server-computed completion is well before now (elapsed-time check passes).
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
             return new BattleOp(scope, battleService, unitOfWork, player, state);
@@ -267,7 +267,7 @@ namespace Game.Application.Tests.Services.Performance
             for (var i = 0; i < count; i++)
             {
                 var op = await StartFreshBattleAsync(fixture);
-                await op.BattleService.EndBattleVictory(op.Player, op.State, DateTime.UtcNow);
+                await op.BattleService.EndBattleVictory(op.Player, op.State);
                 await op.UnitOfWork.CommitAsync();
                 op.Scope.Dispose();
             }

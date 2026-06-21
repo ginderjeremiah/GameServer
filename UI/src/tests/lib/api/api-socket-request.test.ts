@@ -9,12 +9,12 @@ import type { IApiSocketResponse } from '$lib/api/api-socket';
 describe('ApiSocketRequest', () => {
 	describe('getCommandInfo', () => {
 		it('serializes the parameters to a JSON string alongside the id and command name', () => {
-			const request = new ApiSocketRequest('7', 'DefeatEnemy', { timestamp: 42 });
+			const request = new ApiSocketRequest('7', 'DefeatEnemy', { clientTotalMs: 42 });
 
 			expect(request.getCommandInfo()).toEqual({
 				id: '7',
 				name: 'DefeatEnemy',
-				parameters: JSON.stringify({ timestamp: 42 })
+				parameters: JSON.stringify({ clientTotalMs: 42 })
 			});
 		});
 
@@ -31,7 +31,7 @@ describe('ApiSocketRequest', () => {
 
 	describe('resolve', () => {
 		it('settles getResponse with the full success response', async () => {
-			const request = new ApiSocketRequest('1', 'DefeatEnemy', { timestamp: 1 });
+			const request = new ApiSocketRequest('1', 'DefeatEnemy', { clientTotalMs: 1 });
 			const response: IApiSocketResponse<'DefeatEnemy'> = { id: '1', name: 'DefeatEnemy', data: { cooldown: 100 } };
 
 			request.resolve(response);
@@ -42,7 +42,7 @@ describe('ApiSocketRequest', () => {
 
 	describe('settleWithError', () => {
 		it('settles getResponse through the resolve-with-error contract (error field, no data)', async () => {
-			const request = new ApiSocketRequest('2', 'DefeatEnemy', { timestamp: 1 });
+			const request = new ApiSocketRequest('2', 'DefeatEnemy', { clientTotalMs: 1 });
 
 			request.settleWithError('Connection lost. Please try again.');
 
@@ -56,7 +56,7 @@ describe('ApiSocketRequest', () => {
 		});
 
 		it('resolves rather than rejects, so callers never need a try/catch around getResponse', async () => {
-			const request = new ApiSocketRequest('3', 'DefeatEnemy', { timestamp: 1 });
+			const request = new ApiSocketRequest('3', 'DefeatEnemy', { clientTotalMs: 1 });
 			const onRejected = vi.fn();
 
 			request.settleWithError('boom');
@@ -71,7 +71,7 @@ describe('ApiSocketRequest', () => {
 	// timeout firing and then a socket close also iterating the in-flight map (see ApiSocket).
 	describe('single settlement (first settle wins)', () => {
 		it('keeps the first success when a later error settle arrives', async () => {
-			const request = new ApiSocketRequest('4', 'DefeatEnemy', { timestamp: 1 });
+			const request = new ApiSocketRequest('4', 'DefeatEnemy', { clientTotalMs: 1 });
 			const success: IApiSocketResponse<'DefeatEnemy'> = { id: '4', name: 'DefeatEnemy', data: { cooldown: 5 } };
 
 			request.resolve(success);
@@ -81,7 +81,7 @@ describe('ApiSocketRequest', () => {
 		});
 
 		it('keeps the first error when a later success settle arrives', async () => {
-			const request = new ApiSocketRequest('5', 'DefeatEnemy', { timestamp: 1 });
+			const request = new ApiSocketRequest('5', 'DefeatEnemy', { clientTotalMs: 1 });
 
 			request.settleWithError('first');
 			request.resolve({ id: '5', name: 'DefeatEnemy', data: { cooldown: 9 } });

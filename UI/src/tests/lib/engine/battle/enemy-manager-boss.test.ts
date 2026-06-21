@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
 	holder: { stageCb: undefined as ((stage: number) => unknown) | undefined },
 	battleEngine: {
 		stage: 1, // Active: start() then does not kick off an initial idle getNewEnemy
+		timeElapsed: 8880, // the simulated battle duration claimVictory reports as clientTotalMs
 		startLoading: vi.fn(() => Promise.resolve()),
 		pause: vi.fn()
 	},
@@ -246,7 +247,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Victorious);
 
-		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ timestamp: expect.any(Number) }));
+		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ clientTotalMs: expect.any(Number) }));
 		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
 		expect(h.statistics.markZoneCleared).toHaveBeenCalledWith(3);
 		// Auto-fight off ⇒ hand back to the idle farm loop.
@@ -794,7 +795,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Victorious);
 
-		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ timestamp: expect.any(Number) }));
+		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ clientTotalMs: expect.any(Number) }));
 		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });

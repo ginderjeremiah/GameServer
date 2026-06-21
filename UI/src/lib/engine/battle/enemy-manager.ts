@@ -480,9 +480,9 @@ export class EnemyManager {
 		const enemyId = this.currentEnemy?.id;
 		const enemyName = enemyId != null ? staticData.enemies?.[enemyId]?.name : undefined;
 		// Report the duration the client simulated alongside the claim. Diagnostic only (not anti-cheat):
-		// the backend logs when it diverges from its own parity replay.
+		// the backend logs when it diverges from its own parity replay. The server validates the victory and
+		// anchors the cooldown purely off its own clock, so no client timestamp is sent.
 		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', {
-			timestamp: Date.now(),
 			clientTotalMs: battleEngine.timeElapsed
 		});
 		if (!defeatResponse.error && defeatResponse.data?.rewards) {

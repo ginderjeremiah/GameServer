@@ -50,15 +50,16 @@ namespace Game.Application.Services
         // every time, so a small count is decisive; any win or loss disables the guard).
         private const int StalemateCutoffBattles = 10;
 
-        // Symmetric clock-skew tolerance for the client-claimed victory timestamp: one logical tick, because
-        // the frontend's battle-start may sit up to a tick off the backend's (a battle started mid-tick counts
-        // its first partial tick as a full one). Benign skew within a tick in either direction is absorbed,
-        // while a claim outside this envelope on either side is rejected by the anti-cheat check in EndBattleVictory.
-        private static readonly TimeSpan ClaimedTimestampSkewTolerance = TimeSpan.FromMilliseconds(GameConstants.MsPerTick);
+        // Slack on the server-measured elapsed-time victory check: one logical tick, because the frontend's
+        // battle-start may sit up to a tick off the backend's (a battle started mid-tick counts its first
+        // partial tick as a full one). A victory claim is rejected only if measurably less server time has
+        // elapsed since battle start than the replay's duration minus this slack — i.e. it could not yet have
+        // finished. The check is purely server-clock-based, so it is immune to client/server clock skew.
+        private static readonly TimeSpan ElapsedBattleTimeTolerance = TimeSpan.FromMilliseconds(GameConstants.MsPerTick);
 
-        // Post-battle enemy cooldown, shared by the win and loss paths so the two cannot diverge. The win path
-        // anchors it to the client's claimed completion time and the loss path to the server clock, but the
-        // duration is identical.
+        // Post-battle enemy cooldown, shared by the win and loss paths so the two cannot diverge. Both anchor
+        // it to the server clock; the win path anchors to the battle's completion (battle start + replayed
+        // duration) and the loss path to the moment of the loss, but the duration is identical.
         private static readonly TimeSpan PostBattleCooldown = TimeSpan.FromSeconds(5);
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, CancellationToken cancellationToken = default)
@@ -200,7 +201,7 @@ namespace Game.Application.Services
             return true;
         }
 
-        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp, int? clientTotalMs = null, CancellationToken cancellationToken = default)
+        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
@@ -208,14 +209,14 @@ namespace Game.Application.Services
                 // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
                 _logger.LogWarning(
                     "EndBattleVictory rejected for player {PlayerId}: no resolvable active battle "
-                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}, claimedTimestamp: {ClaimedTimestamp:O}).",
-                    player.Id, state.ActiveEnemyId, state.Snapshot is not null, claimedTimestamp);
+                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}).",
+                    player.Id, state.ActiveEnemyId, state.Snapshot is not null);
                 return null;
             }
 
             // Diagnostic only (not anti-cheat): the client reports the battle duration it simulated, so a
             // divergence from the server's parity replay is visible even when the claim still resolves as a
-            // win. Logged regardless of the victory/timestamp outcome below; absent (null) when not reported.
+            // win. Logged regardless of the outcome below; absent (null) when not reported.
             if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
             {
                 _logger.LogWarning(
@@ -233,39 +234,38 @@ namespace Game.Application.Services
                 _logger.LogWarning(
                     "EndBattleVictory rejected for player {PlayerId}: server replay was not a victory "
                     + "(enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, playerDied: {PlayerDied}, "
-                    + "replayMs: {ReplayMs}, isBoss: {IsBoss}, zoneId: {ZoneId}, claimedTimestamp: {ClaimedTimestamp:O}).",
+                    + "replayMs: {ReplayMs}, isBoss: {IsBoss}, zoneId: {ZoneId}).",
                     player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.PlayerDied,
-                    result.TotalMs, state.IsBossBattle, state.BattleZoneId, claimedTimestamp);
+                    result.TotalMs, state.IsBossBattle, state.BattleZoneId);
                 return null;
             }
 
-            var earliestDefeat = state.BattleStartTime.AddMilliseconds(result.TotalMs);
             var now = DateTime.UtcNow;
+            var battleCompletedAt = state.BattleStartTime.AddMilliseconds(result.TotalMs);
 
-            // Reject a claim that lands outside the symmetric skew envelope on either side: too early
-            // (clock lagging) or too far in the future (clock leading) is anti-cheat, but benign skew
-            // within the tolerance is accepted so a slightly-ahead client clock does not void a real win.
-            if (earliestDefeat - claimedTimestamp > ClaimedTimestampSkewTolerance
-                || claimedTimestamp - now > ClaimedTimestampSkewTolerance)
+            // Anti-cheat, server-clock only: a victory cannot be claimed before enough real server time has
+            // elapsed since battle start for the battle to have actually finished. Network latency only ever
+            // delays the claim, so a legitimate win always lands at or after the completion time; reject only
+            // when the server itself observed measurably less elapsed time than the replay's duration (minus a
+            // one-tick slack for the mid-tick battle-start alignment). Both ends use the server clock, so this
+            // is immune to client/server clock skew — unlike a check against a client-supplied timestamp.
+            if (now < battleCompletedAt - ElapsedBattleTimeTolerance)
             {
-                // Claim landed outside the skew envelope. The earlyBy/aheadBy deltas vs. the tolerance show
-                // which side tripped and by how much (benign clock skew vs. a tampered timestamp).
                 _logger.LogWarning(
-                    "EndBattleVictory rejected for player {PlayerId}: claimed timestamp outside skew tolerance "
-                    + "(claimedTimestamp: {ClaimedTimestamp:O}, earliestDefeat: {EarliestDefeat:O}, now: {Now:O}, "
-                    + "earlyByMs: {EarlyByMs}, aheadByMs: {AheadByMs}, toleranceMs: {ToleranceMs}, "
-                    + "battleStart: {BattleStart:O}, replayMs: {ReplayMs}).",
-                    player.Id, claimedTimestamp, earliestDefeat, now,
-                    (earliestDefeat - claimedTimestamp).TotalMilliseconds,
-                    (claimedTimestamp - now).TotalMilliseconds,
-                    ClaimedTimestampSkewTolerance.TotalMilliseconds,
-                    state.BattleStartTime, result.TotalMs);
+                    "EndBattleVictory rejected for player {PlayerId}: claimed before the battle could finish "
+                    + "(battleStart: {BattleStart:O}, replayMs: {ReplayMs}, battleCompletedAt: {BattleCompletedAt:O}, "
+                    + "now: {Now:O}, shortByMs: {ShortByMs}, toleranceMs: {ToleranceMs}).",
+                    player.Id, state.BattleStartTime, result.TotalMs, battleCompletedAt, now,
+                    (battleCompletedAt - now).TotalMilliseconds, ElapsedBattleTimeTolerance.TotalMilliseconds);
                 return null;
             }
 
             var rewards = RecordVictory(player, enemy, result, state, now);
 
-            state.SetCooldown(claimedTimestamp + PostBattleCooldown);
+            // Anchor the post-battle cooldown to the battle's server-computed completion, not to now: the gap
+            // between completion and now is the post-victory network latency, so subtracting it keeps the idle
+            // farm rate latency-independent (a laggy player isn't penalised) without trusting the client clock.
+            state.SetCooldown(battleCompletedAt + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);

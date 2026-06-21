@@ -30,14 +30,12 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
-            var claimedTimestamp = DateTimeOffset.FromUnixTimeMilliseconds(Parameters.Timestamp).UtcDateTime;
-
-            var rewards = await _battleService.EndBattleVictory(player, state, claimedTimestamp, Parameters.ClientTotalMs, cancellationToken);
+            var rewards = await _battleService.EndBattleVictory(player, state, Parameters.ClientTotalMs, cancellationToken);
 
             if (rewards is not null)
             {
-                _logger.LogDebug("DefeatEnemy: (timestamp: {Timestamp}, exp: {Exp})",
-                    claimedTimestamp.ToString("O"), rewards.ExpReward);
+                _logger.LogDebug("DefeatEnemy: player {PlayerId} defeated enemy (exp: {Exp})",
+                    player.Id, rewards.ExpReward);
 
                 context.Session.SavePlayerState();
 

@@ -106,14 +106,14 @@ describe('ApiSocket', () => {
 		it('passes the stored access token as the access_token query parameter', async () => {
 			setTokens({ accessToken: 'token-123', refreshToken: 'r' });
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(lastSocketUrl).toBe('/socket?access_token=token-123');
 		});
 
 		it('opens an unauthenticated socket when no token is stored', async () => {
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(lastSocketUrl).toBe('/socket');
@@ -128,7 +128,7 @@ describe('ApiSocket', () => {
 			// The open path mints a fresh token before building the handshake URL.
 			vi.mocked(ensureValidAccessToken).mockResolvedValue('fresh-token');
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(ensureValidAccessToken).toHaveBeenCalled();
@@ -146,7 +146,7 @@ describe('ApiSocket', () => {
 				})
 			);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			apiSocket.attemptPing(); // a second concurrent open attempt while the refresh is still in flight
 
 			// Both callers are awaiting the single in-flight refresh; no socket exists yet.
@@ -164,7 +164,7 @@ describe('ApiSocket', () => {
 			// Refresh token spent/revoked: no usable token can be obtained.
 			vi.mocked(ensureValidAccessToken).mockResolvedValue(null);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
@@ -176,7 +176,7 @@ describe('ApiSocket', () => {
 
 	describe('sendSocketCommand', () => {
 		it('creates a WebSocket and sends the command', async () => {
-			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -192,7 +192,7 @@ describe('ApiSocket', () => {
 		});
 
 		it('assigns incrementing command IDs', async () => {
-			const p1 = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const p1 = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			const p2 = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
@@ -216,7 +216,7 @@ describe('ApiSocket', () => {
 			(s as unknown as { inFlightRequests: Map<string, unknown> }).inFlightRequests.size;
 
 		it('prunes the in-flight entry once its response resolves', async () => {
-			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			const sent = JSON.parse(ws.send.mock.calls[0][0]);
@@ -229,7 +229,7 @@ describe('ApiSocket', () => {
 		});
 
 		it('settles pending in-flight requests with an error when the socket closes', async () => {
-			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			expect(inFlightSize(apiSocket)).toBe(1);
@@ -255,7 +255,7 @@ describe('ApiSocket', () => {
 				return ws;
 			});
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const connecting = lastWs();
 			expect(connecting.send).not.toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe('ApiSocket', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			vi.useFakeTimers();
 			try {
-				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				expect(inFlightSize(apiSocket)).toBe(1);
 
@@ -301,7 +301,7 @@ describe('ApiSocket', () => {
 		it('clears the timer when a real response arrives, so a later tick never spuriously settles', async () => {
 			vi.useFakeTimers();
 			try {
-				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const ws = lastWs();
 				const sent = JSON.parse(ws.send.mock.calls[0][0]);
@@ -329,7 +329,7 @@ describe('ApiSocket', () => {
 					return ws;
 				});
 
-				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const connecting = lastWs();
 				expect(connecting.send).not.toHaveBeenCalled();
@@ -367,7 +367,7 @@ describe('ApiSocket', () => {
 			vi.useFakeTimers();
 			try {
 				// No tokens (localStorage cleared in beforeEach) so the later close only settles — no reconnect.
-				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const ws = lastWs();
 				expect(inFlightSize(apiSocket)).toBe(1);
@@ -394,7 +394,7 @@ describe('ApiSocket', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			vi.useFakeTimers();
 			try {
-				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const ws = lastWs();
 				expect(inFlightSize(apiSocket)).toBe(1);
@@ -424,7 +424,7 @@ describe('ApiSocket', () => {
 			const listener = vi.fn();
 			apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -439,7 +439,7 @@ describe('ApiSocket', () => {
 			apiSocket.listenCommand('SocketReplaced', listener1, false);
 			apiSocket.listenCommand('SocketReplaced', listener2, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -453,7 +453,7 @@ describe('ApiSocket', () => {
 			const listener = vi.fn();
 			apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -465,7 +465,7 @@ describe('ApiSocket', () => {
 
 	describe('ping/pong', () => {
 		it('responds with pong when ping received', async () => {
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -479,7 +479,7 @@ describe('ApiSocket', () => {
 		it('logs error and does not crash on malformed JSON', async () => {
 			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			receive(ws, 'not-json');
@@ -496,7 +496,7 @@ describe('ApiSocket', () => {
 
 			apiSocket.listenCommand('SocketReplaced', badListener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			receive(ws, JSON.stringify({ name: 'SocketReplaced', data: {} }));
@@ -553,7 +553,7 @@ describe('ApiSocket', () => {
 			const handler = vi.fn();
 			onSocketError(handler, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			ws.onerror?.();
@@ -577,7 +577,7 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			webSocketMock.mockClear();
@@ -595,7 +595,7 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			vi.mocked(refreshTokens).mockResolvedValue(null);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -609,7 +609,7 @@ describe('ApiSocket', () => {
 		it('does not retry a socket that had already opened', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			ws.onopen?.(); // marks the socket as opened
@@ -623,7 +623,7 @@ describe('ApiSocket', () => {
 		it('does not retry on a normal closure', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -635,7 +635,7 @@ describe('ApiSocket', () => {
 
 		it('does not retry when there is no refresh token to use', async () => {
 			// localStorage cleared in beforeEach → getRefreshToken() returns null.
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -655,7 +655,7 @@ describe('ApiSocket', () => {
 				ws.readyState = 0; // CONNECTING
 				return ws;
 			});
-			return s.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			return s.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 		};
 
 		it('settles an unsent queued command when a normal closure arrives before it ever opened', async () => {
@@ -731,7 +731,7 @@ describe('ApiSocket', () => {
 			const listener = vi.fn();
 			const unhook = apiSocket.listenCommand('SocketReplaced', listener, false);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 
@@ -749,7 +749,7 @@ describe('ApiSocket', () => {
 		it('arms the keepalive interval when a socket is created', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
@@ -759,7 +759,7 @@ describe('ApiSocket', () => {
 			vi.useFakeTimers();
 			try {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
-				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 				const socketsBefore = socketInstances.length;
@@ -779,7 +779,7 @@ describe('ApiSocket', () => {
 
 		it('stops the keepalive on a normal (clean) closure', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
@@ -792,7 +792,7 @@ describe('ApiSocket', () => {
 
 		it('disconnect() stops the keepalive and closes the socket', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
@@ -816,7 +816,7 @@ describe('ApiSocket', () => {
 			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			// Each reconnect is rejected pre-open again; without a stable open the budget is never refilled.
@@ -838,7 +838,7 @@ describe('ApiSocket', () => {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
 
-				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 
@@ -870,7 +870,7 @@ describe('ApiSocket', () => {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				internals(apiSocket).socketAuthRetries = 3;
 
-				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const ws = lastWs();
 				ws.onopen?.();
@@ -891,7 +891,7 @@ describe('ApiSocket', () => {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
 				internals(apiSocket).socketAuthRetries = 3;
 
-				apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();
 				const ws = lastWs();
 				ws.onopen?.(); // arms the stability timer
@@ -913,7 +913,7 @@ describe('ApiSocket', () => {
 				(s as unknown as { connectionStableTimer: ReturnType<typeof setTimeout> | null }).connectionStableTimer;
 
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: 1 });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 			const ws = lastWs();
 

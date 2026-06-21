@@ -53,7 +53,7 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task DefeatEnemy_ValidTimestamp_ReturnsRewards()
+        public async Task DefeatEnemy_EnoughTimeElapsed_ReturnsRewards()
         {
             var (userId, playerId) = await SeedAndLoginAsync();
 
@@ -92,10 +92,10 @@ namespace Game.Api.Tests.Integration
             await socketClient.ConnectAsync(wsClient, userId);
             Assert.Equal(WebSocketState.Open, socketClient.State);
 
-            // Now defeat enemy with a timestamp that is sufficiently after the start to ensure victory
-            var futureTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // The battle was backdated 30 minutes, so more than its duration of server time has elapsed and the
+            // victory resolves. The command carries no client timestamp — the server validates off its own clock.
             var response = await socketClient.SendCommandAsync<DefeatEnemyResponse>(
-                "DefeatEnemy", new { Timestamp = futureTimestamp });
+                "DefeatEnemy", new { });
 
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
@@ -112,15 +112,14 @@ namespace Game.Api.Tests.Integration
             var wsClient = Factory.Server.CreateWebSocketClient();
             await socketClient.ConnectAsync(wsClient, userId);
 
-            var futureTimestamp = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeMilliseconds();
             var response = await socketClient.SendCommandAsync<DefeatEnemyResponse>(
-                "DefeatEnemy", new { Timestamp = futureTimestamp });
+                "DefeatEnemy", new { });
 
             Assert.NotNull(response.Error);
         }
 
         [Fact]
-        public async Task DefeatEnemy_TimestampTooEarly_ReturnsError()
+        public async Task DefeatEnemy_ClaimedBeforeBattleCouldFinish_ReturnsError()
         {
             var (userId, _) = await SeedAndLoginAsync();
 
@@ -133,10 +132,10 @@ namespace Game.Api.Tests.Integration
                 "NewEnemy", new { NewZoneId = (int?)null });
             Assert.Null(newEnemyResponse.Error);
 
-            // Try to defeat immediately (timestamp = now, not enough time to win)
-            var nowTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // Try to defeat immediately: the battle just started, so far less server time has elapsed than its
+            // duration and the claim could not have finished yet — rejected.
             var response = await socketClient.SendCommandAsync<DefeatEnemyResponse>(
-                "DefeatEnemy", new { Timestamp = nowTimestamp });
+                "DefeatEnemy", new { });
 
             Assert.NotNull(response.Error);
         }

@@ -155,13 +155,13 @@ namespace Game.Application.Tests.Services
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
 
-            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            var result = await battleService.EndBattleVictory(player, state);
 
             Assert.Null(result);
         }
 
         [Fact]
-        public async Task EndBattleVictory_ValidTimestamp_ReturnsDefeatResult()
+        public async Task EndBattleVictory_EnoughTimeElapsed_ReturnsDefeatResult()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -190,11 +190,11 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             Assert.True(state.HasActiveBattle);
 
-            // Backdate the battle start so the simulation's TotalMs has already elapsed,
-            // making DateTime.UtcNow a valid claimed timestamp (between earliestDefeat and now).
+            // Backdate the battle start so more than the simulation's TotalMs of server time has elapsed,
+            // satisfying the server-measured elapsed-time check.
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            var result = await battleService.EndBattleVictory(player, state);
 
             Assert.NotNull(result);
             Assert.True(result.ExpReward >= 0);
@@ -231,7 +231,7 @@ namespace Game.Application.Tests.Services
 
             // A wildly divergent client-reported duration is logged but never gates the claim — the field
             // is diagnostic only, not anti-cheat — so the victory must still resolve to a DefeatResult.
-            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow, clientTotalMs: int.MaxValue);
+            var result = await battleService.EndBattleVictory(player, state, clientTotalMs: int.MaxValue);
 
             Assert.NotNull(result);
             Assert.False(state.HasActiveBattle);
@@ -285,14 +285,14 @@ namespace Game.Application.Tests.Services
             // DateTime.UtcNow a valid claimed timestamp.
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            var result = await battleService.EndBattleVictory(player, state);
 
             Assert.NotNull(result);
             Assert.Equal(100, result.ExpReward);
         }
 
         [Fact]
-        public async Task EndBattleVictory_TimestampTooEarly_ReturnsNull()
+        public async Task EndBattleVictory_ClaimedBeforeBattleCouldFinish_ReturnsNull()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -320,13 +320,15 @@ namespace Game.Application.Tests.Services
 
             await battleService.StartBattle(player, state, zoneId: zone.Id);
 
-            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            // The battle just started, so far less server time has elapsed than the replay's duration — the
+            // claim could not physically have finished yet and is rejected (the core server-side anti-cheat).
+            var result = await battleService.EndBattleVictory(player, state);
 
             Assert.Null(result);
         }
 
         [Fact]
-        public async Task EndBattleVictory_ClaimedSlightlyAheadOfServer_WithinSkewTolerance_ReturnsDefeatResult()
+        public async Task EndBattleVictory_CooldownAnchoredToBattleCompletion_NotServerClock()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -353,65 +355,22 @@ namespace Game.Application.Tests.Services
             var state = new PlayerState();
 
             await battleService.StartBattle(player, state, zoneId: zone.Id);
-            Assert.True(state.HasActiveBattle);
 
-            // Backdate the battle start so the simulation's TotalMs has already elapsed (the "too early"
-            // side is satisfied), isolating the future-side skew check.
-            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            // Backdate the battle start by well over the post-battle cooldown so the battle's server-computed
+            // completion (battleStart + replay duration) sits firmly in the past.
+            var battleStart = DateTime.UtcNow.AddMinutes(-10);
+            state.BattleStartTime = battleStart;
 
-            // A benign client clock that leads the server by less than one logical tick (the skew tolerance)
-            // must NOT void the win — the frontend's battle-start can sit up to a tick off the backend's.
-            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(GameConstants.MsPerTick / 2);
-            var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
+            var result = await battleService.EndBattleVictory(player, state);
 
             Assert.NotNull(result);
-            Assert.True(result.ExpReward >= 0);
-            Assert.False(state.HasActiveBattle);
-            // The victory cooldown is anchored to the client's claimed completion time (claimed + 5s),
-            // NOT to the server clock, so server load / network latency never affect the play rate.
-            Assert.Equal(claimedTimestamp.AddSeconds(5), state.EnemyCooldown);
-        }
-
-        [Fact]
-        public async Task EndBattleVictory_ClaimedAheadOfServer_BeyondSkewTolerance_ReturnsNull()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
-            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
-            var zone = await TestDataSeeder.CreateZoneAsync(context);
-            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
-
-            var user = await TestDataSeeder.CreateUserAsync(context);
-            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
-
-            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
-            // no longer lazily refill).
-            await ReloadReferenceCachesAsync();
-
-            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
-            var player = await playerRepo.GetPlayer(playerEntity.Id);
-            Assert.NotNull(player);
-
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var state = new PlayerState();
-
-            await battleService.StartBattle(player, state, zoneId: zone.Id);
-            Assert.True(state.HasActiveBattle);
-
-            // Backdate so the "too early" side is satisfied, isolating the future-side skew check.
-            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
-
-            // A claim beyond the one-tick skew tolerance into the future is anti-cheat and must be rejected,
-            // and the active battle must remain so the client can re-claim with a corrected timestamp.
-            var claimedTimestamp = DateTime.UtcNow.AddMilliseconds(GameConstants.MsPerTick + 200);
-            var result = await battleService.EndBattleVictory(player, state, claimedTimestamp);
-
-            Assert.Null(result);
-            Assert.True(state.HasActiveBattle);
+            // The cooldown is anchored to the battle's server-computed completion (battleStart + duration + 5s),
+            // NOT to the server clock — so post-victory network latency never penalises the farm rate. With a
+            // 10-minute-old start the cooldown lands in the past; a now-anchored cooldown would be in the future
+            // (now + 5s). It must be at least battleStart + 5s (the replayed duration is non-negative). Read the
+            // captured battleStart, not state.BattleStartTime, which ClearBattle has reset on the success path.
+            Assert.True(state.EnemyCooldown < DateTime.UtcNow);
+            Assert.True(state.EnemyCooldown >= battleStart.AddSeconds(5));
         }
 
         [Fact]
@@ -444,7 +403,7 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             // Backdate so the simulation's TotalMs has already elapsed
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
-            await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            await battleService.EndBattleVictory(player, state);
 
             var reloadedPlayer = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(reloadedPlayer);
@@ -730,7 +689,7 @@ namespace Game.Application.Tests.Services
 
             // Backdate so the simulated victory's elapsed time has already passed, making the claim valid.
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
-            var defeat = await battleService.EndBattleVictory(player, state, DateTime.UtcNow);
+            var defeat = await battleService.EndBattleVictory(player, state);
             Assert.NotNull(defeat);
 
             // The write-behind handler wrote the clear to the progress cache (its source of truth); the
