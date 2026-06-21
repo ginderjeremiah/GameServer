@@ -45,8 +45,3 @@ export interface INewEnemyModel {
 export interface INewEnemyRequest {
 	newZoneId?: number;
 }
-
-export interface ISetAutoChallengeBossRequest {
-	enabled: boolean;
-	zoneId: number;
-}

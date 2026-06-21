@@ -18,7 +18,7 @@ namespace Game.Core.TestInfrastructure.Builders
         private int _exp = 0;
         private int _currentZoneId = 0;
         private DateTime _lastActivity = DateTime.UtcNow;
-        private int? _autoChallengeBossZoneId = null;
+        private bool _autoChallengeBoss = false;
         private List<StatAllocation> _statAllocations = [];
         private int _statPointsGained = 0;
         private int _statPointsUsed = 0;
@@ -57,9 +57,9 @@ namespace Game.Core.TestInfrastructure.Builders
             return this;
         }
 
-        public PlayerBuilder WithAutoChallengeBossZoneId(int? zoneId)
+        public PlayerBuilder WithAutoChallengeBoss(bool enabled)
         {
-            _autoChallengeBossZoneId = zoneId;
+            _autoChallengeBoss = enabled;
             return this;
         }
 
@@ -107,7 +107,7 @@ namespace Game.Core.TestInfrastructure.Builders
             Exp = _exp,
             CurrentZoneId = _currentZoneId,
             LastActivity = _lastActivity,
-            AutoChallengeBossZoneId = _autoChallengeBossZoneId,
+            AutoChallengeBoss = _autoChallengeBoss,
             StatPoints = new PlayerStatPoints
             {
                 StatAllocations = _statAllocations,

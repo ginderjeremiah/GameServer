@@ -143,23 +143,26 @@ namespace Game.Application.Services
 
         /// <summary>
         /// Persists the player's active idle-loop mode (idle vs. auto-challenge-boss) to the durable player
-        /// aggregate so the offline-rewards simulation can resume the correct loop at next login. Enabling
-        /// validates the target zone as anti-cheat exactly like <see cref="StartBossBattle"/> — the zone must
-        /// exist, be in circulation, be unlocked for the player, and have a dedicated boss — rejecting (no
-        /// mutation) otherwise; disabling is always accepted (returning to idle needs no target). The change
-        /// rides the existing write-behind save via the player's core-updated event.
+        /// aggregate so the offline-rewards simulation can resume the correct loop at next login. The boss is
+        /// always the player's current zone's boss — the loop never targets a separate zone — so enabling
+        /// validates <see cref="Player.CurrentZoneId"/> as anti-cheat the same way <see cref="StartBossBattle"/>
+        /// does (in circulation, unlocked, has a dedicated boss), rejecting (no mutation) otherwise; disabling
+        /// is always accepted (returning to idle needs no target). The change rides the existing write-behind
+        /// save via the player's core-updated event.
         /// </summary>
-        public async Task<bool> SetAutoChallengeBoss(Player player, bool enabled, int zoneId, CancellationToken cancellationToken = default)
+        public async Task<bool> SetAutoChallengeBoss(Player player, bool enabled, CancellationToken cancellationToken = default)
         {
             if (!enabled)
             {
-                player.SetAutoChallengeBoss(null);
+                player.SetAutoChallengeBoss(false);
                 await _playerRepo.SavePlayer(player, cancellationToken);
                 return true;
             }
 
-            // Anti-cheat: a non-existent, retired, locked, or bossless zone cannot be boss-farmed. A
-            // legitimate client only enables this against a zone it is in and whose boss it can challenge.
+            // Anti-cheat: a retired, locked, or bossless current zone cannot be boss-farmed. The zone is the
+            // player's own CurrentZoneId (not client-supplied), so a tampered client can't farm a zone it
+            // isn't in; the meaningful gate is that the current zone actually has a challengeable boss.
+            var zoneId = player.CurrentZoneId;
             if (!_zones.ValidateZoneId(zoneId) || _zones.IsZoneRetired(zoneId))
             {
                 return false;
@@ -171,7 +174,7 @@ namespace Game.Application.Services
                 return false;
             }
 
-            player.SetAutoChallengeBoss(zoneId);
+            player.SetAutoChallengeBoss(true);
             await _playerRepo.SavePlayer(player, cancellationToken);
             return true;
         }

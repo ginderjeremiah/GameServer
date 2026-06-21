@@ -813,8 +813,8 @@ namespace Game.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("AutoChallengeBossZoneId")
-                        .HasColumnType("integer");
+                    b.Property<bool>("AutoChallengeBoss")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("CurrentZoneId")
                         .HasColumnType("integer");

@@ -46,7 +46,7 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBossZoneId: null);
+                AutoChallengeBoss: false);
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
@@ -88,8 +88,8 @@ namespace Game.Application.Tests.DataAccess
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
 
-            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, null);
-            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow, null);
+            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false);
+            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow, false);
             var queue = new InMemoryPubSubQueue(Serialize(firstEvent), Serialize(secondEvent));
 
             await synchronizer.ProcessQueue(queue);
@@ -124,7 +124,7 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBossZoneId: null);
+                AutoChallengeBoss: false);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
@@ -725,7 +725,7 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBossZoneId: null);
+                AutoChallengeBoss: false);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
@@ -846,7 +846,7 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBossZoneId: null);
+                AutoChallengeBoss: false);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
 
@@ -895,7 +895,7 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBossZoneId: null);
+                AutoChallengeBoss: false);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);

@@ -309,16 +309,14 @@ export class EnemyManager {
 
 	/**
 	 * Persists the active idle-loop mode to the backend so the offline-rewards sim can resume the correct
-	 * loop at next login (idle vs. auto-challenge-boss). Mirrors the live auto-fight state: on ⇒ boss-farming
-	 * the current zone, off ⇒ idle. Fire-and-forget — anti-cheat validation is the server's, and a transient
+	 * loop at next login (idle vs. auto-challenge-boss). Mirrors the live auto-fight state: on ⇒ boss-farming,
+	 * off ⇒ idle. The boss is always the current zone's boss, so no zone is sent — the backend keys off the
+	 * player's `CurrentZoneId`. Fire-and-forget — anti-cheat validation is the server's, and a transient
 	 * failure only leaves the persisted mode briefly stale, corrected by the next sync or the backend's
 	 * boss-loss/draw backstop.
 	 */
 	private syncAutoChallengeBoss(enabled: boolean) {
-		void apiSocket.sendSocketCommand('SetAutoChallengeBoss', {
-			enabled,
-			zoneId: playerManager.currentZone
-		});
+		void apiSocket.sendSocketCommand('SetAutoChallengeBoss', enabled);
 	}
 
 	/** Whether the boss loop is still the active, settled context — false once a stop / retreat / handoff

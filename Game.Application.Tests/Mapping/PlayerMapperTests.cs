@@ -115,8 +115,8 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal("Hero", player.Name);
             Assert.Equal(3, player.Level);
             Assert.Equal(MappedLastActivity, player.LastActivity);
-            // No boss mode authored on the entity ⇒ idle (null) on the domain model.
-            Assert.Null(player.AutoChallengeBossZoneId);
+            // No boss mode authored on the entity ⇒ idle (false) on the domain model.
+            Assert.False(player.AutoChallengeBoss);
             Assert.Contains(100, player.Inventory.UnlockedMods);
             Assert.Contains(101, player.Inventory.UnlockedMods);
             var strength = player.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Strength);
@@ -127,15 +127,15 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
-        public void ToCore_MapsAutoChallengeBossZoneId_WhenInBossMode()
+        public void ToCore_MapsAutoChallengeBoss_WhenInBossMode()
         {
-            // A persisted boss-mode player carries the auto-challenge-boss zone, which ToCore must map so
-            // the offline-rewards sim can resume the boss loop at next login.
-            var entity = BuildPlayer(autoChallengeBossZoneId: 4);
+            // A persisted boss-mode player carries the auto-challenge-boss flag, which ToCore must map so
+            // the offline-rewards sim can resume the boss loop (in CurrentZoneId) at next login.
+            var entity = BuildPlayer(autoChallengeBoss: true);
 
             var player = PlayerMapper.ToCore(entity, Catalog(), Catalog(), Catalog());
 
-            Assert.Equal(4, player.AutoChallengeBossZoneId);
+            Assert.True(player.AutoChallengeBoss);
         }
 
         [Fact]
@@ -198,7 +198,7 @@ namespace Game.Application.Tests.Mapping
             List<EntityUnlockedMod>? unlockedMods = null,
             List<EntityPlayerAttribute>? attributes = null,
             List<EntityLogPreference>? logPreferences = null,
-            int? autoChallengeBossZoneId = null) => new()
+            bool autoChallengeBoss = false) => new()
             {
                 Id = 1,
                 Name = "Hero",
@@ -208,7 +208,7 @@ namespace Game.Application.Tests.Mapping
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
                 LastActivity = MappedLastActivity,
-                AutoChallengeBossZoneId = autoChallengeBossZoneId,
+                AutoChallengeBoss = autoChallengeBoss,
                 PlayerSkills = skills ?? [],
                 UnlockedItems = unlockedItems ?? [],
                 AppliedMods = appliedMods ?? [],

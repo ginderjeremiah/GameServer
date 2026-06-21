@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    [Migration("20260620234123_AddPlayerAutoChallengeBossZoneId")]
-    partial class AddPlayerAutoChallengeBossZoneId
+    [Migration("20260621010223_AddPlayerAutoChallengeBoss")]
+    partial class AddPlayerAutoChallengeBoss
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -816,8 +816,8 @@ namespace Game.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("AutoChallengeBossZoneId")
-                        .HasColumnType("integer");
+                    b.Property<bool>("AutoChallengeBoss")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("CurrentZoneId")
                         .HasColumnType("integer");

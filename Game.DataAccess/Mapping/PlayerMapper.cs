@@ -159,7 +159,7 @@ namespace Game.DataAccess.Mapping
                 Exp = entity.Exp,
                 CurrentZoneId = entity.CurrentZoneId,
                 LastActivity = entity.LastActivity,
-                AutoChallengeBossZoneId = entity.AutoChallengeBossZoneId,
+                AutoChallengeBoss = entity.AutoChallengeBoss,
                 StatPoints = new PlayerStatPoints
                 {
                     StatAllocations = statAllocations,

@@ -29,13 +29,13 @@ namespace Game.Core.Players
         public required DateTime LastActivity { get; set; }
 
         /// <summary>
-        /// The zone whose dedicated boss the player's idle loop is auto-challenging, or <c>null</c> when the
-        /// loop is idle-farming. Persisted alongside <see cref="CurrentZoneId"/> (which carries the idle
-        /// location) so the offline-rewards simulation can resume the correct loop at next login: idle when
-        /// null, boss-farming this zone otherwise. Synced from the frontend's live auto-fight state via
-        /// <see cref="SetAutoChallengeBoss"/>.
+        /// Whether the player's idle loop is auto-challenging the boss — of <see cref="CurrentZoneId"/>, the
+        /// single zone the loop operates in (the boss farmed is always the current zone's boss, never a
+        /// separate one). Persisted so the offline-rewards simulation can resume the correct loop at next
+        /// login: idle-farming <see cref="CurrentZoneId"/> when <c>false</c>, boss-farming its boss when
+        /// <c>true</c>. Synced from the frontend's live auto-fight state via <see cref="SetAutoChallengeBoss"/>.
         /// </summary>
-        public required int? AutoChallengeBossZoneId { get; set; }
+        public required bool AutoChallengeBoss { get; set; }
 
         public required PlayerStatPoints StatPoints { get; set; }
         public required Inventory Inventory { get; set; }
@@ -50,15 +50,15 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Persists the active idle-loop mode: a non-null <paramref name="bossZoneId"/> enters boss mode
-        /// (auto-challenging that zone's dedicated boss), <c>null</c> returns the loop to idle-farming.
-        /// Anti-cheat validation of the zone (exists, in circulation, unlocked, has a boss) is the caller's
+        /// Persists the active idle-loop mode: <paramref name="enabled"/> enters boss mode (auto-challenging
+        /// the current zone's dedicated boss), <c>false</c> returns the loop to idle-farming. Anti-cheat
+        /// validation of the current zone (in circulation, unlocked, has a boss) is the caller's
         /// responsibility. Raises a <see cref="PlayerCoreUpdatedEvent"/> so the change rides the existing
         /// write-behind save.
         /// </summary>
-        public void SetAutoChallengeBoss(int? bossZoneId)
+        public void SetAutoChallengeBoss(bool enabled)
         {
-            AutoChallengeBossZoneId = bossZoneId;
+            AutoChallengeBoss = enabled;
             RaiseCoreUpdated();
         }
 
@@ -305,7 +305,7 @@ namespace Game.Core.Players
             // the single core-updated event it raises carries the change (rather than a redundant second event).
             if (isBossBattle && !result.Victory)
             {
-                AutoChallengeBossZoneId = null;
+                AutoChallengeBoss = false;
             }
 
             StampActivity(timestamp);
@@ -339,7 +339,7 @@ namespace Game.Core.Players
         {
             RaiseEvent(new PlayerCoreUpdatedEvent(
                 Id, Level, Exp, CurrentZoneId,
-                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity, AutoChallengeBossZoneId));
+                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity, AutoChallengeBoss));
         }
     }
 }

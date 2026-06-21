@@ -5,23 +5,24 @@
 namespace Game.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddPlayerAutoChallengeBossZoneId : Migration
+    public partial class AddPlayerAutoChallengeBoss : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "AutoChallengeBossZoneId",
+            migrationBuilder.AddColumn<bool>(
+                name: "AutoChallengeBoss",
                 table: "Players",
-                type: "integer",
-                nullable: true);
+                type: "boolean",
+                nullable: false,
+                defaultValue: false);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "AutoChallengeBossZoneId",
+                name: "AutoChallengeBoss",
                 table: "Players");
         }
     }

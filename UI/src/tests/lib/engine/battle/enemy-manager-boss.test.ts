@@ -652,13 +652,14 @@ describe('EnemyManager boss mode', () => {
 
 	it('syncs boss mode to the backend when auto-fight is toggled on', () => {
 		// Mirroring the live auto-fight state to the durable player so the offline sim resumes the boss loop.
+		// The boss is always the current zone's boss, so only the enabled flag is sent (no zone).
 		manager.setAutoFight(true);
-		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: true, zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', true);
 	});
 
 	it('syncs idle mode to the backend when auto-fight is toggled off', () => {
 		manager.setAutoFight(false);
-		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
 	});
 
 	it('syncs idle mode when retreating from the boss (returnToIdle)', async () => {
@@ -667,7 +668,7 @@ describe('EnemyManager boss mode', () => {
 
 		await manager.retreatFromBoss();
 
-		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
 	});
 
 	it('syncs idle mode on a boss loss (returnToIdle)', async () => {
@@ -677,7 +678,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Defeated);
 
-		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
 	});
 
 	it('syncs idle mode on a boss draw (returnToIdle)', async () => {
@@ -687,7 +688,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Drawn);
 
-		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
 	});
 
 	it('does not sync the persisted mode on teardown (stop)', () => {
