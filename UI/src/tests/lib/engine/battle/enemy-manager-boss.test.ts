@@ -670,6 +670,19 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', true);
 	});
 
+	it('persists idle mode when auto-fight is toggled off while engaged in the boss loop', async () => {
+		// The one-off-mid-farm handoff: turning auto-fight off during an active boss fight means the next
+		// victory hands back to idle, so the persisted mode must flip to idle even though mode is still 'boss'.
+		// Directly exercises the mode gate (a fresh-idle toggle-off would read false regardless of the gate).
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		manager.setAutoFight(false);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
 	it('persists boss mode when a pre-armed auto-fight player then challenges', async () => {
 		// The pre-arm becomes real boss-farming the moment the player actually challenges: challengeBoss
 		// re-syncs and persists boss even though the toggle itself (while idle) did not.
