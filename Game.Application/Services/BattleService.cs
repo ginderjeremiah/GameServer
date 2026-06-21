@@ -7,6 +7,7 @@ using Game.Core.Battle;
 using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.Progress;
+using Microsoft.Extensions.Logging;
 using CoreEnemy = Game.Core.Enemies.Enemy;
 using CoreZone = Game.Core.Zones.Zone;
 
@@ -22,7 +23,8 @@ namespace Game.Application.Services
         ISkills skills,
         BattleFactory battleFactory,
         OfflineProgressSimulator offlineSimulator,
-        ChallengeRewardService challengeRewards)
+        ChallengeRewardService challengeRewards,
+        ILogger<BattleService> logger)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
@@ -34,6 +36,7 @@ namespace Game.Application.Services
         private readonly BattleFactory _battleFactory = battleFactory;
         private readonly OfflineProgressSimulator _offlineSimulator = offlineSimulator;
         private readonly ChallengeRewardService _challengeRewards = challengeRewards;
+        private readonly ILogger<BattleService> _logger = logger;
 
         // Offline-rewards window bounds (spike #879). Below the minimum, a return is treated as no time away
         // (no rewards, just re-anchor); above the cap, only the cap is ever simulated so a long absence (or an
@@ -201,11 +204,25 @@ namespace Game.Application.Services
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
+                // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
+                // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
+                _logger.LogWarning(
+                    "EndBattleVictory rejected for player {PlayerId}: no resolvable active battle "
+                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}, claimedTimestamp: {ClaimedTimestamp:O}).",
+                    player.Id, state.ActiveEnemyId, state.Snapshot is not null, claimedTimestamp);
                 return null;
             }
 
             if (!result.Victory)
             {
+                // The server's parity replay of the exact reported battle did not end in a win — a
+                // client/server battle-logic divergence or a forged claim. Seed + enemy + level reproduce it.
+                _logger.LogWarning(
+                    "EndBattleVictory rejected for player {PlayerId}: server replay was not a victory "
+                    + "(enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, playerDied: {PlayerDied}, "
+                    + "replayMs: {ReplayMs}, isBoss: {IsBoss}, zoneId: {ZoneId}, claimedTimestamp: {ClaimedTimestamp:O}).",
+                    player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.PlayerDied,
+                    result.TotalMs, state.IsBossBattle, state.BattleZoneId, claimedTimestamp);
                 return null;
             }
 
@@ -218,6 +235,18 @@ namespace Game.Application.Services
             if (earliestDefeat - claimedTimestamp > ClaimedTimestampSkewTolerance
                 || claimedTimestamp - now > ClaimedTimestampSkewTolerance)
             {
+                // Claim landed outside the skew envelope. The earlyBy/aheadBy deltas vs. the tolerance show
+                // which side tripped and by how much (benign clock skew vs. a tampered timestamp).
+                _logger.LogWarning(
+                    "EndBattleVictory rejected for player {PlayerId}: claimed timestamp outside skew tolerance "
+                    + "(claimedTimestamp: {ClaimedTimestamp:O}, earliestDefeat: {EarliestDefeat:O}, now: {Now:O}, "
+                    + "earlyByMs: {EarlyByMs}, aheadByMs: {AheadByMs}, toleranceMs: {ToleranceMs}, "
+                    + "battleStart: {BattleStart:O}, replayMs: {ReplayMs}).",
+                    player.Id, claimedTimestamp, earliestDefeat, now,
+                    (earliestDefeat - claimedTimestamp).TotalMilliseconds,
+                    (claimedTimestamp - now).TotalMilliseconds,
+                    ClaimedTimestampSkewTolerance.TotalMilliseconds,
+                    state.BattleStartTime, result.TotalMs);
                 return null;
             }
 

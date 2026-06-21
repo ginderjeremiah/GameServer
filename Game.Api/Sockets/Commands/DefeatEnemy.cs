@@ -50,9 +50,7 @@ namespace Game.Api.Sockets.Commands
             }
             else
             {
-                _logger.LogError("DefeatEnemy: Could not defeat enemy (timestamp: {Timestamp})",
-                    claimedTimestamp.ToString("O"));
-
+                // BattleService logs the specific rejection reason (and its diagnostics) at the source.
                 var now = DateTime.UtcNow;
                 return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                 {
