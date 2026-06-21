@@ -14,6 +14,14 @@ namespace Game.Api.Services
 
         public int UserId { get; private set; }
 
+        /// <summary>
+        /// The player id carried by the validated access token's selected-player claim, or
+        /// <see langword="null"/> on a pre-selection token. This is the authority for which character the
+        /// request binds to (see <see cref="SessionInitializer"/>), independent of whatever the volatile
+        /// session cache happens to hold.
+        /// </summary>
+        public int? TokenSelectedPlayerId { get; private set; }
+
         public int SelectedPlayerId => PlayerState.PlayerId;
 
         public PlayerState PlayerState { get; private set; } = new();
@@ -34,13 +42,15 @@ namespace Game.Api.Services
         public bool HasPlayerSession => PlayerState.PlayerId > 0;
 
         /// <summary>
-        /// Records the authenticated user from the validated access token. The user id is the sole
-        /// authority for <see cref="Authenticated"/>, so it is recorded on every authenticated request (by
-        /// <c>SessionLoaderMiddleware</c>) independently of whether any player state is ever loaded.
+        /// Records the authenticated user (and the selected player carried by the token, if any) from the
+        /// validated access token. The user id is the sole authority for <see cref="Authenticated"/>, so it
+        /// is recorded on every authenticated request (by <c>SessionLoaderMiddleware</c>) independently of
+        /// whether any player state is ever loaded.
         /// </summary>
-        public void SetAuthenticatedUser(int userId)
+        public void SetAuthenticatedUser(int userId, int? selectedPlayerId = null)
         {
             UserId = userId;
+            TokenSelectedPlayerId = selectedPlayerId;
         }
 
         /// <summary>
@@ -74,6 +84,7 @@ namespace Game.Api.Services
             }
 
             UserId = 0;
+            TokenSelectedPlayerId = null;
             _player = null;
             PlayerState = new();
         }

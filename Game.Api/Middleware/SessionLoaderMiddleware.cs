@@ -1,3 +1,4 @@
+using Game.Api.Auth;
 using Game.Api.Services;
 using Microsoft.IdentityModel.JsonWebTokens;
 using System.Security.Claims;
@@ -22,7 +23,12 @@ namespace Game.Api.Middleware
             if (principal.Identity?.IsAuthenticated == true
                 && int.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var userId))
             {
-                sessionService.SetAuthenticatedUser(userId);
+                // The selected-player claim is present only once a player has been chosen (post-SelectPlayer);
+                // a pre-selection token carries none, leaving the request unbound until selection.
+                var selectedPlayerId = int.TryParse(principal.FindFirst(JwtTokenService.PlayerIdClaimType)?.Value, out var playerId)
+                    ? playerId
+                    : (int?)null;
+                sessionService.SetAuthenticatedUser(userId, selectedPlayerId);
             }
 
             await _next(context);

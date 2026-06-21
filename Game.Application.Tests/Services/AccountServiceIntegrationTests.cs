@@ -178,7 +178,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task Login_ValidCredentials_ReturnsTokensAndPlayer()
+        public async Task Login_ValidCredentials_ReturnsTokensAndPlayerSummaries()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -195,9 +195,29 @@ namespace Game.Application.Tests.Services
 
             Assert.True(result.Success);
             Assert.Equal(user.Id, result.UserId);
-            Assert.Equal(player.Name, result.Player.Name);
+            // Login lists the account's characters but binds none — that is the SelectPlayer step.
+            var summary = Assert.Single(result.PlayerSummaries);
+            Assert.Equal(player.Id, summary.Id);
+            Assert.Equal(player.Name, summary.Name);
             Assert.False(string.IsNullOrEmpty(result.Tokens.AccessToken));
             Assert.False(string.IsNullOrEmpty(result.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task Login_UserWithMultiplePlayers_ReturnsAllSummaries()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "multiplayer", "pass");
+            var first = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var second = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.Login("multiplayer", "pass");
+
+            Assert.True(result.Success);
+            Assert.Equal(new[] { first.Id, second.Id }.OrderBy(id => id), result.PlayerSummaries.Select(s => s.Id).OrderBy(id => id));
         }
 
         [Fact]
@@ -268,7 +288,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task Login_UserWithoutPlayer_ReturnsNoPlayer()
+        public async Task Login_UserWithoutPlayer_SucceedsWithEmptySummaries()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -276,10 +296,13 @@ namespace Game.Application.Tests.Services
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
+            // Login no longer binds a player, so an account with no characters still authenticates — the
+            // (empty) character list is what the client acts on (offering creation, handled by #1069).
             var result = await accountService.Login("noplayer", "pass");
 
-            Assert.False(result.Success);
-            Assert.Equal(LoginStatus.NoPlayer, result.Status);
+            Assert.True(result.Success);
+            Assert.Empty(result.PlayerSummaries);
+            Assert.False(string.IsNullOrEmpty(result.Tokens.AccessToken));
         }
 
         [Fact]
@@ -328,32 +351,68 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task ResolveSelectedPlayerId_UserWithPlayer_ReturnsFirstPlayerId()
+        public async Task SelectPlayer_OwnedPlayer_RotatesTokensAndReturnsPlayer()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "rehydrateuser", "pass");
+            var user = await TestDataSeeder.CreateUserAsync(context, "selectuser", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("selectuser", "pass");
+
+            var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
+
+            Assert.True(result.Success);
+            Assert.Equal(player.Id, result.Player.Id);
+            Assert.Equal(player.Name, result.Player.Name);
+            Assert.False(string.IsNullOrEmpty(result.Tokens.AccessToken));
+            Assert.NotEqual(login.Tokens.RefreshToken, result.Tokens.RefreshToken);
+
+            // The login refresh token was consumed by the selection, so it can no longer be refreshed.
+            Assert.Null(await accountService.Refresh(login.Tokens.RefreshToken));
+            // The rotated refresh token re-issues a pair that keeps the selected player bound.
+            Assert.NotNull(await accountService.Refresh(result.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task SelectPlayer_PlayerOfAnotherAccount_IsRejectedAndLeavesTokenIntact()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var owner = await TestDataSeeder.CreateUserAsync(context, "owner", "pass");
+            var attacker = await TestDataSeeder.CreateUserAsync(context, "attacker", "pass");
+            var ownerPlayer = await TestDataSeeder.CreatePlayerAsync(context, owner.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("attacker", "pass");
+
+            // Selecting a player the caller does not own is an anti-cheat rejection.
+            var result = await accountService.SelectPlayer(attacker.Id, ownerPlayer.Id, login.Tokens.RefreshToken);
+
+            Assert.False(result.Success);
+            Assert.Equal(SelectPlayerStatus.NotOwned, result.Status);
+            // The rejection happens before the refresh token is consumed, so the caller can still proceed.
+            Assert.NotNull(await accountService.Refresh(login.Tokens.RefreshToken));
+        }
+
+        [Fact]
+        public async Task SelectPlayer_InvalidRefreshToken_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "badtoken", "pass");
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var playerId = await accountService.ResolveSelectedPlayerId(user.Id);
+            var result = await accountService.SelectPlayer(user.Id, player.Id, "not-a-real-token");
 
-            Assert.Equal(player.Id, playerId);
-        }
-
-        [Fact]
-        public async Task ResolveSelectedPlayerId_UserWithoutPlayer_ReturnsNull()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "noplayerrehydrate", "pass");
-
-            var accountService = CreateAccountService(scope.ServiceProvider);
-
-            var playerId = await accountService.ResolveSelectedPlayerId(user.Id);
-
-            Assert.Null(playerId);
+            Assert.False(result.Success);
+            Assert.Equal(SelectPlayerStatus.InvalidToken, result.Status);
         }
 
         [Fact]
@@ -563,9 +622,9 @@ namespace Game.Application.Tests.Services
         /// </summary>
         private sealed class StubAccessTokenService : IAccessTokenService
         {
-            public string CreateAccessToken(int userId, IReadOnlyList<string> roles)
+            public string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null)
             {
-                return $"access-token-{userId}";
+                return playerId is int selected ? $"access-token-{userId}-{selected}" : $"access-token-{userId}";
             }
         }
     }

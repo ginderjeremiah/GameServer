@@ -22,7 +22,6 @@ namespace Game.DataAccess.Repositories
                 Id = u.Id,
                 PassHash = u.PassHash,
                 Roles = u.Roles.Select(r => r.Name).ToList(),
-                PlayerIds = u.Players.Select(p => p.Id).ToList(),
                 IsBanned = u.BannedAt != null,
             };
 
@@ -35,11 +34,13 @@ namespace Game.DataAccess.Repositories
                 ArchivedAt = u.ArchivedAt,
                 BannedAt = u.BannedAt,
                 Roles = u.Roles.Select(r => new Role { Id = r.Id, Name = r.Name }).ToList(),
+                // Mirrors the GetPlayerSummaries projection below — keep the two in step.
                 Players = u.Players.Select(p => new PlayerSummary
                 {
                     Id = p.Id,
                     Name = p.Name,
                     Level = p.Level,
+                    CurrentZoneId = p.CurrentZoneId,
                     LastActivity = p.LastActivity,
                 }).ToList(),
             };
@@ -98,6 +99,22 @@ namespace Game.DataAccess.Repositories
             return await _context.Users
                 .Where(u => u.Id == userId && u.ArchivedAt == null)
                 .SelectMany(u => u.Players.Select(p => p.Id))
+                .ToListAsync();
+        }
+
+        public async Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId)
+        {
+            // Mirrors the ToAdminUser player projection above — keep the two in step.
+            return await _context.Users
+                .Where(u => u.Id == userId && u.ArchivedAt == null)
+                .SelectMany(u => u.Players.Select(p => new PlayerSummary
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Level = p.Level,
+                    CurrentZoneId = p.CurrentZoneId,
+                    LastActivity = p.LastActivity,
+                }))
                 .ToListAsync();
         }
 

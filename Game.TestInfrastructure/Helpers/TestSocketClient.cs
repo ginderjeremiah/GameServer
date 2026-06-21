@@ -15,11 +15,14 @@ namespace Game.TestInfrastructure.Helpers
         public WebSocketState State => _socket.State;
 
         /// <summary>
-        /// Connect using a real ClientWebSocket (for real server endpoints).
+        /// Connect using a real ClientWebSocket (for real server endpoints). The handshake reads the
+        /// selected player from the token claim, so a post-selection token is minted carrying
+        /// <paramref name="playerId"/> (defaulting to <paramref name="userId"/>, which the single-seed
+        /// integration tests share after an identity reset).
         /// </summary>
-        public async Task ConnectAsync(string baseUrl, int userId)
+        public async Task ConnectAsync(string baseUrl, int userId, int? playerId = null)
         {
-            var tokenString = TestAuthHelper.CreateAccessToken(userId);
+            var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId);
 
             _ownedSocket = new ClientWebSocket();
 
@@ -31,11 +34,14 @@ namespace Game.TestInfrastructure.Helpers
 
         /// <summary>
         /// Connect using an in-memory TestServer WebSocket client.
-        /// The WebSocketClient from TestServer handles the in-memory transport.
+        /// The WebSocketClient from TestServer handles the in-memory transport. The handshake reads the
+        /// selected player from the token claim, so a post-selection token is minted carrying
+        /// <paramref name="playerId"/> (defaulting to <paramref name="userId"/>, which the single-seed
+        /// integration tests share after an identity reset).
         /// </summary>
-        public async Task ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, int userId)
+        public async Task ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, int userId, int? playerId = null)
         {
-            var tokenString = TestAuthHelper.CreateAccessToken(userId);
+            var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId);
 
             var wsUri = new Uri($"ws://localhost/socket?access_token={Uri.EscapeDataString(tokenString)}");
             _socket = await wsClient.ConnectAsync(wsUri, _cts.Token);

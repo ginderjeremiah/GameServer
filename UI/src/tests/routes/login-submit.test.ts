@@ -36,7 +36,32 @@ vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confi
 
 import LoginPage from '../../routes/+page.svelte';
 
-const LOGIN_OK = { status: 200, data: { tokens: { accessToken: 'a', refreshToken: 'r' }, player: { name: 'Hero' } } };
+// Login returns the account's characters; SelectPlayer (auto-called for the first character) rotates
+// the token and returns the loaded player to enter the game with.
+const LOGIN_OK = {
+	status: 200,
+	data: {
+		tokens: { accessToken: 'a', refreshToken: 'r' },
+		playerSummaries: [{ id: 1, name: 'Hero', level: 1, currentZoneId: 0 }]
+	}
+};
+const SELECT_OK = {
+	status: 200,
+	data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 1, name: 'Hero' } }
+};
+
+// Routes the staged happy-path responses by endpoint so a test can drive the full
+// Login -> SelectPlayer pipeline without real I/O.
+const happyRoute = (route: string) => {
+	switch (route) {
+		case 'Login/CreateAccount':
+			return Promise.resolve({ status: 200 });
+		case 'Login/SelectPlayer':
+			return Promise.resolve(SELECT_OK);
+		default:
+			return Promise.resolve(LOGIN_OK);
+	}
+};
 
 const fillCredentials = async (username = 'testuser', password = 'secret1') => {
 	await fireEvent.input(screen.getByTestId('username-input'), { target: { value: username } });
@@ -64,31 +89,53 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Login page — submit flow', () => {
-	it('signs in, stores tokens, reports device info and enters the world', async () => {
-		postMock.mockResolvedValue(LOGIN_OK);
+	it('signs in, selects the first character, stores tokens, reports device info and enters the world', async () => {
+		postMock.mockImplementation(happyRoute);
 		render(LoginPage);
 		await fillCredentials();
 
 		await submit();
 
-		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ name: 'Hero' }));
+		// The loaded player from SelectPlayer is what enters the world.
+		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 1, name: 'Hero' }));
+		// Both the pre-selection and rotated token pairs are stored, in order.
 		expect(setTokensMock).toHaveBeenCalledWith(LOGIN_OK.data.tokens);
+		expect(setTokensMock).toHaveBeenCalledWith(SELECT_OK.data.tokens);
+		// SelectPlayer is auto-called for the first character with the login refresh token.
+		expect(postMock).toHaveBeenCalledWith('Login/SelectPlayer', { playerId: 1, refreshToken: 'r' });
 		expect(reportDeviceInfoMock).toHaveBeenCalledTimes(1);
 		// enterWorld navigates to the loading screen after a short delay.
 		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/loading'));
 	});
 
 	it('aborts entry when the player declines the session takeover', async () => {
-		postMock.mockResolvedValue(LOGIN_OK);
+		postMock.mockImplementation(happyRoute);
 		confirmTakeoverMock.mockResolvedValue(false);
 		render(LoginPage);
 		await fillCredentials();
 
 		await submit();
 
+		// The takeover check runs after selection (a per-player presence check).
 		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalled());
-		expect(setTokensMock).toHaveBeenCalledWith(LOGIN_OK.data.tokens);
+		expect(setTokensMock).toHaveBeenCalledWith(SELECT_OK.data.tokens);
 		// Declining leaves the world un-entered.
+		expect(initializeMock).not.toHaveBeenCalled();
+		expect(gotoMock).not.toHaveBeenCalled();
+	});
+
+	it('surfaces a server error when character selection fails', async () => {
+		postMock.mockImplementation((route: string) =>
+			route === 'Login/SelectPlayer'
+				? Promise.resolve({ status: 404, error: 'Player data not found' })
+				: Promise.resolve(LOGIN_OK)
+		);
+		render(LoginPage);
+		await fillCredentials();
+
+		await submit();
+
+		await waitFor(() => expect(screen.getByTestId('status-line').textContent).toContain('Player data not found'));
 		expect(initializeMock).not.toHaveBeenCalled();
 		expect(gotoMock).not.toHaveBeenCalled();
 	});
@@ -107,9 +154,7 @@ describe('Login page — submit flow', () => {
 	});
 
 	it('creates the account then signs in during signup', async () => {
-		postMock.mockImplementation((route: string) =>
-			route === 'Login/CreateAccount' ? Promise.resolve({ status: 200 }) : Promise.resolve(LOGIN_OK)
-		);
+		postMock.mockImplementation(happyRoute);
 		render(LoginPage);
 		await fireEvent.click(screen.getByTestId('mode-toggle'));
 		await fillCredentials('newhero', 'Test1234');
@@ -117,7 +162,7 @@ describe('Login page — submit flow', () => {
 
 		await submit();
 
-		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ name: 'Hero' }));
+		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 1, name: 'Hero' }));
 		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', { username: 'newhero', password: 'Test1234' });
 		expect(postMock).toHaveBeenCalledWith('Login', { username: 'newhero', password: 'Test1234' });
 	});

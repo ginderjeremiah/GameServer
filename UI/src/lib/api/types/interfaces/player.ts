@@ -14,6 +14,7 @@ export interface ILogPreference {
 }
 
 export interface IPlayerData {
+	id: number;
 	name: string;
 	level: number;
 	exp: number;

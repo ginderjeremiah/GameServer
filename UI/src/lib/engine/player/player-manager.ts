@@ -4,6 +4,7 @@ import { formatNum, statify } from '$lib/common';
 import { logMessage } from '../log';
 
 export class PlayerManager implements IPlayerData {
+	public id = 0;
 	public name = '';
 	public level = 0;
 	public exp = 0;
@@ -78,6 +79,7 @@ export class PlayerManager implements IPlayerData {
 	}
 
 	public initialize(data: IPlayerData) {
+		this.id = data.id;
 		this.name = data.name;
 		this.level = data.level;
 		this.exp = data.exp;

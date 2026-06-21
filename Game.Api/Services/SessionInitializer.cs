@@ -4,53 +4,54 @@ namespace Game.Api.Services
 {
     /// <summary>
     /// Loads the authenticated user's player session on demand. <c>SessionLoaderMiddleware</c> records the
-    /// user id on every request, but the <c>GetSession</c> round-trip (and the database rehydration on a
-    /// miss) is paid only where a consumer actually needs player state — the socket handshake and the
-    /// Status/ActiveSession auth endpoints. Every other authenticated HTTP request (admin tooling, refresh,
-    /// device-info) never touches the session cache.
+    /// user id (and the token's selected-player claim) on every request, but the <c>GetSession</c> round-trip
+    /// (and the rehydration on a miss) is paid only where a consumer actually needs player state — the socket
+    /// handshake and the Status/ActiveSession auth endpoints. Every other authenticated HTTP request (admin
+    /// tooling, refresh, device-info) never touches the session cache.
     /// </summary>
     public class SessionInitializer(
         SessionService sessionService,
-        AccountService accountService,
         ILogger<SessionInitializer> logger)
     {
         private readonly SessionService _sessionService = sessionService;
-        private readonly AccountService _accountService = accountService;
         private readonly ILogger<SessionInitializer> _logger = logger;
 
         /// <summary>
-        /// Ensures the authenticated user's player session is loaded for this request: a cache read, and —
-        /// when the token is valid but the cached session is gone (Redis flush, sliding-TTL lapse, or never
-        /// established on this instance) — an in-memory rehydration of the user's player binding (re-derived
-        /// the same way login does). The rehydration does not write the session cache; those writes belong on
-        /// the socket (see <see cref="SessionService.RehydrateSession"/>). Idempotent: a no-op once a player
-        /// session is present. A user with no resolvable player is left without one (the caller surfaces that
-        /// as a graceful error).
+        /// Ensures the authenticated user's player session is bound to the player named by the validated
+        /// token's selected-player claim. The token claim is authoritative: a cached session is honoured only
+        /// when it matches the claim, so an evicted cache (Redis flush, sliding-TTL lapse, never established
+        /// on this instance) <em>or</em> a cache left bound to a different character (e.g. after a switch) is
+        /// re-bound in memory to the token's player. The rehydration does not write the session cache; those
+        /// writes belong on the socket (see <see cref="SessionService.RehydrateSession"/>). Idempotent: a
+        /// no-op once the right player is bound. A pre-selection token (no player claim) leaves the request
+        /// unbound (the caller surfaces that as a graceful error).
         /// </summary>
         public async Task EnsureSessionLoaded(CancellationToken cancellationToken = default)
         {
-            if (_sessionService.HasPlayerSession)
+            if (_sessionService.TokenSelectedPlayerId is not int selectedPlayerId)
+            {
+                _logger.LogWarning(
+                    "Authenticated user {UserId} has a valid token with no selected player; session not established.",
+                    _sessionService.UserId);
+                return;
+            }
+
+            if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
             {
                 return;
             }
 
             await _sessionService.LoadPlayerState(cancellationToken);
-            if (_sessionService.HasPlayerSession)
+            if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
             {
                 return;
             }
 
-            var playerId = await _accountService.ResolveSelectedPlayerId(_sessionService.UserId);
-            if (playerId is null)
-            {
-                _logger.LogWarning(
-                    "Authenticated user {UserId} has a valid token but no resolvable player; session not established.",
-                    _sessionService.UserId);
-                return;
-            }
-
-            _logger.LogInformation("Rehydrating evicted session for authenticated user {UserId}.", _sessionService.UserId);
-            _sessionService.RehydrateSession(playerId.Value);
+            // No cached session for this user, or one bound to a different character than the token
+            // authorizes — re-bind in memory to the token's selected player.
+            _logger.LogInformation("Rehydrating session for authenticated user {UserId} (player {PlayerId}).",
+                _sessionService.UserId, selectedPlayerId);
+            _sessionService.RehydrateSession(selectedPlayerId);
         }
     }
 }

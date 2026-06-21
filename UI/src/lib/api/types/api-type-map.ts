@@ -21,6 +21,8 @@ import type {
 	IRefreshRequest,
 	IReplayDeadLettersData,
 	IRole,
+	ISelectPlayerRequest,
+	ISelectPlayerResult,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
@@ -67,6 +69,7 @@ export type ApiResponseTypes = {
 	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;
 	'Login/Refresh': IAuthTokens;
+	'Login/SelectPlayer': ISelectPlayerResult;
 	'Login/Status': IPlayerData;
 	'Tags': ITag[];
 	'Tags/TagCategories': ITagCategory[];
@@ -102,6 +105,7 @@ export type ApiRequestTypes = {
 	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;
 	'Login/Refresh': IRefreshRequest;
+	'Login/SelectPlayer': ISelectPlayerRequest;
 };
 
 export type ApiEndpoint = keyof ApiResponseTypes;

@@ -8,8 +8,10 @@ namespace Game.Abstractions.Auth
     public interface IAccessTokenService
     {
         /// <summary>
-        /// Creates a signed access token carrying the given user id and role claims.
+        /// Creates a signed access token carrying the given user id and role claims, and — once a player
+        /// has been selected — the chosen player id as the selected-player anchor. A token issued before
+        /// selection carries no player id (<paramref name="playerId"/> is <see langword="null"/>).
         /// </summary>
-        string CreateAccessToken(int userId, IReadOnlyList<string> roles);
+        string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null);
     }
 }
