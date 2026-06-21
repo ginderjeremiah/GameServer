@@ -78,14 +78,28 @@ describe('RenderEngine', () => {
 
 		it('passes delta as the elapsed time since the previous frame', () => {
 			performanceNow = 1000;
-			engine.start(); // delta = 1000 − 0 (initial time)
+			engine.start(); // start re-seeds time to now, so the first frame's delta is 0
 
-			expect(renderUpdates[0][0]).toBe(1000);
+			expect(renderUpdates[0][0]).toBe(0);
 
 			performanceNow = 1016;
 			rafCallbacks.shift()?.(); // second frame: delta = 1016 − 1000 = 16
 
 			expect(renderUpdates[1][0]).toBe(16);
+		});
+
+		it('first-frame delta after a stop/start gap is one frame, not the gap', () => {
+			performanceNow = 1000;
+			engine.start();
+			engine.stop();
+
+			// A long gap elapses while stopped (e.g. minutes on the admin screen).
+			performanceNow = 60_000;
+			renderUpdates.length = 0;
+			engine.start();
+
+			// Without re-seeding, delta would be the whole 59_000ms gap; it must be one frame (~0) instead.
+			expect(renderUpdates[0][0]).toBe(0);
 		});
 
 		it('passes logicalDelta as the difference from logicEngine.time', () => {
