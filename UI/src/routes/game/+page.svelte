@@ -16,6 +16,10 @@
 		</div>
 
 		<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
+
+		{#if showSwitcher}
+			<CharacterSwitcher onClose={() => (showSwitcher = false)} />
+		{/if}
 	</div>
 {:else}
 	<BootSplash />
@@ -36,6 +40,7 @@ import { onDestroy, onMount } from 'svelte';
 import { confirmQuit } from './game-actions';
 import { WelcomeBackView } from './welcome-back/welcome-back-view.svelte';
 import WelcomeBackGate from './welcome-back/WelcomeBackGate.svelte';
+import CharacterSwitcher from './CharacterSwitcher.svelte';
 import BootSplash from '../BootSplash.svelte';
 
 // The welcome-back gate runs the offline-progress check before the idle loop starts (so simulated and
@@ -68,6 +73,8 @@ if (browser) {
 
 let currentScreen = $state<string>('fight');
 let sidebarPinned = $state(false);
+// Whether the in-game character switcher overlay is open (the game keeps running behind it).
+let showSwitcher = $state(false);
 
 // Roles drive which screens appear in the sidebar (e.g. Admin). Read from the access token after
 // mount so the value matches the server render (no token available there) and updates on the client
@@ -92,6 +99,10 @@ const handleNavigate = (key: string) => {
 	}
 	if (key === 'quit') {
 		void confirmQuit();
+		return;
+	}
+	if (key === 'switch') {
+		showSwitcher = true;
 		return;
 	}
 	currentScreen = key;

@@ -71,6 +71,7 @@ export type ApiResponseTypes = {
 	'Login/CreatePlayer': IPlayerSummary;
 	'Login/DeviceInfo': undefined;
 	'Login/Logout': undefined;
+	'Login/Players': IPlayerSummary[];
 	'Login/Refresh': IAuthTokens;
 	'Login/SelectPlayer': ISelectPlayerResult;
 	'Login/Status': IPlayerData;

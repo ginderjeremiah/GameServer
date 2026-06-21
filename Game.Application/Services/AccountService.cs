@@ -177,6 +177,17 @@ namespace Game.Application.Services
         }
 
         /// <summary>
+        /// Lists the account's characters for the in-game character switcher (#1072). The login flow gets
+        /// these from <see cref="Login"/>'s response, but a switch happens inside an authenticated session
+        /// with no login handoff to draw on, so the client re-fetches the current list here. Same projection
+        /// the login step uses.
+        /// </summary>
+        public async Task<IReadOnlyList<PlayerSummary>> GetPlayers(int userId)
+        {
+            return await _users.GetPlayerSummaries(userId);
+        }
+
+        /// <summary>
         /// Creates an additional character on the authenticated account from a user-supplied name. The name
         /// is validated and normalized here (a domain rule), then the new-player blueprint is built by
         /// <see cref="NewPlayerFactory"/> and persisted by the Identity context, which enforces the

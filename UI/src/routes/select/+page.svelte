@@ -1,51 +1,13 @@
 <div class="select-screen" data-testid="select-screen">
-	<div class="select-panel">
-		<DiamondMark size={18} marginBottom={32} />
-
-		<div class="heading">
-			<h1 data-testid="select-heading">Choose your character.</h1>
-			<p class="subtitle">Pick who to play as, or forge a new hero.</p>
-		</div>
-
-		{#if view}
-			<StatusLine type={view.error ? 'err' : 'idle'} text={view.error ?? ''} />
-
-			<div class="character-list" data-testid="character-list">
-				{#each view.players as summary (summary.id)}
-					<PlayerCard
-						{summary}
-						pending={view.pendingId === summary.id}
-						disabled={view.busy}
-						onSelect={(id) => view?.select(id)}
-					/>
-				{/each}
-			</div>
-
-			{#if view.showCreate}
-				<CreateCharacter
-					bind:value={view.newName}
-					valid={view.nameValidation.ok}
-					validationMsg={view.nameValidation.msg}
-					error={view.createError}
-					creating={view.creating}
-					onSubmit={() => view?.create()}
-					onCancel={() => view?.toggleCreate()}
-				/>
-			{:else}
-				<button
-					type="button"
-					class="add-character"
-					data-testid="show-create"
-					disabled={view.busy}
-					onclick={() => view?.toggleCreate()}
-				>
-					+ New character
+	{#if view}
+		<PlayerSelectPanel {view} heading="Choose your character." subtitle="Pick who to play as, or forge a new hero.">
+			{#snippet footer()}
+				<button type="button" class="sign-out" data-testid="sign-out" onclick={signOut}>
+					Use a different account
 				</button>
-			{/if}
-
-			<button type="button" class="sign-out" data-testid="sign-out" onclick={signOut}> Use a different account </button>
-		{/if}
-	</div>
+			{/snippet}
+		</PlayerSelectPanel>
+	{/if}
 </div>
 
 <script lang="ts">
@@ -55,11 +17,8 @@ import { resolve } from '$app/paths';
 import { ApiRequest, getRefreshToken, logout, reportDeviceInfo, setTokens } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 import { playerManager } from '$lib/engine';
-import DiamondMark from '$components/DiamondMark.svelte';
-import StatusLine from '../login/StatusLine.svelte';
 import { confirmSessionTakeover } from '../login/session-takeover';
-import PlayerCard from './PlayerCard.svelte';
-import CreateCharacter from './CreateCharacter.svelte';
+import PlayerSelectPanel from './PlayerSelectPanel.svelte';
 import { PlayerSelectView, type PlayerSelectDeps } from './player-select-view.svelte';
 import { playerSelectHandoff } from './player-select-handoff';
 
@@ -127,73 +86,6 @@ onMount(() => {
 	align-items: center;
 	justify-content: center;
 	padding: 40px;
-}
-
-.select-panel {
-	width: 400px;
-	max-width: 100%;
-}
-
-.heading {
-	text-align: center;
-	margin-bottom: 28px;
-
-	h1 {
-		margin: 0;
-		padding: 0;
-		font-size: 28px;
-		font-weight: 400;
-		letter-spacing: -0.5px;
-		line-height: 1.1;
-		color: var(--text-primary);
-	}
-
-	.subtitle {
-		margin: 10px 0 0;
-		font-size: 12.5px;
-		color: var(--text-secondary);
-		font-family: var(--mono);
-		letter-spacing: 0.6px;
-	}
-}
-
-.character-list {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
-.add-character {
-	width: 100%;
-	margin-top: 12px;
-	padding: 13px 0;
-	background: transparent;
-	color: var(--text-secondary);
-	border: 1px dashed color-mix(in srgb, var(--text-primary) 30%, transparent);
-	border-radius: 2px;
-	font-size: 13px;
-	font-weight: 500;
-	font-family: inherit;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	cursor: pointer;
-	transition: all 160ms;
-
-	&:hover:not(:disabled),
-	&:focus-visible {
-		color: var(--text-primary);
-		border-color: var(--accent);
-	}
-
-	&:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
-	}
-
-	&:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
 }
 
 .sign-out {

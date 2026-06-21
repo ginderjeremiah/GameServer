@@ -325,6 +325,36 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(target.Id, status?.Data?.Id);
         }
 
+        [Fact]
+        public async Task Players_AuthenticatedAccount_ListsAllItsCharacters()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchlist", "pass");
+            var first = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha");
+            var second = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta");
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchlist", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, first.Id);
+
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            var response = await authClient.GetAsync("/api/Login/Players", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Equal(new[] { first.Id, second.Id }.OrderBy(id => id), result.Data.Select(p => p.Id).OrderBy(id => id));
+        }
+
+        [Fact]
+        public async Task Players_Unauthenticated_Returns401()
+        {
+            var response = await Client.GetAsync("/api/Login/Players", CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
         // Switches the bound character through the real SwitchPlayer endpoint and returns the deserialized
         // result (rotated tokens plus the loaded target player).
         private async Task<SelectPlayerResult> SwitchPlayerAsync(AuthTokens tokens, int playerId)
