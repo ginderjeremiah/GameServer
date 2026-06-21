@@ -20,6 +20,7 @@ import type {
 	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
+	IOfflineProgressModel,
 	IPlayerChallenge,
 	IPlayerStatistic,
 	IReferenceDataVersion,
@@ -44,6 +45,7 @@ export type ApiSocketResponseTypes = {
 	'GetEnemies': IEnemy[];
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
+	'GetOfflineProgress': IOfflineProgressModel;
 	'GetPlayerChallenges': IPlayerChallenge[];
 	'GetPlayerStatistics': IPlayerStatistic[];
 	'GetReferenceDataVersions': IReferenceDataVersion[];

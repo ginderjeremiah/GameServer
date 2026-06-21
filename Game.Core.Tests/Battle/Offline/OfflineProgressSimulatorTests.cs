@@ -251,6 +251,59 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(0, result.TotalExp);
         }
 
+        // ── Stalemate cutoff (CPU-waste guard) ───────────────────────────────
+
+        [Fact]
+        public void Simulate_StalemateCutoff_StopsAfterOpeningAllDrawBatch()
+        {
+            // An all-draw stalemate over a budget that would otherwise run many battles: with the cutoff set,
+            // the loop stops once the opening batch has been nothing but draws, instead of burning the whole
+            // budget on maximum-duration draws for no reward.
+            var parameters = IdleParameters(ManyStepsBudget(), StalemateScenario()) with
+            {
+                StalemateCutoffBattles = 5,
+            };
+
+            var result = _simulator.Simulate(parameters);
+
+            Assert.Equal(5, result.BattlesSimulated);
+            Assert.Equal(5, result.Draws);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.Losses);
+        }
+
+        [Fact]
+        public void Simulate_StalemateCutoff_DoesNotFireWhenTheOpeningBatchProducesWins()
+        {
+            // A winning run makes progress in the opening batch, so the cutoff never fires and the loop runs
+            // the whole budget exactly as it would without the guard.
+            var scenario = StrongPlayerWinScenario();
+            var withCutoff = IdleParameters(ManyStepsBudget(), scenario) with { StalemateCutoffBattles = 5 };
+            var withoutCutoff = IdleParameters(ManyStepsBudget(), scenario);
+
+            var guarded = _simulator.Simulate(withCutoff);
+            var unguarded = _simulator.Simulate(withoutCutoff);
+
+            Assert.True(guarded.Wins > 5, "The guard cut a winning run short.");
+            Assert.Equal(unguarded.BattlesSimulated, guarded.BattlesSimulated);
+        }
+
+        [Fact]
+        public void Simulate_StalemateCutoff_DoesNotFireWhenTheOpeningBatchProducesLosses()
+        {
+            // A losing run is also progress (and cheap — quick battles), so the cutoff must not fire on it;
+            // only a pure-draw opening batch is the stalemate the guard targets.
+            var parameters = BossParameters(ManyStepsBudget(), AlwaysLoseBossScenario()) with
+            {
+                StalemateCutoffBattles = 5,
+            };
+
+            var result = _simulator.Simulate(parameters);
+
+            Assert.True(result.BattlesSimulated > 5, "The guard cut a losing run short.");
+            Assert.Equal(result.BattlesSimulated, result.Losses);
+        }
+
         // ── Reward accumulation ──────────────────────────────────────────────
 
         [Fact]

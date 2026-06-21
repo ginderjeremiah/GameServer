@@ -22,6 +22,20 @@ export interface IChallengeType {
 	name: string;
 }
 
+export interface IOfflineProgressModel {
+	awayMs: number;
+	autoChallengeBoss: boolean;
+	zoneId: number;
+	battlesWon: number;
+	battlesLost: number;
+	battlesDrawn: number;
+	totalExp: number;
+	levelsGained: number;
+	statPointsGained: number;
+	hasProgress: boolean;
+	completedChallenges: IChallengeCompletedModel[];
+}
+
 export interface IPlayerChallenge {
 	challengeId: number;
 	progress: number;

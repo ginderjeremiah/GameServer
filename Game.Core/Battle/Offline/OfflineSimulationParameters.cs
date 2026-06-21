@@ -66,5 +66,17 @@ namespace Game.Core.Battle.Offline
         /// seed source the live battle start uses.
         /// </summary>
         public required Func<uint> SeedSource { get; init; }
+
+        /// <summary>
+        /// Optional CPU-waste guard: if set, the loop stops once its opening <see cref="StalemateCutoffBattles"/>
+        /// battles have all been draws — neither a win nor a loss. That is an unwinnable-and-unloseable
+        /// stalemate (e.g. an over-defended boss or an over-matched idle zone) that would otherwise simulate
+        /// the whole away budget as maximum-duration draws for no reward — the most work for nothing, and a
+        /// run a player could trigger repeatedly by reconnecting. A single win or loss anywhere in the opening
+        /// batch means the loop is making progress, so the guard never fires for the rest of the run. Left
+        /// <c>null</c> (the default) to run the full budget — the orchestration sets it; the cap still bounds
+        /// every run regardless.
+        /// </summary>
+        public int? StalemateCutoffBattles { get; init; }
     }
 }

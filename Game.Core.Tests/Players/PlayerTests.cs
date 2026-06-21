@@ -303,6 +303,59 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
         }
 
+        // ── GrantOfflineExp (batched offline grants) ─────────────────────────
+
+        [Fact]
+        public void GrantOfflineExp_SumsRewardsAndLevelsUp()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            // 50 + 60 = 110 ≥ the level-1 threshold of 100, so the player reaches level 2 with 10 carried.
+            player.GrantOfflineExp([50, 60]);
+
+            Assert.Equal(2, player.Level);
+            Assert.Equal(10, player.Exp);
+        }
+
+        [Fact]
+        public void GrantOfflineExp_RaisesSingleCoreUpdatedEventForTheWholeBatch()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            // Many victories, but the batch raises exactly one core-updated event (vs one per grant) so the
+            // offline window doesn't flood the write-behind queue (spike #879 decision 6).
+            player.GrantOfflineExp([10, 10, 10, 10, 10]);
+
+            Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
+        }
+
+        [Fact]
+        public void GrantOfflineExp_AppliesPerGrantClampNotSumClamp()
+        {
+            var clampedPerGrant = MakePlayer(level: 1, exp: 0);
+            var clampedAsSum = MakePlayer(level: 1, exp: 0);
+
+            // Two max grants sum to twice the per-grant clamp; applied per-grant (offline batch) the full
+            // amount lands, whereas a single grant of the sum would be clamped to one MaxExpPerGrant. So the
+            // batched path must out-level the single-clamped grant — proving each reward clears the clamp.
+            clampedPerGrant.GrantOfflineExp([ServerGameConstants.MaxExpPerGrant, ServerGameConstants.MaxExpPerGrant]);
+            clampedAsSum.GrantExp(2 * ServerGameConstants.MaxExpPerGrant);
+
+            Assert.True(clampedPerGrant.Level > clampedAsSum.Level);
+        }
+
+        [Fact]
+        public void GrantOfflineExp_RaisesOneLevelUpEventPerLevel()
+        {
+            var player = MakePlayer(level: 1, exp: 0);
+
+            // 110 + 200 = 310 ≥ 100 (lvl1) + 200 (lvl2) = 300, so two levels are gained across the batch.
+            player.GrantOfflineExp([110, 200]);
+
+            Assert.Equal(3, player.Level);
+            Assert.Equal(2, player.DomainEvents.OfType<PlayerLeveledUpEvent>().Count());
+        }
+
         // ── CompleteChallenge ────────────────────────────────────────────────
 
         [Fact]
@@ -355,6 +408,27 @@ namespace Game.Core.Tests.Players
             Assert.Null(evt.RewardItemId);
             Assert.Null(evt.RewardItemModId);
             Assert.Null(evt.RewardSkillId);
+        }
+
+        [Fact]
+        public void CompleteChallenge_NotifyFalse_UnlocksRewardsButSuppressesCompletedEvent()
+        {
+            var player = MakePlayer();
+            var item = MakeItem(id: 10);
+            var skill = MakeSkill(id: 7);
+
+            // The offline batch completes challenges with the push suppressed: rewards are still unlocked (and
+            // persisted via their own unlock events), but no ChallengeCompletedEvent is raised — the
+            // welcome-back summary is the notification (spike #879 decision 7).
+            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5, rewardSkill: skill, notify: false);
+
+            Assert.Contains(player.Inventory.UnlockedItems, u => u.Item == item);
+            Assert.Contains(5, player.Inventory.UnlockedMods);
+            Assert.Contains(player.Skills, s => s.Id == 7);
+            Assert.Empty(player.DomainEvents.OfType<ChallengeCompletedEvent>());
+            // The reward unlocks still raise their (persistence-only) events, so the completion persists.
+            Assert.Single(player.DomainEvents.OfType<ItemUnlockedEvent>());
+            Assert.Single(player.DomainEvents.OfType<SkillUnlockedEvent>());
         }
 
         // ── TrySetSelectedSkills ─────────────────────────────────────────────

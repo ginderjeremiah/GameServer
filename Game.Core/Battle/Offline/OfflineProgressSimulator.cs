@@ -39,6 +39,10 @@ namespace Game.Core.Battle.Offline
                 .GetModifiers(parameters.ResolveItem, parameters.ResolveMod)
                 .ToList();
 
+            // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
+            // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
+            var madeProgress = false;
+
             while (remainingMs > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -50,10 +54,20 @@ namespace Game.Core.Battle.Offline
                 var expReward = result.Victory ? new DefeatRewards(playerModifiers, enemy).ExpReward : 0;
                 outcomes.Add(new OfflineBattleOutcome(enemy, result, expReward));
 
+                madeProgress |= result.Victory || result.PlayerDied;
+
                 // Each battle consumes its own duration plus the post-battle cooldown gap before the next.
                 // Battle duration is always at least one tick, so the budget strictly decreases and the loop
                 // terminates even with a zero cooldown.
                 remainingMs -= result.TotalMs + parameters.CooldownMs;
+
+                // CPU-waste guard: stop once the opening batch has been nothing but draws (no win, no loss) —
+                // a stalemate that would otherwise burn the whole budget on maximum-duration draws for no
+                // reward. Any progress in that batch disables the guard for the rest of the run.
+                if (parameters.StalemateCutoffBattles is int cutoff && !madeProgress && outcomes.Count >= cutoff)
+                {
+                    break;
+                }
             }
 
             return new OfflineProgressResult(parameters.Mode, parameters.Zone.Id, outcomes);
