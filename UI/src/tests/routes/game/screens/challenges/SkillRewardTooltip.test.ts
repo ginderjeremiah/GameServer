@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EModifierType, ESkillEffectTarget, type ISkill } from '$lib/api';
+import { EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget, type ISkill } from '$lib/api';
 
 // The tooltip resolves attribute display names from the reference-data store; a populated
 // fixture lets us assert the real names render (rather than the enum-key fallback).
@@ -24,6 +24,7 @@ const makeSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	effects: [],
 	cooldownMs: 3000,
 	iconPath: '',
+	acquisition: ESkillAcquisition.Player,
 	...over
 });
 

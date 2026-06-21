@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EChangeType, EModifierType, ESkillEffectTarget, type ISkill } from '$lib/api';
+import { EAttribute, EChangeType, EModifierType, ESkillAcquisition, ESkillEffectTarget, type ISkill } from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Skill config transforms: `newItem` defaults, the derived meta line, the effects
@@ -66,6 +66,7 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			acquisition: ESkillAcquisition.Player,
 			description: '',
 			damageMultipliers: [],
 			effects: []
@@ -136,6 +137,7 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 			effects: [effect({ id: 1, amount: 0.5 })]
@@ -161,6 +163,7 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 			effects: [effect({ id: 1 })]
@@ -188,6 +191,7 @@ describe('skillEntity', () => {
 			baseDamage: 5,
 			cooldownMs: 1000,
 			iconPath: '',
+			acquisition: ESkillAcquisition.Player,
 			description: 'Poisons the foe',
 			damageMultipliers: [],
 			effects: [effect({ id: 0, target: ESkillEffectTarget.Opponent })] // new effect, id 0

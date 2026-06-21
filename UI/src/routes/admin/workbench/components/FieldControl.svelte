@@ -44,6 +44,27 @@
 		</div>
 		{#if dirty}<span class="dirty-dot"></span>{/if}
 	</div>
+{:else if field.type === 'flags'}
+	<div class="fld" style:flex="1 1 100%" style:width="100%">
+		{@render label()}
+		<div class="flags">
+			{#each field.flags ?? [] as flag (flag.value)}
+				<button
+					type="button"
+					class="flag-chip"
+					class:on={hasFlag((value as number) ?? 0, flag.value)}
+					class:dirty
+					aria-pressed={hasFlag((value as number) ?? 0, flag.value)}
+					onclick={() =>
+						set(toggleFlag((value as number) ?? 0, flag.value, !hasFlag((value as number) ?? 0, flag.value)))}
+				>
+					<span class="flag-box"></span>
+					<span>{flag.label}</span>
+				</button>
+			{/each}
+			{#if dirty}<span class="dirty-dot"></span>{/if}
+		</div>
+	</div>
 {:else if field.type === 'select'}
 	<div class="fld" style:width="{field.width ?? 170}px">
 		{@render label()}
@@ -88,6 +109,7 @@
 {/snippet}
 
 <script lang="ts">
+import { hasFlag, toggleFlag } from '$lib/common';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';

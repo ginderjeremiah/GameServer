@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute } from '$lib/api';
+import { EAttribute, ESkillAcquisition } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 
@@ -24,7 +24,8 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	effects: [],
 	description: '',
 	cooldownMs,
-	iconPath: ''
+	iconPath: '',
+	acquisition: ESkillAcquisition.Player
 });
 
 const makeBattlerData = (overrides: Partial<Parameters<Battler['reset']>[0] & {}> = {}) => ({

@@ -9,6 +9,7 @@ import type {
 	EItemModType,
 	EModifierType,
 	ERarity,
+	ESkillAcquisition,
 	ESkillEffectTarget,
 	EStatisticType
 } from '../';
@@ -98,6 +99,7 @@ export interface ISkill {
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
+	acquisition: ESkillAcquisition;
 	retiredAt?: string;
 }
 

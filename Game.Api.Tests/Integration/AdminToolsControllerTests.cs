@@ -393,8 +393,9 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
-            var skill1 = await TestDataSeeder.CreateSkillAsync(context, "Slash");
-            var skill2 = await TestDataSeeder.CreateSkillAsync(context, "Bite");
+            // Enemy skills must be Enemy-flagged (the SetSkills authoring guard).
+            var skill1 = await TestDataSeeder.CreateSkillAsync(context, "Slash", acquisition: ESkillAcquisition.Enemy);
+            var skill2 = await TestDataSeeder.CreateSkillAsync(context, "Bite", acquisition: ESkillAcquisition.Enemy);
 
             using var authClient = await SetupAuthenticatedClientAsync();
 
@@ -421,8 +422,9 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Skilled");
-            var keptSkill = await TestDataSeeder.CreateSkillAsync(context, "Slash");
-            var removedSkill = await TestDataSeeder.CreateSkillAsync(context, "Bite");
+            // Enemy skills must be Enemy-flagged (the SetSkills authoring guard).
+            var keptSkill = await TestDataSeeder.CreateSkillAsync(context, "Slash", acquisition: ESkillAcquisition.Enemy);
+            var removedSkill = await TestDataSeeder.CreateSkillAsync(context, "Bite", acquisition: ESkillAcquisition.Enemy);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, keptSkill.Id);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, removedSkill.Id);
 

@@ -21,6 +21,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
+                Acquisition = (ESkillAcquisition)entity.Acquisition,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new Contracts.AttributeMultiplier
                     {

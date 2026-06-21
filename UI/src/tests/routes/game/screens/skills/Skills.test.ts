@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import {
 	EAttribute,
 	EModifierType,
+	ESkillAcquisition,
 	ESkillEffectTarget,
 	type IChallenge,
 	type IEnemy,
@@ -98,6 +99,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	description: 'A skill.',
 	cooldownMs: 1000,
 	iconPath: '',
+	acquisition: ESkillAcquisition.Player,
 	...over
 });
 

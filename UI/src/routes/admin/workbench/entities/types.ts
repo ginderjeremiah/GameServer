@@ -24,10 +24,17 @@ export interface SelectOption {
 	text: string;
 }
 
+/** A single toggleable bit in a {@link FieldConfig} `flags` field (a `[Flags]` enum member). */
+export interface FlagOption {
+	label: string;
+	/** The enum member's bit value (e.g. `ESkillAcquisition.Player`). */
+	value: number;
+}
+
 export interface FieldConfig<T> {
 	key: keyof T & string;
 	label: string;
-	type: 'text' | 'number' | 'toggle' | 'textarea' | 'select';
+	type: 'text' | 'number' | 'toggle' | 'textarea' | 'select' | 'flags';
 	placeholder?: string;
 	/** Lets a text/textarea field stretch to fill the row. */
 	grow?: boolean;
@@ -45,6 +52,8 @@ export interface FieldConfig<T> {
 	 * reference visible rather than blanking it.
 	 */
 	options?: (current?: number) => SelectOption[];
+	/** The toggleable bits for a `flags` field (each renders as a checkbox over a `[Flags]` bitmask). */
+	flags?: FlagOption[];
 	/** Marks the field required; an empty value raises the field/section/record warning. */
 	required?: boolean;
 	reqMsg?: string;
@@ -107,8 +116,12 @@ export interface TableSectionConfig<T> extends BaseSection<T> {
 export interface ChipsSectionConfig<T> extends BaseSection<T> {
 	kind: 'chips';
 	itemsKey: keyof T & string;
-	/** Catalogue of addable entries; a `retired` entry stays available for display but can't be newly added. */
-	catalogue: () => { id: number; name: string; retired?: boolean }[];
+	/**
+	 * Catalogue of addable entries. A `retired` entry, or one with `addable: false` (e.g. a skill not
+	 * flagged for this channel), stays available for display of an already-assigned chip but can't be
+	 * newly added.
+	 */
+	catalogue: () => { id: number; name: string; retired?: boolean; addable?: boolean }[];
 	labelOf: (entry: { id: number; name: string }) => string;
 	metaOf: (entry: { id: number; name: string }) => string;
 	emptyIcon: WorkbenchIconKind;

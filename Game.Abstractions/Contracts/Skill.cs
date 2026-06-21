@@ -1,3 +1,5 @@
+using Game.Core;
+
 namespace Game.Abstractions.Contracts
 {
     /// <summary>Read contract for a skill in the reference-data catalogue.</summary>
@@ -11,6 +13,9 @@ namespace Game.Abstractions.Contracts
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
+
+        /// <summary>The channels allowed to grant this skill (authoring intent; see <see cref="ESkillAcquisition"/>).</summary>
+        public ESkillAcquisition Acquisition { get; set; }
 
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
         /// Null while active.</summary>

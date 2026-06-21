@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
+using Game.Core;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -12,10 +13,11 @@ namespace Game.DataAccess.Repositories.Admin
     /// <c>Include(...)</c> graph is never dragged into the change tracker. Changes are staged on the unit
     /// of work; the per-action commit filter persists them.
     /// </summary>
-    internal class AdminEnemies(IEnemyEntityCache enemies, IZoneEntityCache zones, IEntityStore entityStore) : IAdminEnemies
+    internal class AdminEnemies(IEnemyEntityCache enemies, IZoneEntityCache zones, ISkillEntityCache skills, IEntityStore entityStore) : IAdminEnemies
     {
         private readonly IEnemyEntityCache _enemies = enemies;
         private readonly IZoneEntityCache _zones = zones;
+        private readonly ISkillEntityCache _skills = skills;
         private readonly IEntityStore _entityStore = entityStore;
 
         public AdminSaveResult SaveEnemies(IReadOnlyList<Change<Contracts.Enemy>> changes)
@@ -93,6 +95,16 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Enemy");
             }
 
+            // Authoring guard (anti-tamper): every skill assigned to an enemy must declare itself
+            // Enemy-acquirable. The flag is the declared intent; this pool is the reality, so the save
+            // bridges them — rejected up front (a tampered admin client can't bypass the frontend's
+            // filtered picker). The whole desired set is checked, so a skill whose flag was later cleared
+            // can no longer be re-saved onto the enemy.
+            if (FindEnemySkillFlagViolation(data.SkillIds) is { } rejection)
+            {
+                return rejection;
+            }
+
             // An EnemySkill is a pure join row (no payload beyond its key), so a skill present on both
             // sides needs no update — only deletes and inserts apply.
             return ChildCollectionReconciler.Reconcile(
@@ -144,6 +156,30 @@ namespace Game.DataAccess.Repositories.Admin
                     EnemyId = enemy.Id,
                     Weight = s.Weight,
                 }));
+        }
+
+        /// <summary>
+        /// Returns a rejection for the first desired skill that is not <see cref="ESkillAcquisition.Enemy"/>-flagged
+        /// (or does not exist), or null when every assigned skill is valid.
+        /// </summary>
+        private AdminSaveResult? FindEnemySkillFlagViolation(IEnumerable<int> skillIds)
+        {
+            foreach (var skillId in skillIds)
+            {
+                var skill = _skills.LookupSkill(skillId);
+                if (skill is null)
+                {
+                    return AdminSaveResult.Failure($"Skill {skillId} does not exist.");
+                }
+
+                if (!((ESkillAcquisition)skill.Acquisition).HasFlag(ESkillAcquisition.Enemy))
+                {
+                    return AdminSaveResult.Failure(
+                        $"Skill '{skill.Name}' is not flagged as an Enemy skill and cannot be assigned to an enemy.");
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

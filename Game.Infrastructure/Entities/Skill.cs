@@ -9,6 +9,9 @@
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
 
+        /// <summary>The <see cref="Core.ESkillAcquisition"/> bitmask of channels allowed to grant this skill.</summary>
+        public int Acquisition { get; set; }
+
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
 
