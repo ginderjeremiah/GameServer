@@ -4,7 +4,9 @@ using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Battle;
+using Game.Core.Battle.Offline;
 using Game.Core.Players;
+using Game.Core.Progress;
 using CoreEnemy = Game.Core.Enemies.Enemy;
 using CoreZone = Game.Core.Zones.Zone;
 
@@ -18,7 +20,9 @@ namespace Game.Application.Services
         IItems items,
         IItemMods itemMods,
         ISkills skills,
-        BattleFactory battleFactory)
+        BattleFactory battleFactory,
+        OfflineProgressSimulator offlineSimulator,
+        ChallengeRewardService challengeRewards)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IEnemies _enemies = enemies;
@@ -28,6 +32,20 @@ namespace Game.Application.Services
         private readonly IItemMods _itemMods = itemMods;
         private readonly ISkills _skills = skills;
         private readonly BattleFactory _battleFactory = battleFactory;
+        private readonly OfflineProgressSimulator _offlineSimulator = offlineSimulator;
+        private readonly ChallengeRewardService _challengeRewards = challengeRewards;
+
+        // Offline-rewards window bounds (spike #879). Below the minimum, a return is treated as no time away
+        // (no rewards, just re-anchor); above the cap, only the cap is ever simulated so a long absence (or an
+        // all-draw zone) can't run unbounded CPU.
+        public static readonly TimeSpan MinimumOfflineAway = TimeSpan.FromMinutes(5);
+        public static readonly TimeSpan MaximumOfflineSimulation = TimeSpan.FromHours(10);
+
+        // CPU-waste guard handed to the offline simulator: an opening batch of pure draws is a stalemate the
+        // player can neither win nor lose, so simulating the whole away budget of maximum-duration draws earns
+        // nothing for the most work. Stop after this many opening all-draw battles (a true stalemate draws
+        // every time, so a small count is decisive; any win or loss disables the guard).
+        private const int StalemateCutoffBattles = 10;
 
         // Symmetric clock-skew tolerance for the client-claimed victory timestamp: one logical tick, because
         // the frontend's battle-start may sit up to a tick off the backend's (a battle started mid-tick counts
@@ -243,6 +261,196 @@ namespace Game.Application.Services
             return true;
         }
 
+        /// <summary>
+        /// Resolves a stale in-flight battle left by a mid-battle disconnect, crediting it exactly like an
+        /// abandon (re-simulate capped at the elapsed wall-clock, pay a win out in full, else record the
+        /// loss/draw) and clearing it. A no-op when no battle is active. Used by the offline-rewards flow to
+        /// settle the disconnected battle before it simulates the away window — so the window's simulation, and
+        /// the idle loop that follows the welcome-back gate, both start from a clean state.
+        /// </summary>
+        public Task ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            return AbandonBattle(player, state, cancellationToken);
+        }
+
+        /// <summary>
+        /// Computes how long the player was away, replays the missed idle/boss battles (spike #879), applies
+        /// the accumulated rewards, and returns a welcome-back summary. Runs inline within the calling socket
+        /// command (the cap keeps the worst case well under the command timeout); the command's cancellation
+        /// token is threaded into the simulation loop so a long run unwinds promptly.
+        /// <para>
+        /// Away time is <c>now − <see cref="Player.LastActivity"/></c>, measured server-side. Below
+        /// <see cref="MinimumOfflineAway"/> it is a no-op beyond re-anchoring <c>LastActivity</c> (so a second
+        /// immediate call earns nothing); otherwise it resolves any stale in-flight battle, resumes the
+        /// persisted loop mode in the player's (viability-checked) current zone, simulates up to
+        /// <see cref="MaximumOfflineSimulation"/>, applies exp per victory and the consolidated
+        /// statistics/challenges, re-anchors <c>LastActivity</c>, and persists once.
+        /// </para>
+        /// </summary>
+        public async Task<OfflineProgressSummary> SimulateOfflineProgress(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+            var awayMs = (long)(now - player.LastActivity).TotalMilliseconds;
+            var cappedAwayMs = Math.Min(awayMs, (long)MaximumOfflineSimulation.TotalMilliseconds);
+
+            // Below the threshold there are no offline rewards. Re-anchor LastActivity (so the next away period
+            // starts fresh and an immediate re-claim is a no-op) and return an empty summary. Any stale
+            // in-flight battle is left for the idle loop's first StartBattle to abandon, exactly as on a normal
+            // reconnect — there is no away window to simulate, so settling it here would change nothing.
+            if (awayMs < MinimumOfflineAway.TotalMilliseconds)
+            {
+                player.StampActivity(now);
+                await _playerRepo.SavePlayer(player, cancellationToken);
+                return OfflineProgressSummary.Empty(cappedAwayMs, player.AutoChallengeBoss, player.CurrentZoneId);
+            }
+
+            // Settle the disconnected battle before simulating the away window, so its outcome is credited once
+            // (here) rather than being re-abandoned by the first live StartBattle after the gate.
+            await ResolveStaleBattle(player, state, cancellationToken);
+
+            var (mode, zone) = await ResolveOfflineLoop(player, cancellationToken);
+            var parameters = BuildSimulationParameters(player, mode, zone, awayMs);
+
+            var result = _offlineSimulator.Simulate(parameters, cancellationToken);
+
+            var levelBefore = player.Level;
+            var statPointsBefore = player.StatPoints.StatPointsGained;
+            var completedChallenges = await ApplyOfflineRewards(player, result, cancellationToken);
+
+            // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
+            // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
+            // Both are absolute write-behind writes (the final state persists regardless), and two is still
+            // nowhere near the per-victory flood decision 6 avoids.
+            player.StampActivity(now);
+            await _playerRepo.SavePlayer(player, cancellationToken);
+
+            return new OfflineProgressSummary
+            {
+                AwayMs = cappedAwayMs,
+                AutoChallengeBoss = result.IsBossBattle,
+                ZoneId = result.ZoneId,
+                BattlesWon = result.Wins,
+                BattlesLost = result.Losses,
+                BattlesDrawn = result.Draws,
+                TotalExp = result.TotalExp,
+                LevelsGained = player.Level - levelBefore,
+                StatPointsGained = player.StatPoints.StatPointsGained - statPointsBefore,
+                CompletedChallenges = completedChallenges,
+            };
+        }
+
+        // Resolves which loop the offline simulation resumes and the zone it runs in. Boss mode resumes only
+        // when the persisted flag is set and the current zone still has a challengeable boss (in circulation,
+        // unlocked, boss authored); otherwise the loop falls back to idle in the nearest viable zone (the same
+        // lazy-relocation the live idle loop uses, so a retired/empty current zone never stalls the sim).
+        private async Task<(OfflineLoopMode Mode, CoreZone Zone)> ResolveOfflineLoop(Player player, CancellationToken cancellationToken)
+        {
+            var currentZoneId = player.CurrentZoneId;
+            if (player.AutoChallengeBoss
+                && _zones.ValidateZoneId(currentZoneId)
+                && !_zones.IsZoneRetired(currentZoneId))
+            {
+                var bossZone = _zones.GetDomainZone(currentZoneId);
+                if (bossZone.BossEnemyId is not null && await IsZoneUnlocked(player.Id, bossZone, cancellationToken))
+                {
+                    return (OfflineLoopMode.Boss, bossZone);
+                }
+            }
+
+            var idleZoneId = await EnsureViableZone(player, currentZoneId, cancellationToken);
+            return (OfflineLoopMode.Idle, _zones.GetDomainZone(idleZoneId));
+        }
+
+        // Builds the simulator inputs for the resolved loop. Idle rolls a random per-zone spawn each battle;
+        // boss builds the zone's dedicated boss deterministically — the same factory resolvers the live battle
+        // start uses, so an offline battle is constructed identically to an online one. The player snapshot and
+        // the catalog resolvers are shared across the whole run (the player's power is stationary offline).
+        private OfflineSimulationParameters BuildSimulationParameters(Player player, OfflineLoopMode mode, CoreZone zone, long awayMs)
+        {
+            Func<int, CoreEnemy> resolveEnemy = mode == OfflineLoopMode.Boss
+                ? BossEnemyResolver(zone)
+                : level => _enemies.GetRandomDomainEnemy(zone.Id, level);
+
+            return new OfflineSimulationParameters
+            {
+                Snapshot = BattleSnapshot.FromPlayer(player),
+                Mode = mode,
+                Zone = zone,
+                AwayBudgetMs = awayMs,
+                CapMs = (long)MaximumOfflineSimulation.TotalMilliseconds,
+                CooldownMs = (int)PostBattleCooldown.TotalMilliseconds,
+                ResolveEnemy = resolveEnemy,
+                ResolveItem = _items.GetItem,
+                ResolveMod = _itemMods.GetItemMod,
+                ResolveSkill = _skills.GetSkill,
+                SeedSource = CreateBattleSeed,
+                StalemateCutoffBattles = StalemateCutoffBattles,
+            };
+        }
+
+        // The boss resolver for a boss-mode run: the zone's dedicated boss at the requested (fixed boss) level.
+        // ResolveOfflineLoop only selects boss mode for a zone whose BossEnemyId is set, so the null check here
+        // is a defensive invariant rather than a reachable state.
+        private Func<int, CoreEnemy> BossEnemyResolver(CoreZone zone)
+        {
+            var bossEnemyId = zone.BossEnemyId
+                ?? throw new InvalidOperationException($"Boss offline loop for zone {zone.Id} has no boss enemy.");
+            return level => _enemies.GetDomainEnemy(bossEnemyId, level)
+                ?? throw new InvalidOperationException(
+                    $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist.");
+        }
+
+        // Applies a simulated away window's rewards to the player and progress in one consolidated pass
+        // (spike #879 decisions 6 & 7): each battle feeds the same per-battle statistics path the live handler
+        // uses, exp is granted per victory (so the per-grant clamp never truncates a haul and levels accrue),
+        // and the affected challenges are evaluated once at the end with the live per-challenge push suppressed
+        // (the summary is the notification). Returns the completed challenges for the summary.
+        private async Task<IReadOnlyList<CompletedChallenge>> ApplyOfflineRewards(Player player, OfflineProgressResult result, CancellationToken cancellationToken)
+        {
+            if (result.BattlesSimulated == 0)
+            {
+                return [];
+            }
+
+            var progress = await _progressRepo.Load(player, cancellationToken);
+
+            var victoryExpRewards = new List<int>();
+            // Union the statistic rows touched across every battle, so the end-of-window challenge evaluation
+            // sees every moved statistic. RecordBattleCompleted currently returns the progress aggregate's
+            // cumulative dirty set (it is loaded once for the whole window), but unioning each call's result
+            // explicitly keeps this correct even if that method were ever changed to return only the per-battle
+            // delta — a mixed-outcome window can touch a tracked statistic in a non-final battle (e.g. a kill
+            // challenge crossed by early wins before a closing loss), and the union captures it regardless.
+            var touchedStatistics = new HashSet<(EStatisticType Type, int? EntityId)>();
+            foreach (var battle in result.Battles)
+            {
+                foreach (var key in progress.RecordBattleCompleted(
+                    battle.Enemy, battle.Result.Victory, battle.Result.PlayerDied, battle.Result.TotalMs,
+                    battle.Result.Stats, result.IsBossBattle, result.ZoneId))
+                {
+                    touchedStatistics.Add(key);
+                }
+
+                if (battle.Result.Victory)
+                {
+                    victoryExpRewards.Add(battle.ExpReward);
+                }
+            }
+
+            // Grant the whole window's exp before evaluating challenges, so a statistic-independent
+            // LevelReached challenge sees the post-window level (mirroring the live order, where exp is granted
+            // before the battle-completed handler evaluates challenges).
+            if (victoryExpRewards.Count > 0)
+            {
+                player.GrantOfflineExp(victoryExpRewards);
+            }
+
+            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, notify: false);
+
+            await _progressRepo.Save(progress, cancellationToken);
+            return completed;
+        }
+
         private async Task AbandonBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
@@ -423,5 +631,62 @@ namespace Game.Application.Services
     {
         public required CoreEnemy Enemy { get; set; }
         public required uint Seed { get; set; }
+    }
+
+    /// <summary>
+    /// The welcome-back summary of a returning player's offline progress: how long they were away (capped),
+    /// which loop ran, the battle tally, and the rewards earned (exp, levels, stat points, and the challenges
+    /// completed with what they unlocked). Returned by <see cref="BattleService.SimulateOfflineProgress"/> and
+    /// projected to the API model the client gate renders.
+    /// </summary>
+    public class OfflineProgressSummary
+    {
+        /// <summary>How long the player was away, in milliseconds, clamped to the simulation cap.</summary>
+        public required long AwayMs { get; init; }
+
+        /// <summary>Whether the simulated loop was auto-challenging the boss (<c>true</c>) or idle-farming
+        /// (<c>false</c>).</summary>
+        public required bool AutoChallengeBoss { get; init; }
+
+        /// <summary>The zone the loop ran in.</summary>
+        public required int ZoneId { get; init; }
+
+        public required int BattlesWon { get; init; }
+        public required int BattlesLost { get; init; }
+        public required int BattlesDrawn { get; init; }
+
+        /// <summary>Total experience earned across all victories.</summary>
+        public required long TotalExp { get; init; }
+
+        /// <summary>Levels gained over the window.</summary>
+        public required int LevelsGained { get; init; }
+
+        /// <summary>Stat points gained over the window (from the levels gained).</summary>
+        public required int StatPointsGained { get; init; }
+
+        /// <summary>The challenges completed over the window, each with the reward ids it unlocked.</summary>
+        public required IReadOnlyList<CompletedChallenge> CompletedChallenges { get; init; }
+
+        /// <summary>
+        /// Whether the window produced anything worth gating on. The frontend skips the welcome-back gate for
+        /// an empty summary (a sub-threshold absence, or one that earned nothing) and enters the game directly.
+        /// </summary>
+        public bool HasProgress =>
+            BattlesWon > 0 || BattlesLost > 0 || BattlesDrawn > 0 || CompletedChallenges.Count > 0;
+
+        /// <summary>An empty summary: away time recorded but nothing simulated (a sub-threshold return).</summary>
+        public static OfflineProgressSummary Empty(long awayMs, bool autoChallengeBoss, int zoneId) => new()
+        {
+            AwayMs = awayMs,
+            AutoChallengeBoss = autoChallengeBoss,
+            ZoneId = zoneId,
+            BattlesWon = 0,
+            BattlesLost = 0,
+            BattlesDrawn = 0,
+            TotalExp = 0,
+            LevelsGained = 0,
+            StatPointsGained = 0,
+            CompletedChallenges = [],
+        };
     }
 }

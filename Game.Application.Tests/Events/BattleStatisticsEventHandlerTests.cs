@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Events;
+using Game.Application.Services;
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
@@ -145,9 +146,7 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<IChallenges>(),
-                scope.ServiceProvider.GetRequiredService<IItems>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
 
             // A LevelReached challenge tracks no recorded statistic, so it is only reached via the index's
             // statistic-independent set — which any completed battle evaluates, even this empty-stats victory.
@@ -183,9 +182,7 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<IChallenges>(),
-                scope.ServiceProvider.GetRequiredService<IItems>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
 
             var battleEvent = new BattleCompletedEvent(
                 loadedPlayer, loadedEnemy, Victory: true, PlayerDied: false, TotalMs: 5000,
@@ -253,9 +250,7 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<IChallenges>(),
-                scope.ServiceProvider.GetRequiredService<IItems>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
 
             var battleEvent = new BattleCompletedEvent(
                 player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
