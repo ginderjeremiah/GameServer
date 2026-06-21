@@ -87,8 +87,7 @@
 </div>
 
 <script lang="ts">
-import { ApiRequest, reportDeviceInfo, setTokens } from '$lib/api';
-import { playerManager } from '$lib/engine';
+import { ApiRequest, setTokens } from '$lib/api';
 import { preventDefault } from '$lib/common/event-wrappers';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
@@ -109,7 +108,7 @@ import {
 	validateUsername,
 	type LoginMode
 } from './login/login-validation';
-import { confirmSessionTakeover } from './login/session-takeover';
+import { playerSelectHandoff } from './select/player-select-handoff';
 
 let mode = $state<LoginMode>('login');
 let username = $state('');
@@ -170,12 +169,6 @@ const toggleMode = () => {
 	success = false;
 };
 
-const enterWorld = (data: Parameters<typeof playerManager.initialize>[0]) => {
-	success = true;
-	playerManager.initialize(data);
-	setTimeout(() => goto(resolve('/loading')), 600);
-};
-
 const handleSubmit = async () => {
 	submitted = true;
 	serverError = null;
@@ -198,36 +191,20 @@ const handleSubmit = async () => {
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
 
-		// Login now returns the account's characters; selecting one binds the session and rotates the
-		// token to carry the chosen player. The real player-select screen is #1070 — until then, auto-select
-		// the first character so the existing single-character flow keeps working.
+		// Login lists the account's characters; choosing one (which binds the session and rotates the
+		// token to carry the player) happens on the character-select screen. Hand the summaries off and
+		// proceed there — the refresh token needed to select is held in the token store.
 		const summaries = response.data.playerSummaries;
 		if (summaries.length === 0) {
 			submitting = false;
 			serverError = 'This account has no characters.';
 			return;
 		}
-		const selected = await new ApiRequest('Login/SelectPlayer').post({
-			playerId: summaries[0].id,
-			refreshToken: response.data.tokens.refreshToken
-		});
-		if (selected.status !== 200) {
-			submitting = false;
-			serverError = selected.error ?? 'Could not enter the game.';
-			return;
-		}
-		setTokens(selected.data.tokens);
-
-		// Warn before entering the game if the player is already connected elsewhere — entering would
-		// take over (disconnect) that session. This per-player presence check runs after selection.
-		// Declining logs this freshly-issued session back out.
-		if (!(await confirmSessionTakeover())) {
-			submitting = false;
-			return;
-		}
-		// Fire-and-forget: report this device's capabilities now that we're authenticated.
-		void reportDeviceInfo();
-		enterWorld(selected.data.player);
+		// Surface the brief "signing in" success status while the navigation to the character-select
+		// screen settles; `submitting` stays true so the form holds disabled through the transition.
+		success = true;
+		playerSelectHandoff.set(summaries);
+		goto(resolve('/select'));
 	} else if (mode === 'signup') {
 		submitting = false;
 		serverError = response.error ?? 'Account created but login failed.';

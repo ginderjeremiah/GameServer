@@ -1,43 +1,80 @@
-<div class="game-container" data-testid="game-screen">
-	<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
+{#if welcome.phase === 'summary' && welcome.summary}
+	<WelcomeBackGate summary={welcome.summary} onEnter={() => welcome.enter()} />
+{:else if welcome.phase === 'entered'}
+	<div class="game-container" data-testid="game-screen">
+		<div class="sidebar-spacer" class:pinned={sidebarPinned}></div>
 
-	<div class="main-content">
-		<div class="screen-container" data-testid="screen-container">
-			{#if CurrentScreen}
-				<CurrentScreen />
-			{:else}
-				<PlaceholderScreen label={currentScreenDef?.label ?? ''} />
-			{/if}
+		<div class="main-content">
+			<div class="screen-container" data-testid="screen-container">
+				{#if CurrentScreen}
+					<CurrentScreen />
+				{:else}
+					<PlaceholderScreen label={currentScreenDef?.label ?? ''} />
+				{/if}
+			</div>
+			<LogPanel />
 		</div>
-		<LogPanel />
-	</div>
 
-	<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
-</div>
+		<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
+
+		{#if showSwitcher}
+			<CharacterSwitcher onClose={() => (showSwitcher = false)} />
+		{/if}
+	</div>
+{:else}
+	<BootSplash />
+{/if}
 
 <script lang="ts">
 import { NavSidebar, LogPanel } from '$components';
 import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
 import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
-import { startGame } from '$lib/engine';
+import { startGame, stopEngines, enemyManager } from '$lib/engine';
+import { refreshPlayer } from '$lib/engine/session';
 import { navigation } from '$stores';
-import { getRoles } from '$lib/api';
+import { apiSocket, getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { onMount } from 'svelte';
+import { onDestroy, onMount } from 'svelte';
 import { confirmQuit } from './game-actions';
+import { WelcomeBackView } from './welcome-back/welcome-back-view.svelte';
+import WelcomeBackGate from './welcome-back/WelcomeBackGate.svelte';
+import CharacterSwitcher from './CharacterSwitcher.svelte';
+import BootSplash from '../BootSplash.svelte';
+
+// The welcome-back gate runs the offline-progress check before the idle loop starts (so simulated and
+// live battles never overlap), then either passes straight through or shows the away-summary gate. The
+// engine touch points are injected so the flow stays testable without the live engine.
+const welcome = new WelcomeBackView({
+	fetchProgress: async () => {
+		const response = await apiSocket.sendSocketCommand('GetOfflineProgress');
+		return response.error ? null : (response.data ?? null);
+	},
+	resyncPlayer: refreshPlayer,
+	reconcileMode: (autoChallengeBoss) => enemyManager.reconcilePersistedMode(autoChallengeBoss),
+	enterGame: () => {
+		try {
+			startGame();
+		} catch (e) {
+			console.error('Failed to start game', e);
+		}
+	}
+});
 
 if (browser) {
-	try {
-		startGame();
-	} catch (e) {
-		console.error('Failed to start game', e);
-	}
+	// Cleanup is registered once at init (the gate may start the loops later, after an await, where
+	// onDestroy can't be called); stopEngines is idempotent, so it's safe even if the loops never ran.
+	onDestroy(stopEngines);
+	onMount(() => {
+		void welcome.run();
+	});
 }
 
 let currentScreen = $state<string>('fight');
 let sidebarPinned = $state(false);
+// Whether the in-game character switcher overlay is open (the game keeps running behind it).
+let showSwitcher = $state(false);
 
 // Roles drive which screens appear in the sidebar (e.g. Admin). Read from the access token after
 // mount so the value matches the server render (no token available there) and updates on the client
@@ -62,6 +99,10 @@ const handleNavigate = (key: string) => {
 	}
 	if (key === 'quit') {
 		void confirmQuit();
+		return;
+	}
+	if (key === 'switch') {
+		showSwitcher = true;
 		return;
 	}
 	currentScreen = key;

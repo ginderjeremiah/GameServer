@@ -97,6 +97,24 @@ describe('root layout boot gate', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	it('does not bounce the character-select screen for a missing player, but still guards protected routes', async () => {
+		// Boot completes in place (login route, no stored session), arming the post-boot safety net.
+		renderLayout();
+		await waitFor(() => expect(screen.getByTestId('child')).toBeTruthy());
+		expect(goto).not.toHaveBeenCalled();
+
+		// Login navigates to /select before a character is selected/loaded — the safety net must NOT
+		// bounce it back to login (the regression that broke the whole login flow).
+		playerManager.name = '';
+		setPath('/select');
+		await waitFor(() => expect(page.url.pathname).toBe('/select'));
+		expect(goto).not.toHaveBeenCalled();
+
+		// The effect is still live: losing the player on a genuinely protected route returns to login.
+		setPath('/game');
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
+	});
+
 	it('falls back to the loading screen when a reference set must be downloaded', async () => {
 		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
 		resumeSession.mockResolvedValue('loading');

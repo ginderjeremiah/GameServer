@@ -30,6 +30,29 @@ export function shortUsername(prefix: string) {
 
 export const TEST_PASSWORD = 'Test123!';
 
+/**
+ * From the character-select screen (where login/signup now lands), enter as the account's first
+ * character and land on `/loading`.
+ *
+ * A rapid re-login of the same user can trip the "active session" takeover warning: the prior
+ * session's socket may still be within its presence TTL (notably on WebKit, whose browser-context
+ * teardown doesn't cleanly close the socket, so the server hasn't yet cleared the presence key). The
+ * takeover modal is confirmed if it appears; if the prior session was already torn down cleanly (as on
+ * Chromium/Firefox) no modal shows and we proceed straight through.
+ */
+export async function selectFirstCharacter(page: Page) {
+	await expect(page).toHaveURL('/select', { timeout: 10000 });
+	await page.getByTestId('player-card').first().click();
+
+	try {
+		await page.locator('[data-modal-primary]').click({ timeout: 3000 });
+	} catch {
+		// No takeover prompt appeared — the prior session had already been cleaned up.
+	}
+
+	await expect(page).toHaveURL('/loading', { timeout: 10000 });
+}
+
 export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.goto('/');
 	await waitForLoginReady(page);
@@ -43,31 +66,19 @@ export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
 	await page.getByTestId('submit-button').click();
 
-	await expect(page).toHaveURL('/loading', { timeout: 10000 });
+	await selectFirstCharacter(page);
 	return username;
 }
 
 /**
- * Log an existing account in from the login screen and land on `/loading`.
- *
- * A rapid re-login of the same user can trip the "active session" takeover warning: the prior
- * session's socket may still be within its presence TTL (notably on WebKit, whose browser-context
- * teardown doesn't cleanly close the socket, so the server hasn't yet cleared the presence key). The
- * takeover modal is confirmed if it appears; if the prior session was already torn down cleanly (as on
- * Chromium/Firefox) no modal shows and we proceed straight through.
+ * Log an existing account in from the login screen, pick its first character, and land on `/loading`.
  */
 export async function loginExistingUser(page: Page, username: string) {
 	await page.getByTestId('username-input').fill(username);
 	await page.getByTestId('password-input').fill(TEST_PASSWORD);
 	await page.getByTestId('submit-button').click();
 
-	try {
-		await page.locator('[data-modal-primary]').click({ timeout: 3000 });
-	} catch {
-		// No takeover prompt appeared — the prior session had already been cleaned up.
-	}
-
-	await expect(page).toHaveURL('/loading', { timeout: 10000 });
+	await selectFirstCharacter(page);
 }
 
 export async function createAccountAndStartGame(page: Page, prefix = 'e') {

@@ -22,7 +22,7 @@ export interface ScreenDef {
 	 * The component rendered when this screen is active — the single source of truth for the screen's
 	 * UI. Omitted for entries that render nothing of their own: a "wip" placeholder (`built: false`,
 	 * which falls back to {@link PlaceholderScreen}) or an action-only entry that navigates or opens a
-	 * dialog instead (e.g. Admin, Quit).
+	 * dialog/overlay instead (e.g. Admin, Quit, Switch Character).
 	 */
 	component?: Component;
 	/** When set, the screen is only available to users holding this role. */
@@ -52,6 +52,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 	{ key: 'stats', label: 'Stats', group: 'character', built: true, component: Statistics },
 	{ key: 'codex', label: 'Codex', group: 'character', built: true, component: Codex },
 	{ key: 'options', label: 'Options', group: 'settings', built: true, component: Options },
+	{ key: 'switch', label: 'Switch Character', group: 'settings', built: true },
 	{ key: 'help', label: 'Help', group: 'settings', built: false },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
 	{ key: 'admin', label: 'Admin', group: 'admin', built: true, requiresRole: ERole.Admin }

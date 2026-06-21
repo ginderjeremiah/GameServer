@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Api.Http;
@@ -8,6 +9,7 @@ using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Headers;
@@ -228,6 +230,168 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SwitchPlayer_Unauthenticated_Returns401()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/SwitchPlayer",
+                new { PlayerId = 1, RefreshToken = "irrelevant" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_TargetOfAnotherAccount_IsRejected()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var owner = await TestDataSeeder.CreateUserAsync(context, "switchowner", "pass");
+            var ownerPlayer = await TestDataSeeder.CreatePlayerAsync(context, owner.Id);
+            var attacker = await TestDataSeeder.CreateUserAsync(context, "switchattacker", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var attackerPlayer = await TestDataSeeder.CreatePlayerAsync(context, attacker.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, attackerPlayer.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchattacker", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, attackerPlayer.Id);
+
+            // Switching to a character of another account is rejected (anti-cheat) before binding it.
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SwitchPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = ownerPlayer.Id, select.Tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            var response = await Client.SendAsync(request, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
+            Assert.Null(result.Data);
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_FromOneCharacterToAnother_CreditsDepartedAndBindsTarget()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A winning idle scenario so the departed character actually earns over its credited away window:
+            // the player one-shots a fixed-power enemy in a single-zone loop.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchuser", "pass");
+            var departed = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha", zoneId: zone.Id);
+            var target = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta", zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, departed.Id, playerSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, target.Id, playerSkill.Id);
+
+            // Back-date the departed character's activity so the switch credits a real away window.
+            var departedLevelBefore = departed.Level;
+            departed.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchuser", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, departed.Id);
+
+            var switched = await SwitchPlayerAsync(select.Tokens, target.Id);
+
+            // The response binds the target character and rotates the token.
+            Assert.Equal(target.Id, switched.Player.Id);
+            Assert.Equal("Beta", switched.Player.Name);
+            Assert.NotEqual(select.Tokens.RefreshToken, switched.Tokens.RefreshToken);
+
+            // The cached session is now bound to the target character.
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var session = await sessionStore.GetSession(user.Id);
+            Assert.NotNull(session);
+            Assert.Equal(target.Id, session.PlayerId);
+
+            // The departed character was credited for its away window — it gained levels from the simulated
+            // victories (write-behind, so poll the persisted aggregate until the credit lands).
+            await AssertPlayerLeveledAboveAsync(departed.Id, departedLevelBefore);
+
+            // The rotated access token authenticates Status and resolves the target character from its claim.
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", switched.Tokens.AccessToken);
+            var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+            var status = await statusResponse.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.Equal(target.Id, status?.Data?.Id);
+        }
+
+        [Fact]
+        public async Task Players_AuthenticatedAccount_ListsAllItsCharacters()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchlist", "pass");
+            var first = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha");
+            var second = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta");
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchlist", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, first.Id);
+
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            var response = await authClient.GetAsync("/api/Login/Players", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiEnumerableResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Equal(new[] { first.Id, second.Id }.OrderBy(id => id), result.Data.Select(p => p.Id).OrderBy(id => id));
+        }
+
+        [Fact]
+        public async Task Players_Unauthenticated_Returns401()
+        {
+            var response = await Client.GetAsync("/api/Login/Players", CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        // Switches the bound character through the real SwitchPlayer endpoint and returns the deserialized
+        // result (rotated tokens plus the loaded target player).
+        private async Task<SelectPlayerResult> SwitchPlayerAsync(AuthTokens tokens, int playerId)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SwitchPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = playerId, tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+            var response = await Client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            return result.Data;
+        }
+
+        // The credited save is write-behind (fire-and-forget cache write), so poll the persisted aggregate
+        // until the departed character's level reflects the simulated away window.
+        private async Task AssertPlayerLeveledAboveAsync(int playerId, int levelBefore)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                var persisted = await GetPersistedPlayerAsync(playerId);
+                if (persisted.Level > levelBefore)
+                {
+                    return;
+                }
+
+                await Task.Delay(25, CancellationToken);
+            }
+
+            Assert.Fail("The departed character was not credited (its level did not advance) after the switch.");
+        }
+
+        [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
             // Arrange — CreateAccount inserts PlayerSkills with SkillId 0, 1, 2
@@ -290,6 +454,99 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.OK));
             Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.BadRequest));
             Assert.DoesNotContain(responses, response => response.StatusCode == HttpStatusCode.InternalServerError);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AuthenticatedValidName_CreatesCharacterAndReturnsSummary()
+        {
+            // The new-player blueprint inserts PlayerSkills with SkillId 0, 1, 2.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "creatorctrl", "pass");
+
+            var client = Factory.CreateClient();
+            // A pre-selection token (no player bound) — the realistic state on the character-select screen.
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Gandalf" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.Data);
+            Assert.Null(result.ErrorMessage);
+            Assert.Equal("Gandalf", result.Data.Name);
+
+            // The character is persisted and attached to the account.
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var created = await verifyContext.Players.FirstOrDefaultAsync(p => p.Id == result.Data.Id, CancellationToken);
+            Assert.NotNull(created);
+            Assert.Equal(user.Id, created.UserId);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task CreatePlayer_Unauthenticated_Returns401()
+        {
+            var response = await Client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Nobody" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_InvalidName_Returns400AndCreatesNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "badnamectrl", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            // A name past the 20-char limit is rejected with a structured error, not a 500.
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer",
+                new { Name = "this-name-is-way-too-long-to-be-valid" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
+            Assert.Null(result.Data);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task CreatePlayer_AtConfiguredCap_Returns400()
+        {
+            // Verifies the configured default cap (6) is wired end-to-end: an account already holding the cap
+            // is refused another character.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
+            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var user = await TestDataSeeder.CreateUserAsync(context, "cappedctrl", "pass");
+            for (var i = 0; i < 6; i++)
+            {
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: $"Char{i}");
+            }
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "OneTooMany" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(6, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+            client.Dispose();
         }
 
         [Fact]

@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts.Identity;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
@@ -5,6 +6,7 @@ using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Api.RateLimiting;
 using Game.Application.Services;
+using Game.Core.Players;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,7 +22,8 @@ namespace Game.Api.Controllers
         AccountService accountService,
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
-        PlayerService playerService) : ControllerBase
+        PlayerService playerService,
+        BattleService battleService) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly SessionInitializer _sessionInitializer = sessionInitializer;
@@ -28,6 +31,7 @@ namespace Game.Api.Controllers
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
+        private readonly BattleService _battleService = battleService;
 
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
@@ -87,6 +91,99 @@ namespace Game.Api.Controllers
                 Tokens = ToAuthTokens(result.Tokens),
                 Player = PlayerData.FromPlayer(result.Player),
             });
+        }
+
+        /// <summary>
+        /// Switches the authenticated account's live character without re-logging in (spike #922). Credits the
+        /// departed character — the one the caller's token currently binds — for any elapsed idle time via the
+        /// offline-rewards simulator, resolving its in-flight battle and dropping the login-time 5-minute floor
+        /// so a deliberate switch loses no progress, then binds and loads the newly selected character through
+        /// the same path as <see cref="SelectPlayer"/> (validating ownership and rotating the token). The client
+        /// must tear down its game socket before calling this, since the departed-character credit runs over
+        /// HTTP, off that character's battle loop.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            // Validate the switch target up front (read-only, no token rotation) so an unowned switch never
+            // credits or mutates the departed character. SelectPlayer below re-validates and may also fail on an
+            // invalid refresh token, in which case the departed character has been credited and re-anchored (benign:
+            // the progress is legitimate and re-anchoring makes a retry near-idempotent).
+            if (!await _accountService.OwnsPlayer(_sessionService.UserId, request.PlayerId))
+            {
+                return ApiResponse.Error(SelectPlayerErrorMessage(SelectPlayerStatus.NotOwned), SelectPlayerErrorCategory(SelectPlayerStatus.NotOwned));
+            }
+
+            // Settle the departed character before binding the new one, so its idle progress and in-flight
+            // battle are credited rather than discarded when the session is rebound below.
+            await CreditDepartedCharacter(request.PlayerId, HttpContext.RequestAborted);
+
+            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken);
+            if (!result.Success)
+            {
+                return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
+            }
+
+            _sessionService.CreateSession(_sessionService.UserId, result.Player.Id);
+
+            return ApiResponse.Success(new SelectPlayerResult
+            {
+                Tokens = ToAuthTokens(result.Tokens),
+                Player = PlayerData.FromPlayer(result.Player),
+            });
+        }
+
+        /// <summary>
+        /// Credits the character the caller is switching away from (the token's currently-selected player) for
+        /// any elapsed idle time, resolving its in-flight battle. A no-op when there is no departed character to
+        /// settle — a pre-selection token (no bound player) or a switch to the same character — or when that
+        /// character's aggregate can no longer be loaded.
+        /// </summary>
+        private async Task CreditDepartedCharacter(int targetPlayerId, CancellationToken cancellationToken)
+        {
+            if (_sessionService.TokenSelectedPlayerId is not int departedPlayerId || departedPlayerId == targetPlayerId)
+            {
+                return;
+            }
+
+            // Bind the departed character's in-flight session state (from the token claim) so the simulator can
+            // resolve any stale battle, then load its aggregate to apply the credited rewards to.
+            await _sessionInitializer.EnsureSessionLoaded(cancellationToken);
+            var departed = await _playerService.LoadPlayer(departedPlayerId, cancellationToken);
+            if (departed is null)
+            {
+                return;
+            }
+
+            await _battleService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
+        }
+
+        /// <summary>
+        /// Creates an additional character on the authenticated account. Validates the name and enforces the
+        /// per-account character cap server-side (anti-cheat). Runs over HTTP as part of the pre-game
+        /// character-select flow — no session binding is established, so the caller's selected character is
+        /// unchanged. Returns the new character's summary so the client can add it to the select list.
+        /// </summary>
+        [HttpPost]
+        public async Task<ApiResponse<PlayerSummary>> CreatePlayer([FromBody] CreatePlayerRequest request)
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name);
+            if (!result.Success)
+            {
+                return ApiResponse.Error(CreatePlayerErrorMessage(result.Status), CreatePlayerErrorCategory(result.Status));
+            }
+
+            return ApiResponse.Success(result.Player);
         }
 
         [AllowAnonymous]
@@ -173,6 +270,23 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
+        /// Lists the authenticated account's characters. The login flow gets these from <see cref="Login"/>'s
+        /// response, but the in-game character switcher runs inside an authenticated session with no login
+        /// handoff to draw on, so it re-fetches the current list here before a switch.
+        /// </summary>
+        [HttpGet]
+        public async Task<ApiEnumerableResponse<PlayerSummary>> Players()
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            var players = await _accountService.GetPlayers(_sessionService.UserId);
+            return ApiResponse.Success(players);
+        }
+
+        /// <summary>
         /// Records the device capabilities the frontend reports once after login, enriching the device
         /// identified by the fingerprint header of this request. Requires authentication so it can only be
         /// sent by a logged-in client. Returns an error when the request carries no device fingerprint.
@@ -231,6 +345,30 @@ namespace Game.Api.Controllers
                 // A legit client never selects an unowned character; treat tampering as a plain bad request.
                 SelectPlayerStatus.NotOwned => ApiErrorCategory.BadRequest,
                 SelectPlayerStatus.PlayerDataNotFound => ApiErrorCategory.NotFound,
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static string CreatePlayerErrorMessage(CreatePlayerStatus status)
+        {
+            return status switch
+            {
+                CreatePlayerStatus.InvalidName =>
+                    $"Character names must be {PlayerName.MinLength}-{PlayerName.MaxLength} characters and contain no control characters.",
+                CreatePlayerStatus.CapReached => "You have reached the maximum number of characters for this account.",
+                CreatePlayerStatus.UserNotFound => "Account not found",
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        private static ApiErrorCategory CreatePlayerErrorCategory(CreatePlayerStatus status)
+        {
+            return status switch
+            {
+                // Both an invalid name and exceeding the cap are client-side validation/business failures.
+                CreatePlayerStatus.InvalidName => ApiErrorCategory.BadRequest,
+                CreatePlayerStatus.CapReached => ApiErrorCategory.BadRequest,
+                CreatePlayerStatus.UserNotFound => ApiErrorCategory.NotFound,
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

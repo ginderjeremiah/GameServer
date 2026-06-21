@@ -651,6 +651,29 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.autoFight).toBe(false);
 	});
 
+	it('re-arms auto-fight from the persisted boss mode (welcome-back reconciliation)', () => {
+		// The live autoFight always starts false; the welcome-back gate (#1043) re-arms it to what the
+		// player left, so a returning boss-farmer's toggle is restored (pre-armed intent, not engagement).
+		manager.reconcilePersistedMode(true);
+		expect(manager.autoFight).toBe(true);
+	});
+
+	it('leaves auto-fight off when the persisted mode is idle (welcome-back reconciliation)', () => {
+		manager.reconcilePersistedMode(false);
+		expect(manager.autoFight).toBe(false);
+	});
+
+	it('seeds the sync baseline so a reconciled boss-farmer does not re-emit a redundant boss sync', async () => {
+		// reconcilePersistedMode aligns the dedup baseline with the backend's persisted value, so engaging
+		// the boss (which mirrors the live mode) recognises boss is already persisted and emits nothing.
+		manager.reconcilePersistedMode(true);
+		send.mockClear();
+
+		await manager.challengeBoss();
+
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', true);
+	});
+
 	it('does not persist boss mode when auto-fight is pre-armed while idle-farming', () => {
 		// Option A (#1067): toggling auto-fight on from the boss trigger while still idle-farming is intent,
 		// not engagement — it must NOT persist boss, or the offline sim would resume a never-challenged player

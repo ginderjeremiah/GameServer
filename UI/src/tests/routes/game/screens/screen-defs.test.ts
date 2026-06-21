@@ -48,9 +48,9 @@ describe('GAME_SCREENS', () => {
 		expect(gated).toEqual(['admin']);
 	});
 
-	// These entries navigate or open a dialog instead of rendering a screen component, so the page
-	// returns early before deriving a component for them.
-	const ACTION_KEYS = ['admin', 'quit'];
+	// These entries navigate or open a dialog/overlay instead of rendering a screen component, so the
+	// page returns early before deriving a component for them.
+	const ACTION_KEYS = ['admin', 'quit', 'switch'];
 
 	it('gives every built, renderable screen a component (single-source registry)', () => {
 		const missing = GAME_SCREENS.filter((s) => s.built && !ACTION_KEYS.includes(s.key) && !s.component).map(

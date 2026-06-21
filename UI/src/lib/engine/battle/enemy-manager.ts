@@ -303,6 +303,19 @@ export class EnemyManager {
 		this.syncAutoChallengeBoss(on && this.mode === 'boss');
 	}
 
+	/**
+	 * Reconciles the fresh session's live loop state with the mode the backend persisted at the player's
+	 * last disconnect, read by the welcome-back gate from `GetOfflineProgress` (#1043). The live `autoFight`
+	 * always starts false, so a returning boss-farmer would otherwise find their auto-fight toggle off; this
+	 * re-arms it to what they left (pre-armed intent — it does not auto-engage the boss, mirroring arming the
+	 * toggle from the idle BossTrigger). It also seeds the sync dedup baseline with the persisted value so a
+	 * later genuine toggle still emits, while a redundant one is dropped.
+	 */
+	public reconcilePersistedMode(autoChallengeBoss: boolean) {
+		this.autoFight = autoChallengeBoss;
+		this.lastSyncedAutoChallengeBoss = autoChallengeBoss;
+	}
+
 	private returnToIdle(sync = true) {
 		this.mode = 'idle';
 		this.autoFight = false;

@@ -12,6 +12,7 @@ using Game.Api.Services;
 using Game.Api.Sockets.Commands;
 using Game.Application.Auth;
 using Game.Application.DependencyInjection;
+using Game.Application.Services;
 using Game.Core.Events;
 using Game.Core.Players.Events;
 using Game.DataAccess;
@@ -104,6 +105,16 @@ namespace Game.Api
                         && options.MaxDelaySeconds >= options.BaseDelaySeconds
                         && options.FailureWindowSeconds > 0,
                     "LoginBackoff requires FailureThreshold >= 0, 0 < BaseDelaySeconds <= MaxDelaySeconds, and FailureWindowSeconds > 0")
+                .ValidateOnStart();
+
+            // The per-account character cap (anti-cheat) is config-bound with a safe positive default, so an
+            // unconfigured deployment still enforces a cap; validated as positive on start so a misconfigured
+            // zero/negative fails fast rather than silently disabling the guard.
+            builder.Services.AddOptions<PlayerCreationOptions>()
+                .BindConfiguration(PlayerCreationOptions.SectionName)
+                .Validate(
+                    options => options.MaxPlayersPerAccount > 0,
+                    "PlayerCreation requires MaxPlayersPerAccount > 0")
                 .ValidateOnStart();
 
             ConfigureAuth(builder);

@@ -49,5 +49,12 @@ export type AttributeModifier = DerivedAttributeModifier | BaseAttributeModifier
  *  of, generated from `Game.Core.Attributes.Modifiers.StaticAttributeModifiers.All`
  *  and kept in the same order the backend applies them. The explicit type both
  *  documents the contract and verifies, at compile time, that the generated table
- *  conforms to the {@link AttributeModifier} union. */
-export const STATIC_ATTRIBUTE_MODIFIERS: readonly AttributeModifier[] = GENERATED_STATIC_ATTRIBUTE_MODIFIERS;
+ *  conforms to the {@link AttributeModifier} union.
+ *
+ *  Each `BattleAttributes` spreads these into its own modifier list, so every battler
+ *  shares the same modifier object references. The objects (and the table) are frozen
+ *  to enforce that shared-template invariant at runtime — a complement to the union's
+ *  `readonly` fields — so a stray mutation on one battler can't corrupt every other. */
+export const STATIC_ATTRIBUTE_MODIFIERS: readonly AttributeModifier[] = Object.freeze(
+	GENERATED_STATIC_ATTRIBUTE_MODIFIERS.map((modifier) => Object.freeze(modifier))
+);

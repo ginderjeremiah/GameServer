@@ -43,11 +43,25 @@ export const anchorPosition = (anchor: TooltipAnchor): Position => {
 // already tracking the cursor, so re-anchoring the tooltip off the element's box on that focus would
 // make it jump away from the pointer (#880). `:focus-visible` isn't reliably readable inside a focus
 // handler, so we mirror its heuristic from the raw input events: keydown ⇒ keyboard, pointer ⇒ mouse.
-let focusViaKeyboard = true;
-if (typeof document !== 'undefined') {
-	// Capture phase so the modality is recorded before the focus the interaction triggers fires.
-	document.addEventListener('keydown', () => (focusViaKeyboard = true), true);
-	document.addEventListener('pointerdown', () => (focusViaKeyboard = false), true);
+interface FocusModality {
+	viaKeyboard: boolean;
+}
+
+// The capture-phase modality listeners are document/app-lifetime by design, so they are never torn
+// down. They and their shared state hang off a global singleton (keyed by a stable `Symbol.for`) so a
+// module re-evaluation — HMR, or repeated test imports — reuses the existing registration instead of
+// stacking a second, unremovable pair of listeners (a leak the codebase otherwise avoids).
+const focusModalityKey = Symbol.for('gameserver.tooltip.focusModality');
+const globalScope = globalThis as unknown as Record<symbol, FocusModality | undefined>;
+const existingModality = globalScope[focusModalityKey];
+const focusModality: FocusModality = existingModality ?? { viaKeyboard: true };
+if (!existingModality) {
+	globalScope[focusModalityKey] = focusModality;
+	if (typeof document !== 'undefined') {
+		// Capture phase so the modality is recorded before the focus the interaction triggers fires.
+		document.addEventListener('keydown', () => (focusModality.viaKeyboard = true), true);
+		document.addEventListener('pointerdown', () => (focusModality.viaKeyboard = false), true);
+	}
 }
 
 /**
@@ -56,7 +70,7 @@ if (typeof document !== 'undefined') {
  * would make the tooltip jump. Keyboard focus has no cursor, so it still pins the tooltip to the box.
  */
 export const focusAnchor = (event: FocusEvent): HTMLElement | undefined =>
-	focusViaKeyboard && event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+	focusModality.viaKeyboard && event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
 
 // Keyed by the tooltip's stable id rather than held in a reactive array. An
 // array relied on `findIndex(... === data)` + `splice` to unregister, which is

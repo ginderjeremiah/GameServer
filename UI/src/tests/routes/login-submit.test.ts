@@ -2,18 +2,14 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen, waitFor } from '@testing-library/svelte';
 
 // Controllable doubles for the submit pipeline: ApiRequest.post is keyed by route so a test can
-// stage the CreateAccount / Login responses independently, and the session-takeover decision and
-// world-entry side effects are mocked so the happy path can be driven without real I/O.
-const { postMock, setTokensMock, reportDeviceInfoMock, gotoMock, initializeMock, confirmTakeoverMock } = vi.hoisted(
-	() => ({
-		postMock: vi.fn(),
-		setTokensMock: vi.fn(),
-		reportDeviceInfoMock: vi.fn(),
-		gotoMock: vi.fn(),
-		initializeMock: vi.fn(),
-		confirmTakeoverMock: vi.fn()
-	})
-);
+// stage the CreateAccount / Login responses independently, and the navigation + character-handoff
+// side effects are mocked so the happy path can be driven without real I/O.
+const { postMock, setTokensMock, gotoMock, handoffSetMock } = vi.hoisted(() => ({
+	postMock: vi.fn(),
+	setTokensMock: vi.fn(),
+	gotoMock: vi.fn(),
+	handoffSetMock: vi.fn()
+}));
 
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
@@ -28,40 +24,24 @@ vi.mock('$lib/api', () => ({
 		post = (body: unknown) => postMock(this.route, body);
 		get = vi.fn();
 	},
-	setTokens: setTokensMock,
-	reportDeviceInfo: reportDeviceInfoMock
+	setTokens: setTokensMock
 }));
-vi.mock('$lib/engine', () => ({ playerManager: { name: '', initialize: initializeMock } }));
-vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confirmTakeoverMock }));
+vi.mock('$routes/select/player-select-handoff', () => ({
+	playerSelectHandoff: { set: handoffSetMock, take: vi.fn() }
+}));
 
 import LoginPage from '../../routes/+page.svelte';
 
-// Login returns the account's characters; SelectPlayer (auto-called for the first character) rotates
-// the token and returns the loaded player to enter the game with.
+// Login returns the account's characters; the page hands them to the character-select screen and
+// navigates there rather than auto-selecting.
+const SUMMARIES = [{ id: 1, name: 'Hero', level: 1, currentZoneId: 0, lastActivity: '2026-06-20T00:00:00Z' }];
 const LOGIN_OK = {
 	status: 200,
-	data: {
-		tokens: { accessToken: 'a', refreshToken: 'r' },
-		playerSummaries: [{ id: 1, name: 'Hero', level: 1, currentZoneId: 0 }]
-	}
-};
-const SELECT_OK = {
-	status: 200,
-	data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 1, name: 'Hero' } }
+	data: { tokens: { accessToken: 'a', refreshToken: 'r' }, playerSummaries: SUMMARIES }
 };
 
-// Routes the staged happy-path responses by endpoint so a test can drive the full
-// Login -> SelectPlayer pipeline without real I/O.
-const happyRoute = (route: string) => {
-	switch (route) {
-		case 'Login/CreateAccount':
-			return Promise.resolve({ status: 200 });
-		case 'Login/SelectPlayer':
-			return Promise.resolve(SELECT_OK);
-		default:
-			return Promise.resolve(LOGIN_OK);
-	}
-};
+const happyRoute = (route: string) =>
+	route === 'Login/CreateAccount' ? Promise.resolve({ status: 200 }) : Promise.resolve(LOGIN_OK);
 
 const fillCredentials = async (username = 'testuser', password = 'secret1') => {
 	await fireEvent.input(screen.getByTestId('username-input'), { target: { value: username } });
@@ -79,65 +59,44 @@ const submit = async () => {
 beforeEach(() => {
 	postMock.mockReset();
 	setTokensMock.mockClear();
-	reportDeviceInfoMock.mockClear();
 	gotoMock.mockClear();
-	initializeMock.mockClear();
-	confirmTakeoverMock.mockReset();
-	confirmTakeoverMock.mockResolvedValue(true);
+	handoffSetMock.mockClear();
 });
 
 afterEach(cleanup);
 
 describe('Login page — submit flow', () => {
-	it('signs in, selects the first character, stores tokens, reports device info and enters the world', async () => {
+	it('signs in, stores the pre-selection tokens, hands off the characters and navigates to select', async () => {
 		postMock.mockImplementation(happyRoute);
 		render(LoginPage);
 		await fillCredentials();
 
 		await submit();
 
-		// The loaded player from SelectPlayer is what enters the world.
-		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 1, name: 'Hero' }));
-		// Both the pre-selection and rotated token pairs are stored, in order.
-		expect(setTokensMock).toHaveBeenCalledWith(LOGIN_OK.data.tokens);
-		expect(setTokensMock).toHaveBeenCalledWith(SELECT_OK.data.tokens);
-		// SelectPlayer is auto-called for the first character with the login refresh token.
-		expect(postMock).toHaveBeenCalledWith('Login/SelectPlayer', { playerId: 1, refreshToken: 'r' });
-		expect(reportDeviceInfoMock).toHaveBeenCalledTimes(1);
-		// enterWorld navigates to the loading screen after a short delay.
-		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/loading'));
+		// The login (pre-selection) token pair is stored so the select screen can rotate it on selection.
+		await waitFor(() => expect(setTokensMock).toHaveBeenCalledWith(LOGIN_OK.data.tokens));
+		// The account's characters are handed to the select screen, and the page navigates there.
+		expect(handoffSetMock).toHaveBeenCalledWith(SUMMARIES);
+		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
+		// No character is auto-selected here any more.
+		expect(postMock).not.toHaveBeenCalledWith('Login/SelectPlayer', expect.anything());
 	});
 
-	it('aborts entry when the player declines the session takeover', async () => {
-		postMock.mockImplementation(happyRoute);
-		confirmTakeoverMock.mockResolvedValue(false);
+	it('surfaces a server error when login has no characters', async () => {
+		postMock.mockResolvedValue({
+			status: 200,
+			data: { tokens: { accessToken: 'a', refreshToken: 'r' }, playerSummaries: [] }
+		});
 		render(LoginPage);
 		await fillCredentials();
 
 		await submit();
 
-		// The takeover check runs after selection (a per-player presence check).
-		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalled());
-		expect(setTokensMock).toHaveBeenCalledWith(SELECT_OK.data.tokens);
-		// Declining leaves the world un-entered.
-		expect(initializeMock).not.toHaveBeenCalled();
-		expect(gotoMock).not.toHaveBeenCalled();
-	});
-
-	it('surfaces a server error when character selection fails', async () => {
-		postMock.mockImplementation((route: string) =>
-			route === 'Login/SelectPlayer'
-				? Promise.resolve({ status: 404, error: 'Player data not found' })
-				: Promise.resolve(LOGIN_OK)
+		await waitFor(() =>
+			expect(screen.getByTestId('status-line').textContent).toContain('This account has no characters.')
 		);
-		render(LoginPage);
-		await fillCredentials();
-
-		await submit();
-
-		await waitFor(() => expect(screen.getByTestId('status-line').textContent).toContain('Player data not found'));
-		expect(initializeMock).not.toHaveBeenCalled();
 		expect(gotoMock).not.toHaveBeenCalled();
+		expect(handoffSetMock).not.toHaveBeenCalled();
 	});
 
 	it('surfaces a server error on a rejected login', async () => {
@@ -150,7 +109,7 @@ describe('Login page — submit flow', () => {
 		await waitFor(() =>
 			expect(screen.getByTestId('status-line').textContent).toContain('Incorrect username or password.')
 		);
-		expect(initializeMock).not.toHaveBeenCalled();
+		expect(gotoMock).not.toHaveBeenCalled();
 	});
 
 	it('creates the account then signs in during signup', async () => {
@@ -162,7 +121,7 @@ describe('Login page — submit flow', () => {
 
 		await submit();
 
-		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 1, name: 'Hero' }));
+		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
 		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', { username: 'newhero', password: 'Test1234' });
 		expect(postMock).toHaveBeenCalledWith('Login', { username: 'newhero', password: 'Test1234' });
 	});
@@ -180,6 +139,6 @@ describe('Login page — submit flow', () => {
 		// The login request is never attempted once creation fails.
 		expect(postMock).toHaveBeenCalledTimes(1);
 		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', expect.anything());
-		expect(initializeMock).not.toHaveBeenCalled();
+		expect(gotoMock).not.toHaveBeenCalled();
 	});
 });

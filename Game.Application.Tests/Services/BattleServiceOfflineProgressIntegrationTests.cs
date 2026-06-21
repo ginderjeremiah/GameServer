@@ -245,6 +245,55 @@ namespace Game.Application.Tests.Services
             Assert.True(summary.BattlesWon > 1);
         }
 
+        [Fact]
+        public async Task SimulateSwitchProgress_SubThresholdAway_StillCreditsAndReanchors()
+        {
+            // A deliberate character switch drops the 5-minute floor: an away window the login path would treat
+            // as a no-op still credits the departed character (#922 lossless switch).
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var levelBefore = player.Level;
+            // Under the 5-minute login floor, but long enough to win several battles when the floor is dropped.
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-2);
+
+            var summary = await battleService.SimulateSwitchProgress(player, state, CancellationToken);
+
+            Assert.True(summary.BattlesWon > 1, "Expected the sub-threshold window to still win multiple battles.");
+            Assert.True(summary.HasProgress);
+            Assert.Equal((long)summary.BattlesWon * ExpPerWin, summary.TotalExp);
+            Assert.True(player.Level > levelBefore);
+            // The away anchor is re-stamped to ~now, so the parked window starts fresh from the switch.
+            Assert.True(DateTime.UtcNow - player.LastActivity < TimeSpan.FromMinutes(1));
+        }
+
+        [Fact]
+        public async Task SimulateSwitchProgress_StaleInFlightBattle_IsResolvedBeforeSimulating()
+        {
+            // The departed character's in-flight battle must be settled by the switch credit (not discarded),
+            // even for a sub-threshold away window the login path would skip.
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
+            Assert.True(state.HasActiveBattle);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Sub-threshold away — the login path would leave the stale battle for the next StartBattle; the
+            // switch path resolves it.
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-2);
+
+            await battleService.SimulateSwitchProgress(player, state, CancellationToken);
+
+            Assert.False(state.HasActiveBattle);
+        }
+
         /// <summary>
         /// Seeds a player who reliably one-shots a fixed-power enemy in a single-zone idle loop, so an away
         /// window produces a deterministic run of victories (each worth <see cref="ExpPerWin"/>). The enemy's

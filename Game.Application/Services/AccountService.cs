@@ -4,6 +4,7 @@ using Game.Abstractions.DataAccess;
 using Game.Application.Auth;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Game.Application.Services
 {
@@ -20,6 +21,7 @@ namespace Game.Application.Services
         IPasswordHasher passwordHasher,
         LoginBackoffGuard backoffGuard,
         NewPlayerFactory newPlayerFactory,
+        IOptions<PlayerCreationOptions> playerCreationOptions,
         ILogger<AccountService> logger)
     {
         private readonly IUsers _users = users;
@@ -29,6 +31,7 @@ namespace Game.Application.Services
         private readonly IPasswordHasher _passwordHasher = passwordHasher;
         private readonly LoginBackoffGuard _backoffGuard = backoffGuard;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
+        private readonly PlayerCreationOptions _playerCreationOptions = playerCreationOptions.Value;
         private readonly ILogger<AccountService> _logger = logger;
 
         /// <summary>
@@ -159,6 +162,57 @@ namespace Game.Application.Services
 
             var tokens = await IssueTokens(userId, session.Roles, playerId);
             return AccountSelectPlayerResult.Succeeded(tokens, player);
+        }
+
+        /// <summary>
+        /// Whether the given player belongs to the account — a read-only ownership check that consumes no
+        /// token. Used to gate a character switch's departed-character credit on a valid target before the
+        /// authoritative (token-rotating) <see cref="SelectPlayer"/> runs, so a rejected switch never mutates
+        /// the departed character.
+        /// </summary>
+        public async Task<bool> OwnsPlayer(int userId, int playerId)
+        {
+            var playerIds = await _users.GetPlayerIds(userId);
+            return playerIds.Contains(playerId);
+        }
+
+        /// <summary>
+        /// Lists the account's characters for the in-game character switcher (#1072). The login flow gets
+        /// these from <see cref="Login"/>'s response, but a switch happens inside an authenticated session
+        /// with no login handoff to draw on, so the client re-fetches the current list here. Same projection
+        /// the login step uses.
+        /// </summary>
+        public async Task<IReadOnlyList<PlayerSummary>> GetPlayers(int userId)
+        {
+            return await _users.GetPlayerSummaries(userId);
+        }
+
+        /// <summary>
+        /// Creates an additional character on the authenticated account from a user-supplied name. The name
+        /// is validated and normalized here (a domain rule), then the new-player blueprint is built by
+        /// <see cref="NewPlayerFactory"/> and persisted by the Identity context, which enforces the
+        /// config-bound per-account cap as anti-cheat. Distinct failure reasons are reported via the result
+        /// status so the caller can surface the right message; on success the new character's summary is
+        /// returned so the client can add it to the select list.
+        /// </summary>
+        public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name)
+        {
+            if (!PlayerName.TryNormalize(name, out var normalized))
+            {
+                return AccountCreatePlayerResult.Failed(CreatePlayerStatus.InvalidName);
+            }
+
+            var blueprint = _newPlayerFactory.Create(normalized);
+            var result = await _users.CreatePlayer(userId, blueprint, _playerCreationOptions.MaxPlayersPerAccount);
+
+            return result.Outcome switch
+            {
+                CreatePlayerOutcome.Success =>
+                    AccountCreatePlayerResult.Succeeded(result.Player ?? throw new InvalidOperationException("A successful player creation must carry the created summary.")),
+                CreatePlayerOutcome.CapReached => AccountCreatePlayerResult.Failed(CreatePlayerStatus.CapReached),
+                CreatePlayerOutcome.UserNotFound => AccountCreatePlayerResult.Failed(CreatePlayerStatus.UserNotFound),
+                _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, null),
+            };
         }
 
         /// <summary>
