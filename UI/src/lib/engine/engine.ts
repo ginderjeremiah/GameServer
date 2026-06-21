@@ -1,4 +1,3 @@
-import { onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { BattleEngine } from './battle/battle-engine';
@@ -135,12 +134,23 @@ export const handleSocketReplaced = async () => {
 	void goto(resolve('/'));
 };
 
-const stopGame = () => {
+/**
+ * Stops the live game loops (logical, render, battle) and the background-throttle monitor. Shared by the
+ * full {@link stopGame} teardown and the game route's own unmount cleanup, so navigating away from the
+ * game stops the loops without tearing down the socket/stores a session-replacement must clear. Every
+ * stop is idempotent, so this is safe to call even when the loops never started (e.g. the player left
+ * during the welcome-back gate, before {@link startGame} ran).
+ */
+export const stopEngines = () => {
 	logicEngine.stop();
 	backgroundThrottleMonitor.stop();
 	renderEngine.stop();
 	enemyManager.stop();
 	battleEngine.stop();
+};
+
+const stopGame = () => {
+	stopEngines();
 	statistics.reset();
 	playerChallenges.reset();
 	resetLogs();
@@ -156,24 +166,13 @@ const stopGame = () => {
 const startLogicEngine = () => {
 	logicEngine.start();
 	backgroundThrottleMonitor.start();
-	onDestroy(() => {
-		logicEngine.stop();
-		backgroundThrottleMonitor.stop();
-	});
 };
 
 const startRenderEngine = () => {
 	renderEngine.start();
-	onDestroy(() => {
-		renderEngine.stop();
-	});
 };
 
 const startBattleEngine = () => {
 	enemyManager.start();
 	battleEngine.start();
-	onDestroy(() => {
-		enemyManager.stop();
-		battleEngine.stop();
-	});
 };

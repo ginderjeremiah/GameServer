@@ -18,7 +18,7 @@ vi.mock('$lib/api', () => ({
 vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: { initialize: playerInitialize } }));
 vi.mock('$lib/engine/reference-data', () => ({ hydrateAllFromCache }));
 
-import { resumeSession } from '$lib/engine/session';
+import { resumeSession, refreshPlayer } from '$lib/engine/session';
 
 const PLAYER = { name: 'Hero' };
 
@@ -78,5 +78,30 @@ describe('resumeSession', () => {
 
 		expect(await resumeSession()).toBe('loading');
 		expect(playerInitialize).toHaveBeenCalledWith(PLAYER);
+	});
+});
+
+describe('refreshPlayer', () => {
+	it('re-initializes the player from a 200 response', async () => {
+		await refreshPlayer();
+
+		expect(playerInitialize).toHaveBeenCalledWith(PLAYER);
+		// A mid-session refresh does not re-report device info (the boot path owns that).
+		expect(reportDeviceInfo).not.toHaveBeenCalled();
+	});
+
+	it('leaves the existing player intact when the status check is not 200', async () => {
+		statusGet.mockResolvedValue({ status: 401 });
+
+		await refreshPlayer();
+
+		expect(playerInitialize).not.toHaveBeenCalled();
+	});
+
+	it('swallows a failed request so the gate proceeds on the existing player', async () => {
+		statusGet.mockRejectedValue(new Error('network'));
+
+		await expect(refreshPlayer()).resolves.toBeUndefined();
+		expect(playerInitialize).not.toHaveBeenCalled();
 	});
 });
