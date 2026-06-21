@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
+import { EAttribute, ESkillAcquisition, type IChallenge, type IEnemy, type ISkill, type IZone } from '$lib/api';
 
 // Engine + stores are mocked so importing the view-model doesn't drag in the real
 // game engine. `playerManager.unlockedSkills` is a plain writable array and
@@ -71,6 +71,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	description: '',
 	cooldownMs: 1000,
 	iconPath: '',
+	acquisition: ESkillAcquisition.Player,
 	...over
 });
 

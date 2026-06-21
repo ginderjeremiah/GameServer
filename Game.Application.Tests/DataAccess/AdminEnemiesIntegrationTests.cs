@@ -149,9 +149,10 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 var enemy = await TestDataSeeder.CreateEnemyAsync(context);
-                var kept = await TestDataSeeder.CreateSkillAsync(context, "Kept");
-                var removed = await TestDataSeeder.CreateSkillAsync(context, "Removed");
-                var added = await TestDataSeeder.CreateSkillAsync(context, "Added");
+                // Skills in the desired set must be Enemy-flagged (the SetSkills authoring guard).
+                var kept = await TestDataSeeder.CreateSkillAsync(context, "Kept", acquisition: ESkillAcquisition.Enemy);
+                var removed = await TestDataSeeder.CreateSkillAsync(context, "Removed", acquisition: ESkillAcquisition.Enemy);
+                var added = await TestDataSeeder.CreateSkillAsync(context, "Added", acquisition: ESkillAcquisition.Enemy);
                 await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, kept.Id);
                 await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, removed.Id);
 
@@ -336,6 +337,33 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.False(result.Succeeded);
             Assert.Equal("Enemy not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetSkills_AssigningNonEnemyFlaggedSkill_ReturnsFailure()
+        {
+            int enemyId, skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                // A Player-only skill isn't flagged for the enemy channel, so assigning it must be rejected
+                // (anti-tamper: the flag is the declared intent, this pool is the reality).
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Player Strike", acquisition: ESkillAcquisition.Player);
+                enemyId = enemy.Id;
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SetSkills(new SetEnemySkillsData { EnemyId = enemyId, SkillIds = [skillId] });
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Skill 'Player Strike' is not flagged as an Enemy skill and cannot be assigned to an enemy.",
+                result.ErrorMessage);
         }
 
         [Fact]

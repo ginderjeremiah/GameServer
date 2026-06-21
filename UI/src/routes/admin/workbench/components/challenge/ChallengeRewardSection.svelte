@@ -97,7 +97,8 @@
 </div>
 
 <script lang="ts">
-import { ERarity, type IChallenge } from '$lib/api';
+import { ERarity, ESkillAcquisition, type IChallenge } from '$lib/api';
+import { hasFlag } from '$lib/common';
 import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
@@ -162,14 +163,21 @@ const modPickRecords = $derived(
 		retired: !!m.retiredAt
 	}))
 );
+// Only Player-flagged skills can be newly granted (the backend enforces this too); the current
+// reward stays visible even if it isn't Player-flagged or is retired, so it's never silently lost.
 const skillPickRecords = $derived(
-	keepActive(reference.skillRecords(), challenge.rewardSkillId).map((s) => ({
-		id: s.id,
-		name: s.name,
-		color: 'var(--accent)',
-		tag: `${s.baseDamage} dmg`,
-		retired: !!s.retiredAt
-	}))
+	reference
+		.skillRecords()
+		.filter(
+			(s) => s.id === challenge.rewardSkillId || (!s.retiredAt && hasFlag(s.acquisition, ESkillAcquisition.Player))
+		)
+		.map((s) => ({
+			id: s.id,
+			name: s.name,
+			color: 'var(--accent)',
+			tag: `${s.baseDamage} dmg`,
+			retired: !!s.retiredAt
+		}))
 );
 
 const setItem = (id: number | undefined) => {

@@ -3,6 +3,7 @@ import {
 	EAttribute,
 	EItemCategory,
 	ERarity,
+	ESkillAcquisition,
 	type EModifierType,
 	type ESkillEffectTarget,
 	type EItemModType,
@@ -81,7 +82,8 @@ export function battlerFactory(registry: ISkill[]) {
 				damageMultipliers: spec.multipliers,
 				effects: spec.effects,
 				description: '',
-				iconPath: ''
+				iconPath: '',
+				acquisition: ESkillAcquisition.Player
 			});
 			return id;
 		});

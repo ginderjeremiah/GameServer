@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EAttribute, ELogType, EModifierType, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, ELogType, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
 
 // Callbacks captured from the mocked engine hooks. `onLogicalUpdate` emits a delta,
@@ -125,7 +125,8 @@ describe('BattleEngine', () => {
 			effects: [],
 			description: '',
 			cooldownMs: 500,
-			iconPath: ''
+			iconPath: '',
+			acquisition: ESkillAcquisition.Player
 		};
 
 		mockEnemies.length = 0;

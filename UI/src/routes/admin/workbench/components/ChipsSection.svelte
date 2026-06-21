@@ -67,9 +67,10 @@ const itemsKey = $derived(section.itemsKey as string);
 const ids = $derived((fieldsOf(record)[itemsKey] as number[]) ?? []);
 const baseIds = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as number[]) : null);
 const catalogue = $derived(section.catalogue());
-// Retired entries stay in the catalogue so an already-assigned chip still renders its
-// name, but they are excluded from the add-list so they can't be newly assigned.
-const available = $derived(catalogue.filter((c) => !ids.includes(c.id) && !c.retired));
+// Retired or non-addable entries (e.g. a skill not flagged for this channel) stay in the
+// catalogue so an already-assigned chip still renders its name, but they are excluded from the
+// add-list so they can't be newly assigned.
+const available = $derived(catalogue.filter((c) => !ids.includes(c.id) && !c.retired && c.addable !== false));
 
 const add = (id: number) => {
 	// No truthiness guard on `id`: ids are zero-based, so id 0 is a valid first entry.

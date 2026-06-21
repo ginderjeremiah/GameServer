@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EItemCategory, EItemModType, ERarity, type IItemMod, type ISkill } from '$lib/api';
+import {
+	EAttribute,
+	EItemCategory,
+	EItemModType,
+	ERarity,
+	ESkillAcquisition,
+	type IItemMod,
+	type ISkill
+} from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import type { Item } from '$lib/battle';
 import type { ResolvedReward } from '$routes/game/screens/challenges/challenges-view.svelte';
@@ -68,7 +76,8 @@ const previewSkill = (): ISkill => ({
 	damageMultipliers: [{ attributeId: EAttribute.Intellect, multiplier: 1.5 }],
 	effects: [],
 	cooldownMs: 3000,
-	iconPath: ''
+	iconPath: '',
+	acquisition: ESkillAcquisition.Player
 });
 
 const skillReward = (revealed: boolean): ResolvedReward =>

@@ -26,6 +26,7 @@ namespace Game.DataAccess.Repositories.Admin
                     CooldownMs = item.CooldownMs,
                     Description = item.Description,
                     IconPath = item.IconPath,
+                    Acquisition = (int)item.Acquisition,
                 }),
                 edit: item => _entityStore.Update(new Entities.Skill
                 {
@@ -35,6 +36,7 @@ namespace Game.DataAccess.Repositories.Admin
                     CooldownMs = item.CooldownMs,
                     Description = item.Description,
                     IconPath = item.IconPath,
+                    Acquisition = (int)item.Acquisition,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

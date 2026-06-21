@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EAttribute, ERarity, EItemModType, type IItemMod, type ISkill } from '$lib/api';
+import { EAttribute, ERarity, ESkillAcquisition, EItemModType, type IItemMod, type ISkill } from '$lib/api';
 import RewardAffordance from '$routes/game/screens/challenges/RewardAffordance.svelte';
 import RewardAffordanceFixture from './RewardAffordanceFixture.svelte';
 import type { RewardTooltipController } from '$routes/game/screens/challenges/reward-tooltip-context';
@@ -35,7 +35,8 @@ const sampleSkill: ISkill = {
 	damageMultipliers: [{ attributeId: EAttribute.Intellect, multiplier: 1.5 }],
 	effects: [],
 	cooldownMs: 3000,
-	iconPath: ''
+	iconPath: '',
+	acquisition: ESkillAcquisition.Player
 };
 
 const skillReward = (revealed: boolean): ResolvedReward => ({

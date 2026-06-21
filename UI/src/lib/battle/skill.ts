@@ -1,4 +1,4 @@
-﻿import { IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget } from '$lib/api';
+﻿import { IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget, ESkillAcquisition } from '$lib/api';
 import { Battler } from './battler';
 import { calculateSkillDamage, scaledEffectAmount } from './battle-formulas';
 
@@ -11,6 +11,9 @@ export class Skill implements ISkill {
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
+	// Carried to satisfy the ISkill contract this display-and-battle model implements; battle logic
+	// never reads provenance (the acquisition flag is authoring intent, not a combat input).
+	acquisition: ESkillAcquisition;
 	chargeTime = 0;
 	renderChargeTime = 0;
 	owner: Battler;
@@ -24,6 +27,7 @@ export class Skill implements ISkill {
 		this.description = data.description;
 		this.cooldownMs = data.cooldownMs;
 		this.iconPath = data.iconPath;
+		this.acquisition = data.acquisition;
 		this.owner = owner;
 	}
 

@@ -475,6 +475,31 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// The channels a skill is <em>allowed</em> to be acquired through. A declared authoring intent, not a
+    /// record of what exists: a skill may be <see cref="Item"/>-flagged with no item granting it yet. The
+    /// references (a challenge's reward, an enemy's skill pool, an item's grant) are the reality; backend
+    /// authoring validation bridges the two. "Enemy-Only" is <see cref="Enemy"/> set with the others clear —
+    /// an <see cref="Item"/>-only skill can never be a challenge reward, which is what guarantees it can be
+    /// obtained solely by equipping the granting item.
+    /// </summary>
+    [Flags]
+    [ClientMirrored]
+    public enum ESkillAcquisition
+    {
+        /// <summary>Not acquirable through any channel.</summary>
+        None = 0,
+
+        /// <summary>Selectable by the player — a valid challenge reward, added to the unlocked loadout pool.</summary>
+        Player = 1,
+
+        /// <summary>Grantable by an equipped item.</summary>
+        Item = 2,
+
+        /// <summary>Assignable to an enemy's skill pool.</summary>
+        Enemy = 4,
+    }
+
+    /// <summary>
     /// Represents the rarity of something (which loosely corresponds to its strength and the requirements to obtain it).
     /// </summary>
     public enum ERarity

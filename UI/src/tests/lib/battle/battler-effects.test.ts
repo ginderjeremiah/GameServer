@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 // A mutable skill registry backing the mocked `staticData.skills`, so the battleStep ordering test can
@@ -210,7 +210,8 @@ describe('Battler skill-effect bookkeeping', () => {
 					effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
 				],
 				description: '',
-				iconPath: ''
+				iconPath: '',
+				acquisition: ESkillAcquisition.Player
 			},
 			caster
 		);
@@ -236,7 +237,8 @@ describe('Battler skill-effect bookkeeping', () => {
 					effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
 				],
 				description: '',
-				iconPath: ''
+				iconPath: '',
+				acquisition: ESkillAcquisition.Player
 			},
 			caster
 		);
@@ -377,7 +379,8 @@ describe('Skill effect attribute scaling', () => {
 				damageMultipliers: [],
 				effects: [effect],
 				description: '',
-				iconPath: ''
+				iconPath: '',
+				acquisition: ESkillAcquisition.Player
 			},
 			caster
 		);

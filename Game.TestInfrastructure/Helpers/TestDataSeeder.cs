@@ -69,7 +69,8 @@ namespace Game.TestInfrastructure.Helpers
             GameContext context,
             string name = "Attack",
             decimal baseDamage = 10m,
-            int cooldownMs = 1000)
+            int cooldownMs = 1000,
+            ESkillAcquisition acquisition = ESkillAcquisition.Player)
         {
             var skill = new Skill
             {
@@ -78,6 +79,7 @@ namespace Game.TestInfrastructure.Helpers
                 BaseDamage = baseDamage,
                 CooldownMs = cooldownMs,
                 IconPath = "",
+                Acquisition = (int)acquisition,
             };
 
             context.Skills.Add(skill);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute } from '$lib/api';
+import { EAttribute, ESkillAcquisition } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import {
@@ -19,6 +19,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	description: 'A basic slash',
 	cooldownMs: 1000,
 	iconPath: '/icons/slash.png',
+	acquisition: ESkillAcquisition.Player,
 	...overrides
 });
 

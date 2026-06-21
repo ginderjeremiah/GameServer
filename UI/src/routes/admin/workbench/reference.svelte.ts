@@ -112,6 +112,7 @@ class WorkbenchReference {
 			id: s.id,
 			name: s.name,
 			baseDamage: s.baseDamage,
+			acquisition: s.acquisition,
 			retired: !!s.retiredAt
 		}));
 

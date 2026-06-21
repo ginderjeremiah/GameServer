@@ -121,6 +121,13 @@ export enum ERarity {
 	Mythic = 6,
 }
 
+export enum ESkillAcquisition {
+	None = 0,
+	Player = 1,
+	Item = 2,
+	Enemy = 4,
+}
+
 export enum ESkillEffectTarget {
 	Self = 1,
 	Opponent = 2,

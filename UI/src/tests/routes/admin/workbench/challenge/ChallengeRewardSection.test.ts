@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { ERarity, type IChallenge } from '$lib/api';
+import { ERarity, ESkillAcquisition, type IChallenge } from '$lib/api';
 
 const ITEMS: { id: number; name: string; rarityId: ERarity; retiredAt?: string }[] = [
 	{ id: 0, name: 'Iron Helm', rarityId: ERarity.Common },
@@ -10,8 +10,10 @@ const ITEMS: { id: number; name: string; rarityId: ERarity; retiredAt?: string }
 const MODS: { id: number; name: string; itemModTypeId: number; retiredAt?: string }[] = [
 	{ id: 0, name: 'Sharp', itemModTypeId: 2 }
 ];
-const SKILLS: { id: number; name: string; baseDamage: number; retiredAt?: string }[] = [
-	{ id: 0, name: 'Cleave', baseDamage: 12 }
+const SKILLS: { id: number; name: string; baseDamage: number; acquisition: ESkillAcquisition; retiredAt?: string }[] = [
+	{ id: 0, name: 'Cleave', baseDamage: 12, acquisition: ESkillAcquisition.Player },
+	// An Enemy-only skill: it can't be a challenge reward, so the picker must omit it.
+	{ id: 1, name: 'Enemy Roar', baseDamage: 8, acquisition: ESkillAcquisition.Enemy }
 ];
 
 const { mockReference } = vi.hoisted(() => ({
@@ -163,6 +165,15 @@ describe('ChallengeRewardSection', () => {
 		await fireEvent.click(screen.getByText('Cleave'));
 		expect((store.items[0] as unknown as IChallenge).rewardSkillId).toBe(0);
 		expect(container.querySelector('.ch-picker')).toBeNull();
+	});
+
+	it('offers only Player-flagged skills in the picker, omitting an Enemy-only skill', async () => {
+		const { store, record, baseline } = setup();
+		render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose skill…'));
+		// Cleave is Player-acquirable; Enemy Roar is Enemy-only and can't be a challenge reward.
+		expect(screen.getByText('Cleave')).toBeTruthy();
+		expect(screen.queryByText('Enemy Roar')).toBeNull();
 	});
 
 	it('collapses an open picker when the rendered record switches to a different challenge', async () => {

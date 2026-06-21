@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EChallengeType, ERarity, type ISkill } from '$lib/api';
+import { EChallengeType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
 import OverviewPane from '$routes/game/screens/challenges/OverviewPane.svelte';
 import type {
 	ChallengeVM,
@@ -19,7 +19,8 @@ const sampleSkill: ISkill = {
 	damageMultipliers: [],
 	effects: [],
 	cooldownMs: 3000,
-	iconPath: ''
+	iconPath: '',
+	acquisition: ESkillAcquisition.Player
 };
 
 const reward: ResolvedReward = {

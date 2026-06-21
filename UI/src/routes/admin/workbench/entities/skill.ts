@@ -1,4 +1,12 @@
-import { ApiRequest, EAttribute, EModifierType, ESkillEffectTarget, fetchSocketData, type ISkill } from '$lib/api';
+import {
+	ApiRequest,
+	EAttribute,
+	EModifierType,
+	ESkillAcquisition,
+	ESkillEffectTarget,
+	fetchSocketData,
+	type ISkill
+} from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, persistEntity, skillEffectChanges } from '../save-helpers';
@@ -24,6 +32,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 		baseDamage: 10,
 		cooldownMs: 2000,
 		iconPath: '',
+		// New skills default to player-acquirable; re-flag Item/Enemy skills as needed.
+		acquisition: ESkillAcquisition.Player,
 		description: '',
 		damageMultipliers: [],
 		effects: []
@@ -54,6 +64,16 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
+				{
+					key: 'acquisition',
+					label: 'Acquisition (channels allowed to grant this skill)',
+					type: 'flags',
+					flags: [
+						{ label: 'Player', value: ESkillAcquisition.Player },
+						{ label: 'Item', value: ESkillAcquisition.Item },
+						{ label: 'Enemy', value: ESkillAcquisition.Enemy }
+					]
+				},
 				{
 					key: 'description',
 					label: 'Description',

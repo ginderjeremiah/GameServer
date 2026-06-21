@@ -30,6 +30,16 @@ export function enumPairs(obj: Record<string | number, string | number>) {
 		.map((key) => ({ id: Number(key), name: normalizeText(obj[key] as string) }));
 }
 
+/** Whether every bit in `flag` is set in the bitmask `value` (mirrors C# `[Flags]` `HasFlag`). */
+export function hasFlag(value: number, flag: number): boolean {
+	return (value & flag) === flag;
+}
+
+/** Returns `value` with `flag`'s bits set (`on`) or cleared (`!on`). */
+export function toggleFlag(value: number, flag: number, on: boolean): number {
+	return on ? value | flag : value & ~flag;
+}
+
 export function capitalize(str?: string) {
 	if (!str) {
 		return '';

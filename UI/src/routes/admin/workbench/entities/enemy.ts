@@ -1,4 +1,5 @@
-import { ApiRequest, fetchSocketData, type IEnemy } from '$lib/api';
+import { ApiRequest, ESkillAcquisition, fetchSocketData, type IEnemy } from '$lib/api';
+import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
@@ -119,7 +120,10 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 			warn: (e) => (e.skillPool.length ? null : 'No skills assigned'),
 			kind: 'chips',
 			itemsKey: 'skillPool',
-			catalogue: () => reference.skillCatalogue(),
+			// Only Enemy-flagged skills can be newly assigned (the backend enforces this too); an
+			// already-assigned skill that lost the flag stays visible as a removable chip.
+			catalogue: () =>
+				reference.skillCatalogue().map((s) => ({ ...s, addable: hasFlag(s.acquisition, ESkillAcquisition.Enemy) })),
 			labelOf: (s) => s.name,
 			metaOf: (s) => `${(s as unknown as { baseDamage: number }).baseDamage} dmg`,
 			emptyIcon: 'rune',

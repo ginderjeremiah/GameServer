@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IAttributeMultiplier } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { Skill } from '$lib/battle/skill';
@@ -14,6 +14,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	description: 'A basic slash',
 	cooldownMs: 1000,
 	iconPath: '/icons/slash.png',
+	acquisition: ESkillAcquisition.Player,
 	...overrides
 });
 

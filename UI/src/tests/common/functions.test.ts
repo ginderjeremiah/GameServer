@@ -7,6 +7,8 @@ import {
 	keys,
 	groupBy,
 	enumPairs,
+	hasFlag,
+	toggleFlag,
 	delay
 } from '../../lib/common/functions';
 
@@ -144,6 +146,44 @@ describe('enumPairs', () => {
 		}
 		const pairs = enumPairs(TestEnum);
 		expect(pairs[0].name).toBe('My Value');
+	});
+});
+
+describe('hasFlag', () => {
+	// Bits mirror a [Flags] enum: Player=1, Item=2, Enemy=4.
+	it('detects a set single-bit flag', () => {
+		expect(hasFlag(1 | 4, 4)).toBe(true);
+	});
+
+	it('returns false for a clear flag', () => {
+		expect(hasFlag(1 | 4, 2)).toBe(false);
+	});
+
+	it('treats None (0) as having no flags', () => {
+		expect(hasFlag(0, 1)).toBe(false);
+	});
+
+	it('requires every bit of a multi-bit flag to be set', () => {
+		expect(hasFlag(1 | 2, 2 | 4)).toBe(false);
+		expect(hasFlag(2 | 4, 2 | 4)).toBe(true);
+	});
+});
+
+describe('toggleFlag', () => {
+	it('sets a flag without disturbing others', () => {
+		expect(toggleFlag(1, 4, true)).toBe(1 | 4);
+	});
+
+	it('clears a flag without disturbing others', () => {
+		expect(toggleFlag(1 | 2 | 4, 2, false)).toBe(1 | 4);
+	});
+
+	it('is a no-op when setting an already-set flag', () => {
+		expect(toggleFlag(1 | 2, 2, true)).toBe(1 | 2);
+	});
+
+	it('is a no-op when clearing an already-clear flag', () => {
+		expect(toggleFlag(1, 4, false)).toBe(1);
 	});
 });
 
