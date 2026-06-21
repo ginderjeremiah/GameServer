@@ -212,7 +212,7 @@ export class BattleEngine {
 			)) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged, blocked);
 				logMessage(ELogType.Damage, this.damageLogMessage(skill.name, damage, outcome), outcome);
-				notifyCombatFloat(combatFloatEvent(byPlayer, crit, dodged, blocked, damage));
+				notifyCombatFloat(combatFloatEvent(outcome, damage));
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
@@ -337,24 +337,21 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, blo
 	return 'enemy-hit';
 }
 
-/** Maps one activation's flags to the float that spawns for it, mirroring {@link damageLogOutcome}'s
- *  decision. A player hit floats over the enemy (crit when it crit); an incoming enemy hit floats over
- *  the player as a dodge (no number), a block, or a plain hit. */
-function combatFloatEvent(
-	byPlayer: boolean,
-	crit: boolean,
-	dodged: boolean,
-	blocked: boolean,
-	damage: number
-): CombatFloatEvent {
-	if (byPlayer) {
-		return { target: 'enemy', kind: crit ? 'crit' : 'hit', amount: damage };
+/** Maps one activation's resolved {@link LogOutcome} to the float that spawns for it, so the float and
+ *  the combat-log line are both driven by the single {@link damageLogOutcome} classifier rather than a
+ *  parallel copy of the flag branching. A player hit/crit floats over the enemy; an incoming enemy hit
+ *  floats over the player as a dodge (no number), a block, or a plain hit. */
+function combatFloatEvent(outcome: LogOutcome, damage: number): CombatFloatEvent {
+	switch (outcome) {
+		case 'player-crit':
+			return { target: 'enemy', kind: 'crit', amount: damage };
+		case 'player-hit':
+			return { target: 'enemy', kind: 'hit', amount: damage };
+		case 'player-dodge':
+			return { target: 'player', kind: 'dodge' };
+		case 'player-block':
+			return { target: 'player', kind: 'block', amount: damage };
+		case 'enemy-hit':
+			return { target: 'player', kind: 'hit', amount: damage };
 	}
-	if (dodged) {
-		return { target: 'player', kind: 'dodge' };
-	}
-	if (blocked) {
-		return { target: 'player', kind: 'block', amount: damage };
-	}
-	return { target: 'player', kind: 'hit', amount: damage };
 }
