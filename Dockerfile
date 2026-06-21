@@ -1,7 +1,6 @@
 FROM nginx:alpine
 
-# Copy the template to the folder where alpine automatically performs envsubst
-COPY nginx.conf /etc/nginx/templates/nginx.conf.template
+# Copy to the default server block template directory
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Railway injects the PORT variable automatically
 EXPOSE 80
