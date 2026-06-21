@@ -288,6 +288,10 @@ export class EnemyManager {
 	/** Toggle auto-fight: when on, a boss victory immediately re-challenges the boss. */
 	public setAutoFight(on: boolean) {
 		this.autoFight = on;
+		// Persist the player's auto-fight intent (#1040's "mirror the live autoFight state" semantic). Note
+		// auto-fight can be pre-armed from BossTrigger while the loop is still idle, so this persists boss
+		// mode on intent rather than active engagement; whether to gate on mode==='boss' is tracked in #1067
+		// (must be settled before the offline-sim consumer in #1041/#1042 reads the field).
 		this.syncAutoChallengeBoss(on);
 	}
 

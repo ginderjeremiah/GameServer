@@ -690,6 +690,18 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
 	});
 
+	it('does not sync the persisted mode on teardown (stop)', () => {
+		// stop() routes through returnToIdle(false): teardown is not a user intent change, so it must not
+		// clobber a disconnecting boss-farmer's persisted mode. Pins the deliberate no-sync branch so a
+		// later "simplification" back to returnToIdle() (which would sync) is caught.
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		manager.stop();
+
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', expect.anything());
+	});
+
 	it('does not spawn an idle enemy when a boss handoff lands during the post-victory cooldown', async () => {
 		// An idle victory enters a cooldown; mid-cooldown the player challenges the boss (mode flips to
 		// boss, and reset resolves the cooldown early). When the cooldown resolves, the idle handler must

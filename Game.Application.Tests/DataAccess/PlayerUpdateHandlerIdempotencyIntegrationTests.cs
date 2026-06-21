@@ -503,9 +503,12 @@ namespace Game.Application.Tests.DataAccess
 
             // Update-only against the always-present Players row: re-applying with higher absolute values
             // updates the row in place rather than duplicating, so the core fields converge to the latest.
-            // The first apply enters boss mode; the second returns to idle, proving the nullable mode column
-            // round-trips both directions (a set value, then back to null).
+            // The first apply enters boss mode; the second returns to idle. Asserting the column between the
+            // two applies proves the set direction actually reached the column (the final null alone wouldn't —
+            // null is the column default, so it would pass even if the set→null write were dropped).
             await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity, AutoChallengeBossZoneId: zoneId));
+            await AssertAutoChallengeBossZoneIdAsync(playerId, zoneId);
+
             await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity, AutoChallengeBossZoneId: null));
 
             using var scope = CreateScope();
@@ -519,6 +522,7 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(160, row.StatPointsGained);
             Assert.Equal(140, row.StatPointsUsed);
             Assert.Equal(latestActivity, row.LastActivity);
+            // The set→null write landed (not just the default), proving the idle direction round-trips too.
             Assert.Null(row.AutoChallengeBossZoneId);
         }
 
@@ -620,6 +624,17 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<IPlayerUpdateHandler<TEvent>>();
             await handler.HandleAsync(evt);
+        }
+
+        // Reads the persisted column from a fresh context so an intermediate assertion sees the committed value.
+        private async Task AssertAutoChallengeBossZoneIdAsync(int playerId, int? expected)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.Players.AsNoTracking()
+                .Where(p => p.Id == playerId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(expected, row.AutoChallengeBossZoneId);
         }
 
         // Runs the same event through several independent scopes at once so multiple applies pass the
