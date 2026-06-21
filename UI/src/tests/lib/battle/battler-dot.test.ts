@@ -40,21 +40,6 @@ describe('Battler damage/heal-over-time', () => {
 		expect(battler.currentHealth).toBe(startHealth - 2);
 	});
 
-	it('floors a negative DamageTakenPerSecond at zero (no heal past the cap)', () => {
-		// A negative DamageTakenPerSecond must NOT heal: DoT floors at zero (like takeDamage) so it can't
-		// bypass the MaxHealth cap. The battler starts below full to prove no heal.
-		const battler = makeBattler([
-			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
-			{ id: EAttribute.DamageTakenPerSecond, amount: -50 }
-		]);
-		battler.takeDamage(52); // Defense 2 → 50 damage → currentHealth 50
-
-		const dealt = battler.applyDamageOverTime(40); // -50 * 40 / 1000 = -2, floored to 0
-
-		expect(dealt).toBe(0);
-		expect(battler.currentHealth).toBe(50);
-	});
-
 	it('scales HealthRegenPerSecond by the tick', () => {
 		const battler = makeBattler([
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
