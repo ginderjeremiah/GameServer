@@ -650,6 +650,46 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.autoFight).toBe(false);
 	});
 
+	it('syncs boss mode to the backend when auto-fight is toggled on', () => {
+		// Mirroring the live auto-fight state to the durable player so the offline sim resumes the boss loop.
+		manager.setAutoFight(true);
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: true, zoneId: 3 });
+	});
+
+	it('syncs idle mode to the backend when auto-fight is toggled off', () => {
+		manager.setAutoFight(false);
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+	});
+
+	it('syncs idle mode when retreating from the boss (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		send.mockClear();
+
+		await manager.retreatFromBoss();
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+	});
+
+	it('syncs idle mode on a boss loss (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Defeated);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+	});
+
+	it('syncs idle mode on a boss draw (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Drawn);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', { enabled: false, zoneId: 3 });
+	});
+
 	it('does not spawn an idle enemy when a boss handoff lands during the post-victory cooldown', async () => {
 		// An idle victory enters a cooldown; mid-cooldown the player challenges the boss (mode flips to
 		// boss, and reset resolves the cooldown early). When the cooldown resolves, the idle handler must

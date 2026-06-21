@@ -1264,5 +1264,177 @@ namespace Game.Application.Tests.Services
             Assert.Null(result);
             Assert.False(state.HasActiveBattle);
         }
+
+        // ── SetAutoChallengeBoss ─────────────────────────────────────────────
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_EnableValidBossZone_PersistsZoneAndRoundTrips()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: zone.Id);
+
+            Assert.True(success);
+            Assert.Equal(zone.Id, player.AutoChallengeBossZoneId);
+
+            // Round-trip through the write-behind cache (Redis is the source of truth): a fresh load
+            // deserializes the persisted mode rather than reading the same in-memory instance.
+            var reloaded = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(reloaded);
+            Assert.Equal(zone.Id, reloaded.AutoChallengeBossZoneId);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_Disable_ReturnsToIdleAndRoundTrips()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: zone.Id);
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: false, zoneId: zone.Id);
+
+            Assert.True(success);
+            Assert.Null(player.AutoChallengeBossZoneId);
+
+            var reloaded = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(reloaded);
+            Assert.Null(reloaded.AutoChallengeBossZoneId);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_LockedZone_ReturnsFalseAndLeavesModeIdle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            // A boss zone gated behind a challenge the player has not completed: anti-cheat must reject it.
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Reach the boss zone");
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Locked Boss Zone", bossEnemyId: boss.Id, bossLevel: 5, unlockChallengeId: gate.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: zone.Id);
+
+            Assert.False(success);
+            Assert.Null(player.AutoChallengeBossZoneId);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_BosslessZone_ReturnsFalseAndLeavesModeIdle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Bossless Zone");
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: zone.Id);
+
+            Assert.False(success);
+            Assert.Null(player.AutoChallengeBossZoneId);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_RetiredZone_ReturnsFalseAndLeavesModeIdle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            // A boss zone that is retired (out of circulation): its boss cannot be farmed.
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Retired Boss Zone", bossEnemyId: boss.Id, bossLevel: 5, retiredAt: DateTime.UtcNow);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: zone.Id);
+
+            Assert.False(success);
+            Assert.Null(player.AutoChallengeBossZoneId);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_InvalidZoneId_ReturnsFalseAndLeavesModeIdle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Some Zone");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            // An out-of-range zone id is rejected without throwing (the range check precedes GetDomainZone).
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true, zoneId: 9999);
+
+            Assert.False(success);
+            Assert.Null(player.AutoChallengeBossZoneId);
+        }
     }
 }

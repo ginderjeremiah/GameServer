@@ -25,6 +25,7 @@ import type {
 	IReferenceDataVersion,
 	IRemoveModRequest,
 	IServerCommandFailedModel,
+	ISetAutoChallengeBossRequest,
 	ISetItemFavoriteRequest,
 	ISkill,
 	IStatisticType,
@@ -54,6 +55,7 @@ export type ApiSocketResponseTypes = {
 	'RemoveMod': undefined;
 	'SaveLogPreferences': undefined;
 	'ServerCommandFailed': IServerCommandFailedModel;
+	'SetAutoChallengeBoss': undefined;
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
@@ -69,6 +71,7 @@ export type ApiSocketRequestTypes = {
 	'NewEnemy': INewEnemyRequest;
 	'RemoveMod': IRemoveModRequest;
 	'SaveLogPreferences': ILogPreference[];
+	'SetAutoChallengeBoss': ISetAutoChallengeBossRequest;
 	'SetItemFavorite': ISetItemFavoriteRequest;
 	'SetSelectedSkills': number[];
 	'UnequipItem': IEquipRequest;

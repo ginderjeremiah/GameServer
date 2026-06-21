@@ -115,6 +115,8 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal("Hero", player.Name);
             Assert.Equal(3, player.Level);
             Assert.Equal(MappedLastActivity, player.LastActivity);
+            // No boss mode authored on the entity ⇒ idle (null) on the domain model.
+            Assert.Null(player.AutoChallengeBossZoneId);
             Assert.Contains(100, player.Inventory.UnlockedMods);
             Assert.Contains(101, player.Inventory.UnlockedMods);
             var strength = player.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Strength);
@@ -122,6 +124,18 @@ namespace Game.Application.Tests.Mapping
             var pref = Assert.Single(player.LogPreferences);
             Assert.Equal(ELogType.Damage, pref.LogType);
             Assert.False(pref.Enabled);
+        }
+
+        [Fact]
+        public void ToCore_MapsAutoChallengeBossZoneId_WhenInBossMode()
+        {
+            // A persisted boss-mode player carries the auto-challenge-boss zone, which ToCore must map so
+            // the offline-rewards sim can resume the boss loop at next login.
+            var entity = BuildPlayer(autoChallengeBossZoneId: 4);
+
+            var player = PlayerMapper.ToCore(entity, Catalog(), Catalog(), Catalog());
+
+            Assert.Equal(4, player.AutoChallengeBossZoneId);
         }
 
         [Fact]
@@ -183,7 +197,8 @@ namespace Game.Application.Tests.Mapping
             List<EntityAppliedMod>? appliedMods = null,
             List<EntityUnlockedMod>? unlockedMods = null,
             List<EntityPlayerAttribute>? attributes = null,
-            List<EntityLogPreference>? logPreferences = null) => new()
+            List<EntityLogPreference>? logPreferences = null,
+            int? autoChallengeBossZoneId = null) => new()
             {
                 Id = 1,
                 Name = "Hero",
@@ -193,6 +208,7 @@ namespace Game.Application.Tests.Mapping
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
                 LastActivity = MappedLastActivity,
+                AutoChallengeBossZoneId = autoChallengeBossZoneId,
                 PlayerSkills = skills ?? [],
                 UnlockedItems = unlockedItems ?? [],
                 AppliedMods = appliedMods ?? [],

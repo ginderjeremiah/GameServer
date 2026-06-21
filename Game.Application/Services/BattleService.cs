@@ -141,6 +141,41 @@ namespace Game.Application.Services
             };
         }
 
+        /// <summary>
+        /// Persists the player's active idle-loop mode (idle vs. auto-challenge-boss) to the durable player
+        /// aggregate so the offline-rewards simulation can resume the correct loop at next login. Enabling
+        /// validates the target zone as anti-cheat exactly like <see cref="StartBossBattle"/> — the zone must
+        /// exist, be in circulation, be unlocked for the player, and have a dedicated boss — rejecting (no
+        /// mutation) otherwise; disabling is always accepted (returning to idle needs no target). The change
+        /// rides the existing write-behind save via the player's core-updated event.
+        /// </summary>
+        public async Task<bool> SetAutoChallengeBoss(Player player, bool enabled, int zoneId, CancellationToken cancellationToken = default)
+        {
+            if (!enabled)
+            {
+                player.SetAutoChallengeBoss(null);
+                await _playerRepo.SavePlayer(player, cancellationToken);
+                return true;
+            }
+
+            // Anti-cheat: a non-existent, retired, locked, or bossless zone cannot be boss-farmed. A
+            // legitimate client only enables this against a zone it is in and whose boss it can challenge.
+            if (!_zones.ValidateZoneId(zoneId) || _zones.IsZoneRetired(zoneId))
+            {
+                return false;
+            }
+
+            var zone = _zones.GetDomainZone(zoneId);
+            if (zone.BossEnemyId is null || !await IsZoneUnlocked(player.Id, zone, cancellationToken))
+            {
+                return false;
+            }
+
+            player.SetAutoChallengeBoss(zoneId);
+            await _playerRepo.SavePlayer(player, cancellationToken);
+            return true;
+        }
+
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp, CancellationToken cancellationToken = default)
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))

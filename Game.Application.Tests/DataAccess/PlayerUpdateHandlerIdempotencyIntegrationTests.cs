@@ -503,8 +503,10 @@ namespace Game.Application.Tests.DataAccess
 
             // Update-only against the always-present Players row: re-applying with higher absolute values
             // updates the row in place rather than duplicating, so the core fields converge to the latest.
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity));
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity));
+            // The first apply enters boss mode; the second returns to idle, proving the nullable mode column
+            // round-trips both directions (a set value, then back to null).
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity, AutoChallengeBossZoneId: zoneId));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity, AutoChallengeBossZoneId: null));
 
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -517,6 +519,7 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(160, row.StatPointsGained);
             Assert.Equal(140, row.StatPointsUsed);
             Assert.Equal(latestActivity, row.LastActivity);
+            Assert.Null(row.AutoChallengeBossZoneId);
         }
 
         [Fact]
