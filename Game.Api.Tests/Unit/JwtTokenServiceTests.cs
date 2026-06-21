@@ -95,6 +95,26 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public void CreateAccessToken_WithSelectedPlayer_EmitsPlayerIdClaim()
+        {
+            var token = CreateService().CreateAccessToken(7, [], playerId: 99);
+
+            var jwt = new JsonWebToken(token);
+
+            Assert.Equal("99", jwt.GetClaim(JwtTokenService.PlayerIdClaimType).Value);
+        }
+
+        [Fact]
+        public void CreateAccessToken_NoSelectedPlayer_EmitsNoPlayerIdClaim()
+        {
+            var token = CreateService().CreateAccessToken(7, []);
+
+            var jwt = new JsonWebToken(token);
+
+            Assert.DoesNotContain(jwt.Claims, c => c.Type == JwtTokenService.PlayerIdClaimType);
+        }
+
+        [Fact]
         public void CreateAccessToken_ExpiryMatchesConfiguredAccessTokenLifetime()
         {
             var token = CreateService().CreateAccessToken(1, []);

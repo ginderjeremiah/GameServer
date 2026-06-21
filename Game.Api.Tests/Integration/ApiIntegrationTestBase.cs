@@ -53,13 +53,14 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Creates a new HttpClient carrying a bearer access token for the given user ID and any granted
-        /// roles, with a player session pre-created in the cache.
+        /// Creates a new HttpClient carrying a post-selection bearer access token (the selected-player claim
+        /// set to <paramref name="playerId"/>) for the given user ID and any granted roles, with a player
+        /// session pre-created in the cache.
         /// </summary>
         protected HttpClient CreateAuthenticatedClient(int userId, int playerId, params string[] roles)
         {
             var client = Factory.CreateClient();
-            TestAuthHelper.AddAuthHeader(client, userId, roles);
+            TestAuthHelper.AddAuthHeader(client, userId, playerId, roles);
             using var scope = Factory.Services.CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
             sessionService.CreateSession(userId, playerId);
@@ -67,25 +68,49 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>
-        /// Logs in with the given credentials through the real login flow and returns a client carrying
-        /// the issued bearer access token, along with the full login result (tokens + player data).
+        /// Logs in and selects the account's first character through the real auth flow, returning a
+        /// game-ready client carrying the post-selection bearer access token (selected-player claim set)
+        /// along with the rotated token pair.
         /// </summary>
-        protected async Task<(HttpClient Client, LoginResult Login)> LoginAndBuildClientAsync(string username, string password)
+        protected async Task<(HttpClient Client, AuthTokens Tokens)> LoginAndBuildClientAsync(string username, string password)
         {
             var login = await LoginAsync(username, password);
+            var select = await SelectPlayerAsync(login.Tokens, login.PlayerSummaries[0].Id);
             var client = Factory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.Tokens.AccessToken);
-            return (client, login);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", select.Tokens.AccessToken);
+            return (client, select.Tokens);
         }
 
         /// <summary>
-        /// Logs in through the real login endpoint and returns the deserialized login result.
+        /// Logs in through the real login endpoint and returns the deserialized login result (pre-selection
+        /// tokens plus the account's player summaries).
         /// </summary>
         protected async Task<LoginResult> LoginAsync(string username, string password)
         {
             var response = await Client.PostAsJsonAsync("/api/Login", new { Username = username, Password = password }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.Data);
+            return result.Data;
+        }
+
+        /// <summary>
+        /// Selects a character through the real SelectPlayer endpoint (authenticated with the pre-selection
+        /// access token, rotating the supplied refresh token) and returns the deserialized result (rotated
+        /// tokens plus the loaded player).
+        /// </summary>
+        protected async Task<SelectPlayerResult> SelectPlayerAsync(AuthTokens tokens, int playerId)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SelectPlayer")
+            {
+                Content = JsonContent.Create(new { PlayerId = playerId, tokens.RefreshToken }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+            var response = await Client.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<SelectPlayerResult>>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.Data);
             return result.Data;

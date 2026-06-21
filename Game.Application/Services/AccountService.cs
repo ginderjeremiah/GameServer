@@ -58,9 +58,11 @@ namespace Game.Application.Services
         }
 
         /// <summary>
-        /// Authenticates a login: verifies the credentials, loads the player aggregate, and issues a
-        /// fresh access/refresh token pair. Distinct failure reasons are reported via the result status
-        /// so the caller can surface the appropriate message.
+        /// Authenticates a login: verifies the credentials and issues a fresh (pre-selection) access/refresh
+        /// token pair plus the account's player summaries. It deliberately does <b>not</b> bind or load a
+        /// player — the client picks a character on the subsequent <see cref="SelectPlayer"/> step, which
+        /// rotates the tokens to carry the chosen player. Distinct failure reasons are reported via the
+        /// result status so the caller can surface the appropriate message.
         /// </summary>
         public async Task<AccountLoginResult> Login(string username, string password)
         {
@@ -100,18 +102,6 @@ namespace Game.Application.Services
                 return AccountLoginResult.Failed(LoginStatus.Banned);
             }
 
-            var selectedPlayerId = SelectPlayerId(account.PlayerIds);
-            if (selectedPlayerId is null)
-            {
-                return AccountLoginResult.Failed(LoginStatus.NoPlayer);
-            }
-
-            var player = await _playerRepo.GetPlayer(selectedPlayerId.Value);
-            if (player is null)
-            {
-                return AccountLoginResult.Failed(LoginStatus.PlayerDataNotFound);
-            }
-
             // Transparently re-hash a credential stored with an outdated work factor now that we have
             // verified the plaintext, so existing accounts upgrade without a forced reset. This is
             // best-effort: an opportunistic upgrade must never cost the user an otherwise-valid login — if
@@ -128,38 +118,53 @@ namespace Game.Application.Services
                 }
             }
 
-            var tokens = await IssueTokens(account.Id, account.Roles);
+            // List the account's characters for the select step; the pre-selection token carries no player.
+            var summaries = await _users.GetPlayerSummaries(account.Id);
+            var tokens = await IssueTokens(account.Id, account.Roles, playerId: null);
 
-            return AccountLoginResult.Succeeded(tokens, player, account.Id);
+            return AccountLoginResult.Succeeded(tokens, summaries, account.Id);
         }
 
         /// <summary>
-        /// Resolves which player an authenticated user's session binds to, re-deriving the same selection
-        /// the login flow makes (the user's first player). Returns <see langword="null"/> when the user has
-        /// no player. Used to rehydrate a session whose volatile cache entry was evicted while the access
-        /// token is still valid, so the request is served instead of being reported as not-logged-in.
+        /// Selects which of the account's characters to enter as: validates the player belongs to the
+        /// authenticated account (anti-cheat), loads its aggregate, and rotates the token pair to carry the
+        /// chosen player id as the selected-player anchor. Ownership and the player load are checked before
+        /// the refresh token is consumed, so a rejected selection leaves the caller's token intact. Distinct
+        /// failure reasons are reported via the result status so the caller can surface the right message.
         /// </summary>
-        public async Task<int?> ResolveSelectedPlayerId(int userId)
+        public async Task<AccountSelectPlayerResult> SelectPlayer(int userId, int playerId, string refreshToken)
         {
             var playerIds = await _users.GetPlayerIds(userId);
-            return SelectPlayerId(playerIds);
-        }
+            if (!playerIds.Contains(playerId))
+            {
+                return AccountSelectPlayerResult.Failed(SelectPlayerStatus.NotOwned);
+            }
 
-        /// <summary>
-        /// Selects which player an account's session binds to. The game is single-player per account today,
-        /// so this is always the first (and only) player; centralizing it here keeps the login and
-        /// session-rehydration paths from diverging and gives a future player-selection mechanism a single
-        /// seam to grow from. Returns <see langword="null"/> when the account has no player.
-        /// </summary>
-        private static int? SelectPlayerId(IReadOnlyList<int> playerIds)
-        {
-            return playerIds.Count > 0 ? playerIds[0] : null;
+            var player = await _playerRepo.GetPlayer(playerId);
+            if (player is null)
+            {
+                return AccountSelectPlayerResult.Failed(SelectPlayerStatus.PlayerDataNotFound);
+            }
+
+            // Consume the caller's (pre-selection) refresh token and re-issue a rotated pair carrying the
+            // chosen player. Consuming only after the validations pass upholds single-use rotation without
+            // burning the token on a rejected selection. The roles come from the consumed token (the "roles
+            // are fixed for the session" model), and the user it resolves to must match the authenticated
+            // caller.
+            var session = await _refreshTokenStore.Consume(refreshToken);
+            if (session is null || session.UserId != userId)
+            {
+                return AccountSelectPlayerResult.Failed(SelectPlayerStatus.InvalidToken);
+            }
+
+            var tokens = await IssueTokens(userId, session.Roles, playerId);
+            return AccountSelectPlayerResult.Succeeded(tokens, player);
         }
 
         /// <summary>
         /// Validates and rotates a refresh token: consuming it (single use) and, when valid, issuing a
-        /// brand-new token pair carrying the same user and roles. Returns <see langword="null"/> when the
-        /// supplied token is missing, expired, or already consumed.
+        /// brand-new token pair carrying the same user, roles, and selected player. Returns
+        /// <see langword="null"/> when the supplied token is missing, expired, or already consumed.
         /// </summary>
         public async Task<AuthTokenPair?> Refresh(string refreshToken)
         {
@@ -169,7 +174,7 @@ namespace Game.Application.Services
                 return null;
             }
 
-            return await IssueTokens(session.UserId, session.Roles);
+            return await IssueTokens(session.UserId, session.Roles, session.PlayerId);
         }
 
         /// <summary>
@@ -185,14 +190,14 @@ namespace Game.Application.Services
         }
 
         /// <summary>
-        /// Issues a fresh access/refresh token pair for the given user. The refresh token is rotated on
-        /// every use (both login and refresh call this), so a previously issued refresh token is never
-        /// reused.
+        /// Issues a fresh access/refresh token pair for the given user, both carrying the selected player
+        /// id (<see langword="null"/> before selection). The refresh token is rotated on every use (login,
+        /// select, and refresh all call this), so a previously issued refresh token is never reused.
         /// </summary>
-        private async Task<AuthTokenPair> IssueTokens(int userId, IReadOnlyList<string> roles)
+        private async Task<AuthTokenPair> IssueTokens(int userId, IReadOnlyList<string> roles, int? playerId)
         {
-            var accessToken = _accessTokenService.CreateAccessToken(userId, roles);
-            var refreshToken = await _refreshTokenStore.Issue(userId, roles, AuthConstants.RefreshTokenLifetime);
+            var accessToken = _accessTokenService.CreateAccessToken(userId, roles, playerId);
+            var refreshToken = await _refreshTokenStore.Issue(userId, roles, playerId, AuthConstants.RefreshTokenLifetime);
             return new AuthTokenPair(accessToken, refreshToken);
         }
     }

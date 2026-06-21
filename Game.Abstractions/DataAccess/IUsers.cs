@@ -61,11 +61,18 @@ namespace Game.Abstractions.DataAccess
         Task<AccountCredentials?> GetUser(string username);
 
         /// <summary>
-        /// Returns the ids of the active (non-archived) user's players. Used to re-derive a session's
-        /// player binding when rehydrating an evicted session cache for a still-valid access token.
-        /// Empty when the user does not exist, is archived, or has no players.
+        /// Returns the ids of the active (non-archived) user's players. Used to validate that a selected
+        /// player belongs to the authenticated account (anti-cheat) before binding the session. Empty when
+        /// the user does not exist, is archived, or has no players.
         /// </summary>
         Task<IReadOnlyList<int>> GetPlayerIds(int userId);
+
+        /// <summary>
+        /// Returns lightweight summaries of the active (non-archived) user's players for the login
+        /// player-selection list (name, level, current zone). Empty when the user does not exist, is
+        /// archived, or has no players.
+        /// </summary>
+        Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId);
 
         /// <summary>
         /// Determines whether the username is taken by an active (non-archived) account. Archived users

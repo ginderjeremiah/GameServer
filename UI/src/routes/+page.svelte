@@ -197,15 +197,37 @@ const handleSubmit = async () => {
 	const response = await new ApiRequest('Login').post({ username, password });
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
+
+		// Login now returns the account's characters; selecting one binds the session and rotates the
+		// token to carry the chosen player. The real player-select screen is #1070 — until then, auto-select
+		// the first character so the existing single-character flow keeps working.
+		const summaries = response.data.playerSummaries;
+		if (summaries.length === 0) {
+			submitting = false;
+			serverError = 'This account has no characters.';
+			return;
+		}
+		const selected = await new ApiRequest('Login/SelectPlayer').post({
+			playerId: summaries[0].id,
+			refreshToken: response.data.tokens.refreshToken
+		});
+		if (selected.status !== 200) {
+			submitting = false;
+			serverError = selected.error ?? 'Could not enter the game.';
+			return;
+		}
+		setTokens(selected.data.tokens);
+
 		// Warn before entering the game if the player is already connected elsewhere — entering would
-		// take over (disconnect) that session. Declining logs this freshly-issued session back out.
+		// take over (disconnect) that session. This per-player presence check runs after selection.
+		// Declining logs this freshly-issued session back out.
 		if (!(await confirmSessionTakeover())) {
 			submitting = false;
 			return;
 		}
 		// Fire-and-forget: report this device's capabilities now that we're authenticated.
 		void reportDeviceInfo();
-		enterWorld(response.data.player);
+		enterWorld(selected.data.player);
 	} else if (mode === 'signup') {
 		submitting = false;
 		serverError = response.error ?? 'Account created but login failed.';

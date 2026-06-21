@@ -1,14 +1,16 @@
-using Game.Api.Models.Player;
+using Game.Abstractions.Contracts.Identity;
 
 namespace Game.Api.Models.Auth
 {
     /// <summary>
-    /// The result of a successful login: the issued auth tokens plus the player's data, so the client
-    /// can both authenticate subsequent requests and enter the game in a single round-trip.
+    /// The result of a successful login: the issued (pre-selection) auth tokens plus a summary of each
+    /// character on the account, so the client can authenticate subsequent requests and present the
+    /// player-selection step. The selected character is loaded and bound by the follow-up
+    /// <c>Login/SelectPlayer</c> call, which rotates the tokens to carry the chosen player.
     /// </summary>
     public class LoginResult : IModel
     {
         public required AuthTokens Tokens { get; set; }
-        public required PlayerData Player { get; set; }
+        public required List<PlayerSummary> PlayerSummaries { get; set; }
     }
 }
