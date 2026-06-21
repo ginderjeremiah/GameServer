@@ -88,7 +88,9 @@ export class EnemyManager {
 			// Cut short an in-flight retry backoff so a getNewEnemy parked under a sustained outage exits
 			// at once on the cleared `started` flag rather than after the full backoff window.
 			this.interruptFetch();
-			this.returnToIdle();
+			// Teardown (screen unmount / session end), not a user intent change, so don't sync the persisted
+			// loop mode — clobbering it to idle here would lose a disconnecting boss-farmer's mode.
+			this.returnToIdle(false);
 		}
 	}
 
@@ -286,13 +288,35 @@ export class EnemyManager {
 	/** Toggle auto-fight: when on, a boss victory immediately re-challenges the boss. */
 	public setAutoFight(on: boolean) {
 		this.autoFight = on;
+		// Persist the player's auto-fight intent (#1040's "mirror the live autoFight state" semantic). Note
+		// auto-fight can be pre-armed from BossTrigger while the loop is still idle, so this persists boss
+		// mode on intent rather than active engagement; whether to gate on mode==='boss' is tracked in #1067
+		// (must be settled before the offline-sim consumer in #1041/#1042 reads the field).
+		this.syncAutoChallengeBoss(on);
 	}
 
-	private returnToIdle() {
+	private returnToIdle(sync = true) {
 		this.mode = 'idle';
 		this.autoFight = false;
 		this.bossOutcome = undefined;
 		this.bossUnlockedNextZone = false;
+		// Sync the persisted loop mode for genuine return-to-idle transitions (retreat, boss loss/draw,
+		// single-victory handoff). Teardown passes sync=false — it must not reset the persisted intent.
+		if (sync) {
+			this.syncAutoChallengeBoss(false);
+		}
+	}
+
+	/**
+	 * Persists the active idle-loop mode to the backend so the offline-rewards sim can resume the correct
+	 * loop at next login (idle vs. auto-challenge-boss). Mirrors the live auto-fight state: on ⇒ boss-farming,
+	 * off ⇒ idle. The boss is always the current zone's boss, so no zone is sent — the backend keys off the
+	 * player's `CurrentZoneId`. Fire-and-forget — anti-cheat validation is the server's, and a transient
+	 * failure only leaves the persisted mode briefly stale, corrected by the next sync or the backend's
+	 * boss-loss/draw backstop.
+	 */
+	private syncAutoChallengeBoss(enabled: boolean) {
+		void apiSocket.sendSocketCommand('SetAutoChallengeBoss', enabled);
 	}
 
 	/** Whether the boss loop is still the active, settled context — false once a stop / retreat / handoff

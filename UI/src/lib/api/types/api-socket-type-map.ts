@@ -54,6 +54,7 @@ export type ApiSocketResponseTypes = {
 	'RemoveMod': undefined;
 	'SaveLogPreferences': undefined;
 	'ServerCommandFailed': IServerCommandFailedModel;
+	'SetAutoChallengeBoss': undefined;
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
@@ -69,6 +70,7 @@ export type ApiSocketRequestTypes = {
 	'NewEnemy': INewEnemyRequest;
 	'RemoveMod': IRemoveModRequest;
 	'SaveLogPreferences': ILogPreference[];
+	'SetAutoChallengeBoss': boolean;
 	'SetItemFavorite': ISetItemFavoriteRequest;
 	'SetSelectedSkills': number[];
 	'UnequipItem': IEquipRequest;

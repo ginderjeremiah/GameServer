@@ -650,6 +650,59 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.autoFight).toBe(false);
 	});
 
+	it('syncs boss mode to the backend when auto-fight is toggled on', () => {
+		// Mirroring the live auto-fight state to the durable player so the offline sim resumes the boss loop.
+		// The boss is always the current zone's boss, so only the enabled flag is sent (no zone).
+		manager.setAutoFight(true);
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', true);
+	});
+
+	it('syncs idle mode to the backend when auto-fight is toggled off', () => {
+		manager.setAutoFight(false);
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('syncs idle mode when retreating from the boss (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		send.mockClear();
+
+		await manager.retreatFromBoss();
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('syncs idle mode on a boss loss (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Defeated);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('syncs idle mode on a boss draw (returnToIdle)', async () => {
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Drawn);
+
+		expect(send).toHaveBeenCalledWith('SetAutoChallengeBoss', false);
+	});
+
+	it('does not sync the persisted mode on teardown (stop)', () => {
+		// stop() routes through returnToIdle(false): teardown is not a user intent change, so it must not
+		// clobber a disconnecting boss-farmer's persisted mode. Pins the deliberate no-sync branch so a
+		// later "simplification" back to returnToIdle() (which would sync) is caught.
+		manager.setAutoFight(true);
+		send.mockClear();
+
+		manager.stop();
+
+		expect(send).not.toHaveBeenCalledWith('SetAutoChallengeBoss', expect.anything());
+	});
+
 	it('does not spawn an idle enemy when a boss handoff lands during the post-victory cooldown', async () => {
 		// An idle victory enters a cooldown; mid-cooldown the player challenges the boss (mode flips to
 		// boss, and reset resolves the cooldown early). When the cooldown resolves, the idle handler must

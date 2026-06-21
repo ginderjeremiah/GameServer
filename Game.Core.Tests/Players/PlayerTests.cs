@@ -724,6 +724,103 @@ namespace Game.Core.Tests.Players
             Assert.Equal(timestamp, evt.LastActivity);
         }
 
+        // ── SetAutoChallengeBoss ─────────────────────────────────────────────
+
+        [Fact]
+        public void SetAutoChallengeBoss_Enabled_EntersBossModeAndRaisesCoreUpdatedCarryingIt()
+        {
+            var player = MakePlayer();
+
+            player.SetAutoChallengeBoss(true);
+
+            Assert.True(player.AutoChallengeBoss);
+            var evt = Assert.IsType<PlayerCoreUpdatedEvent>(Assert.Single(player.DomainEvents));
+            Assert.True(evt.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void SetAutoChallengeBoss_Disabled_ReturnsToIdleAndRaisesCoreUpdatedCarryingIt()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            player.ClearEvents();
+
+            player.SetAutoChallengeBoss(false);
+
+            Assert.False(player.AutoChallengeBoss);
+            var evt = Assert.IsType<PlayerCoreUpdatedEvent>(Assert.Single(player.DomainEvents));
+            Assert.False(evt.AutoChallengeBoss);
+        }
+
+        // ── RecordBattleCompleted — boss-mode backstop ───────────────────────
+
+        [Fact]
+        public void RecordBattleCompleted_BossLoss_ResetsModeToIdle()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow);
+
+            // A recorded boss loss drops the persisted loop back to idle (mirrors the online auto-fight-off).
+            Assert.False(player.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_BossDraw_ResetsModeToIdle()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            // A draw is neither side dying within the cap: not a victory, so it resolves the same as a loss.
+            var result = new BattleResult(Victory: false, PlayerDied: false, TotalMs: 120000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow);
+
+            Assert.False(player.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_BossVictory_KeepsBossMode()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 3000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow);
+
+            // A boss win keeps farming the boss — the persisted mode is unchanged.
+            Assert.True(player.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_IdleLoss_DoesNotTouchBossMode()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            // An idle (non-boss) loss never affects the persisted boss mode.
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow);
+
+            Assert.True(player.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_BossLoss_CarriesClearedModeInASingleCoreUpdatedEvent()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            player.ClearEvents();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow);
+
+            // The mode reset rides the single core-updated event StampActivity raises, not a redundant second one.
+            var coreUpdated = Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
+            Assert.False(coreUpdated.AutoChallengeBoss);
+        }
+
         // ── ClearEvents ──────────────────────────────────────────────────────
 
         [Fact]

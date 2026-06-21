@@ -28,6 +28,15 @@ namespace Game.Core.Players
         /// </summary>
         public required DateTime LastActivity { get; set; }
 
+        /// <summary>
+        /// Whether the player's idle loop is auto-challenging the boss — of <see cref="CurrentZoneId"/>, the
+        /// single zone the loop operates in (the boss farmed is always the current zone's boss, never a
+        /// separate one). Persisted so the offline-rewards simulation can resume the correct loop at next
+        /// login: idle-farming <see cref="CurrentZoneId"/> when <c>false</c>, boss-farming its boss when
+        /// <c>true</c>. Synced from the frontend's live auto-fight state via <see cref="SetAutoChallengeBoss"/>.
+        /// </summary>
+        public required bool AutoChallengeBoss { get; set; }
+
         public required PlayerStatPoints StatPoints { get; set; }
         public required Inventory Inventory { get; set; }
         public required List<Skill> SelectedSkills { get; set; }
@@ -37,6 +46,19 @@ namespace Game.Core.Players
         public void ChangeZone(int zoneId)
         {
             CurrentZoneId = zoneId;
+            RaiseCoreUpdated();
+        }
+
+        /// <summary>
+        /// Persists the active idle-loop mode: <paramref name="enabled"/> enters boss mode (auto-challenging
+        /// the current zone's dedicated boss), <c>false</c> returns the loop to idle-farming. Anti-cheat
+        /// validation of the current zone (in circulation, unlocked, has a boss) is the caller's
+        /// responsibility. Raises a <see cref="PlayerCoreUpdatedEvent"/> so the change rides the existing
+        /// write-behind save.
+        /// </summary>
+        public void SetAutoChallengeBoss(bool enabled)
+        {
+            AutoChallengeBoss = enabled;
             RaiseCoreUpdated();
         }
 
@@ -276,6 +298,16 @@ namespace Game.Core.Players
         {
             RaiseEvent(new BattleCompletedEvent(
                 this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId));
+
+            // Backstop mirroring the online auto-fight-off: a recorded dedicated-boss loss or draw drops the
+            // persisted loop back to idle, so the offline sim doesn't resume boss-farming a loop the player has
+            // actually fallen out of, even if a frontend mode sync was missed. Cleared before StampActivity so
+            // the single core-updated event it raises carries the change (rather than a redundant second event).
+            if (isBossBattle && !result.Victory)
+            {
+                AutoChallengeBoss = false;
+            }
+
             StampActivity(timestamp);
         }
 
@@ -307,7 +339,7 @@ namespace Game.Core.Players
         {
             RaiseEvent(new PlayerCoreUpdatedEvent(
                 Id, Level, Exp, CurrentZoneId,
-                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity));
+                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity, AutoChallengeBoss));
         }
     }
 }
