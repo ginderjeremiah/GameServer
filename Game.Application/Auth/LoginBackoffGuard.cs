@@ -6,9 +6,10 @@ namespace Game.Application.Auth
     /// Coordinates the per-account login backoff: reads/writes the consecutive-failure state through
     /// <see cref="ILoginBackoffStore"/>, applies <see cref="LoginBackoffPolicy"/>, and supplies the current
     /// instant via the injected <see cref="TimeProvider"/>. The login orchestration uses it to gate, record,
-    /// and reset attempts. Being coupled to the store (an out-of-process dependency) it holds no logic worth
-    /// unit-testing itself — the backoff arithmetic lives in the pure <see cref="LoginBackoffPolicy"/>, and
-    /// the wiring is covered by integration tests.
+    /// and reset attempts. The backoff arithmetic lives in the pure <see cref="LoginBackoffPolicy"/>; recording
+    /// a failure layers an optimistic compare-and-set retry over it so concurrent failures for one account
+    /// (the slow distributed guess this control targets) can't lose increments. The store interaction is
+    /// covered by integration tests.
     /// </summary>
     public class LoginBackoffGuard(
         ILoginBackoffStore store,
@@ -37,9 +38,21 @@ namespace Game.Application.Auth
         /// </summary>
         public async Task RegisterFailure(string username, CancellationToken cancellationToken = default)
         {
-            var current = await _store.Get(username, cancellationToken);
-            var (next, retention) = _policy.RegisterFailure(current, _timeProvider.GetUtcNow());
-            await _store.Set(username, next, retention, cancellationToken);
+            // Optimistic concurrency over the read-compute-write: a plain GET → compute → SET would let two
+            // concurrent failures both read the same count and both write the same next value, dropping an
+            // increment so the streak climbs slower than the attempt rate. Re-read and recompute whenever the
+            // compare-and-set loses to a concurrent writer; each iteration observes the now-higher count, so the
+            // count always reflects every failure. The loop is lock-free — some writer commits each round — so
+            // it makes progress under contention rather than spinning indefinitely.
+            while (true)
+            {
+                var current = await _store.Get(username, cancellationToken);
+                var (next, retention) = _policy.RegisterFailure(current, _timeProvider.GetUtcNow());
+                if (await _store.TryUpdate(username, current, next, retention, cancellationToken))
+                {
+                    return;
+                }
+            }
         }
 
         /// <summary>Clears the account's failure streak after its credentials verify (a correct password is

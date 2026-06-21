@@ -47,5 +47,14 @@
         public Task Delete(string key, CancellationToken cancellationToken = default);
         public void DeleteAndForget(string key);
         public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Atomically sets <paramref name="key"/> to <paramref name="newValue"/> with <paramref name="expiry"/>
+        /// as its TTL, but only if its current value still equals <paramref name="expectedValue"/> — or, when
+        /// <paramref name="expectedValue"/> is <see langword="null"/>, only if the key is currently unset.
+        /// Returns <see langword="true"/> when the swap was applied and <see langword="false"/> when the stored
+        /// value had diverged (a concurrent writer won), letting a caller retry its read-modify-write so an
+        /// update is never silently lost. The optimistic-concurrency counterpart to <see cref="CompareAndDelete"/>.
+        /// </summary>
+        public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default);
     }
 }
