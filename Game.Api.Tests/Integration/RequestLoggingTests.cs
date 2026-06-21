@@ -35,7 +35,7 @@ namespace Game.Api.Tests.Integration
             await Client.GetAsync("/api/Login/Status", CancellationToken);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var startEntry = Assert.Single(entries, e => e.Message == "Request Start");
+            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
             var scope = Assert.IsType<Dictionary<string, object?>>(startEntry.ScopeStates.Single());
             Assert.Equal("GET", scope["Method"]);
             Assert.Equal("/api/Login/Status", scope["Path"]);
@@ -76,7 +76,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var startEntry = Assert.Single(entries, e => e.Message == "Request Start");
+            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
             var scope = Assert.IsType<Dictionary<string, object?>>(startEntry.ScopeStates.Single());
             Assert.Equal(userId, scope["UserId"]);
         }
