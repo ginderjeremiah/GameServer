@@ -117,15 +117,25 @@ namespace Game.Core.Players
         /// </summary>
         private void ApplyExp(int amount)
         {
-            Exp += Math.Clamp(amount, 0, ServerGameConstants.MaxExpPerGrant);
-            // Guard the threshold against a non-positive level so a pre-initialized Level of 0 can't make
-            // the threshold 0 and spin the loop.
-            while (Exp >= Math.Max(1, Level) * GameConstants.ExpPerLevel)
+            // Level is required and ≥ 1 on every construction path, so a Level of 0 here is a corrupt
+            // aggregate, not a state to silently tolerate. Fail loudly (matching the fail-fast policy in
+            // e.g. BattleSnapshot.FromPlayer) rather than papering over it with a Math.Max guard that would
+            // spin the level-up loop on a zero threshold.
+            if (Level < 1)
             {
-                Exp -= Math.Max(1, Level) * GameConstants.ExpPerLevel;
+                throw new InvalidOperationException(
+                    $"Player {Id} has a corrupt Level of {Level}; expected at least 1.");
+            }
+
+            Exp += Math.Clamp(amount, 0, ServerGameConstants.MaxExpPerGrant);
+            var levelThreshold = Level * GameConstants.ExpPerLevel;
+            while (Exp >= levelThreshold)
+            {
+                Exp -= levelThreshold;
                 Level++;
                 StatPoints.StatPointsGained += GameConstants.StatPointsPerLevel;
                 RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
+                levelThreshold = Level * GameConstants.ExpPerLevel;
             }
         }
 

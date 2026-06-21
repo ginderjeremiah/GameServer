@@ -111,7 +111,7 @@ namespace Game.Application.Tests.DataAccess
             var result = admin.SetEnemies(data);
 
             Assert.False(result.Succeeded);
-            Assert.Equal("The submitted enemy set contains duplicate entries.", result.ErrorMessage);
+            Assert.Equal("The submitted enemy change set contains duplicate entries.", result.ErrorMessage);
         }
 
         [Fact]

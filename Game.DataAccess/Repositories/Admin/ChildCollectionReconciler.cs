@@ -48,7 +48,9 @@ namespace Game.DataAccess.Repositories.Admin
             {
                 if (!desiredKeys.Add(desiredKey(item)))
                 {
-                    return AdminSaveResult.Failure($"The submitted {resourceName} set contains duplicate entries.");
+                    // Route through the shared helper so the duplicate-rejection wording can't drift from the
+                    // change-set processors'. resourceName is always supplied here, so the type arg is unused.
+                    return ChangeSetProcessor.DuplicateFailure<TDesired>(resourceName);
                 }
             }
 

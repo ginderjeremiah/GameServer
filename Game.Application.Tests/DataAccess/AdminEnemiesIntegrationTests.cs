@@ -268,7 +268,7 @@ namespace Game.Application.Tests.DataAccess
             var result = admin.SetAttributeDistributions(data);
 
             Assert.False(result.Succeeded);
-            Assert.Equal("The submitted attribute distribution set contains duplicate entries.", result.ErrorMessage);
+            Assert.Equal("The submitted attribute distribution change set contains duplicate entries.", result.ErrorMessage);
         }
 
         [Fact]

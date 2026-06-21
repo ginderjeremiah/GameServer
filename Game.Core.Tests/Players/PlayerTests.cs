@@ -170,6 +170,16 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents.OfType<PlayerLeveledUpEvent>());
         }
 
+        [Fact]
+        public void GrantExp_CorruptZeroLevel_FailsFastInsteadOfSpinning()
+        {
+            // Level is required and ≥ 1 on every real construction path, so a Level of 0 is a corrupt
+            // aggregate. The grant must throw loudly rather than tolerate a zero level-up threshold.
+            var player = MakePlayer(level: 0, exp: 0);
+
+            Assert.Throws<InvalidOperationException>(() => player.GrantExp(100));
+        }
+
         // ── UnlockItem ──────────────────────────────────────────────────────
 
         [Fact]
