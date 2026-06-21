@@ -10,6 +10,7 @@ describe('bootRedirect', () => {
 
 	it('hands a "game" resume off to /game from the transient boot/auth routes', () => {
 		expect(bootRedirect('game', '/')).toBe('game');
+		expect(bootRedirect('game', '/select')).toBe('game');
 		expect(bootRedirect('game', '/loading')).toBe('game');
 	});
 
@@ -22,6 +23,7 @@ describe('bootRedirect', () => {
 	it('sends a failed restore back to login from a protected route, staying put on /', () => {
 		expect(bootRedirect('login', '/admin')).toBe('login');
 		expect(bootRedirect('login', '/game')).toBe('login');
+		expect(bootRedirect('login', '/select')).toBe('login');
 		expect(bootRedirect('login', '/loading')).toBe('login');
 		expect(bootRedirect('login', '/')).toBeNull();
 	});

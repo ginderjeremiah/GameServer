@@ -12,11 +12,12 @@ import type { ResumeDestination } from './session';
 export type BootRedirect = 'game' | 'loading' | 'login' | null;
 
 /**
- * Routes that exist only as part of the boot/auth flow. An authenticated session must not be left
- * resting on one, so a resume that lands "in the game" hands off to `/game` from here — but stays put
- * on any real in-app route (e.g. `/admin`) so a refresh keeps the player exactly where they were.
+ * Routes that exist only as part of the boot/auth flow (login, character-select, loading). An
+ * authenticated session must not be left resting on one, so a resume that lands "in the game" hands
+ * off to `/game` from here — but stays put on any real in-app route (e.g. `/admin`) so a refresh keeps
+ * the player exactly where they were.
  */
-const BOOT_ONLY_ROUTES = new Set(['/', '/loading']);
+const BOOT_ONLY_ROUTES = new Set(['/', '/select', '/loading']);
 
 /**
  * Decides where the boot gate should navigate after `resumeSession`, given the resolved destination
