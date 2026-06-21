@@ -296,6 +296,23 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(result.Wins, kill.Value);
         }
 
+        [Fact]
+        public void Simulate_CarriesEachBattlesStatsThrough_ForStatisticsConsolidation()
+        {
+            // The whole BattleResult — including its BattleStats — rides on each outcome so the orchestration
+            // layer (#1042) can feed every battle through the shared per-battle statistics-recording path. Pin
+            // that the stats are the real per-battle combat figures, not defaults.
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), StrongPlayerWinScenario()));
+
+            Assert.NotEmpty(result.Battles);
+            Assert.All(result.Battles, battle =>
+            {
+                Assert.True(battle.Result.Stats.PlayerDamageDealt > 0);
+                Assert.True(battle.Result.Stats.PlayerSkillsUsed > 0);
+                Assert.NotEmpty(battle.Result.Stats.SkillStats);
+            });
+        }
+
         // ── Cancellation ─────────────────────────────────────────────────────
 
         [Fact]
