@@ -479,7 +479,12 @@ export class EnemyManager {
 		// after a successful DefeatEnemy so a failed command can't show "X was defeated!" with no rewards.
 		const enemyId = this.currentEnemy?.id;
 		const enemyName = enemyId != null ? staticData.enemies?.[enemyId]?.name : undefined;
-		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', { timestamp: Date.now() });
+		// Report the duration the client simulated alongside the claim. Diagnostic only (not anti-cheat):
+		// the backend logs when it diverges from its own parity replay.
+		const defeatResponse = await apiSocket.sendSocketCommand('DefeatEnemy', {
+			timestamp: Date.now(),
+			clientTotalMs: battleEngine.timeElapsed
+		});
 		if (!defeatResponse.error && defeatResponse.data?.rewards) {
 			if (enemyName) {
 				logMessage(ELogType.EnemyDefeated, enemyName + ' was defeated!');

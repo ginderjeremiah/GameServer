@@ -13,6 +13,7 @@ export interface IChallengeBossRequest {
 
 export interface IDefeatEnemyRequest {
 	timestamp: number;
+	clientTotalMs?: number;
 }
 
 export interface IDefeatEnemyResponse {

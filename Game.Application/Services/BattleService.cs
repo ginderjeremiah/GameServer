@@ -200,7 +200,7 @@ namespace Game.Application.Services
             return true;
         }
 
-        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp, CancellationToken cancellationToken = default)
+        public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, DateTime claimedTimestamp, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
             if (!TryResolveActiveBattle(state, out var enemy, out var result))
             {
@@ -211,6 +211,19 @@ namespace Game.Application.Services
                     + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}, claimedTimestamp: {ClaimedTimestamp:O}).",
                     player.Id, state.ActiveEnemyId, state.Snapshot is not null, claimedTimestamp);
                 return null;
+            }
+
+            // Diagnostic only (not anti-cheat): the client reports the battle duration it simulated, so a
+            // divergence from the server's parity replay is visible even when the claim still resolves as a
+            // win. Logged regardless of the victory/timestamp outcome below; absent (null) when not reported.
+            if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
+            {
+                _logger.LogWarning(
+                    "EndBattleVictory battle-duration divergence for player {PlayerId}: client reported "
+                    + "{ClientTotalMs}ms but server replay was {ServerTotalMs}ms (delta: {DeltaMs}, "
+                    + "enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}).",
+                    player.Id, reportedMs, result.TotalMs, reportedMs - result.TotalMs,
+                    enemy.Id, enemy.Level, state.BattleSeed);
             }
 
             if (!result.Victory)

@@ -32,7 +32,7 @@ namespace Game.Api.Sockets.Commands
 
             var claimedTimestamp = DateTimeOffset.FromUnixTimeMilliseconds(Parameters.Timestamp).UtcDateTime;
 
-            var rewards = await _battleService.EndBattleVictory(player, state, claimedTimestamp, cancellationToken);
+            var rewards = await _battleService.EndBattleVictory(player, state, claimedTimestamp, Parameters.ClientTotalMs, cancellationToken);
 
             if (rewards is not null)
             {

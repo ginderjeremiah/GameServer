@@ -202,6 +202,42 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleVictory_DivergentClientTotalMs_IsDiagnosticOnly_StillReturnsDefeatResult()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // A wildly divergent client-reported duration is logged but never gates the claim — the field
+            // is diagnostic only, not anti-cheat — so the victory must still resolve to a DefeatResult.
+            var result = await battleService.EndBattleVictory(player, state, DateTime.UtcNow, clientTotalMs: int.MaxValue);
+
+            Assert.NotNull(result);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_RewardMeasuresPowerFromSnapshot_NotLiveAggregate()
         {
             using var scope = CreateScope();
