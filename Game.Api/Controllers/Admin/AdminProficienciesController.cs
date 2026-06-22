@@ -9,9 +9,10 @@ namespace Game.Api.Controllers.Admin
 {
     /// <summary>
     /// Admin Workbench endpoints for persisting proficiencies and their related collections (per-level
-    /// bonuses, per-level reward skills, prerequisite edges, and skill contributions). A thin HTTP adapter
-    /// over <see cref="IAdminProficiencies"/>. The route prefix is shared across every admin controller so
-    /// the existing <c>/api/AdminTools/*</c> contract is preserved.
+    /// bonuses, per-level reward skills, and cross-path prerequisite edges). A thin HTTP adapter over
+    /// <see cref="IAdminProficiencies"/>. Skill contributions belong to the path — see
+    /// <see cref="AdminPathsController"/>. The route prefix is shared across every admin controller so the
+    /// existing <c>/api/AdminTools/*</c> contract is preserved.
     /// </summary>
     [Route("/api/AdminTools/[action]")]
     [ApiController]
@@ -43,12 +44,6 @@ namespace Game.Api.Controllers.Admin
         public ApiResponse SetProficiencyPrerequisites([FromBody] SetProficiencyPrerequisitesData changeData)
         {
             return _adminProficiencies.SetPrerequisites(changeData);
-        }
-
-        [HttpPost]
-        public ApiResponse SetProficiencyContributions([FromBody] SetProficiencyContributionsData changeData)
-        {
-            return _adminProficiencies.SetContributions(changeData);
         }
     }
 }

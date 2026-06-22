@@ -27,12 +27,19 @@ namespace Game.Application.Tests.DataAccess
         [Fact]
         public async Task SaveProficiencies_AddsANewProficiency()
         {
+            int pathId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
                 Assert.True(admin.SaveProficiencies(
                 [
-                    new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency() },
+                    new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: pathId) },
                 ]).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
@@ -43,18 +50,40 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveProficiencies_EditOutOfRangeId_ReturnsNotFound()
+        public async Task SaveProficiencies_EditOutOfRangeId_ReturnsNotFound()
+        {
+            int pathId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: 99999, pathId: pathId) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Proficiency not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_UnknownPath_ReturnsFailure()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
 
             var result = admin.SaveProficiencies(
             [
-                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: 99999) },
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: 99999) },
             ]);
 
             Assert.False(result.Succeeded);
-            Assert.Equal("Proficiency not found.", result.ErrorMessage);
+            Assert.Contains("Path 99999 does not exist", result.ErrorMessage);
         }
 
         [Fact]
@@ -272,37 +301,26 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains("cannot be its own prerequisite", result.ErrorMessage);
         }
 
-        [Fact]
-        public async Task SetContributions_UnknownSkill_ReturnsFailure()
+        private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
         {
-            int proficiencyId;
-            using (var seedScope = CreateScope())
-            {
-                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
-
-            var result = admin.SetContributions(new SetProficiencyContributionsData
-            {
-                Id = proficiencyId,
-                Contributions = [new Contracts.SkillProficiencyContribution { SkillId = 99999, Weight = 1m }],
-            });
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("does not exist", result.ErrorMessage);
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var path = new Entities.Path { Name = "Fire", Description = "", FalloffBase = 0.3m };
+            context.Paths.Add(path);
+            await context.SaveChangesAsync(CancellationToken);
+            return path;
         }
 
         private async Task<Entities.Proficiency> SeedProficiencyAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var path = await SeedPathAsync(scope);
             var proficiency = new Entities.Proficiency
             {
                 Name = "Blades",
                 Description = "",
                 IconPath = "",
+                PathId = path.Id,
+                PathOrdinal = 0,
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 2m,
@@ -310,7 +328,6 @@ namespace Game.Application.Tests.DataAccess
                 LevelModifiers = [],
                 LevelRewards = [],
                 Prerequisites = [],
-                SkillContributions = [],
             };
             context.Proficiencies.Add(proficiency);
             await context.SaveChangesAsync(CancellationToken);
@@ -344,12 +361,14 @@ namespace Game.Application.Tests.DataAccess
             Amount = amount,
         };
 
-        private static Contracts.Proficiency NewProficiency(int id = 0, int? seedSkillId = null, string name = "Blades") => new()
+        private static Contracts.Proficiency NewProficiency(int id = 0, int? seedSkillId = null, string name = "Blades", int pathId = 0) => new()
         {
             Id = id,
             Name = name,
             Description = "",
             IconPath = "",
+            PathId = pathId,
+            PathOrdinal = 0,
             MaxLevel = 10,
             BaseXp = 100m,
             XpGrowth = 2m,
@@ -358,7 +377,6 @@ namespace Game.Application.Tests.DataAccess
             LevelModifiers = [],
             LevelRewards = [],
             PrerequisiteIds = [],
-            Contributions = [],
         };
     }
 }

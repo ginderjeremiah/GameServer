@@ -29,12 +29,21 @@ namespace Game.DataAccess.Repositories.Admin
                 return rejection;
             }
 
+            // A proficiency is a tier of a path; the path it names must exist (the FK would also reject it,
+            // but a named check fails the whole set cleanly before anything is staged).
+            if (FindPathViolation(changes) is { } pathRejection)
+            {
+                return pathRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Proficiency
                 {
                     Name = item.Name,
                     Description = item.Description,
                     IconPath = item.IconPath,
+                    PathId = item.PathId,
+                    PathOrdinal = item.PathOrdinal,
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
@@ -47,6 +56,8 @@ namespace Game.DataAccess.Repositories.Admin
                     Name = item.Name,
                     Description = item.Description,
                     IconPath = item.IconPath,
+                    PathId = item.PathId,
+                    PathOrdinal = item.PathOrdinal,
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
@@ -168,37 +179,6 @@ namespace Game.DataAccess.Repositories.Admin
                 resourceName: "proficiency prerequisite");
         }
 
-        public AdminSaveResult SetContributions(SetProficiencyContributionsData data)
-        {
-            var proficiency = _proficiencies.LookupProficiency(data.Id);
-            if (proficiency is null)
-            {
-                return AdminSaveResult.NotFound("Proficiency");
-            }
-
-            foreach (var contribution in data.Contributions)
-            {
-                if (_skills.LookupSkill(contribution.SkillId) is null)
-                {
-                    return AdminSaveResult.Failure($"Skill {contribution.SkillId} does not exist.");
-                }
-            }
-
-            return ChildCollectionReconciler.Reconcile(
-                existing: proficiency.SkillContributions,
-                desired: data.Contributions,
-                existingKey: c => c.SkillId,
-                desiredKey: c => c.SkillId,
-                delete: c => _entityStore.Delete(new Entities.SkillProficiency
-                {
-                    SkillId = c.SkillId,
-                    ProficiencyId = proficiency.Id,
-                }),
-                insert: c => _entityStore.Insert(ToContributionEntity(proficiency.Id, c)),
-                resourceName: "proficiency contribution",
-                update: c => _entityStore.Update(ToContributionEntity(proficiency.Id, c)));
-        }
-
         private static Entities.ProficiencyLevelModifier ToModifierEntity(int proficiencyId, Contracts.ProficiencyLevelModifier modifier)
         {
             return new Entities.ProficiencyLevelModifier
@@ -221,14 +201,29 @@ namespace Game.DataAccess.Repositories.Admin
             };
         }
 
-        private static Entities.SkillProficiency ToContributionEntity(int proficiencyId, Contracts.SkillProficiencyContribution contribution)
+        /// <summary>Returns a rejection if any added/edited proficiency names a path that does not exist or a
+        /// negative ordinal, else null.</summary>
+        private AdminSaveResult? FindPathViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
         {
-            return new Entities.SkillProficiency
+            foreach (var change in changes)
             {
-                SkillId = contribution.SkillId,
-                ProficiencyId = proficiencyId,
-                Weight = contribution.Weight,
-            };
+                if (change.ChangeType == EChangeType.Delete)
+                {
+                    continue;
+                }
+
+                if (_proficiencies.LookupPath(change.Item.PathId) is null)
+                {
+                    return AdminSaveResult.Failure($"Path {change.Item.PathId} does not exist.");
+                }
+
+                if (change.Item.PathOrdinal < 0)
+                {
+                    return AdminSaveResult.Failure("A proficiency's path ordinal (tier) cannot be negative.");
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Returns a rejection if any authored level falls outside <c>1..MaxLevel</c>, else null. A

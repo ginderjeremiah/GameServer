@@ -7,6 +7,10 @@ namespace Game.Abstractions.DataAccess
     public interface IProficiencies
     {
         public List<Contracts.Proficiency> AllProficiencies();
+
+        /// <summary>Every path (with its skill contributions) — the reference set the tree screen renders.</summary>
+        public List<Contracts.Path> AllPaths();
+
         public CoreProficiency GetProficiency(int proficiencyId);
 
         /// <summary>The proficiencies the given skill contributes to (with weights), or empty if none — the

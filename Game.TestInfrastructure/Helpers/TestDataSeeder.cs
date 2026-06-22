@@ -5,6 +5,7 @@ using Game.Core;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Path = Game.Infrastructure.Entities.Path;
 
 namespace Game.TestInfrastructure.Helpers
 {
@@ -251,13 +252,17 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
-        // Adds a skill-to-proficiency contribution (the join the battle XP accrual reads): firing skillId in a
-        // won battle feeds proficiencyId's XP, weighted by weight.
+        // Adds a skill-to-path contribution (the join the battle XP accrual reads) homed at the given
+        // proficiency's tier: firing skillId in a won battle feeds proficiencyId's XP, weighted by weight.
         public static async Task LinkSkillToProficiencyAsync(GameContext context, int proficiencyId, int skillId, decimal weight = 1m)
         {
-            context.Set<SkillProficiency>().Add(new SkillProficiency
+            var proficiency = await context.Proficiencies.FindAsync(proficiencyId)
+                ?? throw new InvalidOperationException($"Proficiency {proficiencyId} has not been seeded.");
+
+            context.Set<SkillPathContribution>().Add(new SkillPathContribution
             {
-                ProficiencyId = proficiencyId,
+                PathId = proficiency.PathId,
+                HomeTier = proficiency.PathOrdinal,
                 SkillId = skillId,
                 Weight = weight,
             });
@@ -403,18 +408,43 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        public static async Task<Path> CreatePathAsync(
+            GameContext context,
+            string name = "Test Path",
+            decimal falloffBase = 0.3m)
+        {
+            var path = new Path
+            {
+                Name = name,
+                Description = "",
+                FalloffBase = falloffBase,
+            };
+
+            context.Paths.Add(path);
+            await context.SaveChangesAsync();
+            return path;
+        }
+
+        // A proficiency is a tier of a path. When no path is supplied, a fresh standalone single-tier path is
+        // created so the proficiency is always well-formed.
         public static async Task<Proficiency> CreateProficiencyAsync(
             GameContext context,
             string name = "Test Proficiency",
             int maxLevel = 10,
             decimal baseXp = 100m,
-            decimal xpGrowth = 2m)
+            decimal xpGrowth = 2m,
+            int? pathId = null,
+            int pathOrdinal = 0)
         {
+            pathId ??= (await CreatePathAsync(context)).Id;
+
             var proficiency = new Proficiency
             {
                 Name = name,
                 Description = "",
                 IconPath = "",
+                PathId = pathId.Value,
+                PathOrdinal = pathOrdinal,
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
@@ -422,7 +452,6 @@ namespace Game.TestInfrastructure.Helpers
                 LevelModifiers = [],
                 LevelRewards = [],
                 Prerequisites = [],
-                SkillContributions = [],
             };
 
             context.Proficiencies.Add(proficiency);

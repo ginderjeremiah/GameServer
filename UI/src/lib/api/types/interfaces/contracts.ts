@@ -91,11 +91,22 @@ export interface IItemModSlot {
 	itemModSlotTypeId: EItemModType;
 }
 
+export interface IPath {
+	id: number;
+	name: string;
+	description: string;
+	falloffBase: number;
+	retiredAt?: string;
+	contributions: ISkillPathContribution[];
+}
+
 export interface IProficiency {
 	id: number;
 	name: string;
 	description: string;
 	iconPath: string;
+	pathId: number;
+	pathOrdinal: number;
 	maxLevel: number;
 	baseXp: number;
 	xpGrowth: number;
@@ -105,7 +116,6 @@ export interface IProficiency {
 	levelModifiers: IProficiencyLevelModifier[];
 	levelRewards: IProficiencyLevelReward[];
 	prerequisiteIds: number[];
-	contributions: ISkillProficiencyContribution[];
 }
 
 export interface IProficiencyLevelModifier {
@@ -145,8 +155,9 @@ export interface ISkillEffect {
 	scalingAmount: number;
 }
 
-export interface ISkillProficiencyContribution {
+export interface ISkillPathContribution {
 	skillId: number;
+	homeTier: number;
 	weight: number;
 }
 

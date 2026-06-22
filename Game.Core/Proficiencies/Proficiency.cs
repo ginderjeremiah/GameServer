@@ -13,6 +13,11 @@ namespace Game.Core.Proficiencies
         public required string Name { get; init; }
         public required string Description { get; init; }
 
+        /// <summary>The path this proficiency is a tier of, and its 0-based position (tier) within it. The
+        /// XP-routing sub-issue (#1161) reads these to route a path's contribution to its current tier.</summary>
+        public required int PathId { get; init; }
+        public required int PathOrdinal { get; init; }
+
         /// <summary>The level cap (~10).</summary>
         public required int MaxLevel { get; init; }
 
