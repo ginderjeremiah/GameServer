@@ -122,6 +122,7 @@ namespace Game.Application.Tests.DataAccess
                 Acquisition = (int)acquisition,
                 SkillDamageMultipliers = [],
                 SkillEffects = [],
+                RarityId = (int)ERarity.Common
             };
             context.Skills.Add(skill);
             await context.SaveChangesAsync(CancellationToken);

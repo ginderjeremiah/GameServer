@@ -1,6 +1,5 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
-using Game.Application;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -281,6 +280,7 @@ namespace Game.Application.Tests.DataAccess
                 Acquisition = (int)acquisition,
                 SkillDamageMultipliers = [],
                 SkillEffects = [],
+                RarityId = (int)ERarity.Common
             };
             context.Skills.Add(skill);
             await context.SaveChangesAsync(CancellationToken);
