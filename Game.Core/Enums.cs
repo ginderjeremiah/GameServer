@@ -455,6 +455,12 @@ namespace Game.Core
         /// The modifier came from an active skill effect (a timed buff/debuff).
         /// </summary>
         SkillEffect = 7,
+
+        /// <summary>
+        /// The modifier came from a player's proficiency level (a per-level/milestone bonus baked into the
+        /// battle snapshot at battle start).
+        /// </summary>
+        Proficiency = 8,
     }
 
     /// <summary>

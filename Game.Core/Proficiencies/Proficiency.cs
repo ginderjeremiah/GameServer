@@ -86,6 +86,21 @@ namespace Game.Core.Proficiencies
         }
 
         /// <summary>
+        /// The attribute bonuses a player who has reached <paramref name="level"/> in this proficiency has
+        /// earned, as battle <see cref="Attributes.Modifiers.AttributeModifier"/>s
+        /// (<see cref="EAttributeModifierSource.Proficiency"/> source) fed into the battler at assembly. Per the
+        /// "sum of the increments for every level reached" rule (see <see cref="ProficiencyLevel"/>), it is the
+        /// modifiers of every authored payout level at or below <paramref name="level"/> — cumulative, so a
+        /// higher level strictly adds to a lower one. A level-0 (just-opened) proficiency yields nothing unless
+        /// a payout is authored at level 0. The bonuses are baked into the battle snapshot at battle start
+        /// (spike #982 decision 7), so a level gained while idling takes effect on the next battle.
+        /// </summary>
+        public IEnumerable<Attributes.Modifiers.AttributeModifier> ModifiersForLevel(int level) =>
+            Levels.Where(l => l.Level <= level)
+                .SelectMany(l => l.Modifiers)
+                .Select(modifier => modifier.ToAttributeModifier());
+
+        /// <summary>
         /// The authored payout levels crossed by advancing from <paramref name="fromLevel"/> (exclusive) to
         /// <paramref name="toLevel"/> (inclusive) — the milestones this battle's gain newly reached, in
         /// ascending order. The effects themselves (reward skills, child-node unlocks) are applied by the

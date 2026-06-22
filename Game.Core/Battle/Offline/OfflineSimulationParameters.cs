@@ -1,5 +1,6 @@
 using Game.Core.Enemies;
 using Game.Core.Items;
+using Game.Core.Proficiencies;
 using Game.Core.Skills;
 using Game.Core.Zones;
 
@@ -59,6 +60,10 @@ namespace Game.Core.Battle.Offline
 
         /// <summary>Resolves a selected skill by id when reconstructing the player from the snapshot.</summary>
         public required Func<int, Skill> ResolveSkill { get; init; }
+
+        /// <summary>Resolves a proficiency definition by id when composing the snapshot's per-level/milestone
+        /// bonuses (used only when the snapshot captured proficiency levels).</summary>
+        public required Func<int, Proficiency> ResolveProficiency { get; init; }
 
         /// <summary>
         /// Supplies a fresh battle RNG seed for each simulated battle, mirroring the live path's per-battle
