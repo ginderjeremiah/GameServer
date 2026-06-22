@@ -483,13 +483,14 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
-	// Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond is applied and death
-	// checked BEFORE HealthRegenPerSecond. The player carries a constant 250 DamageTakenPerSecond (10/tick)
-	// and 150 HealthRegenPerSecond (6/tick) -- a net -4 grinding its 50 HP down. On the tick the 10 DoT takes
-	// HP from 10 to 0 the player dies -- the 6 heal that would have saved it never runs because death is
-	// checked first. Death at tick 11 -> 440.
+	// Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond then HealthRegenPerSecond
+	// apply BEFORE its death check, so the heal can offset a lethal DoT tick (#1090). The player carries a
+	// constant 250 DamageTakenPerSecond (10/tick) and 150 HealthRegenPerSecond (6/tick) -- a net -4 grinding
+	// its 50 HP down. Each tick the 6 heal applies after the 10 DoT and is checked together, so the player only
+	// dies once the net drain crosses 0: 50/4 = 12.5 -> death at tick 13 -> 520. (Checking death before the
+	// heal would have killed it at tick 11/440; see regenSavesFromLethalDot for a net-zero drain it survives.)
 	{
-		name: 'dotBeforeRegenSameTickKills',
+		name: 'dotRegenNetNegativeKillsAfterHeal',
 		player: () =>
 			makeBattler(
 				[
@@ -500,7 +501,27 @@ const scenarios: ParityScenario[] = [
 				[]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
-		expected: { victory: false, playerDied: true, totalMs: 440 }
+		expected: { victory: false, playerDied: true, totalMs: 520 }
+	},
+
+	// Heal-over-time saves the battler from an otherwise-lethal DoT tick (#1090). The player carries a constant
+	// 1500 DamageTakenPerSecond (60/tick) -- more than its whole 50 HP -- and an equal 1500 HealthRegenPerSecond
+	// (60/tick). Each tick the 60 DoT drives HP to -10 but the same-tick 60 heal (applied before the death
+	// check, capped at MaxHealth) restores it to 50, so the player never dies; dealing no damage back, the
+	// battle runs to the timeout. (Checking death before the heal would have killed it on tick 1.)
+	{
+		name: 'regenSavesFromLethalDot',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Endurance, amount: 0 },
+					{ id: EAttribute.DamageTakenPerSecond, amount: 1500 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 1500 }
+				],
+				[]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], []),
+		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
 	// DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to 0, but
