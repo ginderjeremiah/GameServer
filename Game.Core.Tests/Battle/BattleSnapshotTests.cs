@@ -3,6 +3,7 @@ using Game.Core.Battle;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
+using Game.Core.Proficiencies;
 using Game.Core.Skills;
 using Game.Core.TestInfrastructure.Builders;
 using Xunit;
@@ -169,6 +170,66 @@ namespace Game.Core.Tests.Battle
 
             // Strength = 2 (item) + 3 (mod 10) + 4 (mod 11) = 9
             Assert.Equal(9, battler.GetAttributeValue(EAttribute.Strength));
+        }
+
+        // ── Proficiency bonuses ──────────────────────────────────────────────
+
+        [Fact]
+        public void FromPlayer_CapturesSuppliedProficiencyLevels()
+        {
+            var player = MakePlayer();
+
+            var snapshot = BattleSnapshot.FromPlayer(player,
+                [new ProficiencyLevelSnapshot { ProficiencyId = 3, Level = 2 }]);
+
+            var captured = Assert.Single(snapshot.ProficiencyLevels);
+            Assert.Equal(3, captured.ProficiencyId);
+            Assert.Equal(2, captured.Level);
+        }
+
+        [Fact]
+        public void FromPlayer_NoProficiencyLevelsSupplied_CapturesEmpty()
+        {
+            var snapshot = BattleSnapshot.FromPlayer(MakePlayer());
+
+            Assert.Empty(snapshot.ProficiencyLevels);
+        }
+
+        [Fact]
+        public void ToBattler_AppliesCapturedProficiencyLevelBonuses()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [Alloc(EAttribute.Strength, 4)],
+                EquippedItems = [],
+                SkillIds = [],
+                ProficiencyLevels = [new ProficiencyLevelSnapshot { ProficiencyId = 5, Level = 2 }],
+            };
+
+            // A proficiency granting +3 Strength at level 1 and +6 at level 2; the player is level 2, so both apply.
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+                ProficiencyResolver(MakeProficiency(5,
+                    (1, [ProfMod(EAttribute.Strength, 3)]),
+                    (2, [ProfMod(EAttribute.Strength, 6)]))));
+
+            // Strength = 4 (allocation) + 3 + 6 (proficiency) = 13.
+            Assert.Equal(13, battler.GetAttributeValue(EAttribute.Strength));
+        }
+
+        [Fact]
+        public void GetModifiers_ProficiencyLevelsCapturedButNoResolver_Throws()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [],
+                ProficiencyLevels = [new ProficiencyLevelSnapshot { ProficiencyId = 5, Level = 1 }],
+            };
+
+            Assert.Throws<InvalidOperationException>(() => snapshot.GetModifiers(ThrowItem, ThrowMod).ToList());
         }
 
         // ── Item-granted skills (append + order + dedupe) ────────────────────
@@ -443,6 +504,36 @@ namespace Game.Core.Tests.Battle
             id => throw new InvalidOperationException($"Unexpected mod resolve for {id}");
         private static readonly Func<int, Skill> ThrowSkill =
             id => throw new InvalidOperationException($"Unexpected skill resolve for {id}");
+
+        private static Func<int, Proficiency> ProficiencyResolver(params Proficiency[] proficiencies)
+        {
+            var map = proficiencies.ToDictionary(p => p.Id);
+            return id => map[id];
+        }
+
+        private static ProficiencyModifier ProfMod(EAttribute attribute, double amount) =>
+            new() { Attribute = attribute, ModifierType = EModifierType.Additive, Amount = amount };
+
+        private static Proficiency MakeProficiency(int id, params (int Level, ProficiencyModifier[] Modifiers)[] levels) => new()
+        {
+            Id = id,
+            Name = $"Proficiency {id}",
+            Description = string.Empty,
+            PathId = 0,
+            PathOrdinal = 0,
+            MaxLevel = 10,
+            BaseXp = 100,
+            XpGrowth = 2,
+            StartsUnlocked = true,
+            SeedSkillId = null,
+            PrerequisiteIds = [],
+            Levels = levels.Select(l => new ProficiencyLevel
+            {
+                Level = l.Level,
+                Modifiers = l.Modifiers,
+                RewardSkillId = null,
+            }).ToList(),
+        };
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory,
             List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null,

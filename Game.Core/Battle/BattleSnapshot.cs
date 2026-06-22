@@ -2,6 +2,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Players;
+using Game.Core.Proficiencies;
 using Game.Core.Skills;
 
 namespace Game.Core.Battle
@@ -34,11 +35,20 @@ namespace Game.Core.Battle
         public required List<int> SkillIds { get; set; }
 
         /// <summary>
+        /// The player's proficiency levels at battle start (one entry per proficiency the player has trained).
+        /// Captured so the per-level/milestone attribute bonuses bake into the snapshot exactly like the stat
+        /// allocations — a level gained while idling takes effect on the next battle, and the offline window
+        /// fights at a stationary power (spike #982 decision 7). Defaults to empty so a snapshot built without
+        /// proficiency state carries no proficiency bonus.
+        /// </summary>
+        public List<ProficiencyLevelSnapshot> ProficiencyLevels { get; set; } = [];
+
+        /// <summary>
         /// Captures a player's current battle-relevant state as a minimal ID-based snapshot. The
         /// projection lives in the domain alongside <see cref="ToBattler"/> so the capture/reconstruct
         /// pair stays a single, self-consistent unit.
         /// </summary>
-        public static BattleSnapshot FromPlayer(Player player)
+        public static BattleSnapshot FromPlayer(Player player, IEnumerable<ProficiencyLevelSnapshot>? proficiencyLevels = null)
         {
             var equippedItems = player.Inventory.EquipmentSlots
                 .SelectNotNull(slot => slot.ItemId)
@@ -74,6 +84,9 @@ namespace Game.Core.Battle
                 StatAllocations = player.StatPoints.StatAllocations.Select(allocation => allocation.Copy()).ToList(),
                 EquippedItems = equippedItems,
                 SkillIds = player.SelectedSkills.Select(s => s.Id).ToList(),
+                // Proficiency progress lives on the separate PlayerProgress aggregate, so the caller supplies
+                // the captured levels (it owns the progress read); absent for callers with no proficiency state.
+                ProficiencyLevels = proficiencyLevels?.ToList() ?? [],
             };
         }
 
@@ -86,9 +99,11 @@ namespace Game.Core.Battle
         /// the resolvers so the domain stays independent of the data-access layer that owns catalog lookups,
         /// mirroring <see cref="BattleFactory"/>'s enemy resolver.
         /// </summary>
-        public Battler ToBattler(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
+        public Battler ToBattler(
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill,
+            Func<int, Proficiency>? resolveProficiency = null)
         {
-            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod));
+            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency));
             var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
@@ -110,18 +125,48 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Composes the player's battle attribute modifiers from this snapshot — the captured stat
-        /// allocations plus each equipped item's attributes and those of its applied mods — resolving the
-        /// captured ids against the in-memory catalogs. Shared by <see cref="ToBattler"/> (the simulation)
-        /// and the exp-reward power measurement (<see cref="DefeatRewards"/>), so both read the player's
-        /// power from the same frozen snapshot rather than the live aggregate.
+        /// allocations, each equipped item's attributes and those of its applied mods, and the per-level/
+        /// milestone bonuses of the captured proficiency levels — resolving the captured ids against the
+        /// in-memory catalogs. Shared by <see cref="ToBattler"/> (the simulation) and the exp-reward power
+        /// measurement (<see cref="DefeatRewards"/>), so both read the player's power from the same frozen
+        /// snapshot rather than the live aggregate. The <paramref name="resolveProficiency"/> resolver is
+        /// required only when proficiency levels were captured (it is unused for a proficiency-less snapshot).
         /// </summary>
-        public IEnumerable<AttributeModifier> GetModifiers(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod)
+        public IEnumerable<AttributeModifier> GetModifiers(
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Proficiency>? resolveProficiency = null)
         {
-            return StatAllocations.Select(allocation => allocation.ToModifier())
+            var modifiers = StatAllocations.Select(allocation => allocation.ToModifier())
                 .Concat(EquippedItems.SelectMany(equipped =>
                     resolveItem(equipped.ItemId)
                         .GetAttributeModifiers(equipped.AppliedModIds.Select(resolveMod))));
+
+            if (ProficiencyLevels.Count == 0)
+            {
+                return modifiers;
+            }
+
+            if (resolveProficiency is null)
+            {
+                throw new InvalidOperationException(
+                    "A battle snapshot with captured proficiency levels requires a proficiency resolver to compose its bonuses.");
+            }
+
+            return modifiers.Concat(ProficiencyLevels.SelectMany(captured =>
+                resolveProficiency(captured.ProficiencyId).ModifiersForLevel(captured.Level)));
         }
+    }
+
+    /// <summary>
+    /// Captures a player's level in one proficiency at battle start — the input the per-level/milestone
+    /// attribute bonuses are resolved from at battler assembly (<see cref="BattleSnapshot.GetModifiers"/>).
+    /// </summary>
+    public class ProficiencyLevelSnapshot
+    {
+        /// <summary>The id of the proficiency.</summary>
+        public required int ProficiencyId { get; set; }
+
+        /// <summary>The player's level in that proficiency at battle start.</summary>
+        public required int Level { get; set; }
     }
 
     /// <summary>

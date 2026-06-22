@@ -4,6 +4,7 @@ using Game.Core.Battle.Offline;
 using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Players;
+using Game.Core.Proficiencies;
 using Game.Core.Skills;
 using Game.Core.Zones;
 using Xunit;
@@ -421,6 +422,7 @@ namespace Game.Core.Tests.Battle.Offline
                 ResolveItem = scenario.ResolveItem,
                 ResolveMod = scenario.ResolveMod,
                 ResolveSkill = scenario.ResolveSkill,
+                ResolveProficiency = ThrowProficiency,
                 SeedSource = () => 0,
             };
 
@@ -621,5 +623,8 @@ namespace Game.Core.Tests.Battle.Offline
             id => throw new InvalidOperationException($"Unexpected item resolve for {id}");
         private static readonly Func<int, ItemMod> ThrowMod =
             id => throw new InvalidOperationException($"Unexpected mod resolve for {id}");
+        // These scenarios capture no proficiency levels, so the snapshot never resolves a proficiency.
+        private static readonly Func<int, Proficiency> ThrowProficiency =
+            id => throw new InvalidOperationException($"Unexpected proficiency resolve for {id}");
     }
 }

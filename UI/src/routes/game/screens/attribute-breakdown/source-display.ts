@@ -20,7 +20,10 @@ const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
 	// player's breakdown; it falls back to the neutral base hue if ever shown.
 	[EAttributeModifierSource.AttributeDistribution]: 'base',
 	// SkillEffect is a timed battle modifier; it falls back to the derived hue.
-	[EAttributeModifierSource.SkillEffect]: 'derived'
+	[EAttributeModifierSource.SkillEffect]: 'derived',
+	// Proficiency is a permanent progression bonus; it is not yet surfaced in the player breakdown (that
+	// lands with the proficiency client work), so it falls back to the stat-points hue until then.
+	[EAttributeModifierSource.Proficiency]: 'points'
 };
 
 const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
@@ -30,7 +33,8 @@ const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.ItemMod]: 'Item mods',
 	[EAttributeModifierSource.Derived]: 'Derived',
 	[EAttributeModifierSource.AttributeDistribution]: 'Distribution',
-	[EAttributeModifierSource.SkillEffect]: 'Skill effect'
+	[EAttributeModifierSource.SkillEffect]: 'Skill effect',
+	[EAttributeModifierSource.Proficiency]: 'Proficiency'
 };
 
 /** Themeable source accent hue, e.g. `var(--source-points)`. */

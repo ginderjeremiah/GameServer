@@ -21,6 +21,7 @@ namespace Game.Application.Services
         IItems items,
         IItemMods itemMods,
         ISkills skills,
+        IProficiencies proficiencies,
         BattleFactory battleFactory,
         OfflineProgressSimulator offlineSimulator,
         ChallengeRewardService challengeRewards,
@@ -34,6 +35,7 @@ namespace Game.Application.Services
         private readonly IItems _items = items;
         private readonly IItemMods _itemMods = itemMods;
         private readonly ISkills _skills = skills;
+        private readonly IProficiencies _proficiencies = proficiencies;
         private readonly BattleFactory _battleFactory = battleFactory;
         private readonly OfflineProgressSimulator _offlineSimulator = offlineSimulator;
         private readonly ChallengeRewardService _challengeRewards = challengeRewards;
@@ -105,7 +107,7 @@ namespace Game.Application.Services
                 level => _enemies.GetRandomDomainEnemy(zone.Id, level));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
-            var snapshot = BattleSnapshot.FromPlayer(player);
+            var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
 
             state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, battleStartTime, snapshot, zone.Id, isBossBattle: false);
 
@@ -175,7 +177,7 @@ namespace Game.Application.Services
                         $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist."));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
-            var snapshot = BattleSnapshot.FromPlayer(player);
+            var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
 
             state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: true);
 
@@ -399,7 +401,8 @@ namespace Game.Application.Services
             await ResolveStaleBattle(player, state, cancellationToken);
 
             var (mode, zone) = await ResolveOfflineLoop(player, cancellationToken);
-            var parameters = BuildSimulationParameters(player, mode, zone, awayMs);
+            var proficiencyLevels = await CaptureProficiencyLevels(player.Id, cancellationToken);
+            var parameters = BuildSimulationParameters(player, mode, zone, awayMs, proficiencyLevels);
 
             var result = _offlineSimulator.Simulate(parameters, cancellationToken);
 
@@ -455,7 +458,9 @@ namespace Game.Application.Services
         // boss builds the zone's dedicated boss deterministically — the same factory resolvers the live battle
         // start uses, so an offline battle is constructed identically to an online one. The player snapshot and
         // the catalog resolvers are shared across the whole run (the player's power is stationary offline).
-        private OfflineSimulationParameters BuildSimulationParameters(Player player, OfflineLoopMode mode, CoreZone zone, long awayMs)
+        private OfflineSimulationParameters BuildSimulationParameters(
+            Player player, OfflineLoopMode mode, CoreZone zone, long awayMs,
+            IReadOnlyList<ProficiencyLevelSnapshot> proficiencyLevels)
         {
             Func<int, CoreEnemy> resolveEnemy = mode == OfflineLoopMode.Boss
                 ? BossEnemyResolver(zone)
@@ -463,7 +468,10 @@ namespace Game.Application.Services
 
             return new OfflineSimulationParameters
             {
-                Snapshot = BattleSnapshot.FromPlayer(player),
+                // One snapshot drives the whole window: the player's power — proficiency levels included — is
+                // frozen at the window start, so the away period fights at a stationary power even as the
+                // simulated victories accrue proficiency XP (mirroring how gear and stats are frozen).
+                Snapshot = BattleSnapshot.FromPlayer(player, proficiencyLevels),
                 Mode = mode,
                 Zone = zone,
                 AwayBudgetMs = awayMs,
@@ -473,6 +481,7 @@ namespace Game.Application.Services
                 ResolveItem = _items.GetItem,
                 ResolveMod = _itemMods.GetItemMod,
                 ResolveSkill = _skills.GetSkill,
+                ResolveProficiency = _proficiencies.GetProficiency,
                 SeedSource = CreateBattleSeed,
                 StalemateCutoffBattles = StalemateCutoffBattles,
             };
@@ -620,7 +629,8 @@ namespace Game.Application.Services
                 throw new InvalidOperationException("Cannot record a victory without an active battle snapshot.");
             }
 
-            var rewards = new DefeatRewards(snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod), enemy);
+            var rewards = new DefeatRewards(
+                snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency), enemy);
 
             player.GrantExp(rewards.ExpReward);
             // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
@@ -696,6 +706,19 @@ namespace Game.Application.Services
         // does not affect how it is consumed. Shared by both start paths.
         internal static uint CreateBattleSeed() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint)));
 
+        // Captures the player's current proficiency levels for the battle snapshot, so the per-level/milestone
+        // bonuses bake into the fight at its start (spike #982 area E). Proficiency progress lives on the
+        // separate PlayerProgress aggregate, so it is read through the lean proficiency-only accessor rather
+        // than the battle aggregate; the empty list (the universal state until proficiencies are authored and
+        // opened) yields no proficiency modifiers, so the replay stays identical to today.
+        private async Task<List<ProficiencyLevelSnapshot>> CaptureProficiencyLevels(int playerId, CancellationToken cancellationToken)
+        {
+            var proficiencies = await _progressRepo.GetProficiencies(playerId, cancellationToken);
+            return proficiencies
+                .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level })
+                .ToList();
+        }
+
         // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
         // active battle, so each caller keeps only its outcome-specific branching. Centralising the guard, the
@@ -729,7 +752,8 @@ namespace Game.Application.Services
         {
             enemy.SetBattleSkills(enemySkillIds);
 
-            var playerBattler = snapshot.ToBattler(_items.GetItem, _itemMods.GetItemMod, _skills.GetSkill);
+            var playerBattler = snapshot.ToBattler(
+                _items.GetItem, _itemMods.GetItemMod, _skills.GetSkill, _proficiencies.GetProficiency);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.BattleSkills,
