@@ -174,6 +174,22 @@ namespace Game.Core.Tests.Proficiencies
         }
 
         [Fact]
+        public void Split_ZeroAttentionTierAlongsidePositive_DegradesToZero_NotNaN()
+        {
+            // A zero-attention tier (authored Weight 0, or a 0 tier weight once #979 lands) mixed with a
+            // positive one: the total attention is positive so it is not filtered out, and its slice must fall
+            // out as 0 rather than 0/0 = NaN — a NaN would throw on the downstream (decimal)Xp cast.
+            var contributions = new[] { OnTier(0, attention: 1.0), new WeightedContribution(1, Attention: 0.0, Falloff: 1.0) };
+
+            var slices = Split(Pie, 1.0, contributions);
+
+            Assert.Equal(Pie, slices.Single(s => s.ProficiencyId == 0).Xp, precision: 9);
+            var zero = slices.Single(s => s.ProficiencyId == 1).Xp;
+            Assert.False(double.IsNaN(zero));
+            Assert.Equal(0.0, zero, precision: 9);
+        }
+
+        [Fact]
         public void Split_OrdersSlicesByProficiencyId()
         {
             var contributions = new[] { OnTier(5), OnTier(2), OnTier(9) };

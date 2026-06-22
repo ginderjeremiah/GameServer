@@ -37,36 +37,32 @@ namespace Game.Core.Proficiencies
         public static IReadOnlyList<ProficiencyXpSlice> Split(
             double fixedPie, double difficultyMultiplier, IEnumerable<WeightedContribution> contributions)
         {
-            var attentionByTier = new Dictionary<int, double>();
+            // Per frontier tier, the attention-weighted falloff of its fired skills (Σ attention × falloff) —
+            // its attention share of the pie already folded together with its on-tier efficiency — alongside
+            // the loadout's total falloff-free attention (the denominator that makes the slowdown absolute).
             var earnedAttentionByTier = new Dictionary<int, double>();
+            var totalAttention = 0.0;
             foreach (var contribution in contributions)
             {
-                attentionByTier[contribution.ProficiencyId] =
-                    attentionByTier.GetValueOrDefault(contribution.ProficiencyId) + contribution.Attention;
                 earnedAttentionByTier[contribution.ProficiencyId] =
                     earnedAttentionByTier.GetValueOrDefault(contribution.ProficiencyId)
                         + contribution.Attention * contribution.Falloff;
+                totalAttention += contribution.Attention;
             }
 
-            var totalAttention = attentionByTier.Values.Sum();
             if (totalAttention <= 0)
             {
                 return [];
             }
 
+            // Each tier earns its falloff-weighted attention as a fraction of the falloff-free total: its
+            // attention share of the pie scaled by its on-tier efficiency, folded into one division. Dividing
+            // by the falloff-free total (not the earned total) is what leaves the un-earned remainder unminted,
+            // and folding the two steps avoids a 0/0 = NaN for a zero-attention tier (it degrades to 0).
             var total = fixedPie * difficultyMultiplier;
-            return [.. attentionByTier
+            return [.. earnedAttentionByTier
                 .OrderBy(pair => pair.Key)
-                .Select(pair =>
-                {
-                    // The share of the pie this tier's attention claims (the ceiling), scaled by its on-tier
-                    // efficiency — the attention-weighted average falloff. The product is total × earned /
-                    // totalAttention, so dividing by the falloff-free total is what leaves the un-earned
-                    // remainder unminted.
-                    var ceiling = total * pair.Value / totalAttention;
-                    var efficiency = earnedAttentionByTier[pair.Key] / pair.Value;
-                    return new ProficiencyXpSlice(pair.Key, ceiling * efficiency);
-                })];
+                .Select(pair => new ProficiencyXpSlice(pair.Key, total * pair.Value / totalAttention))];
         }
     }
 }
