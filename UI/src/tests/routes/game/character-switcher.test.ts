@@ -64,7 +64,7 @@ afterEach(() => {
 
 describe('CharacterSwitcher', () => {
 	it('lists the account characters, excluding the one currently being played', async () => {
-		render(CharacterSwitcher, { onClose: vi.fn() });
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		expect(screen.getByText('Rogue')).toBeTruthy();
@@ -77,7 +77,7 @@ describe('CharacterSwitcher', () => {
 			status: 200,
 			data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 2, name: 'Rogue' } }
 		});
-		render(CharacterSwitcher, { onClose: vi.fn() });
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
@@ -95,7 +95,7 @@ describe('CharacterSwitcher', () => {
 
 	it('recovers with a reload when the switch fails after teardown', async () => {
 		postMock.mockResolvedValue({ status: 400, error: 'nope' });
-		render(CharacterSwitcher, { onClose: vi.fn() });
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
@@ -108,7 +108,7 @@ describe('CharacterSwitcher', () => {
 
 	it('closes without touching the game when cancelled', async () => {
 		const onClose = vi.fn();
-		render(CharacterSwitcher, { onClose });
+		render(CharacterSwitcher, { open: true, onClose });
 
 		await waitFor(() => expect(screen.getByTestId('switcher-cancel')).toBeTruthy());
 		await fireEvent.click(screen.getByTestId('switcher-cancel'));
@@ -118,9 +118,26 @@ describe('CharacterSwitcher', () => {
 		expect(disconnectMock).not.toHaveBeenCalled();
 	});
 
+	it('closes on Escape via the shared overlay primitive', async () => {
+		const onClose = vi.fn();
+		render(CharacterSwitcher, { open: true, onClose });
+
+		await waitFor(() => expect(screen.getByTestId('switcher-cancel')).toBeTruthy());
+		await fireEvent.keyDown(window, { key: 'Escape' });
+
+		expect(onClose).toHaveBeenCalled();
+	});
+
+	it('does not load characters while closed', async () => {
+		render(CharacterSwitcher, { open: false, onClose: vi.fn() });
+
+		expect(getMock).not.toHaveBeenCalled();
+		expect(screen.queryByTestId('character-switcher')).toBeNull();
+	});
+
 	it('surfaces an error state when the character list fails to load', async () => {
 		getMock.mockResolvedValue({ status: 500, error: 'boom' });
-		render(CharacterSwitcher, { onClose: vi.fn() });
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
 
 		await waitFor(() => expect(screen.getByTestId('switcher-error')).toBeTruthy());
 		expect(screen.getByText('boom')).toBeTruthy();
@@ -131,7 +148,7 @@ describe('CharacterSwitcher', () => {
 			status: 200,
 			data: { id: 9, name: 'Mage', level: 1, currentZoneId: 0, lastActivity: '2026-06-21T00:00:00Z' }
 		});
-		render(CharacterSwitcher, { onClose: vi.fn() });
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getByTestId('show-create'));

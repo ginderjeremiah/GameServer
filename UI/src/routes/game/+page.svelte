@@ -17,9 +17,7 @@
 
 		<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
 
-		{#if showSwitcher}
-			<CharacterSwitcher onClose={() => (showSwitcher = false)} />
-		{/if}
+		<CharacterSwitcher open={showSwitcher} onClose={() => (showSwitcher = false)} />
 	</div>
 {:else}
 	<BootSplash />
