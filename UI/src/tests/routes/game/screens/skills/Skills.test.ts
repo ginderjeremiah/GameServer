@@ -15,70 +15,61 @@ import {
 
 // Same engine/stores/api mocks as the view-model test: the rendered screen builds
 // its own SkillsView from these at mount.
-const {
-	mockPlayerManager,
-	mockInventoryManager,
-	sendSocketCommand,
-	toastError,
-	staticData,
-	playerChallenges,
-	registerTooltipComponent
-} = vi.hoisted(() => {
-	const playerManager = {
-		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-		currentZone: 0,
-		attributes: [] as { attributeId: number; amount: number }[],
-		get selectedSkills(): number[] {
-			return playerManager.unlockedSkills
-				.filter((s) => s.selected)
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-				.map((s) => s.skillId);
-		},
-		setSelectedSkills(orderedIds: number[]) {
-			for (const unlockedSkill of playerManager.unlockedSkills) {
-				const order = orderedIds.indexOf(unlockedSkill.skillId);
-				unlockedSkill.selected = order >= 0;
-				unlockedSkill.order = order >= 0 ? order : undefined;
+const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData, registerTooltipComponent } =
+	vi.hoisted(() => {
+		const playerManager = {
+			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+			currentZone: 0,
+			attributes: [] as { attributeId: number; amount: number }[],
+			get selectedSkills(): number[] {
+				return playerManager.unlockedSkills
+					.filter((s) => s.selected)
+					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+					.map((s) => s.skillId);
+			},
+			setSelectedSkills(orderedIds: number[]) {
+				for (const unlockedSkill of playerManager.unlockedSkills) {
+					const order = orderedIds.indexOf(unlockedSkill.skillId);
+					unlockedSkill.selected = order >= 0;
+					unlockedSkill.order = order >= 0 ? order : undefined;
+				}
 			}
-		}
-	};
-	return {
-		mockPlayerManager: playerManager,
-		mockInventoryManager: {
-			equipmentStats: [] as { attributeId: number; amount: number }[],
-			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
-		},
-		sendSocketCommand: vi.fn(),
-		toastError: vi.fn(),
-		// The rail registers a ChallengeTooltip; the registration is stubbed and the tooltip
-		// resolves the gating challenge from this same reference data (completion from the store).
-		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
-		registerTooltipComponent: vi.fn(() => ({
-			describedById: 'tooltip-skill',
-			setTooltipPosition: vi.fn(),
-			showTooltip: vi.fn(),
-			hideTooltip: vi.fn()
-		})),
-		staticData: {
-			skills: [] as ISkill[],
-			challenges: [] as IChallenge[],
-			zones: undefined as IZone[] | undefined,
-			enemies: undefined as IEnemy[] | undefined,
-			attributes: undefined as unknown,
-			challengeTypes: undefined as unknown,
-			items: undefined as unknown,
-			itemMods: undefined as unknown
-		}
-	};
-});
+		};
+		return {
+			mockPlayerManager: playerManager,
+			mockInventoryManager: {
+				equipmentStats: [] as { attributeId: number; amount: number }[],
+				equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
+			},
+			sendSocketCommand: vi.fn(),
+			toastError: vi.fn(),
+			// The shared attribute tooltip (damage-breakdown chips, equipped band) registers through this;
+			// the registration is stubbed since the tooltip wiring itself isn't under test here.
+			registerTooltipComponent: vi.fn(() => ({
+				describedById: 'tooltip-skill',
+				setTooltipPosition: vi.fn(),
+				showTooltip: vi.fn(),
+				hideTooltip: vi.fn()
+			})),
+			staticData: {
+				skills: [] as ISkill[],
+				challenges: [] as IChallenge[],
+				zones: undefined as IZone[] | undefined,
+				enemies: undefined as IEnemy[] | undefined,
+				attributes: undefined as unknown,
+				challengeTypes: undefined as unknown,
+				items: undefined as unknown,
+				itemMods: undefined as unknown
+			}
+		};
+	});
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
 vi.mock('$stores', () => ({
 	staticData,
 	toastError,
-	playerChallenges,
 	registerTooltipComponent,
-	// The gate tooltip content under test is driven by `challengeId`; position is irrelevant here.
+	// The attribute tooltip computes a position from the hover anchor; the value is irrelevant here.
 	anchorPosition: () => ({ x: 0, y: 0 })
 }));
 vi.mock('$lib/api', async (importOriginal) => {
@@ -108,6 +99,8 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	...over
 });
 
+// ids 0–3 are owned (see the unlockedSkills fixture below); Echo (id 4) is unowned, so the screen
+// must never list it now that the locked/aspirational catalogue is gone.
 const SKILLS: ISkill[] = [
 	skill({ id: 0, name: 'Alpha' }),
 	skill({ id: 1, name: 'Bravo', damageMultipliers: [{ attributeId: EAttribute.Intellect, multiplier: 1 }] }),
@@ -115,10 +108,6 @@ const SKILLS: ISkill[] = [
 	skill({ id: 3, name: 'Delta' }),
 	skill({ id: 4, name: 'Echo', damageMultipliers: [{ attributeId: EAttribute.Intellect, multiplier: 1 }] })
 ];
-
-const CHALLENGES = [
-	{ id: 0, name: 'Slay Ten', description: '', challengeTypeId: 0, entityType: 0, progressGoal: 10, rewardSkillId: 4 }
-] as unknown as IChallenge[];
 
 // Zone 0 (idle range [2,8], boss enemy 2 at level 10): one in-zone spawn + the boss pill.
 const ZONES: IZone[] = [
@@ -147,9 +136,7 @@ const rowByName = (container: HTMLElement, name: string): HTMLElement | undefine
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
-	playerChallenges.isChallengeCompleted.mockReset().mockReturnValue(false);
 	staticData.skills = SKILLS;
-	staticData.challenges = CHALLENGES;
 	staticData.zones = ZONES;
 	staticData.enemies = ENEMIES;
 	staticData.attributes = undefined;
@@ -257,29 +244,28 @@ describe('Skills screen', () => {
 		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [3, 1, 2]);
 	});
 
-	it('drives the sort/filter modal — sort, attribute filter, show-locked, reset', async () => {
+	it('drives the sort/filter modal — sort, attribute filter, reset', async () => {
 		const { container } = render(Skills);
 		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
 		expect(container.querySelector('.modal')).toBeTruthy();
-
-		// Show locked → the locked skill (Echo) appears in the rail.
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
-		expect(rowByName(container, 'Echo')).toBeTruthy();
+		// The locked/aspirational catalogue is gone, so the modal no longer offers a show-locked toggle.
+		expect(container.querySelector('.switch')).toBeNull();
 
 		// Sort by name.
 		const nameSort = Array.from(container.querySelectorAll<HTMLButtonElement>('.opt')).find(
 			(o) => o.textContent?.trim() === 'Name'
 		)!;
 		await fireEvent.click(nameSort);
+		expect(nameSort.classList.contains('on')).toBe(true);
 
 		// Filter by an attribute chip.
 		const attrChip = container.querySelector<HTMLButtonElement>('.opt.attr')!;
 		await fireEvent.click(attrChip);
 		expect(attrChip.classList.contains('on')).toBe(true);
 
-		// Reset clears the filters; locked rows hide again.
+		// Reset clears the active attribute filter.
 		await fireEvent.click(container.querySelector<HTMLButtonElement>('.btn.dim')!);
-		expect(rowByName(container, 'Echo')).toBeUndefined();
+		expect(container.querySelector('.opt.attr')?.classList.contains('on')).toBe(false);
 
 		// Apply closes the modal.
 		const apply = Array.from(container.querySelectorAll<HTMLButtonElement>('.mfoot .btn')).find(
@@ -410,18 +396,6 @@ describe('Skills screen', () => {
 		expect(container.querySelector('.effect-row')).toBeNull();
 	});
 
-	it('shows the locked CTA in the inspector for a locked skill', async () => {
-		const { container } = render(Skills);
-		// Reveal locked skills, then select Echo (locked) into the inspector.
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
-		await fireEvent.click(rowByName(container, 'Echo')!);
-		const cta = container.querySelector<HTMLButtonElement>('.d-cta .btn')!;
-		expect(cta.disabled).toBe(true);
-		expect(cta.textContent).toContain('Locked');
-		expect(container.querySelector('.d-hint')?.textContent).toContain('Unlock by completing');
-	});
-
 	it('folds the expected crit contribution into the inspector breakdown and raw note', async () => {
 		// CriticalChance is flagged `isPercentage` so the breakdown's chance renders as `50%`.
 		staticData.attributes = [
@@ -463,92 +437,12 @@ describe('Skills screen', () => {
 		expect(rowByName(container, 'Alpha')).toBeTruthy();
 	});
 
-	it('surfaces the gating challenge tooltip when hovering a locked, challenge-gated skill', async () => {
-		// Echo (id 4) is locked and is the reward of challenge 0; give that challenge a requirement.
-		staticData.challenges = [
-			{
-				id: 0,
-				name: 'Slay Ten',
-				description: 'Defeat 10 enemies',
-				challengeTypeId: 0,
-				progressGoal: 10,
-				rewardSkillId: 4
-			}
-		] as unknown as IChallenge[];
+	it('lists only the player’s unlocked skills — an unowned skill never appears in the rail', () => {
+		// Echo (id 4) is not in the player's unlockedSkills, so the rail must not list it anywhere
+		// (the aspirational/locked catalogue has been removed; the Codex answers "how do I get it?").
 		const { container } = render(Skills);
-
-		// Reveal locked skills so Echo (gated) appears in the rail.
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
-		const echo = rowByName(container, 'Echo')!;
-
-		// Nothing is shown until the locked row is hovered.
-		expect(screen.queryByText('Slay Ten')).toBeNull();
-
-		await fireEvent.mouseEnter(echo, { clientX: 5, clientY: 5 });
-		// The gating challenge's name + requirement surface; the skill reward stays sealed (incomplete).
-		expect(screen.getByText('Slay Ten')).toBeTruthy();
-		expect(screen.getByText('Defeat 10 enemies')).toBeTruthy();
-
-		// Leaving the row clears the gate so it no longer renders.
-		await fireEvent.mouseLeave(echo);
-		expect(screen.queryByText('Slay Ten')).toBeNull();
-	});
-
-	it('surfaces the gating challenge tooltip on keyboard focus of a locked, challenge-gated skill', async () => {
-		staticData.challenges = [
-			{
-				id: 0,
-				name: 'Slay Ten',
-				description: 'Defeat 10 enemies',
-				challengeTypeId: 0,
-				progressGoal: 10,
-				rewardSkillId: 4
-			}
-		] as unknown as IChallenge[];
-		const { container } = render(Skills);
-
-		// Reveal locked skills so Echo (gated) appears in the rail.
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
-		const echo = rowByName(container, 'Echo')!;
-
-		// The gated row is a focusable button; focusing it (keyboard path) surfaces the gate.
-		await fireEvent.focus(echo);
-		expect(screen.getByText('Slay Ten')).toBeTruthy();
-		expect(screen.getByText('Defeat 10 enemies')).toBeTruthy();
-
-		// Blurring the row clears the gate so it no longer renders.
-		await fireEvent.blur(echo);
-		expect(screen.queryByText('Slay Ten')).toBeNull();
-	});
-
-	it('does not surface a challenge tooltip when hovering an unlocked skill', async () => {
-		const { container } = render(Skills);
-		// Alpha is an unlocked, equipped skill — hovering it must not show any gate.
-		await fireEvent.mouseEnter(rowByName(container, 'Alpha')!, { clientX: 5, clientY: 5 });
-		expect(screen.queryByText('Slay Ten')).toBeNull();
-	});
-
-	it('associates a gated skill row with the gate tooltip via aria-describedby, but not an unlocked one', async () => {
-		staticData.challenges = [
-			{
-				id: 0,
-				name: 'Slay Ten',
-				description: 'Defeat 10 enemies',
-				challengeTypeId: 0,
-				progressGoal: 10,
-				rewardSkillId: 4
-			}
-		] as unknown as IChallenge[];
-		const { container } = render(Skills);
-
-		// Reveal locked skills so Echo (gated) appears in the rail.
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.filt-btn')!);
-		await fireEvent.click(container.querySelector<HTMLButtonElement>('.switch')!);
-
-		// Only the gated row references the gate explanation, so a screen reader announces it on focus.
-		expect(rowByName(container, 'Echo')!.getAttribute('aria-describedby')).toBe('tooltip-skill');
-		expect(rowByName(container, 'Alpha')!.getAttribute('aria-describedby')).toBeNull();
+		expect(rowByName(container, 'Echo')).toBeUndefined();
+		// Only the 3 equipped + the single unlocked-but-unequipped skill (Delta) are shown.
+		expect(container.querySelectorAll('.row').length).toBe(4);
 	});
 });
