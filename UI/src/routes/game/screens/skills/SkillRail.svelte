@@ -30,14 +30,7 @@
 				<span>{view.equipped.length}/{view.cap}</span>
 			</div>
 			{#each view.equippedRail as metrics (metrics.skill.id)}
-				<SkillRow
-					{metrics}
-					{view}
-					gateDescribedById={describedById}
-					onGateShow={showChallenge}
-					onGateMove={moveChallenge}
-					onGateLeave={hideChallenge}
-				/>
+				<SkillRow {metrics} {view} />
 			{/each}
 		{/if}
 		<div class="grp">
@@ -46,14 +39,7 @@
 		</div>
 		{#if view.availableRail.length}
 			{#each view.availableRail as metrics (metrics.skill.id)}
-				<SkillRow
-					{metrics}
-					{view}
-					gateDescribedById={describedById}
-					onGateShow={showChallenge}
-					onGateMove={moveChallenge}
-					onGateLeave={hideChallenge}
-				/>
+				<SkillRow {metrics} {view} />
 			{/each}
 		{:else}
 			<div class="empty">none match the filter</div>
@@ -61,20 +47,11 @@
 	</div>
 </div>
 
-<ChallengeTooltip bind:this={tooltip} {challengeId} />
-
 <script lang="ts">
-import { SKILL_SORTS, type SkillMetrics, type SkillsView } from './skills-view.svelte';
+import { SKILL_SORTS, type SkillsView } from './skills-view.svelte';
 import SkillRow from './SkillRow.svelte';
 import { attributeCode } from '$lib/common';
-import { ChallengeTooltip } from '$components';
-import {
-	anchorPosition,
-	registerTooltipComponent,
-	staticData,
-	type TooltipAnchor,
-	type TooltipComponent
-} from '$stores';
+import { staticData } from '$stores';
 
 type Props = {
 	view: SkillsView;
@@ -82,35 +59,12 @@ type Props = {
 
 const { view }: Props = $props();
 
-// A locked skill rewarded by a not-yet-completed challenge surfaces that gating challenge — its
-// requirement and everything completing it unlocks — through the shared ChallengeTooltip, reachable
-// by both mouse hover and keyboard focus, exactly as the locked-zone arrow does. SkillRow fires
-// these callbacks only for gated rows.
-let tooltip = $state<TooltipComponent>();
-let challengeId = $state<number | undefined>();
-const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
-
-const showChallenge = (metrics: SkillMetrics, anchor: TooltipAnchor) => {
-	if (metrics.source == null) {
-		return;
-	}
-	challengeId = metrics.source.id;
-	setTooltipPosition(anchorPosition(anchor));
-	showTooltip();
-};
-const moveChallenge = (ev: MouseEvent) => setTooltipPosition(anchorPosition(ev));
-const hideChallenge = () => {
-	hideTooltip();
-	challengeId = undefined;
-};
-
 const sortLabel = $derived(SKILL_SORTS.find((s) => s.key === view.sort)?.label ?? 'DPS');
-const filterLabel = $derived.by(() => {
-	const attrs = view.filterAttributes.length
+const filterLabel = $derived(
+	view.filterAttributes.length
 		? 'Attr: ' + view.filterAttributes.map((a) => attributeCode(a, staticData.attributes)).join(', ')
-		: 'All attributes';
-	return attrs + (view.showLocked ? ' · +locked' : '');
-});
+		: 'All attributes'
+);
 </script>
 
 <style lang="scss">

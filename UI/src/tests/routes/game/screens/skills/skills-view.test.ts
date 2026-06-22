@@ -89,7 +89,6 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 });
 
 const metric = (over: Partial<SkillMetrics> & { skill: ISkill }): SkillMetrics => ({
-	unlocked: true,
 	rawDamage: 0,
 	cooldown: 1,
 	contributions: [],
@@ -97,7 +96,7 @@ const metric = (over: Partial<SkillMetrics> & { skill: ISkill }): SkillMetrics =
 });
 
 /* The sample catalogue: ids 0–2 are equipped starters, 3 is unlocked-but-unequipped,
-   4 is locked, 5 is retired-and-unowned (excluded from the catalogue). */
+   4 is not owned (excluded from the catalogue), 5 is retired-and-unowned (also excluded). */
 const SKILLS: ISkill[] = [
 	skill({
 		id: 0,
@@ -130,20 +129,6 @@ const SKILLS: ISkill[] = [
 	}),
 	skill({ id: 5, name: 'Foxtrot', baseDamage: 8, cooldownMs: 800, retiredAt: '2026-01-01T00:00:00Z' })
 ];
-
-// Only `name` + `rewardSkillId` matter here; the enum-typed fields are cast.
-const CHALLENGES = [
-	{ id: 0, name: 'Slay Ten', description: '', challengeTypeId: 0, entityType: 0, progressGoal: 10, rewardSkillId: 3 },
-	{
-		id: 1,
-		name: 'Clear the Vale',
-		description: '',
-		challengeTypeId: 0,
-		entityType: 0,
-		progressGoal: 1,
-		rewardSkillId: 4
-	}
-] as unknown as IChallenge[];
 
 /* Compare-vs fixtures. Enemy Defense resolves through the real BattleAttributes as
    `2 (base) + 1·Endurance + 0.5·Agility`, so each enemy's distribution is chosen for a
@@ -196,7 +181,6 @@ beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
 	staticData.skills = SKILLS;
-	staticData.challenges = CHALLENGES;
 	staticData.zones = ZONES;
 	staticData.enemies = ENEMIES;
 	mockPlayerManager.currentZone = 0;
@@ -259,29 +243,28 @@ describe('SkillsView — initial state', () => {
 		expect(view.cap).toBe(3);
 	});
 
-	it('excludes retired-and-unowned skills but keeps locked ones in the catalogue', () => {
+	it('lists only the player’s unlocked skills, excluding unowned and retired-unowned ones', () => {
 		const ids = view.catalogue.map((s) => s.id);
-		expect(ids).toContain(4); // locked, not retired → aspirational
+		expect(ids).toEqual([0, 1, 2, 3]); // the unlocked set, in catalogue order
+		expect(ids).not.toContain(4); // not owned
 		expect(ids).not.toContain(5); // retired and unowned
+	});
+
+	it('keeps a retired skill the player still owns in the catalogue', () => {
+		// Retirement keeps an owned record resolvable, so a retired-but-owned skill stays listed.
+		mockPlayerManager.unlockedSkills = [...mockPlayerManager.unlockedSkills, { skillId: 5, selected: false, order: 0 }];
+		const fresh = new SkillsView();
+		expect(fresh.catalogue.map((s) => s.id)).toContain(5);
 	});
 
 	it('exposes unlocked ids as a set for O(1) membership', () => {
 		expect(view.unlockedIds).toBeInstanceOf(Set);
 		expect(view.unlockedIds.has(0)).toBe(true); // unlocked starter
-		expect(view.unlockedIds.has(4)).toBe(false); // locked
+		expect(view.unlockedIds.has(4)).toBe(false); // not owned
 	});
 
 	it('exposes the skill catalogue defense ceiling for the slider', () => {
-		expect(view.maxDamage).toBe(100); // skill 4 base damage
-	});
-
-	it('resolves each skill metric to the challenge that rewards it (by rewardSkillId)', () => {
-		// Challenge 0 rewards skill 3, challenge 1 rewards skill 4; skills with no rewarding
-		// challenge have no source. The lookup is hoisted into a Map keyed by rewardSkillId,
-		// so resolution stays O(1) per skill rather than scanning every challenge.
-		expect(view.metric(3)?.source?.name).toBe('Slay Ten');
-		expect(view.metric(4)?.source?.name).toBe('Clear the Vale');
-		expect(view.metric(0)?.source).toBeUndefined();
+		expect(view.maxDamage).toBe(50); // skill 3 (Delta) base damage — the largest unlocked
 	});
 
 	it('resolves metrics through the shared battle formulas and the derived attribute composition', () => {
@@ -340,14 +323,12 @@ describe('SkillsView — innate (item-granted) skills', () => {
 });
 
 describe('SkillsView — rail filtering & sorting', () => {
-	it('hides locked skills until showLocked is on', () => {
+	it('never lists a skill the player has not unlocked', () => {
+		// Skill 4 is not owned, so it is absent from the rail (there is no longer a locked view).
 		expect(view.railList.map((m) => m.skill.id)).not.toContain(4);
-		view.toggleShowLocked();
-		expect(view.railList.map((m) => m.skill.id)).toContain(4);
 	});
 
 	it('filters by attribute', () => {
-		view.toggleShowLocked();
 		view.toggleAttributeFilter(EAttribute.Strength);
 		expect(view.railList.map((m) => m.skill.id).sort()).toEqual([0, 3]);
 	});
@@ -425,8 +406,8 @@ describe('SkillsView — loadout edits persist the ordered loadout', () => {
 		expect(lastPayload()).toEqual([1, 2, 0]);
 	});
 
-	it('ignores toggling a locked skill', () => {
-		view.toggle(4);
+	it('ignores toggling a skill the player has not unlocked', () => {
+		view.toggle(4); // not owned — the ownership guard rejects it
 		expect(view.equipped).toEqual([0, 1, 2]);
 		expect(view.pendingSwap).toBeNull();
 		expect(sendSocketCommand).not.toHaveBeenCalled();
@@ -571,7 +552,8 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 	});
 
 	it('raises the slider ceiling to the biggest crit-scaled hit', () => {
-		// Skill 4 (Echo) has the largest raw damage (100); the ceiling scales by the crit multiplier.
-		expect(view.maxDamage).toBeCloseTo(100 * view.critMultiplier, 10);
+		// Among the unlocked skills, Delta (id 3) has the largest raw damage (50); the ceiling scales
+		// by the crit multiplier.
+		expect(view.maxDamage).toBeCloseTo(50 * view.critMultiplier, 10);
 	});
 });

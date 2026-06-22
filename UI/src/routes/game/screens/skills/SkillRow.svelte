@@ -2,16 +2,9 @@
 	type="button"
 	class="row"
 	class:sel={view.selectedId === metrics.skill.id}
-	class:lock={!metrics.unlocked}
 	onclick={() => view.select(metrics.skill.id)}
-	onmouseenter={gated ? (e) => onGateShow?.(metrics, e) : undefined}
-	onmousemove={gated ? onGateMove : undefined}
-	onmouseleave={gated ? onGateLeave : undefined}
-	onfocus={gated ? onGateFocus : undefined}
-	onblur={gated ? onGateLeave : undefined}
-	use:describedByTooltip={gated ? gateDescribedById : undefined}
 >
-	<SkillIcon skill={metrics.skill} locked={!metrics.unlocked} size={30} />
+	<SkillIcon skill={metrics.skill} size={30} />
 	<span class="body">
 		<span class="rowname">{metrics.skill.name}</span>
 		<span class="rowmeta"
@@ -27,42 +20,17 @@
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
-import type { TooltipAnchor } from '$stores';
-import { focusAnchor } from '$stores/tooltip.svelte';
-import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import SkillIcon from './SkillIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
 	metrics: SkillMetrics;
 	view: SkillsView;
-	/** Callbacks that surface a gated skill's gating challenge, reachable by both mouse hover and
-	 *  keyboard focus. Fired only when the row is gated (locked + rewarded by a challenge); unlocked
-	 *  rows never invoke them. The anchor is a pointer event (cursor) or the row element (focus). */
-	onGateShow?: (metrics: SkillMetrics, anchor: TooltipAnchor) => void;
-	onGateMove?: (ev: MouseEvent) => void;
-	onGateLeave?: () => void;
-	/** Stable id of the shared gate tooltip, wired to a gated row's `aria-describedby` so a screen
-	 *  reader announces the gate explanation on focus. */
-	gateDescribedById?: string;
 };
 
-const { metrics, view, onGateShow, onGateMove, onGateLeave, gateDescribedById }: Props = $props();
+const { metrics, view }: Props = $props();
 
 const fmt = (n: number) => formatNum(Math.round(n));
-
-// Keyboard focus anchors the gate tooltip off the row's box; a mouse click is left to the hover
-// handlers so the tooltip keeps tracking the cursor instead of jumping (#880).
-const onGateFocus = (ev: FocusEvent) => {
-	const anchor = focusAnchor(ev);
-	if (anchor) {
-		onGateShow?.(metrics, anchor);
-	}
-};
-
-// A locked skill that is some challenge's reward is gated behind that challenge — hovering it
-// surfaces the gate. Unlocked skills (and locked ones with no challenge source) show no tooltip.
-const gated = $derived(!metrics.unlocked && metrics.source != null);
 </script>
 
 <style lang="scss">
@@ -91,10 +59,6 @@ const gated = $derived(!metrics.unlocked && metrics.source != null);
 	&.sel {
 		background: color-mix(in srgb, var(--accent) 12%, transparent);
 		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-
-	&.lock {
-		opacity: 0.5;
 	}
 }
 

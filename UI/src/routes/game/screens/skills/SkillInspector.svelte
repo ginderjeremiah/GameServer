@@ -2,7 +2,7 @@
 	{#if metrics}
 		<div class="d-top">
 			<div class="d-ico-wrap">
-				<SkillIcon skill={metrics.skill} locked={!metrics.unlocked} size={78} />
+				<SkillIcon skill={metrics.skill} size={78} />
 				{#if equipped}
 					<span class="slotbadge">{view.slotOf(metrics.skill.id)}</span>
 				{/if}
@@ -49,10 +49,6 @@
 			<div class="foot-item">
 				<div class="fl">Scaling</div>
 				<div class="fv">{scalingSummary}</div>
-			</div>
-			<div class="foot-item">
-				<div class="fl">Source</div>
-				<div class="fv">{sourceSummary}</div>
 			</div>
 			<div class="foot-item">
 				<div class="fl">Status</div>
@@ -121,21 +117,8 @@ const scalingSummary = $derived(
 		? metrics.skill.damageMultipliers.map((m) => attributeCode(m.attributeId, staticData.attributes)).join(' · ')
 		: '—'
 );
-const sourceSummary = $derived(
-	metrics
-		? metrics.unlocked
-			? '✓ ' + (metrics.source?.name ?? 'Starting skill')
-			: '🔒 ' + (metrics.source?.name ?? 'Locked')
-		: ''
-);
 const statusSummary = $derived(
-	metrics
-		? equipped
-			? 'Equipped · slot ' + view.slotOf(metrics.skill.id)
-			: metrics.unlocked
-				? 'Available'
-				: 'Locked'
-		: ''
+	metrics ? (equipped ? 'Equipped · slot ' + view.slotOf(metrics.skill.id) : 'Available') : ''
 );
 
 const castsPer10s = $derived(metrics && metrics.cooldown > 0 ? (10 / metrics.cooldown).toFixed(1) : '—');

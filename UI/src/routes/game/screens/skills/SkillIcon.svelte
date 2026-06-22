@@ -1,17 +1,12 @@
 <div
 	class="skill-icon"
-	class:locked
 	style:--icon-accent={accent}
 	style:--rarity-border={rarityBorder}
 	style:width="{size}px"
 	style:height="{size}px"
 >
 	<div class="icon-clip">
-		{#if locked}
-			<span class="lock-glyph" aria-hidden="true">🔒</span>
-		{:else}
-			<img src={skill.iconPath} alt={skill.name} />
-		{/if}
+		<img src={skill.iconPath} alt={skill.name} />
 	</div>
 	{#if skill.effects.length > 0}
 		<div class="effect-badge-anchor"><SkillEffectBadge /></div>
@@ -25,13 +20,11 @@ import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 
 type Props = {
 	skill: ISkill;
-	/** Whether the skill is locked (shows a lock glyph instead of the icon). */
-	locked?: boolean;
 	/** Tile edge length in px. */
 	size?: number;
 };
 
-const { skill, locked = false, size = 30 }: Props = $props();
+const { skill, size = 30 }: Props = $props();
 
 /** Accent glow keyed to the skill's primary scaling attribute (neutral if none). */
 const accent = $derived(
@@ -49,10 +42,6 @@ const rarityBorder = $derived(rarityColor(skill.rarityId));
 	border: 1px solid var(--rarity-border, var(--border-light));
 	border-radius: 3px;
 	background: color-mix(in srgb, var(--white) 4%, transparent);
-
-	&.locked {
-		opacity: 0.8;
-	}
 }
 
 // Clips the rounded icon image; kept separate from `.skill-icon` so the effect badge
@@ -84,12 +73,6 @@ const rarityBorder = $derived(rarityColor(skill.rarityId));
 		object-fit: cover;
 		opacity: 0.92;
 	}
-}
-
-.lock-glyph {
-	position: relative;
-	font-size: 0.9em;
-	color: var(--text-muted);
 }
 
 .effect-badge-anchor {

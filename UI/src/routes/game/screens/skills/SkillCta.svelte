@@ -1,8 +1,5 @@
 <div class="d-cta">
-	{#if !metrics.unlocked}
-		<button type="button" class="btn dim" disabled>🔒 Locked</button>
-		<div class="d-hint">Unlock by completing<br /><b>{metrics.source?.name ?? 'a challenge'}</b></div>
-	{:else if equipped}
+	{#if equipped}
 		<button type="button" class="btn danger" onclick={() => view.toggle(metrics.skill.id)}>✓ In loadout · Remove</button
 		>
 		<div class="d-hint">priority slot {view.slotOf(metrics.skill.id)} · drag below to reorder</div>
@@ -49,10 +46,6 @@ const { view, metrics, equipped, pending, full }: Props = $props();
 	line-height: 1.5;
 	text-align: right;
 	color: var(--text-muted);
-
-	b {
-		color: var(--text-secondary);
-	}
 }
 
 .btn {
@@ -77,13 +70,6 @@ const { view, metrics, equipped, pending, full }: Props = $props();
 		background: color-mix(in srgb, var(--enemy-accent) 16%, transparent);
 		color: var(--enemy-accent);
 		border-color: color-mix(in srgb, var(--enemy-accent) 55%, transparent);
-	}
-
-	&.dim {
-		background: transparent;
-		color: var(--text-muted);
-		border-color: var(--border-light);
-		cursor: not-allowed;
 	}
 }
 </style>

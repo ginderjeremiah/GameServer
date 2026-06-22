@@ -1,5 +1,5 @@
-/* Skill loadout screen — a rail of every unlocked (and, optionally, aspirational
-   locked) skill beside a large inspector, with an editable equipped band below.
+/* Skill loadout screen — a rail of the player's unlocked skills beside a large
+   inspector, with an editable equipped band below.
 
    The page lets the player choose which skills (and in what order) are equipped
    for battle, capped at the generated `MAX_SELECTED_SKILLS`. Edits are atomic: each
@@ -14,7 +14,7 @@
    item/mod stats), so the page shows what the game actually fights with by
    construction (#347). */
 
-import { EAttribute, type IChallenge, type ISkill, type IZone, apiSocket } from '$lib/api';
+import { EAttribute, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import {
 	BattleAttributes,
@@ -53,16 +53,12 @@ export const FILTERABLE_ATTRIBUTES: EAttribute[] = [
  *  (effective values are derived per-render from the live Compare-vs defense). */
 export interface SkillMetrics {
 	skill: ISkill;
-	/** True when the player owns the skill (false ⇒ locked / aspirational). */
-	unlocked: boolean;
 	/** Raw damage at the player's current attributes, before enemy defense. */
 	rawDamage: number;
 	/** Cooldown in seconds, adjusted for the player's CooldownRecovery (matches
 	 *  the in-battle skill tooltip's `adjustedCd`). */
 	cooldown: number;
 	contributions: SkillContribution[];
-	/** The challenge that rewards this skill, if any — drives the "unlocked by" line. */
-	source?: IChallenge;
 }
 
 /** A read-only innate skill granted by an equipped item — shown in the loadout band but not selectable,
@@ -135,7 +131,6 @@ export class SkillsView {
 	search = $state('');
 	sort = $state<SkillSort>('dps');
 	filterAttributes = $state<EAttribute[]>([]);
-	showLocked = $state(false);
 	/** Compare-vs flat defense (0 ⇒ no defender). Drives every effective value. */
 	defense = $state(0);
 	/** The selected Compare-vs preset pill, or null when defense was set manually (slider drag). */
@@ -161,14 +156,15 @@ export class SkillsView {
 	/** The loadout cap (number of equip slots) — the single generated game constant. */
 	readonly cap = MAX_SELECTED_SKILLS;
 
-	/** Ids the player has unlocked, as a set for O(1) membership in the catalogue/metric derivations.
-	 *  Rebuilt from reactive deps on each change (a lookup, not mutable held state). */
+	/** Ids the player has unlocked, as a set for O(1) membership (the catalogue filter and the
+	 *  equip-ownership guard). Rebuilt from reactive deps on each change (a lookup, not held state). */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	readonly unlockedIds = $derived(new Set(playerManager.unlockedSkills.map((s) => s.skillId)));
 
-	/** Skills shown on the page: every non-retired skill, plus any retired skill the
-	 *  player still owns (retirement keeps owned records resolvable). */
-	readonly catalogue = $derived((staticData.skills ?? []).filter((s) => this.unlockedIds.has(s.id) || !s.retiredAt));
+	/** Skills shown on the page: only the skills the player has unlocked (including any retired
+	 *  skill they still own — retirement keeps owned records resolvable). "How do I get more
+	 *  skills?" is answered by the Codex, not here. */
+	readonly catalogue = $derived((staticData.skills ?? []).filter((s) => this.unlockedIds.has(s.id)));
 
 	/** The player's resolved battle attributes (allocation + equipped item/mod stats),
 	 *  the same composition the battle uses. */
@@ -190,26 +186,13 @@ export class SkillsView {
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
 		const cdMultiplier = cooldownMultiplier(attrs);
-		// Index the rewarding challenge by skill id once, so the per-skill source
-		// lookup stays O(1) rather than scanning every challenge per skill.
-		// A transient memo local to the derivation, not reactive state.
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const challengeBySkillId = new Map<number, IChallenge>();
-		for (const challenge of staticData.challenges ?? []) {
-			// First-match wins, mirroring the previous `find`, when two challenges reward the same skill.
-			if (challenge.rewardSkillId != null && !challengeBySkillId.has(challenge.rewardSkillId)) {
-				challengeBySkillId.set(challenge.rewardSkillId, challenge);
-			}
-		}
 		const byId: Record<number, SkillMetrics> = {};
 		for (const skill of this.catalogue) {
 			byId[skill.id] = {
 				skill,
-				unlocked: this.unlockedIds.has(skill.id),
 				rawDamage: calculateSkillDamage(skill, attrs),
 				cooldown: cdMultiplier > 0 ? skill.cooldownMs / 1000 / cdMultiplier : skill.cooldownMs / 1000,
-				contributions: skillContributions(skill, attrs),
-				source: challengeBySkillId.get(skill.id)
+				contributions: skillContributions(skill, attrs)
 			};
 		}
 		return byId;
@@ -264,7 +247,7 @@ export class SkillsView {
 	);
 
 	/** Number of active library filters (badge on the Sort·Filter button). */
-	readonly activeFilterCount = $derived(this.filterAttributes.length + (this.showLocked ? 1 : 0));
+	readonly activeFilterCount = $derived(this.filterAttributes.length);
 
 	/** Filtered + sorted metrics (the rail's full list before equipped/available split). */
 	readonly railList = $derived.by(() => {
@@ -273,9 +256,6 @@ export class SkillsView {
 			.map((s) => this.metricsById[s.id])
 			.filter((m): m is SkillMetrics => m != null)
 			.filter((m) => {
-				if (!this.showLocked && !m.unlocked) {
-					return false;
-				}
 				if (term && !m.skill.name.toLowerCase().includes(term)) {
 					return false;
 				}
@@ -445,14 +425,9 @@ export class SkillsView {
 			: [...this.filterAttributes, attr];
 	}
 
-	toggleShowLocked(): void {
-		this.showLocked = !this.showLocked;
-	}
-
 	resetFilters(): void {
 		this.sort = 'dps';
 		this.filterAttributes = [];
-		this.showLocked = false;
 	}
 
 	/* ── persistence ─────────────────────────────────────────────────────────── */
