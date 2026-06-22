@@ -33,9 +33,11 @@ let waitingOnDelay = $state(true);
 
 onMount(() => {
 	waitingOnDelay = !!delay;
-	if (delay) {
-		setTimeout(() => (waitingOnDelay = false), delay);
+	if (!delay) {
+		return;
 	}
+	const timer = setTimeout(() => (waitingOnDelay = false), delay);
+	return () => clearTimeout(timer);
 });
 
 const offset = Math.floor(Math.random() * 360);

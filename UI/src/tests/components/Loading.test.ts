@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import Loading from '$components/Loading.svelte';
 
@@ -40,5 +40,21 @@ describe('Loading', () => {
 		// until the timeout fires even though loading=true.
 		const { container } = render(Loading, { props: { loading: true, delay: 500 } });
 		expect(container.querySelector('.loading-spinner-container')).toBeNull();
+	});
+
+	it('clears the reveal-delay timer on unmount so it never fires after destroy', () => {
+		const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+		const { unmount } = render(Loading, { props: { loading: true, delay: 500 } });
+		unmount();
+		expect(clearSpy).toHaveBeenCalled();
+		clearSpy.mockRestore();
+	});
+
+	it('does not arm a timer when no delay is set', () => {
+		const setSpy = vi.spyOn(globalThis, 'setTimeout');
+		const { unmount } = render(Loading, { props: { loading: true } });
+		expect(setSpy).not.toHaveBeenCalled();
+		unmount();
+		setSpy.mockRestore();
 	});
 });
