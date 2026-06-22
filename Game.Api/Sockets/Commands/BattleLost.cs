@@ -36,12 +36,18 @@ namespace Game.Api.Sockets.Commands
             {
                 _logger.LogDebug("BattleLost: Player {PlayerId} lost battle", player.Id);
 
+                // A boss loss returns to the idle farm, so prefetch and bundle the next idle battle — letting
+                // the client begin it the instant the post-loss cooldown elapses, hiding the NewEnemy round-trip.
+                var next = await _battleService.PrepareNextIdleBattle(player, state, cancellationToken);
+
                 context.Session.SavePlayerState();
 
                 var now = DateTime.UtcNow;
                 return Success(new BattleLostResponse
                 {
                     Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
+                    NextEnemy = EnemyInstance.FromSource(next),
+                    NextZoneId = player.CurrentZoneId,
                 });
             }
             else

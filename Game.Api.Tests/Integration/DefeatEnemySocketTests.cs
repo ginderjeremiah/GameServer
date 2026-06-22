@@ -101,6 +101,10 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             Assert.NotNull(response.Data.Rewards);
             Assert.True(response.Data.Rewards.ExpReward >= 0);
+            // An idle victory bundles the next idle battle so the client begins it without a separate
+            // NewEnemy round-trip — its fetch latency is hidden under the post-battle cooldown (#1092).
+            Assert.NotNull(response.Data.NextEnemy);
+            Assert.NotNull(response.Data.NextZoneId);
         }
 
         [Fact]

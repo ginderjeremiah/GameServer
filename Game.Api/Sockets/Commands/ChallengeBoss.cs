@@ -29,7 +29,7 @@ namespace Game.Api.Sockets.Commands
             var player = context.Session.Player;
             var zoneId = Parameters.ZoneId ?? player.CurrentZoneId;
 
-            var result = await _battleService.StartBossBattle(player, state, zoneId, cancellationToken);
+            var result = await _battleService.StartBossBattle(player, state, zoneId, Parameters.ClientBattleMs, cancellationToken);
 
             if (result is null)
             {

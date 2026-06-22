@@ -44,6 +44,18 @@ const notifyCombatFloat = combatFloatHook.notify;
  *  activation during the live battle loop; the headless simulator never emits these. */
 export const onCombatFloat = combatFloatHook.onNotified;
 
+/** A reference snapshot of the player's battle-relevant derivation inputs — the same four inputs the
+ *  player {@link Battler} is derived from. Captured by {@link BattleEngine.capturePlayerBattleState} and
+ *  compared by {@link BattleEngine.playerBattleStateMatches}. Used by the idle loop to tell whether the
+ *  player changed their build during a post-battle cooldown, in which case a server-prefetched next battle
+ *  (snapshotted at the previous battle's end) would no longer match what the frontend derives. */
+export interface PlayerBattleState {
+	equipmentStats: IBattlerAttribute[];
+	attributes: IBattlerAttribute[];
+	selectedSkills: number[];
+	level: number;
+}
+
 export class BattleEngine {
 	public stage = Idle;
 	public player: Battler = new Battler();
@@ -173,6 +185,31 @@ export class BattleEngine {
 
 	public getOpponent(battler: Battler) {
 		return battler.id === this.player.id ? this.enemy : this.player;
+	}
+
+	/** Captures the player's current battle-relevant derivation inputs (the same inputs {@link resetPlayer}
+	 *  derives the player {@link Battler} from). The idle loop captures this at a battle's end to later detect
+	 *  whether the player changed their build during the post-battle cooldown. */
+	public capturePlayerBattleState(): PlayerBattleState {
+		return {
+			equipmentStats: inventoryManager.equipmentStats,
+			attributes: playerManager.attributes,
+			selectedSkills: playerManager.selectedSkills,
+			level: playerManager.level
+		};
+	}
+
+	/** Whether the player's battle-relevant inputs are unchanged since {@link capturePlayerBattleState}
+	 *  produced `state`. Compared by reference (every producer reassigns rather than mutates in place, per
+	 *  #811), so a match guarantees the player {@link Battler} the frontend would derive is identical to the
+	 *  snapshot the server prefetched the next battle against — i.e. the bundled battle is parity-safe. */
+	public playerBattleStateMatches(state: PlayerBattleState): boolean {
+		return (
+			state.equipmentStats === inventoryManager.equipmentStats &&
+			state.attributes === playerManager.attributes &&
+			state.selectedSkills === playerManager.selectedSkills &&
+			state.level === playerManager.level
+		);
 	}
 
 	public startLoading(loadingTime: number) {

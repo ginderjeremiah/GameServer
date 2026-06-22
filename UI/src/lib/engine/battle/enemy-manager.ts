@@ -1,7 +1,7 @@
 import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
 import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOrder } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
-import { battleEngine, BattleStage, onBattleStageChanged, playerManager } from '../';
+import { battleEngine, BattleStage, onBattleStageChanged, playerManager, type PlayerBattleState } from '../';
 import { logMessage } from '../log';
 
 const newEnemyLoadedHook = createHook<[IEnemyInstance]>();
@@ -28,6 +28,27 @@ const BOSS_VICTORY_OVERLAY_MS = 2600;
  * paused). Per the boss design they never run simultaneously.
  */
 export type FightMode = 'idle' | 'boss';
+
+/** The data a battle-end (DefeatEnemy / BattleLost) response carries: the post-battle cooldown plus the
+ *  optional server-prefetched next idle battle bundled to hide its fetch latency under the cooldown. */
+interface BattleEndResult {
+	cooldown: number;
+	nextEnemy?: IEnemyInstance;
+	nextZoneId?: number;
+}
+
+/** A server-prefetched next idle battle, held across the post-battle cooldown so the loop can begin it
+ *  without a separate NewEnemy round-trip. It is used only if still valid when the cooldown elapses — same
+ *  zone and unchanged player battle-state ({@link EnemyManager.preparedStillValid}); otherwise the loop
+ *  falls back to a fresh fetch. */
+interface PreparedBattle {
+	enemy: IEnemyInstance;
+	/** The zone the server spawned the prefetched enemy in (authoritative after any relocation). */
+	zoneId: number;
+	/** The player's battle-relevant inputs when the battle was prepared, so a build change during the
+	 *  cooldown can be detected and the now-divergent prefetch discarded (parity). */
+	playerState: PlayerBattleState;
+}
 
 export class EnemyManager {
 	public currentEnemy: IEnemyInstance | undefined;
@@ -98,7 +119,15 @@ export class EnemyManager {
 		}
 	}
 
-	public async getNewEnemy(): Promise<void> {
+	/**
+	 * Spawns the next idle enemy, notifying listeners once one is ready. Optionally takes a server-prefetched
+	 * {@link PreparedBattle}: when still valid it is presented immediately with no `NewEnemy` round-trip (its
+	 * latency was hidden under the post-battle cooldown), otherwise a fresh one is fetched. The present runs
+	 * *inside* this method's re-entrancy/supersession guard (rather than from the stage handler directly), so
+	 * a prefetched enemy can never double-spawn with a concurrent fetch nor clobber a fight a transition moved
+	 * on to — the same guarantees the fetch path relies on.
+	 */
+	public async getNewEnemy(prepared?: PreparedBattle): Promise<void> {
 		const generation = this.fetchGeneration;
 		if (this.fetchingEnemy) {
 			// A fetch is already running. If it captured this same generation it's a genuine re-entrant
@@ -117,15 +146,33 @@ export class EnemyManager {
 				return;
 			}
 		}
-		const run = this.runFetchLoop(generation);
+		const run = this.runFetchLoop(generation, prepared);
 		this.inFlightFetch = run;
 		await run;
 	}
 
-	private async runFetchLoop(generation: number): Promise<void> {
+	private async runFetchLoop(generation: number, prepared?: PreparedBattle): Promise<void> {
 		this.fetchingEnemy = true;
 		this.fetchingGeneration = generation;
 		try {
+			// A still-valid server-prefetched battle is presented without a round-trip. Done here (inside the
+			// fetchingEnemy/generation guard) rather than from the stage handler so it shares the fetch path's
+			// protections: a concurrent getNewEnemy is dropped above, and a stop / superseding transition that
+			// lands between capture and present (bumping the generation) skips it — so the prefetched idle
+			// enemy can't double-spawn or clobber the fight the supersession moved to. Used only while still
+			// valid (same zone, unchanged player battle-state); otherwise fall through to a fresh fetch.
+			if (prepared && this.started && generation === this.fetchGeneration && this.preparedStillValid(prepared)) {
+				this.currentEnemy = prepared.enemy;
+				notifyNewEnemyLoaded(this.currentEnemy);
+				return;
+			}
+			// How long the client actually simulated the battle this fetch supersedes, so the backend bounds
+			// its abandon re-simulation accurately. We only reach here for a prefetched battle that was *not*
+			// presented (absent or invalidated by a zone/build change during the cooldown) — the client never
+			// fought it, so report 0 and the backend records no phantom outcome. A plain fetch (no prefetch,
+			// e.g. after an idle loss/draw) reports the elapsed time the client did fight.
+			const clientBattleMs = prepared ? 0 : battleEngine.timeElapsed;
+
 			// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
 			// (a sustained outage no longer grows the async chain without bound). The loop ends as soon
 			// as `stop()` flips `started` or a transition supersedes this fetch (bumping the generation);
@@ -133,7 +180,8 @@ export class EnemyManager {
 			// the full delay — so the controls don't feel frozen while a backoff is parked.
 			while (this.started && generation === this.fetchGeneration) {
 				const result = await apiSocket.sendSocketCommand('NewEnemy', {
-					newZoneId: playerManager.currentZone
+					newZoneId: playerManager.currentZone,
+					clientBattleMs
 				});
 				// The loop condition only gates the top of each iteration, so a stop / superseding
 				// transition that lands while parked on the await above (not on the cancellable backoff)
@@ -238,11 +286,16 @@ export class EnemyManager {
 		this.mode = 'boss';
 		this.bossOutcome = undefined;
 		this.bossUnlockedNextZone = false;
+		// How long the client simulated the battle this challenge supersedes, so the backend bounds its abandon
+		// accurately. Captured before pause() (which leaves the Loading stage): during the post-battle cooldown
+		// no battle has been fought, so report 0 — otherwise the elapsed time of the in-progress idle fight.
+		const clientBattleMs = battleEngine.stage === BattleStage.Loading ? 0 : battleEngine.timeElapsed;
 		// Freeze the outgoing battle for the duration of the swap so it can't resolve mid-transition.
 		battleEngine.pause();
 		try {
 			const result = await apiSocket.sendSocketCommand('ChallengeBoss', {
-				zoneId: playerManager.currentZone
+				zoneId: playerManager.currentZone,
+				clientBattleMs
 			});
 			// A stop, or a later press superseding this challenge, landed while ChallengeBoss was in flight;
 			// abandon so its result can't clobber the transition that took over (mirrors getNewEnemy's guard).
@@ -369,8 +422,12 @@ export class EnemyManager {
 	}
 
 	private async watchIdleStage(stage: BattleStage) {
+		let prepared: PreparedBattle | undefined;
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
-			const cooldown = await this.claimVictory();
+			const { cooldown, nextEnemy, nextZoneId } = await this.claimVictory();
+			// Capture the server-prefetched next battle (with the current player state) before waiting out the
+			// cooldown, so a build change during the cooldown can be detected when deciding whether to use it.
+			prepared = this.capturePreparedBattle(nextEnemy, nextZoneId);
 			if (cooldown > 0) {
 				await battleEngine.startLoading(cooldown);
 			}
@@ -392,8 +449,35 @@ export class EnemyManager {
 			stage === BattleStage.Drawn ||
 			stage === BattleStage.Idle
 		) {
-			await this.getNewEnemy();
+			await this.getNewEnemy(prepared);
 		}
+	}
+
+	/**
+	 * Builds a {@link PreparedBattle} from a battle-end response's bundled next enemy, capturing the player's
+	 * battle-state now so a later change can be detected. Returns undefined when the server bundled no next
+	 * enemy (then {@link getNewEnemy} falls back to a normal fetch).
+	 */
+	private capturePreparedBattle(enemy?: IEnemyInstance, zoneId?: number): PreparedBattle | undefined {
+		if (!enemy) {
+			return undefined;
+		}
+		return {
+			enemy,
+			zoneId: zoneId ?? playerManager.currentZone,
+			playerState: battleEngine.capturePlayerBattleState()
+		};
+	}
+
+	/**
+	 * Whether a prefetched battle can still be used: the player has not navigated to a different zone, and
+	 * their battle-relevant state is unchanged since it was prepared. A zone change means the prefetched
+	 * enemy is for the wrong zone (and the server must be told the new one); a state change would make the
+	 * prefetch's frozen server snapshot diverge from what the frontend now derives (a false-rejection
+	 * hazard). Either case falls back to a fresh post-cooldown fetch.
+	 */
+	private preparedStillValid(prepared: PreparedBattle): boolean {
+		return prepared.zoneId === playerManager.currentZone && battleEngine.playerBattleStateMatches(prepared.playerState);
 	}
 
 	private async watchBossStage(stage: BattleStage) {
@@ -464,14 +548,16 @@ export class EnemyManager {
 			logMessage(ELogType.Debug, 'There was an error recording the boss loss: ' + lostResponse.error);
 		}
 		this.returnToIdle();
-		// An error response carries no `data` (e.g. a transient socket failure), so guard the
-		// dereference the same way `getNewEnemy` does — otherwise a failed BattleLost would throw
-		// before `getNewEnemy` runs and strand the player with no new enemy after a boss loss.
+		// Capture the server-prefetched next idle battle (with the current player state) before the cooldown,
+		// so a build change during the cooldown can be detected. An error response carries no `data` (e.g. a
+		// transient socket failure), so guard the dereferences the same way `getNewEnemy` does — otherwise a
+		// failed BattleLost would throw before the next enemy spawns and strand the player after a boss loss.
+		const prepared = this.capturePreparedBattle(lostResponse.data?.nextEnemy, lostResponse.data?.nextZoneId);
 		const cooldown = lostResponse.data?.cooldown ?? 0;
 		if (cooldown > 0) {
 			await battleEngine.startLoading(cooldown);
 		}
-		await this.getNewEnemy();
+		await this.getNewEnemy(prepared);
 	}
 
 	/** Resolve a dedicated-boss fight that reached the 2-minute time limit. A timeout is a draw, not a
@@ -485,9 +571,10 @@ export class EnemyManager {
 
 	/**
 	 * Reports the current enemy's defeat to the server and grants the earned exp. Shared by the idle
-	 * and boss victory paths so the two cannot drift. Returns the post-victory cooldown (ms).
+	 * and boss victory paths so the two cannot drift. Returns the post-victory cooldown (ms) and, for an
+	 * idle victory, the server-prefetched next battle bundled with the response (absent for a boss victory).
 	 */
-	private async claimVictory(): Promise<number> {
+	private async claimVictory(): Promise<BattleEndResult> {
 		// Resolve the enemy's name up front (guarding a missing/retired id), but only log the defeat
 		// after a successful DefeatEnemy so a failed command can't show "X was defeated!" with no rewards.
 		const enemyId = this.currentEnemy?.id;
@@ -508,6 +595,10 @@ export class EnemyManager {
 		}
 		// Guard `data` for a possible error response (absent `data`), now that this is the shared
 		// victory path for both the idle and boss loops.
-		return defeatResponse.data?.cooldown ?? 0;
+		return {
+			cooldown: defeatResponse.data?.cooldown ?? 0,
+			nextEnemy: defeatResponse.data?.nextEnemy,
+			nextZoneId: defeatResponse.data?.nextZoneId
+		};
 	}
 }
