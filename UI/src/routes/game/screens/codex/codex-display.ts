@@ -5,6 +5,7 @@
 
 import { formatNum } from '$lib/common';
 import type { LevelRange } from './enemy-level';
+import type { SkillAcquisitionStatus, SkillSource } from './skill-provenance';
 
 /** Top-level Codex tab — Enemies, Zones and Skills are all built. */
 export type CodexTab = 'enemies' | 'zones' | 'skills';
@@ -84,6 +85,19 @@ export function formatCooldown(ms: number): string {
 export function formatBaseDamage(baseDamage: number): string {
 	return baseDamage > 0 ? formatNum(baseDamage) : '—';
 }
+
+/* ── skill provenance (how-to-obtain) display ──────────────────────────────── */
+
+/** Lead-in for a concrete acquisition source: a challenge rewards it, an item grants it. */
+export const skillSourceLabel = (kind: SkillSource['kind']): string =>
+	kind === 'challenge' ? 'Rewarded by' : 'Granted by';
+
+/** Wording for the no-source acquisition cases (empty for an obtainable skill, which lists sources). */
+export const SKILL_ACQUISITION_EMPTY: Record<SkillAcquisitionStatus, string> = {
+	obtainable: '',
+	'enemy-only': 'Enemy-only — encountered in battle, not obtainable by you.',
+	unobtainable: 'Not currently obtainable.'
+};
 
 /* ── enemy-table search + sort (pure, unit-tested directly) ────────────────── */
 
