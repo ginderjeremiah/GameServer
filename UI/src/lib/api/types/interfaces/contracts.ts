@@ -70,6 +70,7 @@ export interface IItem {
 	attributes: IBattlerAttribute[];
 	modSlots: IItemModSlot[];
 	tags: number[];
+	grantedSkillId?: number;
 	retiredAt?: string;
 }
 

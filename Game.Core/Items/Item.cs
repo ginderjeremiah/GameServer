@@ -31,6 +31,13 @@ namespace Game.Core.Items
         public required ERarity Rarity { get; init; }
 
         /// <summary>
+        /// The id of the skill this item grants while equipped, or null for none. Stored as an id only
+        /// (not the resolved <see cref="Skills.Skill"/>) so the item cache stays independent of the skill
+        /// cache; the battle assembly resolves it against the skill catalog at simulation time.
+        /// </summary>
+        public int? GrantedSkillId { get; init; }
+
+        /// <summary>
         /// The attribute modifiers that the item applies.
         /// </summary>
         public required IReadOnlyList<AttributeModifier> Attributes { get; init; }

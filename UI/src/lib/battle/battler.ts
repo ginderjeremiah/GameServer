@@ -101,8 +101,8 @@ export class Battler {
 		return cooldownMultiplier(this.attributes);
 	}
 
-	constructor(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
-		this.reset(battlerData, additionalAtttributes);
+	constructor(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[], grantedSkillIds?: number[]) {
+		this.reset(battlerData, additionalAtttributes, grantedSkillIds);
 	}
 
 	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
@@ -292,7 +292,7 @@ export class Battler {
 		}
 	}
 
-	public reset(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[]) {
+	public reset(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[], grantedSkillIds?: number[]) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
 		for (const modifier of this.#effectModifiers.values()) {
@@ -308,10 +308,10 @@ export class Battler {
 			this.attributes.setData(atts);
 			this.level = battlerData.level;
 			this.name = battlerData.name;
-			this.skills = this.fillSelectedSkills(battlerData);
+			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? []);
 		}
 
-		// Re-arm every skill to the battle-start baseline. The data path's fillSelectedSkills already
+		// Re-arm every skill to the battle-start baseline. The data path's fillSkills already
 		// produced fresh (charge-0) skills; the data-less re-arm (an idle re-spawn with an unchanged
 		// loadout, #811) keeps the existing skills, so their charges must be zeroed here or the next
 		// fight would inherit the previous battle's accrued cooldowns.
@@ -326,13 +326,26 @@ export class Battler {
 		this.isDead = false;
 	}
 
-	private fillSelectedSkills(battlerData: BattlerData) {
+	/** Assembles the battler's loadout: the player-selected skills first (in their chosen order, padded to
+	 *  the loadout cap so the fight screen keeps its fixed slots), then the item-granted skills (already
+	 *  gathered in EEquipmentSlot order) de-duplicated by id against the selected skills and each other —
+	 *  first occurrence wins. Mirrors the backend `BattleSnapshot.ToBattler` / `BattleLoadout.OrderSkillIds`
+	 *  assembly so the two simulators field the same skills (battle parity). */
+	private fillSkills(battlerData: BattlerData, grantedSkillIds: number[]) {
 		const skillData = staticData.skills ?? [];
 		const skills: (Skill | undefined)[] = battlerData.selectedSkills.map(
 			(skillId) => new Skill(skillData[skillId], this)
 		);
 		while (skills.length < MAX_SELECTED_SKILLS) {
 			skills.push(undefined);
+		}
+
+		const seen = new Set(battlerData.selectedSkills);
+		for (const skillId of grantedSkillIds) {
+			if (!seen.has(skillId)) {
+				seen.add(skillId);
+				skills.push(new Skill(skillData[skillId], this));
+			}
 		}
 		return skills;
 	}

@@ -26,6 +26,69 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
+        public async Task SaveItems_GrantedSkillNotItemFlagged_ReturnsFailure()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // A Player-only skill is not Item-acquirable, so it can't be granted by an item.
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Player Bolt", acquisition: ESkillAcquisition.Player);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var result = admin.SaveItems(
+            [
+                new Change<Contracts.Item>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Bad Grant", grantedSkillId: skillId),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Skill 'Player Bolt' is not flagged as Item-acquirable and cannot be granted by an item.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveItems_GrantedSkillItemFlagged_Succeeds()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Cleave", acquisition: ESkillAcquisition.Item);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new() { ChangeType = EChangeType.Add, Item = NewItem(name: "Granting Axe", grantedSkillId: skillId) },
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminItems>();
+                Assert.True(admin.SaveItems(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var created = await context.Items.AsNoTracking().SingleAsync(i => i.Name == "Granting Axe", CancellationToken);
+                Assert.Equal(skillId, created.GrantedSkillId);
+            }
+        }
+
+        [Fact]
         public void SaveModSlots_AddForUnknownItem_ReturnsNotFound()
         {
             using var scope = CreateScope();
@@ -240,5 +303,19 @@ namespace Game.Application.Tests.DataAccess
             Assert.False(result.Succeeded);
             Assert.Equal("The submitted item attribute change set contains duplicate entries.", result.ErrorMessage);
         }
+
+        private static Contracts.Item NewItem(int id = 0, string name = "Test Item", int? grantedSkillId = null) => new()
+        {
+            Id = id,
+            Name = name,
+            Description = "",
+            ItemCategoryId = EItemCategory.Weapon,
+            RarityId = ERarity.Common,
+            IconPath = "",
+            GrantedSkillId = grantedSkillId,
+            Attributes = [],
+            ModSlots = [],
+            Tags = [],
+        };
     }
 }

@@ -56,6 +56,24 @@ export const makeEffect = (
 	scalingAmount = 0
 ): ISkillEffect => ({ id, target, attributeId, modifierTypeId, amount, durationMs, scalingAttributeId, scalingAmount });
 
+/** Registers a skill spec into a mock registry (the array a test's mocked `staticData.skills` returns),
+ *  returning its assigned id so a Battler resolves it exactly as the live game does. */
+function registerSkill(registry: ISkill[], spec: SkillSpec): number {
+	const id = registry.length;
+	registry.push({
+		id,
+		name: `Skill ${id}`,
+		baseDamage: spec.baseDamage,
+		cooldownMs: spec.cooldownMs,
+		damageMultipliers: spec.multipliers,
+		effects: spec.effects,
+		description: '',
+		iconPath: '',
+		acquisition: ESkillAcquisition.Player
+	});
+	return id;
+}
+
 /**
  * Binds a `makeBattler` builder to a mock skill registry (the array a test's
  * mocked `staticData.skills` returns). `makeBattler` registers each skill spec
@@ -72,21 +90,7 @@ export function battlerFactory(registry: ISkill[]) {
 		skills: SkillSpec[],
 		equipment?: IBattlerAttribute[]
 	): Battler => {
-		const selectedSkills = skills.map((spec) => {
-			const id = registry.length;
-			registry.push({
-				id,
-				name: `Skill ${id}`,
-				baseDamage: spec.baseDamage,
-				cooldownMs: spec.cooldownMs,
-				damageMultipliers: spec.multipliers,
-				effects: spec.effects,
-				description: '',
-				iconPath: '',
-				acquisition: ESkillAcquisition.Player
-			});
-			return id;
-		});
+		const selectedSkills = skills.map((spec) => registerSkill(registry, spec));
 
 		return new Battler(
 			{
@@ -97,6 +101,35 @@ export function battlerFactory(registry: ISkill[]) {
 			},
 			equipment
 		);
+	};
+}
+
+/**
+ * Binds a granted-skill battler builder to a mock skill registry. `register` adds a skill spec and returns
+ * its id, so a scenario can build explicit selected/granted id lists — including a granted id that duplicates
+ * a selected id, or the same granted id twice (two items granting one skill) — to exercise the de-dupe rule.
+ * `build` constructs a real Battler from raw stat allocations whose battle skills are the selected ids plus
+ * the granted ids (the latter mirroring `InventoryManager.grantedSkillIds`, gathered from equipped items in
+ * EEquipmentSlot order); the Battler applies the shared append/order/de-dupe rule.
+ */
+export function grantedBattlerFactory(registry: ISkill[]) {
+	return {
+		register: (spec: SkillSpec): number => registerSkill(registry, spec),
+		build: (
+			attrs: { id: EAttribute; amount: number }[],
+			selectedSkillIds: number[],
+			grantedSkillIds: number[]
+		): Battler =>
+			new Battler(
+				{
+					name: 'Battler',
+					level: 1,
+					selectedSkills: selectedSkillIds,
+					attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+				},
+				undefined,
+				grantedSkillIds
+			)
 	};
 }
 

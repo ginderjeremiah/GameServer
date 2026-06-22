@@ -7,6 +7,7 @@ import {
 	EItemModType,
 	EModifierType,
 	ERarity,
+	ESkillAcquisition,
 	ESkillEffectTarget
 } from '$lib/api';
 
@@ -222,6 +223,37 @@ describe('retired records in selectable options', () => {
 		// entityName / itemRecName remain index-based so an authored reference still renders.
 		expect(reference.entityName(EEntityType.Enemy, 2)).toBe('Goblin');
 		expect(reference.entityName(EEntityType.Skill, 1)).toBe('Fireball');
+	});
+});
+
+describe('granted-skill picker options', () => {
+	beforeEach(() => {
+		// Cleave is Item-grantable, Fireball is Player-only, Smite is Item-grantable but retired.
+		staticData.skills = [
+			{ id: 0, name: 'Cleave', baseDamage: 12, acquisition: ESkillAcquisition.Item },
+			{ id: 1, name: 'Fireball', baseDamage: 25, acquisition: ESkillAcquisition.Player },
+			{
+				id: 2,
+				name: 'Smite',
+				baseDamage: 30,
+				acquisition: ESkillAcquisition.Item,
+				retiredAt: '2026-01-01T00:00:00Z'
+			}
+		];
+	});
+
+	it('offers a None sentinel plus only the active Item-flagged skills', () => {
+		expect(reference.grantedSkillOptions()).toEqual([
+			{ value: -1, text: 'None' },
+			{ value: 0, text: 'Cleave' }
+		]);
+	});
+
+	it('keeps the current value visible (marked retired) even when it is retired or not Item-flagged', () => {
+		// A retired Item-flagged skill stays when it is the current grant…
+		expect(reference.grantedSkillOptions(2)).toContainEqual({ value: 2, text: 'Smite · retired' });
+		// …and a Player-only skill that was somehow already authored stays selectable rather than vanishing.
+		expect(reference.grantedSkillOptions(1)).toContainEqual({ value: 1, text: 'Fireball' });
 	});
 });
 

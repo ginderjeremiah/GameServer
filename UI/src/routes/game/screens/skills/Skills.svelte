@@ -24,6 +24,8 @@
 
 	<EquippedBand {view} />
 
+	<InnateBand {view} />
+
 	<SortFilterModal {view} />
 
 	<!-- Shared attribute tooltip for the scaling chips in the damage breakdown and the equipped
@@ -41,6 +43,7 @@ import CompareBar from './CompareBar.svelte';
 import SkillRail from './SkillRail.svelte';
 import SkillInspector from './SkillInspector.svelte';
 import EquippedBand from './EquippedBand.svelte';
+import InnateBand from './InnateBand.svelte';
 import SortFilterModal from './SortFilterModal.svelte';
 
 const view = new SkillsView();

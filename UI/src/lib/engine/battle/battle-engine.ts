@@ -176,7 +176,9 @@ export class BattleEngine {
 			this.player.reset();
 			return;
 		}
-		this.player.reset(playerManager, equipmentStats);
+		// Granted skills change only when equipment does, so gating the re-derive on equipmentStats (above)
+		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them.
+		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds);
 		this.lastEquipmentStats = equipmentStats;
 		this.lastPlayerAttributes = attributes;
 		this.lastSelectedSkills = selectedSkills;

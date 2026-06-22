@@ -27,7 +27,10 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 	};
 	return {
 		mockPlayerManager: playerManager,
-		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
+		mockInventoryManager: {
+			equipmentStats: [] as { attributeId: number; amount: number }[],
+			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
+		},
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
 		staticData: {
@@ -196,6 +199,7 @@ beforeEach(() => {
 	];
 	mockPlayerManager.attributes = [];
 	mockInventoryManager.equipmentStats = [];
+	mockInventoryManager.equippedSlots = [];
 	view = new SkillsView();
 });
 
@@ -268,6 +272,47 @@ describe('SkillsView — initial state', () => {
 		// CooldownRecovery = base 1 + 0.004·10 = 1.04, read directly as the cooldown multiplier.
 		expect(fresh.cooldown(0)).toBeCloseTo(1 / 1.04, 10);
 		expect(fresh.metric(0)?.contributions).toEqual([{ attributeId: EAttribute.Strength, multiplier: 1, value: 20 }]);
+	});
+});
+
+describe('SkillsView — innate (item-granted) skills', () => {
+	it('is empty when no equipped item grants a skill', () => {
+		expect(view.innateSkills).toEqual([]);
+	});
+
+	it('lists granted skills in equipped-slot order with their source item, skipping non-granting items', () => {
+		mockInventoryManager.equippedSlots = [
+			{ name: 'Helm of Echoes', grantedSkillId: 3 }, // slot 0
+			undefined,
+			{ name: 'Plain Greaves' }, // slot 2, no grant
+			{ name: 'Staff of Embers', grantedSkillId: 4 } // slot 3
+		];
+		const fresh = new SkillsView();
+
+		expect(fresh.innateSkills.map((g) => [g.skill.id, g.sourceItemName, g.duplicate])).toEqual([
+			[3, 'Helm of Echoes', false],
+			[4, 'Staff of Embers', false]
+		]);
+	});
+
+	it('flags a grant that duplicates a selected skill as already in the loadout', () => {
+		// Skill 0 is in the equipped loadout, so an item granting it is a duplicate (fielded once).
+		mockInventoryManager.equippedSlots = [{ name: 'Echo Blade', grantedSkillId: 0 }];
+		const fresh = new SkillsView();
+
+		const innate = fresh.innateSkills;
+		expect(innate).toHaveLength(1);
+		expect(innate[0]).toMatchObject({ duplicate: true, sourceItemName: 'Echo Blade' });
+	});
+
+	it('flags a second item granting the same skill as a duplicate', () => {
+		mockInventoryManager.equippedSlots = [
+			{ name: 'First Axe', grantedSkillId: 3 },
+			{ name: 'Second Axe', grantedSkillId: 3 }
+		];
+		const fresh = new SkillsView();
+
+		expect(fresh.innateSkills.map((g) => g.duplicate)).toEqual([false, true]);
 	});
 });
 

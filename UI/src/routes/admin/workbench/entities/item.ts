@@ -9,7 +9,9 @@ import type { EntityConfig } from './types';
 const refresh = async (): Promise<IItem[]> => {
 	const items = await fetchSocketData('GetItems');
 	staticData.items = items;
-	return items;
+	// Normalise the optional granted-skill FK to the select's "None" sentinel (-1) for the editable copy;
+	// staticData.items stays raw (null = none) for the game/other screens.
+	return items.map((item) => ({ ...item, grantedSkillId: item.grantedSkillId ?? -1 }));
 };
 
 export const itemEntity: EntityConfig<IItem> = {
@@ -26,6 +28,7 @@ export const itemEntity: EntityConfig<IItem> = {
 		itemCategoryId: EItemCategory.Helm,
 		rarityId: ERarity.Common,
 		iconPath: '',
+		grantedSkillId: -1,
 		attributes: [],
 		modSlots: [],
 		tags: []
@@ -70,6 +73,13 @@ export const itemEntity: EntityConfig<IItem> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No icon path'
+				},
+				{
+					key: 'grantedSkillId',
+					label: 'Granted Skill',
+					type: 'select',
+					options: reference.grantedSkillOptions,
+					width: 240
 				},
 				{ key: 'description', label: 'Description', type: 'textarea', placeholder: 'Flavor text…', grow: true }
 			]
@@ -129,7 +139,15 @@ export const itemEntity: EntityConfig<IItem> = {
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: (it) => ({ ...it, attributes: [], modSlots: [], tags: [] }),
+			// Map the "None" sentinel (-1) back to no grant before persisting; child collections are saved
+			// through their own endpoints, so the primary DTO clears them.
+			toPrimaryDto: (it) => ({
+				...it,
+				grantedSkillId: it.grantedSkillId === -1 ? undefined : it.grantedSkillId,
+				attributes: [],
+				modSlots: [],
+				tags: []
+			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditItems', changes),
 			refresh,
 			childSavers: [

@@ -6,6 +6,7 @@ import {
 	EItemModType,
 	EModifierType,
 	ERarity,
+	ESkillAcquisition,
 	ESkillEffectTarget,
 	fetchSocketData,
 	type IChallengeType,
@@ -14,7 +15,7 @@ import {
 	type ITag,
 	type ITagCategory
 } from '$lib/api';
-import { enumPairs, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
+import { enumPairs, hasFlag, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
 import { staticData } from '$stores';
 import type { SelectOption } from './entities/types';
 
@@ -106,6 +107,18 @@ class WorkbenchReference {
 	unlockChallengeOptions = (keep?: number): SelectOption[] => [
 		{ value: -1, text: 'None (always open)' },
 		...this.retireableOptions(staticData.challenges ?? [], keep)
+	];
+	/**
+	 * Item granted-skill picker options: a "None" sentinel (-1) plus every active Item-flagged skill
+	 * (the backend enforces the flag too). The current value stays visible — even if it's retired or no
+	 * longer Item-flagged — so an already-authored grant isn't silently dropped from the list.
+	 */
+	grantedSkillOptions = (keep?: number): SelectOption[] => [
+		{ value: -1, text: 'None' },
+		...this.retireableOptions(
+			(staticData.skills ?? []).filter((s) => hasFlag(s.acquisition, ESkillAcquisition.Item) || s.id === keep),
+			keep
+		)
 	];
 	skillCatalogue = () =>
 		(staticData.skills ?? []).map((s) => ({

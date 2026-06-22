@@ -27,7 +27,8 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 		]
 	};
 	const mockInventoryManager = {
-		equipmentStats: [] as { attributeId: number; amount: number }[]
+		equipmentStats: [] as { attributeId: number; amount: number }[],
+		grantedSkillIds: [] as number[]
 	};
 
 	return { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager };
@@ -756,7 +757,7 @@ describe('BattleEngine', () => {
 			mockInventoryManager.equipmentStats = newStats;
 			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
-			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, newStats);
+			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, newStats, mockInventoryManager.grantedSkillIds);
 		});
 
 		it('re-derives the player when the level changes between spawns (keeps the fight card level fresh)', () => {
@@ -766,7 +767,11 @@ describe('BattleEngine', () => {
 			mockPlayerManager.level = 6;
 			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
-			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, mockInventoryManager.equipmentStats);
+			expect(resetSpy).toHaveBeenCalledWith(
+				mockPlayerManager,
+				mockInventoryManager.equipmentStats,
+				mockInventoryManager.grantedSkillIds
+			);
 		});
 	});
 });

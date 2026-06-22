@@ -613,6 +613,77 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
+
+                // ── Item-granted skills (append + order + dedupe) ─────────────────────────────
+                // The player's battler fields its selected skills plus the skills its equipped items grant
+                // (BattleSnapshot.ToBattler appends them, de-duplicated, in EEquipmentSlot order). Each scenario
+                // is built through the snapshot path with an equipped item carrying a GrantedSkillId.
+
+                // An item grants a skill in addition to a selected one: both fire. Selected S1 (20−2 = 18/hit)
+                // and granted S2 (30−2 = 28/hit) on cooldown 400 fire together (ticks 10,20,30) for 46/tick; the
+                // 100-HP enemy dies on the tick-30 volley → 1200ms. (The selected skill alone — 18/tick — would
+                // win only on hit 6 at 2400ms, so the grant is decisive.)
+                ["itemGrantsSkill"] = new ParityScenario(
+                    Player: () => MakeBattlerWithGrants(
+                        strength: 10,
+                        selectedSkillIds: [1],
+                        grants: [(100, 2)],
+                        skillPool:
+                        [
+                            MakeSkill(1, baseDamage: 20, cooldownMs: 400),
+                            MakeSkill(2, baseDamage: 30, cooldownMs: 400),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // Two equipped items grant the SAME skill: it is de-duplicated to one (not fielded twice). The
+                // single granted S2 deals 28/hit (cooldown 400); the 100-HP enemy dies on hit 4 at tick 40 →
+                // 1600ms. (Two un-deduped copies — 56/tick — would kill on hit 2 at 800ms.)
+                ["twoItemsGrantSameSkill"] = new ParityScenario(
+                    Player: () => MakeBattlerWithGrants(
+                        strength: 10,
+                        selectedSkillIds: [],
+                        grants: [(100, 2), (101, 2)],
+                        skillPool: [MakeSkill(2, baseDamage: 30, cooldownMs: 400)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // A granted skill duplicating a SELECTED skill is de-duplicated (first/selected wins): the player
+                // fields S1 once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 →
+                // 2000ms. (Without dedupe the two copies — 40/tick — would kill on hit 3 at 1200ms.)
+                ["grantedSkillDuplicatesSelected"] = new ParityScenario(
+                    Player: () => MakeBattlerWithGrants(
+                        strength: 10,
+                        selectedSkillIds: [1],
+                        grants: [(100, 1)],
+                        skillPool: [MakeSkill(1, baseDamage: 22, cooldownMs: 400)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a
+                // skill whose self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw less
+                // 2 Def deals 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the
+                // 150-HP enemy on fire 6 at tick 60 → 2400ms — proving granted skills wrap into a full BattleSkill.
+                ["grantedSkillWithEffects"] = new ParityScenario(
+                    Player: () => MakeBattlerWithGrants(
+                        strength: 10,
+                        selectedSkillIds: [],
+                        grants: [(100, 2)],
+                        skillPool:
+                        [
+                            MakeSkill(2, baseDamage: 0, cooldownMs: 400, mult: EAttribute.Strength, multAmount: 1.0,
+                                effects: [MakeEffect(110, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 20, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
@@ -836,6 +907,50 @@ namespace Game.Core.Tests.Battle
 
             return BattlerFactory.FromPlayer(player);
         }
+
+        /// <summary>
+        /// Builds a player Battler through the snapshot path (<see cref="BattleSnapshot.ToBattler"/>, the
+        /// production anti-cheat replay surface) whose battle skills are the <paramref name="selectedSkillIds"/>
+        /// plus the skills the equipped items in <paramref name="grants"/> grant — each grant a
+        /// (itemId, grantedSkillId) pair. Exercises the item-granted-skill append/order/dedupe end to end:
+        /// every referenced skill (selected or granted) is resolved from <paramref name="skillPool"/>.
+        /// </summary>
+        private static Battler MakeBattlerWithGrants(
+            double strength,
+            List<int> selectedSkillIds,
+            List<(int ItemId, int GrantedSkillId)> grants,
+            List<Skill> skillPool)
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [new StatAllocation { Attribute = EAttribute.Strength, Amount = strength }],
+                EquippedItems = grants
+                    .Select(g => new EquippedItemSnapshot { ItemId = g.ItemId, AppliedModIds = [] })
+                    .ToList(),
+                SkillIds = selectedSkillIds,
+            };
+
+            var itemsById = grants.ToDictionary(g => g.ItemId, g => GrantItem(g.ItemId, g.GrantedSkillId));
+            var skillsById = skillPool.ToDictionary(s => s.Id);
+
+            return snapshot.ToBattler(
+                id => itemsById[id],
+                _ => throw new InvalidOperationException("No mods are applied in the granted-skill scenarios."),
+                id => skillsById[id]);
+        }
+
+        private static Item GrantItem(int id, int grantedSkillId) => new()
+        {
+            Id = id,
+            Name = $"Item {id}",
+            Description = string.Empty,
+            Category = EItemCategory.Accessory,
+            Rarity = ERarity.Common,
+            GrantedSkillId = grantedSkillId,
+            Attributes = [],
+            ModSlots = [],
+        };
 
         private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier> attributes) => new()
         {

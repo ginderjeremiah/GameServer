@@ -26,7 +26,13 @@ vi.mock('$stores', () => ({
 import { BattleSimulator, Battler } from '$lib/battle';
 import type { BattleResult } from '$lib/battle';
 import { DEFAULT_MAX_BATTLE_MS, MS_PER_TICK } from '$lib/api/types/game-constants';
-import { battlerFactory, equipmentFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
+import {
+	battlerFactory,
+	equipmentFactory,
+	grantedBattlerFactory,
+	makeSkill,
+	makeEffect
+} from './battle-sim-test-utils';
 
 /** A duration long enough that an effect never expires within a battle (for "permanent" buffs). */
 const PERMANENT = 1_000_000;
@@ -45,6 +51,7 @@ const PARITY_SEED = 0x9e3779b9;
  */
 const makeBattler = battlerFactory(mockSkills);
 const makeEquipment = equipmentFactory(mockItems, mockItemMods);
+const granted = grantedBattlerFactory(mockSkills);
 
 // ── Shared parity matrix ───────────────────────────────────────────────────────
 // Every scenario here MUST mirror — with identical inputs and identical expected
@@ -801,6 +808,73 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(12, 400)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// ── Item-granted skills (append + order + dedupe) ────────────────────────────
+	// The player's battler fields its selected skills plus the skills its equipped items grant (the frontend
+	// gathers them via InventoryManager.grantedSkillIds and Battler appends them, de-duplicated). Mirrors the
+	// backend `itemGrantsSkill` / `twoItemsGrantSameSkill` / `grantedSkillDuplicatesSelected` /
+	// `grantedSkillWithEffects` scenarios.
+
+	// An item grants a skill in addition to a selected one: both fire. Selected (20−2 = 18/hit) and granted
+	// (30−2 = 28/hit) on cooldown 400 fire together (ticks 10,20,30) for 46/tick; the 100-HP enemy dies on the
+	// tick-30 volley → 1200ms. (The selected skill alone — 18/tick — would win only at 2400ms.)
+	{
+		name: 'itemGrantsSkill',
+		player: () => {
+			const selected = granted.register(makeSkill(20, 400));
+			const grant = granted.register(makeSkill(30, 400));
+			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [selected], [grant]);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// Two equipped items grant the SAME skill: it is de-duplicated to one (not fielded twice). The single
+	// granted skill deals 28/hit (cooldown 400); the 100-HP enemy dies on hit 4 at tick 40 → 1600ms. (Two
+	// un-deduped copies — 56/tick — would kill on hit 2 at 800ms.)
+	{
+		name: 'twoItemsGrantSameSkill',
+		player: () => {
+			const grant = granted.register(makeSkill(30, 400));
+			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [], [grant, grant]);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// A granted skill duplicating a SELECTED skill is de-duplicated (first/selected wins): the player fields it
+	// once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms. (Without dedupe
+	// the two copies — 40/tick — would kill on hit 3 at 1200ms.)
+	{
+		name: 'grantedSkillDuplicatesSelected',
+		player: () => {
+			const skill = granted.register(makeSkill(22, 400));
+			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [skill], [skill]);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
+	// A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a skill whose
+	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw less 2 Def deals
+	// 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the 150-HP enemy on fire 6 at
+	// tick 60 → 2400ms — proving granted skills wrap into a full battle skill (charge + effects).
+	{
+		name: 'grantedSkillWithEffects',
+		player: () => {
+			const grant = granted.register(
+				makeSkill(
+					0,
+					400,
+					[{ attributeId: EAttribute.Strength, multiplier: 1.0 }],
+					[makeEffect(110, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
+				)
+			);
+			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [], [grant]);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 20 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
 	}
 ];
