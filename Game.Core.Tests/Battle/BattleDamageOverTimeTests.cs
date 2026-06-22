@@ -131,6 +131,58 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(15, result.Stats.PlayerDamageHealed); // 3 healed × 5 ticks
         }
 
+        // ── End-of-tick ordering: heal saves from a lethal DoT tick (#1090) ──
+
+        [Fact]
+        public void ResolveDamageOverTime_HealOffsetsLethalDotTick_KeepsPlayerAlive()
+        {
+            // A 50-HP player takes 60 DoT this tick (more than its whole health) but an equal 60 heal applies
+            // before the death check, restoring it to MaxHealth — so it survives a DoT that would otherwise kill.
+            var player = MakeBattler(
+                Stat(Strength, 0), Stat(DamageTakenPerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ResolveDamageOverTime();
+
+            Assert.False(player.IsDead);
+            Assert.Equal(50, player.CurrentHealth); // 50 − 60 + 60, capped at MaxHealth
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_HealOffsetsLethalDotTick_KeepsEnemyAlive()
+        {
+            // The enemy resolves first; its own heal applies before its death check, so a regen saves it from an
+            // otherwise-lethal DoT tick exactly as it does for the player.
+            var player = MakeBattler(Stat(Strength, 0));
+            var enemy = MakeBattler(
+                Stat(Strength, 0), Stat(DamageTakenPerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ResolveDamageOverTime();
+
+            Assert.False(enemy.IsDead);
+            Assert.Equal(50, enemy.CurrentHealth);
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_HealBelowNetDamage_StillKillsButCountsTheHeal()
+        {
+            // The heal applies before the death check but cannot offset the whole tick: a 5-HP player takes 10
+            // DoT and heals 4, dying at −1. The applied heal is still recorded toward PlayerDamageHealed.
+            var player = MakeBattler(
+                Stat(Strength, 0), Stat(DamageTakenPerSecond, 250), Stat(HealthRegenPerSecond, 100));
+            player.TakeDamage(47); // Defense 2 → 45 damage → MaxHealth 50 → CurrentHealth 5
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ResolveDamageOverTime();
+
+            Assert.True(player.IsDead);
+            Assert.Equal(-1, player.CurrentHealth); // 5 − 10 + 4
+            Assert.Equal(4, context.Stats.PlayerDamageHealed);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Battler MakeBattler(params AttributeModifier[] modifiers) =>
@@ -152,6 +204,7 @@ namespace Game.Core.Tests.Battle
             Id = id,
             Name = $"Skill {id}",
             Description = "",
+            Rarity = ERarity.Common,
             CooldownMs = 40,
             BaseDamage = baseDamage,
             DamageMultipliers = [],

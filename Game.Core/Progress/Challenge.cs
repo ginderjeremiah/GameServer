@@ -33,6 +33,14 @@ namespace Game.Core.Progress
                 // The player's level is always present, so the progress value is always real data.
                 playerChallenge.UpdateProgress(playerProgress.Player.Level, hasData: true);
             }
+            else
+            {
+                // A challenge type with no backing statistic must be explicitly handled above (like
+                // LevelReached). Falling through here means a new type was wired up only half-way and
+                // would otherwise silently never progress — fail loud instead.
+                throw new ArgumentOutOfRangeException(nameof(Type), Type.Id,
+                    $"Challenge type {Type.Id} has no backing statistic and no progress handling.");
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, type IAttribute } from '$lib/api';
+import { EAttribute, ERarity, type IAttribute } from '$lib/api';
 
 // The tooltip resolves the opponent through the battle engine and attribute names through the
 // reference-data store; both are mocked so the damage maths is fully controlled by the test.
@@ -46,14 +46,14 @@ describe('SkillTooltip', () => {
 		expect(panel.style.display).toBe('none');
 	});
 
-	it('composes the tooltip shell with an accent-tinted glow', () => {
-		const skill = makeSkill(owner, { name: 'Cleave', cooldownMs: 1000 });
+	it('composes the tooltip shell with a rarity-tinted glow', () => {
+		const skill = makeSkill(owner, { name: 'Cleave', cooldownMs: 1000, rarityId: ERarity.Rare });
 		const { container } = render(SkillTooltip, { props: { skill } });
 		const shell = container.querySelector('.tt-shell') as HTMLElement;
 		expect(shell).not.toBeNull();
-		// Migrated to TooltipShell: accent left border + opt-in accent-tinted glow.
+		// Migrated to TooltipShell: rarity-tinted left border + opt-in glow (display-only — battle ignores rarity).
 		expect(shell.classList.contains('glow')).toBe(true);
-		expect(shell.getAttribute('style')).toContain('border-left: 3px solid var(--accent)');
+		expect(shell.getAttribute('style')).toContain('border-left: 3px solid var(--rarity-rare)');
 	});
 
 	it('shows the damage breakdown: base, per-attribute multiplier, enemy defense and total', () => {

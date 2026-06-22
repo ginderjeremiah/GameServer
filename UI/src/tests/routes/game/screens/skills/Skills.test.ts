@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import {
+	ERarity,
 	EAttribute,
 	EModifierType,
 	ESkillAcquisition,
@@ -102,6 +103,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	description: 'A skill.',
 	cooldownMs: 1000,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

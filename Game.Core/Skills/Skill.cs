@@ -18,6 +18,13 @@
 
         public required int CooldownMs { get; init; }
 
+        /// <summary>
+        /// The skill's rarity tier. Authoring/display metadata today (the battle never reads it), but a
+        /// reserved logic hook: it is the tier weight the proficiency XP accrual reads by id at battle
+        /// completion (#982/#1123). See <see cref="Items.Item.Rarity"/> for the shared convention.
+        /// </summary>
+        public required ERarity Rarity { get; init; }
+
         public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 
         public required IReadOnlyList<SkillEffect> Effects { get; init; }

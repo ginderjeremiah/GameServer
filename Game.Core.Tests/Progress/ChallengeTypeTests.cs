@@ -135,5 +135,28 @@ namespace Game.Core.Tests.Progress
                 Assert.Equal(type, challengeType.Id);
             }
         }
+
+        [Fact]
+        public void EveryChallengeTypeEitherMapsToAStatisticOrIsExplicitlyHandled()
+        {
+            // The type→statistic resolution is total and fail-loud: every challenge type must either
+            // carry a backing statistic or be a deliberately statistic-less accumulator (LevelReached).
+            // A newly-added type with no GetStatisticType arm throws in the constructor rather than
+            // silently resolving to "no statistic" and never progressing.
+            var statisticLess = new HashSet<EChallengeType> { EChallengeType.LevelReached };
+
+            foreach (var type in Enum.GetValues<EChallengeType>())
+            {
+                var challengeType = new ChallengeType(type);
+                if (statisticLess.Contains(type))
+                {
+                    Assert.Null(challengeType.StatisticType);
+                }
+                else
+                {
+                    Assert.NotNull(challengeType.StatisticType);
+                }
+            }
+        }
     }
 }

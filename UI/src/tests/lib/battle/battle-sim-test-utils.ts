@@ -69,6 +69,7 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		effects: spec.effects,
 		description: '',
 		iconPath: '',
+		rarityId: ERarity.Common,
 		acquisition: ESkillAcquisition.Player
 	});
 	return id;

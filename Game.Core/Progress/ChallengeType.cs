@@ -44,7 +44,12 @@
                 EChallengeType.DamageDealt => EStatisticType.DamageDealt,
                 EChallengeType.BattlesWon => EStatisticType.BattlesWon,
                 EChallengeType.SkillsUsed => EStatisticType.SkillsUsed,
-                _ => null
+                // LevelReached accumulates the player's level directly and has no backing statistic;
+                // UpdateChallengeProgress special-cases it. Listed explicitly so the default arm can
+                // fail loud on a newly-added type that was wired up only half-way.
+                EChallengeType.LevelReached => null,
+                _ => throw new ArgumentOutOfRangeException(nameof(id), id,
+                    $"No statistic mapping defined for challenge type {id}.")
             };
         }
     }

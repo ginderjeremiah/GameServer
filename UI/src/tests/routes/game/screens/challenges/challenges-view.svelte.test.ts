@@ -27,7 +27,7 @@ const { staticData, mockFetchSocket } = vi.hoisted(() => ({
 		itemMods: [] as IItemMod[],
 		enemies: [] as { id: number; name: string }[],
 		zones: [] as { id: number; name: string; order?: number; unlockChallengeId?: number }[],
-		skills: [] as { id: number; name: string }[]
+		skills: [] as { id: number; name: string; rarityId?: ERarity }[]
 	},
 	mockFetchSocket: vi.fn()
 }));
@@ -97,7 +97,7 @@ beforeEach(() => {
 	staticData.zones = [];
 	staticData.zones[2] = { id: 2, name: 'Forgotten Catacombs' };
 	staticData.skills = [];
-	staticData.skills[2] = { id: 2, name: 'Firebolt' };
+	staticData.skills[2] = { id: 2, name: 'Firebolt', rarityId: ERarity.Epic };
 
 	staticData.challengeTypes = [
 		{ id: EChallengeType.EnemiesKilled, goalComparison: EChallengeGoalComparison.AtLeast, name: 'Enemies Killed' },
@@ -147,7 +147,7 @@ describe('resolveReward', () => {
 		expect(reward?.mod?.id).toBe(213);
 	});
 
-	it('resolves a skill reward with the neutral skill accent and "Skill" sub-line', () => {
+	it('resolves a skill reward with its rarity tier accent, "rarity · Skill" sub-line and a tier glow', () => {
 		const ch = challenge({
 			id: 7,
 			name: 'Pyromancer',
@@ -155,8 +155,16 @@ describe('resolveReward', () => {
 			rewardSkillId: 2
 		});
 		const reward = resolveReward(ch, true);
-		expect(reward).toMatchObject({ kind: 'skill', revealed: true, name: 'Firebolt', sub: 'Skill' });
-		expect(reward?.accent).toBe('var(--accent-light)');
+		expect(reward).toMatchObject({
+			kind: 'skill',
+			revealed: true,
+			name: 'Firebolt',
+			sub: 'Epic · Skill',
+			rarity: ERarity.Epic
+		});
+		// Skill rewards now tint + glow by their real rarity tier (no neutral/suppressed-glow special case).
+		expect(reward?.accent).toContain('--rarity-');
+		expect(reward?.glow).toContain('--rarity-');
 		expect(reward?.skill?.id).toBe(2);
 	});
 

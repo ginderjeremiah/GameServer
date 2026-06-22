@@ -1,14 +1,20 @@
-<!-- The skill dossier (right panel): an intellect-accented header (Skill + name + description), base
-     damage / cooldown meta, the attributes the skill scales with, its authored effects (wording from
-     the shared skill-effect-display helper), and the enemies that use it. The "used by" pills
-     cross-link into the enemy dossier. A reference card only — no equip/loadout, no player-build DPS. -->
+<!-- The skill dossier (right panel): the header carries a rarity-tinted accent border + tier tag
+     alongside the intellect "Skill" kind mark (mirroring items: rarity on the border, kind on the
+     label), base damage / cooldown meta, how to obtain the skill (challenge rewards / item grants, or
+     the enemy-only / not-obtainable wording), the attributes the skill scales with, its authored
+     effects (wording from the shared skill-effect-display helper), and the enemies that use it. The
+     "used by" pills cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
 {#if view.selectedSkill}
 	{@const skill = view.selectedSkill}
+	{@const rarity = view.selectedSkillRarity}
 	<div class="dossier" data-testid="codex-skill-dossier">
-		<div class="head">
+		<div class="head" style:border-left-color={rarity?.color}>
 			<div class="kind-line">
 				<span class="kind-dot"></span>
 				<span class="kind">Skill</span>
+				{#if rarity}
+					<RarityTagBox color={rarity.color} label={rarity.label} />
+				{/if}
 			</div>
 			<div class="name">{skill.name}</div>
 			{#if skill.description}
@@ -26,6 +32,26 @@
 					<div class="meta-label">Cooldown</div>
 					<div class="meta-val">{formatCooldown(skill.cooldownMs)}</div>
 				</div>
+			</div>
+
+			<div class="section">
+				<div class="section-label">How to obtain</div>
+				{#if view.skillProvenance.sources.length > 0}
+					<div class="sources">
+						{#each view.skillProvenance.sources as source (source.kind + '-' + source.id)}
+							<div
+								class="source"
+								style:--src={source.accent}
+								data-testid="codex-skill-source-{source.kind}-{source.id}"
+							>
+								<span class="src-kind">{source.label}</span>
+								<span class="src-name">{source.name}</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="empty">{view.skillProvenance.emptyLabel}</div>
+				{/if}
 			</div>
 
 			<div class="section">
@@ -98,6 +124,7 @@
 import type { CodexView } from './codex-view.svelte';
 import { formatBaseDamage, formatCooldown } from './codex-display';
 import StatisticsPanel from './StatisticsPanel.svelte';
+import RarityTagBox from '$components/RarityTagBox.svelte';
 
 interface Props {
 	view: CodexView;
@@ -233,6 +260,39 @@ let { view }: Props = $props();
 .attr {
 	font-size: 12px;
 	color: var(--text-secondary);
+}
+
+.sources {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.source {
+	display: flex;
+	align-items: baseline;
+	gap: 9px;
+	background: var(--panel);
+	border: 1px solid var(--border-subtle);
+	border-left: 2px solid var(--src);
+	border-radius: 5px;
+	padding: 8px 11px;
+}
+
+.src-kind {
+	font-family: var(--mono);
+	font-size: 8.5px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	flex: none;
+}
+
+.src-name {
+	font-size: 12.5px;
+	color: var(--text-primary);
+	flex: 1;
+	min-width: 0;
 }
 
 .effects {

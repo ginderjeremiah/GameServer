@@ -36,6 +36,7 @@ const sampleSkill: ISkill = {
 	effects: [],
 	cooldownMs: 3000,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player
 };
 
@@ -44,7 +45,7 @@ const skillReward = (revealed: boolean): ResolvedReward => ({
 	revealed,
 	rarity: ERarity.Common,
 	accent: 'var(--accent-light)',
-	glow: null,
+	glow: 'var(--rarity-common-glow)',
 	name: 'Firebolt',
 	sub: 'Skill',
 	skill: sampleSkill

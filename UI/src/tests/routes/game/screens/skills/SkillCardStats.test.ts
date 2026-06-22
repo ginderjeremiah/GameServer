@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { ERarity, ESkillAcquisition } from '$lib/api';
+import { ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
 import type { IChallenge, IEnemy, ISkill, IZone } from '$lib/api';
 
 // Engine/stores/api are mocked so constructing a real SkillsView doesn't drag in the game engine.
-// `inventoryManager.equippedSlots` feeds the innate (item-granted) skills the band renders.
+// AttributeChip is stubbed to a marker so chip rendering can be asserted without the icon/tooltip machinery.
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
@@ -46,9 +46,11 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, MAX_SELECTED_SKILLS: 3 };
 });
+vi.mock('$components/AttributeChip.svelte', () => ({ default: ChipStub }));
 
+import ChipStub from './AttributeChipStub.svelte';
 import { SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
-import InnateBand from '$routes/game/screens/skills/InnateBand.svelte';
+import SkillCardStats from '$routes/game/screens/skills/SkillCardStats.svelte';
 
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
@@ -56,71 +58,76 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
-	cooldownMs: 1000,
+	cooldownMs: 2000,
 	iconPath: '',
 	rarityId: ERarity.Common,
-	acquisition: ESkillAcquisition.Item,
+	acquisition: ESkillAcquisition.Player,
 	...over
 });
 
-const SKILLS: ISkill[] = [
-	skill({ id: 0, name: 'Alpha' }),
-	skill({ id: 1, name: 'Bravo' }),
-	skill({ id: 2, name: 'Charlie' }),
-	skill({ id: 3, name: 'Cleave' })
-];
-
 let view: SkillsView;
 
-const cards = (container: HTMLElement) =>
-	Array.from(container.querySelectorAll<HTMLElement>('[data-testid="innate-card"]'));
+const setSkills = (skills: ISkill[]) => {
+	staticData.skills = skills;
+	mockPlayerManager.unlockedSkills = skills.map((s, i) => ({ skillId: s.id, selected: false, order: i }));
+	view = new SkillsView();
+};
+
+/** Narrows the optional metric to a non-undefined value (failing the test loudly otherwise). */
+const metricOf = (id: number) => {
+	const metrics = view.metric(id);
+	if (!metrics) {
+		throw new Error(`expected metrics for skill ${id}`);
+	}
+	return metrics;
+};
 
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
-	staticData.skills = SKILLS;
-	// ids 0–2 equipped (the loadout), id 3 unlocked-but-unequipped.
-	mockPlayerManager.unlockedSkills = [
-		{ skillId: 0, selected: true, order: 0 },
-		{ skillId: 1, selected: true, order: 1 },
-		{ skillId: 2, selected: true, order: 2 },
-		{ skillId: 3, selected: false, order: 0 }
-	];
 	mockPlayerManager.attributes = [];
 	mockInventoryManager.equipmentStats = [];
 	mockInventoryManager.equippedSlots = [];
-	view = new SkillsView();
 });
 
 afterEach(cleanup);
 
-describe('InnateBand', () => {
-	it('renders nothing when no equipped item grants a skill', () => {
-		const { container } = render(InnateBand, { props: { view } });
-		expect(cards(container)).toHaveLength(0);
+describe('SkillCardStats', () => {
+	it('renders the dmg / cd / dps stat rows from the live view', () => {
+		setSkills([skill({ id: 0, baseDamage: 10, cooldownMs: 2000 })]);
+		const metrics = metricOf(0);
+
+		const { container } = render(SkillCardStats, { props: { view, metrics } });
+		const keys = Array.from(container.querySelectorAll('.stat .k')).map((k) => k.textContent);
+		expect(keys).toEqual(['dmg', 'cd', 'dps']);
+
+		const values = Array.from(container.querySelectorAll('.stat .v')).map((v) => v.textContent);
+		// dmg = 10 (no defense), cd = 2.0s, dps = 10 / 2 = 5.
+		expect(values[0]).toBe('10');
+		expect(values[1]).toBe('2.0s');
+		expect(values[2]).toBe('5');
 	});
 
-	it('renders a read-only card per granting item, labelled with its source skill and item', () => {
-		mockInventoryManager.equippedSlots = [{ name: 'Staff of Embers', grantedSkillId: 3 }];
-		view = new SkillsView();
+	it('renders one chip per damage multiplier', () => {
+		setSkills([
+			skill({
+				id: 0,
+				damageMultipliers: [
+					{ attributeId: EAttribute.Endurance, multiplier: 2 },
+					{ attributeId: EAttribute.Intellect, multiplier: 3 }
+				]
+			})
+		]);
+		const metrics = metricOf(0);
 
-		const { container } = render(InnateBand, { props: { view } });
-		const card = cards(container)[0];
-		expect(card).toBeTruthy();
-		expect(card.textContent).toContain('Cleave');
-		expect(card.textContent).toContain('Staff of Embers');
-		// Read-only: no remove/reorder controls (unlike the editable EquippedBand).
-		expect(card.querySelector('.rm')).toBeNull();
-		expect(card.querySelector('.reorder')).toBeNull();
+		const { container } = render(SkillCardStats, { props: { view, metrics } });
+		expect(container.querySelectorAll('[data-testid="attr-chip"]')).toHaveLength(2);
 	});
 
-	it('surfaces a grant that duplicates a selected skill as already in the loadout', () => {
-		// Skill 0 (Alpha) is in the equipped loadout, so an item granting it is a duplicate.
-		mockInventoryManager.equippedSlots = [{ name: 'Echo Blade', grantedSkillId: 0 }];
-		view = new SkillsView();
+	it('renders no chips when the skill has no damage multipliers', () => {
+		setSkills([skill({ id: 0, damageMultipliers: [] })]);
+		const metrics = metricOf(0);
 
-		const { container } = render(InnateBand, { props: { view } });
-		const card = cards(container)[0];
-		expect(card.classList.contains('dupe')).toBe(true);
-		expect(card.textContent?.toLowerCase()).toContain('already in your loadout');
+		const { container } = render(SkillCardStats, { props: { view, metrics } });
+		expect(container.querySelectorAll('[data-testid="attr-chip"]')).toHaveLength(0);
 	});
 });

@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, EChallengeType, EEntityType, EModifierType, ESkillEffectTarget, EStatisticType } from '$lib/api';
+import {
+	EAttribute,
+	EChallengeType,
+	EEntityType,
+	EModifierType,
+	ERarity,
+	ESkillAcquisition,
+	ESkillEffectTarget,
+	EStatisticType
+} from '$lib/api';
 import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 
 // Codex fetches the player's statistics + challenges over the socket and resolves reference data
@@ -77,6 +86,7 @@ function seedStaticData(): void {
 			description: 'A wide sweeping strike.',
 			baseDamage: 14,
 			cooldownMs: 1800,
+			acquisition: ESkillAcquisition.Player,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
 			effects: []
 		},
@@ -108,9 +118,12 @@ function seedStaticData(): void {
 			challengeTypeId: EChallengeType.EnemiesKilled,
 			entityType: EEntityType.Enemy,
 			targetEntityId: 0,
-			progressGoal: 100
+			progressGoal: 100,
+			rewardSkillId: 0
 		}
 	];
+	// War Cry (skill 1) is granted by a Rare staff — the Item acquisition channel.
+	staticData.items = [{ id: 0, name: 'Ember Staff', rarityId: ERarity.Rare, grantedSkillId: 1 }];
 	staticData.challengeTypes = [{ id: EChallengeType.EnemiesKilled, goalComparison: 1, name: 'Enemies Killed' }];
 	staticData.statisticTypes = SERVER_STAT_TYPES;
 	staticData.attributes = [
@@ -275,6 +288,18 @@ describe('Codex screen', () => {
 		// Cleave (head of the table) has recorded damage → its "Your record" section renders.
 		expect(await screen.findByTestId('codex-skill-stats')).toBeTruthy();
 		expect(screen.getByText('Damage Dealt')).toBeTruthy();
+	});
+
+	it('shows how a skill is obtained in its dossier (challenge reward, then item grant)', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
+		// Cleave (head of the table) is rewarded by a challenge.
+		const cleaveDossier = screen.getByTestId('codex-skill-dossier');
+		expect(cleaveDossier.textContent).toContain('How to obtain');
+		expect(screen.getByTestId('codex-skill-source-challenge-0').textContent).toContain('Cull the Skitterers');
+		// War Cry is granted by the Ember Staff item.
+		await fireEvent.click(screen.getByTestId('codex-skill-1'));
+		expect(screen.getByTestId('codex-skill-source-item-0').textContent).toContain('Ember Staff');
 	});
 
 	it('shows a skill’s authored effects in its dossier', async () => {

@@ -245,6 +245,7 @@ namespace Game.Core.Tests.Battle
                 Id = 1,
                 Name = "Buff Strike",
                 Description = "",
+                Rarity = ERarity.Common,
                 CooldownMs = 40,
                 BaseDamage = 0,
                 DamageMultipliers =

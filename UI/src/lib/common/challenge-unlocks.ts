@@ -13,11 +13,11 @@ import { rarityColor, rarityLabel } from './rarity';
 interface UnlockRewardBase {
 	/** The reward's real name. Callers mask it themselves (e.g. `???`) while the challenge is sealed. */
 	name: string;
-	/** Themeable accent: the rarity hue for items/mods, a neutral skill accent for skills. */
+	/** Themeable rarity hue for the reward (items, mods, and skills all carry a rarity tier). */
 	accent: string;
-	/** Teaser sub-label, e.g. `Rare · Helm`, `Epic · Prefix`, or `Skill`. */
+	/** Teaser sub-label, e.g. `Rare · Helm`, `Epic · Prefix`, or `Legendary · Skill`. */
 	sub: string;
-	/** Rarity tier (drives the rarity sort/glow on richer surfaces). Skills carry none, so they resolve to `Common`. */
+	/** Rarity tier (drives the rarity sort/glow on richer surfaces). */
 	rarity: ERarity;
 }
 
@@ -98,10 +98,9 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 				kind: 'skill',
 				skill,
 				name: skill.name,
-				accent: 'var(--accent-light)',
-				sub: 'Skill',
-				// Skills carry no rarity tier; resolve to the lowest so they sort with Common.
-				rarity: ERarity.Common
+				accent: rarityColor(skill.rarityId),
+				sub: `${rarityLabel(skill.rarityId)} · Skill`,
+				rarity: skill.rarityId
 			};
 		}
 	}

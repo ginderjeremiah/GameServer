@@ -205,6 +205,77 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public async Task SaveSkills_AddAndEdit_PersistsRarity()
+        {
+            // Add a new skill authored as Legendary — its rarity persists on insert.
+            using (var addScope = CreateScope())
+            {
+                var admin = addScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                var result = admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewSkill("Rarity Skill", ERarity.Legendary),
+                    },
+                ]);
+                Assert.True(result.Succeeded);
+                await addScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            int skillId;
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await context.Skills.SingleAsync(s => s.Name == "Rarity Skill", CancellationToken);
+                Assert.Equal((int)ERarity.Legendary, skill.RarityId);
+                skillId = skill.Id;
+            }
+            // The edit's existence guard reads the cache, so refresh it before re-tiering the new skill.
+            await ReloadReferenceCachesAsync();
+
+            // Re-tiering to Mythic persists on edit.
+            using (var editScope = CreateScope())
+            {
+                var admin = editScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                var result = admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Edit,
+                        Item = NewSkill("Rarity Skill", ERarity.Mythic, id: skillId),
+                    },
+                ]);
+                Assert.True(result.Succeeded);
+                await editScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await context.Skills.SingleAsync(s => s.Id == skillId, CancellationToken);
+                Assert.Equal((int)ERarity.Mythic, skill.RarityId);
+            }
+        }
+
+        private static Contracts.Skill NewSkill(string name, ERarity rarity, int id = 0)
+        {
+            return new Contracts.Skill
+            {
+                Id = id,
+                Name = name,
+                BaseDamage = 5m,
+                Description = "",
+                CooldownMs = 1000,
+                IconPath = "",
+                RarityId = rarity,
+                Acquisition = ESkillAcquisition.Player,
+                DamageMultipliers = [],
+                Effects = [],
+            };
+        }
+
         private static async Task<Entities.SkillEffect> SeedEffectAsync(
             GameContext context, int skillId, EAttribute attribute, decimal amount)
         {

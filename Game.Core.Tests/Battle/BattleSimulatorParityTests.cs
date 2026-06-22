@@ -357,20 +357,36 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
-                // Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond is applied and
-                // death checked BEFORE HealthRegenPerSecond. The player carries a constant 250 DamageTakenPerSecond
-                // (10/tick) and 150 HealthRegenPerSecond (6/tick) — a net −4 grinding its 50 HP down. On the tick
-                // the 10 DoT takes HP from 10 to 0 the player dies — the 6 heal that would have saved it
-                // (10+6−10=6) never runs because death is checked first. Death at tick 11 → 440ms. (Healing first
-                // would let the player survive past here.)
-                ["dotBeforeRegenSameTickKills"] = new ParityScenario(
+                // Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond then
+                // HealthRegenPerSecond apply BEFORE its death check, so the heal can offset a lethal DoT tick
+                // (#1090). The player carries a constant 250 DamageTakenPerSecond (10/tick) and 150
+                // HealthRegenPerSecond (6/tick) — a net −4 grinding its 50 HP down. Each tick the 6 heal applies
+                // after the 10 DoT and is checked together, so the player only dies once the net drain crosses 0:
+                // 50/4 = 12.5 → death at tick 13 → 520ms. (Checking death before the heal would have killed it at
+                // tick 11/440ms; see regenSavesFromLethalDot for a net-zero drain the heal fully survives.)
+                ["dotRegenNetNegativeKillsAfterHeal"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0, skills: [],
                         extra: [(EAttribute.DamageTakenPerSecond, 250), (EAttribute.HealthRegenPerSecond, 150)]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: true,
-                    ExpectedTotalMs: 440),
+                    ExpectedTotalMs: 520),
+
+                // Heal-over-time saves the battler from an otherwise-lethal DoT tick (#1090). The player carries
+                // a constant 1500 DamageTakenPerSecond (60/tick) — more than its whole 50 HP — and an equal 1500
+                // HealthRegenPerSecond (60/tick). Each tick the 60 DoT drives HP to −10 but the same-tick 60 heal
+                // (applied before the death check, capped at MaxHealth) restores it to 50, so the player never
+                // dies; dealing no damage back, the battle runs to the timeout. (Checking death before the heal
+                // would have killed it on tick 1.)
+                ["regenSavesFromLethalDot"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.DamageTakenPerSecond, 1500), (EAttribute.HealthRegenPerSecond, 1500)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
                 // DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to
                 // 0, but its constant 250 DamageTakenPerSecond (base poison) → 10/tick ignores Defense and grinds
@@ -791,6 +807,7 @@ namespace Game.Core.Tests.Battle
                 Id = id,
                 Name = $"Skill {id}",
                 Description = "",
+                Rarity = ERarity.Common,
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
                 DamageMultipliers = mult is null
