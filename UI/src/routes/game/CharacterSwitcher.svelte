@@ -7,16 +7,10 @@
 
 	The game keeps running while the overlay is open, so cancelling is instant and lossless; only committing
 	to a switch tears anything down. -->
-<div
-	class="switcher-backdrop"
-	role="dialog"
-	aria-modal="true"
-	aria-label="Switch character"
-	data-testid="character-switcher"
-	tabindex="-1"
-	onkeydown={(e) => e.key === 'Escape' && onClose()}
->
-	<div class="switcher-panel">
+<!-- The overlay chrome (backdrop, Escape dismissal, focus trap, focus capture+restore, scroll lock) is
+	owned by the shared `Popover` primitive per docs/frontend.md; this component supplies only the content. -->
+<Popover {open} {onClose} label="Switch character" closeLabel="Cancel">
+	<div class="switcher-panel" data-testid="character-switcher">
 		{#if phase === 'loading'}
 			<div class="status-state" data-testid="switcher-loading">Loading characters…</div>
 			<button type="button" class="cancel" onclick={onClose}>Cancel</button>
@@ -42,22 +36,24 @@
 			</PlayerSelectPanel>
 		{/if}
 	</div>
-</div>
+</Popover>
 
 <script lang="ts">
-import { onMount } from 'svelte';
 import { ApiRequest, apiSocket, getRefreshToken, setTokens } from '$lib/api';
 import { playerManager, stopEngines } from '$lib/engine';
+import Popover from '$components/Popover.svelte';
 import { confirmSessionTakeover } from '../login/session-takeover';
 import PlayerSelectPanel from '../select/PlayerSelectPanel.svelte';
 import { PlayerSelectView, type PlayerSelectDeps } from '../select/player-select-view.svelte';
 
 interface Props {
+	/** Whether the switcher overlay is shown. The character list (re)loads each time it opens. */
+	open: boolean;
 	/** Closes the overlay, leaving the running game untouched. */
 	onClose: () => void;
 }
 
-let { onClose }: Props = $props();
+let { open, onClose }: Props = $props();
 
 type Phase = 'loading' | 'error' | 'ready';
 let phase = $state<Phase>('loading');
@@ -108,7 +104,11 @@ const reloadToBoot = () => {
 };
 const enterWorld = reloadToBoot;
 
-onMount(async () => {
+const loadCharacters = async () => {
+	phase = 'loading';
+	loadError = null;
+	view = null;
+
 	const response = await new ApiRequest('Login/Players').get();
 	if (response.status !== 200 || !response.data) {
 		loadError = response.error ?? 'Could not load your characters.';
@@ -123,22 +123,17 @@ onMount(async () => {
 		others
 	);
 	phase = 'ready';
+};
+
+// Load (fresh) whenever the overlay opens; while closed the Popover renders nothing and no fetch runs.
+$effect(() => {
+	if (open) {
+		void loadCharacters();
+	}
 });
 </script>
 
 <style lang="scss">
-.switcher-backdrop {
-	position: fixed;
-	inset: 0;
-	z-index: 50;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 40px;
-	background: color-mix(in srgb, var(--black) 62%, transparent);
-	backdrop-filter: blur(3px);
-}
-
 .switcher-panel {
 	width: 400px;
 	max-width: 100%;
