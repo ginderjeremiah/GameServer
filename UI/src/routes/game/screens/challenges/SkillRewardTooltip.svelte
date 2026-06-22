@@ -2,7 +2,7 @@
 	chrome. Unlike the battle `SkillTooltip` it needs no `Battler`/owner context (there is no live
 	fight when inspecting a challenge reward), so it reads the authored `ISkill` directly. The same
 	component serves the sealed teaser (`masked`): redacted rows that keep their counts truthful. -->
-<TooltipShell accent={masked ? ACCENT : 'var(--accent)'} glow={!masked}>
+<TooltipShell accent={rarityAccent} glow={!masked}>
 	{#snippet header()}
 		<TooltipTitle
 			label="Skill"
@@ -10,7 +10,7 @@
 			diamondColor="var(--accent)"
 			labelColor="var(--accent)"
 			{masked}
-			sealedAccent={ACCENT}
+			sealedAccent={rarityAccent}
 		/>
 	{/snippet}
 
@@ -20,7 +20,7 @@
 				<TooltipStatsGrid
 					masked
 					maskedRows={skill.damageMultipliers.length}
-					accent={ACCENT}
+					accent={rarityAccent}
 					barWidths={SCALING_BAR_WIDTHS}
 				/>
 			</TooltipSection>
@@ -28,12 +28,17 @@
 
 		{#if skill.effects.length}
 			<TooltipSection label="On hit">
-				<TooltipStatsGrid masked maskedRows={skill.effects.length} accent={ACCENT} barWidths={EFFECT_BAR_WIDTHS} />
+				<TooltipStatsGrid
+					masked
+					maskedRows={skill.effects.length}
+					accent={rarityAccent}
+					barWidths={EFFECT_BAR_WIDTHS}
+				/>
 			</TooltipSection>
 		{/if}
 
 		<TooltipSection label="Description" last>
-			<TooltipDescription masked accent={ACCENT} lineWidths={DESC_LINE_WIDTHS} />
+			<TooltipDescription masked accent={rarityAccent} lineWidths={DESC_LINE_WIDTHS} />
 		</TooltipSection>
 	{:else}
 		<TooltipSection label="Damage">
@@ -84,7 +89,8 @@ import {
 	attributeName,
 	describeEffect,
 	effectDirectionColor,
-	formatNum
+	formatNum,
+	rarityColor
 } from '$lib/common';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -101,8 +107,10 @@ interface Props {
 
 const { skill, masked = false }: Props = $props();
 
-// Skills have no rarity tier, so the teaser uses the neutral skill accent throughout.
-const ACCENT = 'var(--accent-light)';
+// The tooltip's main accent (left border) and sealed teaser reflect the skill's rarity tier, mirroring
+// the item/mod reward tooltips; the diamond/label keep the neutral skill accent (skills have no
+// secondary type classifier like an item category).
+const rarityAccent = $derived(rarityColor(skill.rarityId));
 
 const scaling = $derived(
 	skill.damageMultipliers.map((m) => ({

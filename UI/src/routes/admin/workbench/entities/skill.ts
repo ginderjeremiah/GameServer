@@ -2,6 +2,7 @@ import {
 	ApiRequest,
 	EAttribute,
 	EModifierType,
+	ERarity,
 	ESkillAcquisition,
 	ESkillEffectTarget,
 	fetchSocketData,
@@ -32,12 +33,15 @@ export const skillEntity: EntityConfig<ISkill> = {
 		baseDamage: 10,
 		cooldownMs: 2000,
 		iconPath: '',
+		rarityId: ERarity.Common,
 		// New skills default to player-acquirable; re-flag Item/Enemy skills as needed.
 		acquisition: ESkillAcquisition.Player,
 		description: '',
 		damageMultipliers: [],
 		effects: []
 	}),
+	listBadge: (s) => reference.rarityName(s.rarityId),
+	badgeColor: (s) => reference.rarityColor(s.rarityId),
 	meta: (s) => [
 		['dmg', s.baseDamage],
 		['×mult', s.damageMultipliers.length],
@@ -63,6 +67,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 				},
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
+				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
 				{
 					key: 'acquisition',

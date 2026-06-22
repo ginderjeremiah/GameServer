@@ -70,7 +70,8 @@ namespace Game.TestInfrastructure.Helpers
             string name = "Attack",
             decimal baseDamage = 10m,
             int cooldownMs = 1000,
-            ESkillAcquisition acquisition = ESkillAcquisition.Player)
+            ESkillAcquisition acquisition = ESkillAcquisition.Player,
+            ERarity rarity = ERarity.Common)
         {
             var skill = new Skill
             {
@@ -79,6 +80,7 @@ namespace Game.TestInfrastructure.Helpers
                 BaseDamage = baseDamage,
                 CooldownMs = cooldownMs,
                 IconPath = "",
+                RarityId = (int)rarity,
                 Acquisition = (int)acquisition,
             };
 

@@ -975,6 +975,7 @@ namespace Game.Core.Tests.Players
             Name = $"Skill {id}",
             BaseDamage = 10,
             Description = string.Empty,
+            Rarity = ERarity.Common,
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

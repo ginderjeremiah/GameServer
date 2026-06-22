@@ -1,4 +1,4 @@
-<TooltipShell accent="var(--accent)" glow hidden={!skill} bind:base={container}>
+<TooltipShell accent={rarityAccent} glow hidden={!skill} bind:base={container}>
 	{#snippet header()}
 		<TooltipTitle label="Skill" name={skill?.name ?? ''} diamondColor="var(--accent)" labelColor="var(--accent)">
 			{#snippet trailing()}
@@ -31,7 +31,7 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, expectedCritMultiplier, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
-import { attributeIsHarmful, attributeName, describeEffect, formatAttributeValue } from '$lib/common';
+import { attributeIsHarmful, attributeName, describeEffect, formatAttributeValue, rarityColor } from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -55,6 +55,9 @@ const { skill }: Props = $props();
 let container = $state<HTMLDivElement>();
 
 const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) : undefined);
+
+// The skill's rarity tier tints the tooltip accent (display only — the battle never reads rarity).
+const rarityAccent = $derived(skill ? rarityColor(skill.rarityId) : 'var(--accent)');
 
 const baseDamage = $derived(skill?.baseDamage ?? 0);
 const multipliers = $derived(

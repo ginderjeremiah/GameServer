@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { ESkillAcquisition } from '$lib/api';
+import { ERarity, ESkillAcquisition } from '$lib/api';
 import type { IChallenge, IEnemy, ISkill, IZone } from '$lib/api';
 
 // Engine/stores/api are mocked so constructing a real SkillsView doesn't drag in the game engine.
@@ -64,6 +64,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	description: '',
 	cooldownMs: 1000,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

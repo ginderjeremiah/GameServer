@@ -837,6 +837,7 @@ namespace Game.Api.Tests.Integration
                         CooldownMs = 1500,
                         Description = "Updated",
                         IconPath = "skills/new.png",
+                        RarityId = (int)ERarity.Common,
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -878,6 +879,7 @@ namespace Game.Api.Tests.Integration
                         CooldownMs = 1000,
                         Description = "Should never be saved",
                         IconPath = "skills/ghost.png",
+                        RarityId = (int)ERarity.Common,
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -893,6 +895,7 @@ namespace Game.Api.Tests.Integration
                         CooldownMs = 1000,
                         Description = "x",
                         IconPath = "skills/phantom.png",
+                        RarityId = (int)ERarity.Common,
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },

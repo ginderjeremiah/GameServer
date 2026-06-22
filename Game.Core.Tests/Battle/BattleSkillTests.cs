@@ -235,6 +235,7 @@ namespace Game.Core.Tests.Battle
             Id = 1,
             Name = "Test Skill",
             Description = string.Empty,
+            Rarity = ERarity.Common,
             CooldownMs = cooldownMs,
             BaseDamage = baseDamage,
             DamageMultipliers = multipliers ?? [],

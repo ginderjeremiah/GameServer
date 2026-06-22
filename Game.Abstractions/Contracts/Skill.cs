@@ -13,6 +13,7 @@ namespace Game.Abstractions.Contracts
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
+        public ERarity RarityId { get; set; }
 
         /// <summary>The channels allowed to grant this skill (authoring intent; see <see cref="ESkillAcquisition"/>).</summary>
         public ESkillAcquisition Acquisition { get; set; }

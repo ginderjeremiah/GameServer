@@ -1,15 +1,20 @@
-<!-- The skill dossier (right panel): an intellect-accented header (Skill + name + description), base
-     damage / cooldown meta, how to obtain the skill (challenge rewards / item grants, or the
-     enemy-only / not-obtainable wording), the attributes the skill scales with, its authored effects
-     (wording from the shared skill-effect-display helper), and the enemies that use it. The "used by"
-     pills cross-link into the enemy dossier. A reference card only — no equip/loadout, no player DPS. -->
+<!-- The skill dossier (right panel): the header carries a rarity-tinted accent border + tier tag
+     alongside the intellect "Skill" kind mark (mirroring items: rarity on the border, kind on the
+     label), base damage / cooldown meta, how to obtain the skill (challenge rewards / item grants, or
+     the enemy-only / not-obtainable wording), the attributes the skill scales with, its authored
+     effects (wording from the shared skill-effect-display helper), and the enemies that use it. The
+     "used by" pills cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
 {#if view.selectedSkill}
 	{@const skill = view.selectedSkill}
+	{@const rarity = view.selectedSkillRarity}
 	<div class="dossier" data-testid="codex-skill-dossier">
-		<div class="head">
+		<div class="head" style:border-left-color={rarity?.color}>
 			<div class="kind-line">
 				<span class="kind-dot"></span>
 				<span class="kind">Skill</span>
+				{#if rarity}
+					<RarityTagBox color={rarity.color} label={rarity.label} />
+				{/if}
 			</div>
 			<div class="name">{skill.name}</div>
 			{#if skill.description}
@@ -119,6 +124,7 @@
 import type { CodexView } from './codex-view.svelte';
 import { formatBaseDamage, formatCooldown } from './codex-display';
 import StatisticsPanel from './StatisticsPanel.svelte';
+import RarityTagBox from '$components/RarityTagBox.svelte';
 
 interface Props {
 	view: CodexView;
