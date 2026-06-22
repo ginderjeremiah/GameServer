@@ -108,20 +108,20 @@ namespace Game.Application.Tests.Mapping
             int? seedSkillId = null,
             List<Entities.ProficiencyLevelModifier>? modifiers = null,
             List<Entities.ProficiencyLevelReward>? rewards = null) => new()
-        {
-            Id = 0,
-            Name = "Blades",
-            Description = "A blade discipline.",
-            IconPath = "blades.png",
-            MaxLevel = 10,
-            BaseXp = 100m,
-            XpGrowth = 1.5m,
-            StartsUnlocked = true,
-            SeedSkillId = seedSkillId,
-            LevelModifiers = modifiers ?? [],
-            LevelRewards = rewards ?? [],
-            Prerequisites = [],
-            SkillContributions = [],
-        };
+            {
+                Id = 0,
+                Name = "Blades",
+                Description = "A blade discipline.",
+                IconPath = "blades.png",
+                MaxLevel = 10,
+                BaseXp = 100m,
+                XpGrowth = 1.5m,
+                StartsUnlocked = true,
+                SeedSkillId = seedSkillId,
+                LevelModifiers = modifiers ?? [],
+                LevelRewards = rewards ?? [],
+                Prerequisites = [],
+                SkillContributions = [],
+            };
     }
 }
