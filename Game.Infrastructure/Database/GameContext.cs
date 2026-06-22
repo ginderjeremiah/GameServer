@@ -443,9 +443,8 @@ namespace Game.Infrastructure.Database
                 entity.HasKey(ui => new { ui.PlayerId, ui.ItemId });
 
                 // One item per equipment slot, enforced at the DB level so two concurrent equips into the same
-                // slot can't both succeed — the load-clear-save in ItemEquippedHandler isn't atomic across
-                // instances. The partial filter lets the many unequipped (null-slot) rows coexist, and declaring
-                // the index lets EF order the clear of a slot's prior occupant before the new occupant takes it.
+                // slot can't both succeed — ItemEquippedHandler's clear-then-write isn't atomic across instances.
+                // The partial filter lets the many unequipped (null-slot) rows coexist.
                 entity.HasIndex(ui => new { ui.PlayerId, ui.EquipmentSlotId })
                     .IsUnique()
                     .HasFilter("\"EquipmentSlotId\" IS NOT NULL");
