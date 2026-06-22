@@ -1,4 +1,5 @@
 using Game.Core.Events;
+using System.Collections.ObjectModel;
 
 namespace Game.Core
 {
@@ -11,10 +12,19 @@ namespace Game.Core
     {
         private readonly List<IDomainEvent> _domainEvents = [];
 
+        // A ReadOnlyCollection is a live view over the backing list, so the wrapper is built once and reused
+        // rather than re-allocated on every get — the dispatcher reads Count then ToArray per drain iteration.
+        private readonly ReadOnlyCollection<IDomainEvent> _domainEventsView;
+
+        protected AggregateRoot()
+        {
+            _domainEventsView = _domainEvents.AsReadOnly();
+        }
+
         /// <summary>
         /// Domain events raised during the current operation.
         /// </summary>
-        public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+        public IReadOnlyList<IDomainEvent> DomainEvents => _domainEventsView;
 
         /// <summary>
         /// Records a domain event to be dispatched by the application layer.

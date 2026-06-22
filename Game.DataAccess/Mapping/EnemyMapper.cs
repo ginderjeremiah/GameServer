@@ -59,10 +59,11 @@ namespace Game.DataAccess.Mapping
                     }).ToList(),
                 // The cached skill list is the zero-based, contiguous-id reference set (docs/backend.md
                 // → Reference Data), so a skill resolves by direct index instead of a per-call dictionary.
-                // The bounds check skips a malformed out-of-range ref, matching the prior skip-if-missing
-                // behaviour (a persisted EnemySkill.SkillId is FK-guaranteed in range, so it is defensive).
+                // A persisted EnemySkill.SkillId is FK-guaranteed in range against the contiguity-asserted
+                // skill set, so the index always resolves; an out-of-range id would be content-data
+                // corruption and throws loudly here rather than silently dropping the skill (the loud-fail
+                // policy the player-load path enforces, vs. the prior skip-if-missing filter).
                 AvailableSkills = entity.EnemySkills
-                    .Where(es => es.SkillId >= 0 && es.SkillId < allSkills.Count)
                     .Select(es => SkillMapper.ToCore(allSkills[es.SkillId]))
                     .ToList(),
             };
