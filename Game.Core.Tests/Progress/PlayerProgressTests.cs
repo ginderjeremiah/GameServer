@@ -775,18 +775,109 @@ namespace Game.Core.Tests.Progress
             Assert.DoesNotContain(1, progress.DirtyChallenges.Select(c => c.Challenge.Id));
         }
 
+        // ── Proficiencies (level/XP progress + dirty tracking) ───────────────
+
+        [Fact]
+        public void TryGetProficiency_UntrackedProficiency_ReturnsFalse()
+        {
+            var progress = MakeProgress();
+
+            Assert.False(progress.TryGetProficiency(3, out var proficiency));
+            Assert.Null(proficiency);
+        }
+
+        [Fact]
+        public void TryGetProficiency_TrackedProficiency_ReturnsTrueAndRow()
+        {
+            var progress = MakeProgress(proficiencies: [Prof(proficiencyId: 3, level: 2, xp: 150m)]);
+
+            Assert.True(progress.TryGetProficiency(3, out var proficiency));
+            Assert.NotNull(proficiency);
+            Assert.Equal(2, proficiency.Level);
+            Assert.Equal(150m, proficiency.Xp);
+        }
+
+        [Fact]
+        public void DirtyProficiencies_OnFreshlyLoadedProgress_IsEmpty()
+        {
+            // Proficiencies supplied at construction (a cache/DB load) are not dirty — only mutations are.
+            var progress = MakeProgress(proficiencies: [Prof(proficiencyId: 3, level: 2, xp: 150m)]);
+
+            Assert.Empty(progress.DirtyProficiencies);
+        }
+
+        [Fact]
+        public void TryGetProficiency_DoesNotMarkDirty()
+        {
+            var progress = MakeProgress(proficiencies: [Prof(proficiencyId: 3, level: 2, xp: 150m)]);
+
+            progress.TryGetProficiency(3, out _);
+
+            // A read must never enter the persist set.
+            Assert.Empty(progress.DirtyProficiencies);
+        }
+
+        [Fact]
+        public void SetProficiencyProgress_NewProficiency_AddsRowAndMarksDirty()
+        {
+            var progress = MakeProgress();
+
+            progress.SetProficiencyProgress(proficiencyId: 3, level: 1, xp: 40m);
+
+            var proficiency = Assert.Single(progress.Proficiencies);
+            Assert.Equal(3, proficiency.ProficiencyId);
+            Assert.Equal(1, proficiency.Level);
+            Assert.Equal(40m, proficiency.Xp);
+            var dirty = Assert.Single(progress.DirtyProficiencies);
+            Assert.Equal(3, dirty.ProficiencyId);
+        }
+
+        [Fact]
+        public void SetProficiencyProgress_ExistingProficiency_UpdatesInPlaceAndMarksDirty()
+        {
+            var progress = MakeProgress(proficiencies: [Prof(proficiencyId: 3, level: 1, xp: 40m)]);
+
+            progress.SetProficiencyProgress(proficiencyId: 3, level: 2, xp: 130m);
+
+            // The existing row is updated in place (no duplicate) and enters the persist set.
+            var proficiency = Assert.Single(progress.Proficiencies);
+            Assert.Equal(2, proficiency.Level);
+            Assert.Equal(130m, proficiency.Xp);
+            Assert.Equal(3, Assert.Single(progress.DirtyProficiencies).ProficiencyId);
+        }
+
+        [Fact]
+        public void SetProficiencyProgress_MarksOnlyTheTouchedProficiencyDirty()
+        {
+            var progress = MakeProgress(proficiencies:
+            [
+                Prof(proficiencyId: 3, level: 1, xp: 40m),
+                Prof(proficiencyId: 4, level: 0, xp: 10m),
+            ]);
+
+            progress.SetProficiencyProgress(proficiencyId: 3, level: 2, xp: 130m);
+
+            // Only the mutated proficiency is dirty; the untouched one stays out of the persist set.
+            Assert.Contains(progress.DirtyProficiencies, p => p.ProficiencyId == 3);
+            Assert.DoesNotContain(progress.DirtyProficiencies, p => p.ProficiencyId == 4);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static PlayerProgress MakeProgress(
             Player? player = null,
             IEnumerable<PlayerStatistic>? statistics = null,
-            IEnumerable<PlayerChallenge>? challenges = null)
+            IEnumerable<PlayerChallenge>? challenges = null,
+            IEnumerable<PlayerProficiency>? proficiencies = null)
         {
-            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? []);
+            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? [], proficiencies ?? []);
         }
 
         private static PlayerStatistic Stat(EStatisticType type, int? entityId, decimal value) =>
             new() { Type = type, EntityId = entityId, Value = value };
+
+        private static PlayerProficiency Prof(int proficiencyId, int level, decimal xp) =>
+            new() { ProficiencyId = proficiencyId, Level = level, Xp = xp };
 
         private static Challenge MakeChallenge(
             int id,

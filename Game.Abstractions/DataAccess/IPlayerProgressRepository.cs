@@ -19,6 +19,12 @@ namespace Game.Abstractions.DataAccess
         Task<List<PlayerChallenge>> GetChallenges(int playerId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Returns the player's proficiency progress (level + XP per proficiency) as domain models for
+        /// read-only consumers.
+        /// </summary>
+        Task<List<PlayerProficiency>> GetProficiencies(int playerId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Returns the ids of the challenges the player has completed. A lean read for gating checks (e.g.
         /// zone-unlock enforcement) that only need completion, not full progress.
         /// </summary>

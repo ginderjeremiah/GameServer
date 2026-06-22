@@ -99,6 +99,36 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 }
             }
 
+            if (evt.Proficiencies.Count > 0)
+            {
+                var proficiencyIds = evt.Proficiencies.Select(p => p.ProficiencyId).ToList();
+                var existing = await context.PlayerProficiencies
+                    .Where(pp => pp.PlayerId == evt.PlayerId && proficiencyIds.Contains(pp.ProficiencyId))
+                    .ToListAsync();
+                // Same defensive grouping as the challenge lookup above: the (player, proficiency) primary key
+                // makes a duplicate impossible, but ToFirstByKey keeps a stray duplicate from poisoning it.
+                var byId = existing.ToFirstByKey(pp => pp.ProficiencyId);
+
+                foreach (var proficiency in evt.Proficiencies)
+                {
+                    if (byId.TryGetValue(proficiency.ProficiencyId, out var row))
+                    {
+                        row.Level = proficiency.Level;
+                        row.Xp = proficiency.Xp;
+                    }
+                    else
+                    {
+                        context.PlayerProficiencies.Add(new PlayerProficiency
+                        {
+                            PlayerId = evt.PlayerId,
+                            ProficiencyId = proficiency.ProficiencyId,
+                            Level = proficiency.Level,
+                            Xp = proficiency.Xp,
+                        });
+                    }
+                }
+            }
+
             await context.SaveChangesAsync();
         }
     }

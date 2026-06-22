@@ -43,6 +43,12 @@ export interface IPlayerChallenge {
 	completedAt?: string;
 }
 
+export interface IPlayerProficiency {
+	proficiencyId: number;
+	level: number;
+	xp: number;
+}
+
 export interface IPlayerStatistic {
 	statisticTypeId: EStatisticType;
 	entityId?: number;

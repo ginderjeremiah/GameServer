@@ -102,6 +102,6 @@ namespace Game.Core.Tests.Progress
         };
 
         private static PlayerProgress MakeProgress(Player? player = null, IEnumerable<PlayerStatistic>? statistics = null) =>
-            new(player ?? new PlayerBuilder().Build(), statistics ?? [], []);
+            new(player ?? new PlayerBuilder().Build(), statistics ?? [], [], []);
     }
 }

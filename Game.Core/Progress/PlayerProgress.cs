@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Players;
@@ -8,16 +9,19 @@ namespace Game.Core.Progress
     {
         private readonly Dictionary<(EStatisticType Type, int? EntityId), PlayerStatistic> _statistics;
         private readonly Dictionary<int, PlayerChallenge> _challenges;
+        private readonly Dictionary<int, PlayerProficiency> _proficiencies;
 
         // Rows mutated since this aggregate was loaded. The write-behind save enqueues only these (as
         // absolute values) rather than the whole, ever-growing stat set; the full snapshot still goes to
         // the cache, which is the source of truth.
         private readonly HashSet<(EStatisticType Type, int? EntityId)> _dirtyStatistics = [];
         private readonly HashSet<int> _dirtyChallenges = [];
+        private readonly HashSet<int> _dirtyProficiencies = [];
 
         public Player Player { get; }
         public IEnumerable<PlayerStatistic> Statistics => _statistics.Values;
         public IEnumerable<PlayerChallenge> ChallengeProgress => _challenges.Values;
+        public IEnumerable<PlayerProficiency> Proficiencies => _proficiencies.Values;
 
         /// <summary>The statistics changed since load — what the write-behind save persists.</summary>
         public IEnumerable<PlayerStatistic> DirtyStatistics => _dirtyStatistics.Select(key => _statistics[key]);
@@ -25,14 +29,19 @@ namespace Game.Core.Progress
         /// <summary>The challenge-progress rows changed since load — what the write-behind save persists.</summary>
         public IEnumerable<PlayerChallenge> DirtyChallenges => _dirtyChallenges.Select(id => _challenges[id]);
 
+        /// <summary>The proficiency-progress rows changed since load — what the write-behind save persists.</summary>
+        public IEnumerable<PlayerProficiency> DirtyProficiencies => _dirtyProficiencies.Select(id => _proficiencies[id]);
+
         public PlayerProgress(
             Player player,
             IEnumerable<PlayerStatistic> statistics,
-            IEnumerable<PlayerChallenge> challengeProgress)
+            IEnumerable<PlayerChallenge> challengeProgress,
+            IEnumerable<PlayerProficiency> proficiencies)
         {
             Player = player;
             _statistics = statistics.ToDictionary(s => (s.Type, s.EntityId));
             _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
+            _proficiencies = proficiencies.ToDictionary(p => p.ProficiencyId);
         }
 
         /// <summary>
@@ -198,6 +207,41 @@ namespace Game.Core.Progress
             var exists = _statistics.TryGetValue((type, entityId), out var stat);
             value = stat?.Value ?? 0m;
             return exists;
+        }
+
+        /// <summary>
+        /// Looks up a player's progress in a proficiency, reporting whether a row exists. A missing row is the
+        /// "never trained" state (level 0, no XP) — the same row-presence convention statistics use — so the
+        /// XP-accrual path treats absence as a fresh start rather than reading a magic value.
+        /// </summary>
+        /// <returns><c>true</c> when a row exists for the proficiency; otherwise <c>false</c>.</returns>
+        public bool TryGetProficiency(int proficiencyId, [MaybeNullWhen(false)] out PlayerProficiency proficiency) =>
+            _proficiencies.TryGetValue(proficiencyId, out proficiency);
+
+        /// <summary>
+        /// Sets a proficiency's absolute level and accumulated XP, creating the row on first training, and
+        /// marks it dirty for the write-behind persist. The XP → level computation against the authored curve
+        /// belongs to the XP-accrual sub-issue (#1116); this is the persistence seam it writes its result
+        /// through (absolute values, so a re-applied write-behind event converges idempotently).
+        /// </summary>
+        public void SetProficiencyProgress(int proficiencyId, int level, decimal xp)
+        {
+            if (_proficiencies.TryGetValue(proficiencyId, out var proficiency))
+            {
+                proficiency.Level = level;
+                proficiency.Xp = xp;
+            }
+            else
+            {
+                _proficiencies[proficiencyId] = new PlayerProficiency
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = level,
+                    Xp = xp,
+                };
+            }
+
+            _dirtyProficiencies.Add(proficiencyId);
         }
 
         /// <summary>

@@ -8,6 +8,7 @@ using Game.Core.Progress;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
+using CoreProficiency = Game.Core.Progress.PlayerProficiency;
 using CoreStat = Game.Core.Progress.PlayerStatistic;
 
 namespace Game.DataAccess.Repositories
@@ -38,7 +39,8 @@ namespace Game.DataAccess.Repositories
             return new PlayerProgress(
                 player,
                 cached.Statistics.Select(ToCoreStatistic),
-                cached.Challenges.Select(ToCoreChallenge));
+                cached.Challenges.Select(ToCoreChallenge),
+                cached.Proficiencies.Select(ToCoreProficiency));
         }
 
         public async Task<List<CoreStat>> GetStatistics(int playerId, CancellationToken cancellationToken = default)
@@ -59,12 +61,18 @@ namespace Game.DataAccess.Repositories
             return [.. cached.Challenges.Where(c => c.Completed).Select(c => c.ChallengeId)];
         }
 
+        public async Task<List<CoreProficiency>> GetProficiencies(int playerId, CancellationToken cancellationToken = default)
+        {
+            var cached = await GetCachedProgress(playerId, cancellationToken);
+            return cached.Proficiencies.Select(ToCoreProficiency).ToList();
+        }
+
         public async Task Save(PlayerProgress progress, CancellationToken cancellationToken = default)
         {
             // Nothing mutated since load -> the cache already holds the current snapshot (and reads slide its
             // TTL), so there is nothing to persist and no reason to rewrite the cache.
-            var changed = ToCached(progress.DirtyStatistics, progress.DirtyChallenges);
-            if (changed.Statistics.Count == 0 && changed.Challenges.Count == 0)
+            var changed = ToCached(progress.DirtyStatistics, progress.DirtyChallenges, progress.DirtyProficiencies);
+            if (changed.Statistics.Count == 0 && changed.Challenges.Count == 0 && changed.Proficiencies.Count == 0)
             {
                 return;
             }
@@ -84,12 +92,13 @@ namespace Game.DataAccess.Repositories
                     PlayerId = playerId,
                     Statistics = changed.Statistics,
                     Challenges = changed.Challenges,
+                    Proficiencies = changed.Proficiencies,
                 }.Serialize(),
             };
             await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope, cancellationToken);
 
             // The cache is the source of truth, so write the full current snapshot (absolute values).
-            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress);
+            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress, progress.Proficiencies);
             _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
         }
 
@@ -136,7 +145,18 @@ namespace Game.DataAccess.Repositories
                 })
                 .ToListAsync(cancellationToken);
 
-            return new CachedPlayerProgress { Statistics = statistics, Challenges = challenges };
+            var proficiencies = await _context.PlayerProficiencies
+                .AsNoTracking()
+                .Where(pp => pp.PlayerId == playerId)
+                .Select(pp => new CachedPlayerProficiency
+                {
+                    ProficiencyId = pp.ProficiencyId,
+                    Level = pp.Level,
+                    Xp = pp.Xp,
+                })
+                .ToListAsync(cancellationToken);
+
+            return new CachedPlayerProgress { Statistics = statistics, Challenges = challenges, Proficiencies = proficiencies };
         }
 
         private static CoreStat ToCoreStatistic(CachedPlayerStatistic cached) => new()
@@ -149,8 +169,17 @@ namespace Game.DataAccess.Repositories
         private CoreChallenge ToCoreChallenge(CachedPlayerChallenge cached) =>
             new(_challenges.GetChallenge(cached.ChallengeId), cached.Progress, cached.Completed, cached.CompletedAt);
 
+        private static CoreProficiency ToCoreProficiency(CachedPlayerProficiency cached) => new()
+        {
+            ProficiencyId = cached.ProficiencyId,
+            Level = cached.Level,
+            Xp = cached.Xp,
+        };
+
         private static CachedPlayerProgress ToCached(
-            IEnumerable<CoreStat> statistics, IEnumerable<CoreChallenge> challenges) => new()
+            IEnumerable<CoreStat> statistics,
+            IEnumerable<CoreChallenge> challenges,
+            IEnumerable<CoreProficiency> proficiencies) => new()
             {
                 Statistics = statistics.Select(s => new CachedPlayerStatistic
                 {
@@ -164,6 +193,12 @@ namespace Game.DataAccess.Repositories
                     Progress = c.Progress,
                     Completed = c.Completed,
                     CompletedAt = c.CompletedAt,
+                }).ToList(),
+                Proficiencies = proficiencies.Select(p => new CachedPlayerProficiency
+                {
+                    ProficiencyId = p.ProficiencyId,
+                    Level = p.Level,
+                    Xp = p.Xp,
                 }).ToList(),
             };
     }

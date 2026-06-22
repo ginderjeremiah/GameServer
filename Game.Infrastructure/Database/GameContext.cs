@@ -42,6 +42,7 @@ namespace Game.Infrastructure.Database
         public DbSet<Player> Players { get; set; }
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
         public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
+        public DbSet<PlayerProficiency> PlayerProficiencies { get; set; }
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
         public DbSet<Rarity> Rarities { get; set; }
@@ -274,6 +275,19 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.Progress)
                     .HasPrecision(36, 3);
+            });
+
+            modelBuilder.Entity<PlayerProficiency>(entity =>
+            {
+                // The composite natural key doubles as the unique constraint the write-behind upsert relies on:
+                // a concurrent at-least-once double-apply collides on the PK and is absorbed by the handler's
+                // unique-violation-then-retry path (mirroring PlayerChallenge — no separate index needed since
+                // neither key column is nullable).
+                entity.HasKey(pp => new { pp.PlayerId, pp.ProficiencyId });
+
+                // Xp shares the authored XP-curve precision (Proficiency.BaseXp/XpGrowth) it is compared against.
+                entity.Property(pp => pp.Xp)
+                    .HasPrecision(18, 3);
             });
 
             modelBuilder.Entity<PlayerSkill>()

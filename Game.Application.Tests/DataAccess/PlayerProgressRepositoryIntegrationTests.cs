@@ -44,7 +44,7 @@ namespace Game.Application.Tests.DataAccess
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], []);
+                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
                 progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
                     new BattleStats { PlayerDamageDealt = 12.5 }, isBossBattle: false, zoneId: 0);
 
@@ -187,6 +187,81 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(4m, challengeProgress.Progress);
                 Assert.False(challengeProgress.Completed);
             }
+        }
+
+        [Fact]
+        public async Task Save_EnqueuesProficiencyProgress_AndServesItFromCacheWithoutTheDatabase()
+        {
+            var playerId = await SeedPlayerAsync();
+            int proficiencyId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                proficiencyId = (await TestDataSeeder.CreateProficiencyAsync(context)).Id;
+            }
+
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId)); // cache miss -> empty
+                progress.SetProficiencyProgress(proficiencyId, level: 2, xp: 130m);
+
+                await repo.Save(progress); // enqueues the changed proficiency and advances the cache snapshot
+            }
+
+            // The batched event carries the proficiency as absolute level/XP.
+            var evt = await DequeueProgressEvent(redis);
+            Assert.Equal(playerId, evt.PlayerId);
+            var enqueued = Assert.Single(evt.Proficiencies);
+            Assert.Equal(proficiencyId, enqueued.ProficiencyId);
+            Assert.Equal(2, enqueued.Level);
+            Assert.Equal(130m, enqueued.Xp);
+
+            // A fresh scope reads the proficiency straight from the cache — the database was never written
+            // (the synchronizer is disabled in tests).
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var proficiencies = await repo.GetProficiencies(playerId);
+                var proficiency = Assert.Single(proficiencies);
+                Assert.Equal(proficiencyId, proficiency.ProficiencyId);
+                Assert.Equal(2, proficiency.Level);
+                Assert.Equal(130m, proficiency.Xp);
+            }
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Empty(await context.PlayerProficiencies.AsNoTracking()
+                    .Where(pp => pp.PlayerId == playerId).ToListAsync(CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task Load_CacheMiss_ReloadsProficiencyProgressFromDatabase()
+        {
+            var playerId = await SeedPlayerAsync();
+            int proficiencyId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                proficiencyId = (await TestDataSeeder.CreateProficiencyAsync(context)).Id;
+                await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, proficiencyId, level: 3, xp: 275m);
+            }
+
+            using var scope2 = CreateScope();
+            var repo = scope2.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // The progress cache key is empty (Redis was flushed on setup), so Load reloads from the DB.
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
+
+            var proficiency = Assert.Single(progress.Proficiencies);
+            Assert.Equal(proficiencyId, proficiency.ProficiencyId);
+            Assert.Equal(3, proficiency.Level);
+            Assert.Equal(275m, proficiency.Xp);
         }
 
         [Fact]
