@@ -7,9 +7,11 @@
    cleared / unlocked / locked) beside a zone dossier — level band, spawn pool, boss card, spawn table
    and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The Skills
    tab is a master/detail skill catalogue: a skill table (base damage / cooldown / used-by count)
-   beside a dossier — base damage, cooldown, the attributes it scales with, its authored effects (via
-   the shared `$lib/common/skill-effect-display` helper) and the enemies that use it, which cross-link
-   into the enemy dossier. The data is all live reference/runtime data — the screen reuses the real
+   beside a dossier — base damage, cooldown, how to obtain the skill (derived from actual challenge
+   reward / item grant references, with the acquisition flag wording the enemy-only / not-obtainable
+   case), the attributes it scales with, its authored effects (via the shared
+   `$lib/common/skill-effect-display` helper) and the enemies that use it, which cross-link into the
+   enemy dossier. The data is all live reference/runtime data — the screen reuses the real
    `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`), the Statistics
    screen's per-entity query (`StatisticsData.statsForEntity`), per-zone clears
    (`statistics.isZoneCleared`) and the challenge progress store — rather than hard-coding any of it.
@@ -20,7 +22,7 @@
    The view-model only wires reactive state to the pure helpers; the projection maths live in
    `enemy-level` and the shared `$lib/common/enemy-attributes` (unit-tested directly). */
 
-import { EEntityType, type IEnemy, type IPlayerStatistic, type ISkill, type IZone } from '$lib/api';
+import { EEntityType, ERarity, type IEnemy, type IPlayerStatistic, type ISkill, type IZone } from '$lib/api';
 import {
 	type EnemyAttributes,
 	attributeCode,
@@ -32,7 +34,8 @@ import {
 	describeEffect,
 	effectDirectionColor,
 	enemyAttributesAtLevel,
-	formatNum
+	formatNum,
+	rarityColor
 } from '$lib/common';
 import { playerChallenges, staticData, statistics } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
@@ -56,11 +59,14 @@ import {
 	formatCooldown,
 	matchesEnemySearch,
 	resolveZoneStatus,
+	skillSourceLabel,
 	sortEnemyRows,
 	tabAccent,
-	tabLabel
+	tabLabel,
+	SKILL_ACQUISITION_EMPTY
 } from './codex-display';
 import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enemy-level';
+import { type SkillAcquisitionStatus, resolveSkillProvenance } from './skill-provenance';
 
 /** A one-shot payload handed to the Codex via the navigation store (e.g. from the Statistics screen). */
 export interface CodexNavPayload {
@@ -199,6 +205,25 @@ export interface SkillUserVM {
 	name: string;
 	isBoss: boolean;
 	accent: string;
+}
+
+/** A "how to obtain" source row — a challenge that rewards the skill or an item that grants it. */
+export interface SkillSourceVM {
+	kind: 'challenge' | 'item';
+	id: number;
+	/** "Rewarded by" / "Granted by" lead-in. */
+	label: string;
+	name: string;
+	/** Themed accent: challenge → the section accent; item → its rarity hue. */
+	accent: string;
+}
+
+/** The skill dossier's acquisition section: concrete sources, plus the wording for the no-source case. */
+export interface SkillProvenanceVM {
+	status: SkillAcquisitionStatus;
+	sources: SkillSourceVM[];
+	/** Wording for the no-source case (empty when sources exist). */
+	emptyLabel: string;
 }
 
 const SUB_TAB_DEFS: SubTabVM[] = [
@@ -624,6 +649,33 @@ export class CodexView {
 				isBoss: e.isBoss,
 				accent: enemyAccent(e.isBoss)
 			}));
+	});
+
+	/** How the selected skill is obtained — derived from actual challenge/item references, with the
+	 *  acquisition flag wording the no-source case. Item sources tint by the granting item's rarity. */
+	readonly skillProvenance = $derived.by<SkillProvenanceVM>(() => {
+		const sk = this.selectedSkill;
+		if (!sk) {
+			return { status: 'unobtainable', sources: [], emptyLabel: SKILL_ACQUISITION_EMPTY.unobtainable };
+		}
+		const allItems = staticData.items ?? [];
+		const provenance = resolveSkillProvenance(
+			sk,
+			(staticData.challenges ?? []).filter((c) => !c.retiredAt),
+			allItems.filter((i) => !i.retiredAt)
+		);
+		const sources = provenance.sources.map<SkillSourceVM>((src) => ({
+			kind: src.kind,
+			id: src.id,
+			label: skillSourceLabel(src.kind),
+			name: src.name,
+			accent: src.kind === 'item' ? rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common) : 'var(--accent)'
+		}));
+		return {
+			status: provenance.status,
+			sources,
+			emptyLabel: sources.length > 0 ? '' : SKILL_ACQUISITION_EMPTY[provenance.status]
+		};
 	});
 
 	/** Every statistic that references the selected skill (the skill dossier's "your record"). */
