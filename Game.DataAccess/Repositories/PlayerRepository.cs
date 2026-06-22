@@ -59,14 +59,19 @@ namespace Game.DataAccess.Repositories
         public async Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
         {
             var playerKey = $"{PlayerPrefix}_{playerId}";
-            var player = await _cache.Get<Player>(playerKey, cancellationToken);
-            if (player is null)
+            // The cache and the database both yield the lean PlayerCacheModel, so the reference graph is
+            // re-resolved from the in-memory catalogs through one rehydration path regardless of the source —
+            // a cached player can never serve stale reference data (#1155).
+            var model = await _cache.Get<PlayerCacheModel>(playerKey, cancellationToken);
+            if (model is null)
             {
-                player = await GetPlayerFromDb(playerId, cancellationToken);
-                if (player is not null)
+                model = await GetPlayerModelFromDb(playerId, cancellationToken);
+                if (model is null)
                 {
-                    _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
+                    return null;
                 }
+
+                _cache.SetAndForget(playerKey, model, PlayerCacheTtl);
             }
             else
             {
@@ -74,7 +79,7 @@ namespace Game.DataAccess.Repositories
                 _cache.ExpireAndForget(playerKey, PlayerCacheTtl);
             }
 
-            return player;
+            return PlayerCacheMapper.ToCore(model, _items, _itemMods, _skills);
         }
 
         public async Task SavePlayer(Player player, CancellationToken cancellationToken = default)
@@ -87,20 +92,19 @@ namespace Game.DataAccess.Repositories
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
-            _cache.SetAndForget(playerKey, player, PlayerCacheTtl);
+            // Serialize the lean model rather than the aggregate, so the cached blob never holds reference data.
+            _cache.SetAndForget(playerKey, PlayerCacheMapper.ToCacheModel(player), PlayerCacheTtl);
         }
 
-        private async Task<Player?> GetPlayerFromDb(int playerId, CancellationToken cancellationToken)
+        private async Task<PlayerCacheModel?> GetPlayerModelFromDb(int playerId, CancellationToken cancellationToken)
         {
-            // IncludePlayerGraph applies the full navigation graph PlayerMapper.ToCore reads, so the contract
-            // is enforced structurally rather than per-query. The reference-data portion (item/skill/mod
-            // definitions) is resolved from the in-memory cached catalogs in the mapper, not joined here.
-            var entity = await _context.Players
-                .AsNoTracking()
-                .IncludePlayerGraph()
-                .FirstOrDefaultAsync(p => p.Id == playerId, cancellationToken);
-
-            return entity is null ? null : PlayerMapper.ToCore(entity, _items, _itemMods, _skills);
+            // The projection pulls only the player's own relational columns (reference data reduced to ids,
+            // re-resolved from the cached catalogs in PlayerCacheMapper.ToCore), so no navigation graph is
+            // loaded and no reference-data definitions are joined here.
+            return await _context.Players
+                .Where(p => p.Id == playerId)
+                .SelectPlayerCacheModel()
+                .FirstOrDefaultAsync(cancellationToken);
         }
     }
 
