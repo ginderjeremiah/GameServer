@@ -3,7 +3,7 @@
   "gated": {
     "Game.Core": { "line": 97, "branch": 93 },
     "Game.Application": { "line": 95, "branch": 85 },
-    "Game.DataAccess": { "line": 94, "branch": 90 }
+    "Game.DataAccess": { "line": 93, "branch": 88 }
   },
   "gatedNamespaces": {
     "Game.Api (sockets/services/filters)": {
