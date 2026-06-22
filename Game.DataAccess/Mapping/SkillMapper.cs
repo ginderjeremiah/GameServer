@@ -21,6 +21,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
+                RarityId = (ERarity)entity.RarityId,
                 Acquisition = (ESkillAcquisition)entity.Acquisition,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new Contracts.AttributeMultiplier
@@ -57,6 +58,7 @@ namespace Game.DataAccess.Mapping
                 BaseDamage = (double)entity.BaseDamage,
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
+                Rarity = (ERarity)entity.RarityId,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new DamageMultiplier
                     {

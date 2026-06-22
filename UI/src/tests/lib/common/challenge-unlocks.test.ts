@@ -56,7 +56,7 @@ describe('resolveUnlockReward', () => {
 	const itemMods: (IItemMod | undefined)[] = [];
 	itemMods[4] = { id: 4, name: 'of Fury', itemModTypeId: EItemModType.Suffix, rarityId: ERarity.Epic } as IItemMod;
 	const skills: (ISkill | undefined)[] = [];
-	skills[5] = { id: 5, name: 'Cleave' } as ISkill;
+	skills[5] = { id: 5, name: 'Cleave', rarityId: ERarity.Legendary } as ISkill;
 	const refs = { items, itemMods, skills };
 
 	it('resolves an item reward with rarity tier/accent, "rarity · category" sub-label and the source record', () => {
@@ -73,9 +73,15 @@ describe('resolveUnlockReward', () => {
 		expect(reward?.kind === 'mod' && reward.mod).toBe(itemMods[4]);
 	});
 
-	it('resolves a skill reward (Common tier) with a neutral accent, "Skill" sub-label and the source record', () => {
+	it('resolves a skill reward with its rarity tier/accent, "rarity · Skill" sub-label and the source record', () => {
 		const reward = resolveUnlockReward(challenge({ rewardSkillId: 5 }), refs);
-		expect(reward).toMatchObject({ kind: 'skill', name: 'Cleave', sub: 'Skill', rarity: ERarity.Common });
+		expect(reward).toMatchObject({
+			kind: 'skill',
+			name: 'Cleave',
+			sub: 'Legendary · Skill',
+			rarity: ERarity.Legendary
+		});
+		expect(reward?.accent).toContain('--rarity-');
 		expect(reward?.kind === 'skill' && reward.skill).toBe(skills[5]);
 	});
 

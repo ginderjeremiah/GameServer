@@ -1,5 +1,5 @@
 <!-- The skill table: a column header over a scrollable list of selectable skill rows. Each row shows
-     an intellect-tinted mark, the name, the base damage, the cooldown and how many enemies use it. -->
+     a rarity-tinted tier mark, the name, the base damage, the cooldown and how many enemies use it. -->
 <div class="table">
 	<div class="head">
 		<span class="c-name">Name</span>
@@ -18,7 +18,7 @@
 				onclick={() => view.selectSkill(row.id)}
 			>
 				<span class="c-name name-cell">
-					<span class="mark"></span>
+					<span class="mark" style:--mark={row.rarityColor}></span>
 					<span class="name">{row.name}</span>
 				</span>
 				<span class="c-num val">{row.baseDamageLabel}</span>
@@ -121,8 +121,9 @@ let { view }: Props = $props();
 	height: 8px;
 	flex: none;
 	transform: rotate(45deg);
-	background: var(--attr-intellect);
-	box-shadow: 0 0 6px color-mix(in srgb, var(--attr-intellect) 45%, transparent);
+	// Tier mark tinted by the skill's rarity (themeable var), mirroring how items signal rarity.
+	background: var(--mark, var(--attr-intellect));
+	box-shadow: 0 0 6px color-mix(in srgb, var(--mark, var(--attr-intellect)) 45%, transparent);
 }
 
 .name {

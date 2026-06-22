@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260622070915_AddSkillRarity")]
+    partial class AddSkillRarity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -952,115 +955,6 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("PlayerStatistics");
                 });
 
-            modelBuilder.Entity("Game.Infrastructure.Entities.Proficiency", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<decimal>("BaseXp")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("IconPath")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("MaxLevel")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("RetiredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("SeedSkillId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("StartsUnlocked")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("XpGrowth")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SeedSkillId");
-
-                    b.ToTable("Proficiencies");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyLevelModifier", b =>
-                {
-                    b.Property<int>("ProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("AttributeId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.Property<int>("ModifierType")
-                        .HasColumnType("integer");
-
-                    b.HasKey("ProficiencyId", "Level", "AttributeId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.ToTable("ProficiencyLevelModifiers");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyLevelReward", b =>
-                {
-                    b.Property<int>("ProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RewardSkillId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("ProficiencyId", "Level");
-
-                    b.HasIndex("RewardSkillId");
-
-                    b.ToTable("ProficiencyLevelRewards");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyPrerequisite", b =>
-                {
-                    b.Property<int>("ProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PrerequisiteProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("ProficiencyId", "PrerequisiteProficiencyId");
-
-                    b.HasIndex("PrerequisiteProficiencyId");
-
-                    b.ToTable("ProficiencyPrerequisites");
-                });
-
             modelBuilder.Entity("Game.Infrastructure.Entities.Rarity", b =>
                 {
                     b.Property<int>("Id")
@@ -1238,25 +1132,6 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("SkillId");
 
                     b.ToTable("SkillEffects");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillProficiency", b =>
-                {
-                    b.Property<int>("SkillId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Weight")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
-
-                    b.HasKey("SkillId", "ProficiencyId");
-
-                    b.HasIndex("ProficiencyId");
-
-                    b.ToTable("SkillProficiencies");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.StatisticType", b =>
@@ -2001,73 +1876,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("StatisticType");
                 });
 
-            modelBuilder.Entity("Game.Infrastructure.Entities.Proficiency", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Skill", "SeedSkill")
-                        .WithMany()
-                        .HasForeignKey("SeedSkillId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SeedSkill");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyLevelModifier", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Proficiency")
-                        .WithMany("LevelModifiers")
-                        .HasForeignKey("ProficiencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Attribute");
-
-                    b.Navigation("Proficiency");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyLevelReward", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Proficiency")
-                        .WithMany("LevelRewards")
-                        .HasForeignKey("ProficiencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.Skill", "RewardSkill")
-                        .WithMany()
-                        .HasForeignKey("RewardSkillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Proficiency");
-
-                    b.Navigation("RewardSkill");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.ProficiencyPrerequisite", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Prerequisite")
-                        .WithMany()
-                        .HasForeignKey("PrerequisiteProficiencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Proficiency")
-                        .WithMany("Prerequisites")
-                        .HasForeignKey("ProficiencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Prerequisite");
-
-                    b.Navigation("Proficiency");
-                });
-
             modelBuilder.Entity("Game.Infrastructure.Entities.Skill", b =>
                 {
                     b.HasOne("Game.Infrastructure.Entities.Rarity", "Rarity")
@@ -2121,25 +1929,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Attribute");
 
                     b.Navigation("ScalingAttribute");
-
-                    b.Navigation("Skill");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillProficiency", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Proficiency")
-                        .WithMany("SkillContributions")
-                        .HasForeignKey("ProficiencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
-                        .WithMany()
-                        .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Proficiency");
 
                     b.Navigation("Skill");
                 });
@@ -2343,17 +2132,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("UnlockedItems");
 
                     b.Navigation("UnlockedMods");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.Proficiency", b =>
-                {
-                    b.Navigation("LevelModifiers");
-
-                    b.Navigation("LevelRewards");
-
-                    b.Navigation("Prerequisites");
-
-                    b.Navigation("SkillContributions");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.Rarity", b =>

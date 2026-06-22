@@ -119,6 +119,7 @@ namespace Game.Core.Tests.Battle
                     Id = 0,
                     Name = "Attack",
                     Description = "",
+                    Rarity = ERarity.Common,
                     CooldownMs = 1000,
                     BaseDamage = 10,
                     DamageMultipliers = [
@@ -149,6 +150,7 @@ namespace Game.Core.Tests.Battle
                     Id = 0,
                     Name = "Scratch",
                     Description = "",
+                    Rarity = ERarity.Common,
                     CooldownMs = 1500,
                     BaseDamage = 5,
                     DamageMultipliers = [],

@@ -121,26 +121,24 @@ export function battleStep(
 	}
 
 	// End-of-tick damage/heal-over-time, reached only while both battlers still live (mirroring the
-	// backend's both-alive guard). The enemy resolves first: DamageTakenPerSecond (bypassing Defense),
-	// a death check, then HealthRegenPerSecond (capped at MaxHealth) — so an enemy DoT kill ends the
-	// battle before the player's DoT applies, and a same-tick mutual DoT kill leaves the player alive.
+	// backend's both-alive guard). For each battler DamageTakenPerSecond (bypassing Defense) then
+	// HealthRegenPerSecond (capped at MaxHealth) apply before its death check — so a heal-over-time can
+	// save a battler from an otherwise-lethal DoT tick. The enemy resolves first: an enemy a same-tick
+	// regen cannot save dies before the player's DoT applies, so a same-tick mutual DoT kill leaves the
+	// player alive.
 	if (!player.isDead && !enemy.isDead) {
 		const enemyDot = enemy.applyDamageOverTime(timeDelta);
+		const enemyHot = enemy.applyHealOverTime(timeDelta);
 		if (log) {
 			log.enemyDotDamage = enemyDot;
+			log.enemyHotHeal = enemyHot;
 		}
 		if (!enemy.isDead) {
-			const enemyHot = enemy.applyHealOverTime(timeDelta);
 			const playerDot = player.applyDamageOverTime(timeDelta);
+			const playerHot = player.applyHealOverTime(timeDelta);
 			if (log) {
-				log.enemyHotHeal = enemyHot;
 				log.playerDotDamage = playerDot;
-			}
-			if (!player.isDead) {
-				const playerHot = player.applyHealOverTime(timeDelta);
-				if (log) {
-					log.playerHotHeal = playerHot;
-				}
+				log.playerHotHeal = playerHot;
 			}
 		}
 	}

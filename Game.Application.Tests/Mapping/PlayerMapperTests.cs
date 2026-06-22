@@ -275,6 +275,7 @@ namespace Game.Application.Tests.Mapping
                     Name = $"Skill {skillId}",
                     BaseDamage = 1,
                     Description = string.Empty,
+                    Rarity = ERarity.Common,
                     CooldownMs = 1000,
                     DamageMultipliers = [],
                     Effects = [],

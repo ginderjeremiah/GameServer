@@ -339,6 +339,77 @@ namespace Game.Infrastructure.Tests
             }
         }
 
+        [Fact]
+        public void AsyncWorker_SignaledRepeatedlyDuringRun_NeverOverlapsAndSettlesNotRunning()
+        {
+            // Reproduces #1136: an async callback returns to the thread pool at its first incomplete await, which
+            // re-arms the wait mid-run. Pre-fix, a Start() during an in-flight async run launched a *second concurrent*
+            // loopAction and the finishing run's trailing IsRunning = false could clobber the new run's true. The fix
+            // gates the async loop to one run at a time and coalesces mid-run signals into a single trailing pass.
+            var active = 0;
+            var maxActive = 0;
+            var totalRuns = 0;
+            using var firstRunStarted = new ManualResetEventSlim(false);
+            var releaseFirstRun = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            async Task Action()
+            {
+                var now = Interlocked.Increment(ref active);
+                InterlockedMax(ref maxActive, now);
+                Interlocked.Increment(ref totalRuns);
+
+                // Hold only the first run suspended mid-await so the test can fire more signals while it is in flight;
+                // every later (coalesced) run runs straight through.
+                if (!firstRunStarted.IsSet)
+                {
+                    firstRunStarted.Set();
+                    await releaseFirstRun.Task.WaitAsync(WaitTimeout);
+                }
+
+                Interlocked.Decrement(ref active);
+            }
+
+            var worker = new BackgroundWorker(NullLogger<BackgroundWorker>.Instance, Action);
+
+            worker.Start();
+            Assert.True(firstRunStarted.Wait(WaitTimeout, TestContext.Current.CancellationToken), "The first async run did not start.");
+            Assert.True(worker.IsRunning);
+
+            // Signal repeatedly while the first run is suspended at its await. Pre-fix each re-armed wait fired a
+            // concurrent run (driving maxActive past 1); post-fix they collapse into one trailing pass.
+            for (var i = 0; i < 20; i++)
+            {
+                worker.Start();
+            }
+
+            releaseFirstRun.SetResult();
+            WaitUntil(() => !worker.IsRunning && Volatile.Read(ref active) == 0);
+
+            // Two loopAction calls never ran at once.
+            Assert.Equal(1, Volatile.Read(ref maxActive));
+            // The mid-run signals were not lost — the coalesced trailing run executed.
+            Assert.True(Volatile.Read(ref totalRuns) >= 2, "The coalesced trailing run did not execute.");
+            // The worker settles in a stable, non-running terminal state.
+            Assert.False(worker.IsRunning);
+
+            worker.Kill();
+        }
+
+        // Atomically raises target to value when value is greater, used to detect any overlapping run.
+        private static void InterlockedMax(ref int target, int value)
+        {
+            int current;
+            do
+            {
+                current = Volatile.Read(ref target);
+                if (value <= current)
+                {
+                    return;
+                }
+            }
+            while (Interlocked.CompareExchange(ref target, value, current) != current);
+        }
+
         // Calls Start() repeatedly until the worker is torn down, asserting any disposed exception is the clean
         // worker-named guard rather than a leaked AutoResetEvent disposal (the issue #905 race).
         private static void SpinStartUntilTornDown(BackgroundWorker worker)

@@ -8,7 +8,10 @@
 				{/if}
 			</div>
 			<div class="d-headings">
-				<div class="eyebrow">{scalesEyebrow}</div>
+				<div class="eyebrow-row">
+					<span class="eyebrow">{scalesEyebrow}</span>
+					<RarityTagBox color={rarityAccent} label={rarityName} />
+				</div>
 				<div class="d-name">{metrics.skill.name}</div>
 				<div class="d-desc">{metrics.skill.description}</div>
 			</div>
@@ -66,12 +69,15 @@ import {
 	attributeName,
 	describeEffect,
 	effectDirectionColor,
-	formatNum
+	formatNum,
+	rarityColor,
+	rarityLabel
 } from '$lib/common';
 import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
 import SkillCta from './SkillCta.svelte';
 import SkillDamageBreakdown from './SkillDamageBreakdown.svelte';
+import RarityTagBox from '$components/RarityTagBox.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -86,6 +92,10 @@ const pending = $derived(metrics ? view.pendingSwap === metrics.skill.id : false
 const full = $derived(view.equipped.length >= view.cap);
 
 const fmt = (n: number) => formatNum(Math.round(n));
+
+// The skill's rarity tier, surfaced as a tinted tag beside the eyebrow.
+const rarityAccent = $derived(metrics ? rarityColor(metrics.skill.rarityId) : 'var(--rarity-common)');
+const rarityName = $derived(metrics ? rarityLabel(metrics.skill.rarityId) : '');
 
 // One display description per authored effect, reusing the shared helper so wording/direction
 // match the battle tooltip's "On hit" lines; `id` is kept for a stable each-key.
@@ -190,6 +200,12 @@ const rawNote = $derived.by(() => {
 .d-headings {
 	flex: 1;
 	min-width: 0;
+}
+
+.eyebrow-row {
+	display: flex;
+	align-items: center;
+	gap: 9px;
 }
 
 .eyebrow {

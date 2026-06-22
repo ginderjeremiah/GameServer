@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget, type ISkill } from '$lib/api';
+import { ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget, type ISkill } from '$lib/api';
 
 // The tooltip resolves attribute display names from the reference-data store; a populated
 // fixture lets us assert the real names render (rather than the enum-key fallback).
@@ -24,6 +24,7 @@ const makeSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	effects: [],
 	cooldownMs: 3000,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });
@@ -80,10 +81,12 @@ describe('SkillRewardTooltip', () => {
 	});
 
 	describe('masked', () => {
-		it('accents the panel with the neutral skill hue and masks the name', () => {
-			const { container } = render(SkillRewardTooltip, { props: { skill: makeSkill(), masked: true } });
+		it('accents the panel with the skill rarity hue and masks the name', () => {
+			const { container } = render(SkillRewardTooltip, {
+				props: { skill: makeSkill({ rarityId: ERarity.Legendary }), masked: true }
+			});
 			expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
-				'var(--accent-light)'
+				'var(--rarity-legendary)'
 			);
 			expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('?????????');
 			expect((container.querySelector('.tt-category-label') as HTMLElement).textContent).toBe('Skill');

@@ -1,4 +1,11 @@
-<div class="skill-icon" class:locked style:--icon-accent={accent} style:width="{size}px" style:height="{size}px">
+<div
+	class="skill-icon"
+	class:locked
+	style:--icon-accent={accent}
+	style:--rarity-border={rarityBorder}
+	style:width="{size}px"
+	style:height="{size}px"
+>
 	<div class="icon-clip">
 		{#if locked}
 			<span class="lock-glyph" aria-hidden="true">🔒</span>
@@ -13,7 +20,7 @@
 
 <script lang="ts">
 import type { ISkill } from '$lib/api';
-import { attributeColor } from '$lib/common';
+import { attributeColor, rarityColor } from '$lib/common';
 import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 
 type Props = {
@@ -30,13 +37,16 @@ const { skill, locked = false, size = 30 }: Props = $props();
 const accent = $derived(
 	skill.damageMultipliers.length ? attributeColor(skill.damageMultipliers[0].attributeId) : 'var(--accent)'
 );
+
+/** The tile edge tinted by the skill's rarity tier (themeable var), mirroring item tiles. */
+const rarityBorder = $derived(rarityColor(skill.rarityId));
 </script>
 
 <style lang="scss">
 .skill-icon {
 	position: relative;
 	flex-shrink: 0;
-	border: 1px solid var(--border-light);
+	border: 1px solid var(--rarity-border, var(--border-light));
 	border-radius: 3px;
 	background: color-mix(in srgb, var(--white) 4%, transparent);
 
