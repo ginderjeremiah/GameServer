@@ -1,7 +1,7 @@
 # Spike #982 — Proficiency system (name provisional)
 
 - **Spike issue:** [#982](https://github.com/ginderjeremiah/GameServer/issues/982)
-- **Status:** Design decided; implementation sub-issues created (see [Implementation issues](#implementation-issues)) — not yet implemented.
+- **Status:** Foundation implemented (#1114 / #1115 / #1116 merged). **Refined mid-build to add the Path system** ([Paths](#paths-refinement)) — linear sequences of proficiencies as a first-class contribution unit — slotted in before the player-facing UI. The refinement reworks the merged model and accrual via two new sub-issues (#1160, #1161) and adjusts the remaining open issues in place; see [Path refinement issues](#path-refinement-issues).
 - **Related:** builds on [#980](https://github.com/ginderjeremiah/GameServer/issues/980) (items grant skills — [#1100](https://github.com/ginderjeremiah/GameServer/issues/1100)/[#1101](https://github.com/ginderjeremiah/GameServer/issues/1101) merged); [#979](https://github.com/ginderjeremiah/GameServer/issues/979) (skill rarity) feeds tier-weighted XP; supersedes the challenge→skill reward path.
 
 ## Goal
@@ -43,8 +43,9 @@ Settled with the project owner during the spike:
    - **Fixed pie ⇒ diversifying dilutes.** A loadout of 4 skills from one proficiency trains it at full rate; 4 skills across 4 proficiencies trains each at a quarter rate. Focus is faster than spread, down to the micro level.
    - **Representation (not damage/kills) is what makes bootstrap work.** A freshly-opened branch's weak seed skill earns XP just by being in a fight you win on your *other* skills — the same property that defeats the fast-cooldown grind exploit (a fast skill earns no more pie than a slow one).
    - **Tier weight (from #979 rarity)** paces deep proficiencies so they aren't an eternal trickle-grind on a starter skill; low-tier still earns **nonzero** XP (slow, never walled). Until #979 lands, tier weight is flat (`1`).
+   - **Refined by [Paths](#paths-refinement):** the split now happens at the *path* level, routed to the path's current tier, and each path's slice is scaled by an **absolute on-tier efficiency** (the falloff) — so a stale loadout earns less in absolute terms, not just relatively.
 
-5. **A skill contributes to one _or more_ proficiencies, with weights (multi-contribution, in V1).** Modeled as a join (`skillId → {proficiencyId, weight}`), the same shape as the tag system. This is built up front because it resolves a late-game tension single-FK creates — *your strongest skills sitting in maxed proficiencies would earn zero progression*, forcing you to bench them to grind — and because it lets a sparse early loadout push several tracks at once. Most skills will list one proficiency in practice.
+5. **A skill contributes to one _or more_ proficiencies, with weights (multi-contribution, in V1).** Modeled as a join (`skillId → {proficiencyId, weight}`), the same shape as the tag system. This is built up front because it resolves a late-game tension single-FK creates — *your strongest skills sitting in maxed proficiencies would earn zero progression*, forcing you to bench them to grind — and because it lets a sparse early loadout push several tracks at once. Most skills will list one proficiency in practice. **Refined by [Paths](#paths-refinement):** a contribution now targets a **path** at a **home tier** (not an individual proficiency), and within-path spread is the falloff curve rather than a row per node — so "multi-contribution" now means a skill feeding **multiple paths** (a genuine cross-school skill), which is the case that actually matters.
 
 6. **What opens a proficiency:** (a) **acquiring a skill that contributes to it** (an item seed, a starter skill, or a multi-contribution milestone skill that also touches it); (b) **maxing its prerequisite proficiencies** (tree); (c) **starting proficiencies at creation** (a small **2–3 root** archetype set, class-biased later — discovery comes from *depth*, not a wide root layer).
 
@@ -54,11 +55,27 @@ Settled with the project owner during the spike:
 
 9. **XP is computed backend-authoritative at battle completion, not in the tick loop.** Like statistics/rewards today, proficiency XP is computed when the battle resolves (live: `BattleStatisticsEventHandler`; offline: the consolidation pass) and **pushed to the client** (mirroring challenge-completion). It is **not** part of the 40 ms seeded simulation, so it adds **no battle-parity surface** — the only parity-sensitive piece is the *attribute bonus*, which both sides already compute from player state at snapshot time.
 
+## Paths (refinement)
+
+Added **after the foundation (#1114–#1116) merged**, before the player-facing tree UI — the cheapest moment to restructure, since nothing player-visible had shipped. A **path** is a linear sequence of proficiencies sharing an identity arc (Fire Magic → Inferno Magic), made a first-class unit so a skill ties to the *sequence* once instead of to every node. It reworks the merged model (#1160) and accrual (#1161); the open downstream issues are adjusted in place.
+
+10. **A path is a linear spine; the tree (DAG) connects spines at gateways.** Within a path, proficiency *N+1* opens when *N* is maxed, so the linear edges are **implicit in `PathOrdinal`** — no authored prerequisite rows. `ProficiencyPrerequisite` is reserved for **cross-path gateways** (lava = advanced-fire + advanced-earth → the lava path's first tier). A standalone proficiency is a path of length 1.
+
+11. **Tiers are distinct-identity nodes, not renamed bands.** Each proficiency in a path keeps its own name, description, bonuses, milestone skills, and seed skill — Fire Magic → Inferno Magic, *not* "Basic/Advanced Fire". The node stays the unit of leveling, bonuses, and `PlayerProficiency` progress (so #1115's per-proficiency persistence is untouched); the path is only the connective tissue and the contribution/routing unit.
+
+12. **A skill contributes to a path at a home tier; its pull falls off with tier distance.** The join becomes `SkillPathContribution (SkillId, PathId, HomeTier, Weight)`. A skill's pull on the path's frontier tier is `Weight × falloff(frontierOrdinal − HomeTier)`, `falloff(0) = 1` decaying for deeper tiers (geometric `FalloffBase^distance`, authored per path — strawman). A standard fire skill (home tier 0) trains Fire Magic fully and Inferno at a fraction — one row + a curve, not a row per tier. Distance is always ≥ 0 (a tier's native skills are gated behind that tier opening, so a skill never trains a tier *below* where it was acquired).
+
+13. **XP routes to the current tier, and falloff is an _absolute_ multiplier — the pie is a ceiling, not a constant.** At completion each represented path resolves to its **frontier tier** (lowest un-maxed, unlocked node). The pie is split across paths by their **falloff-free attention** (`Σ tierWeight × Weight` — how much of the loadout points at the path), then each slice is scaled by the path's **on-tier efficiency** (its contribution-weighted average falloff); the un-earned remainder is **not minted**. So coasting on stale skills trains slower in *absolute* terms — the intended cost — distinct from the maxed-tier slice-drop the routing already removed. Still computed server-side off the tick loop: no parity surface, and the offline path replays identically (same loadout → same falloff).
+    - **Seed skills stop a fresh tier from stalling.** Opening a tier grants its native seed skill (home tier = that tier, falloff 1), so a newly-revealed Inferno starts at full pace while old fire skills *supplement* at the discount. The pull is "fill the loadout with the new tier's natives" — never walled, just slower if you coast.
+
+14. **Hiding is a client-render choice, not enforced.** Locked tiers are simply not drawn (no teaser for now — an easy later add). Definitions stay on the **shared, broadcast reference channel**; no per-player filtering. A tampered client can read ahead — an accepted, deliberate non-goal. The client derives the unlocked set from player levels + the path/gateway structure it already holds.
+
 ## Strawman data model (illustrative — shapes, not final numbers)
 
-- **`Proficiency`** (authored reference data): `Id`, `Name`, `Description`, `MaxLevel` (~10), `XpCurve` (per-level thresholds or formula params), `Prerequisites` (proficiency ids that must be maxed), `PerLevelModifiers` (attribute modifiers applied × level), `Milestones` (`{ Level, Modifiers, RewardSkillId? }`), `SeedSkillId?` (tree-opened nodes only), `StartsUnlocked` (the root flag; class overrides later), `RetiredAt`.
-- **`SkillProficiency`** (join): `SkillId`, `ProficiencyId`, `Weight` — multi-contribution.
-- **`PlayerProficiency`** (per-player): `(PlayerId, ProficiencyId)`, `Level`, `Xp`.
+- **`Path`** (authored reference data — *added by the [refinement](#paths-refinement)*): `Id`, `Name`, `Description`, `FalloffBase` (the per-tier contribution decay), `RetiredAt`. Its ordered tiers are the proficiencies carrying its `PathId`, sequenced by `PathOrdinal`.
+- **`Proficiency`** (authored reference data): `Id`, `Name`, `Description`, `MaxLevel` (~10), `XpCurve` (per-level thresholds or formula params), **`PathId` + `PathOrdinal`** (its tier within the path), `PerLevelModifiers` (attribute modifiers applied × level), `Milestones` (`{ Level, Modifiers, RewardSkillId? }`), `SeedSkillId?` (granted when this tier opens), `StartsUnlocked` (true only for the first tier of a root path; class overrides later), `RetiredAt`. `Prerequisites` (proficiency ids that must be maxed) now hold **cross-path gateway** edges only — within-path order is implicit in `PathOrdinal`.
+- **`SkillPathContribution`** (join — *replaces `SkillProficiency`*): `SkillId`, `PathId`, `HomeTier`, `Weight` — a skill feeds a path at a home tier; multiple rows = a cross-**path** (multi-school) skill.
+- **`PlayerProficiency`** (per-player — unchanged): `(PlayerId, ProficiencyId)`, `Level`, `Xp`.
 
 All curves, caps, milestone levels, and bonus magnitudes are a **strawman to tune during implementation** (the #178/#528 convention).
 
@@ -67,11 +84,15 @@ All curves, caps, milestone levels, and bonus magnitudes are a **strawman to tun
 ### A. Proficiency reference-data model + skill contributions + admin authoring
 The `Proficiency` entity (+ prerequisites, per-level/milestone bonus specs, seed skill) and the `SkillProficiency` contribution join; DbContext config + migration; cache holder + snapshot + `VersionKey`; entity↔core↔contract mappers; reader repository + DI; admin Workbench **proficiency editor** (Identity / Levels & milestones / contributions sections, child savers per the `persistEntity` pattern) and add/edit endpoints; a `progression` workbench group entry. Foundation; no hard external dependency (rarity weight is additive later).
 
+**Refinement ([#1160](https://github.com/ginderjeremiah/GameServer/issues/1160)):** add the `Path` entity, give `Proficiency` a `PathId`/`PathOrdinal`, replace the `SkillProficiency` join with `SkillPathContribution` (+ `HomeTier`), reduce `ProficiencyPrerequisite` to cross-path gateways, and add a Workbench **path editor** (ordered tiers + `FalloffBase`) alongside the proficiency editor. Reworks the merged #1114.
+
 ### B. PlayerProficiency progress persistence
 `PlayerProficiency` EF entity keyed `(PlayerId, ProficiencyId)`; fold `level`/`xp` into the `PlayerProgress` aggregate with its own dirty set; extend `ProgressUpdatedEvent` + the write-behind upsert handler + the progress cache model; contract + `GetPlayerProficiencies`. Mirrors `PlayerStatistic`/`PlayerChallenge`. Depends on **A**.
 
 ### C. XP accrual + leveling (the core mechanic)
 At battle completion compute the **fixed-pie, difficulty-scaled** XP and split it across the proficiencies whose contributing skills **fired** (consuming `BattleStats.SkillStats`); apply to `PlayerProficiency`, handling multi-level gains against `XpCurve`. Wire the **live** path (`BattleStatisticsEventHandler`) and the **offline** consolidation pass (constant loadout over the window). Tier weight flat (`1`) initially. Emit a result payload (per-proficiency xp gained / new level / milestones crossed) for the client push. Depends on **A**, **B**.
+
+**Refinement ([#1161](https://github.com/ginderjeremiah/GameServer/issues/1161)):** route each path's contribution to its frontier tier, weight by `falloff(distance)`, and split the pie by attention × **absolute on-tier efficiency** (the pie becomes a ceiling — coasting evaporates the remainder). Reworks the merged #1116's `ProficiencyXpCalculator` + `BuildContributions`.
 
 ### D. Milestone & unlock effects + open triggers
 On level-up: cross **milestones** (grant `RewardSkillId` via `UnlockSkill`, flag bonus milestones), and on **max** open child nodes. **Open triggers:** open a proficiency when a contributing skill is acquired (item/starter/milestone — the item path builds on #980/#1101), when prerequisites max (granting the `SeedSkillId`), and seed the **root** set at character creation. Adjusts what `ESkillAcquisition.Player` *means* (milestone-granted, not challenge-granted). Depends on **A**, **B**, **C**; the item-acquisition open trigger builds on [#1101](https://github.com/ginderjeremiah/GameServer/issues/1101) (merged).
@@ -108,6 +129,17 @@ Created as native sub-issues of #982:
 | [#1122](https://github.com/ginderjeremiah/GameServer/issues/1122) — Remove skill rewards from challenges + re-home | I | #1118 | medium |
 
 **#1114** is the foundation. **#1116** is the core mechanic; **#1117** (bonuses) and **#1119** (data delivery) branch off **#1115** in parallel. **#1118** ties leveling to skill/branch unlocks. **#1120**/**#1121** are the player-facing surface. **#1122** is the transition cleanup, last because it needs milestones to re-home onto. Each issue carries its own unit/integration tests; **#1117** (and only it) adds **frontend↔backend parity** vectors.
+
+### Path refinement issues
+
+The [Paths refinement](#paths-refinement) lands after #1114–#1116 (merged). It reworks the foundation via two new native sub-issues and adjusts the open downstream issues in place (no new issues for those):
+
+| Issue | Reworks / depends on | Scope |
+| --- | --- | --- |
+| [#1160](https://github.com/ginderjeremiah/GameServer/issues/1160) — Path model: entity, contribution-join rework, admin authoring | extends #1114 | large |
+| [#1161](https://github.com/ginderjeremiah/GameServer/issues/1161) — Home-tier falloff routing + absolute-falloff XP accrual | reworks #1116; depends on #1160 | medium |
+
+Adjusted open issues: **#1118** — open-triggers become path-aware (within-path reveal-on-max is implicit from `PathOrdinal`; gateways stay explicit; each tier grants its seed skill on open). **#1120** — the tree screen renders paths as spines and **hides locked tiers** (client-derived, no teasers for now). **#1117** / **#1119** / **#1121** / **#1122** are largely unaffected (per-tier bonuses, broadcast delivery, feedback, and the challenge cleanup are unchanged by Paths). When #1160 / #1161 land, refresh the Proficiency section of `docs/game-design.md` for the path model + absolute falloff.
 
 ## Documentation to update on landing
 
