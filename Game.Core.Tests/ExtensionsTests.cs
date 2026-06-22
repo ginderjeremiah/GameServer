@@ -8,47 +8,6 @@ namespace Game.Core.Tests
         private record Sample(int Id, string Name);
 
         [Fact]
-        public void ToBase64_NonNull_EncodesToStringRepresentation()
-        {
-            // "abc" UTF-8 -> base64
-            Assert.Equal("YWJj", "abc".ToBase64());
-        }
-
-        [Fact]
-        public void ToBase64_NullReceiver_EncodesEmptyString()
-        {
-            string? value = null;
-
-            // The null-coalescing path falls back to "" which encodes to an empty base64 string.
-            Assert.Equal("", value.ToBase64());
-        }
-
-        [Fact]
-        public void Deserialize_HttpResponseWithContent_RoundTripsObject()
-        {
-            var original = new Sample(7, "thing");
-            using var msg = new HttpResponseMessage
-            {
-                Content = new StringContent(original.Serialize()),
-            };
-
-            var result = msg.Deserialize<Sample>();
-
-            Assert.Equal(original, result);
-        }
-
-        [Fact]
-        public void Deserialize_HttpResponseWithEmptyStream_ReturnsDefault()
-        {
-            using var msg = new HttpResponseMessage
-            {
-                Content = new StringContent(""),
-            };
-
-            Assert.Null(msg.Deserialize<Sample>());
-        }
-
-        [Fact]
         public void Deserialize_NonNullString_RoundTripsObject()
         {
             var original = new Sample(3, "json");
@@ -105,21 +64,6 @@ namespace Game.Core.Tests
         }
 
         [Theory]
-        [InlineData("HelloWorld", "helloWorld")]
-        [InlineData("A", "a")]
-        [InlineData("alreadyLower", "alreadyLower")]
-        public void Decapitalize_LowercasesFirstCharacter(string input, string expected)
-        {
-            Assert.Equal(expected, input.Decapitalize());
-        }
-
-        [Fact]
-        public void Decapitalize_EmptyString_ReturnsEmpty()
-        {
-            Assert.Equal("", "".Decapitalize());
-        }
-
-        [Theory]
         [InlineData("helloWorld", "HelloWorld")]
         [InlineData("a", "A")]
         [InlineData("AlreadyUpper", "AlreadyUpper")]
@@ -143,17 +87,6 @@ namespace Game.Core.Tests
         public void SpaceWords_InsertsSpaceBetweenLowerThenUpper(string input, string expected)
         {
             Assert.Equal(expected, input.SpaceWords());
-        }
-
-        [Theory]
-        [InlineData("HelloWorld", "hello-world")]
-        [InlineData("oneTwoThree", "one-two-three")]
-        [InlineData("NoBreaks", "no-breaks")]
-        [InlineData("nobreak", "nobreak")]
-        [InlineData("", "")]
-        public void SnakeCase_InsertsHyphenBetweenLowerThenUpperAndLowercases(string input, string expected)
-        {
-            Assert.Equal(expected, input.SnakeCase());
         }
     }
 }

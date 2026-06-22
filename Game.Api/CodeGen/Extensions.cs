@@ -1,9 +1,28 @@
 ﻿using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Game.Api.CodeGen
 {
-    internal static class CodeGenExtensions
+    internal static partial class CodeGenExtensions
     {
+        /// <summary>
+        /// Returns a copy of this string, but the first letter is lowercase. An empty string is returned unchanged.
+        /// Used to emit camelCase TypeScript identifiers from PascalCase member names.
+        /// </summary>
+        internal static string Decapitalize(this string str)
+        {
+            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
+        }
+
+        /// <summary>
+        /// Returns a copy of this string, but each sequence of a lowercase character followed by an uppercase character has a "-"
+        /// inserted between the characters then the entire string is converted to lowercase. Used to emit kebab-cased file names.
+        /// </summary>
+        internal static string SnakeCase(this string str)
+        {
+            return WordBreakRegex().Replace(str, "$1-$2").ToLower();
+        }
+
         internal static NullabilityInfo GetNullabilityInfo(this ParameterInfo parameter)
         {
             var nullabilityContext = new NullabilityInfoContext();
@@ -100,5 +119,8 @@ namespace Game.Api.CodeGen
         {
             return type.IsValueType && MirroredStructs.Contains(type);
         }
+
+        [GeneratedRegex("([a-z])([A-Z])")]
+        private static partial Regex WordBreakRegex();
     }
 }

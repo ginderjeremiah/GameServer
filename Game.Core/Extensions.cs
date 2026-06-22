@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Game.Core
@@ -10,26 +9,6 @@ namespace Game.Core
     public static partial class Extensions
     {
         private static readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-        /// <summary>
-        /// Converts this object to a string using its <see cref="object.ToString"/> method then converts that to a base64 string representation.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="obj"></param>
-        /// <returns>A base64 <see cref="string"/> representation of this object.</returns>
-        public static string ToBase64<T>(this T obj)
-        {
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(obj?.ToString() ?? ""));
-        }
-
-        /// <summary>
-        /// Reads the <see cref="HttpRequestMessage.Content"/> as a JSON stream and deserializes it to an object of type <typeparamref name="T"/>.
-        /// </summary>
-        public static T? Deserialize<T>(this HttpResponseMessage msg)
-        {
-            var stream = msg.Content.ReadAsStream();
-            return stream.Length > 0 ? JsonSerializer.Deserialize<T>(stream, _options) : default;
-        }
 
         /// <summary>
         /// Deserializes this string from JSON to an object of type <typeparamref name="T"/>.
@@ -108,16 +87,6 @@ namespace Game.Core
         }
 
         /// <summary>
-        /// Returns a copy of this string, but the first letter is lowercase. An empty string is returned unchanged.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns>A string with the first letter lowercase.</returns>
-        public static string Decapitalize(this string str)
-        {
-            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
-        }
-
-        /// <summary>
         /// Returns a copy of this string, but the first letter is uppercase. An empty string is returned unchanged.
         /// </summary>
         /// <param name="str"></param>
@@ -135,17 +104,6 @@ namespace Game.Core
         public static string SpaceWords(this string str)
         {
             return WordBreakRegex().Replace(str, "$1 $2");
-        }
-
-        /// <summary>
-        /// Returns a copy of this string, but each sequence of a lowercase character followed by an uppercase character has a "-" inserted between the characters
-        /// then the entire string is converted to lowercase.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns>A string in lowercase with "-"s between each lowercase character followed by an uppercase character in the original string.</returns>
-        public static string SnakeCase(this string str)
-        {
-            return WordBreakRegex().Replace(str, "$1-$2").ToLower();
         }
 
         [GeneratedRegex("([a-z])([A-Z])")]
