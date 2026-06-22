@@ -5,6 +5,7 @@ import {
 	EEntityType,
 	EModifierType,
 	ERarity,
+	ESkillAcquisition,
 	ESkillEffectTarget,
 	EStatisticType,
 	type IPlayerStatistic
@@ -97,7 +98,7 @@ function seed(): void {
 		{ id: 2, name: 'Cinder Tyrant', isBoss: true, attributeDistribution: dist(), skillPool: [0, 1], spawns: [] }
 	];
 	staticData.skills = [
-		// Cleave: a Strength-scaling attack used by two enemies (one a boss).
+		// Cleave: a Strength-scaling attack used by two enemies (one a boss); rewarded by challenge 0.
 		{
 			id: 0,
 			name: 'Cleave',
@@ -105,16 +106,18 @@ function seed(): void {
 			baseDamage: 14,
 			cooldownMs: 1800,
 			rarityId: ERarity.Rare,
+			acquisition: ESkillAcquisition.Player,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
 			effects: []
 		},
-		// War Cry: a utility buff/debuff with no base damage, used by every enemy.
+		// War Cry: a utility buff/debuff with no base damage, used by every enemy; granted by an item.
 		{
 			id: 1,
 			name: 'War Cry',
 			description: 'A rallying shout.',
 			baseDamage: 0,
 			cooldownMs: 6000,
+			acquisition: ESkillAcquisition.Item,
 			damageMultipliers: [],
 			effects: [
 				{
@@ -139,17 +142,20 @@ function seed(): void {
 				}
 			]
 		},
-		// Focus: a player-only skill (no enemy uses it) — the catalogue still lists it.
+		// Focus: no enemy lists it in its pool, and it's Enemy-flagged with no player source → enemy-only.
 		{
 			id: 2,
 			name: 'Focus',
 			description: 'Center your mind.',
 			baseDamage: 0,
 			cooldownMs: 0,
+			acquisition: ESkillAcquisition.Enemy,
 			damageMultipliers: [],
 			effects: []
 		}
 	];
+	// One item, a Rare staff, grants War Cry (skill 1) — the Item acquisition channel.
+	staticData.items = [{ id: 0, name: 'Ember Staff', rarityId: ERarity.Rare, grantedSkillId: 1, retiredAt: undefined }];
 	staticData.challenges = [
 		{
 			id: 0,
@@ -157,7 +163,8 @@ function seed(): void {
 			challengeTypeId: EChallengeType.EnemiesKilled,
 			entityType: EEntityType.Enemy,
 			targetEntityId: 0,
-			progressGoal: 100
+			progressGoal: 100,
+			rewardSkillId: 0
 		},
 		{
 			id: 1,
@@ -630,6 +637,54 @@ describe('CodexView skill dossier', () => {
 		// A skill with no recorded statistics yields an empty record.
 		view.selectSkill(2);
 		expect(view.skillStatistics).toEqual([]);
+	});
+
+	it('surfaces a challenge reward as a "Rewarded by" source', () => {
+		const view = new CodexView();
+		view.selectSkill(0); // Cleave — rewarded by challenge 0
+		expect(view.skillProvenance.status).toBe('obtainable');
+		expect(view.skillProvenance.sources).toEqual([
+			{ kind: 'challenge', id: 0, label: 'Rewarded by', name: 'Cull the Skitterers', accent: 'var(--attr-intellect)' }
+		]);
+		expect(view.skillProvenance.emptyLabel).toBe('');
+	});
+
+	it('surfaces an item grant as a "Granted by" source, tinted by the item rarity', () => {
+		const view = new CodexView();
+		view.selectSkill(1); // War Cry — granted by the Rare Ember Staff
+		expect(view.skillProvenance.status).toBe('obtainable');
+		expect(view.skillProvenance.sources).toEqual([
+			{ kind: 'item', id: 0, label: 'Granted by', name: 'Ember Staff', accent: 'var(--rarity-rare)' }
+		]);
+	});
+
+	it('words an enemy-flagged skill with no player source as enemy-only', () => {
+		const view = new CodexView();
+		view.selectSkill(2); // Focus — Enemy-flagged, no reward/grant
+		expect(view.skillProvenance.status).toBe('enemy-only');
+		expect(view.skillProvenance.sources).toEqual([]);
+		expect(view.skillProvenance.emptyLabel).toContain('Enemy-only');
+	});
+
+	it('words a flagged-but-unreferenced skill as not obtainable (intent ≠ reality)', () => {
+		// Re-flag Focus as Item-acquirable but leave it granted by no item: the flag must not invent a source.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		staticData.skills[2] = { ...(staticData.skills[2] as any), acquisition: ESkillAcquisition.Item };
+		const view = new CodexView();
+		view.selectSkill(2);
+		expect(view.skillProvenance.status).toBe('unobtainable');
+		expect(view.skillProvenance.sources).toEqual([]);
+		expect(view.skillProvenance.emptyLabel).toBe('Not currently obtainable.');
+	});
+
+	it('excludes a retired item grant from the sources', () => {
+		// Retire the Ember Staff: War Cry loses its only source and falls back to its flag wording.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		staticData.items[0] = { ...(staticData.items[0] as any), retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView();
+		view.selectSkill(1); // War Cry — Item-flagged, but its granting item is retired
+		expect(view.skillProvenance.sources).toEqual([]);
+		expect(view.skillProvenance.status).toBe('unobtainable');
 	});
 });
 

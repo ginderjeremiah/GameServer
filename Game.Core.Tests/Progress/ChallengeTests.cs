@@ -66,6 +66,31 @@ namespace Game.Core.Tests.Progress
             Assert.False(playerChallenge.Completed);
         }
 
+        [Fact]
+        public void UpdateChallengeProgress_EveryChallengeType_AdvancesProgress_NeverSilentlyNoOps()
+        {
+            // Each challenge type must actually move progress when its tracked value is satisfied — a
+            // statistic-backed type from its statistic, LevelReached from the player's level. A type that
+            // is neither would fall through the fail-loud guard and throw, so this fails on a half-wired
+            // new type rather than letting it silently never progress.
+            var player = new PlayerBuilder().WithLevel(50).Build();
+
+            foreach (var type in Enum.GetValues<EChallengeType>())
+            {
+                var challenge = MakeChallenge(type, goal: 1);
+                var playerChallenge = new PlayerChallenge(challenge, progress: 0m, completed: false);
+                var statisticType = challenge.Type.StatisticType;
+                var statistics = statisticType is not null
+                    ? new[] { new PlayerStatistic { Type = statisticType.Id, EntityId = null, Value = 1m } }
+                    : [];
+                var progress = MakeProgress(player, statistics);
+
+                challenge.UpdateChallengeProgress(playerChallenge, progress);
+
+                Assert.True(playerChallenge.Completed, $"Challenge type {type} did not progress.");
+            }
+        }
+
         private static Challenge MakeChallenge(EChallengeType type, decimal goal, int? targetEntityId = null) => new()
         {
             Id = 0,
