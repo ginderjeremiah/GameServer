@@ -172,6 +172,68 @@ describe('battleStep', () => {
 		});
 	});
 
+	// End-of-tick ordering: a heal-over-time applies before the death check, so it can save a battler from an
+	// otherwise-lethal DoT tick (#1090). Mirrors the backend BattleDamageOverTimeTests.
+	describe('DoT/HoT ordering (heal before death check)', () => {
+		it('lets a heal offset a lethal DoT tick and keep the player alive', () => {
+			// 50-HP player takes 60 DoT this tick (more than its whole health) but an equal 60 heal applies
+			// before the death check, restoring it to MaxHealth.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.DamageTakenPerSecond, amount: 1500 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 1500 },
+					...baseStats
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, []);
+
+			battleStep(player, enemy, 40, noRng());
+
+			expect(player.isDead).toBe(false);
+			expect(player.currentHealth).toBe(50); // 50 − 60 + 60, capped at MaxHealth
+		});
+
+		it('lets a heal offset a lethal DoT tick and keep the enemy alive', () => {
+			// The enemy resolves first; its own heal applies before its death check too.
+			const player = makeBattler(baseStats, []);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.DamageTakenPerSecond, amount: 1500 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 1500 },
+					...baseStats
+				],
+				[]
+			);
+
+			battleStep(player, enemy, 40, noRng());
+
+			expect(enemy.isDead).toBe(false);
+			expect(enemy.currentHealth).toBe(50);
+		});
+
+		it('still kills when the heal cannot offset the whole tick', () => {
+			// A 5-HP player takes 10 DoT and heals 4, dying at −1: the heal applies but is insufficient.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.DamageTakenPerSecond, amount: 250 },
+					{ id: EAttribute.HealthRegenPerSecond, amount: 100 },
+					...baseStats
+				],
+				[]
+			);
+			player.takeDamage(47); // Defense 2 → 45 damage → currentHealth 5
+			const enemy = makeBattler(baseStats, []);
+			const log = newLog();
+
+			battleStep(player, enemy, 40, noRng(), log);
+
+			expect(player.isDead).toBe(true);
+			expect(player.currentHealth).toBe(-1); // 5 − 10 + 4
+			expect(log.playerHotHeal).toBe(4);
+		});
+	});
+
 	// Player-only crit/dodge/block, mirroring the backend BattleContextTests. Chances are forced to 1/0
 	// so the outcome is deterministic regardless of the seed; the draw-order test pins the per-fire counts.
 	describe('crit / dodge / block (player-only, seeded)', () => {
