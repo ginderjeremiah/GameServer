@@ -173,6 +173,9 @@ namespace Game.Core.Players
         /// </summary>
         public void UnlockSkill(Skill skill)
         {
+            // A linear "already unlocked?" scan, unlike the deliberately O(1) UnlockItem/UnlockMod paths.
+            // Skills grow far slower than items (and aren't read on the battle-start hot path the way the
+            // unlocked-item set is), so the scan over the small skill count is acceptable here.
             if (!Skills.Any(s => s.Id == skill.Id))
             {
                 Skills.Add(skill);

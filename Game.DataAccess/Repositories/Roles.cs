@@ -8,16 +8,19 @@ namespace Game.DataAccess.Repositories
     {
         // Roles are intrinsic reference data: the ERole enum is the source of truth and the database
         // is only seeded from it (see GameContext). There is therefore nothing to query — the full
-        // set can be constructed in memory directly from the enum.
+        // set is built once from the enum (avoiding the per-call reflection-backed ToString()).
+        private static readonly Role[] _roles = Enum.GetValues<ERole>()
+            .Select(role => new Role
+            {
+                Id = (int)role,
+                Name = role.ToString(),
+            })
+            .ToArray();
+
+        // Returns a fresh list per call so a caller cannot mutate the shared precomputed set.
         public List<Role> GetRoles()
         {
-            return Enum.GetValues<ERole>()
-                .Select(role => new Role
-                {
-                    Id = (int)role,
-                    Name = role.ToString(),
-                })
-                .ToList();
+            return [.. _roles];
         }
     }
 }

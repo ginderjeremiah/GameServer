@@ -186,6 +186,31 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetDomainZone_ReturnsSharedInstanceAndCorrectData()
+        {
+            int zoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                zoneId = (await TestDataSeeder.CreateZoneAsync(context, "Shared Zone", levelMin: 4, levelMax: 7)).Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            var first = zones.GetDomainZone(zoneId);
+            var second = zones.GetDomainZone(zoneId);
+
+            // The optimization: repeated reads hand back the snapshot's pre-materialized instance, not a fresh map.
+            Assert.Same(first, second);
+            Assert.Equal(zoneId, first.Id);
+            Assert.Equal(4, first.LevelMin);
+            Assert.Equal(7, first.LevelMax);
+        }
+
+        [Fact]
         public async Task ChallengesAll_ReturnsSnapshotDirectlyWithoutCopying()
         {
             int challengeId;
