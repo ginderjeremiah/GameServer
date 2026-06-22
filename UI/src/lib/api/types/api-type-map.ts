@@ -18,6 +18,7 @@ import type {
 	IItemModSlot,
 	ILoginCredentials,
 	ILoginResult,
+	IPath,
 	IPlayerData,
 	IPlayerSummary,
 	IProficiency,
@@ -29,7 +30,7 @@ import type {
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
-	ISetProficiencyContributionsData,
+	ISetPathContributionsData,
 	ISetProficiencyModifiersData,
 	ISetProficiencyPrerequisitesData,
 	ISetProficiencyRewardsData,
@@ -52,6 +53,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditItemMods': undefined;
 	'AdminTools/AddEditItemModSlots': undefined;
 	'AdminTools/AddEditItems': undefined;
+	'AdminTools/AddEditPaths': undefined;
 	'AdminTools/AddEditProficiencies': undefined;
 	'AdminTools/AddEditSkills': undefined;
 	'AdminTools/AddEditTags': undefined;
@@ -65,7 +67,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
-	'AdminTools/SetProficiencyContributions': undefined;
+	'AdminTools/SetPathContributions': undefined;
 	'AdminTools/SetProficiencyModifiers': undefined;
 	'AdminTools/SetProficiencyPrerequisites': undefined;
 	'AdminTools/SetProficiencyRewards': undefined;
@@ -98,6 +100,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditItemMods': IChange<IItemMod>[];
 	'AdminTools/AddEditItemModSlots': IChange<IItemModSlot>[];
 	'AdminTools/AddEditItems': IChange<IItem>[];
+	'AdminTools/AddEditPaths': IChange<IPath>[];
 	'AdminTools/AddEditProficiencies': IChange<IProficiency>[];
 	'AdminTools/AddEditSkills': IChange<ISkill>[];
 	'AdminTools/AddEditTags': IChange<ITag>[];
@@ -110,7 +113,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
-	'AdminTools/SetProficiencyContributions': ISetProficiencyContributionsData;
+	'AdminTools/SetPathContributions': ISetPathContributionsData;
 	'AdminTools/SetProficiencyModifiers': ISetProficiencyModifiersData;
 	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData;
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;

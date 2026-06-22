@@ -28,11 +28,17 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
 
+                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+
                 var proficiency = new Entities.Proficiency
                 {
                     Name = "Blades",
                     Description = "d",
                     IconPath = "i",
+                    PathId = path.Id,
+                    PathOrdinal = 0,
                     MaxLevel = 10,
                     BaseXp = 100m,
                     XpGrowth = 2m,
@@ -40,7 +46,6 @@ namespace Game.Application.Tests.DataAccess
                     LevelModifiers = [],
                     LevelRewards = [],
                     Prerequisites = [],
-                    SkillContributions = [],
                 };
                 context.Proficiencies.Add(proficiency);
                 await context.SaveChangesAsync(CancellationToken);
@@ -60,10 +65,11 @@ namespace Game.Application.Tests.DataAccess
                     Level = 5,
                     RewardSkillId = skillId,
                 });
-                context.SkillProficiencies.Add(new Entities.SkillProficiency
+                context.SkillPathContributions.Add(new Entities.SkillPathContribution
                 {
                     SkillId = skillId,
-                    ProficiencyId = proficiencyId,
+                    PathId = proficiency.PathId,
+                    HomeTier = proficiency.PathOrdinal,
                     Weight = 1.5m,
                 });
                 await context.SaveChangesAsync(CancellationToken);
@@ -86,11 +92,16 @@ namespace Game.Application.Tests.DataAccess
             Assert.Empty(level5.Modifiers);
             Assert.Equal(skillId, level5.RewardSkillId);
 
+            // The contribution targets the path at the proficiency's tier; the reverse index resolves it back
+            // to the home-tier proficiency (the shim the accrual reads until #1161).
             var contributions = proficiencies.ContributionsForSkill(skillId);
             Assert.Equal(proficiencyId, contributions.Single().ProficiencyId);
             Assert.Equal(1.5d, contributions.Single().Weight);
 
             Assert.Contains(proficiencies.AllProficiencies(), p => p.Id == proficiencyId && p.Name == "Blades");
+            Assert.Contains(
+                proficiencies.AllPaths(),
+                p => p.Name == "Fire" && p.Contributions.Any(c => c.SkillId == skillId && c.HomeTier == 0));
         }
 
         [Fact]

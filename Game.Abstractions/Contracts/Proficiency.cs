@@ -9,6 +9,10 @@ namespace Game.Abstractions.Contracts
         public required string Name { get; set; }
         public required string Description { get; set; }
         public required string IconPath { get; set; }
+
+        /// <summary>The path this proficiency is a tier of, and its 0-based position (tier) within it.</summary>
+        public int PathId { get; set; }
+        public int PathOrdinal { get; set; }
         public int MaxLevel { get; set; }
         public decimal BaseXp { get; set; }
         public decimal XpGrowth { get; set; }
@@ -20,7 +24,8 @@ namespace Game.Abstractions.Contracts
 
         public required IEnumerable<ProficiencyLevelModifier> LevelModifiers { get; set; }
         public required IEnumerable<ProficiencyLevelReward> LevelRewards { get; set; }
+
+        /// <summary>Cross-path gateway prerequisites (within-path order is implicit in <see cref="PathOrdinal"/>).</summary>
         public required IEnumerable<int> PrerequisiteIds { get; set; }
-        public required IEnumerable<SkillProficiencyContribution> Contributions { get; set; }
     }
 }

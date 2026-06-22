@@ -39,11 +39,12 @@ namespace Game.TestInfrastructure.Helpers
                     "Zones",
                     "Tags",
                     "Challenges",
+                    "Paths",
                     "Proficiencies",
                     "ProficiencyLevelModifiers",
                     "ProficiencyLevelRewards",
                     "ProficiencyPrerequisites",
-                    "SkillProficiencies"
+                    "SkillPathContributions"
                 RESTART IDENTITY CASCADE
                 """);
         }

@@ -58,6 +58,8 @@ namespace Game.Application.Tests.Mapping
 
             Assert.Equal(0, core.Id);
             Assert.Equal("Blades", core.Name);
+            Assert.Equal(1, core.PathId);
+            Assert.Equal(2, core.PathOrdinal);
             Assert.Equal(10, core.MaxLevel);
             Assert.Equal(100d, core.BaseXp);
             Assert.Equal(1.5d, core.XpGrowth);
@@ -72,19 +74,42 @@ namespace Game.Application.Tests.Mapping
             var entity = NewProficiency(
                 modifiers: [Modifier(level: 2, EAttribute.Agility, 3m)],
                 rewards: [Reward(level: 2, rewardSkillId: 8)]);
-            entity.SkillContributions = [new() { SkillId = 5, ProficiencyId = 0, Weight = 1.5m }];
 
             var contract = ProficiencyMapper.ToContract(entity);
 
             Assert.Equal("Blades", contract.Name);
+            Assert.Equal(1, contract.PathId);
+            Assert.Equal(2, contract.PathOrdinal);
             Assert.Equal(100m, contract.BaseXp);
             var modifier = Assert.Single(contract.LevelModifiers);
             Assert.Equal(EAttribute.Agility, modifier.AttributeId);
             Assert.Equal(3m, modifier.Amount);
             var reward = Assert.Single(contract.LevelRewards);
             Assert.Equal(8, reward.RewardSkillId);
+        }
+
+        [Fact]
+        public void PathMapper_ToContract_RoundTripsContributions()
+        {
+            var path = new Entities.Path
+            {
+                Id = 0,
+                Name = "Fire",
+                Description = "The fire line.",
+                FalloffBase = 0.3m,
+                SkillContributions =
+                [
+                    new() { SkillId = 5, PathId = 0, HomeTier = 1, Weight = 1.5m },
+                ],
+            };
+
+            var contract = PathMapper.ToContract(path);
+
+            Assert.Equal("Fire", contract.Name);
+            Assert.Equal(0.3m, contract.FalloffBase);
             var contribution = Assert.Single(contract.Contributions);
             Assert.Equal(5, contribution.SkillId);
+            Assert.Equal(1, contribution.HomeTier);
             Assert.Equal(1.5m, contribution.Weight);
         }
 
@@ -113,6 +138,8 @@ namespace Game.Application.Tests.Mapping
                 Name = "Blades",
                 Description = "A blade discipline.",
                 IconPath = "blades.png",
+                PathId = 1,
+                PathOrdinal = 2,
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 1.5m,
@@ -121,7 +148,6 @@ namespace Game.Application.Tests.Mapping
                 LevelModifiers = modifiers ?? [],
                 LevelRewards = rewards ?? [],
                 Prerequisites = [],
-                SkillContributions = [],
             };
     }
 }

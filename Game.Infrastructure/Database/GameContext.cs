@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Attribute = Game.Infrastructure.Entities.Attribute;
+using Path = Game.Infrastructure.Entities.Path;
 
 namespace Game.Infrastructure.Database
 {
@@ -50,11 +51,12 @@ namespace Game.Infrastructure.Database
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<SkillEffect> SkillEffects { get; set; }
+        public DbSet<Path> Paths { get; set; }
         public DbSet<Proficiency> Proficiencies { get; set; }
         public DbSet<ProficiencyLevelModifier> ProficiencyLevelModifiers { get; set; }
         public DbSet<ProficiencyLevelReward> ProficiencyLevelRewards { get; set; }
         public DbSet<ProficiencyPrerequisite> ProficiencyPrerequisites { get; set; }
-        public DbSet<SkillProficiency> SkillProficiencies { get; set; }
+        public DbSet<SkillPathContribution> SkillPathContributions { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
@@ -400,6 +402,21 @@ namespace Game.Infrastructure.Database
                     .HasForeignKey(se => se.ScalingAttributeId);
             });
 
+            modelBuilder.Entity<Path>(entity =>
+            {
+                entity.Property(p => p.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(p => p.Name)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(p => p.FalloffBase)
+                    .HasPrecision(18, 3);
+            });
+
             modelBuilder.Entity<Proficiency>(entity =>
             {
                 entity.Property(p => p.Id)
@@ -419,6 +436,15 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(p => p.XpGrowth)
                     .HasPrecision(18, 3);
+
+                entity.HasOne(p => p.Path)
+                    .WithMany(path => path.Proficiencies)
+                    .HasForeignKey(p => p.PathId);
+
+                // A path's tiers occupy distinct ordinals; the unique index bakes that invariant into the
+                // schema and makes the home-tier → tier resolution unambiguous.
+                entity.HasIndex(p => new { p.PathId, p.PathOrdinal })
+                    .IsUnique();
 
                 // Optional tree-seed skill. Clear the FK if the skill is ever removed (skills are retired,
                 // not deleted, so this never fires in practice).
@@ -475,9 +501,9 @@ namespace Game.Infrastructure.Database
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<SkillProficiency>(entity =>
+            modelBuilder.Entity<SkillPathContribution>(entity =>
             {
-                entity.HasKey(sp => new { sp.SkillId, sp.ProficiencyId });
+                entity.HasKey(sp => new { sp.SkillId, sp.PathId });
 
                 entity.Property(sp => sp.Weight)
                     .HasPrecision(18, 3);
@@ -486,9 +512,9 @@ namespace Game.Infrastructure.Database
                     .WithMany()
                     .HasForeignKey(sp => sp.SkillId);
 
-                entity.HasOne(sp => sp.Proficiency)
+                entity.HasOne(sp => sp.Path)
                     .WithMany(p => p.SkillContributions)
-                    .HasForeignKey(sp => sp.ProficiencyId);
+                    .HasForeignKey(sp => sp.PathId);
             });
 
             modelBuilder.Entity<StatisticType>(entity =>

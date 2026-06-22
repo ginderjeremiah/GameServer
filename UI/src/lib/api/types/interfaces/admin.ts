@@ -10,7 +10,7 @@ import type {
 	IProficiencyLevelModifier,
 	IProficiencyLevelReward,
 	ISkillEffect,
-	ISkillProficiencyContribution,
+	ISkillPathContribution,
 	IZoneEnemy
 } from '../';
 
@@ -62,9 +62,9 @@ export interface ISetEnemySpawnsData {
 	spawns: IEnemySpawn[];
 }
 
-export interface ISetProficiencyContributionsData {
+export interface ISetPathContributionsData {
 	id: number;
-	contributions: ISkillProficiencyContribution[];
+	contributions: ISkillPathContribution[];
 }
 
 export interface ISetProficiencyModifiersData {

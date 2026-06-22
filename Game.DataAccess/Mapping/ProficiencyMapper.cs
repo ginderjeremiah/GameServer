@@ -18,6 +18,8 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 Description = entity.Description,
                 IconPath = entity.IconPath,
+                PathId = entity.PathId,
+                PathOrdinal = entity.PathOrdinal,
                 MaxLevel = entity.MaxLevel,
                 BaseXp = entity.BaseXp,
                 XpGrowth = entity.XpGrowth,
@@ -40,12 +42,6 @@ namespace Game.DataAccess.Mapping
                     }).ToList(),
                 PrerequisiteIds = entity.Prerequisites
                     .Select(p => p.PrerequisiteProficiencyId).ToList(),
-                Contributions = entity.SkillContributions
-                    .Select(c => new Contracts.SkillProficiencyContribution
-                    {
-                        SkillId = c.SkillId,
-                        Weight = c.Weight,
-                    }).ToList(),
             };
         }
 
@@ -83,6 +79,8 @@ namespace Game.DataAccess.Mapping
                 Id = entity.Id,
                 Name = entity.Name,
                 Description = entity.Description,
+                PathId = entity.PathId,
+                PathOrdinal = entity.PathOrdinal,
                 MaxLevel = entity.MaxLevel,
                 BaseXp = (double)entity.BaseXp,
                 XpGrowth = (double)entity.XpGrowth,

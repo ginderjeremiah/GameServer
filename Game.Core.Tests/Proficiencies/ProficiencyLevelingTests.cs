@@ -101,6 +101,8 @@ namespace Game.Core.Tests.Proficiencies
             Id = 0,
             Name = "Test",
             Description = string.Empty,
+            PathId = 0,
+            PathOrdinal = 0,
             MaxLevel = maxLevel,
             BaseXp = baseXp,
             XpGrowth = xpGrowth,

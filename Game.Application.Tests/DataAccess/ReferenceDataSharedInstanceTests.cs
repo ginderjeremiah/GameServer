@@ -101,11 +101,17 @@ namespace Game.Application.Tests.DataAccess
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var path = new Entities.Path { Name = "Shared Path", Description = "", FalloffBase = 0.3m };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+
                 var proficiency = new Entities.Proficiency
                 {
                     Name = "Shared Proficiency",
                     Description = "",
                     IconPath = "",
+                    PathId = path.Id,
+                    PathOrdinal = 0,
                     MaxLevel = 10,
                     BaseXp = 100m,
                     XpGrowth = 2m,
@@ -113,7 +119,6 @@ namespace Game.Application.Tests.DataAccess
                     LevelModifiers = [],
                     LevelRewards = [],
                     Prerequisites = [],
-                    SkillContributions = [],
                 };
                 context.Proficiencies.Add(proficiency);
                 await context.SaveChangesAsync(CancellationToken);
