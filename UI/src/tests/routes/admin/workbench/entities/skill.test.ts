@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EChangeType, EModifierType, ESkillAcquisition, ESkillEffectTarget, type ISkill } from '$lib/api';
+import {
+	ERarity,
+	EAttribute,
+	EChangeType,
+	EModifierType,
+	ESkillAcquisition,
+	ESkillEffectTarget,
+	type ISkill
+} from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Skill config transforms: `newItem` defaults, the derived meta line, the effects
@@ -66,11 +74,25 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			rarityId: ERarity.Common,
 			acquisition: ESkillAcquisition.Player,
 			description: '',
 			damageMultipliers: [],
 			effects: []
 		});
+	});
+
+	it('list badge surfaces the rarity tier name and hue', () => {
+		const skill: ISkill = { ...skillEntity.newItem(1), rarityId: ERarity.Legendary };
+		expect(skillEntity.listBadge?.(skill)).toBe('Legendary');
+		expect(skillEntity.badgeColor?.(skill)).toContain('--rarity-');
+	});
+
+	it('the identity section exposes a Rarity select bound to rarityId', () => {
+		const identity = skillEntity.sections.find((s) => s.key === 'identity');
+		const fields = identity && 'fields' in identity ? identity.fields : [];
+		const rarityField = fields.find((f) => f.key === 'rarityId');
+		expect(rarityField).toMatchObject({ type: 'select', label: 'Rarity' });
 	});
 
 	it('meta shows the damage, multiplier count, effect count and cooldown', () => {
@@ -137,6 +159,7 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			rarityId: ERarity.Common,
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -163,6 +186,7 @@ describe('skillEntity', () => {
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
+			rarityId: ERarity.Common,
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -191,6 +215,7 @@ describe('skillEntity', () => {
 			baseDamage: 5,
 			cooldownMs: 1000,
 			iconPath: '',
+			rarityId: ERarity.Common,
 			acquisition: ESkillAcquisition.Player,
 			description: 'Poisons the foe',
 			damageMultipliers: [],

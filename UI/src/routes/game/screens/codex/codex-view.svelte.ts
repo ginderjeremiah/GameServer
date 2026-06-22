@@ -32,7 +32,9 @@ import {
 	describeEffect,
 	effectDirectionColor,
 	enemyAttributesAtLevel,
-	formatNum
+	formatNum,
+	rarityColor,
+	rarityLabel
 } from '$lib/common';
 import { playerChallenges, staticData, statistics } from '$stores';
 import { fmtValue } from '../stats/statistics-display';
@@ -169,7 +171,15 @@ export interface SkillRowVM {
 	cooldownLabel: string;
 	/** How many (non-retired) enemies have this skill in their pool. */
 	usedByCount: number;
+	/** Themeable rarity hue for the row's tier mark. */
+	rarityColor: string;
 	selected: boolean;
+}
+
+/** The selected skill's rarity tier (hue + label) for the dossier header. */
+export interface SkillRarityVM {
+	color: string;
+	label: string;
 }
 
 export interface SkillScalingVM {
@@ -559,6 +569,7 @@ export class CodexView {
 			baseDamageLabel: formatBaseDamage(sk.baseDamage),
 			cooldownLabel: formatCooldown(sk.cooldownMs),
 			usedByCount: enemies.filter((e) => e.skillPool.includes(sk.id)).length,
+			rarityColor: rarityColor(sk.rarityId),
 			selected: sk.id === this.selectedSkillId
 		}));
 	});
@@ -569,6 +580,12 @@ export class CodexView {
 	readonly selectedSkill = $derived<ISkill | undefined>(
 		this.skillsCatalogue.find((s) => s.id === this.selectedSkillId) ?? this.skillsCatalogue[0]
 	);
+
+	/** The selected skill's rarity tier (hue + label) for the dossier header accent. */
+	readonly selectedSkillRarity = $derived.by<SkillRarityVM | null>(() => {
+		const sk = this.selectedSkill;
+		return sk ? { color: rarityColor(sk.rarityId), label: rarityLabel(sk.rarityId) } : null;
+	});
 
 	/** The attributes the selected skill's damage scales with, each tinted by its attribute accent. */
 	readonly skillScaling = $derived.by<SkillScalingVM[]>(() => {

@@ -4,6 +4,7 @@ import {
 	EChallengeType,
 	EEntityType,
 	EModifierType,
+	ERarity,
 	ESkillEffectTarget,
 	EStatisticType,
 	type IPlayerStatistic
@@ -103,6 +104,7 @@ function seed(): void {
 			description: 'A wide sweeping strike.',
 			baseDamage: 14,
 			cooldownMs: 1800,
+			rarityId: ERarity.Rare,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1.5 }],
 			effects: []
 		},
@@ -544,6 +546,14 @@ describe('CodexView skill table', () => {
 		const view = new CodexView();
 		view.selectSkill(1);
 		expect(view.skillRows.find((r) => r.selected)?.id).toBe(1);
+	});
+
+	it('tints each row by its rarity tier and exposes the selected skill rarity for the dossier', () => {
+		const view = new CodexView();
+		// Cleave is authored Rare; its row mark and the dossier accent resolve to the rarity hue + label.
+		expect(view.skillRows.find((r) => r.id === 0)?.rarityColor).toContain('--rarity-');
+		view.selectSkill(0);
+		expect(view.selectedSkillRarity).toEqual({ color: expect.stringContaining('--rarity-'), label: 'Rare' });
 	});
 });
 

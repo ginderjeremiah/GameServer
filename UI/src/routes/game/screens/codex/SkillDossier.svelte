@@ -1,14 +1,19 @@
-<!-- The skill dossier (right panel): an intellect-accented header (Skill + name + description), base
-     damage / cooldown meta, the attributes the skill scales with, its authored effects (wording from
-     the shared skill-effect-display helper), and the enemies that use it. The "used by" pills
-     cross-link into the enemy dossier. A reference card only — no equip/loadout, no player-build DPS. -->
+<!-- The skill dossier (right panel): the header carries a rarity-tinted accent border + tier tag
+     alongside the intellect "Skill" kind mark (mirroring items: rarity on the border, kind on the
+     label), base damage / cooldown meta, the attributes the skill scales with, its authored effects
+     (wording from the shared skill-effect-display helper), and the enemies that use it. The "used by"
+     pills cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
 {#if view.selectedSkill}
 	{@const skill = view.selectedSkill}
+	{@const rarity = view.selectedSkillRarity}
 	<div class="dossier" data-testid="codex-skill-dossier">
-		<div class="head">
+		<div class="head" style:border-left-color={rarity?.color}>
 			<div class="kind-line">
 				<span class="kind-dot"></span>
 				<span class="kind">Skill</span>
+				{#if rarity}
+					<span class="rarity-tag" style:--rarity={rarity.color}>{rarity.label}</span>
+				{/if}
 			</div>
 			<div class="name">{skill.name}</div>
 			{#if skill.description}
@@ -143,6 +148,18 @@ let { view }: Props = $props();
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: var(--attr-intellect);
+}
+
+.rarity-tag {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--rarity);
+	padding: 2px 7px;
+	border: 1px solid color-mix(in srgb, var(--rarity) 45%, transparent);
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--rarity) 12%, transparent);
 }
 
 .name {

@@ -8,12 +8,15 @@
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
+        public int RarityId { get; set; }
 
         /// <summary>The <see cref="Core.ESkillAcquisition"/> bitmask of channels allowed to grant this skill.</summary>
         public int Acquisition { get; set; }
 
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
+
+        public virtual Rarity Rarity { get => field ?? throw new NotLoadedException(nameof(Rarity)); set; }
 
         public virtual List<SkillDamageMultiplier> SkillDamageMultipliers { get => field ?? throw new NotLoadedException(nameof(SkillDamageMultipliers)); set; }
         public virtual List<SkillEffect> SkillEffects { get => field ?? throw new NotLoadedException(nameof(SkillEffects)); set; }

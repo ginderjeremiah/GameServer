@@ -8,7 +8,10 @@
 				{/if}
 			</div>
 			<div class="d-headings">
-				<div class="eyebrow">{scalesEyebrow}</div>
+				<div class="eyebrow-row">
+					<span class="eyebrow">{scalesEyebrow}</span>
+					<span class="rarity-tag" style:--rarity={rarityAccent}>{rarityName}</span>
+				</div>
 				<div class="d-name">{metrics.skill.name}</div>
 				<div class="d-desc">{metrics.skill.description}</div>
 			</div>
@@ -66,7 +69,9 @@ import {
 	attributeName,
 	describeEffect,
 	effectDirectionColor,
-	formatNum
+	formatNum,
+	rarityColor,
+	rarityLabel
 } from '$lib/common';
 import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
@@ -86,6 +91,10 @@ const pending = $derived(metrics ? view.pendingSwap === metrics.skill.id : false
 const full = $derived(view.equipped.length >= view.cap);
 
 const fmt = (n: number) => formatNum(Math.round(n));
+
+// The skill's rarity tier, surfaced as a tinted tag beside the eyebrow.
+const rarityAccent = $derived(metrics ? rarityColor(metrics.skill.rarityId) : 'var(--rarity-common)');
+const rarityName = $derived(metrics ? rarityLabel(metrics.skill.rarityId) : '');
 
 // One display description per authored effect, reusing the shared helper so wording/direction
 // match the battle tooltip's "On hit" lines; `id` is kept for a stable each-key.
@@ -192,12 +201,30 @@ const rawNote = $derived.by(() => {
 	min-width: 0;
 }
 
+.eyebrow-row {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+}
+
 .eyebrow {
 	font-family: var(--mono);
 	font-size: 9.5px;
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: var(--text-muted);
+}
+
+.rarity-tag {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--rarity);
+	padding: 2px 7px;
+	border: 1px solid color-mix(in srgb, var(--rarity) 45%, transparent);
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--rarity) 12%, transparent);
 }
 
 .d-name {

@@ -31,13 +31,12 @@ export type SortKey = 'progress' | 'rarity' | 'name';
 export interface ResolvedReward {
 	kind: 'item' | 'mod' | 'skill';
 	revealed: boolean;
-	/** Rarity tier (drives the rarity sort). Skills have no tier, so they resolve to `Common`. */
+	/** Rarity tier (drives the rarity sort). Items, mods, and skills all carry a tier. */
 	rarity: ERarity;
-	/** Themeable accent: the rarity hue for items/mods, the neutral skill accent for skills. */
+	/** Themeable rarity hue for the reward. */
 	accent: string;
-	/** Themeable rarity glow intensity token (`var(--rarity-*-glow)`), or `null` for the rarity-less
-	 *  skill (which gets only the flat base glow, no tier scaling). */
-	glow: string | null;
+	/** Themeable rarity glow intensity token (`var(--rarity-*-glow)`). */
+	glow: string;
 	name: string;
 	/** Teaser sub-line, e.g. `Rare · Helm`, or `Skill`. */
 	sub: string;
@@ -152,8 +151,8 @@ export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward
 		revealed,
 		rarity: base.rarity,
 		accent: base.accent,
-		// Skills carry no rarity tier, so they get no glow; items/mods glow by tier.
-		glow: base.kind === 'skill' ? null : rarityGlow(base.rarity),
+		// Every reward kind carries a rarity tier, so the glow scales by tier uniformly.
+		glow: rarityGlow(base.rarity),
 		name: base.name,
 		sub: base.sub
 	};

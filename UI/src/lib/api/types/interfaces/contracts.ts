@@ -100,6 +100,7 @@ export interface ISkill {
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
+	rarityId: ERarity;
 	acquisition: ESkillAcquisition;
 	retiredAt?: string;
 }

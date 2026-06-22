@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, ESkillAcquisition } from '$lib/api';
+import { ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 
@@ -25,6 +25,7 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	description: '',
 	cooldownMs,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player
 });
 

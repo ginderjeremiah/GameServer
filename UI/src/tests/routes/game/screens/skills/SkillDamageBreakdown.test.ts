@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, ESkillAcquisition, type IAttribute, type ISkill } from '$lib/api';
+import { ERarity, EAttribute, ESkillAcquisition, type IAttribute, type ISkill } from '$lib/api';
 
 // The breakdown resolves the crit-chance label and attribute names through the reference-data store,
 // so it is mocked. The object backs the hoisted `vi.mock` factory, but its `attributes` are populated
@@ -26,6 +26,7 @@ const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	description: '',
 	cooldownMs: 1000,
 	iconPath: '',
+	rarityId: ERarity.Common,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

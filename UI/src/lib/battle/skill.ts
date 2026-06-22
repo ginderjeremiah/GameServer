@@ -1,4 +1,4 @@
-﻿import { IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget, ESkillAcquisition } from '$lib/api';
+﻿import { ERarity, IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget, ESkillAcquisition } from '$lib/api';
 import { Battler } from './battler';
 import { calculateSkillDamage, scaledEffectAmount } from './battle-formulas';
 
@@ -14,6 +14,10 @@ export class Skill implements ISkill {
 	// Carried to satisfy the ISkill contract this display-and-battle model implements; battle logic
 	// never reads provenance (the acquisition flag is authoring intent, not a combat input).
 	acquisition: ESkillAcquisition;
+	// Likewise carried only to satisfy the contract: the battle never reads rarity (it is display
+	// metadata + a server-side proficiency-XP tier weight, never a combat input), so it stays out of
+	// the parity surface even though the field rides along on the model.
+	rarityId: ERarity;
 	chargeTime = 0;
 	renderChargeTime = 0;
 	owner: Battler;
@@ -28,6 +32,7 @@ export class Skill implements ISkill {
 		this.cooldownMs = data.cooldownMs;
 		this.iconPath = data.iconPath;
 		this.acquisition = data.acquisition;
+		this.rarityId = data.rarityId;
 		this.owner = owner;
 	}
 
