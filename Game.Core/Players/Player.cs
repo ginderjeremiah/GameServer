@@ -363,6 +363,10 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
+        // A victory caller MUST pass the battle's real difficulty multiplier — it scales the proficiency-XP
+        // pie, so the default 0 disables the accrual entirely. Defaulting to 0 is correct only for the
+        // loss/abandon paths (no XP on a non-victory); a future victory path that forgets to thread it would
+        // silently accrue zero XP. Today both victory paths route through RecordVictory, which passes it.
         public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp, double difficultyMultiplier = 0)
         {
             RaiseEvent(new BattleCompletedEvent(
