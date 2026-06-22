@@ -239,6 +239,57 @@ namespace Game.Application.Tests.Events
         }
 
         [Fact]
+        public async Task Victory_CoastingOnAStaleSkill_AccruesTheDiscountedPie_NotTheFullPie()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+
+            // A two-tier Fire path (falloff 0.3). The only contributing skill is homed at tier 0, but the
+            // player has already maxed tier 0, so the path's frontier is tier 1 — the stale skill supplements
+            // it one tier behind, at the 0.3 discount, and the un-earned 0.7 of the pie evaporates (the
+            // absolute slowdown, end to end). The maxed tier 0 banks nothing more.
+            const decimal falloffBase = 0.3m;
+            const int maxLevel = 10;
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Fire", falloffBase: falloffBase);
+            var tierZero = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Fire Magic", maxLevel: maxLevel, pathId: path.Id, pathOrdinal: 0);
+            var tierOne = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Inferno Magic", maxLevel: maxLevel, pathId: path.Id, pathOrdinal: 1);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, tierZero.Id, skill.Id, weight: 1m);
+            await TestDataSeeder.AddPlayerProficiencyAsync(context, player.Id, tierZero.Id, level: maxLevel);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var stats = new BattleStats();
+            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            await MakeHandler(scope).HandleAsync(
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var stored = await progressRepo.GetProficiencies(player.Id);
+
+            // The frontier tier banks only the discounted pie (0.3 × pie), not the full pie a relative split
+            // would have minted for a solo path.
+            var frontier = Assert.Single(stored, p => p.ProficiencyId == tierOne.Id);
+            Assert.Equal(0, frontier.Level);
+            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * (double)falloffBase), frontier.Xp);
+
+            var maxed = Assert.Single(stored, p => p.ProficiencyId == tierZero.Id);
+            Assert.Equal(maxLevel, maxed.Level);
+            Assert.Equal(0m, maxed.Xp);
+        }
+
+        [Fact]
         public async Task Victory_SkillThatDidNotFire_AccruesNoProficiencyXp()
         {
             using var scope = CreateScope();

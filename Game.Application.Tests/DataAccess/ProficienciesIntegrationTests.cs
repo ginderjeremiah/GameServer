@@ -22,7 +22,7 @@ namespace Game.Application.Tests.DataAccess
         [Fact]
         public async Task GetProficiency_AssemblesLevels_AndContributionIndexIsExposed()
         {
-            int proficiencyId, skillId;
+            int proficiencyId, skillId, pathId;
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
@@ -31,6 +31,7 @@ namespace Game.Application.Tests.DataAccess
                 var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
+                pathId = path.Id;
 
                 var proficiency = new Entities.Proficiency
                 {
@@ -92,11 +93,12 @@ namespace Game.Application.Tests.DataAccess
             Assert.Empty(level5.Modifiers);
             Assert.Equal(skillId, level5.RewardSkillId);
 
-            // The contribution targets the path at the proficiency's tier; the reverse index resolves it back
-            // to the home-tier proficiency (the shim the accrual reads until #1161).
-            var contributions = proficiencies.ContributionsForSkill(skillId);
-            Assert.Equal(proficiencyId, contributions.Single().ProficiencyId);
-            Assert.Equal(1.5d, contributions.Single().Weight);
+            // The reverse index exposes the contribution's path, home tier, and weight directly; the accrual
+            // resolves the frontier tier and falloff against the path at battle completion.
+            var contribution = Assert.Single(proficiencies.ContributionsForSkill(skillId));
+            Assert.Equal(pathId, contribution.PathId);
+            Assert.Equal(0, contribution.HomeTier);
+            Assert.Equal(1.5d, contribution.Weight);
 
             Assert.Contains(proficiencies.AllProficiencies(), p => p.Id == proficiencyId && p.Name == "Blades");
             Assert.Contains(
@@ -122,9 +124,9 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task ContributionsForSkill_ResolvesToTheHomeTierProficiency_NotTierZero()
+        public async Task ContributionsForSkill_ExposesThePathAndHomeTier()
         {
-            int tierZeroId, tierOneId, skillId;
+            int pathId, skillId;
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
@@ -133,16 +135,15 @@ namespace Game.Application.Tests.DataAccess
                 var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
+                pathId = path.Id;
 
-                var tierZero = NewTier(path.Id, ordinal: 0, name: "Fire Magic");
-                var tierOne = NewTier(path.Id, ordinal: 1, name: "Inferno Magic");
-                context.Proficiencies.AddRange(tierZero, tierOne);
+                context.Proficiencies.AddRange(
+                    NewTier(path.Id, ordinal: 0, name: "Fire Magic"),
+                    NewTier(path.Id, ordinal: 1, name: "Inferno Magic"));
                 await context.SaveChangesAsync(CancellationToken);
-                tierZeroId = tierZero.Id;
-                tierOneId = tierOne.Id;
 
-                // Homed at tier 1: the shim must resolve to the tier-1 proficiency, not tier 0 (which would
-                // pass a "first proficiency of the path" regression that ignored HomeTier).
+                // Homed at tier 1: the index must carry the authored home tier verbatim (not collapse it to
+                // tier 0), since the accrual resolves the falloff distance from it.
                 context.SkillPathContributions.Add(new Entities.SkillPathContribution
                 {
                     SkillId = skillId,
@@ -158,9 +159,46 @@ namespace Game.Application.Tests.DataAccess
             var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
 
             var contribution = Assert.Single(proficiencies.ContributionsForSkill(skillId));
-            Assert.Equal(tierOneId, contribution.ProficiencyId);
-            Assert.NotEqual(tierZeroId, contribution.ProficiencyId);
+            Assert.Equal(pathId, contribution.PathId);
+            Assert.Equal(1, contribution.HomeTier);
             Assert.Equal(2d, contribution.Weight);
+        }
+
+        [Fact]
+        public async Task GetPath_ExposesFalloffBaseAndTiersOrderedByOrdinal()
+        {
+            int pathId, tierZeroId, tierOneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+
+                var pathEntity = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                context.Paths.Add(pathEntity);
+                await context.SaveChangesAsync(CancellationToken);
+                pathId = pathEntity.Id;
+
+                // Insert the deeper tier first to prove the routing model orders by ordinal, not insertion.
+                var tierOne = NewTier(pathEntity.Id, ordinal: 1, name: "Inferno Magic");
+                var tierZero = NewTier(pathEntity.Id, ordinal: 0, name: "Fire Magic");
+                context.Proficiencies.AddRange(tierOne, tierZero);
+                await context.SaveChangesAsync(CancellationToken);
+                tierZeroId = tierZero.Id;
+                tierOneId = tierOne.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            var path = proficiencies.GetPath(pathId);
+            Assert.Equal(0.3d, path.FalloffBase);
+            Assert.Equal(
+                [(tierZeroId, 0), (tierOneId, 1)],
+                path.Tiers.Select(t => (t.ProficiencyId, t.Ordinal)));
+
+            // An untrained path's frontier is its first tier; one maxed tier 0 advances it to tier 1.
+            Assert.Equal(tierZeroId, path.Frontier(_ => 0)?.ProficiencyId);
+            Assert.Equal(tierOneId, path.Frontier(id => id == tierZeroId ? 10 : 0)?.ProficiencyId);
         }
 
         private static Entities.Proficiency NewTier(int pathId, int ordinal, string name) => new()

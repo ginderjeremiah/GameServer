@@ -3,8 +3,10 @@ using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using CorePath = Game.Core.Proficiencies.Path;
 using CoreProficiency = Game.Core.Proficiencies.Proficiency;
 using Path = Game.Infrastructure.Entities.Path;
+using PathTier = Game.Core.Proficiencies.PathTier;
 using SkillContribution = Game.Core.Proficiencies.SkillContribution;
 
 namespace Game.DataAccess.Repositories.Caching
@@ -12,19 +14,20 @@ namespace Game.DataAccess.Repositories.Caching
     /// <summary>
     /// An immutable snapshot of the proficiency reference set: the ordered proficiency and path entity lists
     /// (contract projection and admin entity lookups), the pre-materialized lean <see cref="CoreProficiency"/>
-    /// domain models, and the derived skill → contributions reverse index. All are built and published
-    /// together so a reader can never observe a new entity list against a stale index.
+    /// domain models, the <see cref="CorePath"/> routing models, and the derived skill → contributions reverse
+    /// index. All are built and published together so a reader can never observe a new entity list against a
+    /// stale index.
     /// <para>
-    /// Skill contributions now target a <see cref="Path"/> at a home tier. The reverse index resolves each
-    /// contribution to the proficiency at that tier so the merged XP accrual (#1116) keeps its
-    /// proficiency-keyed shape; the home-tier-falloff routing that consumes the path/tier directly lands in
-    /// #1161.
+    /// A skill contribution targets a <see cref="Path"/> at a home tier. The reverse index exposes the
+    /// <c>(PathId, HomeTier, Weight)</c> directly; the battle XP accrual resolves the path's frontier tier and
+    /// the home-tier falloff at completion against the <see cref="CorePath"/> models.
     /// </para>
     /// </summary>
     internal sealed record ProficiencySnapshot(
         IReadOnlyList<Proficiency> Entities,
         IReadOnlyList<Path> Paths,
         IReadOnlyList<CoreProficiency> CoreProficiencies,
+        IReadOnlyList<CorePath> CorePaths,
         IReadOnlyDictionary<int, IReadOnlyList<SkillContribution>> ContributionsBySkill);
 
     /// <summary>Singleton snapshot holder for the cached proficiency/path entity lists and their derived structures.</summary>
@@ -52,17 +55,34 @@ namespace Game.DataAccess.Repositories.Caching
 
             paths.AssertZeroBasedContiguity("Paths");
 
-            // The proficiency at each (path, tier). The (PathId, PathOrdinal) unique index keeps this
-            // unambiguous, and the admin contributions save validates a contribution's home tier resolves
-            // here, so the lookup below never misses on authored content.
-            var proficiencyIdByTier = entities.ToDictionary(p => (p.PathId, p.PathOrdinal), p => p.Id);
+            // The routing models: each path's falloff base plus its tiers ordered by ordinal (the proficiencies
+            // carrying its id), so the accrual can resolve a contribution's frontier tier off the player's
+            // levels. Built in path-id order so the list is index == id for GetById, matching the entity list.
+            var tiersByPath = entities
+                .GroupBy(p => p.PathId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<PathTier>)g
+                        .OrderBy(p => p.PathOrdinal)
+                        .Select(p => new PathTier(p.Id, p.PathOrdinal, p.MaxLevel))
+                        .ToList());
 
-            // Shim (removed by #1161): map each path-targeted contribution to the proficiency at its home
-            // tier so the accrual's existing skill → {proficiency, weight} reverse index is preserved.
+            var corePaths = paths
+                .Select(path => new CorePath
+                {
+                    Id = path.Id,
+                    FalloffBase = (double)path.FalloffBase,
+                    Tiers = tiersByPath.GetValueOrDefault(path.Id, []),
+                })
+                .ToList();
+
+            // The reverse index the accrual consumes: each skill → its path contributions (path, home tier,
+            // weight). The frontier routing and home-tier falloff are resolved at battle completion.
             var contributionsBySkill = paths
                 .SelectMany(path => path.SkillContributions.Select(c => (c.SkillId, Contribution: new SkillContribution
                 {
-                    ProficiencyId = proficiencyIdByTier[(path.Id, c.HomeTier)],
+                    PathId = path.Id,
+                    HomeTier = c.HomeTier,
                     Weight = (double)c.Weight,
                 })))
                 .GroupBy(x => x.SkillId)
@@ -74,6 +94,7 @@ namespace Game.DataAccess.Repositories.Caching
                 entities,
                 paths,
                 entities.Select(ProficiencyMapper.ToCore).ToList(),
+                corePaths,
                 contributionsBySkill);
         }
     }

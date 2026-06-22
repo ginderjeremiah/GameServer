@@ -9,14 +9,16 @@ using static Game.Core.Proficiencies.ProficiencyXpCalculator;
 namespace Game.Application.Services
 {
     /// <summary>
-    /// The shared proficiency-XP accrual step for a won battle (spike #982 area C). Given the battle's skill
-    /// stats and its difficulty multiplier, it splits the fixed XP pie across the proficiencies represented in
-    /// the fight, applies the leveling against each proficiency's authored curve, and writes the absolute
-    /// result through the progress aggregate. Both the live battle-completion handler and the offline-rewards
-    /// batch run it, so the accrual is computed identically on both paths (the "offline == live" invariant).
+    /// The shared proficiency-XP accrual step for a won battle (spike #982 area C, refined by the Paths
+    /// rework #1161). Given the battle's skill stats and its difficulty multiplier, it routes each
+    /// represented path to its current frontier tier, splits the fixed XP pie across those tiers by
+    /// falloff-free attention scaled by on-tier efficiency (the absolute-falloff model), applies the leveling
+    /// against each proficiency's authored curve, and writes the absolute result through the progress
+    /// aggregate. Both the live battle-completion handler and the offline-rewards batch run it, so the accrual
+    /// is computed identically on both paths (the "offline == live" invariant).
     /// <para>
-    /// It resolves the reference data (the skill rarity → tier weight and the skill → proficiency
-    /// contributions) and delegates the math to <see cref="ProficiencyXpCalculator"/> and the
+    /// It resolves the reference data (the skill rarity → tier weight, the skill → path contributions, and
+    /// each path's frontier/falloff) and delegates the math to <see cref="ProficiencyXpCalculator"/> and the
     /// <see cref="Proficiency"/> curve. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -37,7 +39,7 @@ namespace Game.Application.Services
             PlayerProgress progress, BattleStats stats, double difficultyMultiplier, Player player, bool notify)
         {
             var slices = ProficiencyXpCalculator.Split(
-                ServerGameConstants.ProficiencyXpPerVictory, difficultyMultiplier, BuildContributions(stats));
+                ServerGameConstants.ProficiencyXpPerVictory, difficultyMultiplier, BuildContributions(stats, progress));
             if (slices.Count == 0)
             {
                 return [];
@@ -46,21 +48,19 @@ namespace Game.Application.Services
             var results = new List<ProficiencyXpResult>();
             foreach (var slice in slices)
             {
+                // The slice's proficiency is the path's frontier tier — un-maxed by construction (the routing
+                // skips fully-maxed paths and resolves a partially-maxed path to its first un-maxed tier), so a
+                // maxed proficiency never reaches here. That routing, not a downstream guard, is what banks
+                // nothing on a maxed path now.
                 var proficiency = _proficiencies.GetProficiency(slice.ProficiencyId);
 
                 var (oldLevel, oldXp) = progress.TryGetProficiency(slice.ProficiencyId, out var existing)
                     ? (existing.Level, existing.Xp)
                     : (0, 0m);
 
-                // A maxed proficiency banks no further XP — its slice is simply spent (the player's other
-                // contributing proficiencies still progress; this is why a skill may contribute to several).
-                if (oldLevel >= proficiency.MaxLevel)
-                {
-                    continue;
-                }
-
-                // Round to the persisted XP scale. A trivial enemy's slice can round to nothing; skip it rather
-                // than persist an information-free zero-gain row.
+                // Round to the persisted XP scale. A trivial enemy's slice — or a coasting path whose falloff
+                // nearly evaporated it — can round to nothing; skip it rather than persist an information-free
+                // zero-gain row.
                 var xpGain = Math.Round((decimal)slice.Xp, 3, MidpointRounding.AwayFromZero);
                 if (xpGain <= 0)
                 {
@@ -82,12 +82,18 @@ namespace Game.Application.Services
             return results;
         }
 
-        // The weighted contributions of every skill that fired in the battle: a proficiency is represented if
-        // at least one contributing skill fired, and a fired skill's pull is skillTierWeight × contributionWeight
-        // (not multiplied by how often it fired — representation, not frequency, so a fast-cooldown skill earns
-        // no more pie than a slow one). Tier weight is flat 1 until #979 lands (ProficiencyTierWeight).
-        private List<WeightedContribution> BuildContributions(BattleStats stats)
+        // The weighted contributions of every skill that fired in the battle, routed to each path's frontier
+        // tier. A path is represented if at least one contributing skill fired (representation, not frequency —
+        // a fast-cooldown skill earns no more pie than a slow one). A fired skill's pull on the frontier tier
+        // is its falloff-free attention (skillTierWeight × contributionWeight, tier weight flat 1 until #979)
+        // paired with the absolute falloff over the home-tier→frontier distance, so a stale skill supplements
+        // the current tier only at a discount. A fully-maxed path (no frontier) banks nothing; a skill homed
+        // deeper than the frontier never trains a tier below where it was acquired.
+        private List<WeightedContribution> BuildContributions(BattleStats stats, PlayerProgress progress)
         {
+            int LevelOf(int proficiencyId) =>
+                progress.TryGetProficiency(proficiencyId, out var existing) ? existing.Level : 0;
+
             var contributions = new List<WeightedContribution>();
             foreach (var (skillId, skillStats) in stats.SkillStats)
             {
@@ -99,8 +105,20 @@ namespace Game.Application.Services
                 var tierWeight = ProficiencyTierWeight.For(_skills.GetSkill(skillId).Rarity);
                 foreach (var contribution in _proficiencies.ContributionsForSkill(skillId))
                 {
+                    var path = _proficiencies.GetPath(contribution.PathId);
+                    if (path.Frontier(LevelOf) is not { } frontier)
+                    {
+                        continue;
+                    }
+
+                    var distance = frontier.Ordinal - contribution.HomeTier;
+                    if (distance < 0)
+                    {
+                        continue;
+                    }
+
                     contributions.Add(new WeightedContribution(
-                        contribution.ProficiencyId, tierWeight * contribution.Weight));
+                        frontier.ProficiencyId, tierWeight * contribution.Weight, path.FalloffAt(distance)));
                 }
             }
 
