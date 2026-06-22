@@ -10,7 +10,7 @@
 			<div class="d-headings">
 				<div class="eyebrow-row">
 					<span class="eyebrow">{scalesEyebrow}</span>
-					<span class="rarity-tag" style:--rarity={rarityAccent}>{rarityName}</span>
+					<RarityTagBox color={rarityAccent} label={rarityName} />
 				</div>
 				<div class="d-name">{metrics.skill.name}</div>
 				<div class="d-desc">{metrics.skill.description}</div>
@@ -77,6 +77,7 @@ import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
 import SkillCta from './SkillCta.svelte';
 import SkillDamageBreakdown from './SkillDamageBreakdown.svelte';
+import RarityTagBox from '$components/RarityTagBox.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -213,18 +214,6 @@ const rawNote = $derived.by(() => {
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: var(--text-muted);
-}
-
-.rarity-tag {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.4px;
-	text-transform: uppercase;
-	color: var(--rarity);
-	padding: 2px 7px;
-	border: 1px solid color-mix(in srgb, var(--rarity) 45%, transparent);
-	border-radius: 3px;
-	background: color-mix(in srgb, var(--rarity) 12%, transparent);
 }
 
 .d-name {

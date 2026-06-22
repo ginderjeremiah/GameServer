@@ -12,7 +12,7 @@
 				<span class="kind-dot"></span>
 				<span class="kind">Skill</span>
 				{#if rarity}
-					<span class="rarity-tag" style:--rarity={rarity.color}>{rarity.label}</span>
+					<RarityTagBox color={rarity.color} label={rarity.label} />
 				{/if}
 			</div>
 			<div class="name">{skill.name}</div>
@@ -103,6 +103,7 @@
 import type { CodexView } from './codex-view.svelte';
 import { formatBaseDamage, formatCooldown } from './codex-display';
 import StatisticsPanel from './StatisticsPanel.svelte';
+import RarityTagBox from '$components/RarityTagBox.svelte';
 
 interface Props {
 	view: CodexView;
@@ -148,18 +149,6 @@ let { view }: Props = $props();
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: var(--attr-intellect);
-}
-
-.rarity-tag {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.4px;
-	text-transform: uppercase;
-	color: var(--rarity);
-	padding: 2px 7px;
-	border: 1px solid color-mix(in srgb, var(--rarity) 45%, transparent);
-	border-radius: 3px;
-	background: color-mix(in srgb, var(--rarity) 12%, transparent);
 }
 
 .name {
