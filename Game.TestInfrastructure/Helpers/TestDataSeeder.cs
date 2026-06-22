@@ -251,6 +251,19 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        // Adds a skill-to-proficiency contribution (the join the battle XP accrual reads): firing skillId in a
+        // won battle feeds proficiencyId's XP, weighted by weight.
+        public static async Task LinkSkillToProficiencyAsync(GameContext context, int proficiencyId, int skillId, decimal weight = 1m)
+        {
+            context.Set<SkillProficiency>().Add(new SkillProficiency
+            {
+                ProficiencyId = proficiencyId,
+                SkillId = skillId,
+                Weight = weight,
+            });
+            await context.SaveChangesAsync();
+        }
+
         public static async Task LinkSkillToPlayerAsync(GameContext context, int playerId, int skillId, bool selected = true, int order = 0)
         {
             context.PlayerSkills.Add(new PlayerSkill

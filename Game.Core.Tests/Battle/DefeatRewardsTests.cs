@@ -102,6 +102,37 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, rewards.ExpReward);
         }
 
+        [Theory]
+        // ratio ∈ [0.8, 1.2] → multiplier 1; below → ratio²; above → ratio² clamped at MaxExpRewardMultiplier.
+        [InlineData(15, 15, 1.0)]    // ratio 1.0
+        [InlineData(5, 100, 0.0025)] // ratio 0.05 → 0.0025 (trivial enemy → tiny multiplier, anti-grind)
+        [InlineData(75, 50, 2.25)]   // ratio 1.5 → 2.25
+        [InlineData(100, 10, 4.0)]   // ratio 10 → clamped at the cap (4)
+        public void DifficultyMultiplier_FollowsTheSameCurveAsTheExpReward(int enemyStrength, int playerStrength, double expected)
+        {
+            var player = MakePlayer(allocations: [(Strength, playerStrength)]);
+            var enemy = MakeEnemy(strength: enemyStrength);
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            // The proficiency-XP accrual scales its fixed pie by this same factor, so it is exposed for reuse
+            // rather than recomputed.
+            Assert.Equal(expected, rewards.DifficultyMultiplier, precision: 9);
+        }
+
+        [Fact]
+        public void DifficultyMultiplier_ZeroPlayerAttributes_IsNeutral()
+        {
+            var player = MakePlayer(allocations: []);
+            var enemy = MakeEnemy(strength: 10, endurance: 5);
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            // No player investment falls back to a neutral multiplier (the reward is then the floored enemy
+            // total), matching the original exp guard.
+            Assert.Equal(1.0, rewards.DifficultyMultiplier, precision: 9);
+        }
+
         [Fact]
         public void ExpReward_ZeroPlayerAttributes_ReturnsFlooredEnemyTotal()
         {

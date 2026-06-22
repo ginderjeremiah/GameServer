@@ -26,5 +26,15 @@ namespace Game.Core
         /// finite regardless of the caller.
         /// </summary>
         public const int MaxExpPerGrant = 100_000;
+
+        /// <summary>
+        /// The fixed pie of proficiency XP a won battle pays out at difficulty multiplier 1 (spike #982
+        /// decision 4). The total is constant per victory — scaled by the <c>DefeatRewards</c> difficulty
+        /// curve and then split across the proficiencies represented in the fight — so diversifying a
+        /// loadout dilutes each track rather than minting more total XP. Computed server-side at battle
+        /// completion (never in the seeded simulation), so it is server-authoritative and not mirrored to
+        /// the client. A strawman magnitude, tunable against the authored per-proficiency XP curves.
+        /// </summary>
+        public const double ProficiencyXpPerVictory = 10.0;
     }
 }

@@ -28,6 +28,7 @@ namespace Game.Api.Tests.Unit
 
         [Theory]
         [InlineData("ChallengeCompleted")]
+        [InlineData("ProficiencyXpGained")]
         [InlineData("SocketReplaced")]
         public void IsServerInitiatedOnly_ReturnsTrue_ForServerInitiatedCommands(string commandName)
         {

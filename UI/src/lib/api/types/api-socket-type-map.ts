@@ -24,6 +24,7 @@ import type {
 	IPlayerChallenge,
 	IPlayerProficiency,
 	IPlayerStatistic,
+	IProficiencyXpGainedModel,
 	IReferenceDataVersion,
 	IRemoveModRequest,
 	IServerCommandFailedModel,
@@ -55,6 +56,7 @@ export type ApiSocketResponseTypes = {
 	'GetStatisticTypes': IStatisticType[];
 	'GetZones': IZone[];
 	'NewEnemy': INewEnemyModel;
+	'ProficiencyXpGained': IProficiencyXpGainedModel;
 	'RemoveMod': undefined;
 	'SaveLogPreferences': undefined;
 	'ServerCommandFailed': IServerCommandFailedModel;

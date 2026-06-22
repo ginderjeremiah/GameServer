@@ -84,6 +84,24 @@ Damage-over-time and heal-over-time are just effects on two **per-second** attri
 
 Effects are deterministic in this version (they always apply when the skill fires — no proc chance), and durations are time-based. Authoring effects on skills is done through the admin Workbench's skill editor.
 
+# Proficiency
+
+A **proficiency** is a mastery track for a category of skills — a progression layer *over* the skills you collect, not a source of them (full design in [the proficiency spike](./spikes/982-proficiency-system.md)). Using a proficiency's contributing skills in won battles levels it, and levels pay out permanent bonuses (and, at milestones, skills and access to deeper proficiencies). Skills map to proficiencies through a weighted contribution join; a skill may feed more than one.
+
+## Proficiency XP — victory-based, fixed-pie, difficulty-scaled
+
+XP is earned **on victory only** and computed **server-side at battle completion** — it is *not* part of the deterministic battle simulation, so it carries no frontend/backend parity surface (only the eventual attribute *bonus* is parity-sensitive, computed from player state at snapshot time). Each won battle pays out a **fixed pie** of XP (`ServerGameConstants.ProficiencyXpPerVictory`), **scaled by the same difficulty multiplier as `DefeatRewards`** — so a trivial enemy pays little (anti-grind) and an appropriately-matched (or over-level) one pays full or more.
+
+The pie is split across the proficiencies **represented** in that fight — a proficiency is represented if at least one of its contributing skills **fired** (a selected skill *or* an innate item skill) — with each one's slice proportional to `Σ(skillTierWeight × contributionWeight)` over its fired contributing skills. Consequences, all intended:
+
+- **Representation, not frequency.** A skill that fired counts once regardless of how often, so a fast-cooldown skill earns no more pie than a slow one (defeating the cooldown-grind exploit), and a freshly-seeded weak skill earns XP just by being in a fight you win on your *other* skills.
+- **Diversifying dilutes.** A loadout focused on one proficiency trains it at full rate; spreading the same skills across several trains each at a fraction — focus is faster than breadth.
+- **Tier weight is flat (`1`) for now.** It becomes the rarity-derived pacing weight once skill rarity (#979) lands; the accrual already reads each fired skill's rarity so enabling it is a one-line change.
+
+Each proficiency has a low level **cap** and a geometric XP **curve** (`BaseXp × XpGrowth^level` per level), both authored per proficiency. A single battle's gain can cross several levels at once; a maxed proficiency banks no further XP (its slice is simply spent — the player's *other* contributing proficiencies still progress, which is why multi-contribution matters). The **offline-rewards** consolidation accrues identically — the same per-victory computation, applied once per won battle over the away window — so an idle session earns exactly what playing it live would. A won battle pushes its per-proficiency result (XP gained, new level, milestones crossed) to the live client; the offline path's gains ride the welcome-back summary instead.
+
+The curve numbers, the pie magnitude, and the caps are all **strawman values tunable during balancing**.
+
 # Items, Item Mods, and Tags
 
 In early versions of this game, items dropped randomly from enemies with random modifications based on matching tags. This tag system has data like: "Weapon", "Sharp", "Two-Handed", etc. An item would have a set of tags, and item modifications would also have tags. When an item dropped, the game would roll for modifications that had matching tags to the item.

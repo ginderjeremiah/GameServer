@@ -49,6 +49,21 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ClientInvoking_ProficiencyXpGained_IsRejectedWithError()
+        {
+            var userId = await SeedAndLoginAsync();
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId);
+
+            var response = await socketClient.SendCommandRawAsync(
+                nameof(ProficiencyXpGained),
+                new { Proficiencies = Array.Empty<object>() });
+
+            Assert.Equal("Command cannot be invoked by the client.", response.Error);
+        }
+
+        [Fact]
         public async Task ClientInvoking_SocketReplaced_IsRejectedAndSocketStaysOpen()
         {
             var userId = await SeedAndLoginAsync();

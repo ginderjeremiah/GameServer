@@ -24,6 +24,7 @@ namespace Game.Application.Services
         BattleFactory battleFactory,
         OfflineProgressSimulator offlineSimulator,
         ChallengeRewardService challengeRewards,
+        ProficiencyRewardService proficiencyRewards,
         ILogger<BattleService> logger)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
@@ -36,6 +37,7 @@ namespace Game.Application.Services
         private readonly BattleFactory _battleFactory = battleFactory;
         private readonly OfflineProgressSimulator _offlineSimulator = offlineSimulator;
         private readonly ChallengeRewardService _challengeRewards = challengeRewards;
+        private readonly ProficiencyRewardService _proficiencyRewards = proficiencyRewards;
         private readonly ILogger<BattleService> _logger = logger;
 
         // Offline-rewards window bounds (spike #879). Below the minimum, a return is treated as no time away
@@ -522,6 +524,13 @@ namespace Game.Application.Services
                 if (battle.Result.Victory)
                 {
                     victoryExpRewards.Add(battle.ExpReward);
+
+                    // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
+                    // (this battle's skill stats + difficulty multiplier), same service — so the offline
+                    // accrual matches what the player would have earned live (the "offline == live" invariant).
+                    // The push is suppressed; the welcome-back summary is the offline notification.
+                    _proficiencyRewards.AccrueAndApply(
+                        progress, battle.Result.Stats, battle.DifficultyMultiplier, player, notify: false);
                 }
             }
 
@@ -614,7 +623,11 @@ namespace Game.Application.Services
             var rewards = new DefeatRewards(snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod), enemy);
 
             player.GrantExp(rewards.ExpReward);
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp);
+            // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
+            // scale the proficiency-XP pie by it — the same curve the exp reward above used (spike #982).
+            player.RecordBattleCompleted(
+                enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
+                rewards.DifficultyMultiplier);
 
             return rewards;
         }

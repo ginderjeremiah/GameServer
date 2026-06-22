@@ -146,7 +146,8 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
             // A LevelReached challenge tracks no recorded statistic, so it is only reached via the index's
             // statistic-independent set — which any completed battle evaluates, even this empty-stats victory.
@@ -182,7 +183,8 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
             var battleEvent = new BattleCompletedEvent(
                 loadedPlayer, loadedEnemy, Victory: true, PlayerDied: false, TotalMs: 5000,
@@ -192,6 +194,138 @@ namespace Game.Application.Tests.Events
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             Assert.DoesNotContain(retired.Id, await progressRepo.GetCompletedChallengeIds(player.Id));
         }
+
+        [Fact]
+        public async Task Victory_WithContributingSkillFired_AccruesProficiencyXpAndAnnouncesIt()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var handler = MakeHandler(scope);
+
+            // The skill fired once in the won battle, so its proficiency is represented and (being the only one)
+            // takes the whole pie; below the first threshold it accrues without leveling.
+            var stats = new BattleStats();
+            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var stored = Assert.Single(await progressRepo.GetProficiencies(player.Id));
+            Assert.Equal(proficiency.Id, stored.ProficiencyId);
+            Assert.Equal(0, stored.Level);
+            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, stored.Xp);
+
+            // The accrual is announced for the live client push, carrying the per-proficiency result.
+            var evt = Assert.Single(loadedPlayer.DomainEvents.OfType<ProficiencyXpGainedEvent>());
+            Assert.Equal(player.Id, evt.PlayerId);
+            var result = Assert.Single(evt.Results);
+            Assert.Equal(proficiency.Id, result.ProficiencyId);
+            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, result.XpGained);
+            Assert.Equal(0, result.NewLevel);
+        }
+
+        [Fact]
+        public async Task Victory_SkillThatDidNotFire_AccruesNoProficiencyXp()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            // A victory where no skill fired (empty skill stats): nothing is represented, so no proficiency is
+            // trained — representation, not the victory itself, is what accrues XP.
+            await MakeHandler(scope).HandleAsync(
+                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), difficultyMultiplier: 1.0), CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            Assert.Empty(await progressRepo.GetProficiencies(player.Id));
+            Assert.Empty(loadedPlayer.DomainEvents.OfType<ProficiencyXpGainedEvent>());
+        }
+
+        [Fact]
+        public async Task ProficiencyXpAccrual_OfflineMatchesLive_ForTheSameBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Two identically-set-up players: one accrues through the live handler, the other through the
+            // shared accrual the offline batch calls — the same (stats, difficulty multiplier) on both.
+            var liveUser = await TestDataSeeder.CreateUserAsync(context, username: "live-player");
+            var livePlayer = await TestDataSeeder.CreatePlayerAsync(context, liveUser.Id);
+            var offlineUser = await TestDataSeeder.CreateUserAsync(context, username: "offline-player");
+            var offlinePlayer = await TestDataSeeder.CreatePlayerAsync(context, offlineUser.Id);
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, livePlayer.Id, skill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, offlinePlayer.Id, skill.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var stats = new BattleStats();
+            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            const double multiplier = 1.5;
+
+            var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);
+            Assert.NotNull(liveLoaded);
+            await MakeHandler(scope).HandleAsync(
+                VictoryEvent(liveLoaded, loadedEnemy, stats, multiplier), CancellationToken);
+
+            var offlineLoaded = await playerRepo.GetPlayer(offlinePlayer.Id);
+            Assert.NotNull(offlineLoaded);
+            var offlineProgress = await progressRepo.Load(offlineLoaded);
+            scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>()
+                .AccrueAndApply(offlineProgress, stats, multiplier, offlineLoaded, notify: false);
+            await progressRepo.Save(offlineProgress);
+
+            var live = Assert.Single(await progressRepo.GetProficiencies(livePlayer.Id));
+            var offline = Assert.Single(await progressRepo.GetProficiencies(offlinePlayer.Id));
+            Assert.Equal(live.Level, offline.Level);
+            Assert.Equal(live.Xp, offline.Xp);
+            // Sanity: the shared accrual actually produced XP (pie × 1.5), so the equality isn't vacuous.
+            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * multiplier), live.Xp);
+        }
+
+        private BattleStatisticsEventHandler MakeHandler(IServiceScope scope) => new(
+            scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
+            scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+            scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
+
+        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double difficultyMultiplier) =>
+            new(player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
+                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, DifficultyMultiplier: difficultyMultiplier);
 
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each
@@ -250,7 +384,8 @@ namespace Game.Application.Tests.Events
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
-                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>());
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
             var battleEvent = new BattleCompletedEvent(
                 player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,

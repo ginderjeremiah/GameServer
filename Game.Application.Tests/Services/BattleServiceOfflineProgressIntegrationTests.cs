@@ -190,6 +190,53 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_AccruesProficiencyXpFromFiredSkills()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            // The player's only selected skill contributes to a fresh proficiency, so every win trains it.
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Smashing", baseXp: 100m, xpGrowth: 2m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, playerSkill.Id, weight: 1m);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, playerEntity.Id);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
+
+            var stored = Assert.Single(await progressRepo.GetProficiencies(playerEntity.Id));
+            Assert.Equal(proficiency.Id, stored.ProficiencyId);
+
+            // Enemy power == player power → difficulty multiplier 1, so each win accrues the whole pie. The
+            // cumulative XP (residual + the consumed thresholds of the curve baseXp 100 / growth 2) equals
+            // wins × pie — the offline accrual matches the live per-victory amount applied once per win.
+            var cumulative = stored.Xp;
+            for (var level = 0; level < stored.Level; level++)
+            {
+                cumulative += (decimal)(100 * Math.Pow(2, level));
+            }
+            Assert.Equal((decimal)(summary.BattlesWon * ServerGameConstants.ProficiencyXpPerVictory), cumulative);
+        }
+
+        [Fact]
         public async Task SimulateOfflineProgress_StaleInFlightBattle_IsResolvedBeforeSimulating()
         {
             using var scope = CreateScope();

@@ -6,6 +6,7 @@ using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Players.Events;
 using Game.Core.Players.Inventories;
+using Game.Core.Proficiencies;
 using Game.Core.Skills;
 
 namespace Game.Core.Players
@@ -217,6 +218,23 @@ namespace Game.Core.Players
         }
 
         /// <summary>
+        /// Announces a won battle's proficiency-XP accrual for the live client push, carrying every
+        /// proficiency the battle trained (XP gained, new level/XP, milestones crossed). The XP itself is
+        /// persisted through the separate progress aggregate; this event is notification-only, mirroring the
+        /// challenge-completion push. The offline batch never calls this — its gains ride the welcome-back
+        /// summary instead (spike #982 decision 9). A no-op when nothing was trained.
+        /// </summary>
+        public void RaiseProficiencyXpGained(IReadOnlyList<ProficiencyXpResult> results)
+        {
+            if (results.Count == 0)
+            {
+                return;
+            }
+
+            RaiseEvent(new ProficiencyXpGainedEvent(Id, results));
+        }
+
+        /// <summary>
         /// Replaces the player's equipped skill loadout with <paramref name="orderedSkillIds"/> in the
         /// given order, handling select, deselect, and reorder through one atomic path. Enforces the
         /// loadout rules as anti-cheat: the set must contain no duplicates, fit within
@@ -345,10 +363,14 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp)
+        // A victory caller MUST pass the battle's real difficulty multiplier — it scales the proficiency-XP
+        // pie, so the default 0 disables the accrual entirely. Defaulting to 0 is correct only for the
+        // loss/abandon paths (no XP on a non-victory); a future victory path that forgets to thread it would
+        // silently accrue zero XP. Today both victory paths route through RecordVictory, which passes it.
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp, double difficultyMultiplier = 0)
         {
             RaiseEvent(new BattleCompletedEvent(
-                this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId));
+                this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId, difficultyMultiplier));
 
             // Backstop mirroring the online auto-fight-off: a recorded dedicated-boss loss or draw drops the
             // persisted loop back to idle, so the offline sim doesn't resume boss-farming a loop the player has
