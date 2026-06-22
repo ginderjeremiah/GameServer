@@ -51,6 +51,7 @@ namespace Game.Infrastructure.Entities
         public virtual List<UnlockedMod> UnlockedMods { get => field ?? throw new NotLoadedException(nameof(UnlockedMods)); set; }
         public virtual List<AppliedMod> AppliedMods { get => field ?? throw new NotLoadedException(nameof(AppliedMods)); set; }
         public virtual List<PlayerChallenge> PlayerChallenges { get => field ?? throw new NotLoadedException(nameof(PlayerChallenges)); set; }
+        public virtual List<PlayerProficiency> PlayerProficiencies { get => field ?? throw new NotLoadedException(nameof(PlayerProficiencies)); set; }
         public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NotLoadedException(nameof(PlayerStatistics)); set; }
         public virtual List<LogPreference> LogPreferences { get => field ?? throw new NotLoadedException(nameof(LogPreferences)); set; }
         public virtual List<PlayerSkill> PlayerSkills { get => field ?? throw new NotLoadedException(nameof(PlayerSkills)); set; }

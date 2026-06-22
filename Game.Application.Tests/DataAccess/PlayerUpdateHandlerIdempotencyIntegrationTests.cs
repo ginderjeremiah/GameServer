@@ -159,6 +159,45 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProgressUpdated_ProficienciesAppliedTwice_UpsertsWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var proficiencyId = await SeedProficiencyAsync();
+
+            await ApplyAsync(MakeProficiencyEvent(playerId, proficiencyId, level: 1, xp: 40m));
+
+            // The second apply carries higher absolute values: the existing row is updated in place, not
+            // duplicated, so progress converges to the latest snapshot.
+            await ApplyAsync(MakeProficiencyEvent(playerId, proficiencyId, level: 2, xp: 130m));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await verifyContext.PlayerProficiencies.AsNoTracking()
+                .Where(pp => pp.PlayerId == playerId && pp.ProficiencyId == proficiencyId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(2, row.Level);
+            Assert.Equal(130m, row.Xp);
+        }
+
+        [Fact]
+        public async Task ProgressUpdated_ProficienciesAppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var proficiencyId = await SeedProficiencyAsync();
+
+            await ApplyConcurrentlyAsync(MakeProficiencyEvent(playerId, proficiencyId, level: 3, xp: 200m));
+
+            Assert.Equal(1, await CountAsync(c => c.PlayerProficiencies.CountAsync(pp => pp.PlayerId == playerId && pp.ProficiencyId == proficiencyId, CancellationToken)));
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerProficiencies.AsNoTracking()
+                .Where(pp => pp.PlayerId == playerId && pp.ProficiencyId == proficiencyId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(3, row.Level);
+            Assert.Equal(200m, row.Xp);
+        }
+
+        [Fact]
         public async Task AttributeAllocationsChanged_AppliedTwice_UpsertsAllocationsWithoutDuplicating()
         {
             var playerId = await SeedPlayerAsync();
@@ -699,6 +738,12 @@ namespace Game.Application.Tests.DataAccess
             Challenges = [new CachedPlayerChallenge { ChallengeId = challengeId, Progress = challengeProgress, Completed = completed, CompletedAt = completed ? DateTime.UtcNow : null }],
         };
 
+        private static ProgressUpdatedEvent MakeProficiencyEvent(int playerId, int proficiencyId, int level, decimal xp) => new()
+        {
+            PlayerId = playerId,
+            Proficiencies = [new CachedPlayerProficiency { ProficiencyId = proficiencyId, Level = level, Xp = xp }],
+        };
+
         private async Task ApplyAsync<TEvent>(TEvent evt)
         {
             using var scope = CreateScope();
@@ -771,6 +816,13 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             return (await TestDataSeeder.CreateItemModAsync(context)).Id;
+        }
+
+        private async Task<int> SeedProficiencyAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateProficiencyAsync(context)).Id;
         }
 
         private async Task<int> SeedZoneAsync()

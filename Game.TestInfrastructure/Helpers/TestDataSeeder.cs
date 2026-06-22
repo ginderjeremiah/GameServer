@@ -390,6 +390,50 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        public static async Task<Proficiency> CreateProficiencyAsync(
+            GameContext context,
+            string name = "Test Proficiency",
+            int maxLevel = 10,
+            decimal baseXp = 100m,
+            decimal xpGrowth = 2m)
+        {
+            var proficiency = new Proficiency
+            {
+                Name = name,
+                Description = "",
+                IconPath = "",
+                MaxLevel = maxLevel,
+                BaseXp = baseXp,
+                XpGrowth = xpGrowth,
+                StartsUnlocked = true,
+                LevelModifiers = [],
+                LevelRewards = [],
+                Prerequisites = [],
+                SkillContributions = [],
+            };
+
+            context.Proficiencies.Add(proficiency);
+            await context.SaveChangesAsync();
+            return proficiency;
+        }
+
+        public static async Task AddPlayerProficiencyAsync(
+            GameContext context,
+            int playerId,
+            int proficiencyId,
+            int level = 0,
+            decimal xp = 0m)
+        {
+            context.PlayerProficiencies.Add(new PlayerProficiency
+            {
+                PlayerId = playerId,
+                ProficiencyId = proficiencyId,
+                Level = level,
+                Xp = xp,
+            });
+            await context.SaveChangesAsync();
+        }
+
         // LogTypes are intrinsic, migration-seeded reference data, so the preference references an
         // existing seeded log type rather than creating one.
         public static async Task AddLogPreferenceAsync(

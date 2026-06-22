@@ -10,6 +10,7 @@ namespace Game.DataAccess
     {
         public List<CachedPlayerStatistic> Statistics { get; set; } = [];
         public List<CachedPlayerChallenge> Challenges { get; set; } = [];
+        public List<CachedPlayerProficiency> Proficiencies { get; set; } = [];
     }
 
     internal sealed class CachedPlayerStatistic
@@ -27,6 +28,13 @@ namespace Game.DataAccess
         public DateTime? CompletedAt { get; set; }
     }
 
+    internal sealed class CachedPlayerProficiency
+    {
+        public int ProficiencyId { get; set; }
+        public int Level { get; set; }
+        public decimal Xp { get; set; }
+    }
+
     /// <summary>
     /// Write-behind persistence event for player progress: the stat and challenge rows that changed in one
     /// save, carried as <b>absolute</b> values so the consumer (<see cref="DataProviderSynchronizer"/>) can
@@ -39,5 +47,6 @@ namespace Game.DataAccess
         public int PlayerId { get; set; }
         public List<CachedPlayerStatistic> Statistics { get; set; } = [];
         public List<CachedPlayerChallenge> Challenges { get; set; } = [];
+        public List<CachedPlayerProficiency> Proficiencies { get; set; } = [];
     }
 }
