@@ -21,6 +21,7 @@ import {
 	applyDefense,
 	calculateSkillDamage,
 	cooldownMultiplier,
+	expectedCritMultiplier,
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
@@ -81,20 +82,27 @@ export interface ComparePreset {
 export const damagePerSecond = (damage: number, cooldown: number): number => (cooldown > 0 ? damage / cooldown : 0);
 
 /** Comparator over `SkillMetrics` for the given sort + Compare-vs defense.
- *  DPS/Damage rank by *effective* value (defense-aware), descending. */
-export function sortMetrics(sort: SkillSort, defense: number): (a: SkillMetrics, b: SkillMetrics) => number {
+ *  DPS/Damage rank by *effective* value (defense-aware), descending. The crit multiplier scales raw
+ *  damage before defense (mirroring {@link SkillsView.effective}), so the ranking matches the
+ *  crit-inclusive numbers the rows display; it defaults to 1 (no crit) for unit-test convenience. */
+export function sortMetrics(
+	sort: SkillSort,
+	defense: number,
+	critMultiplier = 1
+): (a: SkillMetrics, b: SkillMetrics) => number {
 	switch (sort) {
 		case 'name':
 			return (a, b) => a.skill.name.localeCompare(b.skill.name);
 		case 'cd':
 			return (a, b) => a.cooldown - b.cooldown;
 		case 'dmg':
-			return (a, b) => applyDefense(b.rawDamage, defense) - applyDefense(a.rawDamage, defense);
+			return (a, b) =>
+				applyDefense(b.rawDamage * critMultiplier, defense) - applyDefense(a.rawDamage * critMultiplier, defense);
 		case 'dps':
 		default:
 			return (a, b) =>
-				damagePerSecond(applyDefense(b.rawDamage, defense), b.cooldown) -
-				damagePerSecond(applyDefense(a.rawDamage, defense), a.cooldown);
+				damagePerSecond(applyDefense(b.rawDamage * critMultiplier, defense), b.cooldown) -
+				damagePerSecond(applyDefense(a.rawDamage * critMultiplier, defense), a.cooldown);
 	}
 }
 
@@ -157,6 +165,15 @@ export class SkillsView {
 		new BattleAttributes([...playerManager.attributes, ...inventoryManager.equipmentStats], true)
 	);
 
+	/** The player's expected critical-hit damage multiplier (≥1), folded into every effective-damage
+	 *  read so the page mirrors the in-fight skill tooltip and the battle (a crit scales raw damage
+	 *  before Defense). Player-wide — the crit attributes are the player's own — so it applies uniformly
+	 *  across the loadout; reuses the shared display-only `expectedCritMultiplier` rather than duplicating
+	 *  the formula. The live battle still rolls each crit individually. */
+	readonly critChance = $derived(this.battleAttributes.getValue(EAttribute.CriticalChance));
+	readonly critDamage = $derived(this.battleAttributes.getValue(EAttribute.CriticalDamage));
+	readonly critMultiplier = $derived(expectedCritMultiplier(this.critChance, this.critDamage));
+
 	/** Defense-independent metrics per catalogue skill, keyed by id. Recomputed
 	 *  wholesale when attributes/equipment change — read via {@link metric}. */
 	readonly metricsById = $derived.by(() => {
@@ -192,8 +209,11 @@ export class SkillsView {
 		return this.metricsById[id];
 	}
 
-	/** Slider ceiling: enough defense to fully block the biggest hit. */
-	readonly maxDamage = $derived(Math.max(1, ...this.catalogue.map((s) => this.metricsById[s.id]?.rawDamage ?? 0)));
+	/** Slider ceiling: enough defense to fully block the biggest hit — the biggest crit-scaled raw
+	 *  damage, since a crit punches through Defense (mirrors {@link effective}). */
+	readonly maxDamage = $derived(
+		Math.max(1, ...this.catalogue.map((s) => (this.metricsById[s.id]?.rawDamage ?? 0) * this.critMultiplier))
+	);
 
 	/** Enemy quick-picks for the Compare-vs bar, sourced from the player's current zone: every
 	 *  non-retired enemy that spawns there (defense at the range midpoint) plus the zone's dedicated
@@ -256,7 +276,7 @@ export class SkillsView {
 				}
 				return true;
 			});
-		return list.sort(sortMetrics(this.sort, this.defense));
+		return list.sort(sortMetrics(this.sort, this.defense, this.critMultiplier));
 	});
 
 	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
@@ -297,17 +317,26 @@ export class SkillsView {
 		return this.metricsById[id]?.cooldown ?? 0;
 	}
 
+	/** Effective single-hit damage: raw damage scaled by the expected crit multiplier (a crit
+	 *  punches through Defense, so it scales before subtraction), then less the Compare-vs defense. */
 	effective(id: number): number {
-		return applyDefense(this.rawDamage(id), this.defense);
+		return applyDefense(this.rawDamage(id) * this.critMultiplier, this.defense);
 	}
 
 	effectiveDps(id: number): number {
 		return damagePerSecond(this.effective(id), this.cooldown(id));
 	}
 
-	/** Defense actually applied to a skill (clamped to its raw damage, for display). */
+	/** Expected crit damage folded into a skill's hit before Defense (`raw × (critMultiplier − 1)`),
+	 *  0 when no crit can occur — drives the breakdown's Critical row and the raw-note's crit clause. */
+	critBonus(id: number): number {
+		return this.rawDamage(id) * (this.critMultiplier - 1);
+	}
+
+	/** Defense actually applied to a skill (clamped to its crit-scaled hit, for display), so the
+	 *  breakdown's raw + crit − defense reconciles with {@link effective}. */
 	appliedDefense(id: number): number {
-		return Math.min(this.defense, this.rawDamage(id));
+		return Math.min(this.defense, this.rawDamage(id) * this.critMultiplier);
 	}
 
 	/* ── selection + loadout edits ───────────────────────────────────────────── */
