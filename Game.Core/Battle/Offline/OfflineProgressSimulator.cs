@@ -50,9 +50,12 @@ namespace Game.Core.Battle.Offline
                 var enemy = BuildEnemy(parameters);
                 var result = SimulateBattle(parameters, enemy);
 
-                // Exp is earned only on a victory, measured from the stationary snapshot like the live path.
-                var expReward = result.Victory ? new DefeatRewards(playerModifiers, enemy).ExpReward : 0;
-                outcomes.Add(new OfflineBattleOutcome(enemy, result, expReward));
+                // Rewards are earned only on a victory, measured from the stationary snapshot like the live
+                // path. The same DefeatRewards yields both the exp and the difficulty multiplier the offline
+                // proficiency-XP accrual scales its pie by, so the two payouts share one curve evaluation.
+                var rewards = result.Victory ? new DefeatRewards(playerModifiers, enemy) : null;
+                outcomes.Add(new OfflineBattleOutcome(
+                    enemy, result, rewards?.ExpReward ?? 0, rewards?.DifficultyMultiplier ?? 0));
 
                 madeProgress |= result.Victory || result.PlayerDied;
 

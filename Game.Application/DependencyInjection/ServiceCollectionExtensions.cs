@@ -33,6 +33,7 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<AccountService>()
                 .AddScoped<BattleService>()
                 .AddScoped<ChallengeRewardService>()
+                .AddScoped<ProficiencyRewardService>()
                 .AddScoped<LoginTrackingService>()
                 .AddScoped<PlayerService>();
         }

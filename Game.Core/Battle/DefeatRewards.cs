@@ -11,6 +11,16 @@ namespace Game.Core.Battle
         public int ExpReward { get; set; }
 
         /// <summary>
+        /// The difficulty curve factor for this battle — the same <c>ratio²</c> band/clamp the exp reward
+        /// scales by. 1 when the enemy is within ±20% of the player's power, quadratically smaller for a
+        /// trivial enemy (anti-grind) and quadratically larger (clamped at
+        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>) for an over-level one. Proficiency-XP
+        /// accrual scales its fixed pie by this same factor (spike #982 decision 4), so the two payouts
+        /// share one difficulty curve rather than maintaining two.
+        /// </summary>
+        public double DifficultyMultiplier { get; }
+
+        /// <summary>
         /// Computes the rewards for defeating <paramref name="enemy"/>. The player's power is measured from
         /// <paramref name="playerModifiers"/> — the modifier set reconstructed from the battle snapshot
         /// (<see cref="BattleSnapshot.GetModifiers"/>) — rather than the live player aggregate, so the reward
@@ -18,16 +28,19 @@ namespace Game.Core.Battle
         /// </summary>
         public DefeatRewards(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
         {
-            ExpReward = GetExpReward(playerModifiers, enemy);
-        }
-
-        private static int GetExpReward(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
-        {
             var enemyAttTotal = SumCoreAttributes(enemy.GetAttributeModifiers());
             var playerAttTotal = SumCoreAttributes(playerModifiers);
+            DifficultyMultiplier = GetDifficultyMultiplier(enemyAttTotal, playerAttTotal);
+            ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
+        }
+
+        private static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
+        {
+            // No player investment yet: fall back to a neutral multiplier (the reward is then the floored
+            // enemy total), matching the original guard before the curve was factored out.
             if (playerAttTotal <= 0)
             {
-                return ToIntReward(enemyAttTotal);
+                return 1.0;
             }
 
             var attRatio = enemyAttTotal / playerAttTotal;
@@ -35,8 +48,7 @@ namespace Game.Core.Battle
             // ratio, clamped at MaxExpRewardMultiplier so an enemy far above the player can't mint an
             // unbounded payout.
             var expMulti = attRatio is < 0.8 or > 1.2 ? Math.Pow(attRatio, 2) : 1.0;
-            expMulti = Math.Min(expMulti, ServerGameConstants.MaxExpRewardMultiplier);
-            return ToIntReward(enemyAttTotal * expMulti);
+            return Math.Min(expMulti, ServerGameConstants.MaxExpRewardMultiplier);
         }
 
         /// <summary>

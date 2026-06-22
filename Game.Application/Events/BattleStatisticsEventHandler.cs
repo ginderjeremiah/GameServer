@@ -7,11 +7,13 @@ namespace Game.Application.Events
 {
     public class BattleStatisticsEventHandler(
         IPlayerProgressRepository progressRepo,
-        ChallengeRewardService challengeRewards
+        ChallengeRewardService challengeRewards,
+        ProficiencyRewardService proficiencyRewards
     ) : IDomainEventHandler<BattleCompletedEvent>
     {
         private readonly IPlayerProgressRepository _progressRepo = progressRepo;
         private readonly ChallengeRewardService _challengeRewards = challengeRewards;
+        private readonly ProficiencyRewardService _proficiencyRewards = proficiencyRewards;
 
         public async Task HandleAsync(BattleCompletedEvent domainEvent, CancellationToken cancellationToken = default)
         {
@@ -28,6 +30,15 @@ namespace Game.Application.Events
             // statistic-independent ones) and apply their rewards, raising the live per-challenge push. The
             // offline-rewards batch runs this same step with the push suppressed.
             _challengeRewards.EvaluateAndApply(progress, touchedStatistics, domainEvent.Player, notify: true);
+
+            // Accrue proficiency XP on a victory: the fixed pie scaled by the battle's difficulty multiplier,
+            // split across the proficiencies whose skills fired (spike #982). Raises the live per-battle push;
+            // the offline batch runs the same accrual with it suppressed.
+            if (domainEvent.Victory)
+            {
+                _proficiencyRewards.AccrueAndApply(
+                    progress, domainEvent.Stats, domainEvent.DifficultyMultiplier, domainEvent.Player, notify: true);
+            }
 
             await _progressRepo.Save(progress, cancellationToken);
         }

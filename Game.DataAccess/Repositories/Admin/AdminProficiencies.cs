@@ -67,6 +67,13 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Proficiency");
             }
 
+            // A per-level bonus only pays out at a level the proficiency can actually reach (the curve is
+            // interpreted in #1116), so a level outside 1..MaxLevel would author a payout that never fires.
+            if (FindLevelOutOfRange(proficiency, data.Modifiers.Select(m => m.Level), "level modifier") is { } rejection)
+            {
+                return rejection;
+            }
+
             return ChildCollectionReconciler.Reconcile(
                 existing: proficiency.LevelModifiers,
                 desired: data.Modifiers,
@@ -89,6 +96,13 @@ namespace Game.DataAccess.Repositories.Admin
             if (proficiency is null)
             {
                 return AdminSaveResult.NotFound("Proficiency");
+            }
+
+            // A milestone reward only pays out at a reachable level (see SetModifiers), so reject one authored
+            // outside 1..MaxLevel before the anti-tamper skill check.
+            if (FindLevelOutOfRange(proficiency, data.Rewards.Select(r => r.Level), "level reward") is { } levelRejection)
+            {
+                return levelRejection;
             }
 
             // Anti-tamper: a milestone reward skill is a permanent grant, so it must be Player-acquirable.
@@ -215,6 +229,23 @@ namespace Game.DataAccess.Repositories.Admin
                 ProficiencyId = proficiencyId,
                 Weight = contribution.Weight,
             };
+        }
+
+        /// <summary>Returns a rejection if any authored level falls outside <c>1..MaxLevel</c>, else null. A
+        /// payout level must be reachable: level 0 is the untrained state and levels past the cap never
+        /// fire.</summary>
+        private static AdminSaveResult? FindLevelOutOfRange(Entities.Proficiency proficiency, IEnumerable<int> levels, string role)
+        {
+            foreach (var level in levels)
+            {
+                if (level < 1 || level > proficiency.MaxLevel)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Proficiency {role} level {level} is out of range (must be between 1 and the cap of {proficiency.MaxLevel}).");
+                }
+            }
+
+            return null;
         }
 
         private AdminSaveResult? FindSeedSkillFlagViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)

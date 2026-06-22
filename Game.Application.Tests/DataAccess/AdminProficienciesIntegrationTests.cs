@@ -175,6 +175,55 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(5m, modifiers.Single(m => m.Level == 3 && m.AttributeId == (int)EAttribute.Agility).Amount);
         }
 
+        [Theory]
+        [InlineData(0)]  // level 0 is the untrained state, never a payout level
+        [InlineData(11)] // past the cap (MaxLevel 10), so it would never fire
+        public async Task SetModifiers_LevelOutOfRange_ReturnsFailure(int level)
+        {
+            int proficiencyId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetModifiers(new SetProficiencyModifiersData
+            {
+                Id = proficiencyId,
+                Modifiers = [Modifier(level, EAttribute.Strength, 1m)],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("out of range", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetRewards_LevelOutOfRange_ReturnsFailureBeforeTheSkillCheck()
+        {
+            int proficiencyId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            // A level past the cap is rejected on the level check (so the unresolved skill id is never reached).
+            var result = admin.SetRewards(new SetProficiencyRewardsData
+            {
+                Id = proficiencyId,
+                Rewards = [new Contracts.ProficiencyLevelReward { Level = 11, RewardSkillId = 99999 }],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("out of range", result.ErrorMessage);
+        }
+
         [Fact]
         public async Task SetRewards_RewardSkillNotPlayerAcquirable_ReturnsFailure()
         {

@@ -152,6 +152,10 @@ namespace Game.Api
             // than in AddApplication/AddDataAccess alongside the other domain-event handlers.
             DomainEventDispatcher.RegisterDomainEventHandler<ChallengeCompletedEvent, ChallengeCompletedNotifier>();
 
+            // Push a won battle's proficiency-XP gains (level-ups, milestones) to the player's live socket,
+            // for the same socket-infrastructure reason as the challenge notifier above.
+            DomainEventDispatcher.RegisterDomainEventHandler<ProficiencyXpGainedEvent, ProficiencyXpNotifier>();
+
             // Migrations are applied on startup in Development (frictionless local F5) and whenever
             // DataAccessOptions:MigrateOnStartup is enabled (e.g. the Dockerized API used by CI and
             // end-to-end runs). This is intentionally decoupled from the Development-only TypeScript
